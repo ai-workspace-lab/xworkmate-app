@@ -123,6 +123,7 @@ class AppController extends ChangeNotifier {
   List<SecretReferenceEntry> get secretReferences =>
       _settingsController.buildSecretReferences();
   List<SecretAuditEntry> get secretAuditTrail => _settingsController.auditTrail;
+  List<RuntimeLogEntry> get runtimeLogs => _runtime.logs;
 
   List<GatewayChatMessage> get chatMessages {
     final items = List<GatewayChatMessage>.from(_chatController.messages);
@@ -465,6 +466,10 @@ class AppController extends ChangeNotifier {
 
   Future<String> testVaultConnection() {
     return _settingsController.testVaultConnection();
+  }
+
+  void clearRuntimeLogs() {
+    _runtime.clearLogs();
   }
 
   Future<ApisixYamlProfile> validateApisixYaml(ApisixYamlProfile profile) {

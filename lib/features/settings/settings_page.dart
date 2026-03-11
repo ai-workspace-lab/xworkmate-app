@@ -25,6 +25,7 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _apisixYamlController;
   late final TextEditingController _vaultTokenController;
   late final TextEditingController _ollamaApiKeyController;
+  late final TextEditingController _runtimeLogFilterController;
 
   @override
   void initState() {
@@ -34,6 +35,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
     _vaultTokenController = TextEditingController();
     _ollamaApiKeyController = TextEditingController();
+    _runtimeLogFilterController = TextEditingController();
   }
 
   @override
@@ -41,6 +43,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _apisixYamlController.dispose();
     _vaultTokenController.dispose();
     _ollamaApiKeyController.dispose();
+    _runtimeLogFilterController.dispose();
     super.dispose();
   }
 
@@ -673,6 +676,11 @@ class _SettingsPageState extends State<SettingsPage> {
     BuildContext context,
     AppController controller,
   ) {
+    final runtimeLogs = controller.runtimeLogs
+        .where(_matchesRuntimeLogFilter)
+        .toList(growable: false)
+        .reversed
+        .toList(growable: false);
     return [
       SurfaceCard(
         child: Column(
@@ -698,6 +706,16 @@ class _SettingsPageState extends State<SettingsPage> {
               value: controller.activeAgentName,
             ),
             _InfoRow(
+              label: appText('认证模式', 'Auth Mode'),
+              value:
+                  controller.connection.connectAuthMode ??
+                  appText('未发起', 'Not attempted'),
+            ),
+            _InfoRow(
+              label: appText('认证诊断', 'Auth Diagnostics'),
+              value: controller.connection.connectAuthSummary,
+            ),
+            _InfoRow(
               label: appText('健康负载', 'Health Payload'),
               value: controller.connection.healthPayload == null
                   ? appText('不可用', 'Unavailable')
@@ -709,6 +727,93 @@ class _SettingsPageState extends State<SettingsPage> {
                   ? appText('不可用', 'Unavailable')
                   : encodePrettyJson(controller.connection.statusPayload!),
             ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
+      SurfaceCard(
+        key: const ValueKey('runtime-log-card'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        appText('运行日志', 'Runtime Logs'),
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        appText(
+                          '只记录本机运行期的连接、鉴权、配对和 socket 诊断，不写入密钥明文。',
+                          'Shows local runtime diagnostics for connection, auth, pairing, and socket events without logging secret values.',
+                        ),
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton(
+                  onPressed: runtimeLogs.isEmpty
+                      ? null
+                      : () => controller.clearRuntimeLogs(),
+                  child: Text(appText('清空', 'Clear')),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              key: const ValueKey('runtime-log-filter'),
+              controller: _runtimeLogFilterController,
+              decoration: InputDecoration(
+                labelText: appText('筛选日志', 'Filter Logs'),
+                hintText: appText(
+                  '按级别、分类或关键字过滤',
+                  'Filter by level, category, or keyword',
+                ),
+                prefixIcon: const Icon(Icons.manage_search_rounded),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 16),
+            if (runtimeLogs.isEmpty)
+              Text(
+                appText('当前没有运行日志。', 'No runtime logs yet.'),
+                style: Theme.of(context).textTheme.bodyMedium,
+              )
+            else
+              Container(
+                constraints: const BoxConstraints(maxHeight: 320),
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: SelectionArea(
+                  child: ListView.separated(
+                    itemCount: runtimeLogs.length,
+                    shrinkWrap: true,
+                    itemBuilder: (context, index) {
+                      final entry = runtimeLogs[index];
+                      return SelectableText(
+                        entry.line,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                        ),
+                      );
+                    },
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 8),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -820,6 +925,16 @@ class _SettingsPageState extends State<SettingsPage> {
     SettingsSnapshot snapshot,
   ) {
     return controller.saveSettings(snapshot);
+  }
+
+  bool _matchesRuntimeLogFilter(RuntimeLogEntry entry) {
+    final query = _runtimeLogFilterController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return true;
+    }
+    final haystack = '${entry.level} ${entry.category} ${entry.message}'
+        .toLowerCase();
+    return haystack.contains(query);
   }
 
   Widget _buildDeviceSecurityCard(

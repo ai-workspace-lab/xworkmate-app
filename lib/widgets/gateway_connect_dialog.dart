@@ -320,6 +320,13 @@ class _StatusBanner extends StatelessWidget {
             connection.remoteAddress ?? 'No active gateway target',
             style: theme.textTheme.bodyMedium,
           ),
+          const SizedBox(height: 8),
+          Text(
+            appText('认证诊断', 'Auth Diagnostics'),
+            style: theme.textTheme.labelLarge,
+          ),
+          const SizedBox(height: 4),
+          Text(connection.connectAuthSummary, style: theme.textTheme.bodySmall),
           if (connection.pairingRequired) ...[
             const SizedBox(height: 8),
             Text(

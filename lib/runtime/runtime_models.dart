@@ -646,6 +646,9 @@ class GatewayConnectionSnapshot {
     required this.deviceId,
     required this.authRole,
     required this.authScopes,
+    required this.connectAuthMode,
+    required this.connectAuthFields,
+    required this.connectAuthSources,
     required this.hasSharedAuth,
     required this.hasDeviceToken,
     required this.healthPayload,
@@ -665,6 +668,9 @@ class GatewayConnectionSnapshot {
   final String? deviceId;
   final String? authRole;
   final List<String> authScopes;
+  final String? connectAuthMode;
+  final List<String> connectAuthFields;
+  final List<String> connectAuthSources;
   final bool hasSharedAuth;
   final bool hasDeviceToken;
   final Map<String, dynamic>? healthPayload;
@@ -687,6 +693,9 @@ class GatewayConnectionSnapshot {
       deviceId: null,
       authRole: null,
       authScopes: const <String>[],
+      connectAuthMode: null,
+      connectAuthFields: const <String>[],
+      connectAuthSources: const <String>[],
       hasSharedAuth: false,
       hasDeviceToken: false,
       healthPayload: null,
@@ -708,6 +717,9 @@ class GatewayConnectionSnapshot {
     String? deviceId,
     String? authRole,
     List<String>? authScopes,
+    String? connectAuthMode,
+    List<String>? connectAuthFields,
+    List<String>? connectAuthSources,
     bool? hasSharedAuth,
     bool? hasDeviceToken,
     Map<String, dynamic>? healthPayload,
@@ -741,6 +753,9 @@ class GatewayConnectionSnapshot {
       deviceId: deviceId ?? this.deviceId,
       authRole: authRole ?? this.authRole,
       authScopes: authScopes ?? this.authScopes,
+      connectAuthMode: connectAuthMode ?? this.connectAuthMode,
+      connectAuthFields: connectAuthFields ?? this.connectAuthFields,
+      connectAuthSources: connectAuthSources ?? this.connectAuthSources,
       hasSharedAuth: hasSharedAuth ?? this.hasSharedAuth,
       hasDeviceToken: hasDeviceToken ?? this.hasDeviceToken,
       healthPayload: healthPayload ?? this.healthPayload,
@@ -763,6 +778,17 @@ class GatewayConnectionSnapshot {
     final errorText = lastError?.toLowerCase() ?? '';
     return detailCode == 'AUTH_TOKEN_MISSING' ||
         errorText.contains('gateway token missing');
+  }
+
+  String get connectAuthSummary {
+    final mode = connectAuthMode?.trim() ?? 'none';
+    final fields = connectAuthFields.isEmpty
+        ? 'none'
+        : connectAuthFields.join(', ');
+    final sources = connectAuthSources.isEmpty
+        ? 'none'
+        : connectAuthSources.join(' · ');
+    return '$mode | fields: $fields | sources: $sources';
   }
 }
 
@@ -800,6 +826,27 @@ class RuntimeDeviceInfo {
     }
     return '$platform $version';
   }
+}
+
+class RuntimeLogEntry {
+  const RuntimeLogEntry({
+    required this.timestampMs,
+    required this.level,
+    required this.category,
+    required this.message,
+  });
+
+  final int timestampMs;
+  final String level;
+  final String category;
+  final String message;
+
+  String get timeLabel {
+    final date = DateTime.fromMillisecondsSinceEpoch(timestampMs);
+    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}:${date.second.toString().padLeft(2, '0')}';
+  }
+
+  String get line => '[$timeLabel] ${level.toUpperCase()} $category $message';
 }
 
 class GatewayAgentSummary {

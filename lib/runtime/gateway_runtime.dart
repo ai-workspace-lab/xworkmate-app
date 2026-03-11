@@ -60,12 +60,14 @@ class GatewayRuntime extends ChangeNotifier {
       StreamController<GatewayPushEvent>.broadcast();
   final Map<String, Completer<_RpcResponse>> _pending =
       <String, Completer<_RpcResponse>>{};
+  final List<RuntimeLogEntry> _logs = <RuntimeLogEntry>[];
 
   IOWebSocketChannel? _channel;
   StreamSubscription<dynamic>? _socketSubscription;
   Timer? _reconnectTimer;
   GatewayConnectionProfile? _desiredProfile;
   bool _manualDisconnect = false;
+  bool _suppressReconnect = false;
   int _requestCounter = 0;
 
   GatewayConnectionSnapshot _snapshot = GatewayConnectionSnapshot.initial(
@@ -88,7 +90,25 @@ class GatewayRuntime extends ChangeNotifier {
   RuntimePackageInfo get packageInfo => _packageInfo;
   RuntimeDeviceInfo get deviceInfo => _deviceInfo;
   Stream<GatewayPushEvent> get events => _events.stream;
+  List<RuntimeLogEntry> get logs => List<RuntimeLogEntry>.unmodifiable(_logs);
   bool get isConnected => _snapshot.status == RuntimeConnectionStatus.connected;
+
+  void clearLogs() {
+    if (_logs.isEmpty) {
+      return;
+    }
+    _logs.clear();
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void addRuntimeLogForTest({
+    required String level,
+    required String category,
+    required String message,
+  }) {
+    _appendLog(level, category, message);
+  }
 
   Future<void> initialize() async {
     await _store.initialize();
@@ -104,6 +124,7 @@ class GatewayRuntime extends ChangeNotifier {
   }) async {
     _desiredProfile = profile;
     _manualDisconnect = false;
+    _suppressReconnect = false;
     await _closeSocket();
 
     final endpoint = _resolveEndpoint(profile);
@@ -112,11 +133,25 @@ class GatewayRuntime extends ChangeNotifier {
     final storedPassword = (await _store.loadGatewayPassword())?.trim() ?? '';
     final explicitToken = authTokenOverride.trim();
     final explicitPassword = authPasswordOverride.trim();
+    final sharedTokenSource = explicitToken.isNotEmpty
+        ? 'shared:form'
+        : storedToken.isNotEmpty
+        ? 'shared:store'
+        : (setupPayload?.token.trim().isNotEmpty ?? false)
+        ? 'shared:setup-code'
+        : null;
     final sharedToken = explicitToken.isNotEmpty
         ? explicitToken
         : storedToken.isNotEmpty
         ? storedToken
         : (setupPayload?.token.trim() ?? '');
+    final passwordSource = explicitPassword.isNotEmpty
+        ? 'password:form'
+        : storedPassword.isNotEmpty
+        ? 'password:store'
+        : (setupPayload?.password.trim().isNotEmpty ?? false)
+        ? 'password:setup-code'
+        : null;
     final password = explicitPassword.isNotEmpty
         ? explicitPassword
         : storedPassword.isNotEmpty
@@ -130,24 +165,65 @@ class GatewayRuntime extends ChangeNotifier {
         ))?.trim() ??
         '';
     final explicitDeviceToken = '';
+    final deviceTokenSource = explicitDeviceToken.isNotEmpty
+        ? 'device:form'
+        : sharedToken.isEmpty && storedDeviceToken.isNotEmpty
+        ? 'device:store'
+        : null;
     final deviceToken = explicitDeviceToken.isNotEmpty
         ? explicitDeviceToken
         : sharedToken.isEmpty
         ? storedDeviceToken
         : '';
     final authToken = sharedToken.isNotEmpty ? sharedToken : deviceToken;
+    final connectAuthMode = sharedToken.isNotEmpty
+        ? 'shared-token'
+        : deviceToken.isNotEmpty
+        ? 'device-token'
+        : password.isNotEmpty
+        ? 'password'
+        : 'none';
+    final connectAuthFields = <String>[
+      if (authToken.isNotEmpty) 'token',
+      if (deviceToken.isNotEmpty) 'deviceToken',
+      if (password.isNotEmpty) 'password',
+    ];
+    final connectAuthSources = <String>[
+      ...?sharedTokenSource == null ? null : <String>[sharedTokenSource],
+      ...?deviceTokenSource == null ? null : <String>[deviceTokenSource],
+      ...?passwordSource == null ? null : <String>[passwordSource],
+    ];
+    final connectAuthSummary = _connectAuthSummary(
+      mode: connectAuthMode,
+      fields: connectAuthFields,
+      sources: connectAuthSources,
+    );
 
     if (endpoint == null) {
+      _appendLog(
+        'warn',
+        'connect',
+        'missing endpoint | auth: $connectAuthSummary',
+      );
       _snapshot = GatewayConnectionSnapshot.initial(mode: profile.mode)
           .copyWith(
             statusText: 'Missing gateway endpoint',
             lastError: 'Configure setup code or manual host / port first.',
             lastErrorCode: 'MISSING_ENDPOINT',
             deviceId: identity.deviceId,
+            connectAuthMode: connectAuthMode,
+            connectAuthFields: connectAuthFields,
+            connectAuthSources: connectAuthSources,
           );
       notifyListeners();
       return;
     }
+
+    _appendLog(
+      'info',
+      'connect',
+      'attempt ${endpoint.$1}:${endpoint.$2} tls:${endpoint.$3} | auth: $connectAuthSummary',
+    );
 
     _snapshot = GatewayConnectionSnapshot.initial(mode: profile.mode).copyWith(
       status: RuntimeConnectionStatus.connecting,
@@ -156,6 +232,9 @@ class GatewayRuntime extends ChangeNotifier {
       deviceId: identity.deviceId,
       authRole: 'operator',
       authScopes: kDefaultOperatorConnectScopes,
+      connectAuthMode: connectAuthMode,
+      connectAuthFields: connectAuthFields,
+      connectAuthSources: connectAuthSources,
       hasSharedAuth: sharedToken.isNotEmpty || password.isNotEmpty,
       hasDeviceToken: deviceToken.isNotEmpty,
       clearLastError: true,
@@ -215,7 +294,14 @@ class GatewayRuntime extends ChangeNotifier {
           role: stringValue(auth['role']) ?? 'operator',
           token: returnedDeviceToken,
         );
+        _appendLog(
+          'info',
+          'auth',
+          'stored device token for role ${stringValue(auth['role']) ?? 'operator'}',
+        );
       }
+      final negotiatedRole = stringValue(auth['role']) ?? 'operator';
+      final negotiatedScopes = stringList(auth['scopes']);
       _snapshot = _snapshot.copyWith(
         status: RuntimeConnectionStatus.connected,
         statusText: 'Connected',
@@ -224,8 +310,11 @@ class GatewayRuntime extends ChangeNotifier {
         mainSessionKey:
             stringValue(sessionDefaults['mainSessionKey']) ?? 'main',
         lastConnectedAtMs: DateTime.now().millisecondsSinceEpoch,
-        authRole: stringValue(auth['role']) ?? 'operator',
-        authScopes: stringList(auth['scopes']),
+        authRole: negotiatedRole,
+        authScopes: negotiatedScopes,
+        connectAuthMode: connectAuthMode,
+        connectAuthFields: connectAuthFields,
+        connectAuthSources: connectAuthSources,
         hasSharedAuth: sharedToken.isNotEmpty || password.isNotEmpty,
         hasDeviceToken:
             (returnedDeviceToken != null && returnedDeviceToken.isNotEmpty) ||
@@ -233,6 +322,11 @@ class GatewayRuntime extends ChangeNotifier {
         clearLastError: true,
         clearLastErrorCode: true,
         clearLastErrorDetailCode: true,
+      );
+      _appendLog(
+        'info',
+        'connect',
+        'connected ${endpoint.$1}:${endpoint.$2} | role: $negotiatedRole | scopes: ${negotiatedScopes.length}',
       );
       notifyListeners();
     } catch (error) {
@@ -245,18 +339,39 @@ class GatewayRuntime extends ChangeNotifier {
           role: 'operator',
         );
       }
+      if (!_shouldAutoReconnect(runtimeError)) {
+        _suppressReconnect = true;
+        _appendLog(
+          'warn',
+          'socket',
+          'auto reconnect suppressed | code: ${runtimeError?.code ?? 'unknown'} | detail: ${runtimeError?.detailCode ?? 'none'}',
+        );
+      }
       await _closeSocket();
+      _appendLog(
+        'error',
+        'connect',
+        'failed ${endpoint.$1}:${endpoint.$2} | code: ${runtimeError?.code ?? 'unknown'} | detail: ${runtimeError?.detailCode ?? 'none'} | message: ${error.toString()}',
+      );
       _snapshot = _snapshot.copyWith(
         status: RuntimeConnectionStatus.error,
         statusText: 'Connection failed',
         lastError: error.toString(),
         lastErrorCode: runtimeError?.code,
         lastErrorDetailCode: runtimeError?.detailCode,
+        connectAuthMode: connectAuthMode,
+        connectAuthFields: connectAuthFields,
+        connectAuthSources: connectAuthSources,
         hasSharedAuth: sharedToken.isNotEmpty || password.isNotEmpty,
         hasDeviceToken: deviceToken.isNotEmpty,
       );
       notifyListeners();
       if (_shouldAutoReconnect(runtimeError)) {
+        _appendLog(
+          'warn',
+          'socket',
+          'scheduling reconnect in 2s | code: ${runtimeError?.code ?? 'unknown'}',
+        );
         _scheduleReconnect();
       }
       rethrow;
@@ -265,6 +380,7 @@ class GatewayRuntime extends ChangeNotifier {
 
   Future<void> disconnect({bool clearDesiredProfile = true}) async {
     _manualDisconnect = true;
+    _appendLog('info', 'connect', 'manual disconnect');
     if (clearDesiredProfile) {
       _desiredProfile = null;
     }
@@ -285,6 +401,7 @@ class GatewayRuntime extends ChangeNotifier {
   Future<Map<String, dynamic>> health() async {
     final payload = asMap(await request('health'));
     _snapshot = _snapshot.copyWith(healthPayload: payload);
+    _appendLog('debug', 'health', 'health snapshot refreshed');
     notifyListeners();
     return payload;
   }
@@ -292,6 +409,7 @@ class GatewayRuntime extends ChangeNotifier {
   Future<Map<String, dynamic>> status() async {
     final payload = asMap(await request('status'));
     _snapshot = _snapshot.copyWith(statusPayload: payload);
+    _appendLog('debug', 'health', 'status snapshot refreshed');
     notifyListeners();
     return payload;
   }
@@ -676,6 +794,7 @@ class GatewayRuntime extends ChangeNotifier {
   }
 
   Future<GatewayPairedDevice?> approveDevicePairing(String requestId) async {
+    _appendLog('info', 'pairing', 'approve request $requestId');
     final payload = asMap(
       await request(
         'device.pair.approve',
@@ -692,6 +811,7 @@ class GatewayRuntime extends ChangeNotifier {
   }
 
   Future<void> rejectDevicePairing(String requestId) async {
+    _appendLog('info', 'pairing', 'reject request $requestId');
     await request(
       'device.pair.reject',
       params: <String, dynamic>{'requestId': requestId},
@@ -700,6 +820,7 @@ class GatewayRuntime extends ChangeNotifier {
   }
 
   Future<void> removePairedDevice(String deviceId) async {
+    _appendLog('info', 'pairing', 'remove device $deviceId');
     await request(
       'device.pair.remove',
       params: <String, dynamic>{'deviceId': deviceId},
@@ -712,6 +833,11 @@ class GatewayRuntime extends ChangeNotifier {
     required String role,
     List<String> scopes = const <String>[],
   }) async {
+    _appendLog(
+      'info',
+      'token',
+      'rotate role token | device: $deviceId | role: $role',
+    );
     final payload = asMap(
       await request(
         'device.token.rotate',
@@ -742,6 +868,11 @@ class GatewayRuntime extends ChangeNotifier {
     required String deviceId,
     required String role,
   }) async {
+    _appendLog(
+      'info',
+      'token',
+      'revoke role token | device: $deviceId | role: $role',
+    );
     await request(
       'device.token.revoke',
       params: <String, dynamic>{'deviceId': deviceId, 'role': role},
@@ -759,6 +890,7 @@ class GatewayRuntime extends ChangeNotifier {
     Duration timeout = const Duration(seconds: 15),
   }) async {
     if (_channel == null || !isConnected) {
+      _appendLog('warn', 'rpc', 'blocked request $method | offline');
       throw GatewayRuntimeException('gateway not connected', code: 'OFFLINE');
     }
     final result = await _requestRaw(method, params: params, timeout: timeout);
@@ -942,11 +1074,23 @@ class GatewayRuntime extends ChangeNotifier {
         if (nonce != null && !challenge.isCompleted) {
           challenge.complete(nonce);
         }
+        _appendLog('debug', 'connect', 'challenge received');
         return;
       }
       if (event == 'health') {
         _snapshot = _snapshot.copyWith(healthPayload: asMap(payload));
+        _appendLog('debug', 'health', 'push health update');
         notifyListeners();
+      } else if (event == 'device.pair.requested' ||
+          event == 'device.pair.resolved') {
+        final eventPayload = asMap(payload);
+        _appendLog(
+          'info',
+          'pairing',
+          '$event | request: ${stringValue(eventPayload['requestId']) ?? 'unknown'} | device: ${stringValue(eventPayload['deviceId']) ?? 'unknown'}',
+        );
+      } else if (event == 'seqGap') {
+        _appendLog('warn', 'sync', 'sequence gap detected');
       }
       _events.add(
         GatewayPushEvent(
@@ -972,6 +1116,17 @@ class GatewayRuntime extends ChangeNotifier {
     final payload = decoded['payload'];
     final error = asMap(decoded['error']);
     if (!ok) {
+      _appendLog(
+        'error',
+        'rpc',
+        'request failed | code: ${stringValue(error['code']) ?? 'unknown'} | detail: ${stringValue(asMap(error['details'])['code']) ?? 'none'} | message: ${stringValue(error['message']) ?? 'gateway request failed'}',
+      );
+      if (!_shouldAutoReconnectForCodes(
+        stringValue(error['code']),
+        stringValue(asMap(error['details'])['code']),
+      )) {
+        _suppressReconnect = true;
+      }
       completer.completeError(
         GatewayRuntimeException(
           stringValue(error['message']) ?? 'gateway request failed',
@@ -986,9 +1141,15 @@ class GatewayRuntime extends ChangeNotifier {
 
   void _handleSocketFailure(String message) {
     _failPending(GatewayRuntimeException(message, code: 'SOCKET_FAILURE'));
-    if (_manualDisconnect) {
+    if (_manualDisconnect || _suppressReconnect) {
+      _appendLog(
+        'warn',
+        'socket',
+        'failure ignored for reconnect | manual: $_manualDisconnect | suppressed: $_suppressReconnect | message: $message',
+      );
       return;
     }
+    _appendLog('error', 'socket', 'failure | $message');
     _snapshot = _snapshot.copyWith(
       status: RuntimeConnectionStatus.error,
       statusText: 'Gateway error',
@@ -1004,9 +1165,15 @@ class GatewayRuntime extends ChangeNotifier {
     _failPending(
       GatewayRuntimeException('socket closed', code: 'SOCKET_CLOSED'),
     );
-    if (_manualDisconnect) {
+    if (_manualDisconnect || _suppressReconnect) {
+      _appendLog(
+        'warn',
+        'socket',
+        'closed without reconnect | manual: $_manualDisconnect | suppressed: $_suppressReconnect',
+      );
       return;
     }
+    _appendLog('warn', 'socket', 'closed by gateway');
     _snapshot = _snapshot.copyWith(
       status: RuntimeConnectionStatus.error,
       statusText: 'Disconnected',
@@ -1030,21 +1197,27 @@ class GatewayRuntime extends ChangeNotifier {
 
   void _scheduleReconnect() {
     final profile = _desiredProfile;
-    if (_manualDisconnect || profile == null) {
+    if (_manualDisconnect || _suppressReconnect || profile == null) {
       return;
     }
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(const Duration(seconds: 2), () {
+      _appendLog(
+        'info',
+        'socket',
+        'reconnect firing | host: ${profile.host.trim().isEmpty ? 'setup-code' : profile.host.trim()} | port: ${profile.port}',
+      );
       unawaited(connectProfile(profile));
     });
   }
 
   bool _shouldAutoReconnect(GatewayRuntimeException? error) {
-    if (error == null) {
-      return true;
-    }
-    final code = error.code?.trim().toUpperCase();
-    final detailCode = error.detailCode?.trim().toUpperCase();
+    return _shouldAutoReconnectForCodes(error?.code, error?.detailCode);
+  }
+
+  bool _shouldAutoReconnectForCodes(String? code, String? detailCode) {
+    final resolvedCode = code?.trim().toUpperCase();
+    final resolvedDetailCode = detailCode?.trim().toUpperCase();
     const nonRetryableCodes = <String>{
       'INVALID_REQUEST',
       'UNAUTHORIZED',
@@ -1063,10 +1236,11 @@ class GatewayRuntime extends ChangeNotifier {
       'DEVICE_IDENTITY_REQUIRED',
       'CONTROL_UI_DEVICE_IDENTITY_REQUIRED',
     };
-    if (code != null && nonRetryableCodes.contains(code)) {
+    if (resolvedCode != null && nonRetryableCodes.contains(resolvedCode)) {
       return false;
     }
-    if (detailCode != null && nonRetryableDetailCodes.contains(detailCode)) {
+    if (resolvedDetailCode != null &&
+        nonRetryableDetailCodes.contains(resolvedDetailCode)) {
       return false;
     }
     return true;
@@ -1080,6 +1254,32 @@ class GatewayRuntime extends ChangeNotifier {
     await _channel?.sink.close();
     _channel = null;
     _failPending(GatewayRuntimeException('socket reset', code: 'SOCKET_RESET'));
+  }
+
+  void _appendLog(String level, String category, String message) {
+    _logs.add(
+      RuntimeLogEntry(
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+        level: level,
+        category: category,
+        message: message,
+      ),
+    );
+    const maxLogEntries = 250;
+    if (_logs.length > maxLogEntries) {
+      _logs.removeRange(0, _logs.length - maxLogEntries);
+    }
+    notifyListeners();
+  }
+
+  String _connectAuthSummary({
+    required String mode,
+    required List<String> fields,
+    required List<String> sources,
+  }) {
+    final resolvedFields = fields.isEmpty ? 'none' : fields.join(', ');
+    final resolvedSources = sources.isEmpty ? 'none' : sources.join(' · ');
+    return '$mode | fields: $resolvedFields | sources: $resolvedSources';
   }
 
   void _failPending(Object error) {

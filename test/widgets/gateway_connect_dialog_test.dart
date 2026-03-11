@@ -25,6 +25,8 @@ void main() {
       expect(find.text('端口'), findsOneWidget);
       expect(find.text('TLS'), findsOneWidget);
       expect(find.text('共享 Token'), findsOneWidget);
+      expect(find.text('认证诊断'), findsOneWidget);
+      expect(find.textContaining('fields: none'), findsOneWidget);
     },
   );
 }
