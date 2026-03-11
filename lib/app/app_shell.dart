@@ -24,7 +24,7 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  static const _sidebarMinWidth = 180.0;
+  static const _sidebarMinWidth = 90.0;
   static const _sidebarMaxWidth = 320.0;
   double? _sidebarExpandedWidth;
 
