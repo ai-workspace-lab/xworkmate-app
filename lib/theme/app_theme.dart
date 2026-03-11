@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app_palette.dart';
@@ -13,6 +14,11 @@ class AppTheme {
     required Brightness brightness,
     required AppPalette palette,
   }) {
+    final platform = defaultTargetPlatform;
+    final isDesktop =
+        platform == TargetPlatform.macOS ||
+        platform == TargetPlatform.windows ||
+        platform == TargetPlatform.linux;
     final colorScheme =
         ColorScheme.fromSeed(
           seedColor: palette.accent,
@@ -43,47 +49,22 @@ class AppTheme {
     final base = ThemeData(
       useMaterial3: true,
       brightness: brightness,
+      typography: Typography.material2021(platform: platform),
       colorScheme: colorScheme,
       scaffoldBackgroundColor: palette.canvas,
       extensions: [palette],
+    );
+    final tunedTextTheme = _textTheme(
+      base.textTheme,
+      palette: palette,
+      isDesktop: isDesktop,
     );
 
     return base.copyWith(
       splashFactory: NoSplash.splashFactory,
       dividerColor: palette.strokeSoft,
       hoverColor: palette.hover,
-      textTheme: base.textTheme.copyWith(
-        displaySmall: base.textTheme.displaySmall?.copyWith(
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.9,
-        ),
-        headlineSmall: base.textTheme.headlineSmall?.copyWith(
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.5,
-        ),
-        titleLarge: base.textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.2,
-        ),
-        titleMedium: base.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
-        bodyLarge: base.textTheme.bodyLarge?.copyWith(
-          height: 1.45,
-          color: palette.textPrimary,
-        ),
-        bodyMedium: base.textTheme.bodyMedium?.copyWith(
-          height: 1.4,
-          color: palette.textSecondary,
-        ),
-        bodySmall: base.textTheme.bodySmall?.copyWith(
-          height: 1.35,
-          color: palette.textMuted,
-        ),
-        labelLarge: base.textTheme.labelLarge?.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+      textTheme: tunedTextTheme,
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -121,10 +102,12 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: palette.surfaceSecondary,
-        hintStyle: TextStyle(color: palette.textMuted),
+        hintStyle: tunedTextTheme.bodyMedium?.copyWith(
+          color: palette.textMuted,
+        ),
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 18,
+          horizontal: 16,
+          vertical: 16,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -168,6 +151,62 @@ class AppTheme {
         contentTextStyle: TextStyle(color: palette.textPrimary),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
+    );
+  }
+
+  static TextTheme _textTheme(
+    TextTheme base, {
+    required AppPalette palette,
+    required bool isDesktop,
+  }) {
+    return base.copyWith(
+      displaySmall: base.displaySmall?.copyWith(
+        fontSize: isDesktop ? 32 : 34,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.9,
+      ),
+      headlineSmall: base.headlineSmall?.copyWith(
+        fontSize: isDesktop ? 22 : 24,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.45,
+      ),
+      titleLarge: base.titleLarge?.copyWith(
+        fontSize: isDesktop ? 18 : 20,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.2,
+      ),
+      titleMedium: base.titleMedium?.copyWith(
+        fontSize: isDesktop ? 15 : 16,
+        fontWeight: FontWeight.w600,
+      ),
+      titleSmall: base.titleSmall?.copyWith(
+        fontSize: isDesktop ? 13 : 14,
+        fontWeight: FontWeight.w600,
+      ),
+      bodyLarge: base.bodyLarge?.copyWith(
+        fontSize: isDesktop ? 14 : 15,
+        height: 1.45,
+        color: palette.textPrimary,
+      ),
+      bodyMedium: base.bodyMedium?.copyWith(
+        fontSize: isDesktop ? 13 : 14,
+        height: 1.4,
+        color: palette.textSecondary,
+      ),
+      bodySmall: base.bodySmall?.copyWith(
+        fontSize: isDesktop ? 12 : 12,
+        height: 1.35,
+        color: palette.textMuted,
+      ),
+      labelLarge: base.labelLarge?.copyWith(
+        fontSize: isDesktop ? 13 : 14,
+        fontWeight: FontWeight.w600,
+      ),
+      labelMedium: base.labelMedium?.copyWith(
+        fontSize: isDesktop ? 12 : 12,
+        fontWeight: FontWeight.w600,
+      ),
+      labelSmall: base.labelSmall?.copyWith(fontSize: isDesktop ? 11 : 11),
     );
   }
 }

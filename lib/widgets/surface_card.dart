@@ -6,9 +6,9 @@ class SurfaceCard extends StatefulWidget {
   const SurfaceCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(20),
+    this.padding = const EdgeInsets.all(16),
     this.onTap,
-    this.borderRadius = 20,
+    this.borderRadius = 16,
     this.color,
   });
 
@@ -43,8 +43,8 @@ class _SurfaceCardState extends State<SurfaceCard> {
           boxShadow: [
             BoxShadow(
               color: palette.shadow.withValues(alpha: _hovered ? 0.12 : 0.07),
-              blurRadius: _hovered ? 22 : 16,
-              offset: const Offset(0, 10),
+              blurRadius: _hovered ? 12 : 8,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
