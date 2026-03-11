@@ -678,6 +678,73 @@ class _ComposerBar extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      PopupMenuButton<String>(
+                        tooltip: 'Composer actions',
+                        offset: const Offset(0, -180),
+                        onSelected: (value) {
+                          switch (value) {
+                            case 'attach':
+                              onPickAttachments();
+                              break;
+                            case 'plan':
+                              onModeChanged(mode == 'Plan' ? 'Ask' : 'Plan');
+                              break;
+                            case 'gateway':
+                              onOpenGateway();
+                              break;
+                            case 'route':
+                              break;
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem<String>(
+                            value: 'attach',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(Icons.attach_file_rounded),
+                              title: Text('添加照片和文件'),
+                            ),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'plan',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(
+                                mode == 'Plan'
+                                    ? Icons.task_alt_rounded
+                                    : Icons.alt_route_rounded,
+                              ),
+                              title: Text(mode == 'Plan' ? '退出计划模式' : '计划模式'),
+                            ),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'gateway',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(
+                                connected
+                                    ? Icons.lan_rounded
+                                    : Icons.link_rounded,
+                              ),
+                              title: const Text('连接网关'),
+                            ),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'route',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.hub_rounded),
+                              title: Text(
+                                autoAgentLabel ?? 'Browser / Coding / Research',
+                              ),
+                            ),
+                          ),
+                        ],
+                        child: const _ComposerIconButton(
+                          icon: Icons.add_rounded,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       PopupMenuButton<AssistantExecutionTarget>(
                         tooltip: 'Execution target',
                         onSelected: (value) {
@@ -755,73 +822,6 @@ class _ComposerBar extends StatelessWidget {
                           backgroundColor: permissionBackgroundColor,
                           borderColor: permissionBorderColor,
                           foregroundColor: permissionForegroundColor,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      PopupMenuButton<String>(
-                        tooltip: 'Composer actions',
-                        offset: const Offset(0, -180),
-                        onSelected: (value) {
-                          switch (value) {
-                            case 'attach':
-                              onPickAttachments();
-                              break;
-                            case 'plan':
-                              onModeChanged(mode == 'Plan' ? 'Ask' : 'Plan');
-                              break;
-                            case 'gateway':
-                              onOpenGateway();
-                              break;
-                            case 'route':
-                              break;
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          const PopupMenuItem<String>(
-                            value: 'attach',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(Icons.attach_file_rounded),
-                              title: Text('添加照片和文件'),
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'plan',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(
-                                mode == 'Plan'
-                                    ? Icons.task_alt_rounded
-                                    : Icons.alt_route_rounded,
-                              ),
-                              title: Text(mode == 'Plan' ? '退出计划模式' : '计划模式'),
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'gateway',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(
-                                connected
-                                    ? Icons.lan_rounded
-                                    : Icons.link_rounded,
-                              ),
-                              title: const Text('连接网关'),
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'route',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.hub_rounded),
-                              title: Text(
-                                autoAgentLabel ?? 'Browser / Coding / Research',
-                              ),
-                            ),
-                          ),
-                        ],
-                        child: const _ComposerIconButton(
-                          icon: Icons.add_rounded,
                         ),
                       ),
                       const SizedBox(width: 8),
