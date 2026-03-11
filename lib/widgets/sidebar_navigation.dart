@@ -367,6 +367,7 @@ class SidebarFooter extends StatelessWidget {
           )
         else
           Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _SidebarFooterActionTile(
                 icon: themeMode == ThemeMode.dark
@@ -424,47 +425,7 @@ class SidebarFooter extends StatelessWidget {
             ),
           )
         else
-          InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: onOpenAccount,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-              decoration: BoxDecoration(
-                color: accountSelected
-                    ? palette.accentMuted
-                    : palette.surfaceSecondary,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: palette.strokeSoft),
-              ),
-              child: Row(
-                children: [
-                  const CircleAvatar(radius: 16, child: Text('H')),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Haitao Pan',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.labelLarge,
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-                          appText('账号', 'Account'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          _SidebarAccountTile(selected: accountSelected, onTap: onOpenAccount),
       ],
     );
   }
@@ -498,41 +459,119 @@ class _SidebarFooterActionTileState extends State<_SidebarFooterActionTile> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        decoration: BoxDecoration(
-          color: _hovered ? palette.hover : palette.surfaceSecondary,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: palette.strokeSoft),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: widget.onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-              child: Row(
-                children: [
-                  Icon(widget.icon, size: 20, color: palette.textSecondary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          decoration: BoxDecoration(
+            color: _hovered ? palette.hover : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: widget.onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(widget.icon, size: 20, color: palette.textSecondary),
+                    const SizedBox(width: 8),
+                    Text(
                       widget.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelLarge,
                     ),
-                  ),
-                  if (widget.trailingText != null)
-                    Text(
-                      widget.trailingText!,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: palette.textSecondary,
-                        fontWeight: FontWeight.w700,
+                    if (widget.trailingText != null) ...[
+                      const SizedBox(width: 12),
+                      Text(
+                        widget.trailingText!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: palette.textSecondary,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarAccountTile extends StatefulWidget {
+  const _SidebarAccountTile({required this.selected, required this.onTap});
+
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_SidebarAccountTile> createState() => _SidebarAccountTileState();
+}
+
+class _SidebarAccountTileState extends State<_SidebarAccountTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final background = widget.selected
+        ? palette.accentMuted
+        : _hovered
+        ? palette.hover
+        : Colors.transparent;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: widget.onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircleAvatar(radius: 16, child: Text('H')),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Haitao Pan',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          appText('账号', 'Account'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                     ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
