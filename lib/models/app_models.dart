@@ -22,7 +22,7 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
   };
 
   IconData get icon => switch (this) {
-    WorkspaceDestination.assistant => Icons.auto_awesome_rounded,
+    WorkspaceDestination.assistant => Icons.chat_bubble_outline_rounded,
     WorkspaceDestination.tasks => Icons.layers_rounded,
     WorkspaceDestination.modules => Icons.extension_rounded,
     WorkspaceDestination.secrets => Icons.key_rounded,

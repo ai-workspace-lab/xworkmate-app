@@ -17,6 +17,7 @@ class SidebarNavigation extends StatelessWidget {
     required this.onExpandFromCollapsed,
     required this.onOpenAccount,
     required this.onOpenThemeToggle,
+    this.expandedWidthOverride,
   });
 
   final WorkspaceDestination currentSection;
@@ -29,6 +30,7 @@ class SidebarNavigation extends StatelessWidget {
   final VoidCallback onExpandFromCollapsed;
   final VoidCallback onOpenAccount;
   final VoidCallback onOpenThemeToggle;
+  final double? expandedWidthOverride;
 
   static const _mainSections = [
     WorkspaceDestination.assistant,
@@ -43,7 +45,9 @@ class SidebarNavigation extends StatelessWidget {
     final palette = context.palette;
     final isExpanded = sidebarState == AppSidebarState.expanded;
     final isCollapsed = sidebarState == AppSidebarState.collapsed;
-    final expandedWidth = appLanguage == AppLanguage.zh ? 204.0 : 220.0;
+    final expandedWidth =
+        expandedWidthOverride ??
+        (appLanguage == AppLanguage.zh ? 204.0 : 220.0);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),

@@ -9,6 +9,7 @@ import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../widgets/gateway_connect_dialog.dart';
+import '../../widgets/pane_resize_handle.dart';
 import '../../widgets/surface_card.dart';
 
 class AssistantPage extends StatefulWidget {
@@ -34,6 +35,7 @@ class _AssistantPageState extends State<AssistantPage> {
   late final FocusNode _composerFocusNode;
   String _mode = 'ask';
   String _thinkingLabel = 'high';
+  double _conversationPaneRatio = 0.64;
   List<_ComposerAttachment> _attachments = const <_ComposerAttachment>[];
   String? _lastSubmittedPrompt;
   String? _lastAutoAgentLabel;
@@ -80,43 +82,74 @@ class _AssistantPageState extends State<AssistantPage> {
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-          child: Column(
-            children: [
-              Expanded(
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: _ConversationArea(
-                        controller: controller,
-                        items: timelineItems,
-                        scrollController: _conversationController,
-                        onOpenDetail: widget.onOpenDetail,
-                        onFocusComposer: _focusComposer,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: quickActions
-                            .map(
-                              (action) => ActionChip(
-                                avatar: Icon(action.icon, size: 16),
-                                label: Text(action.title),
-                                onPressed: () {
-                                  _inputController.text = action.title;
-                                  _focusComposer();
-                                },
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _ComposerBar(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              const handleHeight = 12.0;
+              const paneGap = 8.0;
+              final availablePaneHeight =
+                  (constraints.maxHeight - handleHeight - paneGap)
+                      .clamp(0.0, double.infinity)
+                      .toDouble();
+              var minConversationHeight = availablePaneHeight >= 620
+                  ? 220.0
+                  : availablePaneHeight * 0.34;
+              var minComposerHeight = availablePaneHeight >= 620
+                  ? 248.0
+                  : availablePaneHeight * 0.30;
+              if (minConversationHeight + minComposerHeight >
+                  availablePaneHeight) {
+                minConversationHeight = availablePaneHeight * 0.52;
+                minComposerHeight = availablePaneHeight - minConversationHeight;
+              }
+              final maxConversationHeight =
+                  (availablePaneHeight - minComposerHeight)
+                      .clamp(minConversationHeight, availablePaneHeight)
+                      .toDouble();
+              final conversationHeight = availablePaneHeight <= 0
+                  ? 0.0
+                  : (_conversationPaneRatio * availablePaneHeight)
+                        .clamp(minConversationHeight, maxConversationHeight)
+                        .toDouble();
+              final composerHeight = (availablePaneHeight - conversationHeight)
+                  .clamp(minComposerHeight, availablePaneHeight)
+                  .toDouble();
+
+              return Column(
+                children: [
+                  SizedBox(
+                    height: conversationHeight,
+                    child: _ConversationArea(
                       controller: controller,
+                      items: timelineItems,
+                      scrollController: _conversationController,
+                      onOpenDetail: widget.onOpenDetail,
+                      onFocusComposer: _focusComposer,
+                    ),
+                  ),
+                  SizedBox(
+                    height: handleHeight,
+                    child: PaneResizeHandle(
+                      axis: Axis.vertical,
+                      onDelta: (delta) {
+                        if (availablePaneHeight <= 0) {
+                          return;
+                        }
+                        final nextHeight = (conversationHeight + delta).clamp(
+                          minConversationHeight,
+                          maxConversationHeight,
+                        );
+                        setState(() {
+                          _conversationPaneRatio =
+                              nextHeight / availablePaneHeight;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: paneGap),
+                  SizedBox(
+                    height: composerHeight,
+                    child: _AssistantLowerPane(
+                      quickActions: quickActions,
                       inputController: _inputController,
                       focusNode: _composerFocusNode,
                       mode: _mode,
@@ -124,6 +157,7 @@ class _AssistantPageState extends State<AssistantPage> {
                       modelLabel: controller.settings.defaultModel,
                       attachments: _attachments,
                       autoAgentLabel: _lastAutoAgentLabel,
+                      controller: controller,
                       onModeChanged: (value) => setState(() => _mode = value),
                       onThinkingChanged: (value) {
                         setState(() => _thinkingLabel = value);
@@ -137,12 +171,13 @@ class _AssistantPageState extends State<AssistantPage> {
                       },
                       onOpenGateway: _showConnectDialog,
                       onPickAttachments: _pickAttachments,
+                      onFocusComposer: _focusComposer,
                       onSend: _submitPrompt,
                     ),
-                  ],
-                ),
-              ),
-            ],
+                  ),
+                ],
+              );
+            },
           ),
         );
       },
@@ -406,6 +441,92 @@ class _AssistantPageState extends State<AssistantPage> {
       return;
     }
     _composerFocusNode.requestFocus();
+  }
+}
+
+class _AssistantLowerPane extends StatelessWidget {
+  const _AssistantLowerPane({
+    required this.quickActions,
+    required this.controller,
+    required this.inputController,
+    required this.focusNode,
+    required this.mode,
+    required this.thinkingLabel,
+    required this.modelLabel,
+    required this.attachments,
+    required this.autoAgentLabel,
+    required this.onModeChanged,
+    required this.onThinkingChanged,
+    required this.onRemoveAttachment,
+    required this.onOpenGateway,
+    required this.onPickAttachments,
+    required this.onFocusComposer,
+    required this.onSend,
+  });
+
+  final List<QuickAction> quickActions;
+  final AppController controller;
+  final TextEditingController inputController;
+  final FocusNode focusNode;
+  final String mode;
+  final String thinkingLabel;
+  final String modelLabel;
+  final List<_ComposerAttachment> attachments;
+  final String? autoAgentLabel;
+  final ValueChanged<String> onModeChanged;
+  final ValueChanged<String> onThinkingChanged;
+  final ValueChanged<_ComposerAttachment> onRemoveAttachment;
+  final VoidCallback onOpenGateway;
+  final VoidCallback onPickAttachments;
+  final VoidCallback onFocusComposer;
+  final Future<void> Function() onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: quickActions
+                  .map(
+                    (action) => ActionChip(
+                      avatar: Icon(action.icon, size: 16),
+                      label: Text(action.title),
+                      onPressed: () {
+                        inputController.text = action.title;
+                        onFocusComposer();
+                      },
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _ComposerBar(
+            controller: controller,
+            inputController: inputController,
+            focusNode: focusNode,
+            mode: mode,
+            thinkingLabel: thinkingLabel,
+            modelLabel: modelLabel,
+            attachments: attachments,
+            autoAgentLabel: autoAgentLabel,
+            onModeChanged: onModeChanged,
+            onThinkingChanged: onThinkingChanged,
+            onRemoveAttachment: onRemoveAttachment,
+            onOpenGateway: onOpenGateway,
+            onPickAttachments: onPickAttachments,
+            onSend: onSend,
+          ),
+        ],
+      ),
+    );
   }
 }
 

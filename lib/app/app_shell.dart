@@ -11,13 +11,23 @@ import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
 import '../widgets/detail_drawer.dart';
+import '../widgets/pane_resize_handle.dart';
 import '../widgets/sidebar_navigation.dart';
 import 'app_controller.dart';
 
-class AppShell extends StatelessWidget {
+class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.controller});
 
   final AppController controller;
+  @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
+  static const _sidebarMinWidth = 180.0;
+  static const _sidebarMaxWidth = 320.0;
+  double? _sidebarExpandedWidth;
+
   static const _mobileDestinations = [
     WorkspaceDestination.assistant,
     WorkspaceDestination.tasks,
@@ -26,11 +36,25 @@ class AppShell extends StatelessWidget {
     WorkspaceDestination.settings,
   ];
 
+  double _clampSidebarWidth(double value, double viewportWidth) {
+    final responsiveMax = (viewportWidth * 0.28).clamp(
+      _sidebarMinWidth,
+      _sidebarMaxWidth,
+    );
+    return value.clamp(_sidebarMinWidth, responsiveMax).toDouble();
+  }
+
+  double _defaultSidebarWidth(AppLanguage language, double viewportWidth) {
+    final baseWidth = language == AppLanguage.zh ? 204.0 : 220.0;
+    return _clampSidebarWidth(baseWidth, viewportWidth);
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: controller,
+      animation: widget.controller,
       builder: (context, _) {
+        final controller = widget.controller;
         return Scaffold(
           body: SafeArea(
             child: LayoutBuilder(
@@ -42,6 +66,14 @@ class AppShell extends StatelessWidget {
                 final isMobile = constraints.maxWidth < 900;
                 final sidebarState = controller.sidebarState;
                 final showSidebar = sidebarState != AppSidebarState.hidden;
+                final expandedSidebarWidth = _clampSidebarWidth(
+                  _sidebarExpandedWidth ??
+                      _defaultSidebarWidth(
+                        controller.appLanguage,
+                        constraints.maxWidth,
+                      ),
+                  constraints.maxWidth,
+                );
                 final showPinnedDetail =
                     controller.detailPanel != null &&
                     constraints.maxWidth > 1460;
@@ -179,6 +211,22 @@ class AppShell extends StatelessWidget {
                                   ? ThemeMode.light
                                   : ThemeMode.dark,
                             ),
+                            expandedWidthOverride:
+                                sidebarState == AppSidebarState.expanded
+                                ? expandedSidebarWidth
+                                : null,
+                          ),
+                        if (sidebarState == AppSidebarState.expanded)
+                          PaneResizeHandle(
+                            axis: Axis.horizontal,
+                            onDelta: (delta) {
+                              setState(() {
+                                _sidebarExpandedWidth = _clampSidebarWidth(
+                                  expandedSidebarWidth + delta,
+                                  constraints.maxWidth,
+                                );
+                              });
+                            },
                           ),
                         Expanded(
                           child: Padding(
@@ -242,7 +290,7 @@ class AppShell extends StatelessWidget {
 
   Widget _buildCurrentPage(ValueChanged<DetailPanelData> onOpenDetail) {
     return IndexedStack(
-      index: controller.destination.index,
+      index: widget.controller.destination.index,
       children: WorkspaceDestination.values
           .map((destination) => _pageForDestination(destination, onOpenDetail))
           .toList(),
@@ -255,23 +303,27 @@ class AppShell extends StatelessWidget {
   ) {
     return switch (destination) {
       WorkspaceDestination.assistant => AssistantPage(
-        controller: controller,
+        controller: widget.controller,
         onOpenDetail: onOpenDetail,
       ),
       WorkspaceDestination.tasks => TasksPage(
-        controller: controller,
+        controller: widget.controller,
         onOpenDetail: onOpenDetail,
       ),
       WorkspaceDestination.modules => ModulesPage(
-        controller: controller,
+        controller: widget.controller,
         onOpenDetail: onOpenDetail,
       ),
       WorkspaceDestination.secrets => SecretsPage(
-        controller: controller,
+        controller: widget.controller,
         onOpenDetail: onOpenDetail,
       ),
-      WorkspaceDestination.settings => SettingsPage(controller: controller),
-      WorkspaceDestination.account => AccountPage(controller: controller),
+      WorkspaceDestination.settings => SettingsPage(
+        controller: widget.controller,
+      ),
+      WorkspaceDestination.account => AccountPage(
+        controller: widget.controller,
+      ),
     };
   }
 }
