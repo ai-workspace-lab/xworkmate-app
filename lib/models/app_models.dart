@@ -67,6 +67,8 @@ class StatusInfo {
   final StatusTone tone;
 }
 
+enum AppSidebarState { expanded, collapsed, hidden }
+
 enum AssistantMode { code, office }
 
 extension AssistantModeCopy on AssistantMode {

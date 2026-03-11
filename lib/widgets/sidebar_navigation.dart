@@ -9,23 +9,25 @@ class SidebarNavigation extends StatelessWidget {
   const SidebarNavigation({
     super.key,
     required this.currentSection,
-    required this.isCollapsed,
+    required this.sidebarState,
     required this.appLanguage,
     required this.themeMode,
     required this.onSectionChanged,
     required this.onToggleLanguage,
-    required this.onToggleCollapsed,
+    required this.onCycleSidebarState,
+    required this.onExpandFromCollapsed,
     required this.onOpenAccount,
     required this.onOpenThemeToggle,
   });
 
   final WorkspaceDestination currentSection;
-  final bool isCollapsed;
+  final AppSidebarState sidebarState;
   final AppLanguage appLanguage;
   final ThemeMode themeMode;
   final ValueChanged<WorkspaceDestination> onSectionChanged;
   final VoidCallback onToggleLanguage;
-  final VoidCallback onToggleCollapsed;
+  final VoidCallback onCycleSidebarState;
+  final VoidCallback onExpandFromCollapsed;
   final VoidCallback onOpenAccount;
   final VoidCallback onOpenThemeToggle;
 
@@ -40,6 +42,7 @@ class SidebarNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final isCollapsed = sidebarState == AppSidebarState.collapsed;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -61,7 +64,10 @@ class SidebarNavigation extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SidebarHeader(isCollapsed: isCollapsed),
+            SidebarHeader(
+              isCollapsed: isCollapsed,
+              onTap: isCollapsed ? onExpandFromCollapsed : null,
+            ),
             const SizedBox(height: 12),
             Container(height: 1, color: palette.sidebarBorder),
             const SizedBox(height: 12),
@@ -72,6 +78,7 @@ class SidebarNavigation extends StatelessWidget {
                   Expanded(
                     child: SingleChildScrollView(
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: _mainSections
                             .map(
                               (section) => Padding(
@@ -99,7 +106,8 @@ class SidebarNavigation extends StatelessWidget {
                     onOpenThemeToggle: onOpenThemeToggle,
                     onOpenSettings: () =>
                         onSectionChanged(WorkspaceDestination.settings),
-                    onToggleCollapsed: onToggleCollapsed,
+                    sidebarState: sidebarState,
+                    onCycleSidebarState: onCycleSidebarState,
                     onOpenAccount: onOpenAccount,
                     accountSelected:
                         currentSection == WorkspaceDestination.account,
@@ -115,15 +123,16 @@ class SidebarNavigation extends StatelessWidget {
 }
 
 class SidebarHeader extends StatelessWidget {
-  const SidebarHeader({super.key, required this.isCollapsed});
+  const SidebarHeader({super.key, required this.isCollapsed, this.onTap});
 
   final bool isCollapsed;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
 
-    return Row(
+    final content = Row(
       children: [
         Container(
           width: 38,
@@ -158,6 +167,22 @@ class SidebarHeader extends StatelessWidget {
           ),
         ],
       ],
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return Tooltip(
+      message: appText('展开导航', 'Expand sidebar'),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: content,
+        ),
+      ),
     );
   }
 }
@@ -197,6 +222,7 @@ class _SidebarNavItemState extends State<SidebarNavItem> {
     final item = AnimatedContainer(
       duration: const Duration(milliseconds: 160),
       curve: Curves.easeOutCubic,
+      width: widget.collapsed ? null : double.infinity,
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(10),
@@ -216,7 +242,7 @@ class _SidebarNavItemState extends State<SidebarNavItem> {
                   ? MainAxisAlignment.center
                   : MainAxisAlignment.start,
               children: [
-                Icon(widget.section.icon, color: foreground, size: 20),
+                Icon(widget.section.icon, color: foreground, size: 18),
                 if (!widget.collapsed) ...[
                   const SizedBox(width: 10),
                   Text(
@@ -248,23 +274,25 @@ class SidebarFooter extends StatelessWidget {
   const SidebarFooter({
     super.key,
     required this.isCollapsed,
+    required this.sidebarState,
     required this.appLanguage,
     required this.themeMode,
     required this.onToggleLanguage,
     required this.onOpenThemeToggle,
     required this.onOpenSettings,
-    required this.onToggleCollapsed,
+    required this.onCycleSidebarState,
     required this.onOpenAccount,
     required this.accountSelected,
   });
 
   final bool isCollapsed;
+  final AppSidebarState sidebarState;
   final AppLanguage appLanguage;
   final ThemeMode themeMode;
   final VoidCallback onToggleLanguage;
   final VoidCallback onOpenThemeToggle;
   final VoidCallback onOpenSettings;
-  final VoidCallback onToggleCollapsed;
+  final VoidCallback onCycleSidebarState;
   final VoidCallback onOpenAccount;
   final bool accountSelected;
 
@@ -285,6 +313,7 @@ class SidebarFooter extends StatelessWidget {
           ? appText('切换浅色', 'Switch to light')
           : appText('切换深色', 'Switch to dark'),
       child: IconButton(
+        iconSize: 20,
         onPressed: onOpenThemeToggle,
         icon: Icon(
           themeMode == ThemeMode.dark
@@ -297,29 +326,35 @@ class SidebarFooter extends StatelessWidget {
     final settingsButton = Tooltip(
       message: appText('打开设置', 'Open settings'),
       child: IconButton(
+        iconSize: 20,
         onPressed: onOpenSettings,
         icon: const Icon(Icons.settings_rounded),
       ),
     );
 
     final collapseButton = Tooltip(
-      message: isCollapsed
-          ? appText('展开导航', 'Expand sidebar')
-          : appText('折叠导航', 'Collapse sidebar'),
+      message: switch (sidebarState) {
+        AppSidebarState.expanded => appText('折叠导航', 'Collapse sidebar'),
+        AppSidebarState.collapsed => appText('隐藏导航', 'Hide sidebar'),
+        AppSidebarState.hidden => appText('展开导航', 'Expand sidebar'),
+      },
       child: IconButton(
-        onPressed: onToggleCollapsed,
-        icon: Icon(
-          isCollapsed
-              ? Icons.menu_open_rounded
-              : Icons.keyboard_double_arrow_left_rounded,
-        ),
+        iconSize: 20,
+        onPressed: onCycleSidebarState,
+        icon: Icon(switch (sidebarState) {
+          AppSidebarState.expanded => Icons.keyboard_double_arrow_left_rounded,
+          AppSidebarState.collapsed => Icons.visibility_off_outlined,
+          AppSidebarState.hidden => Icons.keyboard_double_arrow_right_rounded,
+        }),
       ),
     );
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         if (isCollapsed)
           Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               themeButton,
               const SizedBox(height: 6),

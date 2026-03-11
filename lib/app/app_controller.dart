@@ -40,7 +40,7 @@ class AppController extends ChangeNotifier {
 
   WorkspaceDestination _destination = WorkspaceDestination.assistant;
   ThemeMode _themeMode = ThemeMode.light;
-  bool _sidebarExpanded = true;
+  AppSidebarState _sidebarState = AppSidebarState.expanded;
   DetailPanelData? _detailPanel;
   bool _initializing = true;
   String? _bootstrapError;
@@ -48,7 +48,7 @@ class AppController extends ChangeNotifier {
 
   WorkspaceDestination get destination => _destination;
   ThemeMode get themeMode => _themeMode;
-  bool get sidebarExpanded => _sidebarExpanded;
+  AppSidebarState get sidebarState => _sidebarState;
   DetailPanelData? get detailPanel => _detailPanel;
   bool get initializing => _initializing;
   String? get bootstrapError => _bootstrapError;
@@ -111,8 +111,20 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleSidebar() {
-    _sidebarExpanded = !_sidebarExpanded;
+  void cycleSidebarState() {
+    _sidebarState = switch (_sidebarState) {
+      AppSidebarState.expanded => AppSidebarState.collapsed,
+      AppSidebarState.collapsed => AppSidebarState.hidden,
+      AppSidebarState.hidden => AppSidebarState.expanded,
+    };
+    notifyListeners();
+  }
+
+  void setSidebarState(AppSidebarState state) {
+    if (_sidebarState == state) {
+      return;
+    }
+    _sidebarState = state;
     notifyListeners();
   }
 

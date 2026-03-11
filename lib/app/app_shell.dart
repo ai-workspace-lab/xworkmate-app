@@ -7,6 +7,7 @@ import '../features/modules/modules_page.dart';
 import '../features/secrets/secrets_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/tasks/tasks_page.dart';
+import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
 import '../widgets/detail_drawer.dart';
@@ -39,8 +40,8 @@ class AppShell extends StatelessWidget {
                     Theme.of(context).platform == TargetPlatform.iOS &&
                     constraints.maxWidth < 900;
                 final isMobile = constraints.maxWidth < 900;
-                final collapsed =
-                    !controller.sidebarExpanded || constraints.maxWidth < 1120;
+                final sidebarState = controller.sidebarState;
+                final showSidebar = sidebarState != AppSidebarState.hidden;
                 final showPinnedDetail =
                     controller.detailPanel != null &&
                     constraints.maxWidth > 1460;
@@ -159,23 +160,26 @@ class AppShell extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        SidebarNavigation(
-                          currentSection: controller.destination,
-                          isCollapsed: collapsed,
-                          appLanguage: controller.appLanguage,
-                          themeMode: controller.themeMode,
-                          onSectionChanged: controller.navigateTo,
-                          onToggleLanguage: controller.toggleAppLanguage,
-                          onToggleCollapsed: controller.toggleSidebar,
-                          onOpenAccount: () => controller.navigateTo(
-                            WorkspaceDestination.account,
+                        if (showSidebar)
+                          SidebarNavigation(
+                            currentSection: controller.destination,
+                            sidebarState: sidebarState,
+                            appLanguage: controller.appLanguage,
+                            themeMode: controller.themeMode,
+                            onSectionChanged: controller.navigateTo,
+                            onToggleLanguage: controller.toggleAppLanguage,
+                            onCycleSidebarState: controller.cycleSidebarState,
+                            onExpandFromCollapsed: () => controller
+                                .setSidebarState(AppSidebarState.expanded),
+                            onOpenAccount: () => controller.navigateTo(
+                              WorkspaceDestination.account,
+                            ),
+                            onOpenThemeToggle: () => controller.setThemeMode(
+                              controller.themeMode == ThemeMode.dark
+                                  ? ThemeMode.light
+                                  : ThemeMode.dark,
+                            ),
                           ),
-                          onOpenThemeToggle: () => controller.setThemeMode(
-                            controller.themeMode == ThemeMode.dark
-                                ? ThemeMode.light
-                                : ThemeMode.dark,
-                          ),
-                        ),
                         Expanded(
                           child: Padding(
                             padding: const EdgeInsets.only(
@@ -213,6 +217,17 @@ class AppShell extends StatelessWidget {
                         child: DetailDrawer(
                           data: controller.detailPanel!,
                           onClose: controller.closeDetail,
+                        ),
+                      ),
+                    if (!showSidebar)
+                      Positioned(
+                        left: 0,
+                        top: 18,
+                        bottom: 18,
+                        child: _SidebarRevealRail(
+                          onExpand: () => controller.setSidebarState(
+                            AppSidebarState.expanded,
+                          ),
                         ),
                       ),
                   ],
@@ -258,5 +273,54 @@ class AppShell extends StatelessWidget {
       WorkspaceDestination.settings => SettingsPage(controller: controller),
       WorkspaceDestination.account => AccountPage(controller: controller),
     };
+  }
+}
+
+class _SidebarRevealRail extends StatefulWidget {
+  const _SidebarRevealRail({required this.onExpand});
+
+  final VoidCallback onExpand;
+
+  @override
+  State<_SidebarRevealRail> createState() => _SidebarRevealRailState();
+}
+
+class _SidebarRevealRailState extends State<_SidebarRevealRail> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Tooltip(
+        message: appText('展开导航', 'Expand sidebar'),
+        child: GestureDetector(
+          onTap: widget.onExpand,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: _hovered ? 22 : 10,
+            decoration: BoxDecoration(
+              color: _hovered ? palette.surfaceSecondary : Colors.transparent,
+              borderRadius: const BorderRadius.horizontal(
+                right: Radius.circular(14),
+              ),
+              border: Border.all(
+                color: _hovered ? palette.strokeSoft : Colors.transparent,
+              ),
+            ),
+            child: _hovered
+                ? Icon(
+                    Icons.keyboard_double_arrow_right_rounded,
+                    size: 16,
+                    color: palette.textMuted,
+                  )
+                : null,
+          ),
+        ),
+      ),
+    );
   }
 }
