@@ -17,10 +17,21 @@ class RuntimeBootstrapConfig {
   final GatewayBootstrapTarget? localGateway;
   final GatewayBootstrapTarget? remoteGateway;
 
-  static Future<RuntimeBootstrapConfig> load() async {
-    final env = await _loadEnvFile();
-    final workspaceRoot = _resolveWorkspaceRoot();
-    final openClawRoot = _resolveOpenClawRoot(workspaceRoot);
+  static Future<RuntimeBootstrapConfig> load({
+    String? workspacePathHint,
+    String? cliPathHint,
+  }) async {
+    final workspaceRoot = _resolveWorkspaceRoot(workspacePathHint);
+    final openClawRoot = _resolveOpenClawRoot(
+      workspaceRoot,
+      cliPathHint: cliPathHint,
+    );
+    final env = await _loadEnvFile(
+      workspacePathHint: workspacePathHint,
+      cliPathHint: cliPathHint,
+      workspaceRoot: workspaceRoot,
+      openClawRoot: openClawRoot,
+    );
     return RuntimeBootstrapConfig(
       workspacePath: workspaceRoot?.path,
       remoteProjectRoot: workspaceRoot?.path,
@@ -120,13 +131,27 @@ class GatewayBootstrapTarget {
   }
 }
 
-Future<Map<String, String>> _loadEnvFile() async {
-  final candidates = <File>{
-    File('${Directory.current.path}/.env'),
-    ..._ancestorDirectories(
-      Directory.current,
-    ).map((directory) => File('${directory.path}/.env')),
-  }.toList(growable: false);
+Future<Map<String, String>> _loadEnvFile({
+  String? workspacePathHint,
+  String? cliPathHint,
+  Directory? workspaceRoot,
+  Directory? openClawRoot,
+}) async {
+  final candidateDirectories = <Directory>{
+    Directory.current,
+    ..._ancestorDirectories(Directory.current),
+    ..._pathCandidates(workspacePathHint),
+    ..._pathCandidates(
+      cliPathHint == null ? null : File(cliPathHint).parent.path,
+    ),
+    ...?workspaceRoot == null ? null : <Directory>[workspaceRoot],
+    ...?workspaceRoot == null ? null : _ancestorDirectories(workspaceRoot),
+    ...?openClawRoot == null ? null : <Directory>[openClawRoot],
+    ...?openClawRoot == null ? null : _ancestorDirectories(openClawRoot),
+  };
+  final candidates = candidateDirectories
+      .map((directory) => File('${directory.path}/.env'))
+      .toList(growable: false);
 
   for (final file in candidates) {
     if (!await file.exists()) {
@@ -155,11 +180,12 @@ Future<Map<String, String>> _loadEnvFile() async {
   return const <String, String>{};
 }
 
-Directory? _resolveWorkspaceRoot() {
-  final candidates = <Directory>[
+Directory? _resolveWorkspaceRoot(String? workspacePathHint) {
+  final candidates = <Directory>{
+    ..._pathCandidates(workspacePathHint),
     Directory.current,
     ..._ancestorDirectories(Directory.current),
-  ];
+  }.toList(growable: false);
   for (final candidate in candidates) {
     if (File('${candidate.path}/pubspec.yaml').existsSync() &&
         File('${candidate.path}/lib/main.dart').existsSync()) {
@@ -169,7 +195,17 @@ Directory? _resolveWorkspaceRoot() {
   return null;
 }
 
-Directory? _resolveOpenClawRoot(Directory? workspaceRoot) {
+Directory? _resolveOpenClawRoot(
+  Directory? workspaceRoot, {
+  String? cliPathHint,
+}) {
+  final cliFile = cliPathHint == null ? null : File(cliPathHint);
+  if (cliFile != null && cliFile.existsSync()) {
+    final cliParent = cliFile.parent;
+    if (File('${cliParent.path}/openclaw.mjs').existsSync()) {
+      return cliParent;
+    }
+  }
   if (workspaceRoot == null) {
     return null;
   }
@@ -203,4 +239,21 @@ List<Directory> _ancestorDirectories(Directory start) {
     current = parent;
   }
   return ancestors;
+}
+
+List<Directory> _pathCandidates(String? rawPath) {
+  final trimmed = rawPath?.trim() ?? '';
+  if (trimmed.isEmpty) {
+    return const <Directory>[];
+  }
+  final fileSystemEntityType = FileSystemEntity.typeSync(trimmed);
+  final directory = switch (fileSystemEntityType) {
+    FileSystemEntityType.directory => Directory(trimmed),
+    FileSystemEntityType.file => File(trimmed).parent,
+    _ => Directory(trimmed),
+  };
+  if (!directory.existsSync()) {
+    return const <Directory>[];
+  }
+  return <Directory>[directory, ..._ancestorDirectories(directory)];
 }

@@ -235,7 +235,10 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
   }
 
   Future<void> _loadBootstrapPrefill() async {
-    final bootstrap = await RuntimeBootstrapConfig.load();
+    final bootstrap = await RuntimeBootstrapConfig.load(
+      workspacePathHint: widget.controller.settings.workspacePath,
+      cliPathHint: widget.controller.settings.cliPath,
+    );
     final preferred = bootstrap.preferredGatewayFor(_connectionMode);
     if (!mounted || preferred == null) {
       return;

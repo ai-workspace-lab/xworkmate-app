@@ -507,7 +507,10 @@ class AppController extends ChangeNotifier {
   Future<void> _initialize() async {
     try {
       await _settingsController.initialize();
-      final bootstrap = await RuntimeBootstrapConfig.load();
+      final bootstrap = await RuntimeBootstrapConfig.load(
+        workspacePathHint: settings.workspacePath,
+        cliPathHint: settings.cliPath,
+      );
       final seeded = bootstrap.mergeIntoSettings(settings);
       if (seeded.toJsonString() != settings.toJsonString()) {
         await _settingsController.saveSnapshot(seeded);

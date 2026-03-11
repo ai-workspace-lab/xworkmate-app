@@ -409,7 +409,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              '${controller.connection.status.label} · ${controller.connection.remoteAddress ?? settings.gateway.host}:${settings.gateway.port}',
+              '${controller.connection.status.label} · ${controller.connection.remoteAddress ?? '${settings.gateway.host}:${settings.gateway.port}'}',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 16),
