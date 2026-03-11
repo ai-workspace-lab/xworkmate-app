@@ -18,6 +18,14 @@ flutter test
 flutter run -d macos
 ```
 
+## Vendor Repositories
+
+`vendor/codex` is tracked as a git submodule for future built-in code agent integration.
+
+```bash
+git submodule update --init --recursive
+```
+
 ## macOS Packaging
 
 ```bash
