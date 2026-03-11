@@ -291,6 +291,14 @@ class SidebarFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final themeLabel = themeMode == ThemeMode.dark
+        ? appText('切换浅色', 'Switch to light')
+        : appText('切换深色', 'Switch to dark');
+    final collapseLabel = switch (sidebarState) {
+      AppSidebarState.expanded => appText('折叠导航', 'Collapse sidebar'),
+      AppSidebarState.collapsed => appText('隐藏导航', 'Hide sidebar'),
+      AppSidebarState.hidden => appText('展开导航', 'Expand sidebar'),
+    };
     final languageButton = Tooltip(
       message: appText('切换语言', 'Switch language'),
       child: _SidebarLanguageButton(
@@ -301,9 +309,7 @@ class SidebarFooter extends StatelessWidget {
     );
 
     final themeButton = Tooltip(
-      message: themeMode == ThemeMode.dark
-          ? appText('切换浅色', 'Switch to light')
-          : appText('切换深色', 'Switch to dark'),
+      message: themeLabel,
       child: IconButton(
         iconSize: 20,
         onPressed: onOpenThemeToggle,
@@ -325,11 +331,7 @@ class SidebarFooter extends StatelessWidget {
     );
 
     final collapseButton = Tooltip(
-      message: switch (sidebarState) {
-        AppSidebarState.expanded => appText('折叠导航', 'Collapse sidebar'),
-        AppSidebarState.collapsed => appText('隐藏导航', 'Hide sidebar'),
-        AppSidebarState.hidden => appText('展开导航', 'Expand sidebar'),
-      },
+      message: collapseLabel,
       child: IconButton(
         iconSize: 20,
         onPressed: onCycleSidebarState,
@@ -358,9 +360,41 @@ class SidebarFooter extends StatelessWidget {
             ],
           )
         else
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [themeButton, settingsButton, collapseButton],
+          Column(
+            children: [
+              _SidebarFooterActionTile(
+                icon: themeMode == ThemeMode.dark
+                    ? Icons.light_mode_rounded
+                    : Icons.dark_mode_rounded,
+                label: themeLabel,
+                onTap: onOpenThemeToggle,
+              ),
+              const SizedBox(height: 6),
+              _SidebarFooterActionTile(
+                icon: Icons.translate_rounded,
+                label: appText('语言', 'Language'),
+                trailingText: appLanguage == AppLanguage.zh ? '中文' : 'EN',
+                onTap: onToggleLanguage,
+              ),
+              const SizedBox(height: 6),
+              _SidebarFooterActionTile(
+                icon: Icons.settings_rounded,
+                label: appText('打开设置', 'Open settings'),
+                onTap: onOpenSettings,
+              ),
+              const SizedBox(height: 6),
+              _SidebarFooterActionTile(
+                icon: switch (sidebarState) {
+                  AppSidebarState.expanded =>
+                    Icons.keyboard_double_arrow_left_rounded,
+                  AppSidebarState.collapsed => Icons.visibility_off_outlined,
+                  AppSidebarState.hidden =>
+                    Icons.keyboard_double_arrow_right_rounded,
+                },
+                label: collapseLabel,
+                onTap: onCycleSidebarState,
+              ),
+            ],
           ),
         const SizedBox(height: 8),
         if (isCollapsed)
@@ -435,6 +469,76 @@ class SidebarFooter extends StatelessWidget {
             ],
           ),
       ],
+    );
+  }
+}
+
+class _SidebarFooterActionTile extends StatefulWidget {
+  const _SidebarFooterActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.trailingText,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final String? trailingText;
+
+  @override
+  State<_SidebarFooterActionTile> createState() =>
+      _SidebarFooterActionTileState();
+}
+
+class _SidebarFooterActionTileState extends State<_SidebarFooterActionTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        decoration: BoxDecoration(
+          color: _hovered ? palette.hover : palette.surfaceSecondary,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: palette.strokeSoft),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: widget.onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(widget.icon, size: 20, color: palette.textSecondary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      widget.label,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ),
+                  if (widget.trailingText != null)
+                    Text(
+                      widget.trailingText!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: palette.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
