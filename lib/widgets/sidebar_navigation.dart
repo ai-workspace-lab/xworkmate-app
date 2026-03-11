@@ -44,11 +44,12 @@ class SidebarNavigation extends StatelessWidget {
     final palette = context.palette;
     final isExpanded = sidebarState == AppSidebarState.expanded;
     final isCollapsed = sidebarState == AppSidebarState.collapsed;
+    final expandedWidth = appLanguage == AppLanguage.zh ? 204.0 : 220.0;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
-      width: isExpanded ? 236 : 72,
+      width: isExpanded ? expandedWidth : 72,
       height: double.infinity,
       margin: const EdgeInsets.fromLTRB(8, 8, 6, 8),
       decoration: BoxDecoration(
@@ -60,8 +61,8 @@ class SidebarNavigation extends StatelessWidget {
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: isExpanded ? 12 : 8,
-          vertical: 12,
+          horizontal: isExpanded ? 10 : 8,
+          vertical: 10,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -124,12 +125,13 @@ class SidebarHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final textTheme = Theme.of(context).textTheme;
 
     final content = Row(
       children: [
         Container(
-          width: 38,
-          height: 38,
+          width: isCollapsed ? 38 : 34,
+          height: isCollapsed ? 38 : 34,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             color: palette.accentMuted,
@@ -141,19 +143,23 @@ class SidebarHeader extends StatelessWidget {
           ),
         ),
         if (!isCollapsed) ...[
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   kProductBrandName,
-                  style: Theme.of(context).textTheme.titleLarge,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   appText('可执行 AI 工作台', kProductSubtitle),
-                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall,
                 ),
               ],
             ),
@@ -227,8 +233,8 @@ class _SidebarNavItemState extends State<SidebarNavItem> {
           onTap: widget.onTap,
           child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: widget.collapsed ? 0 : 12,
-              vertical: 10,
+              horizontal: widget.collapsed ? 0 : 10,
+              vertical: widget.collapsed ? 10 : 9,
             ),
             child: Row(
               mainAxisAlignment: widget.collapsed
@@ -237,7 +243,7 @@ class _SidebarNavItemState extends State<SidebarNavItem> {
               children: [
                 Icon(widget.section.icon, color: foreground, size: 18),
                 if (!widget.collapsed) ...[
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Text(
                     widget.section.label,
                     style: Theme.of(
@@ -418,55 +424,46 @@ class SidebarFooter extends StatelessWidget {
             ),
           )
         else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              languageButton,
-              const SizedBox(width: 10),
-              Expanded(
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: onOpenAccount,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: accountSelected
-                          ? palette.accentMuted
-                          : palette.surfaceSecondary,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: palette.strokeSoft),
-                    ),
-                    child: Row(
+          InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: onOpenAccount,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              decoration: BoxDecoration(
+                color: accountSelected
+                    ? palette.accentMuted
+                    : palette.surfaceSecondary,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: palette.strokeSoft),
+              ),
+              child: Row(
+                children: [
+                  const CircleAvatar(radius: 16, child: Text('H')),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const CircleAvatar(radius: 18, child: Text('H')),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Haitao Pan',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.labelLarge,
-                              ),
-                              Text(
-                                appText('账号', 'Account'),
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
+                        Text(
+                          'Haitao Pan',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          appText('账号', 'Account'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
       ],
     );
@@ -514,14 +511,16 @@ class _SidebarFooterActionTileState extends State<_SidebarFooterActionTile> {
             borderRadius: BorderRadius.circular(14),
             onTap: widget.onTap,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
               child: Row(
                 children: [
                   Icon(widget.icon, size: 20, color: palette.textSecondary),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       widget.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelLarge,
                     ),
                   ),
