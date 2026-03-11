@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
+import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
 import '../../widgets/metric_card.dart';
@@ -24,37 +25,37 @@ class TasksPage extends StatefulWidget {
 }
 
 class _TasksPageState extends State<TasksPage> {
-  String _tab = 'Queue';
+  TasksTab _tab = TasksTab.queue;
 
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
-    final items = controller.taskItemsForTab(_tab);
+    final items = controller.taskItemsForTab(_tabKey);
     final metrics = [
       MetricSummary(
-        label: 'Total',
+        label: appText('总数', 'Total'),
         value: '${controller.tasksController.totalCount}',
-        caption: '从 sessions / chat 派生',
+        caption: appText('从会话与对话中派生', 'Derived from sessions / chat'),
         icon: Icons.layers_rounded,
       ),
       MetricSummary(
-        label: 'Running',
+        label: appText('运行中', 'Running'),
         value: '${controller.tasksController.running.length}',
-        caption: '当前活跃 run',
+        caption: appText('当前活跃运行', 'Current active runs'),
         icon: Icons.play_circle_outline_rounded,
         status: _statusInfoForTask('Running'),
       ),
       MetricSummary(
-        label: 'Failed',
+        label: appText('失败', 'Failed'),
         value: '${controller.tasksController.failed.length}',
-        caption: 'aborted / error run',
+        caption: appText('中断或报错的运行', 'Aborted / error runs'),
         icon: Icons.error_outline_rounded,
         status: _statusInfoForTask('Failed'),
       ),
       MetricSummary(
-        label: 'Scheduled',
+        label: appText('计划中', 'Scheduled'),
         value: '${controller.tasksController.scheduled.length}',
-        caption: '等待自动化管理包接入',
+        caption: appText('等待自动化能力接入', 'Pending automation integration'),
         icon: Icons.event_repeat_rounded,
       ),
     ];
@@ -68,8 +69,11 @@ class _TasksPageState extends State<TasksPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
-                title: 'Tasks',
-                subtitle: '查看任务队列、执行状态与历史记录',
+                title: appText('任务', 'Tasks'),
+                subtitle: appText(
+                  '查看任务队列、执行状态与历史记录',
+                  'Review queue, execution state, and history.',
+                ),
                 trailing: Wrap(
                   spacing: 12,
                   runSpacing: 12,
@@ -78,8 +82,8 @@ class _TasksPageState extends State<TasksPage> {
                     SizedBox(
                       width: 220,
                       child: TextField(
-                        decoration: const InputDecoration(
-                          hintText: '搜索',
+                        decoration: InputDecoration(
+                          hintText: appText('搜索任务', 'Search tasks'),
                           prefixIcon: Icon(Icons.search_rounded),
                         ),
                       ),
@@ -89,20 +93,23 @@ class _TasksPageState extends State<TasksPage> {
                       icon: const Icon(Icons.refresh_rounded),
                     ),
                     FilledButton.tonalIcon(
-                      onPressed: () => controller.navigateTo(
-                        WorkspaceDestination.assistant,
-                      ),
+                      onPressed: () =>
+                          controller.navigateTo(WorkspaceDestination.assistant),
                       icon: const Icon(Icons.add_rounded),
-                      label: const Text('新建'),
+                      label: Text(appText('新建任务', 'New Task')),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
               SectionTabs(
-                items: const ['Queue', 'Running', 'History', 'Failed', 'Scheduled'],
-                value: _tab,
-                onChanged: (value) => setState(() => _tab = value),
+                items: TasksTab.values.map((item) => item.label).toList(),
+                value: _tab.label,
+                onChanged: (value) => setState(
+                  () => _tab = TasksTab.values.firstWhere(
+                    (item) => item.label == value,
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
               LayoutBuilder(
@@ -127,19 +134,26 @@ class _TasksPageState extends State<TasksPage> {
                 },
               ),
               const SizedBox(height: 24),
-              if (_tab == 'Scheduled' && items.isEmpty)
+              if (_tab == TasksTab.scheduled && items.isEmpty)
                 SurfaceCard(
                   child: Text(
-                    'Scheduled 任务将在自动化管理包接入后展示。本轮只显示来自 Gateway sessions / chat 的派生任务。',
+                    appText(
+                      '计划任务会在自动化能力接入后展示。当前仅显示来自 Gateway 会话与对话的派生任务。',
+                      'Scheduled tasks will appear after automation is integrated. Only session/chat-derived tasks are shown for now.',
+                    ),
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                 )
               else if (items.isEmpty)
                 SurfaceCard(
                   child: Text(
-                    controller.connection.status == RuntimeConnectionStatus.connected
-                        ? '当前 tab 暂无任务。'
-                        : '连接 Gateway 后，这里会显示真实的 queue / running / history / failed 视图。',
+                    controller.connection.status ==
+                            RuntimeConnectionStatus.connected
+                        ? appText('当前页签暂无任务。', 'No tasks in this tab.')
+                        : appText(
+                            '连接 Gateway 后，这里会显示真实的队列、运行中、历史和失败任务。',
+                            'Connect a gateway to load live queue, running, history, and failed tasks.',
+                          ),
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                 )
@@ -157,7 +171,9 @@ class _TasksPageState extends State<TasksPage> {
                               children: [
                                 Text(
                                   task.title,
-                                  style: Theme.of(context).textTheme.titleMedium,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
@@ -191,12 +207,16 @@ class _TasksPageState extends State<TasksPage> {
                                   children: [
                                     Text(
                                       task.title,
-                                      style: Theme.of(context).textTheme.titleMedium,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleMedium,
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
                                       task.summary,
-                                      style: Theme.of(context).textTheme.bodySmall,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
                                     ),
                                   ],
                                 ),
@@ -211,7 +231,10 @@ class _TasksPageState extends State<TasksPage> {
                                 ),
                               ),
                               Expanded(flex: 2, child: Text(task.owner)),
-                              Expanded(flex: 2, child: Text(task.startedAtLabel)),
+                              Expanded(
+                                flex: 2,
+                                child: Text(task.startedAtLabel),
+                              ),
                               const Icon(Icons.chevron_right_rounded),
                             ],
                           );
@@ -224,7 +247,10 @@ class _TasksPageState extends State<TasksPage> {
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
-                  '点击任务项后弹出 Detail Drawer',
+                  appText(
+                    '点击任务项后会打开详情侧栏',
+                    'Click a task to open the detail drawer.',
+                  ),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -238,32 +264,54 @@ class _TasksPageState extends State<TasksPage> {
   DetailPanelData _taskDetail(DerivedTaskItem task) {
     return DetailPanelData(
       title: task.title,
-      subtitle: 'Session-derived Task',
+      subtitle: appText('会话派生任务', 'Session-derived Task'),
       icon: Icons.layers_rounded,
       status: _statusInfoForTask(task.status),
       description: task.summary,
       meta: [task.surface, task.sessionKey],
-      actions: const ['Open Session', 'Refresh'],
+      actions: [appText('打开会话', 'Open Session'), appText('刷新', 'Refresh')],
       sections: [
         DetailSection(
-          title: 'Task',
+          title: appText('任务', 'Task'),
           items: [
-            DetailItem(label: 'Owner', value: task.owner),
-            DetailItem(label: 'Status', value: task.status),
-            DetailItem(label: 'Started', value: task.startedAtLabel),
-            DetailItem(label: 'Updated', value: task.durationLabel),
-            DetailItem(label: 'Session Key', value: task.sessionKey),
+            DetailItem(label: appText('负责人', 'Owner'), value: task.owner),
+            DetailItem(
+              label: appText('状态', 'Status'),
+              value: _statusLabel(task.status),
+            ),
+            DetailItem(
+              label: appText('开始时间', 'Started'),
+              value: task.startedAtLabel,
+            ),
+            DetailItem(
+              label: appText('更新时间', 'Updated'),
+              value: task.durationLabel,
+            ),
+            DetailItem(
+              label: appText('会话 Key', 'Session Key'),
+              value: task.sessionKey,
+            ),
           ],
         ),
       ],
     );
   }
+
+  String get _tabKey => switch (_tab) {
+    TasksTab.queue => 'Queue',
+    TasksTab.running => 'Running',
+    TasksTab.history => 'History',
+    TasksTab.failed => 'Failed',
+    TasksTab.scheduled => 'Scheduled',
+  };
 }
 
 StatusInfo _statusInfoForTask(String status) => switch (status) {
-  'Running' => const StatusInfo('Running', StatusTone.accent),
-  'Failed' => const StatusInfo('Failed', StatusTone.danger),
-  'Queued' => const StatusInfo('Queued', StatusTone.neutral),
-  'Scheduled' => const StatusInfo('Scheduled', StatusTone.accent),
-  _ => const StatusInfo('Completed', StatusTone.success),
+  'Running' => StatusInfo(appText('运行中', 'Running'), StatusTone.accent),
+  'Failed' => StatusInfo(appText('失败', 'Failed'), StatusTone.danger),
+  'Queued' => StatusInfo(appText('排队中', 'Queued'), StatusTone.neutral),
+  'Scheduled' => StatusInfo(appText('计划中', 'Scheduled'), StatusTone.accent),
+  _ => StatusInfo(appText('已完成', 'Completed'), StatusTone.success),
 };
+
+String _statusLabel(String status) => _statusInfoForTask(status).label;

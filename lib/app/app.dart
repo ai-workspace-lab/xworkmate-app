@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
+import '../i18n/app_language.dart';
 import '../theme/app_theme.dart';
 import 'app_controller.dart';
 import 'app_metadata.dart';
@@ -35,6 +37,9 @@ class _XWorkmateAppState extends State<XWorkmateApp> {
         return MaterialApp(
           title: kSystemAppName,
           debugShowCheckedModeBanner: false,
+          locale: Locale(_controller.appLanguage.code),
+          supportedLocales: const [Locale('zh'), Locale('en')],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
           themeMode: _controller.themeMode,
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
+import '../../i18n/app_language.dart';
+import '../../models/app_models.dart';
 import '../../runtime/runtime_controllers.dart';
 import '../../runtime/runtime_models.dart';
 import '../../widgets/gateway_connect_dialog.dart';
@@ -10,10 +12,7 @@ import '../../widgets/surface_card.dart';
 import '../../widgets/top_bar.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({
-    super.key,
-    required this.controller,
-  });
+  const SettingsPage({super.key, required this.controller});
 
   final AppController controller;
 
@@ -22,7 +21,7 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  String _tab = 'General';
+  SettingsTab _tab = SettingsTab.general;
   late final TextEditingController _apisixYamlController;
   late final TextEditingController _vaultTokenController;
   late final TextEditingController _ollamaApiKeyController;
@@ -58,13 +57,16 @@ class _SettingsPageState extends State<SettingsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
-                title: 'Settings',
-                subtitle: '配置 $kProductBrandName 工作区、网关默认项、界面与诊断选项',
+                title: appText('设置', 'Settings'),
+                subtitle: appText(
+                  '配置 $kProductBrandName 工作区、网关默认项、界面与诊断选项',
+                  'Configure workspace, gateway defaults, appearance, and diagnostics for $kProductBrandName.',
+                ),
                 trailing: SizedBox(
                   width: 220,
                   child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: '搜索',
+                    decoration: InputDecoration(
+                      hintText: appText('搜索设置', 'Search settings'),
                       prefixIcon: Icon(Icons.search_rounded),
                     ),
                   ),
@@ -72,28 +74,42 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               const SizedBox(height: 24),
               SectionTabs(
-                items: const [
-                  'General',
-                  'Workspace',
-                  'Gateway',
-                  'Appearance',
-                  'Diagnostics',
-                  'Experimental',
-                  'About',
-                ],
-                value: _tab,
-                onChanged: (value) => setState(() => _tab = value),
+                items: SettingsTab.values.map((item) => item.label).toList(),
+                value: _tab.label,
+                onChanged: (value) => setState(
+                  () => _tab = SettingsTab.values.firstWhere(
+                    (item) => item.label == value,
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
               ...switch (_tab) {
-                'General' => _buildGeneral(context, controller, settings),
-                'Workspace' => _buildWorkspace(context, controller, settings),
-                'Gateway' => _buildGateway(context, controller, settings),
-                'Appearance' => _buildAppearance(context, controller),
-                'Diagnostics' => _buildDiagnostics(context, controller),
-                'Experimental' => _buildExperimental(context, controller, settings),
-                'About' => _buildAbout(context, controller),
-                _ => const <Widget>[],
+                SettingsTab.general => _buildGeneral(
+                  context,
+                  controller,
+                  settings,
+                ),
+                SettingsTab.workspace => _buildWorkspace(
+                  context,
+                  controller,
+                  settings,
+                ),
+                SettingsTab.gateway => _buildGateway(
+                  context,
+                  controller,
+                  settings,
+                ),
+                SettingsTab.appearance => _buildAppearance(context, controller),
+                SettingsTab.diagnostics => _buildDiagnostics(
+                  context,
+                  controller,
+                ),
+                SettingsTab.experimental => _buildExperimental(
+                  context,
+                  controller,
+                  settings,
+                ),
+                SettingsTab.about => _buildAbout(context, controller),
               },
             ],
           ),
@@ -115,7 +131,7 @@ class _SettingsPageState extends State<SettingsPage> {
             Text('Application', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             _SwitchRow(
-              label: 'Active workspace shell',
+              label: appText('启用工作台外壳', 'Active workspace shell'),
               value: settings.appActive,
               onChanged: (value) => _saveSettings(
                 controller,
@@ -123,7 +139,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _SwitchRow(
-              label: 'Launch at login',
+              label: appText('开机启动', 'Launch at login'),
               value: settings.launchAtLogin,
               onChanged: (value) => _saveSettings(
                 controller,
@@ -131,7 +147,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _SwitchRow(
-              label: 'Show dock icon',
+              label: appText('显示 Dock 图标', 'Show dock icon'),
               value: settings.showDockIcon,
               onChanged: (value) => _saveSettings(
                 controller,
@@ -139,7 +155,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _SwitchRow(
-              label: 'Account local mode',
+              label: appText('账号本地模式', 'Account local mode'),
               value: settings.accountLocalMode,
               onChanged: (value) => _saveSettings(
                 controller,
@@ -154,10 +170,13 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Account Access', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              appText('账号访问', 'Account Access'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             _EditableField(
-              label: 'Account Base URL',
+              label: appText('账号服务地址', 'Account Base URL'),
               value: settings.accountBaseUrl,
               onSubmitted: (value) => _saveSettings(
                 controller,
@@ -165,7 +184,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _EditableField(
-              label: 'Account Username',
+              label: appText('账号用户名', 'Account Username'),
               value: settings.accountUsername,
               onSubmitted: (value) => _saveSettings(
                 controller,
@@ -173,7 +192,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _EditableField(
-              label: 'Workspace Label',
+              label: appText('工作区名称', 'Workspace Label'),
               value: settings.accountWorkspace,
               onSubmitted: (value) => _saveSettings(
                 controller,
@@ -196,10 +215,13 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Workspace', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              appText('工作区', 'Workspace'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             _EditableField(
-              label: 'Workspace Path',
+              label: appText('工作区路径', 'Workspace Path'),
               value: settings.workspacePath,
               onSubmitted: (value) => _saveSettings(
                 controller,
@@ -207,7 +229,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _EditableField(
-              label: 'Remote Project Root',
+              label: appText('远程项目根目录', 'Remote Project Root'),
               value: settings.remoteProjectRoot,
               onSubmitted: (value) => _saveSettings(
                 controller,
@@ -215,15 +237,13 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _EditableField(
-              label: 'CLI Path',
+              label: appText('CLI 路径', 'CLI Path'),
               value: settings.cliPath,
-              onSubmitted: (value) => _saveSettings(
-                controller,
-                settings.copyWith(cliPath: value),
-              ),
+              onSubmitted: (value) =>
+                  _saveSettings(controller, settings.copyWith(cliPath: value)),
             ),
             _EditableField(
-              label: 'Default Model',
+              label: appText('默认模型', 'Default Model'),
               value: settings.defaultModel,
               onSubmitted: (value) => _saveSettings(
                 controller,
@@ -231,7 +251,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _EditableField(
-              label: 'Default Provider',
+              label: appText('默认提供方', 'Default Provider'),
               value: settings.defaultProvider,
               onSubmitted: (value) => _saveSettings(
                 controller,
@@ -246,10 +266,13 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Ollama Local', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              appText('本地 Ollama', 'Ollama Local'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             _EditableField(
-              label: 'Endpoint',
+              label: appText('服务地址', 'Endpoint'),
               value: settings.ollamaLocal.endpoint,
               onSubmitted: (value) => _saveSettings(
                 controller,
@@ -259,22 +282,26 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _EditableField(
-              label: 'Default Model',
+              label: appText('默认模型', 'Default Model'),
               value: settings.ollamaLocal.defaultModel,
               onSubmitted: (value) => _saveSettings(
                 controller,
                 settings.copyWith(
-                  ollamaLocal: settings.ollamaLocal.copyWith(defaultModel: value),
+                  ollamaLocal: settings.ollamaLocal.copyWith(
+                    defaultModel: value,
+                  ),
                 ),
               ),
             ),
             _SwitchRow(
-              label: 'Auto Discover',
+              label: appText('自动发现', 'Auto Discover'),
               value: settings.ollamaLocal.autoDiscover,
               onChanged: (value) => _saveSettings(
                 controller,
                 settings.copyWith(
-                  ollamaLocal: settings.ollamaLocal.copyWith(autoDiscover: value),
+                  ollamaLocal: settings.ollamaLocal.copyWith(
+                    autoDiscover: value,
+                  ),
                 ),
               ),
             ),
@@ -283,7 +310,9 @@ class _SettingsPageState extends State<SettingsPage> {
               alignment: Alignment.centerLeft,
               child: OutlinedButton(
                 onPressed: () => controller.testOllamaConnection(cloud: false),
-                child: Text('Test Connection · ${controller.settingsController.ollamaStatus}'),
+                child: Text(
+                  '${appText('测试连接', 'Test Connection')} · ${controller.settingsController.ollamaStatus}',
+                ),
               ),
             ),
           ],
@@ -294,10 +323,13 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Ollama Cloud', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              appText('云端 Ollama', 'Ollama Cloud'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             _EditableField(
-              label: 'Base URL',
+              label: appText('基础地址', 'Base URL'),
               value: settings.ollamaCloud.baseUrl,
               onSubmitted: (value) => _saveSettings(
                 controller,
@@ -307,7 +339,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _EditableField(
-              label: 'Workspace / Org',
+              label: appText('工作区 / 组织', 'Workspace / Org'),
               value:
                   '${settings.ollamaCloud.organization} / ${settings.ollamaCloud.workspace}',
               onSubmitted: (value) {
@@ -324,12 +356,14 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
             _EditableField(
-              label: 'Default Model',
+              label: appText('默认模型', 'Default Model'),
               value: settings.ollamaCloud.defaultModel,
               onSubmitted: (value) => _saveSettings(
                 controller,
                 settings.copyWith(
-                  ollamaCloud: settings.ollamaCloud.copyWith(defaultModel: value),
+                  ollamaCloud: settings.ollamaCloud.copyWith(
+                    defaultModel: value,
+                  ),
                 ),
               ),
             ),
@@ -337,7 +371,8 @@ class _SettingsPageState extends State<SettingsPage> {
               controller: _ollamaApiKeyController,
               obscureText: true,
               decoration: InputDecoration(
-                labelText: 'API Key (${settings.ollamaCloud.apiKeyRef})',
+                labelText:
+                    '${appText('API Key', 'API Key')} (${settings.ollamaCloud.apiKeyRef})',
               ),
               onSubmitted: controller.settingsController.saveOllamaCloudApiKey,
             ),
@@ -346,7 +381,9 @@ class _SettingsPageState extends State<SettingsPage> {
               alignment: Alignment.centerLeft,
               child: OutlinedButton(
                 onPressed: () => controller.testOllamaConnection(cloud: true),
-                child: Text('Test Cloud · ${controller.settingsController.ollamaStatus}'),
+                child: Text(
+                  '${appText('测试云端', 'Test Cloud')} · ${controller.settingsController.ollamaStatus}',
+                ),
               ),
             ),
           ],
@@ -365,7 +402,10 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Gateway Connection', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              appText('网关连接', 'Gateway Connection'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             Text(
               '${controller.connection.status.label} · ${controller.connection.remoteAddress ?? settings.gateway.host}:${settings.gateway.port}',
@@ -384,11 +424,11 @@ class _SettingsPageState extends State<SettingsPage> {
                       onDone: () => Navigator.of(context).pop(),
                     ),
                   ),
-                  child: const Text('Open Connect Panel'),
+                  child: Text(appText('打开连接面板', 'Open Connect Panel')),
                 ),
                 OutlinedButton(
                   onPressed: controller.refreshGatewayHealth,
-                  child: const Text('Refresh Health'),
+                  child: Text(appText('刷新健康状态', 'Refresh Health')),
                 ),
               ],
             ),
@@ -397,9 +437,14 @@ class _SettingsPageState extends State<SettingsPage> {
               initialValue: controller.selectedAgentId.isEmpty
                   ? ''
                   : controller.selectedAgentId,
-              decoration: const InputDecoration(labelText: 'Selected Agent'),
+              decoration: InputDecoration(
+                labelText: appText('当前代理', 'Selected Agent'),
+              ),
               items: [
-                const DropdownMenuItem<String>(value: '', child: Text('Main')),
+                DropdownMenuItem<String>(
+                  value: '',
+                  child: Text(appText('主代理', 'Main')),
+                ),
                 ...controller.agents.map(
                   (agent) => DropdownMenuItem<String>(
                     value: agent.id,
@@ -417,18 +462,23 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Vault Server', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              appText('Vault 服务', 'Vault Server'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             _EditableField(
-              label: 'Address',
+              label: appText('地址', 'Address'),
               value: settings.vault.address,
               onSubmitted: (value) => _saveSettings(
                 controller,
-                settings.copyWith(vault: settings.vault.copyWith(address: value)),
+                settings.copyWith(
+                  vault: settings.vault.copyWith(address: value),
+                ),
               ),
             ),
             _EditableField(
-              label: 'Namespace',
+              label: appText('命名空间', 'Namespace'),
               value: settings.vault.namespace,
               onSubmitted: (value) => _saveSettings(
                 controller,
@@ -438,26 +488,31 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _EditableField(
-              label: 'Auth Mode',
+              label: appText('认证模式', 'Auth Mode'),
               value: settings.vault.authMode,
               onSubmitted: (value) => _saveSettings(
                 controller,
-                settings.copyWith(vault: settings.vault.copyWith(authMode: value)),
+                settings.copyWith(
+                  vault: settings.vault.copyWith(authMode: value),
+                ),
               ),
             ),
             _EditableField(
-              label: 'Token Ref',
+              label: appText('Token 引用', 'Token Ref'),
               value: settings.vault.tokenRef,
               onSubmitted: (value) => _saveSettings(
                 controller,
-                settings.copyWith(vault: settings.vault.copyWith(tokenRef: value)),
+                settings.copyWith(
+                  vault: settings.vault.copyWith(tokenRef: value),
+                ),
               ),
             ),
             TextField(
               controller: _vaultTokenController,
               obscureText: true,
               decoration: InputDecoration(
-                labelText: 'Vault Token (${settings.vault.tokenRef})',
+                labelText:
+                    '${appText('Vault Token', 'Vault Token')} (${settings.vault.tokenRef})',
               ),
               onSubmitted: controller.settingsController.saveVaultToken,
             ),
@@ -466,7 +521,9 @@ class _SettingsPageState extends State<SettingsPage> {
               alignment: Alignment.centerLeft,
               child: OutlinedButton(
                 onPressed: controller.testVaultConnection,
-                child: Text('Test Vault · ${controller.settingsController.vaultStatus}'),
+                child: Text(
+                  '${appText('测试 Vault', 'Test Vault')} · ${controller.settingsController.vaultStatus}',
+                ),
               ),
             ),
           ],
@@ -477,18 +534,23 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('APISIX YAML', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              appText('APISIX YAML', 'APISIX YAML'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             _EditableField(
-              label: 'Profile Name',
+              label: appText('配置名称', 'Profile Name'),
               value: settings.apisix.name,
               onSubmitted: (value) => _saveSettings(
                 controller,
-                settings.copyWith(apisix: settings.apisix.copyWith(name: value)),
+                settings.copyWith(
+                  apisix: settings.apisix.copyWith(name: value),
+                ),
               ),
             ),
             _EditableField(
-              label: 'Source Type',
+              label: appText('来源类型', 'Source Type'),
               value: settings.apisix.sourceType,
               onSubmitted: (value) => _saveSettings(
                 controller,
@@ -498,20 +560,25 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _EditableField(
-              label: 'File Path',
+              label: appText('文件路径', 'File Path'),
               value: settings.apisix.filePath,
               onSubmitted: (value) => _saveSettings(
                 controller,
-                settings.copyWith(apisix: settings.apisix.copyWith(filePath: value)),
+                settings.copyWith(
+                  apisix: settings.apisix.copyWith(filePath: value),
+                ),
               ),
             ),
             TextField(
               controller: _apisixYamlController,
               minLines: 6,
               maxLines: 10,
-              decoration: const InputDecoration(
-                labelText: 'Inline YAML',
-                hintText: 'Paste APISIX route / upstream YAML for validation',
+              decoration: InputDecoration(
+                labelText: appText('内联 YAML', 'Inline YAML'),
+                hintText: appText(
+                  '粘贴 APISIX 路由或 upstream YAML 用于校验',
+                  'Paste APISIX route / upstream YAML for validation',
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -528,7 +595,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     ),
                   ),
-                  child: const Text('Save Draft'),
+                  child: Text(appText('保存草稿', 'Save Draft')),
                 ),
                 OutlinedButton(
                   onPressed: () async {
@@ -540,10 +607,12 @@ class _SettingsPageState extends State<SettingsPage> {
                     if (!mounted) {
                       return;
                     }
-                    messenger.showSnackBar(SnackBar(content: Text(result.validationMessage)));
+                    messenger.showSnackBar(
+                      SnackBar(content: Text(result.validationMessage)),
+                    );
                   },
                   child: Text(
-                    'Validate · ${settings.apisix.validationState}',
+                    '${appText('校验', 'Validate')} · ${settings.apisix.validationState}',
                   ),
                 ),
               ],
@@ -568,24 +637,27 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Theme', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              appText('主题', 'Theme'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             Wrap(
               spacing: 12,
               runSpacing: 12,
               children: [
                 ChoiceChip(
-                  label: const Text('Light'),
+                  label: Text(appText('浅色', 'Light')),
                   selected: controller.themeMode == ThemeMode.light,
                   onSelected: (_) => controller.setThemeMode(ThemeMode.light),
                 ),
                 ChoiceChip(
-                  label: const Text('Dark'),
+                  label: Text(appText('深色', 'Dark')),
                   selected: controller.themeMode == ThemeMode.dark,
                   onSelected: (_) => controller.setThemeMode(ThemeMode.dark),
                 ),
                 ChoiceChip(
-                  label: const Text('System'),
+                  label: Text(appText('跟随系统', 'System')),
                   selected: controller.themeMode == ThemeMode.system,
                   onSelected: (_) => controller.setThemeMode(ThemeMode.system),
                 ),
@@ -606,24 +678,35 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Gateway Diagnostics', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            _InfoRow(label: 'Connection', value: controller.connection.status.label),
-            _InfoRow(
-              label: 'Address',
-              value: controller.connection.remoteAddress ?? 'Offline',
+            Text(
+              appText('网关诊断', 'Gateway Diagnostics'),
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            _InfoRow(label: 'Agent', value: controller.activeAgentName),
+            const SizedBox(height: 16),
             _InfoRow(
-              label: 'Health Payload',
+              label: appText('连接', 'Connection'),
+              value: controller.connection.status.label,
+            ),
+            _InfoRow(
+              label: appText('地址', 'Address'),
+              value:
+                  controller.connection.remoteAddress ??
+                  appText('离线', 'Offline'),
+            ),
+            _InfoRow(
+              label: appText('代理', 'Agent'),
+              value: controller.activeAgentName,
+            ),
+            _InfoRow(
+              label: appText('健康负载', 'Health Payload'),
               value: controller.connection.healthPayload == null
-                  ? 'Unavailable'
+                  ? appText('不可用', 'Unavailable')
                   : encodePrettyJson(controller.connection.healthPayload!),
             ),
             _InfoRow(
-              label: 'Status Payload',
+              label: appText('状态负载', 'Status Payload'),
               value: controller.connection.statusPayload == null
-                  ? 'Unavailable'
+                  ? appText('不可用', 'Unavailable')
                   : encodePrettyJson(controller.connection.statusPayload!),
             ),
           ],
@@ -634,12 +717,21 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Device', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              appText('设备', 'Device'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
-            _InfoRow(label: 'Platform', value: controller.runtime.deviceInfo.platformLabel),
-            _InfoRow(label: 'Device Family', value: controller.runtime.deviceInfo.deviceFamily),
             _InfoRow(
-              label: 'Model Identifier',
+              label: appText('平台', 'Platform'),
+              value: controller.runtime.deviceInfo.platformLabel,
+            ),
+            _InfoRow(
+              label: appText('设备类型', 'Device Family'),
+              value: controller.runtime.deviceInfo.deviceFamily,
+            ),
+            _InfoRow(
+              label: appText('型号标识', 'Model Identifier'),
               value: controller.runtime.deviceInfo.modelIdentifier,
             ),
           ],
@@ -658,10 +750,13 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Experimental', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              appText('实验特性', 'Experimental'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             _SwitchRow(
-              label: 'Canvas host',
+              label: appText('Canvas 宿主', 'Canvas host'),
               value: settings.experimentalCanvas,
               onChanged: (value) => _saveSettings(
                 controller,
@@ -669,7 +764,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _SwitchRow(
-              label: 'Bridge mode',
+              label: appText('桥接模式', 'Bridge mode'),
               value: settings.experimentalBridge,
               onChanged: (value) => _saveSettings(
                 controller,
@@ -677,7 +772,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _SwitchRow(
-              label: 'Debug runtime',
+              label: appText('调试运行时', 'Debug runtime'),
               value: settings.experimentalDebug,
               onChanged: (value) => _saveSettings(
                 controller,
@@ -690,21 +785,30 @@ class _SettingsPageState extends State<SettingsPage> {
     ];
   }
 
-  List<Widget> _buildAbout(
-    BuildContext context,
-    AppController controller,
-  ) {
+  List<Widget> _buildAbout(BuildContext context, AppController controller) {
     return [
       SurfaceCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('About', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              appText('关于', 'About'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
-            _InfoRow(label: 'App', value: kSystemAppName),
-            _InfoRow(label: 'Version', value: controller.runtime.packageInfo.version),
-            _InfoRow(label: 'Build', value: controller.runtime.packageInfo.buildNumber),
-            _InfoRow(label: 'Package', value: controller.runtime.packageInfo.packageName),
+            _InfoRow(label: appText('应用', 'App'), value: kSystemAppName),
+            _InfoRow(
+              label: appText('版本', 'Version'),
+              value: controller.runtime.packageInfo.version,
+            ),
+            _InfoRow(
+              label: appText('构建号', 'Build'),
+              value: controller.runtime.packageInfo.buildNumber,
+            ),
+            _InfoRow(
+              label: appText('包名', 'Package'),
+              value: controller.runtime.packageInfo.packageName,
+            ),
           ],
         ),
       ),
@@ -767,10 +871,7 @@ class _SwitchRow extends StatelessWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({
-    required this.label,
-    required this.value,
-  });
+  const _InfoRow({required this.label, required this.value});
 
   final String label;
   final String value;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/app_controller.dart';
+import '../i18n/app_language.dart';
 import '../runtime/runtime_models.dart';
 import 'section_tabs.dart';
 
@@ -27,7 +28,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
   final TextEditingController _tokenController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  String _mode = 'Setup Code';
+  String _mode = 'setup';
   bool _tls = true;
   RuntimeConnectionMode _connectionMode = RuntimeConnectionMode.remote;
   bool _submitting = false;
@@ -41,7 +42,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
     _portController = TextEditingController(text: '${profile.port}');
     _tls = profile.tls;
     _connectionMode = profile.mode;
-    _mode = profile.useSetupCode ? 'Setup Code' : 'Manual';
+    _mode = profile.useSetupCode ? 'setup' : 'manual';
   }
 
   @override
@@ -63,36 +64,53 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('Gateway Access', style: theme.textTheme.headlineSmall),
+          Text(
+            appText('Gateway 访问', 'Gateway Access'),
+            style: theme.textTheme.headlineSmall,
+          ),
           const SizedBox(height: 8),
           Text(
-            'Connect XWorkmate to an OpenClaw gateway with setup code or manual host / TLS.',
+            appText(
+              '通过配置码或手动 Host / TLS 将 XWorkmate 连接到 OpenClaw Gateway。',
+              'Connect XWorkmate to an OpenClaw gateway with setup code or manual host / TLS.',
+            ),
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 18),
           SectionTabs(
-            items: const ['Setup Code', 'Manual'],
-            value: _mode,
+            items: [appText('配置码', 'Setup Code'), appText('手动配置', 'Manual')],
+            value: _mode == 'setup'
+                ? appText('配置码', 'Setup Code')
+                : appText('手动配置', 'Manual'),
             size: SectionTabsSize.small,
-            onChanged: (value) => setState(() => _mode = value),
+            onChanged: (value) => setState(
+              () => _mode = value == appText('配置码', 'Setup Code')
+                  ? 'setup'
+                  : 'manual',
+            ),
           ),
           const SizedBox(height: 18),
           _StatusBanner(controller: widget.controller),
           const SizedBox(height: 18),
-          if (_mode == 'Setup Code') ...[
+          if (_mode == 'setup') ...[
             TextField(
               controller: _setupCodeController,
               minLines: 4,
               maxLines: 6,
-              decoration: const InputDecoration(
-                labelText: 'Setup Code',
-                hintText: 'Paste gateway setup code or JSON payload',
+              decoration: InputDecoration(
+                labelText: appText('配置码', 'Setup Code'),
+                hintText: appText(
+                  '粘贴 Gateway 配置码或 JSON 负载',
+                  'Paste gateway setup code or JSON payload',
+                ),
               ),
             ),
           ] else ...[
             DropdownButtonFormField<RuntimeConnectionMode>(
               initialValue: _connectionMode,
-              decoration: const InputDecoration(labelText: 'Connection Mode'),
+              decoration: InputDecoration(
+                labelText: appText('连接模式', 'Connection Mode'),
+              ),
               items: RuntimeConnectionMode.values
                   .map(
                     (mode) => DropdownMenuItem<RuntimeConnectionMode>(
@@ -118,7 +136,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _hostController,
-              decoration: const InputDecoration(labelText: 'Host'),
+              decoration: InputDecoration(labelText: appText('主机', 'Host')),
             ),
             const SizedBox(height: 12),
             Row(
@@ -127,7 +145,9 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                   child: TextField(
                     controller: _portController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Port'),
+                    decoration: InputDecoration(
+                      labelText: appText('端口', 'Port'),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -135,7 +155,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                   child: SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     value: _tls,
-                    title: const Text('TLS'),
+                    title: Text(appText('TLS', 'TLS')),
                     onChanged: _connectionMode == RuntimeConnectionMode.local
                         ? null
                         : (value) => setState(() => _tls = value),
@@ -147,18 +167,21 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
           const SizedBox(height: 18),
           TextField(
             controller: _tokenController,
-            decoration: const InputDecoration(
-              labelText: 'Shared Token',
-              hintText: 'Optional override for gateway token',
+            decoration: InputDecoration(
+              labelText: appText('共享 Token', 'Shared Token'),
+              hintText: appText(
+                '可选：覆盖默认 Gateway Token',
+                'Optional override for gateway token',
+              ),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _passwordController,
             obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Password',
-              hintText: 'Optional shared password',
+            decoration: InputDecoration(
+              labelText: appText('密码', 'Password'),
+              hintText: appText('可选：共享密码', 'Optional shared password'),
             ),
           ),
           const SizedBox(height: 20),
@@ -180,12 +203,16 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                           }
                         },
                   icon: const Icon(Icons.link_off_rounded),
-                  label: const Text('Disconnect'),
+                  label: Text(appText('断开连接', 'Disconnect')),
                 ),
               FilledButton.icon(
                 onPressed: _submitting ? null : _submit,
                 icon: const Icon(Icons.wifi_tethering_rounded),
-                label: Text(_submitting ? 'Connecting…' : 'Connect'),
+                label: Text(
+                  _submitting
+                      ? appText('连接中…', 'Connecting…')
+                      : appText('连接', 'Connect'),
+                ),
               ),
             ],
           ),
@@ -208,7 +235,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
   Future<void> _submit() async {
     setState(() => _submitting = true);
     try {
-      if (_mode == 'Setup Code') {
+      if (_mode == 'setup') {
         await widget.controller.connectWithSetupCode(
           setupCode: _setupCodeController.text,
           token: _tokenController.text,
@@ -245,8 +272,10 @@ class _StatusBanner extends StatelessWidget {
     final tone = switch (connection.status) {
       RuntimeConnectionStatus.connected => theme.colorScheme.primaryContainer,
       RuntimeConnectionStatus.error => theme.colorScheme.errorContainer,
-      RuntimeConnectionStatus.connecting => theme.colorScheme.secondaryContainer,
-      RuntimeConnectionStatus.offline => theme.colorScheme.surfaceContainerHighest,
+      RuntimeConnectionStatus.connecting =>
+        theme.colorScheme.secondaryContainer,
+      RuntimeConnectionStatus.offline =>
+        theme.colorScheme.surfaceContainerHighest,
     };
     return Container(
       width: double.infinity,
@@ -258,10 +287,7 @@ class _StatusBanner extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            connection.status.label,
-            style: theme.textTheme.titleMedium,
-          ),
+          Text(connection.status.label, style: theme.textTheme.titleMedium),
           const SizedBox(height: 6),
           Text(
             connection.remoteAddress ?? 'No active gateway target',

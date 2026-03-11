@@ -84,10 +84,10 @@ class AppShell extends StatelessWidget {
                           borderRadius: BorderRadius.circular(28),
                           border: Border.all(color: palette.strokeSoft),
                         ),
-                          child: SafeArea(
-                            top: false,
-                            child: AccountPage(controller: controller),
-                          ),
+                        child: SafeArea(
+                          top: false,
+                          child: AccountPage(controller: controller),
+                        ),
                       );
                     },
                   );
@@ -100,9 +100,6 @@ class AppShell extends StatelessWidget {
                 if (isMobile) {
                   return Stack(
                     children: [
-                      Positioned.fill(
-                        child: _AmbientBackground(palette: palette),
-                      ),
                       Column(
                         children: [
                           Expanded(
@@ -160,16 +157,15 @@ class AppShell extends StatelessWidget {
 
                 return Stack(
                   children: [
-                    Positioned.fill(
-                      child: _AmbientBackground(palette: palette),
-                    ),
                     Row(
                       children: [
                         SidebarNavigation(
                           currentSection: controller.destination,
                           isCollapsed: collapsed,
+                          appLanguage: controller.appLanguage,
                           themeMode: controller.themeMode,
                           onSectionChanged: controller.navigateTo,
+                          onToggleLanguage: controller.toggleAppLanguage,
                           onToggleCollapsed: controller.toggleSidebar,
                           onOpenAccount: () => controller.navigateTo(
                             WorkspaceDestination.account,
@@ -183,9 +179,9 @@ class AppShell extends StatelessWidget {
                         Expanded(
                           child: Padding(
                             padding: const EdgeInsets.only(
-                              top: 16,
-                              right: 16,
-                              bottom: 16,
+                              top: 10,
+                              right: 10,
+                              bottom: 10,
                             ),
                             child: AnimatedPadding(
                               duration: const Duration(milliseconds: 220),
@@ -193,12 +189,9 @@ class AppShell extends StatelessWidget {
                               padding: EdgeInsets.only(
                                 right: showPinnedDetail ? 392 : 0,
                               ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(30),
-                                child: Container(
-                                  color: palette.canvas.withValues(alpha: 0.16),
-                                  child: _buildCurrentPage(controller.openDetail),
-                                ),
+                              child: Container(
+                                color: palette.canvas,
+                                child: _buildCurrentPage(controller.openDetail),
                               ),
                             ),
                           ),
@@ -265,43 +258,5 @@ class AppShell extends StatelessWidget {
       WorkspaceDestination.settings => SettingsPage(controller: controller),
       WorkspaceDestination.account => AccountPage(controller: controller),
     };
-  }
-}
-
-class _AmbientBackground extends StatelessWidget {
-  const _AmbientBackground({required this.palette});
-
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned(
-          top: -120,
-          right: -80,
-          child: Container(
-            width: 340,
-            height: 340,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: palette.accent.withValues(alpha: 0.07),
-            ),
-          ),
-        ),
-        Positioned(
-          left: -120,
-          bottom: -180,
-          child: Container(
-            width: 380,
-            height: 380,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: palette.success.withValues(alpha: 0.05),
-            ),
-          ),
-        ),
-      ],
-    );
   }
 }

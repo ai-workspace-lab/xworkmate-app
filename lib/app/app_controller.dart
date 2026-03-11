@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/device_identity_store.dart';
 import '../runtime/gateway_runtime.dart';
@@ -71,6 +72,7 @@ class AppController extends ChangeNotifier {
   String get activeAgentName => _agentsController.activeAgentName;
   String get currentSessionKey => _sessionsController.currentSessionKey;
   String? get activeRunId => _chatController.activeRunId;
+  AppLanguage get appLanguage => settings.appLanguage;
   AssistantExecutionTarget get assistantExecutionTarget =>
       settings.assistantExecutionTarget;
   AssistantPermissionLevel get assistantPermissionLevel =>
@@ -120,6 +122,23 @@ class AppController extends ChangeNotifier {
     }
     _themeMode = mode;
     notifyListeners();
+  }
+
+  Future<void> toggleAppLanguage() async {
+    await setAppLanguage(
+      settings.appLanguage == AppLanguage.zh ? AppLanguage.en : AppLanguage.zh,
+    );
+  }
+
+  Future<void> setAppLanguage(AppLanguage language) async {
+    if (settings.appLanguage == language) {
+      return;
+    }
+    setActiveAppLanguage(language);
+    await saveSettings(
+      settings.copyWith(appLanguage: language),
+      refreshAfterSave: false,
+    );
   }
 
   void openDetail(DetailPanelData detailPanel) {
@@ -317,6 +336,7 @@ class AppController extends ChangeNotifier {
     SettingsSnapshot snapshot, {
     bool refreshAfterSave = true,
   }) async {
+    setActiveAppLanguage(snapshot.appLanguage);
     await _settingsController.saveSnapshot(snapshot);
     _agentsController.restoreSelection(snapshot.gateway.selectedAgentId);
     if (refreshAfterSave) {
@@ -363,6 +383,7 @@ class AppController extends ChangeNotifier {
   Future<void> _initialize() async {
     try {
       await _settingsController.initialize();
+      setActiveAppLanguage(settings.appLanguage);
       await _runtime.initialize();
       _agentsController.restoreSelection(settings.gateway.selectedAgentId);
       _sessionsController.configure(

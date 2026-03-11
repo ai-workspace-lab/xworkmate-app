@@ -1,12 +1,14 @@
 import 'dart:convert';
 
+import '../i18n/app_language.dart';
+
 enum RuntimeConnectionMode { unconfigured, local, remote }
 
 extension RuntimeConnectionModeCopy on RuntimeConnectionMode {
   String get label => switch (this) {
-    RuntimeConnectionMode.unconfigured => 'Unconfigured',
-    RuntimeConnectionMode.local => 'Local',
-    RuntimeConnectionMode.remote => 'Remote',
+    RuntimeConnectionMode.unconfigured => appText('未配置', 'Unconfigured'),
+    RuntimeConnectionMode.local => appText('本地', 'Local'),
+    RuntimeConnectionMode.remote => appText('远程', 'Remote'),
   };
 
   static RuntimeConnectionMode fromJsonValue(String? value) {
@@ -21,10 +23,10 @@ enum RuntimeConnectionStatus { offline, connecting, connected, error }
 
 extension RuntimeConnectionStatusCopy on RuntimeConnectionStatus {
   String get label => switch (this) {
-    RuntimeConnectionStatus.offline => 'Offline',
-    RuntimeConnectionStatus.connecting => 'Connecting',
-    RuntimeConnectionStatus.connected => 'Connected',
-    RuntimeConnectionStatus.error => 'Error',
+    RuntimeConnectionStatus.offline => appText('离线', 'Offline'),
+    RuntimeConnectionStatus.connecting => appText('连接中', 'Connecting'),
+    RuntimeConnectionStatus.connected => appText('已连接', 'Connected'),
+    RuntimeConnectionStatus.error => appText('错误', 'Error'),
   };
 }
 
@@ -32,8 +34,8 @@ enum AssistantExecutionTarget { local, remote }
 
 extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   String get label => switch (this) {
-    AssistantExecutionTarget.local => '本地',
-    AssistantExecutionTarget.remote => '远程',
+    AssistantExecutionTarget.local => appText('本地', 'Local'),
+    AssistantExecutionTarget.remote => appText('远程', 'Remote'),
   };
 
   String get promptValue => switch (this) {
@@ -53,8 +55,8 @@ enum AssistantPermissionLevel { defaultAccess, fullAccess }
 
 extension AssistantPermissionLevelCopy on AssistantPermissionLevel {
   String get label => switch (this) {
-    AssistantPermissionLevel.defaultAccess => '默认权限',
-    AssistantPermissionLevel.fullAccess => '完全访问权限',
+    AssistantPermissionLevel.defaultAccess => appText('默认权限', 'Default Access'),
+    AssistantPermissionLevel.fullAccess => appText('完全访问权限', 'Full Access'),
   };
 
   String get promptValue => switch (this) {
@@ -398,6 +400,7 @@ class ApisixYamlProfile {
 
 class SettingsSnapshot {
   const SettingsSnapshot({
+    required this.appLanguage,
     required this.appActive,
     required this.launchAtLogin,
     required this.showDockIcon,
@@ -422,6 +425,7 @@ class SettingsSnapshot {
     required this.assistantPermissionLevel,
   });
 
+  final AppLanguage appLanguage;
   final bool appActive;
   final bool launchAtLogin;
   final bool showDockIcon;
@@ -447,6 +451,7 @@ class SettingsSnapshot {
 
   factory SettingsSnapshot.defaults() {
     return SettingsSnapshot(
+      appLanguage: AppLanguage.zh,
       appActive: true,
       launchAtLogin: false,
       showDockIcon: true,
@@ -473,6 +478,7 @@ class SettingsSnapshot {
   }
 
   SettingsSnapshot copyWith({
+    AppLanguage? appLanguage,
     bool? appActive,
     bool? launchAtLogin,
     bool? showDockIcon,
@@ -497,6 +503,7 @@ class SettingsSnapshot {
     AssistantPermissionLevel? assistantPermissionLevel,
   }) {
     return SettingsSnapshot(
+      appLanguage: appLanguage ?? this.appLanguage,
       appActive: appActive ?? this.appActive,
       launchAtLogin: launchAtLogin ?? this.launchAtLogin,
       showDockIcon: showDockIcon ?? this.showDockIcon,
@@ -526,6 +533,7 @@ class SettingsSnapshot {
 
   Map<String, dynamic> toJson() {
     return {
+      'appLanguage': appLanguage.name,
       'appActive': appActive,
       'launchAtLogin': launchAtLogin,
       'showDockIcon': showDockIcon,
@@ -553,6 +561,9 @@ class SettingsSnapshot {
 
   factory SettingsSnapshot.fromJson(Map<String, dynamic> json) {
     return SettingsSnapshot(
+      appLanguage: AppLanguageCopy.fromJsonValue(
+        json['appLanguage'] as String?,
+      ),
       appActive: json['appActive'] as bool? ?? true,
       launchAtLogin: json['launchAtLogin'] as bool? ?? false,
       showDockIcon: json['showDockIcon'] as bool? ?? true,

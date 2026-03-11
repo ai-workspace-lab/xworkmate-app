@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../i18n/app_language.dart';
+
 enum WorkspaceDestination {
   assistant,
   tasks,
@@ -11,12 +13,12 @@ enum WorkspaceDestination {
 
 extension WorkspaceDestinationCopy on WorkspaceDestination {
   String get label => switch (this) {
-    WorkspaceDestination.assistant => 'Assistant',
-    WorkspaceDestination.tasks => 'Tasks',
-    WorkspaceDestination.modules => 'Modules',
-    WorkspaceDestination.secrets => 'Secrets',
-    WorkspaceDestination.settings => 'Settings',
-    WorkspaceDestination.account => 'Account',
+    WorkspaceDestination.assistant => appText('助手', 'Assistant'),
+    WorkspaceDestination.tasks => appText('任务', 'Tasks'),
+    WorkspaceDestination.modules => appText('模块', 'Modules'),
+    WorkspaceDestination.secrets => appText('密钥', 'Secrets'),
+    WorkspaceDestination.settings => appText('设置', 'Settings'),
+    WorkspaceDestination.account => appText('账号', 'Account'),
   };
 
   IconData get icon => switch (this) {
@@ -29,13 +31,30 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
   };
 
   String get description => switch (this) {
-    WorkspaceDestination.assistant => 'AI 主入口，优先承接自然输入和高频工作发起。',
-    WorkspaceDestination.tasks => '任务队列、运行态、失败项和调度历史的统一视图。',
-    WorkspaceDestination.modules =>
+    WorkspaceDestination.assistant => appText(
+      'AI 主入口，优先承接自然输入和高频工作发起。',
+      'Primary AI entry point for natural input and frequent task starts.',
+    ),
+    WorkspaceDestination.tasks => appText(
+      '任务队列、运行态、失败项和调度历史的统一视图。',
+      'Unified view for queue, running, failed, and history.',
+    ),
+    WorkspaceDestination.modules => appText(
       '平台能力中心，管理 Gateway、Nodes、Agents、Skills 与 Connectors。',
-    WorkspaceDestination.secrets => 'Vault、Provider 凭证与审计信息的轻量管理面。',
-    WorkspaceDestination.settings => '全局配置中心，只负责系统设置与诊断，不承担业务模块入口。',
-    WorkspaceDestination.account => '用户身份、工作区切换与登录会话管理。',
+      'Capability center for gateway, nodes, agents, skills, and connectors.',
+    ),
+    WorkspaceDestination.secrets => appText(
+      'Vault、Provider 凭证与审计信息的轻量管理面。',
+      'Lightweight management for vault, provider credentials, and audit data.',
+    ),
+    WorkspaceDestination.settings => appText(
+      '全局配置中心，只负责系统设置与诊断，不承担业务模块入口。',
+      'Global settings and diagnostics, separated from business modules.',
+    ),
+    WorkspaceDestination.account => appText(
+      '用户身份、工作区切换与登录会话管理。',
+      'Identity, workspace switching, and session management.',
+    ),
   };
 }
 
@@ -52,8 +71,8 @@ enum AssistantMode { code, office }
 
 extension AssistantModeCopy on AssistantMode {
   String get label => switch (this) {
-    AssistantMode.code => '代码开发',
-    AssistantMode.office => '日常办公',
+    AssistantMode.code => appText('代码开发', 'Code'),
+    AssistantMode.office => appText('日常办公', 'Office'),
   };
 }
 
@@ -61,11 +80,11 @@ enum TasksTab { queue, running, history, failed, scheduled }
 
 extension TasksTabCopy on TasksTab {
   String get label => switch (this) {
-    TasksTab.queue => 'Queue',
-    TasksTab.running => 'Running',
-    TasksTab.history => 'History',
-    TasksTab.failed => 'Failed',
-    TasksTab.scheduled => 'Scheduled',
+    TasksTab.queue => appText('队列', 'Queue'),
+    TasksTab.running => appText('运行中', 'Running'),
+    TasksTab.history => appText('历史', 'History'),
+    TasksTab.failed => appText('失败', 'Failed'),
+    TasksTab.scheduled => appText('计划中', 'Scheduled'),
   };
 }
 
@@ -73,12 +92,12 @@ enum ModulesTab { gateway, nodes, agents, skills, clawHub, connectors }
 
 extension ModulesTabCopy on ModulesTab {
   String get label => switch (this) {
-    ModulesTab.gateway => 'Gateway',
-    ModulesTab.nodes => 'Nodes',
-    ModulesTab.agents => 'Agents',
-    ModulesTab.skills => 'Skills',
+    ModulesTab.gateway => appText('网关', 'Gateway'),
+    ModulesTab.nodes => appText('节点', 'Nodes'),
+    ModulesTab.agents => appText('代理', 'Agents'),
+    ModulesTab.skills => appText('技能', 'Skills'),
     ModulesTab.clawHub => 'ClawHub',
-    ModulesTab.connectors => 'Connectors',
+    ModulesTab.connectors => appText('连接器', 'Connectors'),
   };
 }
 
@@ -87,9 +106,9 @@ enum SecretsTab { vault, localStore, providers, audit }
 extension SecretsTabCopy on SecretsTab {
   String get label => switch (this) {
     SecretsTab.vault => 'Vault',
-    SecretsTab.localStore => 'Local Store',
-    SecretsTab.providers => 'Providers',
-    SecretsTab.audit => 'Audit',
+    SecretsTab.localStore => appText('本地存储', 'Local Store'),
+    SecretsTab.providers => appText('提供方', 'Providers'),
+    SecretsTab.audit => appText('审计', 'Audit'),
   };
 }
 
@@ -105,13 +124,13 @@ enum SettingsTab {
 
 extension SettingsTabCopy on SettingsTab {
   String get label => switch (this) {
-    SettingsTab.general => 'General',
-    SettingsTab.workspace => 'Workspace',
-    SettingsTab.gateway => 'Gateway',
-    SettingsTab.appearance => 'Appearance',
-    SettingsTab.diagnostics => 'Diagnostics',
-    SettingsTab.experimental => 'Experimental',
-    SettingsTab.about => 'About',
+    SettingsTab.general => appText('通用', 'General'),
+    SettingsTab.workspace => appText('工作区', 'Workspace'),
+    SettingsTab.gateway => appText('网关', 'Gateway'),
+    SettingsTab.appearance => appText('外观', 'Appearance'),
+    SettingsTab.diagnostics => appText('诊断', 'Diagnostics'),
+    SettingsTab.experimental => appText('实验特性', 'Experimental'),
+    SettingsTab.about => appText('关于', 'About'),
   };
 }
 
@@ -119,9 +138,9 @@ enum AccountTab { profile, workspace, sessions }
 
 extension AccountTabCopy on AccountTab {
   String get label => switch (this) {
-    AccountTab.profile => 'Profile',
-    AccountTab.workspace => 'Workspace',
-    AccountTab.sessions => 'Sessions',
+    AccountTab.profile => appText('资料', 'Profile'),
+    AccountTab.workspace => appText('工作区', 'Workspace'),
+    AccountTab.sessions => appText('会话', 'Sessions'),
   };
 }
 

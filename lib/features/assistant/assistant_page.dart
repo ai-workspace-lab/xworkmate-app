@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
 import '../../data/mock_data.dart';
+import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
@@ -25,19 +26,14 @@ class AssistantPage extends StatefulWidget {
 }
 
 class _AssistantPageState extends State<AssistantPage> {
-  static const List<String> _modes = ['Craft', 'Ask', 'Plan'];
-  static const Map<String, String> _thinkingModes = {
-    '低': 'low',
-    '中': 'medium',
-    '高': 'high',
-    '超高': 'max',
-  };
+  static const List<String> _modes = ['craft', 'ask', 'plan'];
+  static const List<String> _thinkingModes = ['low', 'medium', 'high', 'max'];
 
   late final TextEditingController _inputController;
   late final ScrollController _conversationController;
   late final FocusNode _composerFocusNode;
-  String _mode = 'Ask';
-  String _thinkingLabel = '高';
+  String _mode = 'ask';
+  String _thinkingLabel = 'high';
   List<_ComposerAttachment> _attachments = const <_ComposerAttachment>[];
   String? _lastSubmittedPrompt;
   String? _lastAutoAgentLabel;
@@ -177,7 +173,7 @@ class _AssistantPageState extends State<AssistantPage> {
         items.add(
           _TimelineItem.message(
             kind: _TimelineItemKind.user,
-            label: 'You',
+            label: appText('你', 'You'),
             text: message.text,
             pending: message.pending,
             error: message.error,
@@ -212,21 +208,29 @@ class _AssistantPageState extends State<AssistantPage> {
     final lastRole = messages.isEmpty ? null : messages.last.role.toLowerCase();
     if (_lastSubmittedPrompt != null) {
       final status = hasPendingTask
-          ? 'Running'
-          : (lastRole == 'user' ? 'Queued' : 'Completed');
+          ? 'running'
+          : (lastRole == 'user' ? 'queued' : 'completed');
       items.add(
         _TimelineItem.taskCard(
           title: _lastSubmittedPrompt!,
           status: status,
           summary: switch (status) {
-            'Queued' => 'Submitted to the task queue',
-            'Running' =>
+            'queued' => appText('已提交到任务队列', 'Submitted to the task queue'),
+            'running' => appText(
+              '正在由 ${_lastAutoAgentLabel ?? controller.activeAgentName} 执行',
               'Executing with ${_lastAutoAgentLabel ?? controller.activeAgentName}',
-            _ => 'Execution finished in this conversation',
+            ),
+            _ => appText(
+              '本次会话中的执行已结束',
+              'Execution finished in this conversation',
+            ),
           },
           detail: _lastSubmittedAttachments.isEmpty
               ? '${controller.currentSessionKey} · ${_lastAutoAgentLabel ?? controller.activeAgentName}'
-              : '${controller.currentSessionKey} · ${_lastSubmittedAttachments.length} attachment(s)',
+              : appText(
+                  '${controller.currentSessionKey} · ${_lastSubmittedAttachments.length} 个附件',
+                  '${controller.currentSessionKey} · ${_lastSubmittedAttachments.length} attachment(s)',
+                ),
           owner: _lastAutoAgentLabel ?? controller.activeAgentName,
           sessionKey: controller.currentSessionKey,
         ),
@@ -294,10 +298,7 @@ class _AssistantPageState extends State<AssistantPage> {
       _lastSubmittedAttachments = attachmentNames;
     });
 
-    await controller.sendChatMessage(
-      prompt,
-      thinking: _thinkingModes[_thinkingLabel] ?? 'high',
-    );
+    await controller.sendChatMessage(prompt, thinking: _thinkingLabel);
 
     if (!mounted) {
       return;
@@ -380,10 +381,10 @@ class _AssistantPageState extends State<AssistantPage> {
         '- permission: ${permissionLevel.promptValue}\n\n';
 
     return switch (mode) {
-      'Craft' =>
+      'craft' =>
         '$attachmentBlock$executionContext'
             'Craft a polished result for this request:\n$prompt',
-      'Plan' =>
+      'plan' =>
         '$attachmentBlock$executionContext'
             'Create a clear execution plan for this task:\n$prompt',
       _ => '$attachmentBlock$executionContext$prompt',
@@ -449,8 +450,14 @@ class _ConversationArea extends StatelessWidget {
                       Text(
                         controller.connection.status ==
                                 RuntimeConnectionStatus.connected
-                            ? 'Describe the task naturally. XWorkmate will route execution.'
-                            : 'Connect a gateway to start chatting and running tasks.',
+                            ? appText(
+                                '自然描述任务即可，XWorkmate 会自动路由执行。',
+                                'Describe the task naturally. XWorkmate will route execution.',
+                              )
+                            : appText(
+                                '连接 Gateway 后可开始对话和运行任务。',
+                                'Connect a gateway to start chatting and running tasks.',
+                              ),
                         style: theme.textTheme.bodySmall,
                       ),
                     ],
@@ -501,10 +508,12 @@ class _ConversationArea extends StatelessWidget {
                             onOpenDetail: () => onOpenDetail(
                               DetailPanelData(
                                 title: item.title!,
-                                subtitle: 'Tool Call',
+                                subtitle: appText('工具调用', 'Tool Call'),
                                 icon: Icons.build_circle_outlined,
                                 status: StatusInfo(
-                                  item.pending ? 'Running' : 'Completed',
+                                  item.pending
+                                      ? appText('运行中', 'Running')
+                                      : appText('已完成', 'Completed'),
                                   item.error
                                       ? StatusTone.danger
                                       : StatusTone.accent,
@@ -514,7 +523,7 @@ class _ConversationArea extends StatelessWidget {
                                   controller.currentSessionKey,
                                   controller.activeAgentName,
                                 ],
-                                actions: const ['Copy'],
+                                actions: [appText('复制', 'Copy')],
                                 sections: const [],
                               ),
                             ),
@@ -550,29 +559,35 @@ class _ConversationArea extends StatelessWidget {
   DetailPanelData _buildTaskDetail(_TimelineItem item) {
     return DetailPanelData(
       title: item.title!,
-      subtitle: 'Conversation Task',
+      subtitle: appText('会话任务', 'Conversation Task'),
       icon: Icons.task_alt_rounded,
-      status: _statusInfoForTask(item.status ?? 'Completed'),
+      status: _statusInfoForTask(item.status ?? 'completed'),
       description: item.summary ?? '',
       meta: [
-        item.owner ?? 'Auto route',
+        item.owner ?? appText('自动路由', 'Auto route'),
         item.sessionKey ?? controller.currentSessionKey,
       ],
-      actions: const ['Continue', 'Open Tasks'],
+      actions: [appText('继续', 'Continue'), appText('打开任务', 'Open Tasks')],
       sections: [
         DetailSection(
-          title: 'Execution',
+          title: appText('执行', 'Execution'),
           items: [
-            DetailItem(label: 'Status', value: item.status ?? 'Completed'),
             DetailItem(
-              label: 'Agent',
+              label: appText('状态', 'Status'),
+              value: _taskStatusLabel(item.status ?? 'completed'),
+            ),
+            DetailItem(
+              label: appText('代理', 'Agent'),
               value: item.owner ?? controller.activeAgentName,
             ),
             DetailItem(
-              label: 'Session',
+              label: appText('会话', 'Session'),
               value: item.sessionKey ?? controller.currentSessionKey,
             ),
-            DetailItem(label: 'Detail', value: item.detail ?? 'No detail'),
+            DetailItem(
+              label: appText('详情', 'Detail'),
+              value: item.detail ?? appText('暂无详情', 'No detail'),
+            ),
           ],
         ),
       ],
@@ -632,7 +647,11 @@ class _ComposerBar extends StatelessWidget {
         permissionLevel == AssistantPermissionLevel.fullAccess
         ? const Color(0xFFFFD5B5)
         : palette.strokeSoft;
-    final submitLabel = connected ? (mode == 'Ask' ? '提交' : '运行任务') : '连接';
+    final submitLabel = connected
+        ? (mode == 'ask'
+              ? appText('提交', 'Submit')
+              : appText('运行任务', 'Run Task'))
+        : appText('连接', 'Connect');
 
     return SurfaceCard(
       borderRadius: 16,
@@ -664,8 +683,10 @@ class _ComposerBar extends StatelessWidget {
             decoration: InputDecoration(
               border: InputBorder.none,
               isCollapsed: true,
-              hintText:
-                  'Type naturally: run job autopilot, analyze logs, deploy node…',
+              hintText: appText(
+                '直接描述需求：运行任务、分析日志、部署节点……',
+                'Type naturally: run job autopilot, analyze logs, deploy node…',
+              ),
             ),
             onSubmitted: (_) => onSend(),
           ),
@@ -679,7 +700,7 @@ class _ComposerBar extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       PopupMenuButton<String>(
-                        tooltip: 'Composer actions',
+                        tooltip: appText('输入区操作', 'Composer actions'),
                         offset: const Offset(0, -180),
                         onSelected: (value) {
                           switch (value) {
@@ -687,7 +708,7 @@ class _ComposerBar extends StatelessWidget {
                               onPickAttachments();
                               break;
                             case 'plan':
-                              onModeChanged(mode == 'Plan' ? 'Ask' : 'Plan');
+                              onModeChanged(mode == 'plan' ? 'ask' : 'plan');
                               break;
                             case 'gateway':
                               onOpenGateway();
@@ -710,11 +731,15 @@ class _ComposerBar extends StatelessWidget {
                             child: ListTile(
                               contentPadding: EdgeInsets.zero,
                               leading: Icon(
-                                mode == 'Plan'
+                                mode == 'plan'
                                     ? Icons.task_alt_rounded
                                     : Icons.alt_route_rounded,
                               ),
-                              title: Text(mode == 'Plan' ? '退出计划模式' : '计划模式'),
+                              title: Text(
+                                mode == 'plan'
+                                    ? appText('退出计划模式', 'Exit plan mode')
+                                    : appText('计划模式', 'Plan mode'),
+                              ),
                             ),
                           ),
                           PopupMenuItem<String>(
@@ -726,7 +751,7 @@ class _ComposerBar extends StatelessWidget {
                                     ? Icons.lan_rounded
                                     : Icons.link_rounded,
                               ),
-                              title: const Text('连接网关'),
+                              title: Text(appText('连接网关', 'Connect gateway')),
                             ),
                           ),
                           PopupMenuItem<String>(
@@ -735,7 +760,11 @@ class _ComposerBar extends StatelessWidget {
                               contentPadding: EdgeInsets.zero,
                               leading: const Icon(Icons.hub_rounded),
                               title: Text(
-                                autoAgentLabel ?? 'Browser / Coding / Research',
+                                autoAgentLabel ??
+                                    appText(
+                                      '浏览器 / 编码 / 研究',
+                                      'Browser / Coding / Research',
+                                    ),
                               ),
                             ),
                           ),
@@ -746,7 +775,7 @@ class _ComposerBar extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       PopupMenuButton<AssistantExecutionTarget>(
-                        tooltip: 'Execution target',
+                        tooltip: appText('执行目标', 'Execution target'),
                         onSelected: (value) {
                           controller.setAssistantExecutionTarget(value);
                         },
@@ -780,7 +809,7 @@ class _ComposerBar extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       PopupMenuButton<AssistantPermissionLevel>(
-                        tooltip: 'Permissions',
+                        tooltip: appText('权限', 'Permissions'),
                         onSelected: (value) {
                           controller.setAssistantPermissionLevel(value);
                         },
@@ -832,35 +861,38 @@ class _ComposerBar extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       PopupMenuButton<String>(
-                        tooltip: 'Mode',
+                        tooltip: appText('模式', 'Mode'),
                         onSelected: onModeChanged,
                         itemBuilder: (context) => _AssistantPageState._modes
                             .map(
                               (value) => PopupMenuItem<String>(
                                 value: value,
-                                child: Text(value),
+                                child: Text(_assistantModeLabel(value)),
                               ),
                             )
                             .toList(),
                         child: _ComposerToolbarChip(
                           icon: Icons.tune_rounded,
-                          label: mode,
+                          label: _assistantModeLabel(mode),
                           showChevron: true,
                         ),
                       ),
                       const SizedBox(width: 8),
                       PopupMenuButton<String>(
-                        tooltip: 'Reasoning',
+                        tooltip: appText('推理强度', 'Reasoning'),
                         onSelected: onThinkingChanged,
                         itemBuilder: (context) => _AssistantPageState
                             ._thinkingModes
-                            .keys
                             .map(
                               (value) => PopupMenuItem<String>(
                                 value: value,
                                 child: Row(
                                   children: [
-                                    Expanded(child: Text(value)),
+                                    Expanded(
+                                      child: Text(
+                                        _assistantThinkingLabel(value),
+                                      ),
+                                    ),
                                     if (value == thinkingLabel)
                                       const Icon(Icons.check_rounded, size: 18),
                                   ],
@@ -870,7 +902,7 @@ class _ComposerBar extends StatelessWidget {
                             .toList(),
                         child: _ComposerToolbarChip(
                           icon: Icons.psychology_alt_outlined,
-                          label: thinkingLabel,
+                          label: _assistantThinkingLabel(thinkingLabel),
                           showChevron: true,
                         ),
                       ),
@@ -896,7 +928,7 @@ class _ComposerBar extends StatelessWidget {
                   children: [
                     Icon(
                       connected
-                          ? (mode == 'Ask'
+                          ? (mode == 'ask'
                                 ? Icons.arrow_upward_rounded
                                 : Icons.play_arrow_rounded)
                           : Icons.link_rounded,
@@ -1043,7 +1075,7 @@ class _MessageBubble extends StatelessWidget {
               Text(label, style: theme.textTheme.labelLarge),
               const SizedBox(height: 6),
               SelectableText(
-                text.isEmpty ? 'No content yet.' : text,
+                text.isEmpty ? appText('暂无内容。', 'No content yet.') : text,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurface,
                   height: 1.55,
@@ -1084,18 +1116,19 @@ class _TaskStatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = context.palette;
-    final statusStyle = _pillStyleForStatus(context, status);
-    final icon = switch (status) {
-      'Queued' => Icons.schedule_send_rounded,
-      'Running' => Icons.play_circle_outline_rounded,
-      'Failed' => Icons.error_outline_rounded,
+    final normalizedStatus = _normalizedTaskStatus(status);
+    final statusStyle = _pillStyleForStatus(context, normalizedStatus);
+    final icon = switch (normalizedStatus) {
+      'queued' => Icons.schedule_send_rounded,
+      'running' => Icons.play_circle_outline_rounded,
+      'failed' => Icons.error_outline_rounded,
       _ => Icons.task_alt_rounded,
     };
-    final hint = switch (status) {
-      'Queued' => 'Waiting in queue',
-      'Running' => 'Working now',
-      'Failed' => 'Needs attention',
-      _ => 'Continue in session',
+    final hint = switch (normalizedStatus) {
+      'queued' => appText('排队等待执行', 'Waiting in queue'),
+      'running' => appText('正在执行中', 'Working now'),
+      'failed' => appText('需要处理', 'Needs attention'),
+      _ => appText('可继续在当前会话处理', 'Continue in session'),
     };
 
     return Align(
@@ -1150,7 +1183,7 @@ class _TaskStatusCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     _StatusPill(
-                      label: status,
+                      label: _taskStatusLabel(status),
                       backgroundColor: statusStyle.backgroundColor,
                       textColor: statusStyle.foregroundColor,
                     ),
@@ -1201,12 +1234,14 @@ class _TaskStatusCard extends StatelessWidget {
                         size: 16,
                       ),
                       label: Text(
-                        isCurrentSession ? 'Continue' : 'Open Session',
+                        isCurrentSession
+                            ? appText('继续', 'Continue')
+                            : appText('打开会话', 'Open Session'),
                       ),
                     ),
                     TextButton(
                       onPressed: onOpenTasks,
-                      child: const Text('Open Tasks'),
+                      child: Text(appText('打开任务', 'Open Tasks')),
                     ),
                   ],
                 ),
@@ -1246,11 +1281,11 @@ class _ToolCallTileState extends State<_ToolCallTile> {
     final theme = Theme.of(context);
     final palette = context.palette;
     final statusLabel = widget.pending
-        ? 'Running'
-        : (widget.error ? 'Error' : 'Completed');
+        ? 'running'
+        : (widget.error ? 'error' : 'completed');
     final statusStyle = _pillStyleForStatus(context, statusLabel);
     final collapsedSummary = widget.summary.trim().isEmpty
-        ? 'Tool call in progress.'
+        ? appText('工具调用进行中。', 'Tool call in progress.')
         : widget.summary.trim().replaceAll('\n', ' ');
 
     return Align(
@@ -1307,7 +1342,7 @@ class _ToolCallTileState extends State<_ToolCallTile> {
                       ),
                       const SizedBox(width: 10),
                       _StatusPill(
-                        label: statusLabel,
+                        label: _toolCallStatusLabel(statusLabel),
                         backgroundColor: statusStyle.backgroundColor,
                         textColor: statusStyle.foregroundColor,
                       ),
@@ -1337,14 +1372,17 @@ class _ToolCallTileState extends State<_ToolCallTile> {
                               const SizedBox(height: 8),
                               Text(
                                 widget.summary.trim().isEmpty
-                                    ? 'Tool call in progress.'
+                                    ? appText(
+                                        '工具调用进行中。',
+                                        'Tool call in progress.',
+                                      )
                                     : widget.summary.trim(),
                                 style: theme.textTheme.bodySmall,
                               ),
                               const SizedBox(height: 6),
                               TextButton(
                                 onPressed: widget.onOpenDetail,
-                                child: const Text('Open detail'),
+                                child: Text(appText('打开详情', 'Open detail')),
                               ),
                             ],
                           ),
@@ -1416,7 +1454,7 @@ class _ConnectionChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        '${connection.status.label} · ${connection.remoteAddress ?? 'No target'}',
+        '${connection.status.label} · ${connection.remoteAddress ?? appText('未连接目标', 'No target')}',
         style: theme.textTheme.labelLarge,
       ),
     );
@@ -1525,16 +1563,17 @@ class _PillStyle {
 
 _PillStyle _pillStyleForStatus(BuildContext context, String label) {
   final theme = Theme.of(context);
-  return switch (label) {
-    'Running' => _PillStyle(
+  final normalized = _normalizedTaskStatus(label);
+  return switch (normalized) {
+    'running' => _PillStyle(
       backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.10),
       foregroundColor: theme.colorScheme.primary,
     ),
-    'Queued' => _PillStyle(
+    'queued' => _PillStyle(
       backgroundColor: theme.colorScheme.secondary.withValues(alpha: 0.10),
       foregroundColor: theme.colorScheme.secondary,
     ),
-    'Failed' || 'Error' => _PillStyle(
+    'failed' || 'error' => _PillStyle(
       backgroundColor: theme.colorScheme.error.withValues(alpha: 0.10),
       foregroundColor: theme.colorScheme.error,
     ),
@@ -1546,10 +1585,46 @@ _PillStyle _pillStyleForStatus(BuildContext context, String label) {
 }
 
 StatusInfo _statusInfoForTask(String status) => switch (status) {
-  'Running' => const StatusInfo('Running', StatusTone.accent),
-  'Failed' => const StatusInfo('Failed', StatusTone.danger),
-  'Queued' => const StatusInfo('Queued', StatusTone.neutral),
-  _ => const StatusInfo('Completed', StatusTone.success),
+  'running' ||
+  'Running' => StatusInfo(appText('运行中', 'Running'), StatusTone.accent),
+  'failed' ||
+  'Failed' => StatusInfo(appText('失败', 'Failed'), StatusTone.danger),
+  'queued' ||
+  'Queued' => StatusInfo(appText('排队中', 'Queued'), StatusTone.neutral),
+  _ => StatusInfo(appText('已完成', 'Completed'), StatusTone.success),
+};
+
+String _normalizedTaskStatus(String status) {
+  final value = status.trim().toLowerCase();
+  return switch (value) {
+    'running' => 'running',
+    'queued' => 'queued',
+    'failed' => 'failed',
+    'error' => 'error',
+    _ => 'completed',
+  };
+}
+
+String _taskStatusLabel(String status) => _statusInfoForTask(status).label;
+
+String _toolCallStatusLabel(String status) =>
+    switch (_normalizedTaskStatus(status)) {
+      'running' => appText('运行中', 'Running'),
+      'failed' || 'error' => appText('错误', 'Error'),
+      _ => appText('已完成', 'Completed'),
+    };
+
+String _assistantModeLabel(String mode) => switch (mode) {
+  'craft' => appText('创作', 'Craft'),
+  'plan' => appText('计划', 'Plan'),
+  _ => appText('问答', 'Ask'),
+};
+
+String _assistantThinkingLabel(String level) => switch (level) {
+  'low' => appText('低', 'Low'),
+  'medium' => appText('中', 'Medium'),
+  'max' => appText('超高', 'Max'),
+  _ => appText('高', 'High'),
 };
 
 class _ComposerAttachment {

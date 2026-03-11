@@ -2,15 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
+import '../../i18n/app_language.dart';
+import '../../models/app_models.dart';
 import '../../widgets/section_tabs.dart';
 import '../../widgets/surface_card.dart';
 import '../../widgets/top_bar.dart';
 
 class AccountPage extends StatefulWidget {
-  const AccountPage({
-    super.key,
-    required this.controller,
-  });
+  const AccountPage({super.key, required this.controller});
 
   final AppController controller;
 
@@ -19,7 +18,7 @@ class AccountPage extends StatefulWidget {
 }
 
 class _AccountPageState extends State<AccountPage> {
-  String _tab = 'Profile';
+  AccountTab _tab = AccountTab.profile;
 
   @override
   Widget build(BuildContext context) {
@@ -33,37 +32,55 @@ class _AccountPageState extends State<AccountPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TopBar(title: 'Account', subtitle: '用户身份、工作区切换与登录会话。'),
-              const SizedBox(height: 24),
-              SectionTabs(
-                items: const ['Profile', 'Workspace', 'Sessions'],
-                value: _tab,
-                size: SectionTabsSize.small,
-                onChanged: (value) => setState(() => _tab = value),
+              TopBar(
+                title: appText('账号', 'Account'),
+                subtitle: appText(
+                  '用户身份、工作区切换与登录会话。',
+                  'Identity, workspace switching, and sign-in sessions.',
+                ),
               ),
               const SizedBox(height: 24),
-              if (_tab == 'Profile')
+              SectionTabs(
+                items: AccountTab.values.map((item) => item.label).toList(),
+                value: _tab.label,
+                size: SectionTabsSize.small,
+                onChanged: (value) => setState(
+                  () => _tab = AccountTab.values.firstWhere(
+                    (item) => item.label == value,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              if (_tab == AccountTab.profile)
                 SurfaceCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         settings.accountUsername.trim().isEmpty
-                            ? 'Local Operator'
+                            ? appText('本地操作员', 'Local Operator')
                             : settings.accountUsername,
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 8),
                       Text(
                         settings.accountLocalMode
-                            ? 'Local mode · Placeholder account session'
-                            : 'Unified account entry pending backend integration',
+                            ? appText(
+                                '本地模式 · 占位账号会话',
+                                'Local mode · Placeholder account session',
+                              )
+                            : appText(
+                                '统一账号入口等待后端集成',
+                                'Unified account entry pending backend integration',
+                              ),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         key: ValueKey(settings.accountBaseUrl),
                         initialValue: settings.accountBaseUrl,
-                        decoration: const InputDecoration(labelText: 'Service URL'),
+                        decoration: InputDecoration(
+                          labelText: appText('服务地址', 'Service URL'),
+                        ),
                         onFieldSubmitted: (value) => controller.saveSettings(
                           settings.copyWith(accountBaseUrl: value),
                         ),
@@ -72,7 +89,9 @@ class _AccountPageState extends State<AccountPage> {
                       TextFormField(
                         key: ValueKey(settings.accountUsername),
                         initialValue: settings.accountUsername,
-                        decoration: const InputDecoration(labelText: 'Email / Username'),
+                        decoration: InputDecoration(
+                          labelText: appText('邮箱 / 用户名', 'Email / Username'),
+                        ),
                         onFieldSubmitted: (value) => controller.saveSettings(
                           settings.copyWith(accountUsername: value),
                         ),
@@ -80,7 +99,7 @@ class _AccountPageState extends State<AccountPage> {
                     ],
                   ),
                 ),
-              if (_tab == 'Workspace')
+              if (_tab == AccountTab.workspace)
                 SurfaceCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -90,12 +109,19 @@ class _AccountPageState extends State<AccountPage> {
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 8),
-                      Text('Workspace shell for $kProductBrandName'),
+                      Text(
+                        appText(
+                          '$kProductBrandName 的工作区外壳',
+                          'Workspace shell for $kProductBrandName',
+                        ),
+                      ),
                       const SizedBox(height: 16),
                       TextFormField(
                         key: ValueKey(settings.accountWorkspace),
                         initialValue: settings.accountWorkspace,
-                        decoration: const InputDecoration(labelText: 'Workspace Label'),
+                        decoration: InputDecoration(
+                          labelText: appText('工作区名称', 'Workspace Label'),
+                        ),
                         onFieldSubmitted: (value) => controller.saveSettings(
                           settings.copyWith(accountWorkspace: value),
                         ),
@@ -103,10 +129,15 @@ class _AccountPageState extends State<AccountPage> {
                     ],
                   ),
                 ),
-              if (_tab == 'Sessions')
+              if (_tab == AccountTab.sessions)
                 if (controller.sessions.isEmpty)
-                  const SurfaceCard(
-                    child: Text('No gateway sessions yet. Connect and start a chat first.'),
+                  SurfaceCard(
+                    child: Text(
+                      appText(
+                        '还没有 Gateway 会话。请先连接并开始一次对话。',
+                        'No gateway sessions yet. Connect and start a chat first.',
+                      ),
+                    ),
                   )
                 else
                   ...controller.sessions.map(
@@ -121,16 +152,18 @@ class _AccountPageState extends State<AccountPage> {
                                 children: [
                                   Text(
                                     session.label,
-                                    style: Theme.of(context).textTheme.titleMedium,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    '${session.surface ?? 'Session'} · ${session.kind ?? 'chat'}',
+                                    '${session.surface ?? appText('会话', 'Session')} · ${session.kind ?? 'chat'}',
                                   ),
                                 ],
                               ),
                             ),
-                            Text(session.model ?? 'gateway'),
+                            Text(session.model ?? appText('网关', 'gateway')),
                           ],
                         ),
                       ),

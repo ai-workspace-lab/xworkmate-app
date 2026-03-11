@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
 import '../../data/mock_data.dart';
+import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_controllers.dart';
 import '../../runtime/runtime_models.dart';
@@ -28,27 +29,30 @@ class ModulesPage extends StatefulWidget {
 }
 
 class _ModulesPageState extends State<ModulesPage> {
-  String _tab = 'Gateway';
+  ModulesTab _tab = ModulesTab.gateway;
 
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
     final metrics = [
       MetricSummary(
-        label: 'Gateway',
+        label: appText('网关', 'Gateway'),
         value: controller.connection.status.label,
         caption: controller.connection.remoteAddress ?? kAppVersionLabel,
         icon: Icons.wifi_tethering_rounded,
         status: _connectionStatus(controller.connection.status),
       ),
       MetricSummary(
-        label: 'Nodes',
+        label: appText('节点', 'Nodes'),
         value: '${controller.instances.length}',
-        caption: '${controller.instances.where((item) => item.mode == 'active').length} active',
+        caption: appText(
+          '${controller.instances.where((item) => item.mode == 'active').length} 个活跃实例',
+          '${controller.instances.where((item) => item.mode == 'active').length} active',
+        ),
         icon: Icons.developer_board_rounded,
       ),
       MetricSummary(
-        label: 'Agents',
+        label: appText('代理', 'Agents'),
         value: '${controller.agents.length}',
         caption: controller.activeAgentName,
         icon: Icons.hub_rounded,
@@ -64,9 +68,11 @@ class _ModulesPageState extends State<ModulesPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
-                title: 'Modules',
-                subtitle:
-                    'Manage gateway, agents, nodes, skills, and platform services.',
+                title: appText('模块', 'Modules'),
+                subtitle: appText(
+                  '管理 Gateway、代理、节点、技能和平台服务。',
+                  'Manage gateway, agents, nodes, skills, and platform services.',
+                ),
                 trailing: Wrap(
                   spacing: 12,
                   runSpacing: 12,
@@ -74,8 +80,8 @@ class _ModulesPageState extends State<ModulesPage> {
                     SizedBox(
                       width: 220,
                       child: TextField(
-                        decoration: const InputDecoration(
-                          hintText: '搜索',
+                        decoration: InputDecoration(
+                          hintText: appText('搜索模块', 'Search modules'),
                           prefixIcon: Icon(Icons.search_rounded),
                         ),
                       ),
@@ -95,27 +101,23 @@ class _ModulesPageState extends State<ModulesPage> {
                       icon: const Icon(Icons.refresh_rounded),
                     ),
                     FilledButton.tonalIcon(
-                      onPressed: () => controller.navigateTo(
-                        WorkspaceDestination.settings,
-                      ),
+                      onPressed: () =>
+                          controller.navigateTo(WorkspaceDestination.settings),
                       icon: const Icon(Icons.add_rounded),
-                      label: const Text('接入模块'),
+                      label: Text(appText('接入模块', 'Add Module')),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
               SectionTabs(
-                items: const [
-                  'Gateway',
-                  'Nodes',
-                  'Agents',
-                  'Skills',
-                  'ClawHub',
-                  'Connectors',
-                ],
-                value: _tab,
-                onChanged: (value) => setState(() => _tab = value),
+                items: ModulesTab.values.map((item) => item.label).toList(),
+                value: _tab.label,
+                onChanged: (value) => setState(
+                  () => _tab = ModulesTab.values.firstWhere(
+                    (item) => item.label == value,
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
               LayoutBuilder(
@@ -141,27 +143,28 @@ class _ModulesPageState extends State<ModulesPage> {
               ),
               const SizedBox(height: 28),
               switch (_tab) {
-                'Gateway' => _GatewayPanel(
+                ModulesTab.gateway => _GatewayPanel(
                   controller: controller,
                   onOpenDetail: widget.onOpenDetail,
                 ),
-                'Nodes' => _NodesPanel(
+                ModulesTab.nodes => _NodesPanel(
                   controller: controller,
                   onOpenDetail: widget.onOpenDetail,
                 ),
-                'Agents' => _AgentsPanel(
+                ModulesTab.agents => _AgentsPanel(
                   controller: controller,
                   onOpenDetail: widget.onOpenDetail,
                 ),
-                'Skills' => _SkillsPanel(
+                ModulesTab.skills => _SkillsPanel(
                   controller: controller,
                   onOpenDetail: widget.onOpenDetail,
                 ),
-                'ClawHub' => _FallbackHubPanel(onOpenDetail: widget.onOpenDetail),
-                'Connectors' => _FallbackConnectorsPanel(
+                ModulesTab.clawHub => _FallbackHubPanel(
                   onOpenDetail: widget.onOpenDetail,
                 ),
-                _ => const SizedBox.shrink(),
+                ModulesTab.connectors => _FallbackConnectorsPanel(
+                  onOpenDetail: widget.onOpenDetail,
+                ),
               },
             ],
           ),
@@ -172,10 +175,7 @@ class _ModulesPageState extends State<ModulesPage> {
 }
 
 class _GatewayPanel extends StatelessWidget {
-  const _GatewayPanel({
-    required this.controller,
-    required this.onOpenDetail,
-  });
+  const _GatewayPanel({required this.controller, required this.onOpenDetail});
 
   final AppController controller;
   final ValueChanged<DetailPanelData> onOpenDetail;
@@ -185,29 +185,33 @@ class _GatewayPanel extends StatelessWidget {
     final connection = controller.connection;
     final metrics = [
       MetricSummary(
-        label: 'Mode',
+        label: appText('模式', 'Mode'),
         value: controller.settings.gateway.mode.label,
         caption: controller.settings.gateway.useSetupCode
-            ? 'Setup code'
-            : 'Manual profile',
+            ? appText('配置码', 'Setup code')
+            : appText('手动配置', 'Manual profile'),
         icon: Icons.link_rounded,
       ),
       MetricSummary(
-        label: 'Active Sessions',
+        label: appText('活跃会话', 'Active Sessions'),
         value: '${controller.sessions.length}',
-        caption: 'Current key ${controller.currentSessionKey}',
+        caption: appText(
+          '当前 Key ${controller.currentSessionKey}',
+          'Current key ${controller.currentSessionKey}',
+        ),
         icon: Icons.chat_bubble_outline_rounded,
       ),
       MetricSummary(
-        label: 'Today Runs',
-        value: '${controller.tasksController.running.length + controller.tasksController.history.length}',
-        caption: 'Derived from live session activity',
+        label: appText('今日运行', 'Today Runs'),
+        value:
+            '${controller.tasksController.running.length + controller.tasksController.history.length}',
+        caption: appText('根据实时会话活动计算', 'Derived from live session activity'),
         icon: Icons.bolt_rounded,
       ),
       MetricSummary(
-        label: 'Skills',
+        label: appText('技能', 'Skills'),
         value: '${controller.skills.length}',
-        caption: 'Loaded from gateway',
+        caption: appText('来自网关加载', 'Loaded from gateway'),
         icon: Icons.extension_rounded,
       ),
     ];
@@ -243,28 +247,43 @@ class _GatewayPanel extends StatelessWidget {
         SurfaceCard(
           onTap: () => onOpenDetail(
             DetailPanelData(
-              title: 'Gateway Overview',
-              subtitle: 'Runtime',
+              title: appText('网关概览', 'Gateway Overview'),
+              subtitle: appText('运行时', 'Runtime'),
               icon: Icons.wifi_tethering_rounded,
               status: _connectionStatus(connection.status),
-              description:
-                  'Live gateway control plane summary aligned with the macOS workspace shell.',
+              description: appText(
+                '与 macOS 工作台保持一致的实时 Gateway 控制面摘要。',
+                'Live gateway control plane summary aligned with the macOS workspace shell.',
+              ),
               meta: [
-                connection.remoteAddress ?? 'No target',
+                connection.remoteAddress ?? appText('未连接目标', 'No target'),
                 controller.activeAgentName,
               ],
-              actions: const ['Refresh', 'Open Settings'],
+              actions: [
+                appText('刷新', 'Refresh'),
+                appText('打开设置', 'Open Settings'),
+              ],
               sections: [
                 DetailSection(
-                  title: 'Connection',
+                  title: appText('连接', 'Connection'),
                   items: [
-                    DetailItem(label: 'Status', value: connection.status.label),
                     DetailItem(
-                      label: 'Address',
-                      value: connection.remoteAddress ?? 'Offline',
+                      label: appText('状态', 'Status'),
+                      value: connection.status.label,
                     ),
-                    DetailItem(label: 'Mode', value: controller.settings.gateway.mode.label),
-                    DetailItem(label: 'Agent', value: controller.activeAgentName),
+                    DetailItem(
+                      label: appText('地址', 'Address'),
+                      value:
+                          connection.remoteAddress ?? appText('离线', 'Offline'),
+                    ),
+                    DetailItem(
+                      label: appText('模式', 'Mode'),
+                      value: controller.settings.gateway.mode.label,
+                    ),
+                    DetailItem(
+                      label: appText('代理', 'Agent'),
+                      value: controller.activeAgentName,
+                    ),
                   ],
                 ),
               ],
@@ -273,10 +292,13 @@ class _GatewayPanel extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Gateway', style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                appText('网关', 'Gateway'),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 10),
               Text(
-                '${connection.status.label} · ${connection.remoteAddress ?? 'No target'} · ${controller.activeAgentName}',
+                '${connection.status.label} · ${connection.remoteAddress ?? appText('未连接目标', 'No target')} · ${controller.activeAgentName}',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 14),
@@ -286,17 +308,16 @@ class _GatewayPanel extends StatelessWidget {
                 children: [
                   OutlinedButton(
                     onPressed: controller.refreshGatewayHealth,
-                    child: const Text('刷新状态'),
+                    child: Text(appText('刷新状态', 'Refresh status')),
                   ),
                   OutlinedButton(
                     onPressed: controller.refreshSessions,
-                    child: const Text('刷新会话'),
+                    child: Text(appText('刷新会话', 'Refresh sessions')),
                   ),
                   OutlinedButton(
-                    onPressed: () => controller.navigateTo(
-                      WorkspaceDestination.settings,
-                    ),
-                    child: const Text('配置'),
+                    onPressed: () =>
+                        controller.navigateTo(WorkspaceDestination.settings),
+                    child: Text(appText('配置', 'Configure')),
                   ),
                 ],
               ),
@@ -308,16 +329,23 @@ class _GatewayPanel extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('状态摘要', style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                appText('状态摘要', 'Status Summary'),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 14),
               _KeyValueLine(
                 label: 'Health',
-                value: healthPayload.isEmpty ? 'Unavailable' : encodePrettyJson(healthPayload),
+                value: healthPayload.isEmpty
+                    ? appText('不可用', 'Unavailable')
+                    : encodePrettyJson(healthPayload),
               ),
               const SizedBox(height: 12),
               _KeyValueLine(
                 label: 'Status',
-                value: statusPayload.isEmpty ? 'Unavailable' : encodePrettyJson(statusPayload),
+                value: statusPayload.isEmpty
+                    ? appText('不可用', 'Unavailable')
+                    : encodePrettyJson(statusPayload),
               ),
             ],
           ),
@@ -328,10 +356,7 @@ class _GatewayPanel extends StatelessWidget {
 }
 
 class _NodesPanel extends StatelessWidget {
-  const _NodesPanel({
-    required this.controller,
-    required this.onOpenDetail,
-  });
+  const _NodesPanel({required this.controller, required this.onOpenDetail});
 
   final AppController controller;
   final ValueChanged<DetailPanelData> onOpenDetail;
@@ -343,16 +368,22 @@ class _NodesPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SectionHeader(
-          title: 'Nodes',
-          subtitle: 'Live system-presence data from the gateway runtime.',
+          title: appText('节点', 'Nodes'),
+          subtitle: appText(
+            '来自 Gateway 运行时的在线实例与存在性数据。',
+            'Live system-presence data from the gateway runtime.',
+          ),
         ),
         const SizedBox(height: 16),
         if (items.isEmpty)
           SurfaceCard(
             child: Text(
               controller.connection.status == RuntimeConnectionStatus.connected
-                  ? 'No live instances reported yet.'
-                  : 'Connect a gateway to load instances / presence.',
+                  ? appText('暂时还没有上报在线实例。', 'No live instances reported yet.')
+                  : appText(
+                      '连接 Gateway 后可加载实例与在线状态。',
+                      'Connect a gateway to load instances / presence.',
+                    ),
             ),
           )
         else
@@ -363,24 +394,30 @@ class _NodesPanel extends StatelessWidget {
                 onTap: () => onOpenDetail(
                   DetailPanelData(
                     title: node.host ?? node.id,
-                    subtitle: 'Instance',
+                    subtitle: appText('实例', 'Instance'),
                     icon: Icons.developer_board_rounded,
                     status: _instanceStatus(node),
                     description: node.text,
                     meta: [
-                      node.platform ?? 'unknown',
-                      node.deviceFamily ?? 'unknown',
+                      node.platform ?? appText('未知', 'unknown'),
+                      node.deviceFamily ?? appText('未知', 'unknown'),
                     ],
-                    actions: const ['Refresh'],
+                    actions: [appText('刷新', 'Refresh')],
                     sections: [
                       DetailSection(
-                        title: 'Runtime',
+                        title: appText('运行时', 'Runtime'),
                         items: [
                           DetailItem(label: 'IP', value: node.ip ?? 'n/a'),
-                          DetailItem(label: 'Version', value: node.version ?? 'n/a'),
-                          DetailItem(label: 'Mode', value: node.mode ?? 'n/a'),
                           DetailItem(
-                            label: 'Last Input',
+                            label: 'Version',
+                            value: node.version ?? 'n/a',
+                          ),
+                          DetailItem(
+                            label: appText('模式', 'Mode'),
+                            value: node.mode ?? 'n/a',
+                          ),
+                          DetailItem(
+                            label: appText('最近输入', 'Last Input'),
                             value: node.lastInputSeconds == null
                                 ? 'n/a'
                                 : '${node.lastInputSeconds}s',
@@ -403,7 +440,7 @@ class _NodesPanel extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            '${node.platform ?? 'unknown'} · ${node.deviceFamily ?? 'unknown'}',
+                            '${node.platform ?? appText('未知', 'unknown')} · ${node.deviceFamily ?? appText('未知', 'unknown')}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
@@ -427,10 +464,7 @@ class _NodesPanel extends StatelessWidget {
 }
 
 class _AgentsPanel extends StatelessWidget {
-  const _AgentsPanel({
-    required this.controller,
-    required this.onOpenDetail,
-  });
+  const _AgentsPanel({required this.controller, required this.onOpenDetail});
 
   final AppController controller;
   final ValueChanged<DetailPanelData> onOpenDetail;
@@ -449,8 +483,14 @@ class _AgentsPanel extends StatelessWidget {
           return SurfaceCard(
             child: Text(
               controller.connection.status == RuntimeConnectionStatus.connected
-                  ? 'No agents reported by the gateway.'
-                  : 'Connect a gateway to load agents.',
+                  ? appText(
+                      '网关当前没有返回代理列表。',
+                      'No agents reported by the gateway.',
+                    )
+                  : appText(
+                      '连接 Gateway 后可加载代理。',
+                      'Connect a gateway to load agents.',
+                    ),
             ),
           );
         }
@@ -465,21 +505,39 @@ class _AgentsPanel extends StatelessWidget {
                     onTap: () => onOpenDetail(
                       DetailPanelData(
                         title: agent.name,
-                        subtitle: 'Agent',
+                        subtitle: appText('代理', 'Agent'),
                         icon: Icons.hub_rounded,
                         status: controller.selectedAgentId == agent.id
-                            ? const StatusInfo('Selected', StatusTone.accent)
-                            : const StatusInfo('Available', StatusTone.success),
-                        description: 'Gateway operator agent available for session routing.',
+                            ? StatusInfo(
+                                appText('已选中', 'Selected'),
+                                StatusTone.accent,
+                              )
+                            : StatusInfo(
+                                appText('可用', 'Available'),
+                                StatusTone.success,
+                              ),
+                        description: appText(
+                          '可用于会话路由的 Gateway 执行代理。',
+                          'Gateway operator agent available for session routing.',
+                        ),
                         meta: [agent.id, agent.theme],
-                        actions: const ['Select', 'Open Session'],
+                        actions: [
+                          appText('选择', 'Select'),
+                          appText('打开会话', 'Open Session'),
+                        ],
                         sections: [
                           DetailSection(
-                            title: 'Identity',
+                            title: appText('身份信息', 'Identity'),
                             items: [
-                              DetailItem(label: 'Name', value: agent.name),
+                              DetailItem(
+                                label: appText('名称', 'Name'),
+                                value: agent.name,
+                              ),
                               DetailItem(label: 'ID', value: agent.id),
-                              DetailItem(label: 'Theme', value: agent.theme),
+                              DetailItem(
+                                label: appText('主题', 'Theme'),
+                                value: agent.theme,
+                              ),
                             ],
                           ),
                         ],
@@ -498,14 +556,23 @@ class _AgentsPanel extends StatelessWidget {
                             ),
                             StatusBadge(
                               status: controller.selectedAgentId == agent.id
-                                  ? const StatusInfo('Selected', StatusTone.accent)
-                                  : const StatusInfo('Ready', StatusTone.success),
+                                  ? StatusInfo(
+                                      appText('已选中', 'Selected'),
+                                      StatusTone.accent,
+                                    )
+                                  : StatusInfo(
+                                      appText('就绪', 'Ready'),
+                                      StatusTone.success,
+                                    ),
                               compact: true,
                             ),
                           ],
                         ),
                         const SizedBox(height: 10),
-                        Text('ID: ${agent.id}', style: Theme.of(context).textTheme.bodyMedium),
+                        Text(
+                          'ID: ${agent.id}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
                         const SizedBox(height: 14),
                         Wrap(
                           spacing: 8,
@@ -513,11 +580,11 @@ class _AgentsPanel extends StatelessWidget {
                           children: [
                             FilledButton.tonal(
                               onPressed: () => controller.selectAgent(agent.id),
-                              child: const Text('选择'),
+                              child: Text(appText('选择', 'Select')),
                             ),
                             OutlinedButton(
                               onPressed: () => controller.refreshSessions(),
-                              child: const Text('打开'),
+                              child: Text(appText('打开', 'Open')),
                             ),
                           ],
                         ),
@@ -534,10 +601,7 @@ class _AgentsPanel extends StatelessWidget {
 }
 
 class _SkillsPanel extends StatelessWidget {
-  const _SkillsPanel({
-    required this.controller,
-    required this.onOpenDetail,
-  });
+  const _SkillsPanel({required this.controller, required this.onOpenDetail});
 
   final AppController controller;
   final ValueChanged<DetailPanelData> onOpenDetail;
@@ -549,8 +613,14 @@ class _SkillsPanel extends StatelessWidget {
       return SurfaceCard(
         child: Text(
           controller.connection.status == RuntimeConnectionStatus.connected
-              ? 'No skills loaded for the active gateway / agent.'
-              : 'Connect a gateway to load skills.',
+              ? appText(
+                  '当前网关或代理没有加载技能。',
+                  'No skills loaded for the active gateway / agent.',
+                )
+              : appText(
+                  '连接 Gateway 后可加载技能。',
+                  'Connect a gateway to load skills.',
+                ),
         ),
       );
     }
@@ -564,34 +634,40 @@ class _SkillsPanel extends StatelessWidget {
                 onTap: () => onOpenDetail(
                   DetailPanelData(
                     title: skill.name,
-                    subtitle: 'Skill',
+                    subtitle: appText('技能', 'Skill'),
                     icon: Icons.extension_rounded,
                     status: skill.disabled
-                        ? const StatusInfo('Disabled', StatusTone.warning)
-                        : const StatusInfo('Enabled', StatusTone.success),
+                        ? StatusInfo(
+                            appText('已禁用', 'Disabled'),
+                            StatusTone.warning,
+                          )
+                        : StatusInfo(
+                            appText('已启用', 'Enabled'),
+                            StatusTone.success,
+                          ),
                     description: skill.description,
                     meta: [skill.source, skill.skillKey],
-                    actions: const ['Refresh'],
+                    actions: [appText('刷新', 'Refresh')],
                     sections: [
                       DetailSection(
-                        title: 'Requirements',
+                        title: appText('依赖要求', 'Requirements'),
                         items: [
                           DetailItem(
-                            label: 'Missing bins',
+                            label: appText('缺失二进制', 'Missing bins'),
                             value: skill.missingBins.isEmpty
-                                ? 'None'
+                                ? appText('无', 'None')
                                 : skill.missingBins.join(', '),
                           ),
                           DetailItem(
-                            label: 'Missing env',
+                            label: appText('缺失环境变量', 'Missing env'),
                             value: skill.missingEnv.isEmpty
-                                ? 'None'
+                                ? appText('无', 'None')
                                 : skill.missingEnv.join(', '),
                           ),
                           DetailItem(
-                            label: 'Missing config',
+                            label: appText('缺失配置', 'Missing config'),
                             value: skill.missingConfig.isEmpty
-                                ? 'None'
+                                ? appText('无', 'None')
                                 : skill.missingConfig.join(', '),
                           ),
                         ],
@@ -622,8 +698,14 @@ class _SkillsPanel extends StatelessWidget {
                       flex: 2,
                       child: StatusBadge(
                         status: skill.disabled
-                            ? const StatusInfo('Disabled', StatusTone.warning)
-                            : const StatusInfo('Enabled', StatusTone.success),
+                            ? StatusInfo(
+                                appText('已禁用', 'Disabled'),
+                                StatusTone.warning,
+                              )
+                            : StatusInfo(
+                                appText('已启用', 'Enabled'),
+                                StatusTone.success,
+                              ),
                       ),
                     ),
                     Expanded(flex: 2, child: Text(skill.source)),
@@ -661,7 +743,10 @@ class _FallbackHubPanel extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.name, style: Theme.of(context).textTheme.titleLarge),
+                    Text(
+                      item.name,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                     const SizedBox(height: 8),
                     Text(item.description),
                   ],
@@ -733,7 +818,10 @@ class _FallbackConnectorsPanel extends StatelessWidget {
                                 style: Theme.of(context).textTheme.titleLarge,
                               ),
                             ),
-                            StatusBadge(status: connector.status, compact: true),
+                            StatusBadge(
+                              status: connector.status,
+                              compact: true,
+                            ),
                           ],
                         ),
                         const SizedBox(height: 10),
@@ -751,10 +839,7 @@ class _FallbackConnectorsPanel extends StatelessWidget {
 }
 
 class _KeyValueLine extends StatelessWidget {
-  const _KeyValueLine({
-    required this.label,
-    required this.value,
-  });
+  const _KeyValueLine({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -780,20 +865,33 @@ class _KeyValueLine extends StatelessWidget {
   }
 }
 
-StatusInfo _connectionStatus(RuntimeConnectionStatus status) => switch (status) {
-  RuntimeConnectionStatus.connected => const StatusInfo('Healthy', StatusTone.success),
-  RuntimeConnectionStatus.connecting => const StatusInfo('Connecting', StatusTone.accent),
-  RuntimeConnectionStatus.error => const StatusInfo('Error', StatusTone.danger),
-  RuntimeConnectionStatus.offline => const StatusInfo('Offline', StatusTone.neutral),
-};
+StatusInfo _connectionStatus(RuntimeConnectionStatus status) =>
+    switch (status) {
+      RuntimeConnectionStatus.connected => StatusInfo(
+        appText('健康', 'Healthy'),
+        StatusTone.success,
+      ),
+      RuntimeConnectionStatus.connecting => StatusInfo(
+        appText('连接中', 'Connecting'),
+        StatusTone.accent,
+      ),
+      RuntimeConnectionStatus.error => StatusInfo(
+        appText('错误', 'Error'),
+        StatusTone.danger,
+      ),
+      RuntimeConnectionStatus.offline => StatusInfo(
+        appText('离线', 'Offline'),
+        StatusTone.neutral,
+      ),
+    };
 
 StatusInfo _instanceStatus(GatewayInstanceSummary item) {
   final mode = (item.mode ?? '').toLowerCase();
   if (mode.contains('error') || mode.contains('warn')) {
-    return const StatusInfo('Warning', StatusTone.warning);
+    return StatusInfo(appText('告警', 'Warning'), StatusTone.warning);
   }
   if (mode.contains('active') || mode.contains('online')) {
-    return const StatusInfo('Online', StatusTone.success);
+    return StatusInfo(appText('在线', 'Online'), StatusTone.success);
   }
-  return const StatusInfo('Seen', StatusTone.neutral);
+  return StatusInfo(appText('已发现', 'Seen'), StatusTone.neutral);
 }
