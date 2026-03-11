@@ -8,6 +8,11 @@ extension AppLanguageCopy on AppLanguage {
     AppLanguage.en => 'en',
   };
 
+  String get compactLabel => switch (this) {
+    AppLanguage.zh => '中',
+    AppLanguage.en => 'EN',
+  };
+
   String get buttonLabel => switch (this) {
     AppLanguage.zh => '中 / EN',
     AppLanguage.en => 'EN / 中',

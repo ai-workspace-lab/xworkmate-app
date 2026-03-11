@@ -126,7 +126,7 @@ extension SettingsTabCopy on SettingsTab {
   String get label => switch (this) {
     SettingsTab.general => appText('通用', 'General'),
     SettingsTab.workspace => appText('工作区', 'Workspace'),
-    SettingsTab.gateway => appText('网关', 'Gateway'),
+    SettingsTab.gateway => appText('集成', 'Integrations'),
     SettingsTab.appearance => appText('外观', 'Appearance'),
     SettingsTab.diagnostics => appText('诊断', 'Diagnostics'),
     SettingsTab.experimental => appText('实验特性', 'Experimental'),

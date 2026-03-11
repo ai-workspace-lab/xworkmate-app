@@ -270,18 +270,14 @@ class SidebarFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     final languageButton = Tooltip(
       message: appText('切换语言', 'Switch language'),
-      child: isCollapsed
-          ? IconButton(
-              onPressed: onToggleLanguage,
-              icon: const Icon(Icons.translate_rounded),
-            )
-          : OutlinedButton.icon(
-              onPressed: onToggleLanguage,
-              icon: const Icon(Icons.translate_rounded, size: 18),
-              label: Text(appLanguage.buttonLabel),
-            ),
+      child: _SidebarLanguageButton(
+        appLanguage: appLanguage,
+        compact: isCollapsed,
+        onPressed: onToggleLanguage,
+      ),
     );
 
     final themeButton = Tooltip(
@@ -339,53 +335,134 @@ class SidebarFooter extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [themeButton, settingsButton, collapseButton],
           ),
-        if (!isCollapsed) ...[
-          const SizedBox(height: 8),
-          SizedBox(width: double.infinity, child: languageButton),
-        ],
         const SizedBox(height: 8),
-        Tooltip(
-          message: isCollapsed ? appText('账号', 'Account') : '',
-          child: InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: onOpenAccount,
-            child: Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(
-                horizontal: isCollapsed ? 0 : 12,
-                vertical: 10,
+        if (isCollapsed)
+          Tooltip(
+            message: appText('账号', 'Account'),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: onOpenAccount,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: accountSelected
+                      ? palette.accentMuted
+                      : palette.surfaceSecondary,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: palette.strokeSoft),
+                ),
+                child: const Icon(Icons.account_circle_rounded),
               ),
-              decoration: BoxDecoration(
-                color: accountSelected
-                    ? context.palette.accentMuted
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: isCollapsed
-                  ? const Icon(Icons.account_circle_rounded)
-                  : Row(
-                      children: [
-                        const CircleAvatar(radius: 16, child: Text('H')),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Haitao Pan',
-                              style: Theme.of(context).textTheme.labelLarge,
+            ),
+          )
+        else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              languageButton,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Tooltip(
+                  message: '',
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: onOpenAccount,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: accountSelected
+                            ? palette.accentMuted
+                            : palette.surfaceSecondary,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: palette.strokeSoft),
+                      ),
+                      child: Row(
+                        children: [
+                          const CircleAvatar(radius: 18, child: Text('H')),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Haitao Pan',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.labelLarge,
+                                ),
+                                Text(
+                                  appText('账号', 'Account'),
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
                             ),
-                            Text(
-                              appText('账号', 'Account'),
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _SidebarLanguageButton extends StatefulWidget {
+  const _SidebarLanguageButton({
+    required this.appLanguage,
+    required this.compact,
+    required this.onPressed,
+  });
+
+  final AppLanguage appLanguage;
+  final bool compact;
+  final VoidCallback onPressed;
+
+  @override
+  State<_SidebarLanguageButton> createState() => _SidebarLanguageButtonState();
+}
+
+class _SidebarLanguageButtonState extends State<_SidebarLanguageButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final size = widget.compact ? 44.0 : 58.0;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _hovered ? palette.hover : palette.surfaceSecondary,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: palette.strokeSoft),
+          ),
+          child: Text(
+            widget.appLanguage.compactLabel,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: palette.textPrimary,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
