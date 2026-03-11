@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
-import '../../data/mock_data.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_controllers.dart';
@@ -97,6 +96,9 @@ class _ModulesPageState extends State<ModulesPage> {
                               ? null
                               : controller.selectedAgentId,
                         );
+                        await controller.connectorsController.refresh();
+                        await controller.modelsController.refresh();
+                        await controller.cronJobsController.refresh();
                       },
                       icon: const Icon(Icons.refresh_rounded),
                     ),
@@ -160,9 +162,11 @@ class _ModulesPageState extends State<ModulesPage> {
                   onOpenDetail: widget.onOpenDetail,
                 ),
                 ModulesTab.clawHub => _FallbackHubPanel(
+                  controller: controller,
                   onOpenDetail: widget.onOpenDetail,
                 ),
                 ModulesTab.connectors => _FallbackConnectorsPanel(
+                  controller: controller,
                   onOpenDetail: widget.onOpenDetail,
                 ),
               },
@@ -725,30 +729,83 @@ class _SkillsPanel extends StatelessWidget {
 }
 
 class _FallbackHubPanel extends StatelessWidget {
-  const _FallbackHubPanel({required this.onOpenDetail});
+  const _FallbackHubPanel({
+    required this.controller,
+    required this.onOpenDetail,
+  });
 
+  final AppController controller;
   final ValueChanged<DetailPanelData> onOpenDetail;
 
   @override
   Widget build(BuildContext context) {
+    final items = controller.models;
+    if (items.isEmpty) {
+      return SurfaceCard(
+        child: Text(
+          controller.connection.status == RuntimeConnectionStatus.connected
+              ? appText(
+                  '当前网关没有返回模型目录。',
+                  'No model catalog returned by the gateway.',
+                )
+              : appText(
+                  '连接 Gateway 后可加载模型能力目录。',
+                  'Connect a gateway to load the model catalog.',
+                ),
+        ),
+      );
+    }
     return Wrap(
       spacing: 16,
       runSpacing: 16,
-      children: MockData.workspaceModules
+      children: items
           .map(
-            (item) => SizedBox(
+            (model) => SizedBox(
               width: 360,
               child: SurfaceCard(
-                onTap: () => onOpenDetail(MockData.moduleDetail(item)),
+                onTap: () => onOpenDetail(
+                  DetailPanelData(
+                    title: model.name,
+                    subtitle: appText('模型', 'Model'),
+                    icon: Icons.psychology_alt_rounded,
+                    status: StatusInfo(model.provider, StatusTone.accent),
+                    description: appText(
+                      '来自 OpenClaw Gateway 的可用模型目录项。',
+                      'Model catalog entry exposed by the OpenClaw gateway.',
+                    ),
+                    meta: [model.id, model.provider],
+                    actions: [appText('刷新', 'Refresh')],
+                    sections: [
+                      DetailSection(
+                        title: appText('能力', 'Capabilities'),
+                        items: [
+                          DetailItem(label: 'ID', value: model.id),
+                          DetailItem(
+                            label: appText('提供方', 'Provider'),
+                            value: model.provider,
+                          ),
+                          DetailItem(
+                            label: appText('上下文窗口', 'Context Window'),
+                            value: '${model.contextWindow ?? 0}',
+                          ),
+                          DetailItem(
+                            label: appText('最大输出', 'Max Output'),
+                            value: '${model.maxOutputTokens ?? 0}',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.name,
+                      model.name,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 8),
-                    Text(item.description),
+                    Text('${model.provider} · ${model.id}'),
                   ],
                 ),
               ),
@@ -760,12 +817,32 @@ class _FallbackHubPanel extends StatelessWidget {
 }
 
 class _FallbackConnectorsPanel extends StatelessWidget {
-  const _FallbackConnectorsPanel({required this.onOpenDetail});
+  const _FallbackConnectorsPanel({
+    required this.controller,
+    required this.onOpenDetail,
+  });
 
+  final AppController controller;
   final ValueChanged<DetailPanelData> onOpenDetail;
 
   @override
   Widget build(BuildContext context) {
+    final connectors = controller.connectors;
+    if (connectors.isEmpty) {
+      return SurfaceCard(
+        child: Text(
+          controller.connection.status == RuntimeConnectionStatus.connected
+              ? appText(
+                  '当前网关没有返回连接器状态。',
+                  'No connector status returned by the gateway.',
+                )
+              : appText(
+                  '连接 Gateway 后可加载连接器状态。',
+                  'Connect a gateway to load connector status.',
+                ),
+        ),
+      );
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth > 1220
@@ -776,31 +853,44 @@ class _FallbackConnectorsPanel extends StatelessWidget {
         return Wrap(
           spacing: 16,
           runSpacing: 16,
-          children: MockData.connectors
+          children: connectors
               .map(
                 (connector) => SizedBox(
                   width: width,
                   child: SurfaceCard(
                     onTap: () => onOpenDetail(
                       DetailPanelData(
-                        title: connector.name,
+                        title: connector.label,
                         subtitle: 'Connector',
                         icon: Icons.cable_rounded,
-                        status: connector.status,
-                        description: connector.description,
-                        meta: [connector.lastSync, connector.permission],
-                        actions: const ['Open', 'Refresh'],
+                        status: _connectorStatus(connector),
+                        description:
+                            connector.lastError ?? connector.detailLabel,
+                        meta: [
+                          if (connector.accountName != null)
+                            connector.accountName!,
+                          ...connector.meta,
+                        ],
+                        actions: const ['Refresh'],
                         sections: [
                           DetailSection(
                             title: 'Connector',
                             items: [
                               DetailItem(
-                                label: 'Last Sync',
-                                value: connector.lastSync,
+                                label: appText('状态', 'Status'),
+                                value: connector.status,
                               ),
                               DetailItem(
-                                label: 'Permission',
-                                value: connector.permission,
+                                label: appText('账号', 'Account'),
+                                value: connector.accountName ?? 'default',
+                              ),
+                              DetailItem(
+                                label: appText('配置', 'Configured'),
+                                value: '${connector.configured}',
+                              ),
+                              DetailItem(
+                                label: appText('连接中', 'Connected'),
+                                value: '${connector.connected}',
                               ),
                             ],
                           ),
@@ -814,18 +904,22 @@ class _FallbackConnectorsPanel extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                connector.name,
+                                connector.label,
                                 style: Theme.of(context).textTheme.titleLarge,
                               ),
                             ),
                             StatusBadge(
-                              status: connector.status,
+                              status: _connectorStatus(connector),
                               compact: true,
                             ),
                           ],
                         ),
                         const SizedBox(height: 10),
-                        Text(connector.description),
+                        Text(
+                          connector.accountName == null
+                              ? connector.detailLabel
+                              : '${connector.detailLabel} · ${connector.accountName}',
+                        ),
                       ],
                     ),
                   ),
@@ -836,6 +930,19 @@ class _FallbackConnectorsPanel extends StatelessWidget {
       },
     );
   }
+}
+
+StatusInfo _connectorStatus(GatewayConnectorSummary connector) {
+  return switch (connector.status) {
+    'error' => StatusInfo(appText('异常', 'Error'), StatusTone.danger),
+    'connected' => StatusInfo(appText('已连接', 'Connected'), StatusTone.success),
+    'running' => StatusInfo(appText('运行中', 'Running'), StatusTone.accent),
+    'configured' => StatusInfo(
+      appText('已配置', 'Configured'),
+      StatusTone.warning,
+    ),
+    _ => StatusInfo(appText('空闲', 'Idle'), StatusTone.neutral),
+  };
 }
 
 class _KeyValueLine extends StatelessWidget {

@@ -211,6 +211,18 @@ class _AppShellState extends State<AppShell> {
                                   ? ThemeMode.light
                                   : ThemeMode.dark,
                             ),
+                            accountName:
+                                controller.settings.accountUsername
+                                    .trim()
+                                    .isEmpty
+                                ? appText('本地操作员', 'Local Operator')
+                                : controller.settings.accountUsername,
+                            accountSubtitle:
+                                controller.settings.accountWorkspace
+                                    .trim()
+                                    .isEmpty
+                                ? appText('账号', 'Account')
+                                : controller.settings.accountWorkspace,
                             expandedWidthOverride:
                                 sidebarState == AppSidebarState.expanded
                                 ? expandedSidebarWidth

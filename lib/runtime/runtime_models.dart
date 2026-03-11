@@ -870,6 +870,29 @@ class GatewayChatMessage {
   }
 }
 
+class GatewayChatAttachmentPayload {
+  const GatewayChatAttachmentPayload({
+    required this.type,
+    required this.mimeType,
+    required this.fileName,
+    required this.content,
+  });
+
+  final String type;
+  final String mimeType;
+  final String fileName;
+  final String content;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type,
+      'mimeType': mimeType,
+      'fileName': fileName,
+      'content': content,
+    };
+  }
+}
+
 class GatewayInstanceSummary {
   const GatewayInstanceSummary({
     required this.id,
@@ -924,6 +947,76 @@ class GatewaySkillSummary {
   final List<String> missingBins;
   final List<String> missingEnv;
   final List<String> missingConfig;
+}
+
+class GatewayConnectorSummary {
+  const GatewayConnectorSummary({
+    required this.id,
+    required this.label,
+    required this.detailLabel,
+    required this.accountName,
+    required this.configured,
+    required this.enabled,
+    required this.running,
+    required this.connected,
+    required this.status,
+    required this.lastError,
+    required this.meta,
+  });
+
+  final String id;
+  final String label;
+  final String detailLabel;
+  final String? accountName;
+  final bool configured;
+  final bool enabled;
+  final bool running;
+  final bool connected;
+  final String status;
+  final String? lastError;
+  final List<String> meta;
+}
+
+class GatewayModelSummary {
+  const GatewayModelSummary({
+    required this.id,
+    required this.name,
+    required this.provider,
+    required this.contextWindow,
+    required this.maxOutputTokens,
+  });
+
+  final String id;
+  final String name;
+  final String provider;
+  final int? contextWindow;
+  final int? maxOutputTokens;
+}
+
+class GatewayCronJobSummary {
+  const GatewayCronJobSummary({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.enabled,
+    required this.agentId,
+    required this.scheduleLabel,
+    required this.nextRunAtMs,
+    required this.lastRunAtMs,
+    required this.lastStatus,
+    required this.lastError,
+  });
+
+  final String id;
+  final String name;
+  final String? description;
+  final bool enabled;
+  final String? agentId;
+  final String scheduleLabel;
+  final int? nextRunAtMs;
+  final int? lastRunAtMs;
+  final String? lastStatus;
+  final String? lastError;
 }
 
 class SecretReferenceEntry {

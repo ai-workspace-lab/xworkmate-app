@@ -54,10 +54,27 @@ class _IosMobileShellState extends State<IosMobileShell> {
   IosMobileTab _tab = IosMobileTab.home;
   String _taskTab = 'Running';
   bool _deviceInfoExpanded = false;
-  final TextEditingController _accountPasswordController = TextEditingController();
+  late final TextEditingController _accountBaseUrlController;
+  late final TextEditingController _accountUsernameController;
+  final TextEditingController _accountPasswordController =
+      TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final settings = widget.controller.settings;
+    _accountBaseUrlController = TextEditingController(
+      text: settings.accountBaseUrl,
+    );
+    _accountUsernameController = TextEditingController(
+      text: settings.accountUsername,
+    );
+  }
 
   @override
   void dispose() {
+    _accountBaseUrlController.dispose();
+    _accountUsernameController.dispose();
     _accountPasswordController.dispose();
     super.dispose();
   }
@@ -117,7 +134,9 @@ class _IosMobileShellState extends State<IosMobileShell> {
     final connection = controller.connection;
     final title = connection.remoteAddress ?? 'xworkmate.svc.plus';
     final hero = _HeroCardData(
-      badge: connection.status == RuntimeConnectionStatus.connected ? '会话已就绪' : '等待接入',
+      badge: connection.status == RuntimeConnectionStatus.connected
+          ? '会话已就绪'
+          : '等待接入',
       badgeColor: connection.status == RuntimeConnectionStatus.connected
           ? _blueLine
           : _textSecondary,
@@ -138,7 +157,8 @@ class _IosMobileShellState extends State<IosMobileShell> {
           title: title,
           secondaryIcon: Icons.list_rounded,
           onPrimaryPressed: _showConnectSheet,
-          onSecondaryPressed: () => setState(() => _tab = IosMobileTab.settings),
+          onSecondaryPressed: () =>
+              setState(() => _tab = IosMobileTab.settings),
         ),
         const SizedBox(height: 22),
         _HeroCard(data: hero),
@@ -209,7 +229,8 @@ class _IosMobileShellState extends State<IosMobileShell> {
           title: connection.remoteAddress ?? 'Gateway',
           secondaryIcon: Icons.settings_outlined,
           onPrimaryPressed: _showConnectSheet,
-          onSecondaryPressed: () => setState(() => _tab = IosMobileTab.settings),
+          onSecondaryPressed: () =>
+              setState(() => _tab = IosMobileTab.settings),
         ),
         const SizedBox(height: 22),
         _HeroCard(
@@ -280,7 +301,10 @@ class _IosMobileShellState extends State<IosMobileShell> {
         _StatGrid(
           items: [
             _MiniStat('Total', '${controller.tasksController.totalCount}'),
-            _MiniStat('Running', '${controller.tasksController.running.length}'),
+            _MiniStat(
+              'Running',
+              '${controller.tasksController.running.length}',
+            ),
             _MiniStat('Failed', '${controller.tasksController.failed.length}'),
             _MiniStat('Sessions', '${controller.sessions.length}'),
           ],
@@ -333,7 +357,7 @@ class _IosMobileShellState extends State<IosMobileShell> {
               ),
               const SizedBox(height: 12),
               Text(
-                settings.accountLocalMode ? '请先登录' : '统一账户入口即将接入',
+                settings.accountLocalMode ? '保存账号入口信息' : '统一账户地址已配置',
                 style: const TextStyle(fontSize: 22, color: _textSecondary),
               ),
             ],
@@ -343,19 +367,16 @@ class _IosMobileShellState extends State<IosMobileShell> {
         const _FieldLabel('服务地址'),
         const SizedBox(height: 12),
         _RoundedTextField(
-          key: ValueKey(settings.accountBaseUrl),
-          initialValue: settings.accountBaseUrl,
+          controller: _accountBaseUrlController,
           icon: Icons.dns_outlined,
-          onSubmitted: (value) => controller.saveSettings(
-            settings.copyWith(accountBaseUrl: value),
-          ),
+          onSubmitted: (value) =>
+              controller.saveSettings(settings.copyWith(accountBaseUrl: value)),
         ),
         const SizedBox(height: 22),
         const _FieldLabel('邮箱或账号'),
         const SizedBox(height: 12),
         _RoundedTextField(
-          key: ValueKey(settings.accountUsername),
-          initialValue: settings.accountUsername,
+          controller: _accountUsernameController,
           icon: Icons.person_outline_rounded,
           onSubmitted: (value) => controller.saveSettings(
             settings.copyWith(accountUsername: value),
@@ -375,11 +396,20 @@ class _IosMobileShellState extends State<IosMobileShell> {
         const SizedBox(height: 26),
         _PrimaryWideButton(
           label: settings.accountLocalMode ? '保存本地入口' : '登录',
-          onPressed: () {
+          onPressed: () async {
+            final messenger = ScaffoldMessenger.of(context);
             FocusScope.of(context).unfocus();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('统一账号后端暂未接入，已保留本地入口 UI。')),
+            await controller.saveSettings(
+              settings.copyWith(
+                accountBaseUrl: _accountBaseUrlController.text.trim(),
+                accountUsername: _accountUsernameController.text.trim(),
+                accountLocalMode: true,
+              ),
             );
+            if (!context.mounted) {
+              return;
+            }
+            messenger.showSnackBar(const SnackBar(content: Text('账号入口配置已保存。')));
           },
         ),
       ],
@@ -408,7 +438,8 @@ class _IosMobileShellState extends State<IosMobileShell> {
             iconTint: _accentEnd,
             iconBackground: _accentSoft,
             title: connectionTitle(controller),
-            subtitle: controller.connection.remoteAddress ?? 'xworkmate.svc.plus',
+            subtitle:
+                controller.connection.remoteAddress ?? 'xworkmate.svc.plus',
           ),
           compact: true,
         ),
@@ -419,8 +450,10 @@ class _IosMobileShellState extends State<IosMobileShell> {
           children: [
             _GroupedRow(
               title: 'Gateway',
-              subtitle: controller.connection.remoteAddress ?? settings.gateway.host,
-              leadingDotColor: controller.connection.status ==
+              subtitle:
+                  controller.connection.remoteAddress ?? settings.gateway.host,
+              leadingDotColor:
+                  controller.connection.status ==
                       RuntimeConnectionStatus.connected
                   ? Colors.green
                   : _textSecondary,
@@ -452,7 +485,9 @@ class _IosMobileShellState extends State<IosMobileShell> {
                       initialValue: settings.ollamaLocal.endpoint,
                       onSubmitted: (value) => controller.saveSettings(
                         settings.copyWith(
-                          ollamaLocal: settings.ollamaLocal.copyWith(endpoint: value),
+                          ollamaLocal: settings.ollamaLocal.copyWith(
+                            endpoint: value,
+                          ),
                         ),
                       ),
                     ),
@@ -461,14 +496,19 @@ class _IosMobileShellState extends State<IosMobileShell> {
                       initialValue: settings.ollamaLocal.defaultModel,
                       onSubmitted: (value) => controller.saveSettings(
                         settings.copyWith(
-                          ollamaLocal: settings.ollamaLocal.copyWith(defaultModel: value),
+                          ollamaLocal: settings.ollamaLocal.copyWith(
+                            defaultModel: value,
+                          ),
                         ),
                       ),
                     ),
                   ],
                   footer: OutlinedButton(
-                    onPressed: () => controller.testOllamaConnection(cloud: false),
-                    child: Text('Test · ${controller.settingsController.ollamaStatus}'),
+                    onPressed: () =>
+                        controller.testOllamaConnection(cloud: false),
+                    child: Text(
+                      'Test · ${controller.settingsController.ollamaStatus}',
+                    ),
                   ),
                 ),
               ),
@@ -487,7 +527,9 @@ class _IosMobileShellState extends State<IosMobileShell> {
                       initialValue: settings.ollamaCloud.baseUrl,
                       onSubmitted: (value) => controller.saveSettings(
                         settings.copyWith(
-                          ollamaCloud: settings.ollamaCloud.copyWith(baseUrl: value),
+                          ollamaCloud: settings.ollamaCloud.copyWith(
+                            baseUrl: value,
+                          ),
                         ),
                       ),
                     ),
@@ -496,14 +538,19 @@ class _IosMobileShellState extends State<IosMobileShell> {
                       initialValue: settings.ollamaCloud.defaultModel,
                       onSubmitted: (value) => controller.saveSettings(
                         settings.copyWith(
-                          ollamaCloud: settings.ollamaCloud.copyWith(defaultModel: value),
+                          ollamaCloud: settings.ollamaCloud.copyWith(
+                            defaultModel: value,
+                          ),
                         ),
                       ),
                     ),
                   ],
                   footer: OutlinedButton(
-                    onPressed: () => controller.testOllamaConnection(cloud: true),
-                    child: Text('Test · ${controller.settingsController.ollamaStatus}'),
+                    onPressed: () =>
+                        controller.testOllamaConnection(cloud: true),
+                    child: Text(
+                      'Test · ${controller.settingsController.ollamaStatus}',
+                    ),
                   ),
                 ),
               ),
@@ -553,7 +600,9 @@ class _IosMobileShellState extends State<IosMobileShell> {
                   ],
                   footer: OutlinedButton(
                     onPressed: controller.testVaultConnection,
-                    child: Text('Test · ${controller.settingsController.vaultStatus}'),
+                    child: Text(
+                      'Test · ${controller.settingsController.vaultStatus}',
+                    ),
                   ),
                 ),
               ),
@@ -567,7 +616,8 @@ class _IosMobileShellState extends State<IosMobileShell> {
           children: [
             _GroupedRow(
               title: settings.apisix.name,
-              subtitle: '${settings.apisix.filePath} · ${settings.apisix.validationState}',
+              subtitle:
+                  '${settings.apisix.filePath} · ${settings.apisix.validationState}',
               onTap: () => _openSettingsEditor(
                 title: 'APISIX YAML',
                 child: _ApisixEditor(
@@ -591,7 +641,8 @@ class _IosMobileShellState extends State<IosMobileShell> {
             _GroupedExpandableRow(
               title: 'Device Info',
               expanded: _deviceInfoExpanded,
-              onToggle: () => setState(() => _deviceInfoExpanded = !_deviceInfoExpanded),
+              onToggle: () =>
+                  setState(() => _deviceInfoExpanded = !_deviceInfoExpanded),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
                 child: Column(
@@ -677,7 +728,10 @@ class _IosMobileShellState extends State<IosMobileShell> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Select Agent', style: Theme.of(context).textTheme.headlineSmall),
+                Text(
+                  'Select Agent',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
                 const SizedBox(height: 16),
                 ListTile(
                   shape: RoundedRectangleBorder(
@@ -718,10 +772,7 @@ class _IosMobileShellState extends State<IosMobileShell> {
     );
   }
 
-  void _openSettingsEditor({
-    required String title,
-    required Widget child,
-  }) {
+  void _openSettingsEditor({required String title, required Widget child}) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -735,10 +786,7 @@ class _IosMobileShellState extends State<IosMobileShell> {
           ),
           child: SafeArea(
             top: false,
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: child,
-            ),
+            child: Padding(padding: const EdgeInsets.all(24), child: child),
           ),
         ),
       ),
@@ -784,7 +832,8 @@ class _MobileChatSheetState extends State<_MobileChatSheet> {
           builder: (context, _) {
             final controller = widget.controller;
             final connected =
-                controller.connection.status == RuntimeConnectionStatus.connected;
+                controller.connection.status ==
+                RuntimeConnectionStatus.connected;
             final messages = controller.chatMessages;
             return Padding(
               padding: const EdgeInsets.all(24),
@@ -797,13 +846,15 @@ class _MobileChatSheetState extends State<_MobileChatSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('对话', style: Theme.of(context).textTheme.headlineSmall),
+                            Text(
+                              '对话',
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
                             const SizedBox(height: 6),
                             Text(
                               controller.currentSessionKey,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: _textSecondary,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: _textSecondary),
                             ),
                           ],
                         ),
@@ -844,7 +895,9 @@ class _MobileChatSheetState extends State<_MobileChatSheet> {
                       ),
                       child: !connected
                           ? const Center(
-                              child: Text('Connect a gateway first to enter the chat.'),
+                              child: Text(
+                                'Connect a gateway first to enter the chat.',
+                              ),
                             )
                           : messages.isEmpty
                           ? const Center(
@@ -862,7 +915,9 @@ class _MobileChatSheetState extends State<_MobileChatSheet> {
                                       ? Alignment.centerRight
                                       : Alignment.centerLeft,
                                   child: Container(
-                                    constraints: const BoxConstraints(maxWidth: 320),
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 320,
+                                    ),
                                     padding: const EdgeInsets.all(14),
                                     decoration: BoxDecoration(
                                       color: isUser
@@ -871,7 +926,11 @@ class _MobileChatSheetState extends State<_MobileChatSheet> {
                                       borderRadius: BorderRadius.circular(22),
                                       border: Border.all(color: _stroke),
                                     ),
-                                    child: Text(message.text.isEmpty ? 'Pending' : message.text),
+                                    child: Text(
+                                      message.text.isEmpty
+                                          ? 'Pending'
+                                          : message.text,
+                                    ),
                                   ),
                                 );
                               },
@@ -884,7 +943,9 @@ class _MobileChatSheetState extends State<_MobileChatSheet> {
                     minLines: 2,
                     maxLines: 4,
                     decoration: _roundedInputDecoration(
-                      hintText: connected ? 'Ask XWorkmate anything…' : 'Connect a gateway first…',
+                      hintText: connected
+                          ? 'Ask XWorkmate anything…'
+                          : 'Connect a gateway first…',
                       icon: Icons.edit_outlined,
                     ),
                   ),
@@ -893,7 +954,9 @@ class _MobileChatSheetState extends State<_MobileChatSheet> {
                     children: [
                       Expanded(
                         child: _PrimaryWideButton(
-                          label: controller.chatController.hasPendingRun ? '停止' : '发送',
+                          label: controller.chatController.hasPendingRun
+                              ? '停止'
+                              : '发送',
                           onPressed: connected
                               ? () async {
                                   if (controller.chatController.hasPendingRun) {
@@ -922,10 +985,7 @@ class _MobileChatSheetState extends State<_MobileChatSheet> {
 }
 
 class _ApisixEditor extends StatefulWidget {
-  const _ApisixEditor({
-    required this.controller,
-    required this.profile,
-  });
+  const _ApisixEditor({required this.controller, required this.profile});
 
   final AppController controller;
   final ApisixYamlProfile profile;
@@ -978,7 +1038,9 @@ class _ApisixEditorState extends State<_ApisixEditor> {
           ),
           onSubmitted: (value) => widget.controller.saveSettings(
             widget.controller.settings.copyWith(
-              apisix: widget.controller.settings.apisix.copyWith(filePath: value),
+              apisix: widget.controller.settings.apisix.copyWith(
+                filePath: value,
+              ),
             ),
           ),
         ),
@@ -1021,7 +1083,9 @@ class _ApisixEditorState extends State<_ApisixEditor> {
                   if (!mounted) {
                     return;
                   }
-                  messenger.showSnackBar(SnackBar(content: Text(result.validationMessage)));
+                  messenger.showSnackBar(
+                    SnackBar(content: Text(result.validationMessage)),
+                  );
                 },
                 child: Text(widget.profile.validationState),
               ),
@@ -1029,7 +1093,10 @@ class _ApisixEditorState extends State<_ApisixEditor> {
           ],
         ),
         const SizedBox(height: 12),
-        Text(widget.profile.validationMessage, style: const TextStyle(color: _textSecondary)),
+        Text(
+          widget.profile.validationMessage,
+          style: const TextStyle(color: _textSecondary),
+        ),
       ],
     );
   }
@@ -1152,7 +1219,11 @@ class _MobileHeader extends StatelessWidget {
             children: [
               IconButton(
                 onPressed: onPrimaryPressed,
-                icon: const Icon(Icons.add_rounded, color: Colors.white, size: 32),
+                icon: const Icon(
+                  Icons.add_rounded,
+                  color: Colors.white,
+                  size: 32,
+                ),
               ),
               const SizedBox(width: 8),
               IconButton(
@@ -1213,7 +1284,11 @@ class _HeroCard extends StatelessWidget {
               color: data.iconBackground,
               borderRadius: BorderRadius.circular(32),
             ),
-            child: Icon(data.icon, color: data.iconTint, size: compact ? 38 : 46),
+            child: Icon(
+              data.icon,
+              color: data.iconTint,
+              size: compact ? 38 : 46,
+            ),
           ),
           const SizedBox(width: 18),
           Expanded(
@@ -1466,7 +1541,10 @@ class _StatusCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 18, color: _textSecondary)),
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 18, color: _textSecondary),
+                ),
                 const SizedBox(height: 6),
                 Text(
                   value,
@@ -1497,10 +1575,7 @@ class _StatusCard extends StatelessWidget {
 }
 
 class _BottomPillNav extends StatelessWidget {
-  const _BottomPillNav({
-    required this.currentTab,
-    required this.onChanged,
-  });
+  const _BottomPillNav({required this.currentTab, required this.onChanged});
 
   final IosMobileTab currentTab;
   final ValueChanged<IosMobileTab> onChanged;
@@ -1525,7 +1600,9 @@ class _BottomPillNav extends StatelessWidget {
                     curve: Curves.easeOutCubic,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
-                      color: currentTab == tab ? _surfaceSoft : Colors.transparent,
+                      color: currentTab == tab
+                          ? _surfaceSoft
+                          : Colors.transparent,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Column(
@@ -1575,14 +1652,18 @@ class _GlowOrb extends StatelessWidget {
 
 class _RoundedTextField extends StatelessWidget {
   const _RoundedTextField({
-    super.key,
-    required this.initialValue,
+    this.initialValue,
+    this.controller,
     required this.icon,
     this.hintText = '',
     this.onSubmitted,
-  });
+  }) : assert(
+         initialValue == null || controller == null,
+         'Use either initialValue or controller.',
+       );
 
-  final String initialValue;
+  final String? initialValue;
+  final TextEditingController? controller;
   final IconData icon;
   final String hintText;
   final ValueChanged<String>? onSubmitted;
@@ -1590,8 +1671,8 @@ class _RoundedTextField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextFormField(
-      key: key,
       initialValue: initialValue,
+      controller: controller,
       decoration: _roundedInputDecoration(hintText: hintText, icon: icon),
       onFieldSubmitted: onSubmitted,
     );
@@ -1642,10 +1723,7 @@ class _FieldLabel extends StatelessWidget {
 }
 
 class _PrimaryWideButton extends StatelessWidget {
-  const _PrimaryWideButton({
-    required this.label,
-    required this.onPressed,
-  });
+  const _PrimaryWideButton({required this.label, required this.onPressed});
 
   final String label;
   final VoidCallback onPressed;
@@ -1737,7 +1815,11 @@ class _GroupedRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          const Icon(Icons.chevron_right_rounded, size: 32, color: _textPrimary),
+          const Icon(
+            Icons.chevron_right_rounded,
+            size: 32,
+            color: _textPrimary,
+          ),
         ],
       ),
     );
@@ -1787,7 +1869,9 @@ class _GroupedExpandableRow extends StatelessWidget {
                   ),
                 ),
                 Icon(
-                  expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                  expanded
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
                   size: 32,
                   color: _textPrimary,
                 ),
@@ -1812,10 +1896,7 @@ class _DividerLine extends StatelessWidget {
 }
 
 class _DeviceInfoLine extends StatelessWidget {
-  const _DeviceInfoLine({
-    required this.label,
-    required this.value,
-  });
+  const _DeviceInfoLine({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -1861,7 +1942,10 @@ class _MessageCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: _stroke),
       ),
-      child: Text(text, style: const TextStyle(fontSize: 18, color: _textPrimary)),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 18, color: _textPrimary),
+      ),
     );
   }
 }
@@ -1896,7 +1980,10 @@ class _StatGrid extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.label, style: const TextStyle(color: _textSecondary)),
+                  Text(
+                    item.label,
+                    style: const TextStyle(color: _textSecondary),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     item.value,

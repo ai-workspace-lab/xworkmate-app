@@ -14,7 +14,8 @@ class SecureConfigStore {
   static const _gatewayTokenKey = 'xworkmate.gateway.token';
   static const _gatewayPasswordKey = 'xworkmate.gateway.password';
   static const _gatewayDeviceIdKey = 'xworkmate.gateway.device.id';
-  static const _gatewayDevicePublicKeyKey = 'xworkmate.gateway.device.public_key';
+  static const _gatewayDevicePublicKeyKey =
+      'xworkmate.gateway.device.public_key';
   static const _gatewayDevicePrivateKeyKey =
       'xworkmate.gateway.device.private_key';
   static const _ollamaCloudApiKeyKey = 'xworkmate.ollama.cloud.api_key';
@@ -62,7 +63,11 @@ class SecureConfigStore {
     try {
       final decoded = jsonDecode(raw) as List<dynamic>;
       return decoded
-          .map((item) => SecretAuditEntry.fromJson((item as Map).cast<String, dynamic>()))
+          .map(
+            (item) => SecretAuditEntry.fromJson(
+              (item as Map).cast<String, dynamic>(),
+            ),
+          )
           .toList(growable: false);
     } catch (_) {
       return const [];
@@ -83,7 +88,8 @@ class SecureConfigStore {
 
   Future<String?> loadGatewayToken() => _readSecure(_gatewayTokenKey);
 
-  Future<void> saveGatewayToken(String value) => _writeSecure(_gatewayTokenKey, value);
+  Future<void> saveGatewayToken(String value) =>
+      _writeSecure(_gatewayTokenKey, value);
 
   Future<String?> loadGatewayPassword() => _readSecure(_gatewayPasswordKey);
 
@@ -99,7 +105,8 @@ class SecureConfigStore {
 
   Future<String?> loadVaultToken() => _readSecure(_vaultTokenKey);
 
-  Future<void> saveVaultToken(String value) => _writeSecure(_vaultTokenKey, value);
+  Future<void> saveVaultToken(String value) =>
+      _writeSecure(_vaultTokenKey, value);
 
   Future<LocalDeviceIdentity?> loadDeviceIdentity() async {
     await initialize();
@@ -151,14 +158,18 @@ class SecureConfigStore {
     final ollamaKey = await loadOllamaCloudApiKey();
     final vaultToken = await loadVaultToken();
     return {
-      ...?gatewayToken == null ? null : <String, String>{'gateway_token': gatewayToken},
+      ...?gatewayToken == null
+          ? null
+          : <String, String>{'gateway_token': gatewayToken},
       ...?gatewayPassword == null
           ? null
           : <String, String>{'gateway_password': gatewayPassword},
       ...?ollamaKey == null
           ? null
           : <String, String>{'ollama_cloud_api_key': ollamaKey},
-      ...?vaultToken == null ? null : <String, String>{'vault_token': vaultToken},
+      ...?vaultToken == null
+          ? null
+          : <String, String>{'vault_token': vaultToken},
     };
   }
 

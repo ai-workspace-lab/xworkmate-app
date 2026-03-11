@@ -66,12 +66,12 @@ class _AccountPageState extends State<AccountPage> {
                       Text(
                         settings.accountLocalMode
                             ? appText(
-                                '本地模式 · 占位账号会话',
-                                'Local mode · Placeholder account session',
+                                '本地模式 · 仅保存账号入口与工作区偏好',
+                                'Local mode · saves account entry and workspace preferences only',
                               )
                             : appText(
-                                '统一账号入口等待后端集成',
-                                'Unified account entry pending backend integration',
+                                '统一账号地址已配置，可作为后续接入入口',
+                                'Unified account base URL is configured for future integration',
                               ),
                       ),
                       const SizedBox(height: 16),

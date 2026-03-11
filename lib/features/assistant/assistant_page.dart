@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
@@ -124,6 +127,8 @@ class _AssistantPageState extends State<AssistantPage> {
                       scrollController: _conversationController,
                       onOpenDetail: widget.onOpenDetail,
                       onFocusComposer: _focusComposer,
+                      onOpenGateway: _showConnectDialog,
+                      onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
                     ),
                   ),
                   SizedBox(
@@ -170,6 +175,7 @@ class _AssistantPageState extends State<AssistantPage> {
                         });
                       },
                       onOpenGateway: _showConnectDialog,
+                      onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
                       onPickAttachments: _pickAttachments,
                       onFocusComposer: _focusComposer,
                       onSend: _submitPrompt,
@@ -333,7 +339,12 @@ class _AssistantPageState extends State<AssistantPage> {
       _lastSubmittedAttachments = attachmentNames;
     });
 
-    await controller.sendChatMessage(prompt, thinking: _thinkingLabel);
+    final attachmentPayloads = await _buildAttachmentPayloads(_attachments);
+    await controller.sendChatMessage(
+      prompt,
+      thinking: _thinkingLabel,
+      attachments: attachmentPayloads,
+    );
 
     if (!mounted) {
       return;
@@ -342,6 +353,29 @@ class _AssistantPageState extends State<AssistantPage> {
       _attachments = const <_ComposerAttachment>[];
     });
     _inputController.clear();
+  }
+
+  Future<List<GatewayChatAttachmentPayload>> _buildAttachmentPayloads(
+    List<_ComposerAttachment> attachments,
+  ) async {
+    final payloads = <GatewayChatAttachmentPayload>[];
+    for (final attachment in attachments) {
+      final file = File(attachment.path);
+      if (!await file.exists()) {
+        continue;
+      }
+      final bytes = await file.readAsBytes();
+      final mimeType = attachment.mimeType;
+      payloads.add(
+        GatewayChatAttachmentPayload(
+          type: mimeType.startsWith('image/') ? 'image' : 'file',
+          mimeType: mimeType,
+          fileName: attachment.name,
+          content: base64Encode(bytes),
+        ),
+      );
+    }
+    return payloads;
   }
 
   GatewayAgentSummary? _pickAutoAgent(AppController controller, String prompt) {
@@ -436,6 +470,14 @@ class _AssistantPageState extends State<AssistantPage> {
     );
   }
 
+  Future<void> _connectFromSavedSettingsOrShowDialog() async {
+    if (!widget.controller.canQuickConnectGateway) {
+      _showConnectDialog();
+      return;
+    }
+    await widget.controller.connectSavedGateway();
+  }
+
   void _focusComposer() {
     if (!mounted) {
       return;
@@ -459,6 +501,7 @@ class _AssistantLowerPane extends StatelessWidget {
     required this.onThinkingChanged,
     required this.onRemoveAttachment,
     required this.onOpenGateway,
+    required this.onReconnectGateway,
     required this.onPickAttachments,
     required this.onFocusComposer,
     required this.onSend,
@@ -477,6 +520,7 @@ class _AssistantLowerPane extends StatelessWidget {
   final ValueChanged<String> onThinkingChanged;
   final ValueChanged<_ComposerAttachment> onRemoveAttachment;
   final VoidCallback onOpenGateway;
+  final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
   final VoidCallback onFocusComposer;
   final Future<void> Function() onSend;
@@ -521,6 +565,7 @@ class _AssistantLowerPane extends StatelessWidget {
             onThinkingChanged: onThinkingChanged,
             onRemoveAttachment: onRemoveAttachment,
             onOpenGateway: onOpenGateway,
+            onReconnectGateway: onReconnectGateway,
             onPickAttachments: onPickAttachments,
             onSend: onSend,
           ),
@@ -537,6 +582,8 @@ class _ConversationArea extends StatelessWidget {
     required this.scrollController,
     required this.onOpenDetail,
     required this.onFocusComposer,
+    required this.onOpenGateway,
+    required this.onReconnectGateway,
   });
 
   final AppController controller;
@@ -544,6 +591,8 @@ class _ConversationArea extends StatelessWidget {
   final ScrollController scrollController;
   final ValueChanged<DetailPanelData> onOpenDetail;
   final VoidCallback onFocusComposer;
+  final VoidCallback onOpenGateway;
+  final Future<void> Function() onReconnectGateway;
 
   @override
   Widget build(BuildContext context) {
@@ -593,7 +642,12 @@ class _ConversationArea extends StatelessWidget {
             child: Container(
               color: palette.surfaceSecondary,
               child: items.isEmpty
-                  ? const SizedBox.expand()
+                  ? _AssistantEmptyState(
+                      controller: controller,
+                      onFocusComposer: onFocusComposer,
+                      onOpenGateway: onOpenGateway,
+                      onReconnectGateway: onReconnectGateway,
+                    )
                   : ListView.separated(
                       controller: scrollController,
                       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
@@ -716,6 +770,101 @@ class _ConversationArea extends StatelessWidget {
   }
 }
 
+class _AssistantEmptyState extends StatelessWidget {
+  const _AssistantEmptyState({
+    required this.controller,
+    required this.onFocusComposer,
+    required this.onOpenGateway,
+    required this.onReconnectGateway,
+  });
+
+  final AppController controller;
+  final VoidCallback onFocusComposer;
+  final VoidCallback onOpenGateway;
+  final Future<void> Function() onReconnectGateway;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final connection = controller.connection;
+    final connected = connection.status == RuntimeConnectionStatus.connected;
+    final reconnectAvailable = controller.canQuickConnectGateway;
+    final title = connected
+        ? appText('开始对话或运行任务', 'Start a chat or run a task')
+        : connection.status == RuntimeConnectionStatus.error
+        ? appText('Gateway 连接失败', 'Gateway connection failed')
+        : appText('先连接 Gateway', 'Connect a gateway first');
+    final description = connected
+        ? appText(
+            '输入需求后即可开始执行，结果会回到当前会话并同步到任务页。',
+            'Type a request to start execution. Results return to this session and the Tasks page.',
+          )
+        : (connection.lastError?.trim().isNotEmpty == true
+              ? connection.lastError!.trim()
+              : appText(
+                  '连接后可直接对话、创建任务，并在当前会话查看结果。',
+                  'After connecting, you can chat, create tasks, and read results in this session.',
+                ));
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: SurfaceCard(
+            borderRadius: 20,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.headlineSmall),
+                const SizedBox(height: 10),
+                Text(description, style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 18),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: connected
+                          ? onFocusComposer
+                          : reconnectAvailable
+                          ? () async {
+                              await onReconnectGateway();
+                            }
+                          : onOpenGateway,
+                      icon: Icon(
+                        connected
+                            ? Icons.edit_rounded
+                            : reconnectAvailable
+                            ? Icons.refresh_rounded
+                            : Icons.link_rounded,
+                      ),
+                      label: Text(
+                        connected
+                            ? appText('开始输入', 'Start typing')
+                            : reconnectAvailable
+                            ? appText('重新连接', 'Reconnect')
+                            : appText('连接 Gateway', 'Connect gateway'),
+                      ),
+                    ),
+                    if (!connected)
+                      OutlinedButton.icon(
+                        onPressed: onOpenGateway,
+                        icon: const Icon(Icons.settings_rounded),
+                        label: Text(appText('编辑连接', 'Edit connection')),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ComposerBar extends StatelessWidget {
   const _ComposerBar({
     required this.controller,
@@ -730,6 +879,7 @@ class _ComposerBar extends StatelessWidget {
     required this.onThinkingChanged,
     required this.onRemoveAttachment,
     required this.onOpenGateway,
+    required this.onReconnectGateway,
     required this.onPickAttachments,
     required this.onSend,
   });
@@ -746,6 +896,7 @@ class _ComposerBar extends StatelessWidget {
   final ValueChanged<String> onThinkingChanged;
   final ValueChanged<_ComposerAttachment> onRemoveAttachment;
   final VoidCallback onOpenGateway;
+  final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
   final Future<void> Function() onSend;
 
@@ -754,6 +905,9 @@ class _ComposerBar extends StatelessWidget {
     final palette = context.palette;
     final connected =
         controller.connection.status == RuntimeConnectionStatus.connected;
+    final reconnectAvailable = controller.canQuickConnectGateway;
+    final connecting =
+        controller.connection.status == RuntimeConnectionStatus.connecting;
     final executionTarget = controller.assistantExecutionTarget;
     final permissionLevel = controller.assistantPermissionLevel;
     final permissionForegroundColor =
@@ -772,6 +926,10 @@ class _ComposerBar extends StatelessWidget {
         ? (mode == 'ask'
               ? appText('提交', 'Submit')
               : appText('运行任务', 'Run Task'))
+        : connecting
+        ? appText('连接中…', 'Connecting…')
+        : reconnectAvailable
+        ? appText('重连', 'Reconnect')
         : appText('连接', 'Connect');
 
     return SurfaceCard(
@@ -1033,7 +1191,15 @@ class _ComposerBar extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               FilledButton(
-                onPressed: connected ? onSend : onOpenGateway,
+                onPressed: connecting
+                    ? null
+                    : connected
+                    ? onSend
+                    : reconnectAvailable
+                    ? () async {
+                        await onReconnectGateway();
+                      }
+                    : onOpenGateway,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -1052,6 +1218,8 @@ class _ComposerBar extends StatelessWidget {
                           ? (mode == 'ask'
                                 ? Icons.arrow_upward_rounded
                                 : Icons.play_arrow_rounded)
+                          : reconnectAvailable
+                          ? Icons.refresh_rounded
                           : Icons.link_rounded,
                       size: 18,
                     ),
@@ -1753,20 +1921,39 @@ class _ComposerAttachment {
     required this.name,
     required this.path,
     required this.icon,
+    required this.mimeType,
   });
 
   final String name;
   final String path;
   final IconData icon;
+  final String mimeType;
 
   factory _ComposerAttachment.fromXFile(XFile file) {
     final extension = file.name.split('.').last.toLowerCase();
+    final mimeType = switch (extension) {
+      'png' => 'image/png',
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'gif' => 'image/gif',
+      'webp' => 'image/webp',
+      'json' => 'application/json',
+      'csv' => 'text/csv',
+      'txt' || 'log' || 'md' || 'yaml' || 'yml' => 'text/plain',
+      'pdf' => 'application/pdf',
+      'zip' => 'application/zip',
+      _ => 'application/octet-stream',
+    };
     final icon = switch (extension) {
       'png' || 'jpg' || 'jpeg' || 'gif' || 'webp' => Icons.image_outlined,
       'log' || 'txt' || 'json' || 'csv' => Icons.description_outlined,
       _ => Icons.insert_drive_file_outlined,
     };
 
-    return _ComposerAttachment(name: file.name, path: file.path, icon: icon);
+    return _ComposerAttachment(
+      name: file.name,
+      path: file.path,
+      icon: icon,
+      mimeType: mimeType,
+    );
   }
 }

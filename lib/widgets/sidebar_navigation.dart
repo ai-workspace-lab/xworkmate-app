@@ -17,6 +17,8 @@ class SidebarNavigation extends StatelessWidget {
     required this.onExpandFromCollapsed,
     required this.onOpenAccount,
     required this.onOpenThemeToggle,
+    required this.accountName,
+    required this.accountSubtitle,
     this.expandedWidthOverride,
   });
 
@@ -30,6 +32,8 @@ class SidebarNavigation extends StatelessWidget {
   final VoidCallback onExpandFromCollapsed;
   final VoidCallback onOpenAccount;
   final VoidCallback onOpenThemeToggle;
+  final String accountName;
+  final String accountSubtitle;
   final double? expandedWidthOverride;
 
   static const _mainSections = [
@@ -106,6 +110,8 @@ class SidebarNavigation extends StatelessWidget {
                     sidebarState: sidebarState,
                     onCycleSidebarState: onCycleSidebarState,
                     onOpenAccount: onOpenAccount,
+                    accountName: accountName,
+                    accountSubtitle: accountSubtitle,
                     accountSelected:
                         currentSection == WorkspaceDestination.account,
                   ),
@@ -251,6 +257,8 @@ class SidebarFooter extends StatelessWidget {
     required this.onOpenSettings,
     required this.onCycleSidebarState,
     required this.onOpenAccount,
+    required this.accountName,
+    required this.accountSubtitle,
     required this.accountSelected,
   });
 
@@ -263,6 +271,8 @@ class SidebarFooter extends StatelessWidget {
   final VoidCallback onOpenSettings;
   final VoidCallback onCycleSidebarState;
   final VoidCallback onOpenAccount;
+  final String accountName;
+  final String accountSubtitle;
   final bool accountSelected;
 
   @override
@@ -396,7 +406,12 @@ class SidebarFooter extends StatelessWidget {
             ),
           )
         else
-          _SidebarAccountTile(selected: accountSelected, onTap: onOpenAccount),
+          _SidebarAccountTile(
+            selected: accountSelected,
+            onTap: onOpenAccount,
+            name: accountName,
+            subtitle: accountSubtitle,
+          ),
       ],
     );
   }
@@ -478,10 +493,17 @@ class _SidebarFooterActionTileState extends State<_SidebarFooterActionTile> {
 }
 
 class _SidebarAccountTile extends StatefulWidget {
-  const _SidebarAccountTile({required this.selected, required this.onTap});
+  const _SidebarAccountTile({
+    required this.selected,
+    required this.onTap,
+    required this.name,
+    required this.subtitle,
+  });
 
   final bool selected;
   final VoidCallback onTap;
+  final String name;
+  final String subtitle;
 
   @override
   State<_SidebarAccountTile> createState() => _SidebarAccountTileState();
@@ -518,28 +540,37 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisSize: MainAxisSize.max,
                   children: [
-                    const CircleAvatar(radius: 16, child: Text('H')),
+                    CircleAvatar(
+                      radius: 16,
+                      child: Text(
+                        widget.name.trim().isEmpty
+                            ? 'X'
+                            : widget.name.trim().substring(0, 1).toUpperCase(),
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Haitao Pan',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.labelLarge,
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-                          appText('账号', 'Account'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            widget.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

@@ -55,7 +55,10 @@ class _TasksPageState extends State<TasksPage> {
       MetricSummary(
         label: appText('计划中', 'Scheduled'),
         value: '${controller.tasksController.scheduled.length}',
-        caption: appText('等待自动化能力接入', 'Pending automation integration'),
+        caption: appText(
+          '来自 Gateway cron 调度器',
+          'Loaded from the gateway cron scheduler',
+        ),
         icon: Icons.event_repeat_rounded,
       ),
     ];
@@ -138,8 +141,8 @@ class _TasksPageState extends State<TasksPage> {
                 SurfaceCard(
                   child: Text(
                     appText(
-                      '计划任务会在自动化能力接入后展示。当前仅显示来自 Gateway 会话与对话的派生任务。',
-                      'Scheduled tasks will appear after automation is integrated. Only session/chat-derived tasks are shown for now.',
+                      '当前网关还没有计划任务。',
+                      'No scheduled jobs are currently exposed by the gateway.',
                     ),
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
@@ -311,6 +314,7 @@ StatusInfo _statusInfoForTask(String status) => switch (status) {
   'Failed' => StatusInfo(appText('失败', 'Failed'), StatusTone.danger),
   'Queued' => StatusInfo(appText('排队中', 'Queued'), StatusTone.neutral),
   'Scheduled' => StatusInfo(appText('计划中', 'Scheduled'), StatusTone.accent),
+  'Disabled' => StatusInfo(appText('已禁用', 'Disabled'), StatusTone.neutral),
   _ => StatusInfo(appText('已完成', 'Completed'), StatusTone.success),
 };
 

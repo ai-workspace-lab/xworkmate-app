@@ -314,7 +314,9 @@ class SettingsController extends ChangeNotifier {
   }) async {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
     try {
-      final request = await client.getUrl(uri).timeout(const Duration(seconds: 4));
+      final request = await client
+          .getUrl(uri)
+          .timeout(const Duration(seconds: 4));
       for (final entry in headers.entries) {
         request.headers.set(entry.key, entry.value);
       }
@@ -436,7 +438,8 @@ class GatewaySessionsController extends ChangeNotifier {
     final selected = _selectedAgentId.trim();
     final defaultAgent = _defaultAgentId.trim();
     final base = normalizeMainSessionKey(_mainSessionBaseKey);
-    if (selected.isEmpty || (defaultAgent.isNotEmpty && selected == defaultAgent)) {
+    if (selected.isEmpty ||
+        (defaultAgent.isNotEmpty && selected == defaultAgent)) {
       return base;
     }
     return makeAgentSessionKey(agentId: selected, baseKey: base);
@@ -454,7 +457,9 @@ class GatewaySessionsController extends ChangeNotifier {
     notifyListeners();
     try {
       _sessions = await _runtime.listSessions(limit: 50);
-      if (!_sessions.any((item) => matchesSessionKey(item.key, _currentSessionKey))) {
+      if (!_sessions.any(
+        (item) => matchesSessionKey(item.key, _currentSessionKey),
+      )) {
         _currentSessionKey = preferredSessionKey;
       }
     } catch (error) {
@@ -514,6 +519,7 @@ class GatewayChatController extends ChangeNotifier {
     notifyListeners();
     try {
       _messages = await _runtime.loadHistory(next);
+      _streamingAssistantText = null;
     } catch (error) {
       _error = error.toString();
     } finally {
@@ -526,9 +532,11 @@ class GatewayChatController extends ChangeNotifier {
     required String sessionKey,
     required String message,
     required String thinking,
+    List<GatewayChatAttachmentPayload> attachments =
+        const <GatewayChatAttachmentPayload>[],
   }) async {
     final trimmed = message.trim();
-    if (trimmed.isEmpty || !_runtime.isConnected) {
+    if ((trimmed.isEmpty && attachments.isEmpty) || !_runtime.isConnected) {
       return;
     }
     _sessionKey = sessionKey.trim().isEmpty ? 'main' : sessionKey.trim();
@@ -540,7 +548,7 @@ class GatewayChatController extends ChangeNotifier {
         GatewayChatMessage(
           id: _ephemeralId(),
           role: 'user',
-          text: trimmed,
+          text: trimmed.isEmpty ? 'See attached.' : trimmed,
           timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
           toolCallId: null,
           toolName: null,
@@ -553,8 +561,9 @@ class GatewayChatController extends ChangeNotifier {
     try {
       final runId = await _runtime.sendChat(
         sessionKey: _sessionKey,
-        message: trimmed,
+        message: trimmed.isEmpty ? 'See attached.' : trimmed,
         thinking: thinking,
+        attachments: attachments,
       );
       _pendingRuns.add(runId);
     } catch (error) {
@@ -605,12 +614,21 @@ class GatewayChatController extends ChangeNotifier {
   void _handleChatEvent(Map<String, dynamic> payload) {
     final runId = stringValue(payload['runId']);
     final state = stringValue(payload['state']) ?? '';
-    final incomingSessionKey = stringValue(payload['sessionKey']) ?? _sessionKey;
+    final incomingSessionKey =
+        stringValue(payload['sessionKey']) ?? _sessionKey;
     final isOurRun = runId != null && _pendingRuns.contains(runId);
     if (!matchesSessionKey(incomingSessionKey, _sessionKey) && !isOurRun) {
       return;
     }
 
+    final message = asMap(payload['message']);
+    final role = (stringValue(message['role']) ?? '').toLowerCase();
+    final text = extractMessageText(message);
+    if (role == 'assistant' &&
+        text.isNotEmpty &&
+        (state == 'delta' || state == 'final')) {
+      _streamingAssistantText = text;
+    }
     if (state == 'error') {
       _error = stringValue(payload['errorMessage']) ?? 'Chat failed';
     }
@@ -620,10 +638,11 @@ class GatewayChatController extends ChangeNotifier {
       } else {
         _pendingRuns.clear();
       }
-      _streamingAssistantText = null;
       unawaited(loadSession(_sessionKey));
       notifyListeners();
+      return;
     }
+    notifyListeners();
   }
 
   void _handleAgentEvent(Map<String, dynamic> payload) {
@@ -711,6 +730,108 @@ class SkillsController extends ChangeNotifier {
   }
 }
 
+class ConnectorsController extends ChangeNotifier {
+  ConnectorsController(this._runtime);
+
+  final GatewayRuntime _runtime;
+
+  List<GatewayConnectorSummary> _items = const <GatewayConnectorSummary>[];
+  bool _loading = false;
+  String? _error;
+
+  List<GatewayConnectorSummary> get items => _items;
+  bool get loading => _loading;
+  String? get error => _error;
+
+  Future<void> refresh() async {
+    if (!_runtime.isConnected) {
+      _items = const <GatewayConnectorSummary>[];
+      _error = null;
+      notifyListeners();
+      return;
+    }
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _items = await _runtime.listConnectors();
+    } catch (error) {
+      _error = error.toString();
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+}
+
+class ModelsController extends ChangeNotifier {
+  ModelsController(this._runtime);
+
+  final GatewayRuntime _runtime;
+
+  List<GatewayModelSummary> _items = const <GatewayModelSummary>[];
+  bool _loading = false;
+  String? _error;
+
+  List<GatewayModelSummary> get items => _items;
+  bool get loading => _loading;
+  String? get error => _error;
+
+  Future<void> refresh() async {
+    if (!_runtime.isConnected) {
+      _items = const <GatewayModelSummary>[];
+      _error = null;
+      notifyListeners();
+      return;
+    }
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _items = await _runtime.listModels();
+    } catch (error) {
+      _error = error.toString();
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+}
+
+class CronJobsController extends ChangeNotifier {
+  CronJobsController(this._runtime);
+
+  final GatewayRuntime _runtime;
+
+  List<GatewayCronJobSummary> _items = const <GatewayCronJobSummary>[];
+  bool _loading = false;
+  String? _error;
+
+  List<GatewayCronJobSummary> get items => _items;
+  bool get loading => _loading;
+  String? get error => _error;
+
+  Future<void> refresh() async {
+    if (!_runtime.isConnected) {
+      _items = const <GatewayCronJobSummary>[];
+      _error = null;
+      notifyListeners();
+      return;
+    }
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _items = await _runtime.listCronJobs();
+    } catch (error) {
+      _error = error.toString();
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+}
+
 class DerivedTasksController extends ChangeNotifier {
   List<DerivedTaskItem> _queue = const <DerivedTaskItem>[];
   List<DerivedTaskItem> _running = const <DerivedTaskItem>[];
@@ -729,12 +850,16 @@ class DerivedTasksController extends ChangeNotifier {
 
   void recompute({
     required List<GatewaySessionSummary> sessions,
+    required List<GatewayCronJobSummary> cronJobs,
     required String currentSessionKey,
     required bool hasPendingRun,
     required String activeAgentName,
   }) {
     final sorted = sessions.toList(growable: false)
-      ..sort((left, right) => (right.updatedAtMs ?? 0).compareTo(left.updatedAtMs ?? 0));
+      ..sort(
+        (left, right) =>
+            (right.updatedAtMs ?? 0).compareTo(left.updatedAtMs ?? 0),
+      );
     final queue = <DerivedTaskItem>[];
     final running = <DerivedTaskItem>[];
     final history = <DerivedTaskItem>[];
@@ -752,7 +877,8 @@ class DerivedTasksController extends ChangeNotifier {
         surface: session.surface ?? session.kind ?? 'Assistant',
         startedAtLabel: _timeLabel(session.updatedAtMs),
         durationLabel: _durationLabel(session.updatedAtMs),
-        summary: session.lastMessagePreview ?? session.subject ?? 'Session activity',
+        summary:
+            session.lastMessagePreview ?? session.subject ?? 'Session activity',
         sessionKey: session.key,
       );
       switch (item.status) {
@@ -770,7 +896,27 @@ class DerivedTasksController extends ChangeNotifier {
     _running = running;
     _history = history;
     _failed = failed;
-    _scheduled = const <DerivedTaskItem>[];
+    _scheduled = cronJobs
+        .map(
+          (job) => DerivedTaskItem(
+            id: job.id,
+            title: job.name,
+            owner: job.agentId?.trim().isNotEmpty == true
+                ? job.agentId!
+                : activeAgentName,
+            status: job.enabled ? 'Scheduled' : 'Disabled',
+            surface: 'Cron',
+            startedAtLabel: _timeLabel(job.nextRunAtMs?.toDouble()),
+            durationLabel: job.scheduleLabel,
+            summary:
+                job.description ??
+                job.lastError ??
+                job.lastStatus ??
+                'Scheduled automation',
+            sessionKey: 'cron:${job.id}',
+          ),
+        )
+        .toList(growable: false);
     notifyListeners();
   }
 
@@ -824,10 +970,7 @@ String normalizeMainSessionKey(String? value) {
   return trimmed.isEmpty ? 'main' : trimmed;
 }
 
-String makeAgentSessionKey({
-  required String agentId,
-  required String baseKey,
-}) {
+String makeAgentSessionKey({required String agentId, required String baseKey}) {
   final trimmedAgent = agentId.trim();
   final trimmedBase = baseKey.trim();
   if (trimmedAgent.isEmpty) {

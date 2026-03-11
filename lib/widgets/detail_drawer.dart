@@ -46,12 +46,7 @@ class DetailSheet extends StatelessWidget {
     final mediaQuery = MediaQuery.of(context);
 
     return Container(
-      margin: EdgeInsets.fromLTRB(
-        12,
-        mediaQuery.padding.top + 12,
-        12,
-        12,
-      ),
+      margin: EdgeInsets.fromLTRB(12, mediaQuery.padding.top + 12, 12, 12),
       decoration: BoxDecoration(
         color: palette.surfacePrimary,
         borderRadius: BorderRadius.circular(28),
@@ -162,10 +157,8 @@ class _DetailPanelContent extends StatelessWidget {
                 runSpacing: 8,
                 children: data.actions
                     .map(
-                      (action) => OutlinedButton(
-                        onPressed: () {},
-                        child: Text(action),
-                      ),
+                      (action) =>
+                          OutlinedButton(onPressed: () {}, child: Text(action)),
                     )
                     .toList(),
               ),

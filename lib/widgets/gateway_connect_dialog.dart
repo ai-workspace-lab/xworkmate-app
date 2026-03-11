@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app/app_controller.dart';
 import '../i18n/app_language.dart';
+import '../runtime/runtime_bootstrap.dart';
 import '../runtime/runtime_models.dart';
 import 'section_tabs.dart';
 
@@ -43,6 +44,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
     _tls = profile.tls;
     _connectionMode = profile.mode;
     _mode = profile.useSetupCode ? 'setup' : 'manual';
+    _loadBootstrapPrefill();
   }
 
   @override
@@ -230,6 +232,31 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
         child: body,
       ),
     );
+  }
+
+  Future<void> _loadBootstrapPrefill() async {
+    final bootstrap = await RuntimeBootstrapConfig.load();
+    final preferred = bootstrap.preferredGatewayFor(_connectionMode);
+    if (!mounted || preferred == null) {
+      return;
+    }
+    final profile = widget.controller.settings.gateway;
+    final defaults = GatewayConnectionProfile.defaults();
+    final shouldPrefillEndpoint =
+        profile.setupCode.trim().isEmpty &&
+        profile.host.trim() == defaults.host &&
+        profile.port == defaults.port;
+    setState(() {
+      if (shouldPrefillEndpoint) {
+        _connectionMode = preferred.mode;
+        _hostController.text = preferred.host;
+        _portController.text = '${preferred.port}';
+        _tls = preferred.tls;
+      }
+      if (_tokenController.text.trim().isEmpty && preferred.token.isNotEmpty) {
+        _tokenController.text = preferred.token;
+      }
+    });
   }
 
   Future<void> _submit() async {

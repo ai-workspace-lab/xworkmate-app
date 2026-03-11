@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/device_identity_store.dart';
+import '../runtime/runtime_bootstrap.dart';
 import '../runtime/gateway_runtime.dart';
 import '../runtime/runtime_controllers.dart';
 import '../runtime/runtime_models.dart';
@@ -22,6 +23,9 @@ class AppController extends ChangeNotifier {
     _chatController = GatewayChatController(_runtime);
     _instancesController = InstancesController(_runtime);
     _skillsController = SkillsController(_runtime);
+    _connectorsController = ConnectorsController(_runtime);
+    _modelsController = ModelsController(_runtime);
+    _cronJobsController = CronJobsController(_runtime);
     _tasksController = DerivedTasksController();
     _attachChildListeners();
     unawaited(_initialize());
@@ -36,6 +40,9 @@ class AppController extends ChangeNotifier {
   late final GatewayChatController _chatController;
   late final InstancesController _instancesController;
   late final SkillsController _skillsController;
+  late final ConnectorsController _connectorsController;
+  late final ModelsController _modelsController;
+  late final CronJobsController _cronJobsController;
   late final DerivedTasksController _tasksController;
 
   WorkspaceDestination _destination = WorkspaceDestination.assistant;
@@ -60,6 +67,9 @@ class AppController extends ChangeNotifier {
   GatewayChatController get chatController => _chatController;
   InstancesController get instancesController => _instancesController;
   SkillsController get skillsController => _skillsController;
+  ConnectorsController get connectorsController => _connectorsController;
+  ModelsController get modelsController => _modelsController;
+  CronJobsController get cronJobsController => _cronJobsController;
   DerivedTasksController get tasksController => _tasksController;
 
   GatewayConnectionSnapshot get connection => _runtime.snapshot;
@@ -68,6 +78,9 @@ class AppController extends ChangeNotifier {
   List<GatewaySessionSummary> get sessions => _sessionsController.sessions;
   List<GatewayInstanceSummary> get instances => _instancesController.items;
   List<GatewaySkillSummary> get skills => _skillsController.items;
+  List<GatewayConnectorSummary> get connectors => _connectorsController.items;
+  List<GatewayModelSummary> get models => _modelsController.items;
+  List<GatewayCronJobSummary> get cronJobs => _cronJobsController.items;
   String get selectedAgentId => _agentsController.selectedAgentId;
   String get activeAgentName => _agentsController.activeAgentName;
   String get currentSessionKey => _sessionsController.currentSessionKey;
@@ -77,6 +90,29 @@ class AppController extends ChangeNotifier {
       settings.assistantExecutionTarget;
   AssistantPermissionLevel get assistantPermissionLevel =>
       settings.assistantPermissionLevel;
+  bool get hasStoredGatewayCredential =>
+      _settingsController.secureRefs.containsKey('gateway_token') ||
+      _settingsController.secureRefs.containsKey('gateway_password');
+  bool get canQuickConnectGateway {
+    final profile = settings.gateway;
+    if (profile.useSetupCode && profile.setupCode.trim().isNotEmpty) {
+      return true;
+    }
+    final host = profile.host.trim();
+    if (host.isEmpty || profile.port <= 0) {
+      return false;
+    }
+    if (profile.mode == RuntimeConnectionMode.local) {
+      return true;
+    }
+    final defaults = GatewayConnectionProfile.defaults();
+    return hasStoredGatewayCredential ||
+        host != defaults.host ||
+        profile.port != defaults.port ||
+        profile.tls != defaults.tls ||
+        profile.mode != defaults.mode;
+  }
+
   List<SecretReferenceEntry> get secretReferences =>
       _settingsController.buildSecretReferences();
   List<SecretAuditEntry> get secretAuditTrail => _settingsController.auditTrail;
@@ -194,7 +230,11 @@ class AppController extends ChangeNotifier {
       settings.copyWith(gateway: nextProfile),
       refreshAfterSave: false,
     );
-    await _connectProfile(nextProfile);
+    await _connectProfile(
+      nextProfile,
+      authTokenOverride: resolvedToken,
+      authPasswordOverride: resolvedPassword,
+    );
   }
 
   Future<void> connectManual({
@@ -228,7 +268,11 @@ class AppController extends ChangeNotifier {
       settings.copyWith(gateway: nextProfile),
       refreshAfterSave: false,
     );
-    await _connectProfile(nextProfile);
+    await _connectProfile(
+      nextProfile,
+      authTokenOverride: token.trim(),
+      authPasswordOverride: password.trim(),
+    );
   }
 
   Future<void> disconnectGateway() async {
@@ -238,7 +282,14 @@ class AppController extends ChangeNotifier {
     _chatController.clear();
     await _instancesController.refresh();
     await _skillsController.refresh();
+    await _connectorsController.refresh();
+    await _modelsController.refresh();
+    await _cronJobsController.refresh();
     _recomputeTasks();
+  }
+
+  Future<void> connectSavedGateway() async {
+    await _connectProfile(settings.gateway);
   }
 
   Future<void> refreshGatewayHealth() async {
@@ -307,11 +358,14 @@ class AppController extends ChangeNotifier {
   Future<void> sendChatMessage(
     String message, {
     String thinking = 'off',
+    List<GatewayChatAttachmentPayload> attachments =
+        const <GatewayChatAttachmentPayload>[],
   }) async {
     await _chatController.sendMessage(
       sessionKey: _sessionsController.currentSessionKey,
       message: message,
       thinking: thinking,
+      attachments: attachments,
     );
     _recomputeTasks();
   }
@@ -388,6 +442,9 @@ class AppController extends ChangeNotifier {
     _chatController.dispose();
     _instancesController.dispose();
     _skillsController.dispose();
+    _connectorsController.dispose();
+    _modelsController.dispose();
+    _cronJobsController.dispose();
     _tasksController.dispose();
     super.dispose();
   }
@@ -395,6 +452,11 @@ class AppController extends ChangeNotifier {
   Future<void> _initialize() async {
     try {
       await _settingsController.initialize();
+      final bootstrap = await RuntimeBootstrapConfig.load();
+      final seeded = bootstrap.mergeIntoSettings(settings);
+      if (seeded.toJsonString() != settings.toJsonString()) {
+        await _settingsController.saveSnapshot(seeded);
+      }
       setActiveAppLanguage(settings.appLanguage);
       await _runtime.initialize();
       _agentsController.restoreSelection(settings.gateway.selectedAgentId);
@@ -422,8 +484,16 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  Future<void> _connectProfile(GatewayConnectionProfile profile) async {
-    await _runtime.connectProfile(profile);
+  Future<void> _connectProfile(
+    GatewayConnectionProfile profile, {
+    String authTokenOverride = '',
+    String authPasswordOverride = '',
+  }) async {
+    await _runtime.connectProfile(
+      profile,
+      authTokenOverride: authTokenOverride,
+      authPasswordOverride: authPasswordOverride,
+    );
     await refreshGatewayHealth();
     await refreshAgents();
     await refreshSessions();
@@ -433,6 +503,9 @@ class AppController extends ChangeNotifier {
           ? null
           : _agentsController.selectedAgentId,
     );
+    await _connectorsController.refresh();
+    await _modelsController.refresh();
+    await _cronJobsController.refresh();
     _recomputeTasks();
   }
 
@@ -453,6 +526,7 @@ class AppController extends ChangeNotifier {
   void _recomputeTasks() {
     _tasksController.recompute(
       sessions: _sessionsController.sessions,
+      cronJobs: _cronJobsController.items,
       currentSessionKey: _sessionsController.currentSessionKey,
       hasPendingRun: _chatController.hasPendingRun,
       activeAgentName: _agentsController.activeAgentName,
@@ -467,6 +541,9 @@ class AppController extends ChangeNotifier {
     _chatController.addListener(_relayChildChange);
     _instancesController.addListener(_relayChildChange);
     _skillsController.addListener(_relayChildChange);
+    _connectorsController.addListener(_relayChildChange);
+    _modelsController.addListener(_relayChildChange);
+    _cronJobsController.addListener(_relayChildChange);
     _tasksController.addListener(_relayChildChange);
   }
 
@@ -478,6 +555,9 @@ class AppController extends ChangeNotifier {
     _chatController.removeListener(_relayChildChange);
     _instancesController.removeListener(_relayChildChange);
     _skillsController.removeListener(_relayChildChange);
+    _connectorsController.removeListener(_relayChildChange);
+    _modelsController.removeListener(_relayChildChange);
+    _cronJobsController.removeListener(_relayChildChange);
     _tasksController.removeListener(_relayChildChange);
   }
 
