@@ -35,10 +35,13 @@ class GatewayPushEvent {
 }
 
 class GatewayRuntimeException implements Exception {
-  GatewayRuntimeException(this.message, {this.code});
+  GatewayRuntimeException(this.message, {this.code, this.details});
 
   final String message;
   final String? code;
+  final Object? details;
+
+  String? get detailCode => stringValue(asMap(details)['code']);
 
   @override
   String toString() => code == null ? message : '$code: $message';
@@ -109,7 +112,7 @@ class GatewayRuntime extends ChangeNotifier {
     final storedPassword = (await _store.loadGatewayPassword())?.trim() ?? '';
     final explicitToken = authTokenOverride.trim();
     final explicitPassword = authPasswordOverride.trim();
-    final token = explicitToken.isNotEmpty
+    final sharedToken = explicitToken.isNotEmpty
         ? explicitToken
         : storedToken.isNotEmpty
         ? storedToken
@@ -119,12 +122,28 @@ class GatewayRuntime extends ChangeNotifier {
         : storedPassword.isNotEmpty
         ? storedPassword
         : (setupPayload?.password.trim() ?? '');
+    final identity = await _identityStore.loadOrCreate();
+    final storedDeviceToken =
+        (await _store.loadDeviceToken(
+          deviceId: identity.deviceId,
+          role: 'operator',
+        ))?.trim() ??
+        '';
+    final explicitDeviceToken = '';
+    final deviceToken = explicitDeviceToken.isNotEmpty
+        ? explicitDeviceToken
+        : sharedToken.isEmpty
+        ? storedDeviceToken
+        : '';
+    final authToken = sharedToken.isNotEmpty ? sharedToken : deviceToken;
 
     if (endpoint == null) {
       _snapshot = GatewayConnectionSnapshot.initial(mode: profile.mode)
           .copyWith(
             statusText: 'Missing gateway endpoint',
             lastError: 'Configure setup code or manual host / port first.',
+            lastErrorCode: 'MISSING_ENDPOINT',
+            deviceId: identity.deviceId,
           );
       notifyListeners();
       return;
@@ -134,8 +153,14 @@ class GatewayRuntime extends ChangeNotifier {
       status: RuntimeConnectionStatus.connecting,
       statusText: 'Connecting…',
       remoteAddress: '${endpoint.$1}:${endpoint.$2}',
-      hasSharedAuth: token.isNotEmpty || password.isNotEmpty,
+      deviceId: identity.deviceId,
+      authRole: 'operator',
+      authScopes: kDefaultOperatorConnectScopes,
+      hasSharedAuth: sharedToken.isNotEmpty || password.isNotEmpty,
+      hasDeviceToken: deviceToken.isNotEmpty,
       clearLastError: true,
+      clearLastErrorCode: true,
+      clearLastErrorDetailCode: true,
     );
     notifyListeners();
 
@@ -165,15 +190,6 @@ class GatewayRuntime extends ChangeNotifier {
           code: 'CONNECT_CHALLENGE_TIMEOUT',
         ),
       );
-
-      final identity = await _identityStore.loadOrCreate();
-      final deviceToken =
-          (await _store.loadDeviceToken(
-            deviceId: identity.deviceId,
-            role: 'operator',
-          ))?.trim() ??
-          '';
-      final authToken = token.isNotEmpty ? token : deviceToken;
       final connectResult = await _requestRaw(
         'connect',
         params: await _buildConnectParams(
@@ -181,6 +197,7 @@ class GatewayRuntime extends ChangeNotifier {
           identity: identity,
           nonce: nonce,
           authToken: authToken,
+          authDeviceToken: deviceToken,
           authPassword: password,
         ),
         timeout: const Duration(seconds: 12),
@@ -207,21 +224,41 @@ class GatewayRuntime extends ChangeNotifier {
         mainSessionKey:
             stringValue(sessionDefaults['mainSessionKey']) ?? 'main',
         lastConnectedAtMs: DateTime.now().millisecondsSinceEpoch,
-        hasSharedAuth: token.isNotEmpty || password.isNotEmpty,
+        authRole: stringValue(auth['role']) ?? 'operator',
+        authScopes: stringList(auth['scopes']),
+        hasSharedAuth: sharedToken.isNotEmpty || password.isNotEmpty,
         hasDeviceToken:
-            returnedDeviceToken != null && returnedDeviceToken.isNotEmpty,
+            (returnedDeviceToken != null && returnedDeviceToken.isNotEmpty) ||
+            deviceToken.isNotEmpty,
         clearLastError: true,
+        clearLastErrorCode: true,
+        clearLastErrorDetailCode: true,
       );
       notifyListeners();
     } catch (error) {
+      final runtimeError = error is GatewayRuntimeException ? error : null;
+      if (runtimeError?.detailCode == 'AUTH_DEVICE_TOKEN_MISMATCH' &&
+          deviceToken.isNotEmpty &&
+          sharedToken.isEmpty) {
+        await _store.clearDeviceToken(
+          deviceId: identity.deviceId,
+          role: 'operator',
+        );
+      }
       await _closeSocket();
       _snapshot = _snapshot.copyWith(
         status: RuntimeConnectionStatus.error,
         statusText: 'Connection failed',
         lastError: error.toString(),
+        lastErrorCode: runtimeError?.code,
+        lastErrorDetailCode: runtimeError?.detailCode,
+        hasSharedAuth: sharedToken.isNotEmpty || password.isNotEmpty,
+        hasDeviceToken: deviceToken.isNotEmpty,
       );
       notifyListeners();
-      _scheduleReconnect();
+      if (_shouldAutoReconnect(runtimeError)) {
+        _scheduleReconnect();
+      }
       rethrow;
     }
   }
@@ -236,6 +273,9 @@ class GatewayRuntime extends ChangeNotifier {
     _snapshot = GatewayConnectionSnapshot.initial(mode: _snapshot.mode)
         .copyWith(
           statusText: 'Offline',
+          deviceId: _snapshot.deviceId,
+          authRole: _snapshot.authRole,
+          authScopes: _snapshot.authScopes,
           hasSharedAuth: _snapshot.hasSharedAuth,
           hasDeviceToken: _snapshot.hasDeviceToken,
         );
@@ -611,6 +651,108 @@ class GatewayRuntime extends ChangeNotifier {
         .toList(growable: false);
   }
 
+  Future<GatewayDevicePairingList> listDevicePairing() async {
+    final payload = asMap(
+      await request(
+        'device.pair.list',
+        params: const <String, dynamic>{},
+        timeout: const Duration(seconds: 12),
+      ),
+    );
+    final identity = await _store.loadDeviceIdentity();
+    return GatewayDevicePairingList(
+      pending: asList(
+        payload['pending'],
+      ).map((item) => _parsePendingDevice(asMap(item))).toList(growable: false),
+      paired: asList(payload['paired'])
+          .map(
+            (item) => _parsePairedDevice(
+              asMap(item),
+              currentDeviceId: identity?.deviceId,
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  Future<GatewayPairedDevice?> approveDevicePairing(String requestId) async {
+    final payload = asMap(
+      await request(
+        'device.pair.approve',
+        params: <String, dynamic>{'requestId': requestId},
+        timeout: const Duration(seconds: 12),
+      ),
+    );
+    final identity = await _store.loadDeviceIdentity();
+    final device = asMap(payload['device']);
+    if (device.isEmpty) {
+      return null;
+    }
+    return _parsePairedDevice(device, currentDeviceId: identity?.deviceId);
+  }
+
+  Future<void> rejectDevicePairing(String requestId) async {
+    await request(
+      'device.pair.reject',
+      params: <String, dynamic>{'requestId': requestId},
+      timeout: const Duration(seconds: 12),
+    );
+  }
+
+  Future<void> removePairedDevice(String deviceId) async {
+    await request(
+      'device.pair.remove',
+      params: <String, dynamic>{'deviceId': deviceId},
+      timeout: const Duration(seconds: 12),
+    );
+  }
+
+  Future<String> rotateDeviceToken({
+    required String deviceId,
+    required String role,
+    List<String> scopes = const <String>[],
+  }) async {
+    final payload = asMap(
+      await request(
+        'device.token.rotate',
+        params: <String, dynamic>{
+          'deviceId': deviceId,
+          'role': role,
+          if (scopes.isNotEmpty) 'scopes': scopes,
+        },
+        timeout: const Duration(seconds: 12),
+      ),
+    );
+    final token = stringValue(payload['token']) ?? '';
+    final identity = await _store.loadDeviceIdentity();
+    final resolvedRole = stringValue(payload['role']) ?? role;
+    if (token.isNotEmpty &&
+        identity != null &&
+        (stringValue(payload['deviceId']) ?? deviceId) == identity.deviceId) {
+      await _store.saveDeviceToken(
+        deviceId: identity.deviceId,
+        role: resolvedRole,
+        token: token,
+      );
+    }
+    return token;
+  }
+
+  Future<void> revokeDeviceToken({
+    required String deviceId,
+    required String role,
+  }) async {
+    await request(
+      'device.token.revoke',
+      params: <String, dynamic>{'deviceId': deviceId, 'role': role},
+      timeout: const Duration(seconds: 12),
+    );
+    final identity = await _store.loadDeviceIdentity();
+    if (identity != null && deviceId == identity.deviceId) {
+      await _store.clearDeviceToken(deviceId: identity.deviceId, role: role);
+    }
+  }
+
   Future<dynamic> request(
     String method, {
     Map<String, dynamic>? params,
@@ -663,11 +805,58 @@ class GatewayRuntime extends ChangeNotifier {
     }
   }
 
+  GatewayPendingDevice _parsePendingDevice(Map<String, dynamic> map) {
+    return GatewayPendingDevice(
+      requestId: stringValue(map['requestId']) ?? _randomId(),
+      deviceId: stringValue(map['deviceId']) ?? 'unknown-device',
+      displayName: stringValue(map['displayName']),
+      role: stringValue(map['role']),
+      scopes: stringList(map['scopes']),
+      remoteIp: stringValue(map['remoteIp']),
+      isRepair: boolValue(map['isRepair']) ?? false,
+      requestedAtMs: intValue(map['ts']),
+    );
+  }
+
+  GatewayPairedDevice _parsePairedDevice(
+    Map<String, dynamic> map, {
+    String? currentDeviceId,
+  }) {
+    return GatewayPairedDevice(
+      deviceId: stringValue(map['deviceId']) ?? 'unknown-device',
+      displayName: stringValue(map['displayName']),
+      roles: stringList(map['roles']),
+      scopes: stringList(map['scopes']),
+      remoteIp: stringValue(map['remoteIp']),
+      tokens: asList(
+        map['tokens'],
+      ).map((item) => _parseTokenSummary(asMap(item))).toList(growable: false),
+      createdAtMs: intValue(map['createdAtMs']),
+      approvedAtMs: intValue(map['approvedAtMs']),
+      currentDevice:
+          currentDeviceId != null &&
+          currentDeviceId.isNotEmpty &&
+          currentDeviceId == stringValue(map['deviceId']),
+    );
+  }
+
+  GatewayDeviceTokenSummary _parseTokenSummary(Map<String, dynamic> map) {
+    return GatewayDeviceTokenSummary(
+      role: stringValue(map['role']) ?? 'operator',
+      scopes: stringList(map['scopes']),
+      createdAtMs: intValue(map['createdAtMs']),
+      rotatedAtMs: intValue(map['rotatedAtMs']),
+      revokedAtMs: intValue(map['revokedAtMs']),
+      lastUsedAtMs: intValue(map['lastUsedAtMs']),
+    );
+  }
+
   Future<Map<String, dynamic>> _buildConnectParams({
     required GatewayConnectionProfile profile,
     required LocalDeviceIdentity identity,
     required String nonce,
     required String authToken,
+    required String authDeviceToken,
     required String authPassword,
   }) async {
     final clientId = _resolveClientId();
@@ -709,10 +898,14 @@ class GatewayRuntime extends ChangeNotifier {
       'permissions': const <String, bool>{},
       'role': 'operator',
       'scopes': kDefaultOperatorConnectScopes,
-      if (authToken.isNotEmpty)
-        'auth': <String, dynamic>{'token': authToken}
-      else if (authPassword.isNotEmpty)
-        'auth': <String, dynamic>{'password': authPassword},
+      if (authToken.isNotEmpty ||
+          authDeviceToken.isNotEmpty ||
+          authPassword.isNotEmpty)
+        'auth': <String, dynamic>{
+          if (authToken.isNotEmpty) 'token': authToken,
+          if (authDeviceToken.isNotEmpty) 'deviceToken': authDeviceToken,
+          if (authPassword.isNotEmpty) 'password': authPassword,
+        },
       'locale': Platform.localeName,
       'userAgent': '$kSystemAppName/$_packageInfo.version',
       'device': <String, dynamic>{
@@ -783,6 +976,7 @@ class GatewayRuntime extends ChangeNotifier {
         GatewayRuntimeException(
           stringValue(error['message']) ?? 'gateway request failed',
           code: stringValue(error['code']),
+          details: error['details'],
         ),
       );
       return;
@@ -799,6 +993,8 @@ class GatewayRuntime extends ChangeNotifier {
       status: RuntimeConnectionStatus.error,
       statusText: 'Gateway error',
       lastError: message,
+      lastErrorCode: 'SOCKET_FAILURE',
+      lastErrorDetailCode: null,
     );
     notifyListeners();
     _scheduleReconnect();
@@ -815,6 +1011,8 @@ class GatewayRuntime extends ChangeNotifier {
       status: RuntimeConnectionStatus.error,
       statusText: 'Disconnected',
       lastError: 'Gateway connection closed',
+      lastErrorCode: 'SOCKET_CLOSED',
+      lastErrorDetailCode: null,
     );
     notifyListeners();
     _scheduleReconnect();
@@ -839,6 +1037,39 @@ class GatewayRuntime extends ChangeNotifier {
     _reconnectTimer = Timer(const Duration(seconds: 2), () {
       unawaited(connectProfile(profile));
     });
+  }
+
+  bool _shouldAutoReconnect(GatewayRuntimeException? error) {
+    if (error == null) {
+      return true;
+    }
+    final code = error.code?.trim().toUpperCase();
+    final detailCode = error.detailCode?.trim().toUpperCase();
+    const nonRetryableCodes = <String>{
+      'INVALID_REQUEST',
+      'UNAUTHORIZED',
+      'NOT_PAIRED',
+      'AUTH_REQUIRED',
+    };
+    const nonRetryableDetailCodes = <String>{
+      'AUTH_REQUIRED',
+      'AUTH_UNAUTHORIZED',
+      'AUTH_TOKEN_MISSING',
+      'AUTH_TOKEN_MISMATCH',
+      'AUTH_PASSWORD_MISSING',
+      'AUTH_PASSWORD_MISMATCH',
+      'AUTH_DEVICE_TOKEN_MISMATCH',
+      'PAIRING_REQUIRED',
+      'DEVICE_IDENTITY_REQUIRED',
+      'CONTROL_UI_DEVICE_IDENTITY_REQUIRED',
+    };
+    if (code != null && nonRetryableCodes.contains(code)) {
+      return false;
+    }
+    if (detailCode != null && nonRetryableDetailCodes.contains(detailCode)) {
+      return false;
+    }
+    return true;
   }
 
   Future<void> _closeSocket() async {

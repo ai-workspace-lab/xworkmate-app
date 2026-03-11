@@ -320,6 +320,25 @@ class _StatusBanner extends StatelessWidget {
             connection.remoteAddress ?? 'No active gateway target',
             style: theme.textTheme.bodyMedium,
           ),
+          if (connection.pairingRequired) ...[
+            const SizedBox(height: 8),
+            Text(
+              appText(
+                '当前设备需要先完成配对审批。请在已授权设备上批准该请求后重试。',
+                'This device must be approved first. Approve the pairing request from an authorized device and try again.',
+              ),
+              style: theme.textTheme.bodySmall,
+            ),
+          ] else if (connection.gatewayTokenMissing) ...[
+            const SizedBox(height: 8),
+            Text(
+              appText(
+                '首次连接请提供共享 Token；配对完成后可继续使用本机 device token。',
+                'Provide a shared token for the first connection; after pairing, this device can continue with its device token.',
+              ),
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
           if ((connection.lastError ?? '').isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(connection.lastError!, style: theme.textTheme.bodySmall),

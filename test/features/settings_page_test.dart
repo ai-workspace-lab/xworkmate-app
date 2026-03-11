@@ -23,4 +23,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(controller.themeMode, ThemeMode.light);
   });
+
+  testWidgets('SettingsPage gateway tab exposes device pairing controls', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(tester, child: SettingsPage(controller: controller));
+
+    await tester.tap(find.text('集成'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('打开连接面板'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('gateway-device-security-card')),
+      findsOneWidget,
+    );
+  });
 }

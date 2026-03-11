@@ -640,7 +640,12 @@ class GatewayConnectionSnapshot {
     required this.remoteAddress,
     required this.mainSessionKey,
     required this.lastError,
+    required this.lastErrorCode,
+    required this.lastErrorDetailCode,
     required this.lastConnectedAtMs,
+    required this.deviceId,
+    required this.authRole,
+    required this.authScopes,
     required this.hasSharedAuth,
     required this.hasDeviceToken,
     required this.healthPayload,
@@ -654,7 +659,12 @@ class GatewayConnectionSnapshot {
   final String? remoteAddress;
   final String? mainSessionKey;
   final String? lastError;
+  final String? lastErrorCode;
+  final String? lastErrorDetailCode;
   final int? lastConnectedAtMs;
+  final String? deviceId;
+  final String? authRole;
+  final List<String> authScopes;
   final bool hasSharedAuth;
   final bool hasDeviceToken;
   final Map<String, dynamic>? healthPayload;
@@ -671,7 +681,12 @@ class GatewayConnectionSnapshot {
       remoteAddress: null,
       mainSessionKey: null,
       lastError: null,
+      lastErrorCode: null,
+      lastErrorDetailCode: null,
       lastConnectedAtMs: null,
+      deviceId: null,
+      authRole: null,
+      authScopes: const <String>[],
       hasSharedAuth: false,
       hasDeviceToken: false,
       healthPayload: null,
@@ -687,7 +702,12 @@ class GatewayConnectionSnapshot {
     String? remoteAddress,
     String? mainSessionKey,
     String? lastError,
+    String? lastErrorCode,
+    String? lastErrorDetailCode,
     int? lastConnectedAtMs,
+    String? deviceId,
+    String? authRole,
+    List<String>? authScopes,
     bool? hasSharedAuth,
     bool? hasDeviceToken,
     Map<String, dynamic>? healthPayload,
@@ -696,6 +716,8 @@ class GatewayConnectionSnapshot {
     bool clearRemoteAddress = false,
     bool clearMainSessionKey = false,
     bool clearLastError = false,
+    bool clearLastErrorCode = false,
+    bool clearLastErrorDetailCode = false,
   }) {
     return GatewayConnectionSnapshot(
       status: status ?? this.status,
@@ -709,12 +731,38 @@ class GatewayConnectionSnapshot {
           ? null
           : (mainSessionKey ?? this.mainSessionKey),
       lastError: clearLastError ? null : (lastError ?? this.lastError),
+      lastErrorCode: clearLastErrorCode
+          ? null
+          : (lastErrorCode ?? this.lastErrorCode),
+      lastErrorDetailCode: clearLastErrorDetailCode
+          ? null
+          : (lastErrorDetailCode ?? this.lastErrorDetailCode),
       lastConnectedAtMs: lastConnectedAtMs ?? this.lastConnectedAtMs,
+      deviceId: deviceId ?? this.deviceId,
+      authRole: authRole ?? this.authRole,
+      authScopes: authScopes ?? this.authScopes,
       hasSharedAuth: hasSharedAuth ?? this.hasSharedAuth,
       hasDeviceToken: hasDeviceToken ?? this.hasDeviceToken,
       healthPayload: healthPayload ?? this.healthPayload,
       statusPayload: statusPayload ?? this.statusPayload,
     );
+  }
+
+  bool get pairingRequired {
+    final detailCode = lastErrorDetailCode?.trim().toUpperCase();
+    final errorCode = lastErrorCode?.trim().toUpperCase();
+    final errorText = lastError?.toLowerCase() ?? '';
+    return status != RuntimeConnectionStatus.connected &&
+        (detailCode == 'PAIRING_REQUIRED' ||
+            errorCode == 'NOT_PAIRED' ||
+            errorText.contains('pairing required'));
+  }
+
+  bool get gatewayTokenMissing {
+    final detailCode = lastErrorDetailCode?.trim().toUpperCase();
+    final errorText = lastError?.toLowerCase() ?? '';
+    return detailCode == 'AUTH_TOKEN_MISSING' ||
+        errorText.contains('gateway token missing');
   }
 }
 
@@ -1017,6 +1065,93 @@ class GatewayCronJobSummary {
   final int? lastRunAtMs;
   final String? lastStatus;
   final String? lastError;
+}
+
+class GatewayDevicePairingList {
+  const GatewayDevicePairingList({required this.pending, required this.paired});
+
+  final List<GatewayPendingDevice> pending;
+  final List<GatewayPairedDevice> paired;
+
+  const GatewayDevicePairingList.empty()
+    : pending = const <GatewayPendingDevice>[],
+      paired = const <GatewayPairedDevice>[];
+}
+
+class GatewayPendingDevice {
+  const GatewayPendingDevice({
+    required this.requestId,
+    required this.deviceId,
+    required this.displayName,
+    required this.role,
+    required this.scopes,
+    required this.remoteIp,
+    required this.isRepair,
+    required this.requestedAtMs,
+  });
+
+  final String requestId;
+  final String deviceId;
+  final String? displayName;
+  final String? role;
+  final List<String> scopes;
+  final String? remoteIp;
+  final bool isRepair;
+  final int? requestedAtMs;
+
+  String get label {
+    final display = displayName?.trim() ?? '';
+    return display.isEmpty ? deviceId : display;
+  }
+}
+
+class GatewayPairedDevice {
+  const GatewayPairedDevice({
+    required this.deviceId,
+    required this.displayName,
+    required this.roles,
+    required this.scopes,
+    required this.remoteIp,
+    required this.tokens,
+    required this.createdAtMs,
+    required this.approvedAtMs,
+    required this.currentDevice,
+  });
+
+  final String deviceId;
+  final String? displayName;
+  final List<String> roles;
+  final List<String> scopes;
+  final String? remoteIp;
+  final List<GatewayDeviceTokenSummary> tokens;
+  final int? createdAtMs;
+  final int? approvedAtMs;
+  final bool currentDevice;
+
+  String get label {
+    final display = displayName?.trim() ?? '';
+    return display.isEmpty ? deviceId : display;
+  }
+}
+
+class GatewayDeviceTokenSummary {
+  const GatewayDeviceTokenSummary({
+    required this.role,
+    required this.scopes,
+    required this.createdAtMs,
+    required this.rotatedAtMs,
+    required this.revokedAtMs,
+    required this.lastUsedAtMs,
+  });
+
+  final String role;
+  final List<String> scopes;
+  final int? createdAtMs;
+  final int? rotatedAtMs;
+  final int? revokedAtMs;
+  final int? lastUsedAtMs;
+
+  bool get revoked => revokedAtMs != null;
 }
 
 class SecretReferenceEntry {

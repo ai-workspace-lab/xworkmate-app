@@ -32,6 +32,11 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> refreshDerivedState() async {
+    await _reloadDerivedState();
+    notifyListeners();
+  }
+
   Future<void> saveSnapshot(SettingsSnapshot snapshot) async {
     _snapshot = snapshot;
     await _store.saveSettingsSnapshot(snapshot);
@@ -297,7 +302,7 @@ class SettingsController extends ChangeNotifier {
 
   String _moduleForSecret(String key) {
     if (key.contains('gateway')) {
-      return 'Assistant';
+      return key.contains('device_token') ? 'Devices' : 'Assistant';
     }
     if (key.contains('ollama')) {
       return 'Settings';
@@ -829,6 +834,129 @@ class CronJobsController extends ChangeNotifier {
       _loading = false;
       notifyListeners();
     }
+  }
+}
+
+class DevicesController extends ChangeNotifier {
+  DevicesController(this._runtime);
+
+  final GatewayRuntime _runtime;
+
+  GatewayDevicePairingList _items = const GatewayDevicePairingList.empty();
+  bool _loading = false;
+  String? _error;
+
+  GatewayDevicePairingList get items => _items;
+  bool get loading => _loading;
+  String? get error => _error;
+
+  Future<void> refresh({bool quiet = false}) async {
+    if (!_runtime.isConnected) {
+      _items = const GatewayDevicePairingList.empty();
+      if (!quiet) {
+        _error = null;
+      }
+      notifyListeners();
+      return;
+    }
+    if (_loading) {
+      return;
+    }
+    _loading = true;
+    if (!quiet) {
+      _error = null;
+    }
+    notifyListeners();
+    try {
+      _items = await _runtime.listDevicePairing();
+    } catch (error) {
+      if (!quiet) {
+        _error = error.toString();
+      }
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> approve(String requestId) async {
+    _error = null;
+    notifyListeners();
+    try {
+      await _runtime.approveDevicePairing(requestId);
+      await refresh(quiet: true);
+    } catch (error) {
+      _error = error.toString();
+      notifyListeners();
+    }
+  }
+
+  Future<void> reject(String requestId) async {
+    _error = null;
+    notifyListeners();
+    try {
+      await _runtime.rejectDevicePairing(requestId);
+      await refresh(quiet: true);
+    } catch (error) {
+      _error = error.toString();
+      notifyListeners();
+    }
+  }
+
+  Future<void> remove(String deviceId) async {
+    _error = null;
+    notifyListeners();
+    try {
+      await _runtime.removePairedDevice(deviceId);
+      await refresh(quiet: true);
+    } catch (error) {
+      _error = error.toString();
+      notifyListeners();
+    }
+  }
+
+  Future<String?> rotateToken({
+    required String deviceId,
+    required String role,
+    List<String> scopes = const <String>[],
+  }) async {
+    _error = null;
+    notifyListeners();
+    try {
+      final token = await _runtime.rotateDeviceToken(
+        deviceId: deviceId,
+        role: role,
+        scopes: scopes,
+      );
+      await refresh(quiet: true);
+      return token;
+    } catch (error) {
+      _error = error.toString();
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<void> revokeToken({
+    required String deviceId,
+    required String role,
+  }) async {
+    _error = null;
+    notifyListeners();
+    try {
+      await _runtime.revokeDeviceToken(deviceId: deviceId, role: role);
+      await refresh(quiet: true);
+    } catch (error) {
+      _error = error.toString();
+      notifyListeners();
+    }
+  }
+
+  void clear() {
+    _items = const GatewayDevicePairingList.empty();
+    _error = null;
+    _loading = false;
+    notifyListeners();
   }
 }
 

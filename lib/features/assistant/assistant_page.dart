@@ -799,6 +799,16 @@ class _AssistantEmptyState extends StatelessWidget {
             '输入需求后即可开始执行，结果会回到当前会话并同步到任务页。',
             'Type a request to start execution. Results return to this session and the Tasks page.',
           )
+        : connection.pairingRequired
+        ? appText(
+            '当前设备还没通过 Gateway 配对审批。请先在已授权设备上批准该 pairing request，再重新连接。',
+            'This device has not been approved yet. Approve the pairing request from an authorized device, then reconnect.',
+          )
+        : connection.gatewayTokenMissing
+        ? appText(
+            '首次连接需要共享 Token；配对完成后可继续使用本机的 device token。',
+            'The first connection requires a shared token; after pairing, this device can continue with its device token.',
+          )
         : (connection.lastError?.trim().isNotEmpty == true
               ? connection.lastError!.trim()
               : appText(

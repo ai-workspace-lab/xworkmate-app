@@ -26,6 +26,7 @@ class AppController extends ChangeNotifier {
     _connectorsController = ConnectorsController(_runtime);
     _modelsController = ModelsController(_runtime);
     _cronJobsController = CronJobsController(_runtime);
+    _devicesController = DevicesController(_runtime);
     _tasksController = DerivedTasksController();
     _attachChildListeners();
     unawaited(_initialize());
@@ -43,6 +44,7 @@ class AppController extends ChangeNotifier {
   late final ConnectorsController _connectorsController;
   late final ModelsController _modelsController;
   late final CronJobsController _cronJobsController;
+  late final DevicesController _devicesController;
   late final DerivedTasksController _tasksController;
 
   WorkspaceDestination _destination = WorkspaceDestination.assistant;
@@ -70,6 +72,7 @@ class AppController extends ChangeNotifier {
   ConnectorsController get connectorsController => _connectorsController;
   ModelsController get modelsController => _modelsController;
   CronJobsController get cronJobsController => _cronJobsController;
+  DevicesController get devicesController => _devicesController;
   DerivedTasksController get tasksController => _tasksController;
 
   GatewayConnectionSnapshot get connection => _runtime.snapshot;
@@ -81,6 +84,7 @@ class AppController extends ChangeNotifier {
   List<GatewayConnectorSummary> get connectors => _connectorsController.items;
   List<GatewayModelSummary> get models => _modelsController.items;
   List<GatewayCronJobSummary> get cronJobs => _cronJobsController.items;
+  GatewayDevicePairingList get devices => _devicesController.items;
   String get selectedAgentId => _agentsController.selectedAgentId;
   String get activeAgentName => _agentsController.activeAgentName;
   String get currentSessionKey => _sessionsController.currentSessionKey;
@@ -92,7 +96,10 @@ class AppController extends ChangeNotifier {
       settings.assistantPermissionLevel;
   bool get hasStoredGatewayCredential =>
       _settingsController.secureRefs.containsKey('gateway_token') ||
-      _settingsController.secureRefs.containsKey('gateway_password');
+      _settingsController.secureRefs.containsKey('gateway_password') ||
+      _settingsController.secureRefs.containsKey(
+        'gateway_device_token_operator',
+      );
   bool get canQuickConnectGateway {
     final profile = settings.gateway;
     if (profile.useSetupCode && profile.setupCode.trim().isNotEmpty) {
@@ -277,6 +284,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> disconnectGateway() async {
     await _runtime.disconnect(clearDesiredProfile: false);
+    await _settingsController.refreshDerivedState();
     await _agentsController.refresh();
     await _sessionsController.refresh();
     _chatController.clear();
@@ -285,6 +293,7 @@ class AppController extends ChangeNotifier {
     await _connectorsController.refresh();
     await _modelsController.refresh();
     await _cronJobsController.refresh();
+    _devicesController.clear();
     _recomputeTasks();
   }
 
@@ -303,6 +312,46 @@ class AppController extends ChangeNotifier {
       await _runtime.status();
     } catch (_) {}
     notifyListeners();
+  }
+
+  Future<void> refreshDevices({bool quiet = false}) async {
+    await _devicesController.refresh(quiet: quiet);
+  }
+
+  Future<void> approveDevicePairing(String requestId) async {
+    await _devicesController.approve(requestId);
+    await _settingsController.refreshDerivedState();
+  }
+
+  Future<void> rejectDevicePairing(String requestId) async {
+    await _devicesController.reject(requestId);
+  }
+
+  Future<void> removePairedDevice(String deviceId) async {
+    await _devicesController.remove(deviceId);
+    await _settingsController.refreshDerivedState();
+  }
+
+  Future<String?> rotateDeviceRoleToken({
+    required String deviceId,
+    required String role,
+    List<String> scopes = const <String>[],
+  }) async {
+    final token = await _devicesController.rotateToken(
+      deviceId: deviceId,
+      role: role,
+      scopes: scopes,
+    );
+    await _settingsController.refreshDerivedState();
+    return token;
+  }
+
+  Future<void> revokeDeviceRoleToken({
+    required String deviceId,
+    required String role,
+  }) async {
+    await _devicesController.revokeToken(deviceId: deviceId, role: role);
+    await _settingsController.refreshDerivedState();
   }
 
   Future<void> refreshAgents() async {
@@ -445,6 +494,7 @@ class AppController extends ChangeNotifier {
     _connectorsController.dispose();
     _modelsController.dispose();
     _cronJobsController.dispose();
+    _devicesController.dispose();
     _tasksController.dispose();
     super.dispose();
   }
@@ -506,6 +556,8 @@ class AppController extends ChangeNotifier {
     await _connectorsController.refresh();
     await _modelsController.refresh();
     await _cronJobsController.refresh();
+    await _devicesController.refresh(quiet: true);
+    await _settingsController.refreshDerivedState();
     _recomputeTasks();
   }
 
@@ -520,6 +572,10 @@ class AppController extends ChangeNotifier {
     }
     if (event.event == 'seqGap') {
       unawaited(refreshSessions());
+    }
+    if (event.event == 'device.pair.requested' ||
+        event.event == 'device.pair.resolved') {
+      unawaited(refreshDevices(quiet: true));
     }
   }
 
@@ -544,6 +600,7 @@ class AppController extends ChangeNotifier {
     _connectorsController.addListener(_relayChildChange);
     _modelsController.addListener(_relayChildChange);
     _cronJobsController.addListener(_relayChildChange);
+    _devicesController.addListener(_relayChildChange);
     _tasksController.addListener(_relayChildChange);
   }
 
@@ -558,6 +615,7 @@ class AppController extends ChangeNotifier {
     _connectorsController.removeListener(_relayChildChange);
     _modelsController.removeListener(_relayChildChange);
     _cronJobsController.removeListener(_relayChildChange);
+    _devicesController.removeListener(_relayChildChange);
     _tasksController.removeListener(_relayChildChange);
   }
 

@@ -151,10 +151,25 @@ class SecureConfigStore {
     await _writeSecure(_deviceTokenKey(deviceId, role), token);
   }
 
+  Future<void> clearDeviceToken({
+    required String deviceId,
+    required String role,
+  }) async {
+    await initialize();
+    await _deleteSecure(_deviceTokenKey(deviceId, role));
+  }
+
   Future<Map<String, String>> loadSecureRefs() async {
     await initialize();
     final gatewayToken = await loadGatewayToken();
     final gatewayPassword = await loadGatewayPassword();
+    final deviceIdentity = await loadDeviceIdentity();
+    final deviceToken = deviceIdentity == null
+        ? null
+        : await loadDeviceToken(
+            deviceId: deviceIdentity.deviceId,
+            role: 'operator',
+          );
     final ollamaKey = await loadOllamaCloudApiKey();
     final vaultToken = await loadVaultToken();
     return {
@@ -164,6 +179,9 @@ class SecureConfigStore {
       ...?gatewayPassword == null
           ? null
           : <String, String>{'gateway_password': gatewayPassword},
+      ...?deviceToken == null
+          ? null
+          : <String, String>{'gateway_device_token_operator': deviceToken},
       ...?ollamaKey == null
           ? null
           : <String, String>{'ollama_cloud_api_key': ollamaKey},
