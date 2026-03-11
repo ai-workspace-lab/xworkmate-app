@@ -10,5 +10,13 @@ PRODUCT_NAME = XWorkmate
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = plus.svc.xworkmate
 
+// Reuse the Apple Developer team configured for iOS so macOS archives can sign
+// and upload to TestFlight without per-machine project edits.
+DEVELOPMENT_TEAM = N3G9T67W78
+
+// Keep Xcode archive metadata aligned with Flutter's build name/number.
+MARKETING_VERSION = $(FLUTTER_BUILD_NAME)
+CURRENT_PROJECT_VERSION = $(FLUTTER_BUILD_NUMBER)
+
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 plus.svc. All rights reserved.
