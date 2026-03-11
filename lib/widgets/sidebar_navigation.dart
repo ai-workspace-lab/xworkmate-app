@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../app/app_metadata.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
@@ -125,47 +124,15 @@ class SidebarHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final textTheme = Theme.of(context).textTheme;
 
-    final content = Row(
-      children: [
-        Container(
-          width: isCollapsed ? 38 : 34,
-          height: isCollapsed ? 38 : 34,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: palette.accentMuted,
-          ),
-          child: Icon(
-            Icons.auto_awesome_rounded,
-            color: palette.accent,
-            size: 20,
-          ),
-        ),
-        if (!isCollapsed) ...[
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  kProductBrandName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  appText('可执行 AI 工作台', kProductSubtitle),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
+    final content = Container(
+      width: isCollapsed ? 38 : 34,
+      height: isCollapsed ? 38 : 34,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: palette.accentMuted,
+      ),
+      child: Icon(Icons.auto_awesome_rounded, color: palette.accent, size: 20),
     );
 
     if (onTap == null) {
