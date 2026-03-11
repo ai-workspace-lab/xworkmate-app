@@ -71,6 +71,10 @@ class AppController extends ChangeNotifier {
   String get activeAgentName => _agentsController.activeAgentName;
   String get currentSessionKey => _sessionsController.currentSessionKey;
   String? get activeRunId => _chatController.activeRunId;
+  AssistantExecutionTarget get assistantExecutionTarget =>
+      settings.assistantExecutionTarget;
+  AssistantPermissionLevel get assistantPermissionLevel =>
+      settings.assistantPermissionLevel;
   List<SecretReferenceEntry> get secretReferences =>
       _settingsController.buildSecretReferences();
   List<SecretAuditEntry> get secretAuditTrail => _settingsController.auditTrail;
@@ -174,10 +178,13 @@ class AppController extends ChangeNotifier {
       token: token.trim(),
       password: password.trim(),
     );
-    final resolvedHost = host.trim().isEmpty && mode == RuntimeConnectionMode.local
+    final resolvedHost =
+        host.trim().isEmpty && mode == RuntimeConnectionMode.local
         ? '127.0.0.1'
         : host.trim();
-    final resolvedPort = mode == RuntimeConnectionMode.local && port <= 0 ? 18789 : port;
+    final resolvedPort = mode == RuntimeConnectionMode.local && port <= 0
+        ? 18789
+        : port;
     final nextProfile = settings.gateway.copyWith(
       mode: mode,
       useSetupCode: false,
@@ -282,6 +289,30 @@ class AppController extends ChangeNotifier {
     await _chatController.abortRun();
   }
 
+  Future<void> setAssistantExecutionTarget(
+    AssistantExecutionTarget target,
+  ) async {
+    if (settings.assistantExecutionTarget == target) {
+      return;
+    }
+    await saveSettings(
+      settings.copyWith(assistantExecutionTarget: target),
+      refreshAfterSave: false,
+    );
+  }
+
+  Future<void> setAssistantPermissionLevel(
+    AssistantPermissionLevel level,
+  ) async {
+    if (settings.assistantPermissionLevel == level) {
+      return;
+    }
+    await saveSettings(
+      settings.copyWith(assistantPermissionLevel: level),
+      refreshAfterSave: false,
+    );
+  }
+
   Future<void> saveSettings(
     SettingsSnapshot snapshot, {
     bool refreshAfterSave = true,
@@ -341,7 +372,8 @@ class AppController extends ChangeNotifier {
       );
       _runtimeEventsSubscription = _runtime.events.listen(_handleRuntimeEvent);
       final shouldAutoConnect =
-          settings.gateway.useSetupCode && settings.gateway.setupCode.trim().isNotEmpty;
+          settings.gateway.useSetupCode &&
+          settings.gateway.setupCode.trim().isNotEmpty;
       if (shouldAutoConnect) {
         try {
           await _connectProfile(settings.gateway);

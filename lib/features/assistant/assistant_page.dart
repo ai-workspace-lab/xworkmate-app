@@ -1,3 +1,4 @@
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
@@ -5,10 +6,9 @@ import '../../app/app_metadata.dart';
 import '../../data/mock_data.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
+import '../../theme/app_palette.dart';
 import '../../widgets/gateway_connect_dialog.dart';
-import '../../widgets/section_tabs.dart';
 import '../../widgets/surface_card.dart';
-import '../../widgets/top_bar.dart';
 
 class AssistantPage extends StatefulWidget {
   const AssistantPage({
@@ -25,481 +25,125 @@ class AssistantPage extends StatefulWidget {
 }
 
 class _AssistantPageState extends State<AssistantPage> {
-  String _mode = '代码开发';
+  static const List<String> _modes = ['Craft', 'Ask', 'Plan'];
+  static const Map<String, String> _thinkingModes = {
+    '低': 'low',
+    '中': 'medium',
+    '高': 'high',
+    '超高': 'max',
+  };
+
   late final TextEditingController _inputController;
+  late final ScrollController _conversationController;
+  late final FocusNode _composerFocusNode;
+  String _mode = 'Ask';
+  String _thinkingLabel = '高';
+  List<_ComposerAttachment> _attachments = const <_ComposerAttachment>[];
+  String? _lastSubmittedPrompt;
+  String? _lastAutoAgentLabel;
+  List<String> _lastSubmittedAttachments = const <String>[];
 
   @override
   void initState() {
     super.initState();
     _inputController = TextEditingController();
+    _conversationController = ScrollController();
+    _composerFocusNode = FocusNode();
   }
 
   @override
   void dispose() {
     _inputController.dispose();
+    _conversationController.dispose();
+    _composerFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = widget.controller;
-    final theme = Theme.of(context);
-    final messages = controller.chatMessages.reversed.take(6).toList(growable: false);
-    final sessions = controller.sessions.take(3).toList(growable: false);
     return AnimatedBuilder(
-      animation: controller,
+      animation: widget.controller,
       builder: (context, _) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(32, 32, 32, 40),
+        final controller = widget.controller;
+        final messages = List<GatewayChatMessage>.from(controller.chatMessages);
+        final timelineItems = _buildTimelineItems(controller, messages);
+        final quickActions = MockData.quickActions
+            .take(6)
+            .toList(growable: false);
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_conversationController.hasClients) {
+            return;
+          }
+          _conversationController.animateTo(
+            _conversationController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+          );
+        });
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TopBar(
-                title: 'Assistant',
-                subtitle: '与 $kProductBrandName 对话，并发起任务',
-                trailing: Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  alignment: WrapAlignment.end,
+              Expanded(
+                child: Column(
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: _showConnectDialog,
-                      icon: Icon(
-                        controller.connection.status ==
-                                RuntimeConnectionStatus.connected
-                            ? Icons.wifi_tethering_rounded
-                            : Icons.link_rounded,
-                      ),
-                      label: Text(
-                        controller.connection.status ==
-                                RuntimeConnectionStatus.connected
-                            ? 'Gateway'
-                            : '连接网关',
+                    Expanded(
+                      child: _ConversationArea(
+                        controller: controller,
+                        items: timelineItems,
+                        scrollController: _conversationController,
+                        onOpenDetail: widget.onOpenDetail,
+                        onFocusComposer: _focusComposer,
                       ),
                     ),
-                    FilledButton.tonalIcon(
-                      onPressed: controller.chatController.hasPendingRun
-                          ? controller.abortRun
-                          : null,
-                      icon: const Icon(Icons.stop_circle_outlined),
-                      label: const Text('停止运行'),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: quickActions
+                            .map(
+                              (action) => ActionChip(
+                                avatar: Icon(action.icon, size: 16),
+                                label: Text(action.title),
+                                onPressed: () {
+                                  _inputController.text = action.title;
+                                  _focusComposer();
+                                },
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _ComposerBar(
+                      controller: controller,
+                      inputController: _inputController,
+                      focusNode: _composerFocusNode,
+                      mode: _mode,
+                      thinkingLabel: _thinkingLabel,
+                      modelLabel: controller.settings.defaultModel,
+                      attachments: _attachments,
+                      autoAgentLabel: _lastAutoAgentLabel,
+                      onModeChanged: (value) => setState(() => _mode = value),
+                      onThinkingChanged: (value) {
+                        setState(() => _thinkingLabel = value);
+                      },
+                      onRemoveAttachment: (attachment) {
+                        setState(() {
+                          _attachments = _attachments
+                              .where((item) => item.path != attachment.path)
+                              .toList(growable: false);
+                        });
+                      },
+                      onOpenGateway: _showConnectDialog,
+                      onPickAttachments: _pickAttachments,
+                      onSend: _submitPrompt,
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(height: 30),
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 920),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 68,
-                        height: 68,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(22),
-                          color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                        ),
-                        child: Icon(
-                          Icons.auto_awesome_rounded,
-                          color: theme.colorScheme.primary,
-                          size: 32,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        kProductBrandName,
-                        style: theme.textTheme.displaySmall,
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        kProductTagline,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 16),
-                      _ConnectionChip(controller: controller),
-                      const SizedBox(height: 24),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 360),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: SectionTabs(
-                            items: const ['代码开发', '日常办公'],
-                            value: _mode,
-                            size: SectionTabsSize.small,
-                            onChanged: (value) => setState(() => _mode = value),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      SurfaceCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            TextField(
-                              controller: _inputController,
-                              minLines: 5,
-                              maxLines: 8,
-                              decoration: InputDecoration(
-                                border: InputBorder.none,
-                                hintText: controller.connection.status ==
-                                        RuntimeConnectionStatus.connected
-                                    ? 'Ask XWorkmate anything…'
-                                    : 'Connect a gateway first, then start a task…',
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                OutlinedButton.icon(
-                                  onPressed: _showConnectDialog,
-                                  icon: const Icon(Icons.attach_file_rounded),
-                                  label: const Text('添加附件'),
-                                ),
-                                PopupMenuButton<String>(
-                                  onSelected: controller.selectAgent,
-                                  itemBuilder: (context) => <PopupMenuEntry<String>>[
-                                    const PopupMenuItem<String>(
-                                      value: '',
-                                      child: Text('Main'),
-                                    ),
-                                    ...controller.agents.map(
-                                      (agent) => PopupMenuItem<String>(
-                                        value: agent.id,
-                                        child: Text(agent.name),
-                                      ),
-                                    ),
-                                  ],
-                                  child: OutlinedButton.icon(
-                                    onPressed: null,
-                                    icon: const Icon(Icons.hub_rounded),
-                                    label: Text(controller.activeAgentName),
-                                  ),
-                                ),
-                                OutlinedButton.icon(
-                                  onPressed: () => widget.onOpenDetail(
-                                    DetailPanelData(
-                                      title: controller.settings.defaultModel,
-                                      subtitle: 'Default Model',
-                                      icon: Icons.bolt_rounded,
-                                      status: const StatusInfo(
-                                        'Configured',
-                                        StatusTone.accent,
-                                      ),
-                                      description: 'Default inference target from Settings.',
-                                      meta: const ['Workspace', 'Gateway'],
-                                      actions: const ['Open Settings'],
-                                      sections: [
-                                        DetailSection(
-                                          title: 'Model',
-                                          items: [
-                                            DetailItem(
-                                              label: 'Provider',
-                                              value: controller.settings.defaultProvider,
-                                            ),
-                                            DetailItem(
-                                              label: 'Model',
-                                              value: controller.settings.defaultModel,
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  icon: const Icon(Icons.bolt_rounded),
-                                  label: Text(controller.settings.defaultModel),
-                                ),
-                                FilledButton.icon(
-                                  onPressed: controller.connection.status ==
-                                          RuntimeConnectionStatus.connected
-                                      ? () async {
-                                          final text = _inputController.text;
-                                          await controller.sendChatMessage(text);
-                                          if (mounted && text.trim().isNotEmpty) {
-                                            _inputController.clear();
-                                          }
-                                        }
-                                      : _showConnectDialog,
-                                  icon: const Icon(Icons.send_rounded),
-                                  label: Text(
-                                    controller.connection.status ==
-                                            RuntimeConnectionStatus.connected
-                                        ? '发送'
-                                        : '连接',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Quick Actions',
-                          style: theme.textTheme.titleLarge,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final width = constraints.maxWidth > 760
-                              ? (constraints.maxWidth - 16) / 2
-                              : constraints.maxWidth;
-                          return Wrap(
-                            spacing: 16,
-                            runSpacing: 16,
-                            children: MockData.quickActions
-                                .map(
-                                  (action) => SizedBox(
-                                    width: width,
-                                    child: SurfaceCard(
-                                      onTap: () {
-                                        _inputController.text = action.title;
-                                        widget.onOpenDetail(
-                                          DetailPanelData(
-                                            title: action.title,
-                                            subtitle: 'Quick Action',
-                                            icon: action.icon,
-                                            status: const StatusInfo(
-                                              'Ready',
-                                              StatusTone.accent,
-                                            ),
-                                            description: action.caption,
-                                            meta: const ['Assistant', 'Preset'],
-                                            actions: const ['Run', 'Save'],
-                                            sections: const [
-                                              DetailSection(
-                                                title: 'Action',
-                                                items: [
-                                                  DetailItem(
-                                                    label: 'Mode',
-                                                    value: 'Interactive',
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      },
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 42,
-                                            height: 42,
-                                            decoration: BoxDecoration(
-                                              borderRadius: BorderRadius.circular(14),
-                                              color: theme.colorScheme.primary.withValues(
-                                                alpha: 0.12,
-                                              ),
-                                            ),
-                                            child: Icon(
-                                              action.icon,
-                                              color: theme.colorScheme.primary,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 14),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  action.title,
-                                                  style: theme.textTheme.titleMedium,
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  action.caption,
-                                                  style: theme.textTheme.bodySmall,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 28),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Live Session',
-                          style: theme.textTheme.titleLarge,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      SurfaceCard(
-                        child: controller.connection.status ==
-                                RuntimeConnectionStatus.connected
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.forum_outlined,
-                                        color: theme.colorScheme.primary,
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          controller.currentSessionKey,
-                                          style: theme.textTheme.titleMedium,
-                                        ),
-                                      ),
-                                      OutlinedButton(
-                                        onPressed: () => controller.refreshSessions(),
-                                        child: const Text('刷新'),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  if (messages.isEmpty)
-                                    Text(
-                                      '当前 session 还没有消息，发送第一条指令即可开始。',
-                                      style: theme.textTheme.bodyMedium,
-                                    )
-                                  else
-                                    ...messages.map(
-                                      (message) => Padding(
-                                        padding: const EdgeInsets.only(bottom: 12),
-                                        child: Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Container(
-                                              width: 74,
-                                              padding: const EdgeInsets.only(top: 2),
-                                              child: Text(
-                                                message.role,
-                                                style: theme.textTheme.labelLarge,
-                                              ),
-                                            ),
-                                            Expanded(
-                                              child: Text(
-                                                message.text.isEmpty
-                                                    ? 'Pending event'
-                                                    : message.text,
-                                                maxLines: 3,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: theme.textTheme.bodyMedium,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              )
-                            : Text(
-                                'Assistant 已准备好。先连接 Gateway，再进入真实会话与任务运行。',
-                                style: theme.textTheme.bodyLarge,
-                              ),
-                      ),
-                      const SizedBox(height: 28),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          '最近任务 / 最近会话',
-                          style: theme.textTheme.titleLarge,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final width = constraints.maxWidth > 780
-                              ? (constraints.maxWidth - 32) / 3
-                              : constraints.maxWidth;
-                          final cards = sessions.isEmpty
-                              ? MockData.recentSessions.map(
-                                  (session) => _SessionCardData(
-                                    title: session.title,
-                                    subtitle: session.timestamp,
-                                    summary: session.summary,
-                                  ),
-                                )
-                              : sessions.map(
-                                  (session) => _SessionCardData(
-                                    title: session.label,
-                                    subtitle: session.surface ?? 'Session',
-                                    summary:
-                                        session.lastMessagePreview ??
-                                        session.subject ??
-                                        'No transcript preview yet.',
-                                  ),
-                                );
-                          return Wrap(
-                            spacing: 16,
-                            runSpacing: 16,
-                            children: cards
-                                .map(
-                                  (session) => SizedBox(
-                                    width: width,
-                                    child: SurfaceCard(
-                                      onTap: () => widget.onOpenDetail(
-                                        DetailPanelData(
-                                          title: session.title,
-                                          subtitle: 'Session',
-                                          icon: Icons.history_rounded,
-                                          status: const StatusInfo(
-                                            'Available',
-                                            StatusTone.neutral,
-                                          ),
-                                          description: session.summary,
-                                          meta: [session.subtitle, 'Assistant'],
-                                          actions: const ['Open', 'Continue'],
-                                          sections: [
-                                            DetailSection(
-                                              title: 'Summary',
-                                              items: [
-                                                DetailItem(
-                                                  label: 'Context',
-                                                  value: session.subtitle,
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            session.title,
-                                            style: theme.textTheme.titleMedium,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            session.subtitle,
-                                            style: theme.textTheme.labelLarge,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            session.summary,
-                                            maxLines: 3,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: theme.textTheme.bodySmall,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ],
@@ -509,12 +153,1239 @@ class _AssistantPageState extends State<AssistantPage> {
     );
   }
 
+  List<_TimelineItem> _buildTimelineItems(
+    AppController controller,
+    List<GatewayChatMessage> messages,
+  ) {
+    final items = <_TimelineItem>[];
+
+    for (final message in messages) {
+      if ((message.toolName ?? '').trim().isNotEmpty) {
+        items.add(
+          _TimelineItem.toolCall(
+            toolName: message.toolName!,
+            summary: message.text,
+            pending: message.pending,
+            error: message.error,
+          ),
+        );
+        continue;
+      }
+
+      final role = message.role.toLowerCase();
+      if (role == 'user') {
+        items.add(
+          _TimelineItem.message(
+            kind: _TimelineItemKind.user,
+            label: 'You',
+            text: message.text,
+            pending: message.pending,
+            error: message.error,
+          ),
+        );
+      } else if (role == 'assistant') {
+        items.add(
+          _TimelineItem.message(
+            kind: _TimelineItemKind.assistant,
+            label: kProductBrandName,
+            text: message.text,
+            pending: message.pending,
+            error: message.error,
+          ),
+        );
+      } else {
+        items.add(
+          _TimelineItem.message(
+            kind: _TimelineItemKind.agent,
+            label: _lastAutoAgentLabel ?? controller.activeAgentName,
+            text: message.text,
+            pending: message.pending,
+            error: message.error,
+          ),
+        );
+      }
+    }
+
+    final hasPendingTask =
+        controller.chatController.hasPendingRun ||
+        controller.activeRunId != null;
+    final lastRole = messages.isEmpty ? null : messages.last.role.toLowerCase();
+    if (_lastSubmittedPrompt != null) {
+      final status = hasPendingTask
+          ? 'Running'
+          : (lastRole == 'user' ? 'Queued' : 'Completed');
+      items.add(
+        _TimelineItem.taskCard(
+          title: _lastSubmittedPrompt!,
+          status: status,
+          summary: switch (status) {
+            'Queued' => 'Submitted to the task queue',
+            'Running' =>
+              'Executing with ${_lastAutoAgentLabel ?? controller.activeAgentName}',
+            _ => 'Execution finished in this conversation',
+          },
+          detail: _lastSubmittedAttachments.isEmpty
+              ? '${controller.currentSessionKey} · ${_lastAutoAgentLabel ?? controller.activeAgentName}'
+              : '${controller.currentSessionKey} · ${_lastSubmittedAttachments.length} attachment(s)',
+          owner: _lastAutoAgentLabel ?? controller.activeAgentName,
+          sessionKey: controller.currentSessionKey,
+        ),
+      );
+    }
+
+    return items;
+  }
+
+  Future<void> _pickAttachments() async {
+    final files = await openFiles(
+      acceptedTypeGroups: const [
+        XTypeGroup(
+          label: 'Images',
+          extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'],
+        ),
+        XTypeGroup(label: 'Logs', extensions: ['log', 'txt', 'json', 'csv']),
+        XTypeGroup(
+          label: 'Files',
+          extensions: ['md', 'pdf', 'yaml', 'yml', 'zip'],
+        ),
+      ],
+    );
+    if (!mounted || files.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _attachments = [
+        ..._attachments,
+        ...files.map(_ComposerAttachment.fromXFile),
+      ];
+    });
+  }
+
+  Future<void> _submitPrompt() async {
+    final controller = widget.controller;
+    final settings = controller.settings;
+    final rawPrompt = _inputController.text.trim();
+    if (rawPrompt.isEmpty) {
+      return;
+    }
+
+    final autoAgent = _pickAutoAgent(controller, rawPrompt);
+    if (autoAgent != null) {
+      await controller.selectAgent(autoAgent.id);
+    }
+
+    final attachmentNames = _attachments
+        .map((item) => item.name)
+        .toList(growable: false);
+    final prompt = _composePrompt(
+      mode: _mode,
+      prompt: rawPrompt,
+      attachmentNames: attachmentNames,
+      executionTarget: settings.assistantExecutionTarget,
+      permissionLevel: settings.assistantPermissionLevel,
+      workspacePath: settings.workspacePath,
+      remoteProjectRoot: settings.remoteProjectRoot,
+    );
+
+    setState(() {
+      _lastSubmittedPrompt = rawPrompt;
+      _lastAutoAgentLabel = autoAgent?.name ?? controller.activeAgentName;
+      _lastSubmittedAttachments = attachmentNames;
+    });
+
+    await controller.sendChatMessage(
+      prompt,
+      thinking: _thinkingModes[_thinkingLabel] ?? 'high',
+    );
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _attachments = const <_ComposerAttachment>[];
+    });
+    _inputController.clear();
+  }
+
+  GatewayAgentSummary? _pickAutoAgent(AppController controller, String prompt) {
+    final text = prompt.toLowerCase();
+    final agents = controller.agents;
+    if (agents.isEmpty) {
+      return null;
+    }
+
+    GatewayAgentSummary? byName(String name) {
+      for (final agent in agents) {
+        if (agent.name.toLowerCase().contains(name)) {
+          return agent;
+        }
+      }
+      return null;
+    }
+
+    if (text.contains('browser') ||
+        text.contains('search') ||
+        text.contains('website') ||
+        text.contains('网页') ||
+        text.contains('爬') ||
+        text.contains('抓取')) {
+      return byName('browser');
+    }
+
+    if (text.contains('research') ||
+        text.contains('analyze') ||
+        text.contains('compare') ||
+        text.contains('summary') ||
+        text.contains('研究') ||
+        text.contains('分析') ||
+        text.contains('调研')) {
+      return byName('research');
+    }
+
+    if (text.contains('code') ||
+        text.contains('deploy') ||
+        text.contains('build') ||
+        text.contains('test') ||
+        text.contains('log') ||
+        text.contains('bug') ||
+        text.contains('代码') ||
+        text.contains('部署') ||
+        text.contains('日志')) {
+      return byName('coding');
+    }
+
+    return byName('coding') ?? byName('browser') ?? byName('research');
+  }
+
+  String _composePrompt({
+    required String mode,
+    required String prompt,
+    required List<String> attachmentNames,
+    required AssistantExecutionTarget executionTarget,
+    required AssistantPermissionLevel permissionLevel,
+    required String workspacePath,
+    required String remoteProjectRoot,
+  }) {
+    final attachmentBlock = attachmentNames.isEmpty
+        ? ''
+        : 'Attached files:\n${attachmentNames.map((name) => '- $name').join('\n')}\n\n';
+    final targetRoot = executionTarget == AssistantExecutionTarget.local
+        ? workspacePath.trim()
+        : remoteProjectRoot.trim();
+    final executionContext =
+        'Execution context:\n'
+        '- target: ${executionTarget.promptValue}\n'
+        '- workspace_root: ${targetRoot.isEmpty ? 'not-set' : targetRoot}\n'
+        '- permission: ${permissionLevel.promptValue}\n\n';
+
+    return switch (mode) {
+      'Craft' =>
+        '$attachmentBlock$executionContext'
+            'Craft a polished result for this request:\n$prompt',
+      'Plan' =>
+        '$attachmentBlock$executionContext'
+            'Create a clear execution plan for this task:\n$prompt',
+      _ => '$attachmentBlock$executionContext$prompt',
+    };
+  }
+
   void _showConnectDialog() {
     showDialog<void>(
       context: context,
       builder: (context) => GatewayConnectDialog(
         controller: widget.controller,
         onDone: () => Navigator.of(context).pop(),
+      ),
+    );
+  }
+
+  void _focusComposer() {
+    if (!mounted) {
+      return;
+    }
+    _composerFocusNode.requestFocus();
+  }
+}
+
+class _ConversationArea extends StatelessWidget {
+  const _ConversationArea({
+    required this.controller,
+    required this.items,
+    required this.scrollController,
+    required this.onOpenDetail,
+    required this.onFocusComposer,
+  });
+
+  final AppController controller;
+  final List<_TimelineItem> items;
+  final ScrollController scrollController;
+  final ValueChanged<DetailPanelData> onOpenDetail;
+  final VoidCallback onFocusComposer;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+
+    return SurfaceCard(
+      borderRadius: 14,
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        controller.currentSessionKey,
+                        style: theme.textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        controller.connection.status ==
+                                RuntimeConnectionStatus.connected
+                            ? 'Describe the task naturally. XWorkmate will route execution.'
+                            : 'Connect a gateway to start chatting and running tasks.',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                _ConnectionChip(controller: controller),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: palette.strokeSoft),
+          Expanded(
+            child: Container(
+              color: palette.surfaceSecondary,
+              child: items.isEmpty
+                  ? const SizedBox.expand()
+                  : ListView.separated(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: items.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return switch (item.kind) {
+                          _TimelineItemKind.user => _MessageBubble(
+                            label: item.label!,
+                            text: item.text!,
+                            alignRight: true,
+                            tone: _BubbleTone.user,
+                          ),
+                          _TimelineItemKind.assistant => _MessageBubble(
+                            label: item.label!,
+                            text: item.text!,
+                            alignRight: false,
+                            tone: _BubbleTone.assistant,
+                          ),
+                          _TimelineItemKind.agent => _MessageBubble(
+                            label: item.label!,
+                            text: item.text!,
+                            alignRight: false,
+                            tone: _BubbleTone.agent,
+                          ),
+                          _TimelineItemKind.toolCall => _ToolCallTile(
+                            toolName: item.title!,
+                            summary: item.text!,
+                            pending: item.pending,
+                            error: item.error,
+                            onOpenDetail: () => onOpenDetail(
+                              DetailPanelData(
+                                title: item.title!,
+                                subtitle: 'Tool Call',
+                                icon: Icons.build_circle_outlined,
+                                status: StatusInfo(
+                                  item.pending ? 'Running' : 'Completed',
+                                  item.error
+                                      ? StatusTone.danger
+                                      : StatusTone.accent,
+                                ),
+                                description: item.text ?? '',
+                                meta: [
+                                  controller.currentSessionKey,
+                                  controller.activeAgentName,
+                                ],
+                                actions: const ['Copy'],
+                                sections: const [],
+                              ),
+                            ),
+                          ),
+                          _TimelineItemKind.taskCard => _TaskStatusCard(
+                            title: item.title!,
+                            status: item.status!,
+                            summary: item.summary!,
+                            detail: item.detail!,
+                            owner: item.owner!,
+                            sessionKey: item.sessionKey!,
+                            isCurrentSession:
+                                item.sessionKey == controller.currentSessionKey,
+                            onContinueConversation: () {
+                              controller.switchSession(item.sessionKey!);
+                              onFocusComposer();
+                            },
+                            onOpenTasks: () {
+                              controller.navigateTo(WorkspaceDestination.tasks);
+                              onOpenDetail(_buildTaskDetail(item));
+                            },
+                          ),
+                        };
+                      },
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  DetailPanelData _buildTaskDetail(_TimelineItem item) {
+    return DetailPanelData(
+      title: item.title!,
+      subtitle: 'Conversation Task',
+      icon: Icons.task_alt_rounded,
+      status: _statusInfoForTask(item.status ?? 'Completed'),
+      description: item.summary ?? '',
+      meta: [
+        item.owner ?? 'Auto route',
+        item.sessionKey ?? controller.currentSessionKey,
+      ],
+      actions: const ['Continue', 'Open Tasks'],
+      sections: [
+        DetailSection(
+          title: 'Execution',
+          items: [
+            DetailItem(label: 'Status', value: item.status ?? 'Completed'),
+            DetailItem(
+              label: 'Agent',
+              value: item.owner ?? controller.activeAgentName,
+            ),
+            DetailItem(
+              label: 'Session',
+              value: item.sessionKey ?? controller.currentSessionKey,
+            ),
+            DetailItem(label: 'Detail', value: item.detail ?? 'No detail'),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ComposerBar extends StatelessWidget {
+  const _ComposerBar({
+    required this.controller,
+    required this.inputController,
+    required this.focusNode,
+    required this.mode,
+    required this.thinkingLabel,
+    required this.modelLabel,
+    required this.attachments,
+    required this.autoAgentLabel,
+    required this.onModeChanged,
+    required this.onThinkingChanged,
+    required this.onRemoveAttachment,
+    required this.onOpenGateway,
+    required this.onPickAttachments,
+    required this.onSend,
+  });
+
+  final AppController controller;
+  final TextEditingController inputController;
+  final FocusNode focusNode;
+  final String mode;
+  final String thinkingLabel;
+  final String modelLabel;
+  final List<_ComposerAttachment> attachments;
+  final String? autoAgentLabel;
+  final ValueChanged<String> onModeChanged;
+  final ValueChanged<String> onThinkingChanged;
+  final ValueChanged<_ComposerAttachment> onRemoveAttachment;
+  final VoidCallback onOpenGateway;
+  final VoidCallback onPickAttachments;
+  final Future<void> Function() onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final connected =
+        controller.connection.status == RuntimeConnectionStatus.connected;
+    final executionTarget = controller.assistantExecutionTarget;
+    final permissionLevel = controller.assistantPermissionLevel;
+    final permissionForegroundColor =
+        permissionLevel == AssistantPermissionLevel.fullAccess
+        ? const Color(0xFFE16A12)
+        : palette.textSecondary;
+    final permissionBackgroundColor =
+        permissionLevel == AssistantPermissionLevel.fullAccess
+        ? const Color(0xFFFFF1E7)
+        : palette.surfaceSecondary;
+    final permissionBorderColor =
+        permissionLevel == AssistantPermissionLevel.fullAccess
+        ? const Color(0xFFFFD5B5)
+        : palette.strokeSoft;
+    final submitLabel = connected ? (mode == 'Ask' ? '提交' : '运行任务') : '连接';
+
+    return SurfaceCard(
+      borderRadius: 16,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (attachments.isNotEmpty) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: attachments
+                  .map(
+                    (attachment) => InputChip(
+                      avatar: Icon(attachment.icon, size: 18),
+                      label: Text(attachment.name),
+                      onDeleted: () => onRemoveAttachment(attachment),
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 10),
+          ],
+          TextField(
+            controller: inputController,
+            focusNode: focusNode,
+            autofocus: true,
+            minLines: 4,
+            maxLines: 8,
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              isCollapsed: true,
+              hintText:
+                  'Type naturally: run job autopilot, analyze logs, deploy node…',
+            ),
+            onSubmitted: (_) => onSend(),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      PopupMenuButton<AssistantExecutionTarget>(
+                        tooltip: 'Execution target',
+                        onSelected: (value) {
+                          controller.setAssistantExecutionTarget(value);
+                        },
+                        itemBuilder: (context) => AssistantExecutionTarget
+                            .values
+                            .map(
+                              (value) =>
+                                  PopupMenuItem<AssistantExecutionTarget>(
+                                    value: value,
+                                    child: Row(
+                                      children: [
+                                        Icon(value.icon, size: 18),
+                                        const SizedBox(width: 10),
+                                        Expanded(child: Text(value.label)),
+                                        if (value == executionTarget)
+                                          const Icon(
+                                            Icons.check_rounded,
+                                            size: 18,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                            )
+                            .toList(),
+                        child: _ComposerToolbarChip(
+                          icon: executionTarget.icon,
+                          label: executionTarget.label,
+                          showChevron: true,
+                          maxLabelWidth: 72,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      PopupMenuButton<AssistantPermissionLevel>(
+                        tooltip: 'Permissions',
+                        onSelected: (value) {
+                          controller.setAssistantPermissionLevel(value);
+                        },
+                        itemBuilder: (context) => AssistantPermissionLevel
+                            .values
+                            .map(
+                              (value) =>
+                                  PopupMenuItem<AssistantPermissionLevel>(
+                                    value: value,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          value.icon,
+                                          size: 18,
+                                          color:
+                                              value ==
+                                                  AssistantPermissionLevel
+                                                      .fullAccess
+                                              ? const Color(0xFFE16A12)
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(child: Text(value.label)),
+                                        if (value == permissionLevel)
+                                          const Icon(
+                                            Icons.check_rounded,
+                                            size: 18,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                            )
+                            .toList(),
+                        child: _ComposerToolbarChip(
+                          icon: permissionLevel.icon,
+                          label: permissionLevel.label,
+                          showChevron: true,
+                          maxLabelWidth: 112,
+                          backgroundColor: permissionBackgroundColor,
+                          borderColor: permissionBorderColor,
+                          foregroundColor: permissionForegroundColor,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      PopupMenuButton<String>(
+                        tooltip: 'Composer actions',
+                        offset: const Offset(0, -180),
+                        onSelected: (value) {
+                          switch (value) {
+                            case 'attach':
+                              onPickAttachments();
+                              break;
+                            case 'plan':
+                              onModeChanged(mode == 'Plan' ? 'Ask' : 'Plan');
+                              break;
+                            case 'gateway':
+                              onOpenGateway();
+                              break;
+                            case 'route':
+                              break;
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem<String>(
+                            value: 'attach',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(Icons.attach_file_rounded),
+                              title: Text('添加照片和文件'),
+                            ),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'plan',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(
+                                mode == 'Plan'
+                                    ? Icons.task_alt_rounded
+                                    : Icons.alt_route_rounded,
+                              ),
+                              title: Text(mode == 'Plan' ? '退出计划模式' : '计划模式'),
+                            ),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'gateway',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(
+                                connected
+                                    ? Icons.lan_rounded
+                                    : Icons.link_rounded,
+                              ),
+                              title: const Text('连接网关'),
+                            ),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'route',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.hub_rounded),
+                              title: Text(
+                                autoAgentLabel ?? 'Browser / Coding / Research',
+                              ),
+                            ),
+                          ),
+                        ],
+                        child: const _ComposerIconButton(
+                          icon: Icons.add_rounded,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _ComposerToolbarChip(
+                        icon: Icons.bolt_rounded,
+                        label: modelLabel,
+                        showChevron: true,
+                      ),
+                      const SizedBox(width: 8),
+                      PopupMenuButton<String>(
+                        tooltip: 'Mode',
+                        onSelected: onModeChanged,
+                        itemBuilder: (context) => _AssistantPageState._modes
+                            .map(
+                              (value) => PopupMenuItem<String>(
+                                value: value,
+                                child: Text(value),
+                              ),
+                            )
+                            .toList(),
+                        child: _ComposerToolbarChip(
+                          icon: Icons.tune_rounded,
+                          label: mode,
+                          showChevron: true,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      PopupMenuButton<String>(
+                        tooltip: 'Reasoning',
+                        onSelected: onThinkingChanged,
+                        itemBuilder: (context) => _AssistantPageState
+                            ._thinkingModes
+                            .keys
+                            .map(
+                              (value) => PopupMenuItem<String>(
+                                value: value,
+                                child: Row(
+                                  children: [
+                                    Expanded(child: Text(value)),
+                                    if (value == thinkingLabel)
+                                      const Icon(Icons.check_rounded, size: 18),
+                                  ],
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        child: _ComposerToolbarChip(
+                          icon: Icons.psychology_alt_outlined,
+                          label: thinkingLabel,
+                          showChevron: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton(
+                onPressed: connected ? onSend : onOpenGateway,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  minimumSize: const Size(92, 40),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      connected
+                          ? (mode == 'Ask'
+                                ? Icons.arrow_upward_rounded
+                                : Icons.play_arrow_rounded)
+                          : Icons.link_rounded,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(submitLabel),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ComposerIconButton extends StatelessWidget {
+  const _ComposerIconButton({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: context.palette.surfaceSecondary,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.palette.strokeSoft),
+      ),
+      child: Icon(icon, size: 18, color: context.palette.textMuted),
+    );
+  }
+}
+
+class _ComposerToolbarChip extends StatelessWidget {
+  const _ComposerToolbarChip({
+    required this.icon,
+    required this.label,
+    required this.showChevron,
+    this.backgroundColor,
+    this.borderColor,
+    this.foregroundColor,
+    this.maxLabelWidth = 220,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool showChevron;
+  final Color? backgroundColor;
+  final Color? borderColor;
+  final Color? foregroundColor;
+  final double maxLabelWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.palette;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: backgroundColor ?? palette.surfaceSecondary,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor ?? palette.strokeSoft),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: foregroundColor ?? palette.textMuted),
+          const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxLabelWidth),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: foregroundColor ?? theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+          if (showChevron) ...[
+            const SizedBox(width: 4),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 16,
+              color: foregroundColor ?? palette.textMuted,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MessageBubble extends StatelessWidget {
+  const _MessageBubble({
+    required this.label,
+    required this.text,
+    required this.alignRight,
+    required this.tone,
+  });
+
+  final String label;
+  final String text;
+  final bool alignRight;
+  final _BubbleTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.palette;
+    final borderColor = switch (tone) {
+      _BubbleTone.user => theme.colorScheme.primary.withValues(alpha: 0.18),
+      _BubbleTone.agent => theme.colorScheme.tertiary.withValues(alpha: 0.18),
+      _BubbleTone.assistant => palette.strokeSoft,
+    };
+
+    return Align(
+      alignment: alignRight ? Alignment.centerRight : Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: borderColor),
+            boxShadow: [
+              BoxShadow(
+                color: palette.shadow.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: theme.textTheme.labelLarge),
+              const SizedBox(height: 6),
+              SelectableText(
+                text.isEmpty ? 'No content yet.' : text,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  height: 1.55,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskStatusCard extends StatelessWidget {
+  const _TaskStatusCard({
+    required this.title,
+    required this.status,
+    required this.summary,
+    required this.detail,
+    required this.owner,
+    required this.sessionKey,
+    required this.isCurrentSession,
+    required this.onContinueConversation,
+    required this.onOpenTasks,
+  });
+
+  final String title;
+  final String status;
+  final String summary;
+  final String detail;
+  final String owner;
+  final String sessionKey;
+  final bool isCurrentSession;
+  final VoidCallback onContinueConversation;
+  final VoidCallback onOpenTasks;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.palette;
+    final statusStyle = _pillStyleForStatus(context, status);
+    final icon = switch (status) {
+      'Queued' => Icons.schedule_send_rounded,
+      'Running' => Icons.play_circle_outline_rounded,
+      'Failed' => Icons.error_outline_rounded,
+      _ => Icons.task_alt_rounded,
+    };
+    final hint = switch (status) {
+      'Queued' => 'Waiting in queue',
+      'Running' => 'Working now',
+      'Failed' => 'Needs attention',
+      _ => 'Continue in session',
+    };
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760),
+        child: Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: palette.strokeSoft),
+              boxShadow: [
+                BoxShadow(
+                  color: palette.shadow.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: statusStyle.backgroundColor,
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Icon(
+                        icon,
+                        size: 15,
+                        color: statusStyle.foregroundColor,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title, style: theme.textTheme.titleMedium),
+                          const SizedBox(height: 2),
+                          Text(summary, style: theme.textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _StatusPill(
+                      label: status,
+                      backgroundColor: statusStyle.backgroundColor,
+                      textColor: statusStyle.foregroundColor,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: palette.surfaceSecondary,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 4,
+                    children: [
+                      Text(detail, style: theme.textTheme.bodySmall),
+                      Text(
+                        owner,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      Text(sessionKey, style: theme.textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Text(
+                      hint,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: palette.textMuted,
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: onContinueConversation,
+                      icon: Icon(
+                        isCurrentSession
+                            ? Icons.edit_outlined
+                            : Icons.forum_outlined,
+                        size: 16,
+                      ),
+                      label: Text(
+                        isCurrentSession ? 'Continue' : 'Open Session',
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: onOpenTasks,
+                      child: const Text('Open Tasks'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ToolCallTile extends StatefulWidget {
+  const _ToolCallTile({
+    required this.toolName,
+    required this.summary,
+    required this.pending,
+    required this.error,
+    required this.onOpenDetail,
+  });
+
+  final String toolName;
+  final String summary;
+  final bool pending;
+  final bool error;
+  final VoidCallback onOpenDetail;
+
+  @override
+  State<_ToolCallTile> createState() => _ToolCallTileState();
+}
+
+class _ToolCallTileState extends State<_ToolCallTile> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.palette;
+    final statusLabel = widget.pending
+        ? 'Running'
+        : (widget.error ? 'Error' : 'Completed');
+    final statusStyle = _pillStyleForStatus(context, statusLabel);
+    final collapsedSummary = widget.summary.trim().isEmpty
+        ? 'Tool call in progress.'
+        : widget.summary.trim().replaceAll('\n', ' ');
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: palette.strokeSoft),
+          ),
+          child: Column(
+            children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => setState(() => _expanded = !_expanded),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: statusStyle.foregroundColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: RichText(
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          text: TextSpan(
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: palette.textSecondary,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: widget.toolName,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                              const TextSpan(text: '  '),
+                              TextSpan(text: collapsedSummary),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      _StatusPill(
+                        label: statusLabel,
+                        backgroundColor: statusStyle.backgroundColor,
+                        textColor: statusStyle.foregroundColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _expanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: palette.textMuted,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              ClipRect(
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 160),
+                  curve: Curves.easeOutCubic,
+                  child: _expanded
+                      ? Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Divider(height: 1, color: palette.strokeSoft),
+                              const SizedBox(height: 8),
+                              Text(
+                                widget.summary.trim().isEmpty
+                                    ? 'Tool call in progress.'
+                                    : widget.summary.trim(),
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 6),
+                              TextButton(
+                                onPressed: widget.onOpenDetail,
+                                child: const Text('Open detail'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({
+    required this.label,
+    this.backgroundColor,
+    this.textColor,
+  });
+
+  final String label;
+  final Color? backgroundColor;
+  final Color? textColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color:
+            backgroundColor ??
+            Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(
+          context,
+        ).textTheme.labelMedium?.copyWith(color: textColor),
       ),
     );
   }
@@ -531,12 +1402,15 @@ class _ConnectionChip extends StatelessWidget {
     final connection = controller.connection;
     final color = switch (connection.status) {
       RuntimeConnectionStatus.connected => theme.colorScheme.primaryContainer,
-      RuntimeConnectionStatus.connecting => theme.colorScheme.secondaryContainer,
+      RuntimeConnectionStatus.connecting =>
+        theme.colorScheme.secondaryContainer,
       RuntimeConnectionStatus.error => theme.colorScheme.errorContainer,
-      RuntimeConnectionStatus.offline => theme.colorScheme.surfaceContainerHighest,
+      RuntimeConnectionStatus.offline =>
+        theme.colorScheme.surfaceContainerHighest,
     };
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(999),
@@ -549,14 +1423,154 @@ class _ConnectionChip extends StatelessWidget {
   }
 }
 
-class _SessionCardData {
-  const _SessionCardData({
-    required this.title,
-    required this.subtitle,
-    required this.summary,
+extension on AssistantExecutionTarget {
+  IconData get icon => switch (this) {
+    AssistantExecutionTarget.local => Icons.computer_outlined,
+    AssistantExecutionTarget.remote => Icons.cloud_outlined,
+  };
+}
+
+extension on AssistantPermissionLevel {
+  IconData get icon => switch (this) {
+    AssistantPermissionLevel.defaultAccess => Icons.shield_outlined,
+    AssistantPermissionLevel.fullAccess => Icons.admin_panel_settings_outlined,
+  };
+}
+
+enum _BubbleTone { user, assistant, agent }
+
+enum _TimelineItemKind { user, assistant, agent, taskCard, toolCall }
+
+class _TimelineItem {
+  const _TimelineItem._({
+    required this.kind,
+    this.label,
+    this.text,
+    this.title,
+    this.status,
+    this.summary,
+    this.detail,
+    this.owner,
+    this.sessionKey,
+    this.pending = false,
+    this.error = false,
   });
 
-  final String title;
-  final String subtitle;
-  final String summary;
+  const _TimelineItem.message({
+    required _TimelineItemKind kind,
+    required String label,
+    required String text,
+    required bool pending,
+    required bool error,
+  }) : this._(
+         kind: kind,
+         label: label,
+         text: text,
+         pending: pending,
+         error: error,
+       );
+
+  const _TimelineItem.taskCard({
+    required String title,
+    required String status,
+    required String summary,
+    required String detail,
+    required String owner,
+    required String sessionKey,
+  }) : this._(
+         kind: _TimelineItemKind.taskCard,
+         title: title,
+         status: status,
+         summary: summary,
+         detail: detail,
+         owner: owner,
+         sessionKey: sessionKey,
+       );
+
+  const _TimelineItem.toolCall({
+    required String toolName,
+    required String summary,
+    required bool pending,
+    required bool error,
+  }) : this._(
+         kind: _TimelineItemKind.toolCall,
+         title: toolName,
+         text: summary,
+         pending: pending,
+         error: error,
+       );
+
+  final _TimelineItemKind kind;
+  final String? label;
+  final String? text;
+  final String? title;
+  final String? status;
+  final String? summary;
+  final String? detail;
+  final String? owner;
+  final String? sessionKey;
+  final bool pending;
+  final bool error;
+}
+
+class _PillStyle {
+  const _PillStyle({
+    required this.backgroundColor,
+    required this.foregroundColor,
+  });
+
+  final Color backgroundColor;
+  final Color foregroundColor;
+}
+
+_PillStyle _pillStyleForStatus(BuildContext context, String label) {
+  final theme = Theme.of(context);
+  return switch (label) {
+    'Running' => _PillStyle(
+      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.10),
+      foregroundColor: theme.colorScheme.primary,
+    ),
+    'Queued' => _PillStyle(
+      backgroundColor: theme.colorScheme.secondary.withValues(alpha: 0.10),
+      foregroundColor: theme.colorScheme.secondary,
+    ),
+    'Failed' || 'Error' => _PillStyle(
+      backgroundColor: theme.colorScheme.error.withValues(alpha: 0.10),
+      foregroundColor: theme.colorScheme.error,
+    ),
+    _ => _PillStyle(
+      backgroundColor: theme.colorScheme.tertiary.withValues(alpha: 0.12),
+      foregroundColor: theme.colorScheme.tertiary,
+    ),
+  };
+}
+
+StatusInfo _statusInfoForTask(String status) => switch (status) {
+  'Running' => const StatusInfo('Running', StatusTone.accent),
+  'Failed' => const StatusInfo('Failed', StatusTone.danger),
+  'Queued' => const StatusInfo('Queued', StatusTone.neutral),
+  _ => const StatusInfo('Completed', StatusTone.success),
+};
+
+class _ComposerAttachment {
+  const _ComposerAttachment({
+    required this.name,
+    required this.path,
+    required this.icon,
+  });
+
+  final String name;
+  final String path;
+  final IconData icon;
+
+  factory _ComposerAttachment.fromXFile(XFile file) {
+    final extension = file.name.split('.').last.toLowerCase();
+    final icon = switch (extension) {
+      'png' || 'jpg' || 'jpeg' || 'gif' || 'webp' => Icons.image_outlined,
+      'log' || 'txt' || 'json' || 'csv' => Icons.description_outlined,
+      _ => Icons.insert_drive_file_outlined,
+    };
+
+    return _ComposerAttachment(name: file.name, path: file.path, icon: icon);
+  }
 }

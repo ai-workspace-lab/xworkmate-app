@@ -28,6 +28,48 @@ extension RuntimeConnectionStatusCopy on RuntimeConnectionStatus {
   };
 }
 
+enum AssistantExecutionTarget { local, remote }
+
+extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
+  String get label => switch (this) {
+    AssistantExecutionTarget.local => '本地',
+    AssistantExecutionTarget.remote => '远程',
+  };
+
+  String get promptValue => switch (this) {
+    AssistantExecutionTarget.local => 'local',
+    AssistantExecutionTarget.remote => 'remote',
+  };
+
+  static AssistantExecutionTarget fromJsonValue(String? value) {
+    return AssistantExecutionTarget.values.firstWhere(
+      (item) => item.name == value,
+      orElse: () => AssistantExecutionTarget.local,
+    );
+  }
+}
+
+enum AssistantPermissionLevel { defaultAccess, fullAccess }
+
+extension AssistantPermissionLevelCopy on AssistantPermissionLevel {
+  String get label => switch (this) {
+    AssistantPermissionLevel.defaultAccess => '默认权限',
+    AssistantPermissionLevel.fullAccess => '完全访问权限',
+  };
+
+  String get promptValue => switch (this) {
+    AssistantPermissionLevel.defaultAccess => 'default',
+    AssistantPermissionLevel.fullAccess => 'full-access',
+  };
+
+  static AssistantPermissionLevel fromJsonValue(String? value) {
+    return AssistantPermissionLevel.values.firstWhere(
+      (item) => item.name == value,
+      orElse: () => AssistantPermissionLevel.defaultAccess,
+    );
+  }
+}
+
 class GatewayConnectionProfile {
   const GatewayConnectionProfile({
     required this.mode,
@@ -145,7 +187,8 @@ class OllamaLocalConfig {
 
   factory OllamaLocalConfig.fromJson(Map<String, dynamic> json) {
     return OllamaLocalConfig(
-      endpoint: json['endpoint'] as String? ?? OllamaLocalConfig.defaults().endpoint,
+      endpoint:
+          json['endpoint'] as String? ?? OllamaLocalConfig.defaults().endpoint,
       defaultModel:
           json['defaultModel'] as String? ??
           OllamaLocalConfig.defaults().defaultModel,
@@ -207,14 +250,16 @@ class OllamaCloudConfig {
 
   factory OllamaCloudConfig.fromJson(Map<String, dynamic> json) {
     return OllamaCloudConfig(
-      baseUrl: json['baseUrl'] as String? ?? OllamaCloudConfig.defaults().baseUrl,
+      baseUrl:
+          json['baseUrl'] as String? ?? OllamaCloudConfig.defaults().baseUrl,
       organization: json['organization'] as String? ?? '',
       workspace: json['workspace'] as String? ?? '',
       defaultModel:
           json['defaultModel'] as String? ??
           OllamaCloudConfig.defaults().defaultModel,
       apiKeyRef:
-          json['apiKeyRef'] as String? ?? OllamaCloudConfig.defaults().apiKeyRef,
+          json['apiKeyRef'] as String? ??
+          OllamaCloudConfig.defaults().apiKeyRef,
     );
   }
 }
@@ -267,7 +312,8 @@ class VaultConfig {
   factory VaultConfig.fromJson(Map<String, dynamic> json) {
     return VaultConfig(
       address: json['address'] as String? ?? VaultConfig.defaults().address,
-      namespace: json['namespace'] as String? ?? VaultConfig.defaults().namespace,
+      namespace:
+          json['namespace'] as String? ?? VaultConfig.defaults().namespace,
       authMode: json['authMode'] as String? ?? VaultConfig.defaults().authMode,
       tokenRef: json['tokenRef'] as String? ?? VaultConfig.defaults().tokenRef,
     );
@@ -335,7 +381,8 @@ class ApisixYamlProfile {
     return ApisixYamlProfile(
       name: json['name'] as String? ?? ApisixYamlProfile.defaults().name,
       sourceType:
-          json['sourceType'] as String? ?? ApisixYamlProfile.defaults().sourceType,
+          json['sourceType'] as String? ??
+          ApisixYamlProfile.defaults().sourceType,
       filePath:
           json['filePath'] as String? ?? ApisixYamlProfile.defaults().filePath,
       inlineYaml: json['inlineYaml'] as String? ?? '',
@@ -371,6 +418,8 @@ class SettingsSnapshot {
     required this.accountUsername,
     required this.accountWorkspace,
     required this.accountLocalMode,
+    required this.assistantExecutionTarget,
+    required this.assistantPermissionLevel,
   });
 
   final bool appActive;
@@ -393,6 +442,8 @@ class SettingsSnapshot {
   final String accountUsername;
   final String accountWorkspace;
   final bool accountLocalMode;
+  final AssistantExecutionTarget assistantExecutionTarget;
+  final AssistantPermissionLevel assistantPermissionLevel;
 
   factory SettingsSnapshot.defaults() {
     return SettingsSnapshot(
@@ -416,6 +467,8 @@ class SettingsSnapshot {
       accountUsername: '',
       accountWorkspace: 'Default Workspace',
       accountLocalMode: true,
+      assistantExecutionTarget: AssistantExecutionTarget.local,
+      assistantPermissionLevel: AssistantPermissionLevel.defaultAccess,
     );
   }
 
@@ -440,6 +493,8 @@ class SettingsSnapshot {
     String? accountUsername,
     String? accountWorkspace,
     bool? accountLocalMode,
+    AssistantExecutionTarget? assistantExecutionTarget,
+    AssistantPermissionLevel? assistantPermissionLevel,
   }) {
     return SettingsSnapshot(
       appActive: appActive ?? this.appActive,
@@ -462,6 +517,10 @@ class SettingsSnapshot {
       accountUsername: accountUsername ?? this.accountUsername,
       accountWorkspace: accountWorkspace ?? this.accountWorkspace,
       accountLocalMode: accountLocalMode ?? this.accountLocalMode,
+      assistantExecutionTarget:
+          assistantExecutionTarget ?? this.assistantExecutionTarget,
+      assistantPermissionLevel:
+          assistantPermissionLevel ?? this.assistantPermissionLevel,
     );
   }
 
@@ -487,6 +546,8 @@ class SettingsSnapshot {
       'accountUsername': accountUsername,
       'accountWorkspace': accountWorkspace,
       'accountLocalMode': accountLocalMode,
+      'assistantExecutionTarget': assistantExecutionTarget.name,
+      'assistantPermissionLevel': assistantPermissionLevel.name,
     };
   }
 
@@ -496,13 +557,16 @@ class SettingsSnapshot {
       launchAtLogin: json['launchAtLogin'] as bool? ?? false,
       showDockIcon: json['showDockIcon'] as bool? ?? true,
       workspacePath:
-          json['workspacePath'] as String? ?? SettingsSnapshot.defaults().workspacePath,
+          json['workspacePath'] as String? ??
+          SettingsSnapshot.defaults().workspacePath,
       remoteProjectRoot:
           json['remoteProjectRoot'] as String? ??
           SettingsSnapshot.defaults().remoteProjectRoot,
-      cliPath: json['cliPath'] as String? ?? SettingsSnapshot.defaults().cliPath,
+      cliPath:
+          json['cliPath'] as String? ?? SettingsSnapshot.defaults().cliPath,
       defaultModel:
-          json['defaultModel'] as String? ?? SettingsSnapshot.defaults().defaultModel,
+          json['defaultModel'] as String? ??
+          SettingsSnapshot.defaults().defaultModel,
       defaultProvider:
           json['defaultProvider'] as String? ??
           SettingsSnapshot.defaults().defaultProvider,
@@ -532,6 +596,12 @@ class SettingsSnapshot {
           json['accountWorkspace'] as String? ??
           SettingsSnapshot.defaults().accountWorkspace,
       accountLocalMode: json['accountLocalMode'] as bool? ?? true,
+      assistantExecutionTarget: AssistantExecutionTargetCopy.fromJsonValue(
+        json['assistantExecutionTarget'] as String?,
+      ),
+      assistantPermissionLevel: AssistantPermissionLevelCopy.fromJsonValue(
+        json['assistantPermissionLevel'] as String?,
+      ),
     );
   }
 
@@ -733,14 +803,7 @@ class GatewaySessionSummary {
   final String? lastMessagePreview;
 
   String get label {
-    final candidates = [
-      derivedTitle,
-      displayName,
-      subject,
-      room,
-      space,
-      key,
-    ];
+    final candidates = [derivedTitle, displayName, subject, room, space, key];
     return candidates.firstWhere(
       (item) => item != null && item.trim().isNotEmpty,
       orElse: () => key,
