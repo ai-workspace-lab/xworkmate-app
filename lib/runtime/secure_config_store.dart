@@ -1,12 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'runtime_models.dart';
 
 class SecureConfigStore {
-  SecureConfigStore();
+  SecureConfigStore({Future<String?> Function()? fallbackDirectoryPathResolver})
+    : _fallbackDirectoryPathResolver = fallbackDirectoryPathResolver;
 
   static const _settingsKey = 'xworkmate.settings.snapshot';
   static const _auditKey = 'xworkmate.secrets.audit';
@@ -18,6 +21,7 @@ class SecureConfigStore {
       'xworkmate.gateway.device.public_key';
   static const _gatewayDevicePrivateKeyKey =
       'xworkmate.gateway.device.private_key';
+  static const _deviceIdentityFallbackFileName = 'gateway-device-identity.json';
   static const _ollamaCloudApiKeyKey = 'xworkmate.ollama.cloud.api_key';
   static const _vaultTokenKey = 'xworkmate.vault.token';
 
@@ -25,6 +29,7 @@ class SecureConfigStore {
   FlutterSecureStorage? _secureStorage;
   final Map<String, Object?> _memoryPrefs = <String, Object?>{};
   final Map<String, String> _memorySecure = <String, String>{};
+  final Future<String?> Function()? _fallbackDirectoryPathResolver;
   bool _initialized = false;
 
   Future<void> initialize() async {
@@ -116,7 +121,11 @@ class SecureConfigStore {
     final publicKey = await _readSecure(_gatewayDevicePublicKeyKey);
     final privateKey = await _readSecure(_gatewayDevicePrivateKeyKey);
     if (deviceId == null || publicKey == null || privateKey == null) {
-      return null;
+      final fallbackIdentity = await _loadDeviceIdentityFallback();
+      if (fallbackIdentity != null) {
+        await saveDeviceIdentity(fallbackIdentity);
+      }
+      return fallbackIdentity;
     }
     return LocalDeviceIdentity(
       deviceId: deviceId,
@@ -134,6 +143,7 @@ class SecureConfigStore {
       _gatewayDevicePrivateKeyKey,
       identity.privateKeyBase64Url,
     );
+    await _saveDeviceIdentityFallback(identity);
   }
 
   Future<String?> loadDeviceToken({
@@ -141,7 +151,23 @@ class SecureConfigStore {
     required String role,
   }) async {
     await initialize();
-    return _readSecure(_deviceTokenKey(deviceId, role));
+    final secureValue = await _readSecure(_deviceTokenKey(deviceId, role));
+    if (secureValue != null && secureValue.trim().isNotEmpty) {
+      return secureValue;
+    }
+    final fallbackValue = await _loadDeviceTokenFallback(
+      deviceId: deviceId,
+      role: role,
+    );
+    if (fallbackValue != null && fallbackValue.trim().isNotEmpty) {
+      await saveDeviceToken(
+        deviceId: deviceId,
+        role: role,
+        token: fallbackValue,
+      );
+      return fallbackValue;
+    }
+    return null;
   }
 
   Future<void> saveDeviceToken({
@@ -151,6 +177,11 @@ class SecureConfigStore {
   }) async {
     await initialize();
     await _writeSecure(_deviceTokenKey(deviceId, role), token);
+    await _saveDeviceTokenFallback(
+      deviceId: deviceId,
+      role: role,
+      token: token,
+    );
   }
 
   Future<void> clearDeviceToken({
@@ -159,6 +190,7 @@ class SecureConfigStore {
   }) async {
     await initialize();
     await _deleteSecure(_deviceTokenKey(deviceId, role));
+    await _deleteDeviceTokenFallback(deviceId: deviceId, role: role);
   }
 
   Future<Map<String, String>> loadSecureRefs() async {
@@ -257,5 +289,147 @@ class SecureConfigStore {
   static String _deviceTokenKey(String deviceId, String role) {
     final safeRole = role.trim().isEmpty ? 'operator' : role.trim();
     return 'xworkmate.gateway.device_token.$deviceId.$safeRole';
+  }
+
+  static String _deviceTokenFallbackFileName(String deviceId, String role) {
+    final safeRole = role.trim().isEmpty ? 'operator' : role.trim();
+    return 'gateway-device-token.$deviceId.$safeRole.txt';
+  }
+
+  Future<Directory?> _resolveFallbackDirectory() async {
+    try {
+      final resolvedPath =
+          await _fallbackDirectoryPathResolver?.call() ??
+          await _defaultFallbackDirectoryPath();
+      final trimmed = resolvedPath?.trim() ?? '';
+      if (trimmed.isEmpty) {
+        return null;
+      }
+      final directory = Directory(trimmed);
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+      return directory;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _defaultFallbackDirectoryPath() async {
+    try {
+      final supportDirectory = await getApplicationSupportDirectory();
+      return '${supportDirectory.path}/xworkmate/gateway-auth';
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<File?> _deviceIdentityFallbackFile() async {
+    final directory = await _resolveFallbackDirectory();
+    if (directory == null) {
+      return null;
+    }
+    return File('${directory.path}/$_deviceIdentityFallbackFileName');
+  }
+
+  Future<File?> _deviceTokenFallbackFile({
+    required String deviceId,
+    required String role,
+  }) async {
+    final directory = await _resolveFallbackDirectory();
+    if (directory == null) {
+      return null;
+    }
+    return File(
+      '${directory.path}/${_deviceTokenFallbackFileName(deviceId, role)}',
+    );
+  }
+
+  Future<LocalDeviceIdentity?> _loadDeviceIdentityFallback() async {
+    try {
+      final file = await _deviceIdentityFallbackFile();
+      if (file == null || !await file.exists()) {
+        return null;
+      }
+      final decoded =
+          jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final identity = LocalDeviceIdentity.fromJson(decoded);
+      if (identity.deviceId.trim().isEmpty ||
+          identity.publicKeyBase64Url.trim().isEmpty ||
+          identity.privateKeyBase64Url.trim().isEmpty) {
+        return null;
+      }
+      return identity;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _saveDeviceIdentityFallback(LocalDeviceIdentity identity) async {
+    try {
+      final file = await _deviceIdentityFallbackFile();
+      if (file == null) {
+        return;
+      }
+      await file.writeAsString(jsonEncode(identity.toJson()), flush: true);
+    } catch (_) {
+      return;
+    }
+  }
+
+  Future<String?> _loadDeviceTokenFallback({
+    required String deviceId,
+    required String role,
+  }) async {
+    try {
+      final file = await _deviceTokenFallbackFile(
+        deviceId: deviceId,
+        role: role,
+      );
+      if (file == null || !await file.exists()) {
+        return null;
+      }
+      final value = (await file.readAsString()).trim();
+      return value.isEmpty ? null : value;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _saveDeviceTokenFallback({
+    required String deviceId,
+    required String role,
+    required String token,
+  }) async {
+    try {
+      final file = await _deviceTokenFallbackFile(
+        deviceId: deviceId,
+        role: role,
+      );
+      if (file == null) {
+        return;
+      }
+      await file.writeAsString(token, flush: true);
+    } catch (_) {
+      return;
+    }
+  }
+
+  Future<void> _deleteDeviceTokenFallback({
+    required String deviceId,
+    required String role,
+  }) async {
+    try {
+      final file = await _deviceTokenFallbackFile(
+        deviceId: deviceId,
+        role: role,
+      );
+      if (file == null || !await file.exists()) {
+        return;
+      }
+      await file.delete();
+    } catch (_) {
+      return;
+    }
   }
 }

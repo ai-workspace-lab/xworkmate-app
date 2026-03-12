@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
@@ -55,6 +57,54 @@ void main() {
         (await store.loadSecureRefs()).containsKey('gateway_token'),
         isFalse,
       );
+    },
+  );
+
+  test(
+    'SecureConfigStore falls back to file-backed device identity and token across instances',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-secure-store-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+
+      final identity = const LocalDeviceIdentity(
+        deviceId: 'device-123',
+        publicKeyBase64Url: 'public-key',
+        privateKeyBase64Url: 'private-key',
+        createdAtMs: 1700000000000,
+      );
+      final firstStore = SecureConfigStore(
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await firstStore.saveDeviceIdentity(identity);
+      await firstStore.saveDeviceToken(
+        deviceId: identity.deviceId,
+        role: 'operator',
+        token: 'device-token',
+      );
+
+      final secondStore = SecureConfigStore(
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final reloadedIdentity = await secondStore.loadDeviceIdentity();
+      final reloadedToken = await secondStore.loadDeviceToken(
+        deviceId: identity.deviceId,
+        role: 'operator',
+      );
+
+      expect(reloadedIdentity?.deviceId, identity.deviceId);
+      expect(reloadedIdentity?.publicKeyBase64Url, identity.publicKeyBase64Url);
+      expect(
+        reloadedIdentity?.privateKeyBase64Url,
+        identity.privateKeyBase64Url,
+      );
+      expect(reloadedToken, 'device-token');
     },
   );
 }

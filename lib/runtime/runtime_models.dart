@@ -112,13 +112,18 @@ class GatewayConnectionProfile {
     bool? tls,
     String? selectedAgentId,
   }) {
+    final normalized = _normalizeGatewayManualEndpoint(
+      host: host ?? this.host,
+      port: port ?? this.port,
+      tls: tls ?? this.tls,
+    );
     return GatewayConnectionProfile(
       mode: mode ?? this.mode,
       useSetupCode: useSetupCode ?? this.useSetupCode,
       setupCode: setupCode ?? this.setupCode,
-      host: host ?? this.host,
-      port: port ?? this.port,
-      tls: tls ?? this.tls,
+      host: normalized.host,
+      port: normalized.port,
+      tls: normalized.tls,
       selectedAgentId: selectedAgentId ?? this.selectedAgentId,
     );
   }
@@ -136,16 +141,56 @@ class GatewayConnectionProfile {
   }
 
   factory GatewayConnectionProfile.fromJson(Map<String, dynamic> json) {
+    final defaults = GatewayConnectionProfile.defaults();
+    final normalized = _normalizeGatewayManualEndpoint(
+      host: json['host'] as String? ?? defaults.host,
+      port: json['port'] as int? ?? defaults.port,
+      tls: json['tls'] as bool? ?? defaults.tls,
+    );
     return GatewayConnectionProfile(
       mode: RuntimeConnectionModeCopy.fromJsonValue(json['mode'] as String?),
       useSetupCode: json['useSetupCode'] as bool? ?? false,
       setupCode: json['setupCode'] as String? ?? '',
-      host: json['host'] as String? ?? GatewayConnectionProfile.defaults().host,
-      port: json['port'] as int? ?? GatewayConnectionProfile.defaults().port,
-      tls: json['tls'] as bool? ?? true,
+      host: normalized.host,
+      port: normalized.port,
+      tls: normalized.tls,
       selectedAgentId: json['selectedAgentId'] as String? ?? '',
     );
   }
+}
+
+({String host, int port, bool tls}) _normalizeGatewayManualEndpoint({
+  required String host,
+  required int port,
+  required bool tls,
+}) {
+  final trimmedHost = host.trim();
+  if (trimmedHost.isEmpty) {
+    return (host: trimmedHost, port: port, tls: tls);
+  }
+  final normalizedInput = trimmedHost.contains('://')
+      ? trimmedHost
+      : '${tls ? 'https' : 'http'}://$trimmedHost:${port > 0 ? port : (tls ? 443 : 18789)}';
+  final uri = Uri.tryParse(normalizedInput);
+  final normalizedHost = uri?.host.trim() ?? trimmedHost;
+  if (normalizedHost.isEmpty) {
+    return (host: trimmedHost, port: port, tls: tls);
+  }
+  final scheme = uri?.scheme.trim().toLowerCase() ?? (tls ? 'https' : 'http');
+  final normalizedTls = switch (scheme) {
+    'ws' || 'http' => false,
+    _ => true,
+  };
+  final normalizedPort = uri?.hasPort == true
+      ? uri!.port
+      : normalizedTls
+      ? 443
+      : 18789;
+  return (
+    host: normalizedHost,
+    port: normalizedPort > 0 ? normalizedPort : port,
+    tls: normalizedTls,
+  );
 }
 
 class OllamaLocalConfig {
@@ -1293,4 +1338,22 @@ class LocalDeviceIdentity {
   final String publicKeyBase64Url;
   final String privateKeyBase64Url;
   final int createdAtMs;
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'deviceId': deviceId,
+      'publicKeyBase64Url': publicKeyBase64Url,
+      'privateKeyBase64Url': privateKeyBase64Url,
+      'createdAtMs': createdAtMs,
+    };
+  }
+
+  factory LocalDeviceIdentity.fromJson(Map<String, dynamic> json) {
+    return LocalDeviceIdentity(
+      deviceId: json['deviceId'] as String? ?? '',
+      publicKeyBase64Url: json['publicKeyBase64Url'] as String? ?? '',
+      privateKeyBase64Url: json['privateKeyBase64Url'] as String? ?? '',
+      createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,
+    );
+  }
 }

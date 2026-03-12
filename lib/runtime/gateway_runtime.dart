@@ -1059,7 +1059,12 @@ class GatewayRuntime extends ChangeNotifier {
     if (host.isEmpty) {
       return null;
     }
-    return (host, profile.port, profile.tls);
+    final normalized = parseGatewayEndpoint(
+      host.contains('://')
+          ? host
+          : _composeManualUrl(host, profile.port, profile.tls),
+    );
+    return normalized ?? (host, profile.port, profile.tls);
   }
 
   void _handleIncoming(dynamic raw, Completer<String> challenge) {
@@ -1477,7 +1482,7 @@ String _resolveSetupCodeCandidate(String raw) {
   final parsedPort = uri?.port;
   final port = parsedPort != null && parsedPort >= 1 && parsedPort <= 65535
       ? parsedPort
-      : 18789;
+      : (tls ? 443 : 18789);
   return (host, port, tls);
 }
 

@@ -68,10 +68,6 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
     final typedGatewayToken = _tokenController.text.trim();
     final willUseStoredGatewayToken =
         typedGatewayToken.isEmpty && hasStoredGatewayToken;
-    final willUseBootstrapToken =
-        typedGatewayToken.isEmpty &&
-        !hasStoredGatewayToken &&
-        _bootstrapToken.isNotEmpty;
     final body = SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -205,18 +201,12 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
             ),
             onChanged: (_) => setState(() {}),
           ),
-          if (willUseStoredGatewayToken ||
-              willUseBootstrapToken ||
-              typedGatewayToken.isNotEmpty) ...[
+          if (willUseStoredGatewayToken || typedGatewayToken.isNotEmpty) ...[
             const SizedBox(height: 8),
             _SharedTokenStatusCard(
               hasStoredGatewayToken: hasStoredGatewayToken,
               storedGatewayTokenMask: storedGatewayTokenMask,
               willUseStoredGatewayToken: willUseStoredGatewayToken,
-              willUseBootstrapToken: willUseBootstrapToken,
-              bootstrapTokenMask: _bootstrapToken.isEmpty
-                  ? null
-                  : _maskValue(_bootstrapToken),
               overridingStoredToken:
                   hasStoredGatewayToken && typedGatewayToken.isNotEmpty,
               onClearStoredToken: hasStoredGatewayToken
@@ -353,8 +343,6 @@ class _SharedTokenStatusCard extends StatelessWidget {
     required this.hasStoredGatewayToken,
     required this.storedGatewayTokenMask,
     required this.willUseStoredGatewayToken,
-    required this.willUseBootstrapToken,
-    required this.bootstrapTokenMask,
     required this.overridingStoredToken,
     this.onClearStoredToken,
   });
@@ -362,8 +350,6 @@ class _SharedTokenStatusCard extends StatelessWidget {
   final bool hasStoredGatewayToken;
   final String? storedGatewayTokenMask;
   final bool willUseStoredGatewayToken;
-  final bool willUseBootstrapToken;
-  final String? bootstrapTokenMask;
   final bool overridingStoredToken;
   final Future<void> Function()? onClearStoredToken;
 
@@ -381,8 +367,8 @@ class _SharedTokenStatusCard extends StatelessWidget {
             'A shared token is already stored securely ($storedGatewayTokenMask). Leave the field empty to connect with it.',
           )
         : appText(
-            '将使用开发预填 token（$bootstrapTokenMask）连接；点击连接后会写入安全存储。',
-            'The connect action will use the bootstrap token ($bootstrapTokenMask) and persist it into secure storage.',
+            '首次连接需要 shared token；点击连接后会写入安全存储。',
+            'The first connection needs a shared token; after connect it will be saved into secure storage.',
           );
     return Container(
       width: double.infinity,
@@ -411,17 +397,6 @@ class _SharedTokenStatusCard extends StatelessWidget {
       ),
     );
   }
-}
-
-String _maskValue(String value) {
-  final trimmed = value.trim();
-  if (trimmed.isEmpty) {
-    return 'Not set';
-  }
-  if (trimmed.length <= 6) {
-    return '••••••';
-  }
-  return '${trimmed.substring(0, 3)}••••${trimmed.substring(trimmed.length - 3)}';
 }
 
 class _StatusBanner extends StatelessWidget {
@@ -473,6 +448,16 @@ class _StatusBanner extends StatelessWidget {
               ),
               style: theme.textTheme.bodySmall,
             ),
+            if ((connection.deviceId ?? '').isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                appText(
+                  '当前设备 ID: ${connection.deviceId}',
+                  'Current device ID: ${connection.deviceId}',
+                ),
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
           ] else if (connection.gatewayTokenMissing) ...[
             const SizedBox(height: 8),
             Text(

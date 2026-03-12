@@ -27,6 +27,7 @@ void main() {
       expect(find.text('共享 Token'), findsOneWidget);
       expect(find.text('认证诊断'), findsOneWidget);
       expect(find.textContaining('fields: none'), findsOneWidget);
+      expect(find.textContaining('开发预填 token'), findsNothing);
     },
   );
 }
