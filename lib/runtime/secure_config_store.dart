@@ -91,6 +91,8 @@ class SecureConfigStore {
   Future<void> saveGatewayToken(String value) =>
       _writeSecure(_gatewayTokenKey, value);
 
+  Future<void> clearGatewayToken() => _deleteSecure(_gatewayTokenKey);
+
   Future<String?> loadGatewayPassword() => _readSecure(_gatewayPasswordKey);
 
   Future<void> saveGatewayPassword(String value) =>

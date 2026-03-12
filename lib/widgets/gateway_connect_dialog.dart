@@ -30,7 +30,9 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
   final TextEditingController _passwordController = TextEditingController();
 
   String _mode = 'setup';
+  String _bootstrapToken = '';
   bool _tls = true;
+  bool _obscureSharedToken = true;
   RuntimeConnectionMode _connectionMode = RuntimeConnectionMode.remote;
   bool _submitting = false;
 
@@ -60,6 +62,16 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final storedGatewayTokenMask = widget.controller.storedGatewayTokenMask;
+    final hasStoredGatewayToken =
+        storedGatewayTokenMask != null && storedGatewayTokenMask.isNotEmpty;
+    final typedGatewayToken = _tokenController.text.trim();
+    final willUseStoredGatewayToken =
+        typedGatewayToken.isEmpty && hasStoredGatewayToken;
+    final willUseBootstrapToken =
+        typedGatewayToken.isEmpty &&
+        !hasStoredGatewayToken &&
+        _bootstrapToken.isNotEmpty;
     final body = SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -169,14 +181,54 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
           const SizedBox(height: 18),
           TextField(
             controller: _tokenController,
+            obscureText: _obscureSharedToken,
+            enableSuggestions: false,
+            autocorrect: false,
             decoration: InputDecoration(
               labelText: appText('共享 Token', 'Shared Token'),
               hintText: appText(
                 '可选：覆盖默认 Gateway Token',
                 'Optional override for gateway token',
               ),
+              suffixIcon: IconButton(
+                tooltip: _obscureSharedToken
+                    ? appText('显示 Token', 'Show token')
+                    : appText('隐藏 Token', 'Hide token'),
+                onPressed: () =>
+                    setState(() => _obscureSharedToken = !_obscureSharedToken),
+                icon: Icon(
+                  _obscureSharedToken
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
+                ),
+              ),
             ),
+            onChanged: (_) => setState(() {}),
           ),
+          if (willUseStoredGatewayToken ||
+              willUseBootstrapToken ||
+              typedGatewayToken.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _SharedTokenStatusCard(
+              hasStoredGatewayToken: hasStoredGatewayToken,
+              storedGatewayTokenMask: storedGatewayTokenMask,
+              willUseStoredGatewayToken: willUseStoredGatewayToken,
+              willUseBootstrapToken: willUseBootstrapToken,
+              bootstrapTokenMask: _bootstrapToken.isEmpty
+                  ? null
+                  : _maskValue(_bootstrapToken),
+              overridingStoredToken:
+                  hasStoredGatewayToken && typedGatewayToken.isNotEmpty,
+              onClearStoredToken: hasStoredGatewayToken
+                  ? () async {
+                      await widget.controller.clearStoredGatewayToken();
+                      if (mounted) {
+                        setState(() {});
+                      }
+                    }
+                  : null,
+            ),
+          ],
           const SizedBox(height: 12),
           TextField(
             controller: _passwordController,
@@ -256,8 +308,8 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
         _portController.text = '${preferred.port}';
         _tls = preferred.tls;
       }
-      if (_tokenController.text.trim().isEmpty && preferred.token.isNotEmpty) {
-        _tokenController.text = preferred.token;
+      if (_bootstrapToken.isEmpty && preferred.token.isNotEmpty) {
+        _bootstrapToken = preferred.token;
       }
     });
   }
@@ -265,10 +317,16 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
   Future<void> _submit() async {
     setState(() => _submitting = true);
     try {
+      final typedToken = _tokenController.text.trim();
+      final resolvedToken = typedToken.isNotEmpty
+          ? typedToken
+          : widget.controller.hasStoredGatewayToken
+          ? ''
+          : _bootstrapToken;
       if (_mode == 'setup') {
         await widget.controller.connectWithSetupCode(
           setupCode: _setupCodeController.text,
-          token: _tokenController.text,
+          token: resolvedToken,
           password: _passwordController.text,
         );
       } else {
@@ -277,7 +335,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
           port: int.tryParse(_portController.text.trim()) ?? 0,
           tls: _tls,
           mode: _connectionMode,
-          token: _tokenController.text,
+          token: resolvedToken,
           password: _passwordController.text,
         );
       }
@@ -288,6 +346,82 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
       }
     }
   }
+}
+
+class _SharedTokenStatusCard extends StatelessWidget {
+  const _SharedTokenStatusCard({
+    required this.hasStoredGatewayToken,
+    required this.storedGatewayTokenMask,
+    required this.willUseStoredGatewayToken,
+    required this.willUseBootstrapToken,
+    required this.bootstrapTokenMask,
+    required this.overridingStoredToken,
+    this.onClearStoredToken,
+  });
+
+  final bool hasStoredGatewayToken;
+  final String? storedGatewayTokenMask;
+  final bool willUseStoredGatewayToken;
+  final bool willUseBootstrapToken;
+  final String? bootstrapTokenMask;
+  final bool overridingStoredToken;
+  final Future<void> Function()? onClearStoredToken;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final message = overridingStoredToken
+        ? appText(
+            '本次输入会覆盖已安全保存的 shared token。',
+            'This entry will overwrite the stored shared token.',
+          )
+        : willUseStoredGatewayToken
+        ? appText(
+            '已安全保存 shared token（$storedGatewayTokenMask）。留空时会直接使用它连接。',
+            'A shared token is already stored securely ($storedGatewayTokenMask). Leave the field empty to connect with it.',
+          )
+        : appText(
+            '将使用开发预填 token（$bootstrapTokenMask）连接；点击连接后会写入安全存储。',
+            'The connect action will use the bootstrap token ($bootstrapTokenMask) and persist it into secure storage.',
+          );
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            hasStoredGatewayToken
+                ? Icons.lock_rounded
+                : Icons.inventory_2_rounded,
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(message, style: theme.textTheme.bodySmall)),
+          if (onClearStoredToken != null)
+            TextButton(
+              onPressed: () => onClearStoredToken!.call(),
+              child: Text(appText('清除', 'Clear')),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+String _maskValue(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return 'Not set';
+  }
+  if (trimmed.length <= 6) {
+    return '••••••';
+  }
+  return '${trimmed.substring(0, 3)}••••${trimmed.substring(trimmed.length - 3)}';
 }
 
 class _StatusBanner extends StatelessWidget {

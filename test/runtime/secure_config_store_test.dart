@@ -38,4 +38,23 @@ void main() {
       expect(SecureConfigStore.maskValue(''), 'Not set');
     },
   );
+
+  test(
+    'SecureConfigStore clears gateway token without touching snapshot',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final store = SecureConfigStore();
+
+      await store.saveGatewayToken('token-secret');
+      expect(await store.loadGatewayToken(), 'token-secret');
+
+      await store.clearGatewayToken();
+
+      expect(await store.loadGatewayToken(), isNull);
+      expect(
+        (await store.loadSecureRefs()).containsKey('gateway_token'),
+        isFalse,
+      );
+    },
+  );
 }

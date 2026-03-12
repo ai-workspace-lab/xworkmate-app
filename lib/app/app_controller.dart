@@ -100,6 +100,10 @@ class AppController extends ChangeNotifier {
       _settingsController.secureRefs.containsKey(
         'gateway_device_token_operator',
       );
+  bool get hasStoredGatewayToken =>
+      _settingsController.secureRefs.containsKey('gateway_token');
+  String? get storedGatewayTokenMask =>
+      _settingsController.secureRefs['gateway_token'];
   bool get canQuickConnectGateway {
     final profile = settings.gateway;
     if (profile.useSetupCode && profile.setupCode.trim().isNotEmpty) {
@@ -300,6 +304,10 @@ class AppController extends ChangeNotifier {
 
   Future<void> connectSavedGateway() async {
     await _connectProfile(settings.gateway);
+  }
+
+  Future<void> clearStoredGatewayToken() async {
+    await _settingsController.clearGatewaySecrets(token: true);
   }
 
   Future<void> refreshGatewayHealth() async {

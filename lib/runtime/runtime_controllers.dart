@@ -80,6 +80,40 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> clearGatewaySecrets({
+    bool token = false,
+    bool password = false,
+  }) async {
+    if (token) {
+      await _store.clearGatewayToken();
+      await appendAudit(
+        SecretAuditEntry(
+          timeLabel: _timeLabel(),
+          action: 'Cleared',
+          provider: 'Gateway',
+          target: 'gateway_token',
+          module: 'Assistant',
+          status: 'Success',
+        ),
+      );
+    }
+    if (password) {
+      await _store.clearGatewayPassword();
+      await appendAudit(
+        SecretAuditEntry(
+          timeLabel: _timeLabel(),
+          action: 'Cleared',
+          provider: 'Gateway',
+          target: 'gateway_password',
+          module: 'Assistant',
+          status: 'Success',
+        ),
+      );
+    }
+    await _reloadDerivedState();
+    notifyListeners();
+  }
+
   Future<void> saveOllamaCloudApiKey(String value) async {
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
