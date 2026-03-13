@@ -24,6 +24,7 @@ class SecureConfigStore {
   static const _deviceIdentityFallbackFileName = 'gateway-device-identity.json';
   static const _ollamaCloudApiKeyKey = 'xworkmate.ollama.cloud.api_key';
   static const _vaultTokenKey = 'xworkmate.vault.token';
+  static const _aiGatewayApiKeyKey = 'xworkmate.ai_gateway.api_key';
 
   SharedPreferences? _prefs;
   FlutterSecureStorage? _secureStorage;
@@ -114,6 +115,13 @@ class SecureConfigStore {
 
   Future<void> saveVaultToken(String value) =>
       _writeSecure(_vaultTokenKey, value);
+
+  Future<String?> loadAiGatewayApiKey() => _readSecure(_aiGatewayApiKeyKey);
+
+  Future<void> saveAiGatewayApiKey(String value) =>
+      _writeSecure(_aiGatewayApiKeyKey, value);
+
+  Future<void> clearAiGatewayApiKey() => _deleteSecure(_aiGatewayApiKeyKey);
 
   Future<LocalDeviceIdentity?> loadDeviceIdentity() async {
     await initialize();
@@ -206,6 +214,7 @@ class SecureConfigStore {
           );
     final ollamaKey = await loadOllamaCloudApiKey();
     final vaultToken = await loadVaultToken();
+    final aiGatewayApiKey = await loadAiGatewayApiKey();
     return {
       ...?gatewayToken == null
           ? null
@@ -222,6 +231,9 @@ class SecureConfigStore {
       ...?vaultToken == null
           ? null
           : <String, String>{'vault_token': vaultToken},
+      ...?aiGatewayApiKey == null
+          ? null
+          : <String, String>{'ai_gateway_api_key': aiGatewayApiKey},
     };
   }
 

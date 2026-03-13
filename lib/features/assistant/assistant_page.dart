@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
-import '../../data/mock_data.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
@@ -68,9 +67,6 @@ class _AssistantPageState extends State<AssistantPage> {
         final controller = widget.controller;
         final messages = List<GatewayChatMessage>.from(controller.chatMessages);
         final timelineItems = _buildTimelineItems(controller, messages);
-        final quickActions = MockData.quickActions
-            .take(6)
-            .toList(growable: false);
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || !_conversationController.hasClients) {
@@ -154,12 +150,14 @@ class _AssistantPageState extends State<AssistantPage> {
                   SizedBox(
                     height: composerHeight,
                     child: _AssistantLowerPane(
-                      quickActions: quickActions,
                       inputController: _inputController,
                       focusNode: _composerFocusNode,
                       mode: _mode,
                       thinkingLabel: _thinkingLabel,
-                      modelLabel: controller.settings.defaultModel,
+                      modelLabel: controller.resolvedDefaultModel.isEmpty
+                          ? appText('未选择模型', 'No model selected')
+                          : controller.resolvedDefaultModel,
+                      modelOptions: controller.aiGatewayModelChoices,
                       attachments: _attachments,
                       autoAgentLabel: _lastAutoAgentLabel,
                       controller: controller,
@@ -167,6 +165,7 @@ class _AssistantPageState extends State<AssistantPage> {
                       onThinkingChanged: (value) {
                         setState(() => _thinkingLabel = value);
                       },
+                      onModelChanged: controller.selectDefaultModel,
                       onRemoveAttachment: (attachment) {
                         setState(() {
                           _attachments = _attachments
@@ -488,17 +487,18 @@ class _AssistantPageState extends State<AssistantPage> {
 
 class _AssistantLowerPane extends StatelessWidget {
   const _AssistantLowerPane({
-    required this.quickActions,
     required this.controller,
     required this.inputController,
     required this.focusNode,
     required this.mode,
     required this.thinkingLabel,
     required this.modelLabel,
+    required this.modelOptions,
     required this.attachments,
     required this.autoAgentLabel,
     required this.onModeChanged,
     required this.onThinkingChanged,
+    required this.onModelChanged,
     required this.onRemoveAttachment,
     required this.onOpenGateway,
     required this.onReconnectGateway,
@@ -507,17 +507,18 @@ class _AssistantLowerPane extends StatelessWidget {
     required this.onSend,
   });
 
-  final List<QuickAction> quickActions;
   final AppController controller;
   final TextEditingController inputController;
   final FocusNode focusNode;
   final String mode;
   final String thinkingLabel;
   final String modelLabel;
+  final List<String> modelOptions;
   final List<_ComposerAttachment> attachments;
   final String? autoAgentLabel;
   final ValueChanged<String> onModeChanged;
   final ValueChanged<String> onThinkingChanged;
+  final Future<void> Function(String modelId) onModelChanged;
   final ValueChanged<_ComposerAttachment> onRemoveAttachment;
   final VoidCallback onOpenGateway;
   final Future<void> Function() onReconnectGateway;
@@ -529,47 +530,24 @@ class _AssistantLowerPane extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       physics: const ClampingScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: quickActions
-                  .map(
-                    (action) => ActionChip(
-                      avatar: Icon(action.icon, size: 16),
-                      label: Text(action.title),
-                      onPressed: () {
-                        inputController.text = action.title;
-                        onFocusComposer();
-                      },
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          _ComposerBar(
-            controller: controller,
-            inputController: inputController,
-            focusNode: focusNode,
-            mode: mode,
-            thinkingLabel: thinkingLabel,
-            modelLabel: modelLabel,
-            attachments: attachments,
-            autoAgentLabel: autoAgentLabel,
-            onModeChanged: onModeChanged,
-            onThinkingChanged: onThinkingChanged,
-            onRemoveAttachment: onRemoveAttachment,
-            onOpenGateway: onOpenGateway,
-            onReconnectGateway: onReconnectGateway,
-            onPickAttachments: onPickAttachments,
-            onSend: onSend,
-          ),
-        ],
+      child: _ComposerBar(
+        controller: controller,
+        inputController: inputController,
+        focusNode: focusNode,
+        mode: mode,
+        thinkingLabel: thinkingLabel,
+        modelLabel: modelLabel,
+        modelOptions: modelOptions,
+        attachments: attachments,
+        autoAgentLabel: autoAgentLabel,
+        onModeChanged: onModeChanged,
+        onThinkingChanged: onThinkingChanged,
+        onModelChanged: onModelChanged,
+        onRemoveAttachment: onRemoveAttachment,
+        onOpenGateway: onOpenGateway,
+        onReconnectGateway: onReconnectGateway,
+        onPickAttachments: onPickAttachments,
+        onSend: onSend,
       ),
     );
   }
@@ -883,10 +861,12 @@ class _ComposerBar extends StatelessWidget {
     required this.mode,
     required this.thinkingLabel,
     required this.modelLabel,
+    required this.modelOptions,
     required this.attachments,
     required this.autoAgentLabel,
     required this.onModeChanged,
     required this.onThinkingChanged,
+    required this.onModelChanged,
     required this.onRemoveAttachment,
     required this.onOpenGateway,
     required this.onReconnectGateway,
@@ -900,10 +880,12 @@ class _ComposerBar extends StatelessWidget {
   final String mode;
   final String thinkingLabel;
   final String modelLabel;
+  final List<String> modelOptions;
   final List<_ComposerAttachment> attachments;
   final String? autoAgentLabel;
   final ValueChanged<String> onModeChanged;
   final ValueChanged<String> onThinkingChanged;
+  final Future<void> Function(String modelId) onModelChanged;
   final ValueChanged<_ComposerAttachment> onRemoveAttachment;
   final VoidCallback onOpenGateway;
   final Future<void> Function() onReconnectGateway;
@@ -1143,11 +1125,40 @@ class _ComposerBar extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _ComposerToolbarChip(
-                        icon: Icons.bolt_rounded,
-                        label: modelLabel,
-                        showChevron: true,
-                      ),
+                      modelOptions.isEmpty
+                          ? _ComposerToolbarChip(
+                              icon: Icons.bolt_rounded,
+                              label: modelLabel,
+                              showChevron: false,
+                            )
+                          : PopupMenuButton<String>(
+                              tooltip: appText('模型', 'Model'),
+                              onSelected: (value) {
+                                onModelChanged(value);
+                              },
+                              itemBuilder: (context) => modelOptions
+                                  .map(
+                                    (value) => PopupMenuItem<String>(
+                                      value: value,
+                                      child: Row(
+                                        children: [
+                                          Expanded(child: Text(value)),
+                                          if (value == modelLabel)
+                                            const Icon(
+                                              Icons.check_rounded,
+                                              size: 18,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              child: _ComposerToolbarChip(
+                                icon: Icons.bolt_rounded,
+                                label: modelLabel,
+                                showChevron: true,
+                              ),
+                            ),
                       const SizedBox(width: 8),
                       PopupMenuButton<String>(
                         tooltip: appText('模式', 'Mode'),
@@ -1200,42 +1211,45 @@ class _ComposerBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              FilledButton(
-                onPressed: connecting
-                    ? null
-                    : connected
-                    ? onSend
-                    : reconnectAvailable
-                    ? () async {
-                        await onReconnectGateway();
-                      }
-                    : onOpenGateway,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  minimumSize: const Size(92, 40),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      connected
-                          ? (mode == 'ask'
-                                ? Icons.arrow_upward_rounded
-                                : Icons.play_arrow_rounded)
-                          : reconnectAvailable
-                          ? Icons.refresh_rounded
-                          : Icons.link_rounded,
-                      size: 18,
+              Tooltip(
+                message: submitLabel,
+                child: FilledButton(
+                  onPressed: connecting
+                      ? null
+                      : connected
+                      ? onSend
+                      : reconnectAvailable
+                      ? () async {
+                          await onReconnectGateway();
+                        }
+                      : onOpenGateway,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
                     ),
-                    const SizedBox(width: 6),
-                    Text(submitLabel),
-                  ],
+                    minimumSize: const Size(92, 40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        connected
+                            ? (mode == 'ask'
+                                  ? Icons.arrow_upward_rounded
+                                  : Icons.play_arrow_rounded)
+                            : reconnectAvailable
+                            ? Icons.refresh_rounded
+                            : Icons.link_rounded,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(submitLabel),
+                    ],
+                  ),
                 ),
               ),
             ],

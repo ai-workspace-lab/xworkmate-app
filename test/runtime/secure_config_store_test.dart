@@ -25,6 +25,7 @@ void main() {
       await store.saveGatewayToken('token-secret');
       await store.saveGatewayPassword('password-secret');
       await store.saveVaultToken('vault-secret');
+      await store.saveAiGatewayApiKey('ai-gateway-secret');
 
       final loadedSnapshot = await store.loadSettingsSnapshot();
       final secureRefs = await store.loadSecureRefs();
@@ -36,6 +37,7 @@ void main() {
       expect(secureRefs['gateway_token'], 'token-secret');
       expect(secureRefs['gateway_password'], 'password-secret');
       expect(secureRefs['vault_token'], 'vault-secret');
+      expect(secureRefs['ai_gateway_api_key'], 'ai-gateway-secret');
       expect(SecureConfigStore.maskValue('token-secret'), 'tok••••ret');
       expect(SecureConfigStore.maskValue(''), 'Not set');
     },

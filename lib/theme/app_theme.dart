@@ -62,9 +62,13 @@ class AppTheme {
 
     return base.copyWith(
       splashFactory: NoSplash.splashFactory,
+      visualDensity: isDesktop
+          ? const VisualDensity(horizontal: -1, vertical: -1)
+          : VisualDensity.standard,
       dividerColor: palette.strokeSoft,
       hoverColor: palette.hover,
       textTheme: tunedTextTheme,
+      primaryTextTheme: tunedTextTheme,
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -88,6 +92,51 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          textStyle: tunedTextTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? 16 : 18,
+            vertical: isDesktop ? 12 : 13,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: palette.textPrimary,
+          textStyle: tunedTextTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? 16 : 18,
+            vertical: isDesktop ? 12 : 13,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+          side: BorderSide(color: palette.strokeSoft),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: palette.textPrimary,
+          textStyle: tunedTextTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? 12 : 14,
+            vertical: isDesktop ? 10 : 11,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
           foregroundColor: palette.textSecondary,
@@ -105,9 +154,12 @@ class AppTheme {
         hintStyle: tunedTextTheme.bodyMedium?.copyWith(
           color: palette.textMuted,
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
+        labelStyle: tunedTextTheme.bodyMedium?.copyWith(
+          color: palette.textMuted,
+        ),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: isDesktop ? 16 : 18,
+          vertical: isDesktop ? 14 : 15,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -159,54 +211,110 @@ class AppTheme {
     required AppPalette palette,
     required bool isDesktop,
   }) {
+    final fallbackFonts = switch (defaultTargetPlatform) {
+      TargetPlatform.macOS || TargetPlatform.iOS => const <String>[
+        '.SF NS Text',
+        '.SF Pro Text',
+        'PingFang SC',
+        'Helvetica Neue',
+      ],
+      _ => const <String>['Inter', 'Noto Sans CJK SC', 'PingFang SC'],
+    };
+
+    TextStyle withUiFont(TextStyle? style) {
+      return (style ?? const TextStyle()).copyWith(
+        fontFamilyFallback: fallbackFonts,
+        package: null,
+      );
+    }
+
     return base.copyWith(
-      displaySmall: base.displaySmall?.copyWith(
-        fontSize: isDesktop ? 32 : 34,
-        fontWeight: FontWeight.w600,
-        letterSpacing: -0.9,
+      displaySmall: withUiFont(
+        base.displaySmall?.copyWith(
+          fontSize: isDesktop ? 30 : 32,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.8,
+          height: 1.08,
+        ),
       ),
-      headlineSmall: base.headlineSmall?.copyWith(
-        fontSize: isDesktop ? 22 : 24,
-        fontWeight: FontWeight.w600,
-        letterSpacing: -0.45,
+      headlineSmall: withUiFont(
+        base.headlineSmall?.copyWith(
+          fontSize: isDesktop ? 20 : 22,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.38,
+          height: 1.14,
+        ),
       ),
-      titleLarge: base.titleLarge?.copyWith(
-        fontSize: isDesktop ? 18 : 20,
-        fontWeight: FontWeight.w600,
-        letterSpacing: -0.2,
+      titleLarge: withUiFont(
+        base.titleLarge?.copyWith(
+          fontSize: isDesktop ? 17 : 18,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.18,
+          height: 1.2,
+        ),
       ),
-      titleMedium: base.titleMedium?.copyWith(
-        fontSize: isDesktop ? 15 : 16,
-        fontWeight: FontWeight.w600,
+      titleMedium: withUiFont(
+        base.titleMedium?.copyWith(
+          fontSize: isDesktop ? 15 : 16,
+          fontWeight: FontWeight.w600,
+          height: 1.24,
+        ),
       ),
-      titleSmall: base.titleSmall?.copyWith(
-        fontSize: isDesktop ? 13 : 14,
-        fontWeight: FontWeight.w600,
+      titleSmall: withUiFont(
+        base.titleSmall?.copyWith(
+          fontSize: isDesktop ? 13 : 14,
+          fontWeight: FontWeight.w600,
+          height: 1.2,
+        ),
       ),
-      bodyLarge: base.bodyLarge?.copyWith(
-        fontSize: isDesktop ? 14 : 15,
-        height: 1.45,
-        color: palette.textPrimary,
+      bodyLarge: withUiFont(
+        base.bodyLarge?.copyWith(
+          fontSize: isDesktop ? 14 : 15,
+          fontWeight: FontWeight.w400,
+          height: 1.5,
+          letterSpacing: -0.02,
+          color: palette.textPrimary,
+        ),
       ),
-      bodyMedium: base.bodyMedium?.copyWith(
-        fontSize: isDesktop ? 13 : 14,
-        height: 1.4,
-        color: palette.textSecondary,
+      bodyMedium: withUiFont(
+        base.bodyMedium?.copyWith(
+          fontSize: isDesktop ? 13 : 14,
+          fontWeight: FontWeight.w400,
+          height: 1.46,
+          letterSpacing: -0.01,
+          color: palette.textSecondary,
+        ),
       ),
-      bodySmall: base.bodySmall?.copyWith(
-        fontSize: isDesktop ? 12 : 12,
-        height: 1.35,
-        color: palette.textMuted,
+      bodySmall: withUiFont(
+        base.bodySmall?.copyWith(
+          fontSize: isDesktop ? 12 : 13,
+          fontWeight: FontWeight.w400,
+          height: 1.4,
+          color: palette.textMuted,
+        ),
       ),
-      labelLarge: base.labelLarge?.copyWith(
-        fontSize: isDesktop ? 13 : 14,
-        fontWeight: FontWeight.w600,
+      labelLarge: withUiFont(
+        base.labelLarge?.copyWith(
+          fontSize: isDesktop ? 13 : 14,
+          fontWeight: FontWeight.w600,
+          height: 1.15,
+          letterSpacing: -0.02,
+        ),
       ),
-      labelMedium: base.labelMedium?.copyWith(
-        fontSize: isDesktop ? 12 : 12,
-        fontWeight: FontWeight.w600,
+      labelMedium: withUiFont(
+        base.labelMedium?.copyWith(
+          fontSize: isDesktop ? 12 : 12,
+          fontWeight: FontWeight.w600,
+          height: 1.12,
+        ),
       ),
-      labelSmall: base.labelSmall?.copyWith(fontSize: isDesktop ? 11 : 11),
+      labelSmall: withUiFont(
+        base.labelSmall?.copyWith(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          height: 1.1,
+        ),
+      ),
     );
   }
 }

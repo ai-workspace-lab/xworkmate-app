@@ -367,80 +367,118 @@ class VaultConfig {
   }
 }
 
-class ApisixYamlProfile {
-  const ApisixYamlProfile({
+class AiGatewayProfile {
+  const AiGatewayProfile({
     required this.name,
-    required this.sourceType,
-    required this.filePath,
-    required this.inlineYaml,
-    required this.validationState,
-    required this.validationMessage,
+    required this.baseUrl,
+    required this.apiKeyRef,
+    required this.availableModels,
+    required this.selectedModels,
+    required this.syncState,
+    required this.syncMessage,
   });
 
   final String name;
-  final String sourceType;
-  final String filePath;
-  final String inlineYaml;
-  final String validationState;
-  final String validationMessage;
+  final String baseUrl;
+  final String apiKeyRef;
+  final List<String> availableModels;
+  final List<String> selectedModels;
+  final String syncState;
+  final String syncMessage;
 
-  factory ApisixYamlProfile.defaults() {
-    return const ApisixYamlProfile(
-      name: 'default',
-      sourceType: 'workspace-file',
-      filePath: '/opt/data/apisix/openclaw.yaml',
-      inlineYaml: '',
-      validationState: 'idle',
-      validationMessage: 'Ready to validate',
+  factory AiGatewayProfile.defaults() {
+    return const AiGatewayProfile(
+      name: 'AI Gateway',
+      baseUrl: '',
+      apiKeyRef: 'ai_gateway_api_key',
+      availableModels: <String>[],
+      selectedModels: <String>[],
+      syncState: 'idle',
+      syncMessage: 'Ready to sync models',
     );
   }
 
-  ApisixYamlProfile copyWith({
+  AiGatewayProfile copyWith({
     String? name,
-    String? sourceType,
-    String? filePath,
-    String? inlineYaml,
-    String? validationState,
-    String? validationMessage,
+    String? baseUrl,
+    String? apiKeyRef,
+    List<String>? availableModels,
+    List<String>? selectedModels,
+    String? syncState,
+    String? syncMessage,
   }) {
-    return ApisixYamlProfile(
+    return AiGatewayProfile(
       name: name ?? this.name,
-      sourceType: sourceType ?? this.sourceType,
-      filePath: filePath ?? this.filePath,
-      inlineYaml: inlineYaml ?? this.inlineYaml,
-      validationState: validationState ?? this.validationState,
-      validationMessage: validationMessage ?? this.validationMessage,
+      baseUrl: baseUrl ?? this.baseUrl,
+      apiKeyRef: apiKeyRef ?? this.apiKeyRef,
+      availableModels: availableModels ?? this.availableModels,
+      selectedModels: selectedModels ?? this.selectedModels,
+      syncState: syncState ?? this.syncState,
+      syncMessage: syncMessage ?? this.syncMessage,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'name': name,
-      'sourceType': sourceType,
-      'filePath': filePath,
-      'inlineYaml': inlineYaml,
-      'validationState': validationState,
-      'validationMessage': validationMessage,
+      'baseUrl': baseUrl,
+      'apiKeyRef': apiKeyRef,
+      'availableModels': availableModels,
+      'selectedModels': selectedModels,
+      'syncState': syncState,
+      'syncMessage': syncMessage,
     };
   }
 
-  factory ApisixYamlProfile.fromJson(Map<String, dynamic> json) {
-    return ApisixYamlProfile(
-      name: json['name'] as String? ?? ApisixYamlProfile.defaults().name,
-      sourceType:
-          json['sourceType'] as String? ??
-          ApisixYamlProfile.defaults().sourceType,
-      filePath:
-          json['filePath'] as String? ?? ApisixYamlProfile.defaults().filePath,
-      inlineYaml: json['inlineYaml'] as String? ?? '',
-      validationState:
-          json['validationState'] as String? ??
-          ApisixYamlProfile.defaults().validationState,
-      validationMessage:
-          json['validationMessage'] as String? ??
-          ApisixYamlProfile.defaults().validationMessage,
+  factory AiGatewayProfile.fromJson(Map<String, dynamic> json) {
+    List<String> normalizeList(Object? value) {
+      if (value is! List) {
+        return const <String>[];
+      }
+      return value
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false);
+    }
+
+    final defaults = AiGatewayProfile.defaults();
+    final availableModels = normalizeList(json['availableModels']);
+    final selectedModels = normalizeList(json['selectedModels'])
+        .where(
+          (item) => availableModels.isEmpty || availableModels.contains(item),
+        )
+        .toList(growable: false);
+    final legacyFilePath = json['filePath'] as String?;
+    final legacyBaseUrl =
+        legacyFilePath != null && legacyFilePath.trim().startsWith('http')
+        ? legacyFilePath.trim()
+        : null;
+    return AiGatewayProfile(
+      name: json['name'] as String? ?? defaults.name,
+      baseUrl: json['baseUrl'] as String? ?? legacyBaseUrl ?? defaults.baseUrl,
+      apiKeyRef: json['apiKeyRef'] as String? ?? defaults.apiKeyRef,
+      availableModels: availableModels,
+      selectedModels: selectedModels,
+      syncState: json['syncState'] as String? ?? defaults.syncState,
+      syncMessage: json['syncMessage'] as String? ?? defaults.syncMessage,
     );
   }
+}
+
+class AiGatewayConnectionCheck {
+  const AiGatewayConnectionCheck({
+    required this.state,
+    required this.message,
+    required this.endpoint,
+    required this.modelCount,
+  });
+
+  final String state;
+  final String message;
+  final String endpoint;
+  final int modelCount;
+
+  bool get success => state == 'ready' || state == 'empty';
 }
 
 class SettingsSnapshot {
@@ -458,7 +496,7 @@ class SettingsSnapshot {
     required this.ollamaLocal,
     required this.ollamaCloud,
     required this.vault,
-    required this.apisix,
+    required this.aiGateway,
     required this.experimentalCanvas,
     required this.experimentalBridge,
     required this.experimentalDebug,
@@ -483,7 +521,7 @@ class SettingsSnapshot {
   final OllamaLocalConfig ollamaLocal;
   final OllamaCloudConfig ollamaCloud;
   final VaultConfig vault;
-  final ApisixYamlProfile apisix;
+  final AiGatewayProfile aiGateway;
   final bool experimentalCanvas;
   final bool experimentalBridge;
   final bool experimentalDebug;
@@ -503,13 +541,13 @@ class SettingsSnapshot {
       workspacePath: '/opt/data',
       remoteProjectRoot: '/opt/data/workspace',
       cliPath: 'openclaw',
-      defaultModel: 'gpt-5.4',
+      defaultModel: '',
       defaultProvider: 'gateway',
       gateway: GatewayConnectionProfile.defaults(),
       ollamaLocal: OllamaLocalConfig.defaults(),
       ollamaCloud: OllamaCloudConfig.defaults(),
       vault: VaultConfig.defaults(),
-      apisix: ApisixYamlProfile.defaults(),
+      aiGateway: AiGatewayProfile.defaults(),
       experimentalCanvas: false,
       experimentalBridge: false,
       experimentalDebug: false,
@@ -536,7 +574,7 @@ class SettingsSnapshot {
     OllamaLocalConfig? ollamaLocal,
     OllamaCloudConfig? ollamaCloud,
     VaultConfig? vault,
-    ApisixYamlProfile? apisix,
+    AiGatewayProfile? aiGateway,
     bool? experimentalCanvas,
     bool? experimentalBridge,
     bool? experimentalDebug,
@@ -561,7 +599,7 @@ class SettingsSnapshot {
       ollamaLocal: ollamaLocal ?? this.ollamaLocal,
       ollamaCloud: ollamaCloud ?? this.ollamaCloud,
       vault: vault ?? this.vault,
-      apisix: apisix ?? this.apisix,
+      aiGateway: aiGateway ?? this.aiGateway,
       experimentalCanvas: experimentalCanvas ?? this.experimentalCanvas,
       experimentalBridge: experimentalBridge ?? this.experimentalBridge,
       experimentalDebug: experimentalDebug ?? this.experimentalDebug,
@@ -591,7 +629,7 @@ class SettingsSnapshot {
       'ollamaLocal': ollamaLocal.toJson(),
       'ollamaCloud': ollamaCloud.toJson(),
       'vault': vault.toJson(),
-      'apisix': apisix.toJson(),
+      'aiGateway': aiGateway.toJson(),
       'experimentalCanvas': experimentalCanvas,
       'experimentalBridge': experimentalBridge,
       'experimentalDebug': experimentalDebug,
@@ -638,8 +676,10 @@ class SettingsSnapshot {
       vault: VaultConfig.fromJson(
         (json['vault'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
-      apisix: ApisixYamlProfile.fromJson(
-        (json['apisix'] as Map?)?.cast<String, dynamic>() ?? const {},
+      aiGateway: AiGatewayProfile.fromJson(
+        (json['aiGateway'] as Map?)?.cast<String, dynamic>() ??
+            (json['apisix'] as Map?)?.cast<String, dynamic>() ??
+            const {},
       ),
       experimentalCanvas: json['experimentalCanvas'] as bool? ?? false,
       experimentalBridge: json['experimentalBridge'] as bool? ?? false,

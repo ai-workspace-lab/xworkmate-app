@@ -24,7 +24,7 @@ class AppController extends ChangeNotifier {
     _instancesController = InstancesController(_runtime);
     _skillsController = SkillsController(_runtime);
     _connectorsController = ConnectorsController(_runtime);
-    _modelsController = ModelsController(_runtime);
+    _modelsController = ModelsController(_runtime, _settingsController);
     _cronJobsController = CronJobsController(_runtime);
     _devicesController = DevicesController(_runtime);
     _tasksController = DerivedTasksController();
@@ -104,6 +104,36 @@ class AppController extends ChangeNotifier {
       _settingsController.secureRefs.containsKey('gateway_token');
   String? get storedGatewayTokenMask =>
       _settingsController.secureRefs['gateway_token'];
+  List<String> get aiGatewayModelChoices {
+    final selected = settings.aiGateway.selectedModels
+        .where(settings.aiGateway.availableModels.contains)
+        .toList(growable: false);
+    if (selected.isNotEmpty) {
+      return selected;
+    }
+    final available = settings.aiGateway.availableModels
+        .take(5)
+        .toList(growable: false);
+    if (available.isNotEmpty) {
+      return available;
+    }
+    return _modelsController.items
+        .map((item) => item.id)
+        .toList(growable: false);
+  }
+
+  String get resolvedDefaultModel {
+    final current = settings.defaultModel.trim();
+    final choices = aiGatewayModelChoices;
+    if (choices.contains(current)) {
+      return current;
+    }
+    if (choices.isNotEmpty) {
+      return choices.first;
+    }
+    return current;
+  }
+
   bool get canQuickConnectGateway {
     final profile = settings.gateway;
     if (profile.useSetupCode && profile.setupCode.trim().isNotEmpty) {
@@ -456,6 +486,60 @@ class AppController extends ChangeNotifier {
     );
   }
 
+  Future<void> selectDefaultModel(String modelId) async {
+    final trimmed = modelId.trim();
+    if (trimmed.isEmpty || settings.defaultModel == trimmed) {
+      return;
+    }
+    await saveSettings(
+      settings.copyWith(defaultModel: trimmed),
+      refreshAfterSave: false,
+    );
+  }
+
+  Future<void> updateAiGatewaySelection(List<String> selectedModels) async {
+    final available = settings.aiGateway.availableModels;
+    final normalized = selectedModels
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty && available.contains(item))
+        .toList(growable: false);
+    final fallbackSelection = normalized.isNotEmpty
+        ? normalized
+        : available.isNotEmpty
+        ? <String>[available.first]
+        : const <String>[];
+    final currentDefaultModel = settings.defaultModel.trim();
+    final resolvedDefaultModel = fallbackSelection.contains(currentDefaultModel)
+        ? currentDefaultModel
+        : fallbackSelection.isNotEmpty
+        ? fallbackSelection.first
+        : '';
+    await saveSettings(
+      settings.copyWith(
+        aiGateway: settings.aiGateway.copyWith(
+          selectedModels: fallbackSelection,
+        ),
+        defaultModel: resolvedDefaultModel,
+      ),
+      refreshAfterSave: false,
+    );
+  }
+
+  Future<AiGatewayProfile> syncAiGatewayCatalog(
+    AiGatewayProfile profile, {
+    String apiKeyOverride = '',
+  }) async {
+    final synced = await _settingsController.syncAiGatewayCatalog(
+      profile,
+      apiKeyOverride: apiKeyOverride,
+    );
+    _modelsController.restoreFromSettings(
+      _settingsController.snapshot.aiGateway,
+    );
+    _recomputeTasks();
+    return synced;
+  }
+
   Future<void> saveSettings(
     SettingsSnapshot snapshot, {
     bool refreshAfterSave = true,
@@ -463,6 +547,7 @@ class AppController extends ChangeNotifier {
     setActiveAppLanguage(snapshot.appLanguage);
     await _settingsController.saveSnapshot(snapshot);
     _agentsController.restoreSelection(snapshot.gateway.selectedAgentId);
+    _modelsController.restoreFromSettings(snapshot.aiGateway);
     if (refreshAfterSave) {
       _recomputeTasks();
     }
@@ -478,10 +563,6 @@ class AppController extends ChangeNotifier {
 
   void clearRuntimeLogs() {
     _runtime.clearLogs();
-  }
-
-  Future<ApisixYamlProfile> validateApisixYaml(ApisixYamlProfile profile) {
-    return _settingsController.validateApisixYaml(profile);
   }
 
   List<DerivedTaskItem> taskItemsForTab(String tab) => switch (tab) {
@@ -523,6 +604,7 @@ class AppController extends ChangeNotifier {
       if (seeded.toJsonString() != settings.toJsonString()) {
         await _settingsController.saveSnapshot(seeded);
       }
+      _modelsController.restoreFromSettings(settings.aiGateway);
       setActiveAppLanguage(settings.appLanguage);
       await _runtime.initialize();
       _agentsController.restoreSelection(settings.gateway.selectedAgentId);
