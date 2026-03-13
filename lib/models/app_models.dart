@@ -2,18 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../i18n/app_language.dart';
 
-enum WorkspaceDestination {
+ enum WorkspaceDestination {
   assistant,
   tasks,
   skills,
   nodes,
   agents,
+  mcpServer,
   clawHub,
   secrets,
   aiGateway,
   settings,
   account,
-}
+ }
 
 extension WorkspaceDestinationCopy on WorkspaceDestination {
   String get label => switch (this) {
@@ -22,6 +23,7 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
     WorkspaceDestination.skills => appText('技能', 'Skills'),
     WorkspaceDestination.nodes => appText('节点', 'Nodes'),
     WorkspaceDestination.agents => appText('代理', 'Agents'),
+    WorkspaceDestination.mcpServer => 'MCP Server',
     WorkspaceDestination.clawHub => 'ClawHub',
     WorkspaceDestination.secrets => appText('密钥', 'Secrets'),
     WorkspaceDestination.aiGateway => 'AI Gateway',
@@ -35,6 +37,7 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
     WorkspaceDestination.skills => Icons.auto_awesome_rounded,
     WorkspaceDestination.nodes => Icons.developer_board_rounded,
     WorkspaceDestination.agents => Icons.hub_rounded,
+    WorkspaceDestination.mcpServer => Icons.dns_rounded,
     WorkspaceDestination.clawHub => Icons.extension_rounded,
     WorkspaceDestination.secrets => Icons.key_rounded,
     WorkspaceDestination.aiGateway => Icons.smart_toy_rounded,
@@ -62,6 +65,10 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
     WorkspaceDestination.agents => appText(
       '管理代理实例，配置行为与能力。',
       'Manage agent instances, configure behaviors and capabilities.',
+    ),
+    WorkspaceDestination.mcpServer => appText(
+      '管理 MCP 服务器连接与工具配置。',
+      'Manage MCP server connections and tool configurations.',
     ),
     WorkspaceDestination.clawHub => appText(
       '浏览和安装技能包、代理模板与连接器。',
