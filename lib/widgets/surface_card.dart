@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 
 class SurfaceCard extends StatefulWidget {
   const SurfaceCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(16),
+    this.padding = const EdgeInsets.all(AppSpacing.md),
     this.onTap,
-    this.borderRadius = 16,
+    this.borderRadius = AppRadius.card,
     this.color,
   });
 

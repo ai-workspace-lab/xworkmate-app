@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 class TopBar extends StatelessWidget {
   const TopBar({
@@ -23,9 +24,9 @@ class TopBar extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title, style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
-              if (trailing != null) ...[const SizedBox(height: 16), trailing!],
+              if (trailing != null) ...[const SizedBox(height: AppSpacing.md), trailing!],
             ],
           );
         }
@@ -38,13 +39,13 @@ class TopBar extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title, style: Theme.of(context).textTheme.headlineSmall),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
                 ],
               ),
             ),
             if (trailing != null) ...[
-              const SizedBox(width: 24),
+              const SizedBox(width: AppSpacing.lg),
               Flexible(child: trailing!),
             ],
           ],

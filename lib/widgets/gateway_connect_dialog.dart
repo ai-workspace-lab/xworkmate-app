@@ -5,6 +5,7 @@ import '../i18n/app_language.dart';
 import '../runtime/runtime_bootstrap.dart';
 import '../runtime/runtime_models.dart';
 import 'section_tabs.dart';
+import '../theme/app_theme.dart';
 
 class GatewayConnectDialog extends StatefulWidget {
   const GatewayConnectDialog({

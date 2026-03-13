@@ -57,6 +57,7 @@ class _AppShellState extends State<AppShell> {
         final controller = widget.controller;
         return Scaffold(
           body: SafeArea(
+            bottom: false,
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final palette = context.palette;

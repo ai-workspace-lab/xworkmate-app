@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 
 enum SectionTabsSize { small, medium }
 
@@ -23,20 +24,20 @@ class SectionTabs extends StatelessWidget {
     final palette = context.palette;
     final padding = switch (size) {
       SectionTabsSize.small => const EdgeInsets.symmetric(
-        horizontal: 12,
+        horizontal: AppSpacing.sm,
         vertical: 6,
       ),
       SectionTabsSize.medium => const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 8,
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
       ),
     };
 
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(AppSpacing.xxs),
       decoration: BoxDecoration(
         color: palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.chip),
         border: Border.all(color: palette.strokeSoft),
       ),
       child: SingleChildScrollView(
@@ -45,7 +46,7 @@ class SectionTabs extends StatelessWidget {
           children: items.map((item) {
             final selected = item == value;
             return Padding(
-              padding: const EdgeInsets.only(right: 4),
+              padding: const EdgeInsets.only(right: AppSpacing.xxs),
               child: _SectionTabChip(
                 label: item,
                 selected: selected,
@@ -96,12 +97,12 @@ class _SectionTabChipState extends State<_SectionTabChip> {
               : _hovered
               ? palette.hover
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadius.button),
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadius.button),
             onTap: widget.onTap,
             child: Padding(
               padding: widget.padding,

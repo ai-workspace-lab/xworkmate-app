@@ -10,6 +10,7 @@ import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/gateway_connect_dialog.dart';
 import '../../widgets/pane_resize_handle.dart';
 import '../../widgets/surface_card.dart';
@@ -37,7 +38,7 @@ class _AssistantPageState extends State<AssistantPage> {
   late final FocusNode _composerFocusNode;
   String _mode = 'ask';
   String _thinkingLabel = 'high';
-  double _conversationPaneRatio = 0.64;
+  double _conversationPaneRatio = 0.7;
   List<_ComposerAttachment> _attachments = const <_ComposerAttachment>[];
   String? _lastSubmittedPrompt;
   String? _lastAutoAgentLabel;
@@ -80,21 +81,21 @@ class _AssistantPageState extends State<AssistantPage> {
         });
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              const handleHeight = 12.0;
-              const paneGap = 8.0;
+              const handleHeight = 10.0;
+              const paneGap = 6.0;
               final availablePaneHeight =
                   (constraints.maxHeight - handleHeight - paneGap)
                       .clamp(0.0, double.infinity)
                       .toDouble();
               var minConversationHeight = availablePaneHeight >= 620
-                  ? 220.0
-                  : availablePaneHeight * 0.34;
+                  ? 240.0
+                  : availablePaneHeight * 0.4;
               var minComposerHeight = availablePaneHeight >= 620
-                  ? 248.0
-                  : availablePaneHeight * 0.30;
+                  ? 176.0
+                  : availablePaneHeight * 0.24;
               if (minConversationHeight + minComposerHeight >
                   availablePaneHeight) {
                 minConversationHeight = availablePaneHeight * 0.52;
@@ -578,12 +579,12 @@ class _ConversationArea extends StatelessWidget {
     final theme = Theme.of(context);
 
     return SurfaceCard(
-      borderRadius: 14,
+      borderRadius: 12,
       padding: EdgeInsets.zero,
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
             child: Row(
               children: [
                 Expanded(
@@ -594,7 +595,7 @@ class _ConversationArea extends StatelessWidget {
                         controller.currentSessionKey,
                         style: theme.textTheme.titleLarge,
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
                       Text(
                         controller.connection.status ==
                                 RuntimeConnectionStatus.connected
@@ -628,10 +629,10 @@ class _ConversationArea extends StatelessWidget {
                     )
                   : ListView.separated(
                       controller: scrollController,
-                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                       physics: const BouncingScrollPhysics(),
                       itemCount: items.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
                         final item = items[index];
                         return switch (item.kind) {
@@ -796,22 +797,22 @@ class _AssistantEmptyState extends StatelessWidget {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
+        constraints: const BoxConstraints(maxWidth: 500),
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           child: SurfaceCard(
-            borderRadius: 20,
+            borderRadius: 12,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: theme.textTheme.headlineSmall),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Text(description, style: theme.textTheme.bodyMedium),
-                const SizedBox(height: 18),
+                const SizedBox(height: 12),
                 Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     FilledButton.icon(
                       onPressed: connected
@@ -925,7 +926,7 @@ class _ComposerBar extends StatelessWidget {
         : appText('连接', 'Connect');
 
     return SurfaceCard(
-      borderRadius: 16,
+      borderRadius: 12,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -936,21 +937,21 @@ class _ComposerBar extends StatelessWidget {
               children: attachments
                   .map(
                     (attachment) => InputChip(
-                      avatar: Icon(attachment.icon, size: 18),
+                      avatar: Icon(attachment.icon, size: 16),
                       label: Text(attachment.name),
                       onDeleted: () => onRemoveAttachment(attachment),
                     ),
                   )
                   .toList(),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
           ],
           TextField(
             controller: inputController,
             focusNode: focusNode,
             autofocus: true,
-            minLines: 4,
-            maxLines: 8,
+            minLines: 2,
+            maxLines: 6,
             decoration: InputDecoration(
               border: InputBorder.none,
               isCollapsed: true,
@@ -961,7 +962,7 @@ class _ComposerBar extends StatelessWidget {
             ),
             onSubmitted: (_) => onSend(),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
@@ -1225,12 +1226,12 @@ class _ComposerBar extends StatelessWidget {
                       : onOpenGateway,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
+                      horizontal: 12,
+                      vertical: 8,
                     ),
-                    minimumSize: const Size(92, 40),
+                    minimumSize: const Size(80, 34),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                   child: Row(
@@ -1268,14 +1269,14 @@ class _ComposerIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 36,
-      height: 36,
+      width: 32,
+      height: 32,
       decoration: BoxDecoration(
         color: context.palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: context.palette.strokeSoft),
       ),
-      child: Icon(icon, size: 18, color: context.palette.textMuted),
+      child: Icon(icon, size: 16, color: context.palette.textMuted),
     );
   }
 }
@@ -1305,16 +1306,16 @@ class _ComposerToolbarChip extends StatelessWidget {
     final palette = context.palette;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 6),
       decoration: BoxDecoration(
         color: backgroundColor ?? palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.chip),
         border: Border.all(color: borderColor ?? palette.strokeSoft),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: foregroundColor ?? palette.textMuted),
+          Icon(icon, size: 14, color: foregroundColor ?? palette.textMuted),
           const SizedBox(width: 6),
           ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxLabelWidth),
@@ -1328,10 +1329,10 @@ class _ComposerToolbarChip extends StatelessWidget {
             ),
           ),
           if (showChevron) ...[
-            const SizedBox(width: 4),
+            const SizedBox(width: 2),
             Icon(
               Icons.keyboard_arrow_down_rounded,
-              size: 16,
+              size: 14,
               color: foregroundColor ?? palette.textMuted,
             ),
           ],
@@ -1369,29 +1370,22 @@ class _MessageBubble extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 760),
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.card),
             border: Border.all(color: borderColor),
-            boxShadow: [
-              BoxShadow(
-                color: palette.shadow.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label, style: theme.textTheme.labelLarge),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               SelectableText(
                 text.isEmpty ? appText('暂无内容。', 'No content yet.') : text,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurface,
-                  height: 1.55,
+                  height: 1.45,
                 ),
               ),
             ],
@@ -1450,19 +1444,12 @@ class _TaskStatusCard extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 760),
         child: Material(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.card),
           child: Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSpacing.sm),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.card),
               border: Border.all(color: palette.strokeSoft),
-              boxShadow: [
-                BoxShadow(
-                  color: palette.shadow.withValues(alpha: 0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 6),
-                ),
-              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1471,15 +1458,15 @@ class _TaskStatusCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 28,
-                      height: 28,
+                      width: 24,
+                      height: 24,
                       decoration: BoxDecoration(
                         color: statusStyle.backgroundColor,
-                        borderRadius: BorderRadius.circular(9),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
                         icon,
-                        size: 15,
+                        size: 14,
                         color: statusStyle.foregroundColor,
                       ),
                     ),
@@ -1502,16 +1489,16 @@ class _TaskStatusCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
+                    horizontal: 8,
+                    vertical: 6,
                   ),
                   decoration: BoxDecoration(
                     color: palette.surfaceSecondary,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Wrap(
                     spacing: 10,
@@ -1528,7 +1515,7 @@ class _TaskStatusCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Row(
                   children: [
                     Text(
@@ -1608,18 +1595,18 @@ class _ToolCallTileState extends State<_ToolCallTile> {
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.card),
             border: Border.all(color: palette.strokeSoft),
           ),
           child: Column(
             children: [
               InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.card),
                 onTap: () => setState(() => _expanded = !_expanded),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
+                    horizontal: 10,
+                    vertical: 8,
                   ),
                   child: Row(
                     children: [
@@ -1653,7 +1640,7 @@ class _ToolCallTileState extends State<_ToolCallTile> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       _StatusPill(
                         label: _toolCallStatusLabel(statusLabel),
                         backgroundColor: statusStyle.backgroundColor,
@@ -1677,12 +1664,12 @@ class _ToolCallTileState extends State<_ToolCallTile> {
                   curve: Curves.easeOutCubic,
                   child: _expanded
                       ? Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                          padding: const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.xs),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Divider(height: 1, color: palette.strokeSoft),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6),
                               Text(
                                 widget.summary.trim().isEmpty
                                     ? appText(
@@ -1692,7 +1679,7 @@ class _ToolCallTileState extends State<_ToolCallTile> {
                                     : widget.summary.trim(),
                                 style: theme.textTheme.bodySmall,
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 4),
                               TextButton(
                                 onPressed: widget.onOpenDetail,
                                 child: Text(appText('打开详情', 'Open detail')),
@@ -1725,12 +1712,12 @@ class _StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color:
             backgroundColor ??
             Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.badge),
       ),
       child: Text(
         label,
@@ -1761,14 +1748,14 @@ class _ConnectionChip extends StatelessWidget {
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 5),
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.chip),
       ),
       child: Text(
         '${connection.status.label} · ${connection.remoteAddress ?? appText('未连接目标', 'No target')}',
-        style: theme.textTheme.labelLarge,
+        style: theme.textTheme.labelMedium,
       ),
     );
   }
