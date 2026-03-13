@@ -5,8 +5,12 @@ import '../i18n/app_language.dart';
 enum WorkspaceDestination {
   assistant,
   tasks,
-  modules,
+  skills,
+  nodes,
+  agents,
+  clawHub,
   secrets,
+  aiGateway,
   settings,
   account,
 }
@@ -15,8 +19,12 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
   String get label => switch (this) {
     WorkspaceDestination.assistant => appText('助手', 'Assistant'),
     WorkspaceDestination.tasks => appText('任务', 'Tasks'),
-    WorkspaceDestination.modules => appText('模块', 'Modules'),
+    WorkspaceDestination.skills => appText('技能', 'Skills'),
+    WorkspaceDestination.nodes => appText('节点', 'Nodes'),
+    WorkspaceDestination.agents => appText('代理', 'Agents'),
+    WorkspaceDestination.clawHub => 'ClawHub',
     WorkspaceDestination.secrets => appText('密钥', 'Secrets'),
+    WorkspaceDestination.aiGateway => 'AI Gateway',
     WorkspaceDestination.settings => appText('设置', 'Settings'),
     WorkspaceDestination.account => appText('账号', 'Account'),
   };
@@ -24,8 +32,12 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
   IconData get icon => switch (this) {
     WorkspaceDestination.assistant => Icons.chat_bubble_outline_rounded,
     WorkspaceDestination.tasks => Icons.layers_rounded,
-    WorkspaceDestination.modules => Icons.extension_rounded,
+    WorkspaceDestination.skills => Icons.auto_awesome_rounded,
+    WorkspaceDestination.nodes => Icons.developer_board_rounded,
+    WorkspaceDestination.agents => Icons.hub_rounded,
+    WorkspaceDestination.clawHub => Icons.extension_rounded,
     WorkspaceDestination.secrets => Icons.key_rounded,
+    WorkspaceDestination.aiGateway => Icons.smart_toy_rounded,
     WorkspaceDestination.settings => Icons.tune_rounded,
     WorkspaceDestination.account => Icons.account_circle_rounded,
   };
@@ -39,9 +51,21 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
       '任务队列、运行态、失败项和调度历史的统一视图。',
       'Unified view for queue, running, failed, and history.',
     ),
-    WorkspaceDestination.modules => appText(
-      '平台能力中心，管理 Gateway、Nodes、Agents、Skills 与 Connectors。',
-      'Capability center for gateway, nodes, agents, skills, and connectors.',
+    WorkspaceDestination.skills => appText(
+      '管理技能包与能力扩展，浏览和安装 ClawHub 技能。',
+      'Manage skill packages and extensions, browse and install from ClawHub.',
+    ),
+    WorkspaceDestination.nodes => appText(
+      '管理边缘节点与实例，监控运行状态与负载。',
+      'Manage edge nodes and instances, monitor status and load.',
+    ),
+    WorkspaceDestination.agents => appText(
+      '管理代理实例，配置行为与能力。',
+      'Manage agent instances, configure behaviors and capabilities.',
+    ),
+    WorkspaceDestination.clawHub => appText(
+      '浏览和安装技能包、代理模板与连接器。',
+      'Browse and install skill packages, agent templates and connectors.',
     ),
     WorkspaceDestination.secrets => appText(
       'Vault 密码保险箱，安全存储密钥、凭证与审计信息。',

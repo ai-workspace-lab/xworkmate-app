@@ -9,7 +9,7 @@ void main() {
     'ModulesPage switches connectors tab and routes module actions to settings',
     (WidgetTester tester) async {
       final controller = await createTestController(tester);
-      controller.navigateTo(WorkspaceDestination.modules);
+      controller.navigateTo(WorkspaceDestination.skills);
 
       await pumpPage(
         tester,

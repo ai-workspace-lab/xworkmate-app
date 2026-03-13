@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../features/account/account_page.dart';
-import '../features/ai_gateway/ai_gateway_page.dart';
-import '../features/assistant/assistant_page.dart';
-import '../features/claw_hub/claw_hub_page.dart';
-import '../features/mobile/ios_mobile_shell.dart';
-import '../features/modules/modules_page.dart';
-import '../features/secrets/secrets_page.dart';
-import '../features/settings/settings_page.dart';
-import '../features/tasks/tasks_page.dart';
+ import '../features/account/account_page.dart';
+ import '../features/ai_gateway/ai_gateway_page.dart';
+ import '../features/assistant/assistant_page.dart';
+ import '../features/claw_hub/claw_hub_page.dart';
+ import '../features/mobile/ios_mobile_shell.dart';
+ import '../features/modules/modules_page.dart';
+ import '../features/secrets/secrets_page.dart';
+ import '../features/settings/settings_page.dart';
+ import '../features/skills/skills_page.dart';
+ import '../features/tasks/tasks_page.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
@@ -33,7 +34,7 @@ class _AppShellState extends State<AppShell> {
   static const _mobileDestinations = [
     WorkspaceDestination.assistant,
     WorkspaceDestination.tasks,
-    WorkspaceDestination.modules,
+    WorkspaceDestination.skills,
     WorkspaceDestination.secrets,
     WorkspaceDestination.settings,
   ];
@@ -325,9 +326,19 @@ class _AppShellState extends State<AppShell> {
         controller: widget.controller,
         onOpenDetail: onOpenDetail,
       ),
-      WorkspaceDestination.modules => ModulesPage(
+      WorkspaceDestination.skills => SkillsPage(
         controller: widget.controller,
         onOpenDetail: onOpenDetail,
+      ),
+      WorkspaceDestination.nodes => ModulesPage(
+        controller: widget.controller,
+        onOpenDetail: onOpenDetail,
+        initialTab: ModulesTab.nodes,
+      ),
+      WorkspaceDestination.agents => ModulesPage(
+        controller: widget.controller,
+        onOpenDetail: onOpenDetail,
+        initialTab: ModulesTab.agents,
       ),
       WorkspaceDestination.clawHub => ClawHubPage(
         controller: widget.controller,

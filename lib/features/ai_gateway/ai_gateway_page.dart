@@ -1,13 +1,16 @@
-import 'package:flutter/material.dart';
-
-import '../../app/app_controller.dart';
-import '../../i18n/app_language.dart';
-import '../../models/app_models.dart';
-import '../../widgets/metric_card.dart';
-import '../../widgets/section_header.dart';
-import '../../widgets/section_tabs.dart';
-import '../../widgets/surface_card.dart';
-import '../../widgets/top_bar.dart';
+ import 'package:flutter/material.dart';
+ 
+ import '../../app/app_controller.dart';
+ import '../../i18n/app_language.dart';
+ import '../../models/app_models.dart';
+ import '../../runtime/runtime_models.dart';
+ import '../../theme/app_palette.dart';
+ import '../../theme/app_theme.dart';
+ import '../../widgets/metric_card.dart';
+ import '../../widgets/section_header.dart';
+ import '../../widgets/section_tabs.dart';
+ import '../../widgets/surface_card.dart';
+ import '../../widgets/top_bar.dart';
 
 class AiGatewayPage extends StatefulWidget {
   const AiGatewayPage({
@@ -77,11 +80,12 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
                 children: metrics.map((m) => MetricCard(metric: m)).toList(),
               ),
               const SizedBox(height: 24),
-              SectionTabs<AiGatewayTab>(
-                tabs: AiGatewayTab.values,
-                selected: _tab,
-                onSelect: (t) => setState(() => _tab = t),
-                labelFor: (t) => t.label,
+              SectionTabs(
+                items: AiGatewayTab.values.map((t) => t.label).toList(),
+                value: _tab.label,
+                onChanged: (label) => setState(
+                  () => _tab = AiGatewayTab.values.firstWhere((t) => t.label == label),
+                ),
               ),
               const SizedBox(height: 16),
               _buildTabContent(context, _tab, controller),
@@ -201,7 +205,7 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.endpoint_rounded, color: palette.accent, size: 20),
+                    Icon(Icons.device_hub_rounded, color: palette.accent, size: 20),
                     const SizedBox(width: 8),
                     Text(
                       appText('端点配置', 'Endpoint Configuration'),
@@ -238,7 +242,7 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
     return switch (status) {
       RuntimeConnectionStatus.connected => const StatusInfo('Connected', StatusTone.success),
       RuntimeConnectionStatus.connecting => const StatusInfo('Connecting', StatusTone.accent),
-      RuntimeConnectionStatus.disconnected => const StatusInfo('Disconnected', StatusTone.neutral),
+      RuntimeConnectionStatus.offline => const StatusInfo('Offline', StatusTone.neutral),
       RuntimeConnectionStatus.error => const StatusInfo('Error', StatusTone.danger),
     };
   }
@@ -362,7 +366,7 @@ class _EndpointCard extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         leading: Icon(
-          Icons.endpoint_rounded,
+          Icons.device_hub_rounded,
           color: isConnected ? palette.accent : palette.textMuted,
         ),
         title: Text(name, style: TextStyle(color: palette.textPrimary)),

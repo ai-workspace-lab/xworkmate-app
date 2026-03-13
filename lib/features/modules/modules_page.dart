@@ -13,22 +13,32 @@ import '../../widgets/status_badge.dart';
 import '../../widgets/surface_card.dart';
 import '../../widgets/top_bar.dart';
 
-class ModulesPage extends StatefulWidget {
+ class ModulesPage extends StatefulWidget {
   const ModulesPage({
     super.key,
     required this.controller,
     required this.onOpenDetail,
+    this.initialTab,
   });
 
   final AppController controller;
   final ValueChanged<DetailPanelData> onOpenDetail;
+  final ModulesTab? initialTab;
 
   @override
   State<ModulesPage> createState() => _ModulesPageState();
 }
 
-class _ModulesPageState extends State<ModulesPage> {
+ class _ModulesPageState extends State<ModulesPage> {
   ModulesTab _tab = ModulesTab.gateway;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialTab != null) {
+      _tab = widget.initialTab!;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

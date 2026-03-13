@@ -1,11 +1,13 @@
-import 'package:flutter/material.dart';
-
-import '../../app/app_controller.dart';
-import '../../i18n/app_language.dart';
-import '../../models/app_models.dart';
-import '../../widgets/section_header.dart';
-import '../../widgets/surface_card.dart';
-import '../../widgets/top_bar.dart';
+ import 'package:flutter/material.dart';
+ 
+ import '../../app/app_controller.dart';
+ import '../../i18n/app_language.dart';
+ import '../../models/app_models.dart';
+ import '../../theme/app_palette.dart';
+ import '../../theme/app_theme.dart';
+ import '../../widgets/section_header.dart';
+ import '../../widgets/surface_card.dart';
+ import '../../widgets/top_bar.dart';
 
 class ClawHubPage extends StatefulWidget {
   const ClawHubPage({
@@ -191,7 +193,7 @@ class _ClawHubPageState extends State<ClawHubPage> {
               const SizedBox(height: 24),
               SectionHeader(
                 title: appText('终端', 'Terminal'),
-                icon: Icons.terminal_rounded,
+                subtitle: appText('执行终端命令', 'Execute terminal commands'),
               ),
               const SizedBox(height: 12),
               SurfaceCard(
@@ -327,7 +329,7 @@ class _ClawHubPageState extends State<ClawHubPage> {
               const SizedBox(height: 24),
               SectionHeader(
                 title: appText('快速操作', 'Quick Actions'),
-                icon: Icons.bolt_rounded,
+                subtitle: appText('常用操作快捷入口', 'Quick access to common actions'),
               ),
               const SizedBox(height: 12),
               Wrap(
