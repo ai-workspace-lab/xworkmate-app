@@ -104,6 +104,11 @@ class AppController extends ChangeNotifier {
       _settingsController.secureRefs.containsKey('gateway_token');
   String? get storedGatewayTokenMask =>
       _settingsController.secureRefs['gateway_token'];
+  String get aiGatewayUrl => settings.aiGateway.baseUrl.trim();
+
+  Future<String> loadAiGatewayApiKey() async {
+    return (await _store.loadAiGatewayApiKey())?.trim() ?? '';
+  }
   List<String> get aiGatewayModelChoices {
     final selected = settings.aiGateway.selectedModels
         .where(settings.aiGateway.availableModels.contains)

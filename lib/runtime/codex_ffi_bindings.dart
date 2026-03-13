@@ -198,12 +198,13 @@ class CodexFFIBindings {
   int sendMessage(int threadId, String message) {
     _ensureRuntime();
     final messagePtr = message.toNativeUtf8();
+    final handlePtr = calloc<ThreadHandleFFI>();
     try {
-      final handle = ThreadHandleFFI();
-      handle.id = threadId;
-      return _sendMessage(_runtime!, handle, messagePtr);
+      handlePtr.ref.id = threadId;
+      return _sendMessage(_runtime!, handlePtr.ref, messagePtr);
     } finally {
       calloc.free(messagePtr);
+      calloc.free(handlePtr);
     }
   }
 
