@@ -70,7 +70,7 @@ class _SettingsPageState extends State<SettingsPage> {
       builder: (context, _) {
         final settings = controller.settings;
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(32, 32, 32, 40),
+          padding: const EdgeInsets.fromLTRB(32, 32, 32, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

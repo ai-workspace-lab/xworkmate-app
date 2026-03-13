@@ -28,7 +28,7 @@ class _AccountPageState extends State<AccountPage> {
       animation: controller,
       builder: (context, _) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(32, 32, 32, 40),
+          padding: const EdgeInsets.fromLTRB(32, 32, 32, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

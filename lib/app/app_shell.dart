@@ -245,7 +245,7 @@ class _AppShellState extends State<AppShell> {
                             padding: const EdgeInsets.only(
                               top: 10,
                               right: 10,
-                              bottom: 10,
+                              bottom: 0,
                             ),
                             child: AnimatedPadding(
                               duration: const Duration(milliseconds: 220),
