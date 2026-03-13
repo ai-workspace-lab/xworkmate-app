@@ -31,18 +31,18 @@ class StatusBadge extends StatelessWidget {
 
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 10 : 12,
-        vertical: compact ? 5 : 7,
+        horizontal: compact ? 8 : 10,
+        vertical: compact ? 4 : 6,
       ),
       decoration: BoxDecoration(
         color: tone.$1,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
         status.label,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
           color: tone.$2,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );

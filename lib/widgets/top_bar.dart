@@ -23,9 +23,9 @@ class TopBar extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title, style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 6),
-              Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
-              if (trailing != null) ...[const SizedBox(height: 12), trailing!],
+              const SizedBox(height: 8),
+              Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+              if (trailing != null) ...[const SizedBox(height: 16), trailing!],
             ],
           );
         }
@@ -38,13 +38,13 @@ class TopBar extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title, style: Theme.of(context).textTheme.headlineSmall),
-                  const SizedBox(height: 6),
-                  Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
+                  const SizedBox(height: 8),
+                  Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
                 ],
               ),
             ),
             if (trailing != null) ...[
-              const SizedBox(width: 16),
+              const SizedBox(width: 24),
               Flexible(child: trailing!),
             ],
           ],

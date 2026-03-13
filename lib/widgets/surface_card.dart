@@ -42,9 +42,9 @@ class _SurfaceCardState extends State<SurfaceCard> {
           border: Border.all(color: palette.strokeSoft),
           boxShadow: [
             BoxShadow(
-              color: palette.shadow.withValues(alpha: _hovered ? 0.12 : 0.07),
-              blurRadius: _hovered ? 12 : 8,
-              offset: const Offset(0, 4),
+              color: palette.shadow.withValues(alpha: _hovered ? 0.08 : 0.05),
+              blurRadius: _hovered ? 10 : 6,
+              offset: const Offset(0, 3),
             ),
           ],
         ),

@@ -24,19 +24,19 @@ class SectionTabs extends StatelessWidget {
     final padding = switch (size) {
       SectionTabsSize.small => const EdgeInsets.symmetric(
         horizontal: 12,
-        vertical: 8,
+        vertical: 6,
       ),
       SectionTabsSize.medium => const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 10,
+        horizontal: 12,
+        vertical: 8,
       ),
     };
 
     return Container(
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: palette.strokeSoft),
       ),
       child: SingleChildScrollView(
@@ -45,7 +45,7 @@ class SectionTabs extends StatelessWidget {
           children: items.map((item) {
             final selected = item == value;
             return Padding(
-              padding: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.only(right: 4),
               child: _SectionTabChip(
                 label: item,
                 selected: selected,
@@ -96,12 +96,12 @@ class _SectionTabChipState extends State<_SectionTabChip> {
               : _hovered
               ? palette.hover
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(10),
             onTap: widget.onTap,
             child: Padding(
               padding: widget.padding,

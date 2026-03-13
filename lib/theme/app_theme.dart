@@ -62,6 +62,7 @@ class AppTheme {
 
     return base.copyWith(
       splashFactory: NoSplash.splashFactory,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       visualDensity: isDesktop
           ? const VisualDensity(horizontal: -1, vertical: -1)
           : VisualDensity.standard,
@@ -82,27 +83,29 @@ class AppTheme {
         shadowColor: palette.shadow,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: palette.strokeSoft),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
         backgroundColor: palette.surfaceSecondary,
         side: BorderSide(color: palette.strokeSoft),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        labelStyle: tunedTextTheme.labelMedium,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           textStyle: tunedTextTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
           ),
+          minimumSize: Size(0, isDesktop ? 34 : 36),
           padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 16 : 18,
-            vertical: isDesktop ? 12 : 13,
+            horizontal: isDesktop ? 12 : 14,
+            vertical: isDesktop ? 8 : 9,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(10),
           ),
         ),
       ),
@@ -110,14 +113,15 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: palette.textPrimary,
           textStyle: tunedTextTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
           ),
+          minimumSize: Size(0, isDesktop ? 34 : 36),
           padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 16 : 18,
-            vertical: isDesktop ? 12 : 13,
+            horizontal: isDesktop ? 12 : 14,
+            vertical: isDesktop ? 8 : 9,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(10),
           ),
           side: BorderSide(color: palette.strokeSoft),
         ),
@@ -126,14 +130,15 @@ class AppTheme {
         style: TextButton.styleFrom(
           foregroundColor: palette.textPrimary,
           textStyle: tunedTextTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
           ),
+          minimumSize: Size(0, isDesktop ? 32 : 34),
           padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 12 : 14,
-            vertical: isDesktop ? 10 : 11,
+            horizontal: isDesktop ? 10 : 12,
+            vertical: isDesktop ? 8 : 9,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
           ),
         ),
       ),
@@ -142,10 +147,11 @@ class AppTheme {
           foregroundColor: palette.textSecondary,
           backgroundColor: palette.surfaceSecondary,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             side: BorderSide(color: palette.strokeSoft),
           ),
-          padding: const EdgeInsets.all(12),
+          minimumSize: const Size(34, 34),
+          padding: const EdgeInsets.all(8),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -159,18 +165,18 @@ class AppTheme {
         ),
         contentPadding: EdgeInsets.symmetric(
           horizontal: isDesktop ? 16 : 18,
-          vertical: isDesktop ? 14 : 15,
+          vertical: isDesktop ? 12 : 13,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: palette.strokeSoft),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: palette.strokeSoft),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: palette.accent.withValues(alpha: 0.42)),
         ),
       ),
@@ -190,10 +196,13 @@ class AppTheme {
             return palette.textSecondary;
           }),
           padding: const WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
           shape: WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          textStyle: WidgetStatePropertyAll(
+            tunedTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500),
           ),
         ),
       ),
@@ -231,57 +240,56 @@ class AppTheme {
     return base.copyWith(
       displaySmall: withUiFont(
         base.displaySmall?.copyWith(
-          fontSize: isDesktop ? 30 : 32,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.8,
-          height: 1.08,
+          fontSize: isDesktop ? 22 : 24,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.24,
+          height: 1.25,
         ),
       ),
       headlineSmall: withUiFont(
         base.headlineSmall?.copyWith(
-          fontSize: isDesktop ? 20 : 22,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.38,
-          height: 1.14,
+          fontSize: isDesktop ? 22 : 24,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.24,
+          height: 1.25,
         ),
       ),
       titleLarge: withUiFont(
         base.titleLarge?.copyWith(
-          fontSize: isDesktop ? 17 : 18,
+          fontSize: isDesktop ? 18 : 19,
           fontWeight: FontWeight.w600,
-          letterSpacing: -0.18,
-          height: 1.2,
+          letterSpacing: -0.16,
+          height: 1.3,
         ),
       ),
       titleMedium: withUiFont(
         base.titleMedium?.copyWith(
-          fontSize: isDesktop ? 15 : 16,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
-          height: 1.24,
+          letterSpacing: -0.08,
+          height: 1.35,
         ),
       ),
       titleSmall: withUiFont(
         base.titleSmall?.copyWith(
-          fontSize: isDesktop ? 13 : 14,
-          fontWeight: FontWeight.w600,
-          height: 1.2,
+          fontSize: isDesktop ? 14 : 15,
+          fontWeight: FontWeight.w500,
+          height: 1.4,
         ),
       ),
       bodyLarge: withUiFont(
         base.bodyLarge?.copyWith(
           fontSize: isDesktop ? 14 : 15,
           fontWeight: FontWeight.w400,
-          height: 1.5,
-          letterSpacing: -0.02,
+          height: 1.4,
           color: palette.textPrimary,
         ),
       ),
       bodyMedium: withUiFont(
         base.bodyMedium?.copyWith(
-          fontSize: isDesktop ? 13 : 14,
+          fontSize: 14,
           fontWeight: FontWeight.w400,
-          height: 1.46,
-          letterSpacing: -0.01,
+          height: 1.4,
           color: palette.textSecondary,
         ),
       ),
@@ -289,30 +297,29 @@ class AppTheme {
         base.bodySmall?.copyWith(
           fontSize: isDesktop ? 12 : 13,
           fontWeight: FontWeight.w400,
-          height: 1.4,
+          height: 1.45,
           color: palette.textMuted,
         ),
       ),
       labelLarge: withUiFont(
         base.labelLarge?.copyWith(
           fontSize: isDesktop ? 13 : 14,
-          fontWeight: FontWeight.w600,
-          height: 1.15,
-          letterSpacing: -0.02,
+          fontWeight: FontWeight.w500,
+          height: 1.2,
         ),
       ),
       labelMedium: withUiFont(
         base.labelMedium?.copyWith(
-          fontSize: isDesktop ? 12 : 12,
-          fontWeight: FontWeight.w600,
-          height: 1.12,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          height: 1.2,
         ),
       ),
       labelSmall: withUiFont(
         base.labelSmall?.copyWith(
           fontSize: 11,
-          fontWeight: FontWeight.w600,
-          height: 1.1,
+          fontWeight: FontWeight.w500,
+          height: 1.2,
         ),
       ),
     );

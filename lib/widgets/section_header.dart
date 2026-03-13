@@ -22,7 +22,7 @@ class SectionHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title, style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
