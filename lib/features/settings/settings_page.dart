@@ -1538,16 +1538,39 @@ class _SettingsPageState extends State<SettingsPage> {
                 style: theme.textTheme.bodySmall,
               )
             else
-              ...item.tokens.map(
-                (token) => Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: _buildTokenRow(context, controller, item, token),
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: _buildTokenRow(
+                  context,
+                  controller,
+                  item,
+                  _latestDeviceToken(item.tokens),
                 ),
               ),
           ],
         ),
       ),
     );
+  }
+
+  GatewayDeviceTokenSummary _latestDeviceToken(
+    List<GatewayDeviceTokenSummary> tokens,
+  ) {
+    final sorted = List<GatewayDeviceTokenSummary>.from(tokens)
+      ..sort((left, right) {
+        final rightTime = _deviceTokenStatusTime(right);
+        final leftTime = _deviceTokenStatusTime(left);
+        return rightTime.compareTo(leftTime);
+      });
+    return sorted.first;
+  }
+
+  int _deviceTokenStatusTime(GatewayDeviceTokenSummary token) {
+    return token.lastUsedAtMs ??
+        token.rotatedAtMs ??
+        token.revokedAtMs ??
+        token.createdAtMs ??
+        0;
   }
 
   Widget _buildTokenRow(
@@ -1560,9 +1583,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final details = <String>[
       token.revoked ? appText('已撤销', 'revoked') : appText('有效', 'active'),
       if (token.scopes.isNotEmpty) token.scopes.join(', '),
-      _relativeTime(
-        token.rotatedAtMs ?? token.createdAtMs ?? token.lastUsedAtMs,
-      ),
+      _relativeTime(_deviceTokenStatusTime(token)),
     ];
     return DecoratedBox(
       decoration: BoxDecoration(
