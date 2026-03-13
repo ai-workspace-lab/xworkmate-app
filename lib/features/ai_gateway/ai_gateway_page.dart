@@ -235,7 +235,36 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
             ),
           ),
         );
+      case AiGatewayTab.tools:
+        return SurfaceCard(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.build_rounded, color: palette.accent, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      appText('工具集成', 'Tool Integration'),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _CodexIntegrationCard(controller: controller),
+              ],
+            ),
+          ),
+        );
     }
+  }
+
   }
 
   StatusInfo? _connectionStatus(RuntimeConnectionStatus status) {
@@ -248,7 +277,7 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
   }
 }
 
-enum AiGatewayTab { models, agents, endpoints }
+enum AiGatewayTab { models, agents, endpoints, tools }
 
 extension AiGatewayTabCopy on AiGatewayTab {
   String get label => switch (this) {
@@ -391,6 +420,212 @@ class _EndpointCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ============================================
+// Codex Integration Section
+// ============================================
+
+class _CodexIntegrationCard extends StatefulWidget {
+  const _CodexIntegrationCard({required this.controller});
+
+  final AppController controller;
+
+  @override
+  State<_CodexIntegrationCard> createState() => _CodexIntegrationCardState();
+}
+
+class _CodexIntegrationCardState extends State<_CodexIntegrationCard> {
+  bool _isExporting = false;
+  String? _exportPath;
+  String? _errorMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return Card(
+      color: palette.surfaceSecondary,
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.terminal_rounded, color: palette.accent, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  appText('Codex CLI 集成', 'Codex CLI Integration'),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: palette.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              appText(
+                '导出配置文件以在命令行中使用 Codex CLI。',
+                'Export configuration to use Codex CLI in terminal.',
+              ),
+              style: TextStyle(
+                fontSize: 13,
+                color: palette.textSecondary,
+              ),
+            ),
+            if (_exportPath != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle_rounded, color: Colors.green, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        appText('已导出到: ', 'Exported to: ') + _exportPath!,
+                        style: TextStyle(fontSize: 12, color: Colors.green),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_rounded, color: Colors.red, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _errorMessage!,
+                        style: TextStyle(fontSize: 12, color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isExporting ? null : _exportConfig,
+                    icon: _isExporting
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(Icons.download_rounded, size: 16),
+                    label: Text(appText('导出配置', 'Export Config')),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _openCodexTerminal,
+                    icon: Icon(Icons.terminal_rounded, size: 16),
+                    label: Text(appText('打开终端', 'Open Terminal')),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportConfig() async {
+    setState(() {
+      _isExporting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final home = Platform.environment['HOME'] ?? '';
+      final codexHome = Platform.environment['CODEX_HOME'] ?? '$home/.codex';
+      final configPath = '$codexHome/config.toml';
+
+      // Get gateway URL and API key from controller
+      final gatewayUrl = widget.controller.aiGatewayUrl;
+      final apiKey = widget.controller.aiGatewayApiKey;
+
+      if (gatewayUrl.isEmpty) {
+        throw Exception(appText('AI Gateway URL 未配置', 'AI Gateway URL not configured'));
+      }
+
+      // Create config directory if needed
+      final configDir = Directory(codexHome);
+      if (!await configDir.exists()) {
+        await configDir.create(recursive: true);
+      }
+
+      // Generate config content
+      final configContent = '''
+# Generated by XWorkmate - AI Gateway Configuration
+# Last updated: ${DateTime.now().toIso8601String()}
+
+[model_providers.xworkmate]
+name = "XWorkmate AI Gateway"
+base_url = "$gatewayUrl"
+${apiKey.isNotEmpty ? 'experimental_bearer_token = "$apiKey"' : ''}
+wire_api = "responses"
+
+[model]
+model = "gpt-4.1"
+
+[approval_policy]
+policy = "suggest"
+
+[sandbox]
+mode = "workspace-write"
+
+[features]
+child_agents_md = true
+''';
+
+      await File(configPath).writeAsString(configContent);
+
+      setState(() {
+        _exportPath = configPath;
+        _isExporting = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isExporting = false;
+      });
+    }
+  }
+
+  void _openCodexTerminal() {
+    // This would open a terminal with Codex environment
+    // Implementation depends on platform
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(appText('请在终端中运行: codex', 'Run in terminal: codex')),
       ),
     );
   }
