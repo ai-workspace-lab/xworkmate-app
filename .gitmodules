@@ -1,3 +1,6 @@
 [submodule "vendor/codex"]
 	path = vendor/codex
 	url = https://github.com/openai/codex.git
+[submodule "CodexBar"]
+	path = CodexBar
+	url = https://github.com/steipete/CodexBar.git
