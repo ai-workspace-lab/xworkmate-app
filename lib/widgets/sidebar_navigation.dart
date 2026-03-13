@@ -41,8 +41,9 @@ class SidebarNavigation extends StatelessWidget {
     WorkspaceDestination.assistant,
     WorkspaceDestination.tasks,
     WorkspaceDestination.modules,
+    WorkspaceDestination.clawHub,
     WorkspaceDestination.secrets,
-    WorkspaceDestination.settings,
+    WorkspaceDestination.aiGateway,
   ];
 
   @override
@@ -253,7 +254,9 @@ class _SidebarNavItemState extends State<SidebarNavItem> {
       WorkspaceDestination.assistant => Icons.auto_awesome_rounded,
       WorkspaceDestination.tasks => Icons.task_alt_rounded,
       WorkspaceDestination.modules => Icons.extension_rounded,
-      WorkspaceDestination.secrets => Icons.key_rounded,
+      WorkspaceDestination.clawHub => Icons.hub_rounded,
+      WorkspaceDestination.secrets => Icons.security_rounded,
+      WorkspaceDestination.aiGateway => Icons.smart_toy_rounded,
       WorkspaceDestination.settings => Icons.tune_rounded,
       WorkspaceDestination.account => Icons.account_circle_rounded,
     };
@@ -264,7 +267,9 @@ class _SidebarNavItemState extends State<SidebarNavItem> {
       WorkspaceDestination.assistant => appText('助手', 'Assistant'),
       WorkspaceDestination.tasks => appText('任务', 'Tasks'),
       WorkspaceDestination.modules => appText('模块', 'Modules'),
-      WorkspaceDestination.secrets => appText('密钥', 'Secrets'),
+      WorkspaceDestination.clawHub => 'ClawHub',
+      WorkspaceDestination.secrets => appText('密钥 / Vault', 'Secrets / Vault'),
+      WorkspaceDestination.aiGateway => 'AI Gateway',
       WorkspaceDestination.settings => appText('设置', 'Settings'),
       WorkspaceDestination.account => appText('账户', 'Account'),
     };
@@ -334,6 +339,12 @@ class SidebarFooter extends StatelessWidget {
             onPressed: onCycleSidebarState,
           ),
           const SizedBox(height: AppSpacing.xs),
+          _SidebarActionButton(
+            icon: Icons.tune_rounded,
+            tooltip: appText('设置', 'Settings'),
+            onPressed: onOpenSettings,
+          ),
+          const SizedBox(height: AppSpacing.xs),
           _SidebarAccountTile(
             selected: accountSelected,
             onTap: onOpenAccount,
@@ -375,6 +386,12 @@ class SidebarFooter extends StatelessWidget {
               tooltip: _sidebarStateLabel(sidebarState),
               onPressed: onCycleSidebarState,
             ),
+            const SizedBox(width: AppSpacing.xs),
+            _SidebarActionButton(
+              icon: Icons.tune_rounded,
+              tooltip: appText('设置', 'Settings'),
+              onPressed: onOpenSettings,
+            ),
           ],
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -390,8 +407,9 @@ class SidebarFooter extends StatelessWidget {
 
   IconData _sidebarStateIcon(AppSidebarState state) {
     return switch (state) {
-      AppSidebarState.expanded => Icons.sidebar_rounded,
+      AppSidebarState.expanded => Icons.view_sidebar_rounded,
       AppSidebarState.collapsed => Icons.menu_rounded,
+      AppSidebarState.hidden => Icons.view_sidebar_rounded,
     };
   }
 
@@ -399,6 +417,7 @@ class SidebarFooter extends StatelessWidget {
     return switch (state) {
       AppSidebarState.expanded => appText('收起侧边栏', 'Collapse sidebar'),
       AppSidebarState.collapsed => appText('展开侧边栏', 'Expand sidebar'),
+      AppSidebarState.hidden => appText('展开侧边栏', 'Expand sidebar'),
     };
   }
 }

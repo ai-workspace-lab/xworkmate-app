@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../features/account/account_page.dart';
+import '../features/ai_gateway/ai_gateway_page.dart';
 import '../features/assistant/assistant_page.dart';
+import '../features/claw_hub/claw_hub_page.dart';
 import '../features/mobile/ios_mobile_shell.dart';
 import '../features/modules/modules_page.dart';
 import '../features/secrets/secrets_page.dart';
@@ -327,7 +329,15 @@ class _AppShellState extends State<AppShell> {
         controller: widget.controller,
         onOpenDetail: onOpenDetail,
       ),
+      WorkspaceDestination.clawHub => ClawHubPage(
+        controller: widget.controller,
+        onOpenDetail: onOpenDetail,
+      ),
       WorkspaceDestination.secrets => SecretsPage(
+        controller: widget.controller,
+        onOpenDetail: onOpenDetail,
+      ),
+      WorkspaceDestination.aiGateway => AiGatewayPage(
         controller: widget.controller,
         onOpenDetail: onOpenDetail,
       ),

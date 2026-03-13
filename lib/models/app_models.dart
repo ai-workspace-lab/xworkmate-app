@@ -44,8 +44,12 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
       'Capability center for gateway, nodes, agents, skills, and connectors.',
     ),
     WorkspaceDestination.secrets => appText(
-      'Vault、Provider 凭证与审计信息的轻量管理面。',
-      'Lightweight management for vault, provider credentials, and audit data.',
+      'Vault 密码保险箱，安全存储密钥、凭证与审计信息。',
+      'Vault password safe for secure storage of keys, credentials and audit data.',
+    ),
+    WorkspaceDestination.aiGateway => appText(
+      'AI Gateway 代理与模型网关配置管理。',
+      'AI Gateway proxy and model gateway configuration.',
     ),
     WorkspaceDestination.settings => appText(
       '全局配置中心，只负责系统设置与诊断，不承担业务模块入口。',
