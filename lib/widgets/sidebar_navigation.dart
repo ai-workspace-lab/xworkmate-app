@@ -275,7 +275,7 @@ class _SidebarNavItemState extends State<SidebarNavItem> {
       WorkspaceDestination.skills => appText('技能', 'Skills'),
       WorkspaceDestination.nodes => appText('节点', 'Nodes'),
       WorkspaceDestination.agents => appText('代理', 'Agents'),
-      WorkspaceDestination.mcpServer => 'MCP Server',
+      WorkspaceDestination.mcpServer => 'MCP Hub',
       WorkspaceDestination.clawHub => 'ClawHub',
       WorkspaceDestination.secrets => appText('密钥', 'Secrets'),
       WorkspaceDestination.aiGateway => 'AI Gateway',

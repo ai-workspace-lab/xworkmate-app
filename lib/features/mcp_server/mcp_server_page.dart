@@ -30,7 +30,7 @@ class McpServerPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
-                title: 'MCP Server',
+                title: 'MCP Hub',
                 subtitle: appText(
                   '管理 MCP 服务器连接与工具配置。',
                   'Manage MCP server connections and tool configurations.',

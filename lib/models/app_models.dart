@@ -23,7 +23,7 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
     WorkspaceDestination.skills => appText('技能', 'Skills'),
     WorkspaceDestination.nodes => appText('节点', 'Nodes'),
     WorkspaceDestination.agents => appText('代理', 'Agents'),
-    WorkspaceDestination.mcpServer => 'MCP Server',
+    WorkspaceDestination.mcpServer => 'MCP Hub',
     WorkspaceDestination.clawHub => 'ClawHub',
     WorkspaceDestination.secrets => appText('密钥', 'Secrets'),
     WorkspaceDestination.aiGateway => 'AI Gateway',
@@ -67,8 +67,8 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
       'Manage agent instances, configure behaviors and capabilities.',
     ),
     WorkspaceDestination.mcpServer => appText(
-      '管理 MCP 服务器连接与工具配置。',
-      'Manage MCP server connections and tool configurations.',
+      '管理 MCP Hub 连接与工具配置。',
+      'Manage MCP Hub connections and tool configurations.',
     ),
     WorkspaceDestination.clawHub => appText(
       '浏览和安装技能包、代理模板与连接器。',
