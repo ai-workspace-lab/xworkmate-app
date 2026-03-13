@@ -1,3 +1,4 @@
+import 'dart:io';
  import 'package:flutter/material.dart';
  
  import '../../app/app_controller.dart';
@@ -96,8 +97,8 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
     );
   }
 
-  Widget _buildTabContent(BuildContext context, AiGatewayTab tab, AppController controller) {
-    final palette = context.palette;
+	  Widget _buildTabContent(BuildContext context, AiGatewayTab tab, AppController controller) {
+	    final palette = context.palette;
 
     switch (tab) {
       case AiGatewayTab.models:
@@ -262,30 +263,29 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
             ),
           ),
         );
-    }
-  }
+	    }
+	  }
 
-  }
-
-  StatusInfo? _connectionStatus(RuntimeConnectionStatus status) {
-    return switch (status) {
-      RuntimeConnectionStatus.connected => const StatusInfo('Connected', StatusTone.success),
-      RuntimeConnectionStatus.connecting => const StatusInfo('Connecting', StatusTone.accent),
-      RuntimeConnectionStatus.offline => const StatusInfo('Offline', StatusTone.neutral),
-      RuntimeConnectionStatus.error => const StatusInfo('Error', StatusTone.danger),
-    };
-  }
-}
+	  StatusInfo? _connectionStatus(RuntimeConnectionStatus status) {
+	    return switch (status) {
+	      RuntimeConnectionStatus.connected => const StatusInfo('Connected', StatusTone.success),
+	      RuntimeConnectionStatus.connecting => const StatusInfo('Connecting', StatusTone.accent),
+	      RuntimeConnectionStatus.offline => const StatusInfo('Offline', StatusTone.neutral),
+	      RuntimeConnectionStatus.error => const StatusInfo('Error', StatusTone.danger),
+	    };
+	  }
+	}
 
 enum AiGatewayTab { models, agents, endpoints, tools }
 
-extension AiGatewayTabCopy on AiGatewayTab {
-  String get label => switch (this) {
-    AiGatewayTab.models => appText('模型', 'Models'),
-    AiGatewayTab.agents => appText('代理', 'Agents'),
-    AiGatewayTab.endpoints => appText('端点', 'Endpoints'),
-  };
-}
+	extension AiGatewayTabCopy on AiGatewayTab {
+	  String get label => switch (this) {
+	    AiGatewayTab.models => appText('模型', 'Models'),
+	    AiGatewayTab.agents => appText('代理', 'Agents'),
+	    AiGatewayTab.endpoints => appText('端点', 'Endpoints'),
+	    AiGatewayTab.tools => appText('工具', 'Tools'),
+	  };
+	}
 
 class _ModelCard extends StatelessWidget {
   const _ModelCard({required this.model, required this.onTap});
@@ -557,24 +557,24 @@ class _CodexIntegrationCardState extends State<_CodexIntegrationCard> {
     );
   }
 
-  Future<void> _exportConfig() async {
-    setState(() {
-      _isExporting = true;
-      _errorMessage = null;
-    });
+	  Future<void> _exportConfig() async {
+	    setState(() {
+	      _isExporting = true;
+	      _errorMessage = null;
+	    });
 
     try {
       final home = Platform.environment['HOME'] ?? '';
-      final codexHome = Platform.environment['CODEX_HOME'] ?? '$home/.codex';
-      final configPath = '$codexHome/config.toml';
+	      final codexHome = Platform.environment['CODEX_HOME'] ?? '$home/.codex';
+	      final configPath = '$codexHome/config.toml';
 
-      // Get gateway URL and API key from controller
-      final gatewayUrl = widget.controller.aiGatewayUrl;
-      final apiKey = widget.controller.aiGatewayApiKey;
+	      // Get gateway URL and API key from controller
+	      final gatewayUrl = widget.controller.aiGatewayUrl;
+	      final apiKey = await widget.controller.loadAiGatewayApiKey();
 
-      if (gatewayUrl.isEmpty) {
-        throw Exception(appText('AI Gateway URL 未配置', 'AI Gateway URL not configured'));
-      }
+	      if (gatewayUrl.isEmpty) {
+	        throw Exception(appText('AI Gateway URL 未配置', 'AI Gateway URL not configured'));
+	      }
 
       // Create config directory if needed
       final configDir = Directory(codexHome);

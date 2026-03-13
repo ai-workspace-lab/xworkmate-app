@@ -3,26 +3,49 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/mode_switcher.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
+import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/runtime/secure_config_store.dart';
 
 // Mock GatewayRuntime for testing
-class MockGatewayRuntime extends ChangeNotifier implements GatewayRuntime {
-  final StreamController<GatewayPushEvent> _events = StreamController.broadcast();
+class MockGatewayRuntime extends GatewayRuntime {
+  factory MockGatewayRuntime() {
+    final store = SecureConfigStore();
+    return MockGatewayRuntime._(store);
+  }
+
+  MockGatewayRuntime._(SecureConfigStore store)
+    : _storeForTest = store,
+      super(
+        store: store,
+        identityStore: DeviceIdentityStore(store),
+      );
+
+  final SecureConfigStore _storeForTest;
+  final StreamController<GatewayPushEvent> _eventsController =
+      StreamController<GatewayPushEvent>.broadcast();
   GatewayConnectionSnapshot _snapshot = GatewayConnectionSnapshot.initial();
   bool _isConnected = false;
   final List<Map<String, dynamic>> _requests = [];
 
   void setConnected(bool connected) {
     _isConnected = connected;
-    _snapshot = GatewayConnectionSnapshot(
-      profile: GatewayConnectionProfile.defaults(),
-      status: connected ? RuntimeConnectionStatus.connected : RuntimeConnectionStatus.offline,
+    _snapshot = _snapshot.copyWith(
+      status: connected
+          ? RuntimeConnectionStatus.connected
+          : RuntimeConnectionStatus.offline,
+      statusText: connected ? 'Connected' : 'Offline',
     );
     notifyListeners();
     
     // Emit connection event
     if (connected) {
-      _events.add(GatewayPushEvent(event: 'gateway/connected', payload: {}));
+      _eventsController.add(
+        const GatewayPushEvent(
+          event: 'gateway/connected',
+          payload: <String, dynamic>{},
+        ),
+      );
     }
   }
 
@@ -33,15 +56,15 @@ class MockGatewayRuntime extends ChangeNotifier implements GatewayRuntime {
   GatewayConnectionSnapshot get snapshot => _snapshot;
 
   @override
-  Stream<GatewayPushEvent> get events => _events.stream;
+  Stream<GatewayPushEvent> get events => _eventsController.stream;
 
   @override
-  Future<Map<String, dynamic>> request(
+  Future<dynamic> request(
     String method, {
-    Map<String, dynamic> params = const {},
-    Duration timeout = const Duration(seconds: 30),
+    Map<String, dynamic>? params,
+    Duration timeout = const Duration(seconds: 15),
   }) async {
-    _requests.add({'method': method, 'params': params});
+    _requests.add({'method': method, 'params': params ?? const {}});
     return {'success': true};
   }
 
@@ -55,39 +78,33 @@ class MockGatewayRuntime extends ChangeNotifier implements GatewayRuntime {
     String authPasswordOverride = '',
   }) async {
     _isConnected = true;
-    _snapshot = GatewayConnectionSnapshot(
-      profile: profile,
+    _snapshot = GatewayConnectionSnapshot.initial(mode: profile.mode).copyWith(
       status: RuntimeConnectionStatus.connected,
+      statusText: 'Connected',
     );
     notifyListeners();
-    _events.add(GatewayPushEvent(event: 'gateway/connected', payload: {}));
+    _eventsController.add(
+      const GatewayPushEvent(
+        event: 'gateway/connected',
+        payload: <String, dynamic>{},
+      ),
+    );
   }
 
   @override
-  Future<void> disconnect() async {
+  Future<void> disconnect({bool clearDesiredProfile = true}) async {
     _isConnected = false;
-    _snapshot = GatewayConnectionSnapshot(
-      profile: _snapshot.profile,
-      status: RuntimeConnectionStatus.offline,
+    _snapshot = GatewayConnectionSnapshot.initial(mode: _snapshot.mode).copyWith(
+      statusText: 'Offline',
     );
     notifyListeners();
   }
 
   @override
-  Future<void> clearLogs() async {}
-
-  @override
-  List<RuntimeLogEntry> get logs => [];
-
-  @override
-  List<RuntimeLogEntry> get logsForTest => [];
-
-  @override
-  void addRuntimeLogForTest({
-    required String level,
-    required String category,
-    required String message,
-  }) {}
+  void dispose() {
+    _eventsController.close();
+    super.dispose();
+  }
 }
 
 void main() {
