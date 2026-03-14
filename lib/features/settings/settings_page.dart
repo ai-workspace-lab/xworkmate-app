@@ -439,7 +439,7 @@ class _SettingsPageState extends State<SettingsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              appText('网关连接', 'Gateway Connection'),
+              'OpenClaw Gateway',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
