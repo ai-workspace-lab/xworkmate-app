@@ -10,23 +10,42 @@ import '../runtime/gateway_runtime.dart';
 import '../runtime/runtime_controllers.dart';
 import '../runtime/runtime_models.dart';
 import '../runtime/secure_config_store.dart';
+import '../runtime/runtime_coordinator.dart';
+import '../runtime/codex_runtime.dart';
+import '../runtime/codex_config_bridge.dart';
+import '../runtime/mode_switcher.dart';
+import '../runtime/agent_registry.dart';
 
 class AppController extends ChangeNotifier {
   AppController() {
-    _runtime = GatewayRuntime(
+    // Initialize Codex components first
+    final codexRuntime = CodexRuntime();
+    final configBridge = CodexConfigBridge();
+    
+    // Create Gateway Runtime (wrapped inside RuntimeCoordinator)
+    final gatewayRuntime = GatewayRuntime(
       store: _store,
       identityStore: DeviceIdentityStore(_store),
     );
+    
+    // Create RuntimeCoordinator to manage both Gateway and Codex
+    _runtimeCoordinator = RuntimeCoordinator(
+      gateway: gatewayRuntime,
+      codex: codexRuntime,
+      configBridge: configBridge,
+      modeSwitcher: ModeSwitcher(gatewayRuntime),
+    );
+    
     _settingsController = SettingsController(_store);
-    _agentsController = GatewayAgentsController(_runtime);
-    _sessionsController = GatewaySessionsController(_runtime);
-    _chatController = GatewayChatController(_runtime);
-    _instancesController = InstancesController(_runtime);
-    _skillsController = SkillsController(_runtime);
-    _connectorsController = ConnectorsController(_runtime);
-    _modelsController = ModelsController(_runtime, _settingsController);
-    _cronJobsController = CronJobsController(_runtime);
-    _devicesController = DevicesController(_runtime);
+    _agentsController = GatewayAgentsController(_runtimeCoordinator.gateway);
+    _sessionsController = GatewaySessionsController(_runtimeCoordinator.gateway);
+    _chatController = GatewayChatController(_runtimeCoordinator.gateway);
+    _instancesController = InstancesController(_runtimeCoordinator.gateway);
+    _skillsController = SkillsController(_runtimeCoordinator.gateway);
+    _connectorsController = ConnectorsController(_runtimeCoordinator.gateway);
+    _modelsController = ModelsController(_runtimeCoordinator.gateway, _settingsController);
+    _cronJobsController = CronJobsController(_runtimeCoordinator.gateway);
+    _devicesController = DevicesController(_runtimeCoordinator.gateway);
     _tasksController = DerivedTasksController();
     _attachChildListeners();
     unawaited(_initialize());
@@ -34,7 +53,7 @@ class AppController extends ChangeNotifier {
 
   final SecureConfigStore _store = SecureConfigStore();
 
-  late final GatewayRuntime _runtime;
+  late final RuntimeCoordinator _runtimeCoordinator;
   late final SettingsController _settingsController;
   late final GatewayAgentsController _agentsController;
   late final GatewaySessionsController _sessionsController;
@@ -62,7 +81,13 @@ class AppController extends ChangeNotifier {
   bool get initializing => _initializing;
   String? get bootstrapError => _bootstrapError;
 
+  RuntimeCoordinator get runtimeCoordinator => _runtimeCoordinator;
+  GatewayRuntime get _runtime => _runtimeCoordinator.gateway;
   GatewayRuntime get runtime => _runtime;
+  
+  /// Whether Codex bridge is enabled and configured
+  bool get isCodexBridgeEnabled => _isCodexBridgeEnabled;
+  bool _isCodexBridgeEnabled = false;
   SettingsController get settingsController => _settingsController;
   GatewayAgentsController get agentsController => _agentsController;
   GatewaySessionsController get sessionsController => _sessionsController;
@@ -567,7 +592,7 @@ class AppController extends ChangeNotifier {
   }
 
   void clearRuntimeLogs() {
-    _runtime.clearLogs();
+    _runtimeCoordinator.gateway.clearLogs();
   }
 
   List<DerivedTaskItem> taskItemsForTab(String tab) => switch (tab) {
@@ -579,11 +604,61 @@ class AppController extends ChangeNotifier {
     _ => _tasksController.queue,
   };
 
+  /// Enable Codex ↔ Gateway bridge
+  Future<void> enableCodexBridge() async {
+    if (_isCodexBridgeEnabled) return;
+    
+    try {
+      // Get AI Gateway configuration
+      final gatewayUrl = aiGatewayUrl;
+      final apiKey = await loadAiGatewayApiKey();
+      
+      if (gatewayUrl.isEmpty) {
+        throw StateError(appText('AI Gateway URL 未配置', 'AI Gateway URL not configured'));
+      }
+      
+      // Configure Codex to use AI Gateway
+      await _runtimeCoordinator.configureCodexForGateway(
+        gatewayUrl: gatewayUrl,
+        apiKey: apiKey,
+      );
+      
+      // Try to initialize Codex with auto mode
+      if (!_runtimeCoordinator.isReady) {
+        await _runtimeCoordinator.initializeAuto(
+          preferRemote: true,
+        );
+      }
+      
+      _isCodexBridgeEnabled = true;
+      notifyListeners();
+    } catch (e) {
+      _isCodexBridgeEnabled = false;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Disable Codex ↔ Gateway bridge
+  Future<void> disableCodexBridge() async {
+    if (!_isCodexBridgeEnabled) return;
+    
+    try {
+      // Shutdown Codex runtime but keep Gateway connection
+      await _runtimeCoordinator.codex.stop();
+      _isCodexBridgeEnabled = false;
+      notifyListeners();
+    } catch (e) {
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   @override
   void dispose() {
     _runtimeEventsSubscription?.cancel();
     _detachChildListeners();
-    _runtime.dispose();
+    _runtimeCoordinator.dispose();
     _settingsController.dispose();
     _agentsController.dispose();
     _sessionsController.dispose();
@@ -611,14 +686,14 @@ class AppController extends ChangeNotifier {
       }
       _modelsController.restoreFromSettings(settings.aiGateway);
       setActiveAppLanguage(settings.appLanguage);
-      await _runtime.initialize();
+      await _runtimeCoordinator.initialize();
       _agentsController.restoreSelection(settings.gateway.selectedAgentId);
       _sessionsController.configure(
         mainSessionKey: _runtime.snapshot.mainSessionKey ?? 'main',
         selectedAgentId: _agentsController.selectedAgentId,
         defaultAgentId: '',
       );
-      _runtimeEventsSubscription = _runtime.events.listen(_handleRuntimeEvent);
+      _runtimeEventsSubscription = _runtimeCoordinator.gateway.events.listen(_handleRuntimeEvent);
       final shouldAutoConnect =
           settings.gateway.useSetupCode &&
           settings.gateway.setupCode.trim().isNotEmpty;
@@ -693,7 +768,7 @@ class AppController extends ChangeNotifier {
   }
 
   void _attachChildListeners() {
-    _runtime.addListener(_relayChildChange);
+    _runtimeCoordinator.addListener(_relayChildChange);
     _settingsController.addListener(_relayChildChange);
     _agentsController.addListener(_relayChildChange);
     _sessionsController.addListener(_relayChildChange);
@@ -708,7 +783,7 @@ class AppController extends ChangeNotifier {
   }
 
   void _detachChildListeners() {
-    _runtime.removeListener(_relayChildChange);
+    _runtimeCoordinator.removeListener(_relayChildChange);
     _settingsController.removeListener(_relayChildChange);
     _agentsController.removeListener(_relayChildChange);
     _sessionsController.removeListener(_relayChildChange);

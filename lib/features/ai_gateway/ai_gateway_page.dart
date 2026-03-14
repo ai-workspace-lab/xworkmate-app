@@ -156,6 +156,9 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Codex Bridge Toggle Card
+                _CodexBridgeCard(controller: controller),
+                const SizedBox(height: 24),
                 Row(
                   children: [
                     Icon(Icons.hub_rounded, color: palette.accent, size: 20),
