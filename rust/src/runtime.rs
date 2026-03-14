@@ -5,7 +5,6 @@ use std::os::raw::c_char;
 use std::path::PathBuf;
 
 use crate::error::CodexError;
-use crate::types::CodexEvent;
 
 /// Configuration for Codex runtime.
 #[derive(Debug, Clone)]
@@ -100,24 +99,8 @@ impl CodexConfig {
     }
 }
 
-impl Clone for CodexConfig {
-    fn clone(&self) -> Self {
-        // Safe to clone the pointers as they're just pointers to strings
-        CodexConfig {
-            codex_path: self.codex_path,
-            working_directory: self.working_directory,
-            sandbox_mode: self.sandbox_mode,
-            approval_policy: self.approval_policy,
-            model: self.model,
-            api_key: self.api_key,
-            gateway_url: self.gateway_url,
-            debug: self.debug,
-        }
-    }
-}
-
 /// Rust-native config type.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CodexConfigRust {
     pub codex_path: Option<String>,
     pub working_directory: Option<String>,
@@ -218,11 +201,13 @@ impl CodexRuntime {
 
         // Check common locations
         let home = std::env::var("HOME").unwrap_or_default();
-        let paths = vec![
+        let cargo_path = format!("{}/.cargo/bin/codex", home);
+        let local_path = format!("{}/.local/bin/codex", home);
+        let paths = [
             "/usr/local/bin/codex",
             "/opt/homebrew/bin/codex",
-            &format!("{}/.cargo/bin/codex", home),
-            &format!("{}/.local/bin/codex", home),
+            cargo_path.as_str(),
+            local_path.as_str(),
         ];
 
         for path in paths {
