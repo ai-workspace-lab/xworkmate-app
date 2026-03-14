@@ -51,16 +51,9 @@ clean: ## Remove generated artifacts
 
 rust-build: rust-build-release ## Build Rust FFI library (release mode)
 
-rust-build-release: ## Build Rust FFI library in release mode
+rust-build-release: ## Build Rust FFI library for macOS (arm64)
 	cd rust && cargo build --release --target aarch64-apple-darwin
-	cd rust && cargo build --release --target x86_64-apple-darwin
-	@echo "Creating universal binary..."
-	mkdir -p rust/target/universal
-	lipo -create \
-		rust/target/aarch64-apple-darwin/release/libcodex_ffi.dylib \
-		rust/target/x86_64-apple-darwin/release/libcodex_ffi.dylib \
-		-output rust/target/universal/libcodex_ffi.dylib || true
-	@echo "Universal binary created at rust/target/universal/"
+	@echo "Rust FFI library built successfully"
 
 rust-build-debug: ## Build Rust FFI library in debug mode
 	cd rust && cargo build --target aarch64-apple-darwin

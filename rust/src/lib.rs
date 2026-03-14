@@ -11,7 +11,7 @@ pub use error::CodexError;
 pub use runtime::{CodexRuntime, CodexConfig, CodexConfigRust, ThreadHandle, RuntimeState};
 pub use types::{CodexResult, CodexMessage, CodexEvent};
 
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 use std::os::raw::c_char;
 
 /// FFI-exported initialization function.
@@ -55,14 +55,13 @@ pub unsafe extern "C" fn codex_runtime_destroy(runtime: *mut CodexRuntime) {
 /// Must be called with valid pointers.
 #[no_mangle]
 pub unsafe extern "C" fn codex_start_thread(
-    runtime: *mut CodexRuntime,
+    _runtime: *mut CodexRuntime,
     cwd: *const c_char,
 ) -> ThreadHandle {
-    if runtime.is_null() || cwd.is_null() {
+    if cwd.is_null() {
         return ThreadHandle::null();
     }
     
-    let _runtime = &mut *runtime;
     let _cwd = CStr::from_ptr(cwd);
     
     ThreadHandle::new(0)
@@ -75,7 +74,7 @@ pub unsafe extern "C" fn codex_start_thread(
 #[no_mangle]
 pub unsafe extern "C" fn codex_send_message(
     runtime: *mut CodexRuntime,
-    thread: ThreadHandle,
+    _thread: ThreadHandle,
     message: *const c_char,
 ) -> i32 {
     if runtime.is_null() || message.is_null() {
