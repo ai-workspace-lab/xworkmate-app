@@ -1,6 +1,18 @@
 # Codex CLI 集成任务计划 - 已完成
 
-> 目标：将 Codex CLI 集成到 XWorkmate 作为内置 Code Agent，支持 AI Gateway 模型桥接和 OpenClaw Gateway 在线/离线模式。
+## 目标（产品层）
+
+1. 将 Codex CLI 集成到 XWorkmate 作为内置 Code Agent，支持 AI Gateway 模型桥接和 OpenClaw Gateway 在线/离线模式。
+2. 提供可选设置：将 Codex CLI 以**外部依赖**方式接入 XWorkmate，支持同一套网关桥接与模式切换能力。
+3. 预留其他外部 Code Agent CLI 的接入能力（统一注册、能力发现与调度）。
+
+## 当前实现状态（对齐当前代码）
+
+- 当前落地形态为**外部进程接入**：由 `CodexRuntime.startStdio()` 启动外部 `codex` 进程。
+- Codex 可执行文件通过 `findCodexBinary()` 从 `CODEX_PATH`、常见安装目录与 `PATH` 中查找。
+- 用户需预先安装 Codex CLI（例如 `npm i -g @openai/codex`）。
+- 运行时由 Dart `Process`（`_process: Process?`）进行生命周期管理。
+- 通过 `AgentRegistry`、`RuntimeCoordinator` 已具备多 Agent 扩展的基础结构，可继续接入其他外部 CLI。
 
 ## 架构概览
 
@@ -33,8 +45,8 @@
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      OpenClaw Gateway                                │
-│  .env: AI-Gateway-Url = https://api.svc.plus/v1                     │
-│  .env: AI-Gateway-apiKey = kokvWiXJHwAucEf2ijQruBSk74zodbnXjfvDrK3Q4iw= │
+│  .env: AI-Gateway-Url = <development/test only>                      │
+│  .env: AI-Gateway-apiKey = <do not commit real secrets>              │
 │                                                                      │
 │  模式切换:                                                           │
 │  - Local:  127.0.0.1:18789 (本地代理)                               │
