@@ -40,6 +40,15 @@ class _SecretsPageState extends State<SecretsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
+                breadcrumbs: [
+                  AppBreadcrumbItem(
+                    label: appText('主页', 'Home'),
+                    icon: Icons.home_rounded,
+                    onTap: controller.navigateHome,
+                  ),
+                  AppBreadcrumbItem(label: appText('密钥', 'Secrets')),
+                  AppBreadcrumbItem(label: _tab.label),
+                ],
                 title: appText('密钥', 'Secrets'),
                 subtitle: appText(
                   '管理密钥提供方、凭证和模块间的安全引用。',

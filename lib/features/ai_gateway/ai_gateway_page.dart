@@ -67,6 +67,15 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
+                breadcrumbs: [
+                  AppBreadcrumbItem(
+                    label: appText('主页', 'Home'),
+                    icon: Icons.home_rounded,
+                    onTap: controller.navigateHome,
+                  ),
+                  const AppBreadcrumbItem(label: 'AI Gateway'),
+                  AppBreadcrumbItem(label: _tab.label),
+                ],
                 title: 'AI Gateway',
                 subtitle: appText(
                   'AI 代理与模型网关配置管理中心。',

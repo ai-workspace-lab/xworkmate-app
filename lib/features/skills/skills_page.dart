@@ -31,6 +31,14 @@ class SkillsPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
+                breadcrumbs: [
+                  AppBreadcrumbItem(
+                    label: appText('主页', 'Home'),
+                    icon: Icons.home_rounded,
+                    onTap: controller.navigateHome,
+                  ),
+                  AppBreadcrumbItem(label: appText('技能', 'Skills')),
+                ],
                 title: appText('技能', 'Skills'),
                 subtitle: appText(
                   '管理已安装的技能包，查看技能状态与依赖。',

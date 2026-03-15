@@ -1,13 +1,12 @@
  import 'package:flutter/material.dart';
  
- import '../../app/app_controller.dart';
- import '../../i18n/app_language.dart';
- import '../../models/app_models.dart';
- import '../../theme/app_palette.dart';
- import '../../theme/app_theme.dart';
- import '../../widgets/section_header.dart';
- import '../../widgets/surface_card.dart';
- import '../../widgets/top_bar.dart';
+import '../../app/app_controller.dart';
+import '../../i18n/app_language.dart';
+import '../../models/app_models.dart';
+import '../../theme/app_palette.dart';
+import '../../widgets/section_header.dart';
+import '../../widgets/surface_card.dart';
+import '../../widgets/top_bar.dart';
 
 class ClawHubPage extends StatefulWidget {
   const ClawHubPage({
@@ -120,14 +119,16 @@ class _ClawHubPageState extends State<ClawHubPage> {
       return;
     }
 
-    final slug = args[0];
     setState(() => _isExecuting = true);
-    _addLog('Installing \$slug...');
+    _addLog('Installing ${args[0]}...');
 
     Future.delayed(const Duration(milliseconds: 1200), () {
       setState(() => _isExecuting = false);
-      _addLog('✓ Successfully installed \$slug', type: ClawHubLogType.success);
-      _addLog('  Location: ~/.clawhub/skills/\$slug');
+      _addLog(
+        '✓ Successfully installed ${args[0]}',
+        type: ClawHubLogType.success,
+      );
+      _addLog('  Location: ~/.clawhub/skills/${args[0]}');
       _addLog('  Run "clawhub update" to check for updates.');
     });
   }
@@ -184,6 +185,14 @@ class _ClawHubPageState extends State<ClawHubPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
+                breadcrumbs: [
+                  AppBreadcrumbItem(
+                    label: appText('主页', 'Home'),
+                    icon: Icons.home_rounded,
+                    onTap: widget.controller.navigateHome,
+                  ),
+                  const AppBreadcrumbItem(label: 'ClawHub'),
+                ],
                 title: 'ClawHub',
                 subtitle: appText(
                   'NPM 风格的包管理中心，支持搜索、安装和更新 Skills。',
@@ -200,7 +209,7 @@ class _ClawHubPageState extends State<ClawHubPage> {
                 child: Container(
                   height: 400,
                   decoration: BoxDecoration(
-                    color: palette.surfaceSecondary.withOpacity(0.5),
+                    color: palette.surfaceSecondary.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(

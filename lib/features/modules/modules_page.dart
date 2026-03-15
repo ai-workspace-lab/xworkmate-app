@@ -77,6 +77,15 @@ import '../../widgets/top_bar.dart';
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
+                breadcrumbs: [
+                  AppBreadcrumbItem(
+                    label: appText('主页', 'Home'),
+                    icon: Icons.home_rounded,
+                    onTap: controller.navigateHome,
+                  ),
+                  AppBreadcrumbItem(label: appText('模块', 'Modules')),
+                  AppBreadcrumbItem(label: _tab.label),
+                ],
                 title: appText('模块', 'Modules'),
                 subtitle: appText(
                   '管理 Gateway、代理、节点、技能和平台服务。',

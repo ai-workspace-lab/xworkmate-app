@@ -75,6 +75,15 @@ class _SettingsPageState extends State<SettingsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
+                breadcrumbs: [
+                  AppBreadcrumbItem(
+                    label: appText('主页', 'Home'),
+                    icon: Icons.home_rounded,
+                    onTap: controller.navigateHome,
+                  ),
+                  AppBreadcrumbItem(label: appText('设置', 'Settings')),
+                  AppBreadcrumbItem(label: _tab.label),
+                ],
                 title: appText('设置', 'Settings'),
                 subtitle: appText(
                   '配置 $kProductBrandName 工作区、网关默认项、界面与诊断选项',
