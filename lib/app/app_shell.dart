@@ -14,6 +14,7 @@ import '../features/tasks/tasks_page.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
+import '../widgets/assistant_focus_panel.dart';
 import '../widgets/detail_drawer.dart';
 import '../widgets/pane_resize_handle.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -235,6 +236,11 @@ class _AppShellState extends State<AppShell> {
                                 sidebarState == AppSidebarState.expanded
                                 ? expandedSidebarWidth
                                 : null,
+                            favoriteDestinations: controller
+                                .assistantNavigationDestinations
+                                .toSet(),
+                            onToggleFavorite:
+                                controller.toggleAssistantNavigationDestination,
                           ),
                         if (sidebarState == AppSidebarState.expanded &&
                             !embedSidebarIntoAssistant)
@@ -329,35 +335,7 @@ class _AppShellState extends State<AppShell> {
         navigationPanelBuilder:
             widget.controller.sidebarState == AppSidebarState.hidden
             ? null
-            : (contentWidth) => SidebarNavigation(
-                currentSection: widget.controller.destination,
-                sidebarState: AppSidebarState.expanded,
-                appLanguage: widget.controller.appLanguage,
-                themeMode: widget.controller.themeMode,
-                onSectionChanged: widget.controller.navigateTo,
-                onToggleLanguage: widget.controller.toggleAppLanguage,
-                onCycleSidebarState: widget.controller.cycleSidebarState,
-                onExpandFromCollapsed: () =>
-                    widget.controller.setSidebarState(AppSidebarState.expanded),
-                onOpenAccount: () =>
-                    widget.controller.navigateTo(WorkspaceDestination.account),
-                onOpenThemeToggle: () => widget.controller.setThemeMode(
-                  widget.controller.themeMode == ThemeMode.dark
-                      ? ThemeMode.light
-                      : ThemeMode.dark,
-                ),
-                accountName:
-                    widget.controller.settings.accountUsername.trim().isEmpty
-                    ? appText('本地操作员', 'Local Operator')
-                    : widget.controller.settings.accountUsername,
-                accountSubtitle:
-                    widget.controller.settings.accountWorkspace.trim().isEmpty
-                    ? appText('账号', 'Account')
-                    : widget.controller.settings.accountWorkspace,
-                expandedWidthOverride: contentWidth,
-                marginOverride: EdgeInsets.zero,
-                showCollapseControl: false,
-              ),
+            : (_) => AssistantFocusPanel(controller: widget.controller),
         showStandaloneTaskRail: false,
         unifiedPaneStartsCollapsed:
             widget.controller.sidebarState == AppSidebarState.collapsed,

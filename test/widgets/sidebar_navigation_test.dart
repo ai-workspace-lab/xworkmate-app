@@ -14,6 +14,7 @@ void main() {
     var themeToggled = 0;
     var sidebarCycled = 0;
     var accountOpened = 0;
+    var favoriteToggled = 0;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -32,6 +33,14 @@ void main() {
             onOpenThemeToggle: () => themeToggled++,
             accountName: 'Tester',
             accountSubtitle: 'Workspace',
+            favoriteDestinations: const <WorkspaceDestination>{
+              WorkspaceDestination.tasks,
+            },
+            onToggleFavorite: (value) async {
+              if (value == WorkspaceDestination.tasks) {
+                favoriteToggled++;
+              }
+            },
           ),
         ),
       ),
@@ -44,6 +53,12 @@ void main() {
     await tester.tap(find.text('自动化'));
     await tester.pumpAndSettle();
     expect(selected, WorkspaceDestination.tasks);
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('sidebar-favorite-tasks')),
+    );
+    await tester.pumpAndSettle();
+    expect(favoriteToggled, 1);
 
     await tester.tap(find.byTooltip('切换语言'));
     await tester.pumpAndSettle();

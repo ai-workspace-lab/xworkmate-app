@@ -219,6 +219,10 @@ class AppController extends ChangeNotifier {
       _settingsController.buildSecretReferences();
   List<SecretAuditEntry> get secretAuditTrail => _settingsController.auditTrail;
   List<RuntimeLogEntry> get runtimeLogs => _runtime.logs;
+  List<WorkspaceDestination> get assistantNavigationDestinations =>
+      normalizeAssistantNavigationDestinations(
+        settings.assistantNavigationDestinations,
+      );
 
   List<GatewayChatMessage> get chatMessages {
     final items = List<GatewayChatMessage>.from(_chatController.messages);
@@ -625,6 +629,22 @@ class AppController extends ChangeNotifier {
     if (refreshAfterSave) {
       _recomputeTasks();
     }
+  }
+
+  Future<void> toggleAssistantNavigationDestination(
+    WorkspaceDestination destination,
+  ) async {
+    if (!kAssistantNavigationDestinationCandidates.contains(destination)) {
+      return;
+    }
+    final current = assistantNavigationDestinations;
+    final next = current.contains(destination)
+        ? current.where((item) => item != destination).toList(growable: false)
+        : <WorkspaceDestination>[...current, destination];
+    await saveSettings(
+      settings.copyWith(assistantNavigationDestinations: next),
+      refreshAfterSave: false,
+    );
   }
 
   Future<String> testOllamaConnection({required bool cloud}) {
