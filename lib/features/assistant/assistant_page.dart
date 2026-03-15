@@ -49,6 +49,7 @@ class _AssistantPageState extends State<AssistantPage> {
   double _threadRailWidth = 304;
   String _threadQuery = '';
   bool _sidePaneCollapsed = false;
+  bool _taskRailOverviewExpanded = false;
   _AssistantSidePane _activeSidePane = _AssistantSidePane.tasks;
   final Map<String, _AssistantTaskSeed> _taskSeeds =
       <String, _AssistantTaskSeed>{};
@@ -186,6 +187,13 @@ class _AssistantPageState extends State<AssistantPage> {
                             _focusComposer();
                           },
                           onArchiveTask: _archiveTask,
+                          overviewExpanded: _taskRailOverviewExpanded,
+                          onToggleOverview: () {
+                            setState(() {
+                              _taskRailOverviewExpanded =
+                                  !_taskRailOverviewExpanded;
+                            });
+                          },
                         ),
                         navigationPanel: widget.navigationPanelBuilder!(
                           sidePanelContentWidth,
@@ -257,6 +265,13 @@ class _AssistantPageState extends State<AssistantPage> {
                         _focusComposer();
                       },
                       onArchiveTask: _archiveTask,
+                      overviewExpanded: _taskRailOverviewExpanded,
+                      onToggleOverview: () {
+                        setState(() {
+                          _taskRailOverviewExpanded =
+                              !_taskRailOverviewExpanded;
+                        });
+                      },
                     ),
                   ),
                   SizedBox(
@@ -1366,6 +1381,8 @@ class _AssistantTaskRail extends StatelessWidget {
     required this.onOpenSkills,
     required this.onSelectTask,
     required this.onArchiveTask,
+    required this.overviewExpanded,
+    required this.onToggleOverview,
   });
 
   final AppController controller;
@@ -1380,6 +1397,8 @@ class _AssistantTaskRail extends StatelessWidget {
   final VoidCallback onOpenSkills;
   final Future<void> Function(String sessionKey) onSelectTask;
   final Future<void> Function(String sessionKey) onArchiveTask;
+  final bool overviewExpanded;
+  final VoidCallback onToggleOverview;
 
   @override
   Widget build(BuildContext context) {
@@ -1446,7 +1465,9 @@ class _AssistantTaskRail extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Container(
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -1457,62 +1478,105 @@ class _AssistantTaskRail extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        appText('当前对话就是默认任务', 'This chat is the default task'),
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: theme.colorScheme.onSurface,
-                          fontWeight: FontWeight.w600,
+                      InkWell(
+                        key: const Key('assistant-task-overview-toggle'),
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: onToggleOverview,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      appText(
+                                        '当前对话就是默认任务',
+                                        'This chat is the default task',
+                                      ),
+                                      style: theme.textTheme.titleSmall
+                                          ?.copyWith(
+                                            color: theme.colorScheme.onSurface,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      appText(
+                                        '点击展开任务说明与快捷入口',
+                                        'Tap to expand task guidance and shortcuts',
+                                      ),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: palette.textSecondary,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                overviewExpanded
+                                    ? Icons.keyboard_arrow_up_rounded
+                                    : Icons.keyboard_arrow_down_rounded,
+                                color: palette.textMuted,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        appText(
-                          '左侧选择任一任务，会直接切到这个任务对应的会话上下文。',
-                          'Selecting a task on the left jumps straight into that task conversation.',
+                      if (overviewExpanded) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          appText(
+                            '左侧选择任一任务，会直接切到这个任务对应的会话上下文。',
+                            'Selecting a task on the left jumps straight into that task conversation.',
+                          ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: palette.textSecondary,
+                            height: 1.35,
+                          ),
                         ),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: palette.textSecondary,
-                          height: 1.35,
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _MetaPill(
+                              label:
+                                  '${appText('运行中', 'Running')} $runningCount',
+                              icon: Icons.play_circle_outline_rounded,
+                            ),
+                            _MetaPill(
+                              label:
+                                  '${appText('已完成', 'Completed')} $completedCount',
+                              icon: Icons.check_circle_outline_rounded,
+                            ),
+                            _MetaPill(
+                              label:
+                                  '${appText('技能', 'Skills')} ${controller.skills.length}',
+                              icon: Icons.auto_awesome_rounded,
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _MetaPill(
-                            label: '${appText('运行中', 'Running')} $runningCount',
-                            icon: Icons.play_circle_outline_rounded,
-                          ),
-                          _MetaPill(
-                            label:
-                                '${appText('已完成', 'Completed')} $completedCount',
-                            icon: Icons.check_circle_outline_rounded,
-                          ),
-                          _MetaPill(
-                            label:
-                                '${appText('技能', 'Skills')} ${controller.skills.length}',
-                            icon: Icons.auto_awesome_rounded,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          TextButton.icon(
-                            onPressed: onOpenTasks,
-                            icon: const Icon(Icons.layers_outlined, size: 18),
-                            label: Text(appText('打开任务页', 'Open tasks')),
-                          ),
-                          TextButton.icon(
-                            onPressed: onOpenSkills,
-                            icon: const Icon(Icons.hub_outlined, size: 18),
-                            label: Text(appText('查看技能', 'Open skills')),
-                          ),
-                        ],
-                      ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            TextButton.icon(
+                              onPressed: onOpenTasks,
+                              icon: const Icon(Icons.layers_outlined, size: 18),
+                              label: Text(appText('打开任务页', 'Open tasks')),
+                            ),
+                            TextButton.icon(
+                              onPressed: onOpenSkills,
+                              icon: const Icon(Icons.hub_outlined, size: 18),
+                              label: Text(appText('查看技能', 'Open skills')),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
