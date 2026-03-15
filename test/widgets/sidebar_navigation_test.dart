@@ -34,10 +34,10 @@ void main() {
             accountName: 'Tester',
             accountSubtitle: 'Workspace',
             favoriteDestinations: const <WorkspaceDestination>{
-              WorkspaceDestination.tasks,
+              WorkspaceDestination.skills,
             },
             onToggleFavorite: (value) async {
-              if (value == WorkspaceDestination.tasks) {
+              if (value == WorkspaceDestination.skills) {
                 favoriteToggled++;
               }
             },
@@ -55,7 +55,7 @@ void main() {
     expect(selected, WorkspaceDestination.tasks);
 
     await tester.tap(
-      find.byKey(const ValueKey<String>('sidebar-favorite-tasks')),
+      find.byKey(const ValueKey<String>('sidebar-favorite-skills')),
     );
     await tester.pumpAndSettle();
     expect(favoriteToggled, 1);
