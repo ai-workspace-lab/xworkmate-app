@@ -1,7 +1,6 @@
-/// Agent registry for OpenClaw Gateway integration.
-///
-/// This module handles agent registration and discovery through the Gateway.
-library agent_registry;
+// Agent registry for OpenClaw Gateway integration.
+//
+// This module handles agent registration and discovery through the Gateway.
 
 import 'dart:async';
 
@@ -30,10 +29,10 @@ class AgentCapability {
   }
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'description': description,
-        if (parameters != null) 'parameters': parameters,
-      };
+    'name': name,
+    'description': description,
+    if (parameters != null) 'parameters': parameters,
+  };
 }
 
 /// Agent registration information.
@@ -69,7 +68,8 @@ class AgentRegistration {
       expiresAt: json['expiresAt'] != null
           ? DateTime.tryParse(json['expiresAt'] as String)
           : null,
-      capabilities: (json['capabilities'] as List?)
+      capabilities:
+          (json['capabilities'] as List?)
               ?.map((e) => AgentCapability.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -77,15 +77,15 @@ class AgentRegistration {
   }
 
   Map<String, dynamic> toJson() => {
-        'agentId': agentId,
-        'agentType': agentType,
-        'name': name,
-        'version': version,
-        'token': token,
-        'registeredAt': registeredAt.toIso8601String(),
-        if (expiresAt != null) 'expiresAt': expiresAt!.toIso8601String(),
-        'capabilities': capabilities.map((c) => c.toJson()).toList(),
-      };
+    'agentId': agentId,
+    'agentType': agentType,
+    'name': name,
+    'version': version,
+    'token': token,
+    'registeredAt': registeredAt.toIso8601String(),
+    if (expiresAt != null) 'expiresAt': expiresAt!.toIso8601String(),
+    'capabilities': capabilities.map((c) => c.toJson()).toList(),
+  };
 }
 
 /// Agent information from registry.
@@ -114,9 +114,8 @@ class AgentInfo {
       agentType: json['agentType'] as String,
       name: json['name'] as String,
       status: json['status'] as String,
-      capabilities: (json['capabilities'] as List?)
-              ?.map((e) => e as String)
-              .toList() ??
+      capabilities:
+          (json['capabilities'] as List?)?.map((e) => e as String).toList() ??
           [],
       isOnline: json['isOnline'] as bool? ?? false,
       lastSeen: json['lastSeen'] != null
@@ -158,7 +157,8 @@ class AgentException implements Exception {
   const AgentException(this.message, {this.code});
 
   @override
-  String toString() => code != null ? 'AgentException($code): $message' : message;
+  String toString() =>
+      code != null ? 'AgentException($code): $message' : message;
 }
 
 /// Agent registry for managing agent registration and discovery.
@@ -184,6 +184,7 @@ class AgentRegistry with ChangeNotifier {
     required String name,
     required String version,
     required List<AgentCapability> capabilities,
+    String transport = 'in-process',
     Map<String, dynamic>? metadata,
   }) async {
     if (!_gateway.isConnected) {
@@ -195,22 +196,30 @@ class AgentRegistry with ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _gateway.request('agent/register', params: {
-        'agentType': agentType,
-        'name': name,
-        'version': version,
-        'capabilities': capabilities.map((c) => c.toJson()).toList(),
-        if (metadata != null) 'metadata': metadata,
-        'transport': 'in-process',
-      });
+      final response = await _gateway.request(
+        'agent/register',
+        params: {
+          'agentType': agentType,
+          'name': name,
+          'version': version,
+          'capabilities': capabilities.map((c) => c.toJson()).toList(),
+          ...?metadata == null ? null : <String, dynamic>{'metadata': metadata},
+          'transport': transport,
+        },
+      );
 
-      _registration = AgentRegistration.fromJson(response as Map<String, dynamic>);
+      _registration = AgentRegistration.fromJson(
+        response as Map<String, dynamic>,
+      );
       notifyListeners();
       return _registration!;
     } catch (e) {
       _lastError = e.toString();
       notifyListeners();
-      throw AgentException('Failed to register agent: $e', code: 'REGISTRATION_FAILED');
+      throw AgentException(
+        'Failed to register agent: $e',
+        code: 'REGISTRATION_FAILED',
+      );
     } finally {
       _isRegistering = false;
       notifyListeners();
@@ -228,17 +237,27 @@ class AgentRegistry with ChangeNotifier {
     }
 
     try {
-      await _gateway.request('agent/unregister', params: {
-        'agentId': _registration!.agentId,
-      });
+      await _gateway.request(
+        'agent/unregister',
+        params: {'agentId': _registration!.agentId},
+      );
 
       _registration = null;
       notifyListeners();
     } catch (e) {
       _lastError = e.toString();
       notifyListeners();
-      throw AgentException('Failed to unregister agent: $e', code: 'UNREGISTRATION_FAILED');
+      throw AgentException(
+        'Failed to unregister agent: $e',
+        code: 'UNREGISTRATION_FAILED',
+      );
     }
+  }
+
+  /// Clear local registration state without calling the Gateway.
+  void clearRegistration() {
+    _registration = null;
+    notifyListeners();
   }
 
   /// List all registered agents.
@@ -248,9 +267,14 @@ class AgentRegistry with ChangeNotifier {
     }
 
     try {
-      final response = await _gateway.request('agent/list', params: {
-        if (agentType != null) 'agentType': agentType,
-      });
+      final response = await _gateway.request(
+        'agent/list',
+        params: <String, dynamic>{
+          ...?agentType == null
+              ? null
+              : <String, dynamic>{'agentType': agentType},
+        },
+      );
 
       final agentsJson = response['agents'] as List? ?? [];
       _agents = agentsJson
@@ -277,12 +301,15 @@ class AgentRegistry with ChangeNotifier {
     }
 
     try {
-      final response = await _gateway.request('agent/invoke', params: {
-        'agentId': agentId,
-        'prompt': prompt,
-        if (context != null) 'context': context,
-        if (threadId != null) 'threadId': threadId,
-      });
+      final response = await _gateway.request(
+        'agent/invoke',
+        params: {
+          'agentId': agentId,
+          'prompt': prompt,
+          ...?context == null ? null : <String, dynamic>{'context': context},
+          ...?threadId == null ? null : <String, dynamic>{'threadId': threadId},
+        },
+      );
 
       return AgentResponse.fromJson(response as Map<String, dynamic>);
     } catch (e) {
@@ -306,15 +333,23 @@ class AgentRegistry with ChangeNotifier {
     }
 
     try {
-      await _gateway.request('agent/updateStatus', params: {
-        'agentId': _registration!.agentId,
-        'status': status,
-        if (capabilities != null) 'capabilities': capabilities,
-      });
+      await _gateway.request(
+        'agent/updateStatus',
+        params: {
+          'agentId': _registration!.agentId,
+          'status': status,
+          ...?capabilities == null
+              ? null
+              : <String, dynamic>{'capabilities': capabilities},
+        },
+      );
     } catch (e) {
       _lastError = e.toString();
       notifyListeners();
-      throw AgentException('Failed to update status: $e', code: 'UPDATE_FAILED');
+      throw AgentException(
+        'Failed to update status: $e',
+        code: 'UPDATE_FAILED',
+      );
     }
   }
 
@@ -328,10 +363,15 @@ class AgentRegistry with ChangeNotifier {
     }
 
     try {
-      final response = await _gateway.request('memory/sync', params: {
-        'direction': direction, // 'pull', 'push', 'both'
-        if (sinceVersion != null) 'sinceVersion': sinceVersion,
-      });
+      final response = await _gateway.request(
+        'memory/sync',
+        params: {
+          'direction': direction, // 'pull', 'push', 'both'
+          ...?sinceVersion == null
+              ? null
+              : <String, dynamic>{'sinceVersion': sinceVersion},
+        },
+      );
 
       return response as Map<String, dynamic>;
     } catch (e) {

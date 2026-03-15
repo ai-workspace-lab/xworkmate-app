@@ -15,6 +15,8 @@ void main() {
       final snapshot = SettingsSnapshot.defaults().copyWith(
         accountUsername: 'tester',
         accountWorkspace: 'QA',
+        codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
+        codexCliPath: '/opt/homebrew/bin/codex',
         gateway: GatewayConnectionProfile.defaults().copyWith(
           host: 'gateway.example.com',
           port: 9443,
@@ -32,6 +34,11 @@ void main() {
 
       expect(loadedSnapshot.accountUsername, 'tester');
       expect(loadedSnapshot.accountWorkspace, 'QA');
+      expect(
+        loadedSnapshot.codeAgentRuntimeMode,
+        CodeAgentRuntimeMode.externalCli,
+      );
+      expect(loadedSnapshot.codexCliPath, '/opt/homebrew/bin/codex');
       expect(loadedSnapshot.gateway.host, 'gateway.example.com');
       expect(loadedSnapshot.gateway.port, 9443);
       expect(secureRefs['gateway_token'], 'token-secret');

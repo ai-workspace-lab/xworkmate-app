@@ -10,22 +10,7 @@ import 'mode_switcher.dart';
 import 'runtime_models.dart';
 
 /// Coordination state for the runtime.
-enum CoordinatorState {
-  disconnected,
-  connecting,
-  connected,
-  ready,
-  error,
-}
-
-/// Code agent runtime mode for Codex integration.
-///
-/// - [builtIn]: XWorkmate internal runtime path (no external codex process).
-/// - [externalCli]: Launch external `codex` executable via stdio bridge.
-enum CodeAgentRuntimeMode {
-  builtIn,
-  externalCli,
-}
+enum CoordinatorState { disconnected, connecting, connected, ready, error }
 
 /// Descriptor for additional external Code Agent CLI integrations.
 class ExternalCodeAgentProvider {
@@ -72,6 +57,7 @@ class RuntimeCoordinator extends ChangeNotifier {
 
   /// Current code-agent runtime mode.
   CodeAgentRuntimeMode get runtimeMode => _runtimeMode;
+  String? get codeAgentPath => _codexPath;
 
   /// Current gateway mode.
   GatewayMode get currentMode => modeSwitcher.currentMode;
@@ -94,8 +80,8 @@ class RuntimeCoordinator extends ChangeNotifier {
     required this.codex,
     CodexConfigBridge? configBridge,
     ModeSwitcher? modeSwitcher,
-  })  : configBridge = configBridge ?? CodexConfigBridge(),
-        modeSwitcher = modeSwitcher ?? ModeSwitcher(gateway);
+  }) : configBridge = configBridge ?? CodexConfigBridge(),
+       modeSwitcher = modeSwitcher ?? ModeSwitcher(gateway);
 
   /// Register an external Code Agent CLI provider descriptor.
   ///
@@ -106,13 +92,24 @@ class RuntimeCoordinator extends ChangeNotifier {
     if (normalizedId.isEmpty) {
       throw ArgumentError.value(provider.id, 'provider.id', 'Cannot be empty');
     }
+    final normalizedCommand = provider.command.trim();
+    if (normalizedCommand.isEmpty) {
+      throw ArgumentError.value(
+        provider.command,
+        'provider.command',
+        'Cannot be empty',
+      );
+    }
+    final normalizedCapabilities = _normalizeCapabilitySet(
+      provider.capabilities,
+    ).toList(growable: false)..sort();
 
     _externalCodeAgents[normalizedId] = ExternalCodeAgentProvider(
       id: normalizedId,
       name: provider.name,
-      command: provider.command,
+      command: normalizedCommand,
       defaultArgs: provider.defaultArgs,
-      capabilities: provider.capabilities,
+      capabilities: normalizedCapabilities,
     );
     notifyListeners();
   }
@@ -129,6 +126,49 @@ class RuntimeCoordinator extends ChangeNotifier {
   /// Check whether an external provider is known.
   bool hasExternalCodeAgent(String providerId) {
     return _externalCodeAgents.containsKey(providerId.trim());
+  }
+
+  /// Discover providers that can satisfy required capabilities.
+  ///
+  /// This runtime-level surface is the extension point for future capability
+  /// discovery and provider scheduling.
+  List<ExternalCodeAgentProvider> discoverExternalCodeAgents({
+    Iterable<String> requiredCapabilities = const <String>[],
+  }) {
+    final required = _normalizeCapabilitySet(requiredCapabilities);
+    final providers =
+        _externalCodeAgents.values
+            .where((provider) => _providerSupports(provider, required))
+            .toList(growable: false)
+          ..sort((a, b) => a.id.compareTo(b.id));
+    return providers;
+  }
+
+  /// Select one provider for dispatch based on preference and capabilities.
+  ///
+  /// Scheduling policy is intentionally simple for phase 1:
+  /// - honor preferred provider when it satisfies capability requirements
+  /// - otherwise pick the first discovered provider in deterministic id order
+  ExternalCodeAgentProvider? selectExternalCodeAgent({
+    String? preferredProviderId,
+    Iterable<String> requiredCapabilities = const <String>[],
+  }) {
+    final required = _normalizeCapabilitySet(requiredCapabilities);
+    final preferredId = preferredProviderId?.trim() ?? '';
+    if (preferredId.isNotEmpty) {
+      final preferred = _externalCodeAgents[preferredId];
+      if (preferred != null && _providerSupports(preferred, required)) {
+        return preferred;
+      }
+    }
+
+    final discovered = discoverExternalCodeAgents(
+      requiredCapabilities: required,
+    );
+    if (discovered.isEmpty) {
+      return null;
+    }
+    return discovered.first;
   }
 
   /// Initialize the coordinator with Gateway profile and Codex.
@@ -216,6 +256,76 @@ class RuntimeCoordinator extends ChangeNotifier {
     );
   }
 
+  /// Resolve the external Codex CLI path from explicit settings or PATH lookup.
+  Future<String?> resolveCodexPath({String? codexPath}) async {
+    final overridePath = codexPath?.trim() ?? '';
+    if (overridePath.isNotEmpty) {
+      final file = File(overridePath);
+      if (await file.exists()) {
+        return overridePath;
+      }
+      return null;
+    }
+
+    return codex.findCodexBinary();
+  }
+
+  /// Start the code-agent runtime without changing the Gateway connection state.
+  Future<void> startCodeAgentRuntime({
+    required CodeAgentRuntimeMode runtimeMode,
+    String? codexPath,
+    String? workingDirectory,
+  }) async {
+    _runtimeMode = runtimeMode;
+    _codexPath = codexPath?.trim();
+    _cwd = workingDirectory ?? _cwd ?? Directory.current.path;
+    _lastError = null;
+
+    if (runtimeMode == CodeAgentRuntimeMode.builtIn) {
+      if (codex.isConnected) {
+        await codex.stop();
+      }
+      _state = CoordinatorState.ready;
+      notifyListeners();
+      return;
+    }
+
+    final resolvedCodexPath = await resolveCodexPath(codexPath: _codexPath);
+    if (resolvedCodexPath == null) {
+      _state = CoordinatorState.error;
+      _lastError = 'Codex CLI not found';
+      notifyListeners();
+      throw StateError('Codex CLI not found');
+    }
+
+    _codexPath = resolvedCodexPath;
+    if (codex.isConnected) {
+      _state = CoordinatorState.ready;
+      notifyListeners();
+      return;
+    }
+
+    _state = CoordinatorState.connecting;
+    notifyListeners();
+
+    try {
+      await codex.startStdio(codexPath: resolvedCodexPath, cwd: _cwd);
+      _state = CoordinatorState.ready;
+      notifyListeners();
+    } catch (error) {
+      _state = CoordinatorState.error;
+      _lastError = error.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> stopCodeAgentRuntime() async {
+    await codex.stop();
+    _state = CoordinatorState.disconnected;
+    notifyListeners();
+  }
+
   /// Switch to a different mode.
   Future<void> switchMode(GatewayMode newMode) async {
     final result = await _switchMode(newMode);
@@ -277,10 +387,7 @@ class RuntimeCoordinator extends ChangeNotifier {
     _state = CoordinatorState.disconnected;
     notifyListeners();
 
-    await Future.wait([
-      codex.stop(),
-      gateway.disconnect(),
-    ]);
+    await Future.wait([codex.stop(), gateway.disconnect()]);
   }
 
   Future<ModeSwitchResult> _switchMode(GatewayMode mode) {
@@ -300,22 +407,38 @@ class RuntimeCoordinator extends ChangeNotifier {
       return;
     }
 
-    final resolvedCodexPath = _codexPath ?? await codex.findCodexBinary();
+    final resolvedCodexPath = await resolveCodexPath(codexPath: _codexPath);
     if (resolvedCodexPath == null) {
       // Fall back to offline mode if external Codex CLI is unavailable.
       await modeSwitcher.switchToOffline();
       return;
     }
 
+    _codexPath = resolvedCodexPath;
     try {
-      await codex.startStdio(
-        codexPath: resolvedCodexPath,
-        cwd: _cwd,
-      );
+      await codex.startStdio(codexPath: resolvedCodexPath, cwd: _cwd);
     } catch (_) {
       // Continue without external code agent in offline mode.
       await modeSwitcher.switchToOffline();
     }
+  }
+
+  static Set<String> _normalizeCapabilitySet(Iterable<String> capabilities) {
+    return capabilities
+        .map((item) => item.trim().toLowerCase())
+        .where((item) => item.isNotEmpty)
+        .toSet();
+  }
+
+  static bool _providerSupports(
+    ExternalCodeAgentProvider provider,
+    Set<String> requiredCapabilities,
+  ) {
+    if (requiredCapabilities.isEmpty) {
+      return true;
+    }
+    final provided = _normalizeCapabilitySet(provider.capabilities);
+    return requiredCapabilities.every(provided.contains);
   }
 
   @override

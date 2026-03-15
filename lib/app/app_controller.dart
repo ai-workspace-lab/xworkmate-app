@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'app_metadata.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/device_identity_store.dart';
@@ -13,37 +15,46 @@ import '../runtime/secure_config_store.dart';
 import '../runtime/runtime_coordinator.dart';
 import '../runtime/codex_runtime.dart';
 import '../runtime/codex_config_bridge.dart';
+import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 
+enum CodexCooperationState { notStarted, bridgeOnly, registered }
+
 class AppController extends ChangeNotifier {
-  AppController() {
-    // Initialize Codex components first
-    final codexRuntime = CodexRuntime();
-    final configBridge = CodexConfigBridge();
-    
-    // Create Gateway Runtime (wrapped inside RuntimeCoordinator)
-    final gatewayRuntime = GatewayRuntime(
-      store: _store,
-      identityStore: DeviceIdentityStore(_store),
-    );
-    
-    // Create RuntimeCoordinator to manage both Gateway and Codex
-    _runtimeCoordinator = RuntimeCoordinator(
-      gateway: gatewayRuntime,
-      codex: codexRuntime,
-      configBridge: configBridge,
-      modeSwitcher: ModeSwitcher(gatewayRuntime),
-    );
-    
+  AppController({
+    SecureConfigStore? store,
+    RuntimeCoordinator? runtimeCoordinator,
+  }) {
+    _store = store ?? SecureConfigStore();
+
+    final resolvedRuntimeCoordinator =
+        runtimeCoordinator ??
+        RuntimeCoordinator(
+          gateway: GatewayRuntime(
+            store: _store,
+            identityStore: DeviceIdentityStore(_store),
+          ),
+          codex: CodexRuntime(),
+          configBridge: CodexConfigBridge(),
+        );
+
+    _runtimeCoordinator = resolvedRuntimeCoordinator;
+    _codeAgentNodeOrchestrator = CodeAgentNodeOrchestrator(_runtimeCoordinator);
+    _codeAgentBridgeRegistry = AgentRegistry(_runtimeCoordinator.gateway);
     _settingsController = SettingsController(_store);
     _agentsController = GatewayAgentsController(_runtimeCoordinator.gateway);
-    _sessionsController = GatewaySessionsController(_runtimeCoordinator.gateway);
+    _sessionsController = GatewaySessionsController(
+      _runtimeCoordinator.gateway,
+    );
     _chatController = GatewayChatController(_runtimeCoordinator.gateway);
     _instancesController = InstancesController(_runtimeCoordinator.gateway);
     _skillsController = SkillsController(_runtimeCoordinator.gateway);
     _connectorsController = ConnectorsController(_runtimeCoordinator.gateway);
-    _modelsController = ModelsController(_runtimeCoordinator.gateway, _settingsController);
+    _modelsController = ModelsController(
+      _runtimeCoordinator.gateway,
+      _settingsController,
+    );
     _cronJobsController = CronJobsController(_runtimeCoordinator.gateway);
     _devicesController = DevicesController(_runtimeCoordinator.gateway);
     _tasksController = DerivedTasksController();
@@ -51,9 +62,11 @@ class AppController extends ChangeNotifier {
     unawaited(_initialize());
   }
 
-  final SecureConfigStore _store = SecureConfigStore();
+  late final SecureConfigStore _store;
 
   late final RuntimeCoordinator _runtimeCoordinator;
+  late final CodeAgentNodeOrchestrator _codeAgentNodeOrchestrator;
+  late final AgentRegistry _codeAgentBridgeRegistry;
   late final SettingsController _settingsController;
   late final GatewayAgentsController _agentsController;
   late final GatewaySessionsController _sessionsController;
@@ -84,10 +97,16 @@ class AppController extends ChangeNotifier {
   RuntimeCoordinator get runtimeCoordinator => _runtimeCoordinator;
   GatewayRuntime get _runtime => _runtimeCoordinator.gateway;
   GatewayRuntime get runtime => _runtime;
-  
+
   /// Whether Codex bridge is enabled and configured
   bool get isCodexBridgeEnabled => _isCodexBridgeEnabled;
   bool _isCodexBridgeEnabled = false;
+  bool _isCodexBridgeBusy = false;
+  String? _codexBridgeError;
+  String? _codexRuntimeWarning;
+  String? _resolvedCodexCliPath;
+  CodexCooperationState _codexCooperationState =
+      CodexCooperationState.notStarted;
   SettingsController get settingsController => _settingsController;
   GatewayAgentsController get agentsController => _agentsController;
   GatewaySessionsController get sessionsController => _sessionsController;
@@ -130,10 +149,22 @@ class AppController extends ChangeNotifier {
   String? get storedGatewayTokenMask =>
       _settingsController.secureRefs['gateway_token'];
   String get aiGatewayUrl => settings.aiGateway.baseUrl.trim();
+  bool get isCodexBridgeBusy => _isCodexBridgeBusy;
+  String? get codexBridgeError => _codexBridgeError;
+  String? get codexRuntimeWarning => _codexRuntimeWarning;
+  String? get resolvedCodexCliPath => _resolvedCodexCliPath;
+  bool get hasDetectedCodexCli => _resolvedCodexCliPath != null;
+  String get configuredCodexCliPath => settings.codexCliPath.trim();
+  CodeAgentRuntimeMode get configuredCodeAgentRuntimeMode =>
+      settings.codeAgentRuntimeMode;
+  CodeAgentRuntimeMode get effectiveCodeAgentRuntimeMode =>
+      configuredCodeAgentRuntimeMode;
+  CodexCooperationState get codexCooperationState => _codexCooperationState;
 
   Future<String> loadAiGatewayApiKey() async {
     return (await _store.loadAiGatewayApiKey())?.trim() ?? '';
   }
+
   List<String> get aiGatewayModelChoices {
     final selected = settings.aiGateway.selectedModels
         .where(settings.aiGateway.availableModels.contains)
@@ -348,6 +379,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> disconnectGateway() async {
+    _clearCodexGatewayRegistration();
     await _runtime.disconnect(clearDesiredProfile: false);
     await _settingsController.refreshDerivedState();
     await _agentsController.refresh();
@@ -479,11 +511,16 @@ class AppController extends ChangeNotifier {
     List<GatewayChatAttachmentPayload> attachments =
         const <GatewayChatAttachmentPayload>[],
   }) async {
+    final dispatch = _codeAgentNodeOrchestrator.buildGatewayDispatch(
+      _buildCodeAgentNodeState(),
+    );
     await _chatController.sendMessage(
       sessionKey: _sessionsController.currentSessionKey,
       message: message,
       thinking: thinking,
       attachments: attachments,
+      agentId: dispatch.agentId,
+      metadata: dispatch.metadata,
     );
     _recomputeTasks();
   }
@@ -574,10 +611,17 @@ class AppController extends ChangeNotifier {
     SettingsSnapshot snapshot, {
     bool refreshAfterSave = true,
   }) async {
-    setActiveAppLanguage(snapshot.appLanguage);
-    await _settingsController.saveSnapshot(snapshot);
-    _agentsController.restoreSelection(snapshot.gateway.selectedAgentId);
-    _modelsController.restoreFromSettings(snapshot.aiGateway);
+    final current = settings;
+    final sanitized = _sanitizeCodeAgentSettings(snapshot);
+    setActiveAppLanguage(sanitized.appLanguage);
+    await _settingsController.saveSnapshot(sanitized);
+    _agentsController.restoreSelection(sanitized.gateway.selectedAgentId);
+    _modelsController.restoreFromSettings(sanitized.aiGateway);
+    if (current.codexCliPath != sanitized.codexCliPath ||
+        current.codeAgentRuntimeMode != sanitized.codeAgentRuntimeMode) {
+      _registerCodexExternalProvider(codexPath: sanitized.codexCliPath);
+      await _refreshCodexCliAvailability();
+    }
     if (refreshAfterSave) {
       _recomputeTasks();
     }
@@ -606,51 +650,85 @@ class AppController extends ChangeNotifier {
 
   /// Enable Codex ↔ Gateway bridge
   Future<void> enableCodexBridge() async {
-    if (_isCodexBridgeEnabled) return;
-    
+    if (_isCodexBridgeEnabled || _isCodexBridgeBusy) return;
+
+    _isCodexBridgeBusy = true;
+    _codexBridgeError = null;
+
     try {
-      // Get AI Gateway configuration
       final gatewayUrl = aiGatewayUrl;
       final apiKey = await loadAiGatewayApiKey();
-      
+
       if (gatewayUrl.isEmpty) {
-        throw StateError(appText('AI Gateway URL 未配置', 'AI Gateway URL not configured'));
+        throw StateError(
+          appText('AI Gateway URL 未配置', 'AI Gateway URL not configured'),
+        );
       }
-      
-      // Configure Codex to use AI Gateway
+
+      final runtimeMode = effectiveCodeAgentRuntimeMode;
+      String? codexPath;
+      if (runtimeMode == CodeAgentRuntimeMode.externalCli) {
+        codexPath = await _resolveCodexCliPath();
+        if (codexPath == null) {
+          throw StateError(
+            appText(
+              '未找到 Codex CLI。请先安装或填写可执行文件路径。',
+              'Codex CLI not found. Install it or set a manual binary path.',
+            ),
+          );
+        }
+      }
+
       await _runtimeCoordinator.configureCodexForGateway(
         gatewayUrl: gatewayUrl,
         apiKey: apiKey,
       );
-      
-      // Try to initialize Codex with auto mode
-      if (!_runtimeCoordinator.isReady) {
-        await _runtimeCoordinator.initializeAuto(
-          preferRemote: true,
-        );
-      }
-      
+
+      await _runtimeCoordinator.startCodeAgentRuntime(
+        runtimeMode: runtimeMode,
+        codexPath: codexPath,
+        workingDirectory: _resolveCodexWorkingDirectory(),
+      );
+
+      _registerCodexExternalProvider(codexPath: codexPath);
       _isCodexBridgeEnabled = true;
+      _codexCooperationState = CodexCooperationState.bridgeOnly;
+      await _ensureCodexGatewayRegistration();
       notifyListeners();
     } catch (e) {
-      _isCodexBridgeEnabled = false;
+      _codexBridgeError = e.toString();
       notifyListeners();
       rethrow;
+    } finally {
+      _isCodexBridgeBusy = false;
+      notifyListeners();
     }
   }
 
   /// Disable Codex ↔ Gateway bridge
   Future<void> disableCodexBridge() async {
-    if (!_isCodexBridgeEnabled) return;
-    
+    if (!_isCodexBridgeEnabled || _isCodexBridgeBusy) return;
+
+    _isCodexBridgeBusy = true;
+
     try {
-      // Shutdown Codex runtime but keep Gateway connection
-      await _runtimeCoordinator.codex.stop();
+      if (_runtime.isConnected && _codeAgentBridgeRegistry.isRegistered) {
+        await _codeAgentBridgeRegistry.unregister();
+      } else {
+        _codeAgentBridgeRegistry.clearRegistration();
+      }
+      await _runtimeCoordinator.stopCodeAgentRuntime();
       _isCodexBridgeEnabled = false;
+      _codexCooperationState = CodexCooperationState.notStarted;
+      _codexBridgeError = null;
       notifyListeners();
     } catch (e) {
+      _codexBridgeError = e.toString();
       notifyListeners();
       rethrow;
+    } finally {
+      _isCodexBridgeBusy = false;
+      notifyListeners();
     }
   }
 
@@ -684,16 +762,26 @@ class AppController extends ChangeNotifier {
       if (seeded.toJsonString() != settings.toJsonString()) {
         await _settingsController.saveSnapshot(seeded);
       }
+      final normalized = _sanitizeCodeAgentSettings(
+        _settingsController.snapshot,
+      );
+      if (normalized.toJsonString() !=
+          _settingsController.snapshot.toJsonString()) {
+        await _settingsController.saveSnapshot(normalized);
+      }
       _modelsController.restoreFromSettings(settings.aiGateway);
       setActiveAppLanguage(settings.appLanguage);
-      await _runtimeCoordinator.initialize();
+      _registerCodexExternalProvider();
+      await _refreshCodexCliAvailability();
       _agentsController.restoreSelection(settings.gateway.selectedAgentId);
       _sessionsController.configure(
         mainSessionKey: _runtime.snapshot.mainSessionKey ?? 'main',
         selectedAgentId: _agentsController.selectedAgentId,
         defaultAgentId: '',
       );
-      _runtimeEventsSubscription = _runtimeCoordinator.gateway.events.listen(_handleRuntimeEvent);
+      _runtimeEventsSubscription = _runtimeCoordinator.gateway.events.listen(
+        _handleRuntimeEvent,
+      );
       final shouldAutoConnect =
           settings.gateway.useSetupCode &&
           settings.gateway.setupCode.trim().isNotEmpty;
@@ -736,6 +824,7 @@ class AppController extends ChangeNotifier {
     await _cronJobsController.refresh();
     await _devicesController.refresh(quiet: true);
     await _settingsController.refreshDerivedState();
+    await _ensureCodexGatewayRegistration();
     _recomputeTasks();
   }
 
@@ -755,6 +844,163 @@ class AppController extends ChangeNotifier {
         event.event == 'device.pair.resolved') {
       unawaited(refreshDevices(quiet: true));
     }
+  }
+
+  SettingsSnapshot _sanitizeCodeAgentSettings(SettingsSnapshot snapshot) {
+    _codexRuntimeWarning =
+        snapshot.codeAgentRuntimeMode == CodeAgentRuntimeMode.builtIn
+        ? appText(
+            '内置 Codex 仍处于实验阶段；建议优先使用 External Codex CLI。',
+            'Built-in Codex is still experimental; External Codex CLI is recommended.',
+          )
+        : null;
+    final normalizedPath = snapshot.codexCliPath.trim();
+    if (normalizedPath == snapshot.codexCliPath) {
+      return snapshot;
+    }
+    return snapshot.copyWith(codexCliPath: normalizedPath);
+  }
+
+  Future<void> _refreshCodexCliAvailability() async {
+    _resolvedCodexCliPath = await _runtimeCoordinator.resolveCodexPath(
+      codexPath: settings.codexCliPath,
+    );
+    notifyListeners();
+  }
+
+  Future<String?> _resolveCodexCliPath() async {
+    if (_resolvedCodexCliPath != null) {
+      return _resolvedCodexCliPath;
+    }
+    await _refreshCodexCliAvailability();
+    return _resolvedCodexCliPath;
+  }
+
+  String? _resolveCodexWorkingDirectory() {
+    final candidate = settings.workspacePath.trim();
+    if (candidate.isEmpty) {
+      return null;
+    }
+    final directory = Directory(candidate);
+    return directory.existsSync() ? directory.path : null;
+  }
+
+  void _registerCodexExternalProvider({String? codexPath}) {
+    _runtimeCoordinator.registerExternalCodeAgent(
+      ExternalCodeAgentProvider(
+        id: 'codex',
+        name: 'Codex CLI',
+        command: (codexPath?.trim().isNotEmpty ?? false)
+            ? codexPath!.trim()
+            : 'codex',
+        defaultArgs: const <String>['app-server', '--listen', 'stdio://'],
+        capabilities: const <String>[
+          'chat',
+          'code-edit',
+          'gateway-bridge',
+          'memory-sync',
+        ],
+      ),
+    );
+  }
+
+  CodeAgentNodeState _buildCodeAgentNodeState() {
+    return CodeAgentNodeState(
+      selectedAgentId: _agentsController.selectedAgentId,
+      gatewayConnected: _runtime.isConnected,
+      executionTarget: settings.assistantExecutionTarget,
+      runtimeMode: effectiveCodeAgentRuntimeMode,
+      bridgeEnabled: _isCodexBridgeEnabled,
+      bridgeState: _codexCooperationState.name,
+      preferredProviderId: 'codex',
+      resolvedCodexCliPath: _resolvedCodexCliPath,
+      configuredCodexCliPath: configuredCodexCliPath,
+    );
+  }
+
+  GatewayMode _bridgeGatewayMode() {
+    return switch (settings.gateway.mode) {
+      RuntimeConnectionMode.local => GatewayMode.local,
+      RuntimeConnectionMode.remote => GatewayMode.remote,
+      RuntimeConnectionMode.unconfigured => GatewayMode.offline,
+    };
+  }
+
+  Future<void> _ensureCodexGatewayRegistration() async {
+    if (!_isCodexBridgeEnabled) {
+      return;
+    }
+
+    if (!_runtime.isConnected) {
+      _codexCooperationState = CodexCooperationState.bridgeOnly;
+      _codeAgentBridgeRegistry.clearRegistration();
+      notifyListeners();
+      return;
+    }
+
+    if (_codeAgentBridgeRegistry.isRegistered) {
+      _codexCooperationState = CodexCooperationState.registered;
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final dispatch = _codeAgentNodeOrchestrator.buildGatewayDispatch(
+        _buildCodeAgentNodeState(),
+      );
+      await _codeAgentBridgeRegistry.register(
+        agentType: 'code-agent-bridge',
+        name: 'XWorkmate Codex Bridge',
+        version: kAppVersion,
+        transport: 'stdio-bridge',
+        capabilities: const <AgentCapability>[
+          AgentCapability(
+            name: 'chat',
+            description: 'Bridge external Codex CLI chat turns.',
+          ),
+          AgentCapability(
+            name: 'code-edit',
+            description: 'Bridge code editing tasks through Codex CLI.',
+          ),
+          AgentCapability(
+            name: 'memory-sync',
+            description: 'Coordinate memory sync through OpenClaw Gateway.',
+          ),
+        ],
+        metadata: <String, dynamic>{
+          ...dispatch.metadata,
+          'providerId': 'codex',
+          'runtimeMode': effectiveCodeAgentRuntimeMode.name,
+          'gatewayMode': _bridgeGatewayMode().name,
+          'binaryConfigured': (resolvedCodexCliPath ?? configuredCodexCliPath)
+              .trim()
+              .isNotEmpty,
+          'capabilities': const <String>[
+            'chat',
+            'code-edit',
+            'gateway-bridge',
+            'memory-sync',
+          ],
+        },
+      );
+      _codexCooperationState = CodexCooperationState.registered;
+      _codexBridgeError = null;
+    } catch (error) {
+      _codexCooperationState = CodexCooperationState.bridgeOnly;
+      _codexBridgeError = error.toString();
+    }
+
+    notifyListeners();
+  }
+
+  void _clearCodexGatewayRegistration() {
+    _codeAgentBridgeRegistry.clearRegistration();
+    if (_isCodexBridgeEnabled) {
+      _codexCooperationState = CodexCooperationState.bridgeOnly;
+    } else {
+      _codexCooperationState = CodexCooperationState.notStarted;
+    }
+    notifyListeners();
   }
 
   void _recomputeTasks() {
