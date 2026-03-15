@@ -20,10 +20,16 @@ class AssistantPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onOpenDetail,
+    this.navigationPanelBuilder,
+    this.showStandaloneTaskRail = true,
+    this.unifiedPaneStartsCollapsed = false,
   });
 
   final AppController controller;
   final ValueChanged<DetailPanelData> onOpenDetail;
+  final Widget Function(double contentWidth)? navigationPanelBuilder;
+  final bool showStandaloneTaskRail;
+  final bool unifiedPaneStartsCollapsed;
 
   @override
   State<AssistantPage> createState() => _AssistantPageState();
@@ -42,6 +48,11 @@ class _AssistantPageState extends State<AssistantPage> {
   double _conversationPaneRatio = 0.7;
   double _threadRailWidth = 304;
   String _threadQuery = '';
+  bool _sidePaneCollapsed = false;
+  _AssistantSidePane _activeSidePane = _AssistantSidePane.tasks;
+  final Map<String, _AssistantTaskSeed> _taskSeeds =
+      <String, _AssistantTaskSeed>{};
+  final Set<String> _archivedTaskKeys = <String>{};
   List<_ComposerAttachment> _attachments = const <_ComposerAttachment>[];
   String? _lastSubmittedPrompt;
   String? _lastAutoAgentLabel;
@@ -54,6 +65,16 @@ class _AssistantPageState extends State<AssistantPage> {
     _threadSearchController = TextEditingController();
     _conversationController = ScrollController();
     _composerFocusNode = FocusNode();
+    _sidePaneCollapsed = widget.unifiedPaneStartsCollapsed;
+  }
+
+  @override
+  void didUpdateWidget(covariant AssistantPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.unifiedPaneStartsCollapsed !=
+        widget.unifiedPaneStartsCollapsed) {
+      _sidePaneCollapsed = widget.unifiedPaneStartsCollapsed;
+    }
   }
 
   @override
@@ -95,13 +116,19 @@ class _AssistantPageState extends State<AssistantPage> {
           padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final showThreadRail = constraints.maxWidth >= 860;
+              final showUnifiedSidePane =
+                  widget.navigationPanelBuilder != null &&
+                  constraints.maxWidth >= 860;
+              final showThreadRail =
+                  !showUnifiedSidePane &&
+                  widget.showStandaloneTaskRail &&
+                  constraints.maxWidth >= 860;
               final mainWorkspace = _buildMainWorkspace(
                 controller: controller,
                 timelineItems: timelineItems,
                 currentTask: currentTask,
               );
-              if (!showThreadRail) {
+              if (!showThreadRail && !showUnifiedSidePane) {
                 return mainWorkspace;
               }
 
@@ -111,6 +138,90 @@ class _AssistantPageState extends State<AssistantPage> {
               final threadRailWidth = _threadRailWidth
                   .clamp(232.0, maxThreadRailWidth)
                   .toDouble();
+
+              if (showUnifiedSidePane) {
+                const sideTabRailWidth = 58.0;
+                final sidePanelContentWidth =
+                    (threadRailWidth - sideTabRailWidth - 6)
+                        .clamp(174.0, maxThreadRailWidth)
+                        .toDouble();
+                return Row(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      width: _sidePaneCollapsed
+                          ? sideTabRailWidth
+                          : threadRailWidth,
+                      child: _AssistantUnifiedSidePane(
+                        activePane: _activeSidePane,
+                        collapsed: _sidePaneCollapsed,
+                        taskPanel: _AssistantTaskRail(
+                          key: const Key('assistant-task-rail'),
+                          controller: controller,
+                          tasks: visibleTasks,
+                          query: _threadQuery,
+                          searchController: _threadSearchController,
+                          onQueryChanged: (value) {
+                            setState(() {
+                              _threadQuery = value.trim();
+                            });
+                          },
+                          onClearQuery: () {
+                            _threadSearchController.clear();
+                            setState(() {
+                              _threadQuery = '';
+                            });
+                          },
+                          onRefreshTasks: controller.refreshSessions,
+                          onCreateTask: _createNewThread,
+                          onOpenTasks: () {
+                            controller.navigateTo(WorkspaceDestination.tasks);
+                          },
+                          onOpenSkills: () {
+                            controller.navigateTo(WorkspaceDestination.skills);
+                          },
+                          onSelectTask: (sessionKey) async {
+                            await controller.switchSession(sessionKey);
+                            _focusComposer();
+                          },
+                          onArchiveTask: _archiveTask,
+                        ),
+                        navigationPanel: widget.navigationPanelBuilder!(
+                          sidePanelContentWidth,
+                        ),
+                        onSelectPane: (pane) {
+                          setState(() {
+                            _activeSidePane = pane;
+                            _sidePaneCollapsed = false;
+                          });
+                        },
+                        onToggleCollapsed: () {
+                          setState(() {
+                            _sidePaneCollapsed = !_sidePaneCollapsed;
+                          });
+                        },
+                      ),
+                    ),
+                    if (!_sidePaneCollapsed)
+                      SizedBox(
+                        width: 10,
+                        child: PaneResizeHandle(
+                          axis: Axis.horizontal,
+                          onDelta: (delta) {
+                            setState(() {
+                              _threadRailWidth = (_threadRailWidth + delta)
+                                  .clamp(232.0, maxThreadRailWidth)
+                                  .toDouble();
+                            });
+                          },
+                        ),
+                      ),
+                    const SizedBox(width: 6),
+                    Expanded(child: mainWorkspace),
+                  ],
+                );
+              }
 
               return Row(
                 children: [
@@ -145,6 +256,7 @@ class _AssistantPageState extends State<AssistantPage> {
                         await controller.switchSession(sessionKey);
                         _focusComposer();
                       },
+                      onArchiveTask: _archiveTask,
                     ),
                   ),
                   SizedBox(
@@ -190,15 +302,13 @@ class _AssistantPageState extends State<AssistantPage> {
         var minComposerHeight = availablePaneHeight >= 620
             ? 176.0
             : availablePaneHeight * 0.24;
-        if (minConversationHeight + minComposerHeight >
-            availablePaneHeight) {
+        if (minConversationHeight + minComposerHeight > availablePaneHeight) {
           minConversationHeight = availablePaneHeight * 0.52;
           minComposerHeight = availablePaneHeight - minConversationHeight;
         }
-        final maxConversationHeight =
-            (availablePaneHeight - minComposerHeight)
-                .clamp(minConversationHeight, availablePaneHeight)
-                .toDouble();
+        final maxConversationHeight = (availablePaneHeight - minComposerHeight)
+            .clamp(minConversationHeight, availablePaneHeight)
+            .toDouble();
         final conversationHeight = availablePaneHeight <= 0
             ? 0.0
             : (_conversationPaneRatio * availablePaneHeight)
@@ -428,6 +538,20 @@ class _AssistantPageState extends State<AssistantPage> {
       _lastSubmittedPrompt = rawPrompt;
       _lastAutoAgentLabel = autoAgent?.name ?? controller.activeAgentName;
       _lastSubmittedAttachments = attachmentNames;
+      _touchTaskSeed(
+        sessionKey: controller.currentSessionKey,
+        title:
+            _taskSeeds[controller.currentSessionKey]?.title ??
+            _fallbackSessionTitle(controller.currentSessionKey),
+        preview: rawPrompt,
+        status:
+            controller.connection.status == RuntimeConnectionStatus.connected
+            ? 'running'
+            : 'queued',
+        owner: autoAgent?.name ?? controller.activeAgentName,
+        surface: 'Assistant',
+        draft: controller.currentSessionKey.trim().startsWith('draft:'),
+      );
     });
 
     final attachmentPayloads = await _buildAttachmentPayloads(_attachments);
@@ -578,60 +702,48 @@ class _AssistantPageState extends State<AssistantPage> {
 
   Future<void> _createNewThread() async {
     final sessionKey = _buildDraftSessionKey(widget.controller);
+    setState(() {
+      _archivedTaskKeys.removeWhere(
+        (value) => _sessionKeysMatch(value, sessionKey),
+      );
+      _taskSeeds[sessionKey] = _AssistantTaskSeed(
+        sessionKey: sessionKey,
+        title: appText('新对话', 'New conversation'),
+        preview: appText(
+          '等待描述这个任务的第一条消息',
+          'Waiting for the first message of this task',
+        ),
+        status: 'queued',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        owner: widget.controller.activeAgentName,
+        surface: 'Assistant',
+        draft: true,
+      );
+    });
     await widget.controller.switchSession(sessionKey);
     _focusComposer();
   }
 
   List<_AssistantTaskEntry> _buildTaskEntries(AppController controller) {
-    final sessions = controller.sessions.toList(growable: false)
-      ..sort(
-        (left, right) =>
-            (right.updatedAtMs ?? 0).compareTo(left.updatedAtMs ?? 0),
-      );
-    final entries = sessions
-        .map(
-          (session) => _AssistantTaskEntry(
-            sessionKey: session.key,
-            title: _sessionDisplayTitle(session),
-            preview:
-                _sessionPreview(session) ??
-                appText('等待继续执行这个任务', 'Waiting to continue this task'),
-            status: _sessionStatus(
-              session,
-              currentSessionKey: controller.currentSessionKey,
-              hasPendingRun: controller.chatController.hasPendingRun,
-            ),
-            updatedAtLabel: _sessionUpdatedAtLabel(session.updatedAtMs),
-            owner: controller.activeAgentName,
-            surface: session.surface ?? session.kind ?? 'Assistant',
-            isCurrent: _sessionKeysMatch(
-              session.key,
-              controller.currentSessionKey,
-            ),
-          ),
-        )
-        .toList(growable: true);
-    if (!entries.any(
-      (item) => _sessionKeysMatch(item.sessionKey, controller.currentSessionKey),
-    )) {
-      entries.insert(
-        0,
-        _AssistantTaskEntry(
-          sessionKey: controller.currentSessionKey,
-          title: _fallbackSessionTitle(controller.currentSessionKey),
-          preview: appText(
-            '等待描述这个任务的第一条消息',
-            'Waiting for the first message of this task',
-          ),
-          status: 'queued',
-          updatedAtLabel: appText('现在', 'Now'),
-          owner: controller.activeAgentName,
-          surface: 'Assistant',
-          isCurrent: true,
-          draft: true,
-        ),
-      );
-    }
+    _synchronizeTaskSeeds(controller);
+    final entries =
+        _taskSeeds.values
+            .where((item) => !_isArchivedTask(item.sessionKey))
+            .map(
+              (item) => item.toEntry(
+                isCurrent: _sessionKeysMatch(
+                  item.sessionKey,
+                  controller.currentSessionKey,
+                ),
+              ),
+            )
+            .toList(growable: true)
+          ..sort((left, right) {
+            if (left.isCurrent != right.isCurrent) {
+              return left.isCurrent ? -1 : 1;
+            }
+            return (right.updatedAtMs ?? 0).compareTo(left.updatedAtMs ?? 0);
+          });
     return entries;
   }
 
@@ -640,11 +752,13 @@ class _AssistantPageState extends State<AssistantPage> {
     if (query.isEmpty) {
       return items;
     }
-    return items.where((item) {
-      final haystack =
-          '${item.title}\n${item.preview}\n${item.sessionKey}'.toLowerCase();
-      return haystack.contains(query);
-    }).toList(growable: false);
+    return items
+        .where((item) {
+          final haystack = '${item.title}\n${item.preview}\n${item.sessionKey}'
+              .toLowerCase();
+          return haystack.contains(query);
+        })
+        .toList(growable: false);
   }
 
   _AssistantTaskEntry _resolveCurrentTask(
@@ -661,12 +775,115 @@ class _AssistantPageState extends State<AssistantPage> {
       title: _fallbackSessionTitle(sessionKey),
       preview: '',
       status: 'queued',
-      updatedAtLabel: appText('现在', 'Now'),
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       owner: widget.controller.activeAgentName,
       surface: 'Assistant',
       isCurrent: true,
       draft: true,
     );
+  }
+
+  void _synchronizeTaskSeeds(AppController controller) {
+    for (final session in controller.sessions) {
+      if (_isArchivedTask(session.key)) {
+        continue;
+      }
+      _taskSeeds[session.key] = _AssistantTaskSeed(
+        sessionKey: session.key,
+        title: _sessionDisplayTitle(session),
+        preview:
+            _sessionPreview(session) ??
+            appText('等待继续执行这个任务', 'Waiting to continue this task'),
+        status: _sessionStatus(
+          session,
+          currentSessionKey: controller.currentSessionKey,
+          hasPendingRun: controller.chatController.hasPendingRun,
+        ),
+        updatedAtMs:
+            session.updatedAtMs ??
+            DateTime.now().millisecondsSinceEpoch.toDouble(),
+        owner: controller.activeAgentName,
+        surface: session.surface ?? session.kind ?? 'Assistant',
+        draft: session.key.trim().startsWith('draft:'),
+      );
+    }
+
+    if (_isArchivedTask(controller.currentSessionKey)) {
+      return;
+    }
+    _taskSeeds.putIfAbsent(
+      controller.currentSessionKey,
+      () => _AssistantTaskSeed(
+        sessionKey: controller.currentSessionKey,
+        title: _fallbackSessionTitle(controller.currentSessionKey),
+        preview: appText(
+          '等待描述这个任务的第一条消息',
+          'Waiting for the first message of this task',
+        ),
+        status: 'queued',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        owner: controller.activeAgentName,
+        surface: 'Assistant',
+        draft: controller.currentSessionKey.trim().startsWith('draft:'),
+      ),
+    );
+  }
+
+  void _touchTaskSeed({
+    required String sessionKey,
+    required String title,
+    required String preview,
+    required String status,
+    required String owner,
+    required String surface,
+    required bool draft,
+  }) {
+    _taskSeeds[sessionKey] = _AssistantTaskSeed(
+      sessionKey: sessionKey,
+      title: title,
+      preview: preview,
+      status: status,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      owner: owner,
+      surface: surface,
+      draft: draft,
+    );
+  }
+
+  bool _isArchivedTask(String sessionKey) {
+    for (final archivedKey in _archivedTaskKeys) {
+      if (_sessionKeysMatch(archivedKey, sessionKey)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _archiveTask(String sessionKey) async {
+    final isCurrent = _sessionKeysMatch(
+      sessionKey,
+      widget.controller.currentSessionKey,
+    );
+    setState(() {
+      _archivedTaskKeys.add(sessionKey);
+      _taskSeeds.removeWhere((key, _) => _sessionKeysMatch(key, sessionKey));
+    });
+
+    if (!isCurrent) {
+      return;
+    }
+
+    for (final candidate in _taskSeeds.keys) {
+      if (_isArchivedTask(candidate) ||
+          _sessionKeysMatch(candidate, sessionKey)) {
+        continue;
+      }
+      await widget.controller.switchSession(candidate);
+      _focusComposer();
+      return;
+    }
+
+    await _createNewThread();
   }
 
   String _buildDraftSessionKey(AppController controller) {
@@ -676,6 +893,171 @@ class _AssistantPageState extends State<AssistantPage> {
       return 'draft:$stamp';
     }
     return 'draft:$selectedAgentId:$stamp';
+  }
+}
+
+enum _AssistantSidePane { tasks, navigation }
+
+class _AssistantUnifiedSidePane extends StatelessWidget {
+  const _AssistantUnifiedSidePane({
+    required this.activePane,
+    required this.collapsed,
+    required this.taskPanel,
+    required this.navigationPanel,
+    required this.onSelectPane,
+    required this.onToggleCollapsed,
+  });
+
+  final _AssistantSidePane activePane;
+  final bool collapsed;
+  final Widget taskPanel;
+  final Widget navigationPanel;
+  final ValueChanged<_AssistantSidePane> onSelectPane;
+  final VoidCallback onToggleCollapsed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _AssistantSideTabRail(
+          activePane: activePane,
+          collapsed: collapsed,
+          onSelectPane: onSelectPane,
+          onToggleCollapsed: onToggleCollapsed,
+        ),
+        if (!collapsed) ...[
+          const SizedBox(width: 6),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: activePane == _AssistantSidePane.tasks
+                  ? KeyedSubtree(
+                      key: const ValueKey<String>('assistant-side-pane-tasks'),
+                      child: taskPanel,
+                    )
+                  : KeyedSubtree(
+                      key: const ValueKey<String>(
+                        'assistant-side-pane-navigation',
+                      ),
+                      child: navigationPanel,
+                    ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _AssistantSideTabRail extends StatelessWidget {
+  const _AssistantSideTabRail({
+    required this.activePane,
+    required this.collapsed,
+    required this.onSelectPane,
+    required this.onToggleCollapsed,
+  });
+
+  final _AssistantSidePane activePane;
+  final bool collapsed;
+  final ValueChanged<_AssistantSidePane> onSelectPane;
+  final VoidCallback onToggleCollapsed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return Container(
+      key: const Key('assistant-side-pane'),
+      width: 58,
+      decoration: BoxDecoration(
+        color: palette.sidebar,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: palette.sidebarBorder.withValues(alpha: 0.72),
+        ),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 8),
+          _AssistantSideTabButton(
+            key: const Key('assistant-side-pane-tab-tasks'),
+            icon: Icons.checklist_rtl_rounded,
+            selected: activePane == _AssistantSidePane.tasks,
+            tooltip: appText('任务', 'Tasks'),
+            onTap: () => onSelectPane(_AssistantSidePane.tasks),
+          ),
+          const SizedBox(height: 6),
+          _AssistantSideTabButton(
+            key: const Key('assistant-side-pane-tab-navigation'),
+            icon: Icons.dashboard_customize_outlined,
+            selected: activePane == _AssistantSidePane.navigation,
+            tooltip: appText('导航', 'Navigation'),
+            onTap: () => onSelectPane(_AssistantSidePane.navigation),
+          ),
+          const Spacer(),
+          IconButton(
+            key: const Key('assistant-side-pane-toggle'),
+            tooltip: collapsed
+                ? appText('展开侧板', 'Expand side pane')
+                : appText('收起侧板', 'Collapse side pane'),
+            onPressed: onToggleCollapsed,
+            icon: Icon(
+              collapsed
+                  ? Icons.keyboard_double_arrow_right_rounded
+                  : Icons.keyboard_double_arrow_left_rounded,
+              size: 18,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+class _AssistantSideTabButton extends StatelessWidget {
+  const _AssistantSideTabButton({
+    super.key,
+    required this.icon,
+    required this.selected,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final bool selected;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: selected ? palette.accentMuted : Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: selected ? palette.accent : palette.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -776,8 +1158,8 @@ class _ConversationArea extends StatelessWidget {
     final palette = context.palette;
     final theme = Theme.of(context);
     final statusStyle = _pillStyleForStatus(context, currentTask.status);
-    final taskHint = controller.connection.status ==
-            RuntimeConnectionStatus.connected
+    final taskHint =
+        controller.connection.status == RuntimeConnectionStatus.connected
         ? appText(
             '当前对话会作为任务上下文持续执行，切换左侧任务即可回到对应会话。',
             'This conversation stays attached to the selected task. Pick another task on the left to jump back into it.',
@@ -806,10 +1188,7 @@ class _ConversationArea extends StatelessWidget {
                         style: theme.textTheme.titleLarge,
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        taskHint,
-                        style: theme.textTheme.bodySmall,
-                      ),
+                      Text(taskHint, style: theme.textTheme.bodySmall),
                       const SizedBox(height: 10),
                       Wrap(
                         spacing: 8,
@@ -986,6 +1365,7 @@ class _AssistantTaskRail extends StatelessWidget {
     required this.onOpenTasks,
     required this.onOpenSkills,
     required this.onSelectTask,
+    required this.onArchiveTask,
   });
 
   final AppController controller;
@@ -999,6 +1379,7 @@ class _AssistantTaskRail extends StatelessWidget {
   final VoidCallback onOpenTasks;
   final VoidCallback onOpenSkills;
   final Future<void> Function(String sessionKey) onSelectTask;
+  final Future<void> Function(String sessionKey) onArchiveTask;
 
   @override
   Widget build(BuildContext context) {
@@ -1100,8 +1481,7 @@ class _AssistantTaskRail extends StatelessWidget {
                         runSpacing: 8,
                         children: [
                           _MetaPill(
-                            label:
-                                '${appText('运行中', 'Running')} $runningCount',
+                            label: '${appText('运行中', 'Running')} $runningCount',
                             icon: Icons.play_circle_outline_rounded,
                           ),
                           _MetaPill(
@@ -1186,6 +1566,9 @@ class _AssistantTaskRail extends StatelessWidget {
                         onTap: () async {
                           await onSelectTask(task.sessionKey);
                         },
+                        onArchive: () async {
+                          await onArchiveTask(task.sessionKey);
+                        },
                       );
                     },
                   ),
@@ -1197,10 +1580,15 @@ class _AssistantTaskRail extends StatelessWidget {
 }
 
 class _AssistantTaskTile extends StatelessWidget {
-  const _AssistantTaskTile({required this.entry, required this.onTap});
+  const _AssistantTaskTile({
+    required this.entry,
+    required this.onTap,
+    required this.onArchive,
+  });
 
   final _AssistantTaskEntry entry;
   final VoidCallback onTap;
+  final VoidCallback onArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -1214,7 +1602,7 @@ class _AssistantTaskTile extends StatelessWidget {
           : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        key: ValueKey<String>('assistant-task-${entry.sessionKey}'),
+        key: ValueKey<String>('assistant-task-item-${entry.sessionKey}'),
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Container(
@@ -1263,11 +1651,31 @@ class _AssistantTaskTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    entry.updatedAtLabel,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: palette.textMuted,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        entry.updatedAtLabel,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: palette.textMuted,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      IconButton(
+                        key: ValueKey<String>(
+                          'assistant-task-archive-${entry.sessionKey}',
+                        ),
+                        tooltip: appText('归档任务', 'Archive task'),
+                        visualDensity: VisualDensity.compact,
+                        splashRadius: 16,
+                        onPressed: onArchive,
+                        icon: Icon(
+                          Icons.archive_outlined,
+                          size: 18,
+                          color: palette.textMuted,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1282,7 +1690,10 @@ class _AssistantTaskTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              Row(
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   _StatusPill(
                     label: entry.draft
@@ -1291,21 +1702,8 @@ class _AssistantTaskTile extends StatelessWidget {
                     backgroundColor: statusStyle.backgroundColor,
                     textColor: statusStyle.foregroundColor,
                   ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: _MetaPill(
-                      label: entry.owner,
-                      icon: Icons.smart_toy_outlined,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: _MetaPill(
-                      label: entry.surface,
-                      icon: Icons.forum_outlined,
-                    ),
-                  ),
-                  const Spacer(),
+                  _MetaPill(label: entry.owner, icon: Icons.smart_toy_outlined),
+                  _MetaPill(label: entry.surface, icon: Icons.forum_outlined),
                   if (entry.isCurrent)
                     Text(
                       appText('当前', 'Current'),
@@ -1880,7 +2278,10 @@ class _ComposerToolbarChip extends StatelessWidget {
     final palette = context.palette;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: 6,
+      ),
       decoration: BoxDecoration(
         color: backgroundColor ?? palette.surfaceSecondary,
         borderRadius: BorderRadius.circular(AppRadius.chip),
@@ -2238,7 +2639,12 @@ class _ToolCallTileState extends State<_ToolCallTile> {
                   curve: Curves.easeOutCubic,
                   child: _expanded
                       ? Padding(
-                          padding: const EdgeInsets.fromLTRB(AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.xs),
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.sm,
+                            0,
+                            AppSpacing.sm,
+                            AppSpacing.xs,
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -2322,7 +2728,10 @@ class _ConnectionChip extends StatelessWidget {
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 5),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: 5,
+      ),
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(AppRadius.chip),
@@ -2425,13 +2834,49 @@ class _TimelineItem {
   final bool error;
 }
 
+class _AssistantTaskSeed {
+  const _AssistantTaskSeed({
+    required this.sessionKey,
+    required this.title,
+    required this.preview,
+    required this.status,
+    required this.updatedAtMs,
+    required this.owner,
+    required this.surface,
+    required this.draft,
+  });
+
+  final String sessionKey;
+  final String title;
+  final String preview;
+  final String status;
+  final double updatedAtMs;
+  final String owner;
+  final String surface;
+  final bool draft;
+
+  _AssistantTaskEntry toEntry({required bool isCurrent}) {
+    return _AssistantTaskEntry(
+      sessionKey: sessionKey,
+      title: title,
+      preview: preview,
+      status: status,
+      updatedAtMs: updatedAtMs,
+      owner: owner,
+      surface: surface,
+      isCurrent: isCurrent,
+      draft: draft,
+    );
+  }
+}
+
 class _AssistantTaskEntry {
   const _AssistantTaskEntry({
     required this.sessionKey,
     required this.title,
     required this.preview,
     required this.status,
-    required this.updatedAtLabel,
+    required this.updatedAtMs,
     required this.owner,
     required this.surface,
     required this.isCurrent,
@@ -2442,11 +2887,13 @@ class _AssistantTaskEntry {
   final String title;
   final String preview;
   final String status;
-  final String updatedAtLabel;
+  final double? updatedAtMs;
   final String owner;
   final String surface;
   final bool isCurrent;
   final bool draft;
+
+  String get updatedAtLabel => _sessionUpdatedAtLabel(updatedAtMs);
 }
 
 class _PillStyle {
@@ -2470,30 +2917,45 @@ class _MetaPill extends StatelessWidget {
     final palette = context.palette;
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: palette.strokeSoft),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: palette.textMuted),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: palette.textSecondary,
-              ),
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        if (maxWidth.isFinite && maxWidth < 20) {
+          return const SizedBox.shrink();
+        }
+        final showText = !maxWidth.isFinite || maxWidth >= 52;
+        final horizontalPadding = showText ? 10.0 : 8.0;
+        return Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: 6,
           ),
-        ],
-      ),
+          decoration: BoxDecoration(
+            color: palette.surfaceSecondary,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: palette.strokeSoft),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: palette.textMuted),
+              if (showText) ...[
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: palette.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

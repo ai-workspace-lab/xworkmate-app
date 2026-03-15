@@ -21,6 +21,8 @@ class SidebarNavigation extends StatelessWidget {
     required this.accountName,
     required this.accountSubtitle,
     this.expandedWidthOverride,
+    this.marginOverride,
+    this.showCollapseControl = true,
   });
 
   final WorkspaceDestination currentSection;
@@ -36,6 +38,8 @@ class SidebarNavigation extends StatelessWidget {
   final String accountName;
   final String accountSubtitle;
   final double? expandedWidthOverride;
+  final EdgeInsetsGeometry? marginOverride;
+  final bool showCollapseControl;
 
   static const _primarySections = <WorkspaceDestination>[
     WorkspaceDestination.assistant,
@@ -69,7 +73,9 @@ class SidebarNavigation extends StatelessWidget {
       curve: Curves.easeOutCubic,
       width: isExpanded ? expandedWidth : AppSizes.sidebarCollapsedWidth,
       height: double.infinity,
-      margin: const EdgeInsets.fromLTRB(AppSpacing.xs, AppSpacing.xs, 6, 0),
+      margin:
+          marginOverride ??
+          const EdgeInsets.fromLTRB(AppSpacing.xs, AppSpacing.xs, 6, 0),
       decoration: BoxDecoration(
         color: palette.sidebar,
         borderRadius: BorderRadius.circular(AppRadius.sidebar),
@@ -145,6 +151,7 @@ class SidebarNavigation extends StatelessWidget {
                     accountSubtitle: accountSubtitle,
                     accountSelected:
                         currentSection == WorkspaceDestination.account,
+                    showCollapseControl: showCollapseControl,
                   ),
                 ],
               ),
@@ -404,6 +411,7 @@ class SidebarFooter extends StatelessWidget {
     required this.accountName,
     required this.accountSubtitle,
     required this.accountSelected,
+    required this.showCollapseControl,
   });
 
   final bool isCollapsed;
@@ -419,6 +427,7 @@ class SidebarFooter extends StatelessWidget {
   final String accountName;
   final String accountSubtitle;
   final bool accountSelected;
+  final bool showCollapseControl;
 
   @override
   Widget build(BuildContext context) {
@@ -450,12 +459,14 @@ class SidebarFooter extends StatelessWidget {
             onPressed: onOpenThemeToggle,
           ),
           const SizedBox(height: AppSpacing.xs),
-          _SidebarActionButton(
-            icon: _sidebarStateIcon(sidebarState),
-            tooltip: _sidebarStateLabel(sidebarState),
-            onPressed: onCycleSidebarState,
-          ),
-          const SizedBox(height: AppSpacing.xs),
+          if (showCollapseControl) ...[
+            _SidebarActionButton(
+              icon: _sidebarStateIcon(sidebarState),
+              tooltip: _sidebarStateLabel(sidebarState),
+              onPressed: onCycleSidebarState,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
           _SidebarActionButton(
             icon: Icons.tune_rounded,
             tooltip: appText('设置', 'Settings'),
@@ -507,11 +518,12 @@ class SidebarFooter extends StatelessWidget {
               onPressed: onOpenThemeToggle,
             ),
             const SizedBox(width: AppSpacing.xs),
-            _SidebarActionButton(
-              icon: _sidebarStateIcon(sidebarState),
-              tooltip: _sidebarStateLabel(sidebarState),
-              onPressed: onCycleSidebarState,
-            ),
+            if (showCollapseControl)
+              _SidebarActionButton(
+                icon: _sidebarStateIcon(sidebarState),
+                tooltip: _sidebarStateLabel(sidebarState),
+                onPressed: onCycleSidebarState,
+              ),
           ],
         ),
         const SizedBox(height: AppSpacing.xs),
