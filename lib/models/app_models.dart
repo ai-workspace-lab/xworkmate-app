@@ -106,17 +106,10 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
 }
 
 const List<WorkspaceDestination> kAssistantNavigationDestinationDefaults =
-    <WorkspaceDestination>[
-      WorkspaceDestination.tasks,
-      WorkspaceDestination.skills,
-      WorkspaceDestination.nodes,
-      WorkspaceDestination.agents,
-      WorkspaceDestination.aiGateway,
-    ];
+    <WorkspaceDestination>[];
 
 const List<WorkspaceDestination> kAssistantNavigationDestinationCandidates =
     <WorkspaceDestination>[
-      WorkspaceDestination.tasks,
       WorkspaceDestination.skills,
       WorkspaceDestination.nodes,
       WorkspaceDestination.agents,

@@ -11,6 +11,7 @@ import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/assistant_focus_panel.dart';
 import '../../widgets/gateway_connect_dialog.dart';
 import '../../widgets/pane_resize_handle.dart';
 import '../../widgets/surface_card.dart';
@@ -52,6 +53,7 @@ class _AssistantPageState extends State<AssistantPage> {
   bool _sidePaneCollapsed = false;
   bool _taskRailOverviewExpanded = false;
   _AssistantSidePane _activeSidePane = _AssistantSidePane.tasks;
+  WorkspaceDestination? _activeFocusedDestination;
   final Map<String, _AssistantTaskSeed> _taskSeeds =
       <String, _AssistantTaskSeed>{};
   final Set<String> _archivedTaskKeys = <String>{};
@@ -143,6 +145,16 @@ class _AssistantPageState extends State<AssistantPage> {
 
               if (showUnifiedSidePane) {
                 const sideTabRailWidth = 58.0;
+                final favoriteDestinations =
+                    controller.assistantNavigationDestinations;
+                final activeFocusedDestination = _resolveFocusedDestination(
+                  favoriteDestinations,
+                );
+                final effectiveActiveSidePane =
+                    _activeSidePane == _AssistantSidePane.focused &&
+                        activeFocusedDestination == null
+                    ? _AssistantSidePane.navigation
+                    : _activeSidePane;
                 final sidePanelContentWidth =
                     (threadRailWidth - sideTabRailWidth - 6)
                         .clamp(174.0, maxThreadRailWidth)
@@ -156,8 +168,10 @@ class _AssistantPageState extends State<AssistantPage> {
                           ? sideTabRailWidth
                           : threadRailWidth,
                       child: _AssistantUnifiedSidePane(
-                        activePane: _activeSidePane,
+                        activePane: effectiveActiveSidePane,
+                        activeFocusedDestination: activeFocusedDestination,
                         collapsed: _sidePaneCollapsed,
+                        favoriteDestinations: favoriteDestinations,
                         taskPanel: _AssistantTaskRail(
                           key: const Key('assistant-task-rail'),
                           controller: controller,
@@ -199,13 +213,72 @@ class _AssistantPageState extends State<AssistantPage> {
                         navigationPanel: widget.navigationPanelBuilder!(
                           sidePanelContentWidth,
                         ),
+                        focusedPanel: activeFocusedDestination == null
+                            ? null
+                            : SingleChildScrollView(
+                                padding: const EdgeInsets.fromLTRB(
+                                  12,
+                                  12,
+                                  12,
+                                  12,
+                                ),
+                                child: AssistantFocusDestinationCard(
+                                  controller: controller,
+                                  destination: activeFocusedDestination,
+                                  onOpenPage: () => controller.navigateTo(
+                                    activeFocusedDestination,
+                                  ),
+                                  onRemoveFavorite: () async {
+                                    await controller
+                                        .toggleAssistantNavigationDestination(
+                                          activeFocusedDestination,
+                                        );
+                                    if (!mounted) {
+                                      return;
+                                    }
+                                    setState(() {
+                                      _activeFocusedDestination =
+                                          _resolveFocusedDestination(
+                                            controller
+                                                .assistantNavigationDestinations,
+                                          );
+                                      _activeSidePane =
+                                          _activeFocusedDestination == null
+                                          ? _AssistantSidePane.navigation
+                                          : _AssistantSidePane.focused;
+                                    });
+                                  },
+                                ),
+                              ),
                         onSelectPane: (pane) {
                           setState(() {
-                            if (_activeSidePane == pane) {
+                            final normalizedPane =
+                                pane == _AssistantSidePane.focused
+                                ? _AssistantSidePane.navigation
+                                : pane;
+                            if (effectiveActiveSidePane == normalizedPane) {
                               _sidePaneCollapsed = !_sidePaneCollapsed;
                               return;
                             }
-                            _activeSidePane = pane;
+                            _activeSidePane = normalizedPane;
+                            if (normalizedPane != _AssistantSidePane.focused) {
+                              _activeFocusedDestination = null;
+                            }
+                            _sidePaneCollapsed = false;
+                          });
+                        },
+                        onSelectFocusedDestination: (destination) {
+                          setState(() {
+                            final isSameSelection =
+                                effectiveActiveSidePane ==
+                                    _AssistantSidePane.focused &&
+                                activeFocusedDestination == destination;
+                            if (isSameSelection) {
+                              _sidePaneCollapsed = !_sidePaneCollapsed;
+                              return;
+                            }
+                            _activeFocusedDestination = destination;
+                            _activeSidePane = _AssistantSidePane.focused;
                             _sidePaneCollapsed = false;
                           });
                         },
@@ -914,35 +987,66 @@ class _AssistantPageState extends State<AssistantPage> {
     }
     return 'draft:$selectedAgentId:$stamp';
   }
+
+  WorkspaceDestination? _resolveFocusedDestination(
+    List<WorkspaceDestination> favorites,
+  ) {
+    if (favorites.isEmpty) {
+      return null;
+    }
+    if (_activeFocusedDestination != null &&
+        favorites.contains(_activeFocusedDestination)) {
+      return _activeFocusedDestination;
+    }
+    return favorites.first;
+  }
 }
 
-enum _AssistantSidePane { tasks, navigation }
+enum _AssistantSidePane { tasks, navigation, focused }
 
 class _AssistantUnifiedSidePane extends StatelessWidget {
   const _AssistantUnifiedSidePane({
     required this.activePane,
+    required this.activeFocusedDestination,
     required this.collapsed,
+    required this.favoriteDestinations,
     required this.taskPanel,
     required this.navigationPanel,
+    required this.focusedPanel,
     required this.onSelectPane,
+    required this.onSelectFocusedDestination,
     required this.onToggleCollapsed,
   });
 
   final _AssistantSidePane activePane;
+  final WorkspaceDestination? activeFocusedDestination;
   final bool collapsed;
+  final List<WorkspaceDestination> favoriteDestinations;
   final Widget taskPanel;
   final Widget navigationPanel;
+  final Widget? focusedPanel;
   final ValueChanged<_AssistantSidePane> onSelectPane;
+  final ValueChanged<WorkspaceDestination> onSelectFocusedDestination;
   final VoidCallback onToggleCollapsed;
 
   @override
   Widget build(BuildContext context) {
+    final sidePaneContent =
+        activePane == _AssistantSidePane.tasks
+        ? taskPanel
+        : activePane == _AssistantSidePane.focused && focusedPanel != null
+        ? focusedPanel!
+        : navigationPanel;
+
     return Row(
       children: [
         _AssistantSideTabRail(
           activePane: activePane,
+          activeFocusedDestination: activeFocusedDestination,
           collapsed: collapsed,
+          favoriteDestinations: favoriteDestinations,
           onSelectPane: onSelectPane,
+          onSelectFocusedDestination: onSelectFocusedDestination,
           onToggleCollapsed: onToggleCollapsed,
         ),
         if (!collapsed) ...[
@@ -952,17 +1056,18 @@ class _AssistantUnifiedSidePane extends StatelessWidget {
               duration: const Duration(milliseconds: 180),
               switchInCurve: Curves.easeOutCubic,
               switchOutCurve: Curves.easeInCubic,
-              child: activePane == _AssistantSidePane.tasks
-                  ? KeyedSubtree(
-                      key: const ValueKey<String>('assistant-side-pane-tasks'),
-                      child: taskPanel,
-                    )
-                  : KeyedSubtree(
-                      key: const ValueKey<String>(
-                        'assistant-side-pane-navigation',
-                      ),
-                      child: navigationPanel,
-                    ),
+              child: KeyedSubtree(
+                key: ValueKey<String>(
+                  switch (activePane) {
+                    _AssistantSidePane.tasks => 'assistant-side-pane-tasks',
+                    _AssistantSidePane.navigation =>
+                      'assistant-side-pane-navigation',
+                    _AssistantSidePane.focused =>
+                      'assistant-side-pane-focused-${activeFocusedDestination?.name ?? 'none'}',
+                  },
+                ),
+                child: sidePaneContent,
+              ),
             ),
           ),
         ],
@@ -974,14 +1079,20 @@ class _AssistantUnifiedSidePane extends StatelessWidget {
 class _AssistantSideTabRail extends StatelessWidget {
   const _AssistantSideTabRail({
     required this.activePane,
+    required this.activeFocusedDestination,
     required this.collapsed,
+    required this.favoriteDestinations,
     required this.onSelectPane,
+    required this.onSelectFocusedDestination,
     required this.onToggleCollapsed,
   });
 
   final _AssistantSidePane activePane;
+  final WorkspaceDestination? activeFocusedDestination;
   final bool collapsed;
+  final List<WorkspaceDestination> favoriteDestinations;
   final ValueChanged<_AssistantSidePane> onSelectPane;
+  final ValueChanged<WorkspaceDestination> onSelectFocusedDestination;
   final VoidCallback onToggleCollapsed;
 
   @override
@@ -1016,7 +1127,42 @@ class _AssistantSideTabRail extends StatelessWidget {
             tooltip: appText('导航', 'Navigation'),
             onTap: () => onSelectPane(_AssistantSidePane.navigation),
           ),
-          const Spacer(),
+          if (favoriteDestinations.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: 24,
+              height: 1,
+              color: palette.strokeSoft,
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: favoriteDestinations
+                      .map(
+                        (destination) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: _AssistantSideTabButton(
+                            key: ValueKey<String>(
+                              'assistant-side-pane-tab-focus-${destination.name}',
+                            ),
+                            icon: destination.icon,
+                            selected:
+                                activePane == _AssistantSidePane.focused &&
+                                activeFocusedDestination == destination,
+                            tooltip: destination.label,
+                            onTap: () =>
+                                onSelectFocusedDestination(destination),
+                          ),
+                        ),
+                      )
+                      .toList(growable: false),
+                ),
+              ),
+            ),
+          ] else
+            const Spacer(),
           IconButton(
             key: const Key('assistant-side-pane-toggle'),
             tooltip: collapsed
