@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../i18n/app_language.dart';
+import '../models/app_models.dart';
 
 enum RuntimeConnectionMode { unconfigured, local, remote }
 
@@ -527,6 +528,7 @@ class SettingsSnapshot {
     required this.accountLocalMode,
     required this.assistantExecutionTarget,
     required this.assistantPermissionLevel,
+    required this.assistantNavigationDestinations,
   });
 
   final AppLanguage appLanguage;
@@ -554,6 +556,7 @@ class SettingsSnapshot {
   final bool accountLocalMode;
   final AssistantExecutionTarget assistantExecutionTarget;
   final AssistantPermissionLevel assistantPermissionLevel;
+  final List<WorkspaceDestination> assistantNavigationDestinations;
 
   factory SettingsSnapshot.defaults() {
     return SettingsSnapshot(
@@ -582,6 +585,7 @@ class SettingsSnapshot {
       accountLocalMode: true,
       assistantExecutionTarget: AssistantExecutionTarget.local,
       assistantPermissionLevel: AssistantPermissionLevel.defaultAccess,
+      assistantNavigationDestinations: kAssistantNavigationDestinationDefaults,
     );
   }
 
@@ -611,6 +615,7 @@ class SettingsSnapshot {
     bool? accountLocalMode,
     AssistantExecutionTarget? assistantExecutionTarget,
     AssistantPermissionLevel? assistantPermissionLevel,
+    List<WorkspaceDestination>? assistantNavigationDestinations,
   }) {
     return SettingsSnapshot(
       appLanguage: appLanguage ?? this.appLanguage,
@@ -640,6 +645,9 @@ class SettingsSnapshot {
           assistantExecutionTarget ?? this.assistantExecutionTarget,
       assistantPermissionLevel:
           assistantPermissionLevel ?? this.assistantPermissionLevel,
+      assistantNavigationDestinations:
+          assistantNavigationDestinations ??
+          this.assistantNavigationDestinations,
     );
   }
 
@@ -670,10 +678,26 @@ class SettingsSnapshot {
       'accountLocalMode': accountLocalMode,
       'assistantExecutionTarget': assistantExecutionTarget.name,
       'assistantPermissionLevel': assistantPermissionLevel.name,
+      'assistantNavigationDestinations': assistantNavigationDestinations
+          .map((item) => item.name)
+          .toList(growable: false),
     };
   }
 
   factory SettingsSnapshot.fromJson(Map<String, dynamic> json) {
+    final rawAssistantNavigationDestinations =
+        json['assistantNavigationDestinations'];
+    final assistantNavigationDestinations =
+        rawAssistantNavigationDestinations is List
+        ? normalizeAssistantNavigationDestinations(
+            rawAssistantNavigationDestinations
+                .map(
+                  (item) =>
+                      WorkspaceDestinationCopy.fromJsonValue(item?.toString()),
+                )
+                .whereType<WorkspaceDestination>(),
+          )
+        : kAssistantNavigationDestinationDefaults;
     return SettingsSnapshot(
       appLanguage: AppLanguageCopy.fromJsonValue(
         json['appLanguage'] as String?,
@@ -735,6 +759,7 @@ class SettingsSnapshot {
       assistantPermissionLevel: AssistantPermissionLevelCopy.fromJsonValue(
         json['assistantPermissionLevel'] as String?,
       ),
+      assistantNavigationDestinations: assistantNavigationDestinations,
     );
   }
 

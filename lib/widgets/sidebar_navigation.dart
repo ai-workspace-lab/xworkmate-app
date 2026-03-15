@@ -23,6 +23,8 @@ class SidebarNavigation extends StatelessWidget {
     this.expandedWidthOverride,
     this.marginOverride,
     this.showCollapseControl = true,
+    this.favoriteDestinations = const <WorkspaceDestination>{},
+    this.onToggleFavorite,
   });
 
   final WorkspaceDestination currentSection;
@@ -40,6 +42,8 @@ class SidebarNavigation extends StatelessWidget {
   final double? expandedWidthOverride;
   final EdgeInsetsGeometry? marginOverride;
   final bool showCollapseControl;
+  final Set<WorkspaceDestination> favoriteDestinations;
+  final Future<void> Function(WorkspaceDestination section)? onToggleFavorite;
 
   static const _primarySections = <WorkspaceDestination>[
     WorkspaceDestination.assistant,
@@ -111,6 +115,8 @@ class SidebarNavigation extends StatelessWidget {
                             currentSection: currentSection,
                             collapsed: isCollapsed,
                             emphasis: _SidebarItemEmphasis.primary,
+                            favoriteDestinations: favoriteDestinations,
+                            onToggleFavorite: onToggleFavorite,
                             onSectionChanged: onSectionChanged,
                           ),
                           const SizedBox(height: AppSpacing.md),
@@ -120,6 +126,8 @@ class SidebarNavigation extends StatelessWidget {
                             currentSection: currentSection,
                             collapsed: isCollapsed,
                             emphasis: _SidebarItemEmphasis.secondary,
+                            favoriteDestinations: favoriteDestinations,
+                            onToggleFavorite: onToggleFavorite,
                             onSectionChanged: onSectionChanged,
                           ),
                         ],
@@ -132,6 +140,8 @@ class SidebarNavigation extends StatelessWidget {
                     currentSection: currentSection,
                     collapsed: isCollapsed,
                     emphasis: _SidebarItemEmphasis.secondary,
+                    favoriteDestinations: favoriteDestinations,
+                    onToggleFavorite: onToggleFavorite,
                     onSectionChanged: onSectionChanged,
                   ),
                   const SizedBox(height: AppSpacing.sm),
@@ -213,6 +223,8 @@ class _SidebarSectionGroup extends StatelessWidget {
     required this.currentSection,
     required this.collapsed,
     required this.emphasis,
+    required this.favoriteDestinations,
+    this.onToggleFavorite,
     required this.onSectionChanged,
   });
 
@@ -221,6 +233,8 @@ class _SidebarSectionGroup extends StatelessWidget {
   final WorkspaceDestination currentSection;
   final bool collapsed;
   final _SidebarItemEmphasis emphasis;
+  final Set<WorkspaceDestination> favoriteDestinations;
+  final Future<void> Function(WorkspaceDestination section)? onToggleFavorite;
   final ValueChanged<WorkspaceDestination> onSectionChanged;
 
   @override
@@ -250,6 +264,16 @@ class _SidebarSectionGroup extends StatelessWidget {
               selected: currentSection == section,
               collapsed: collapsed,
               emphasis: emphasis,
+              favorite: favoriteDestinations.contains(section),
+              showFavoriteToggle:
+                  !collapsed &&
+                  onToggleFavorite != null &&
+                  kAssistantNavigationDestinationCandidates.contains(section),
+              onToggleFavorite: onToggleFavorite == null
+                  ? null
+                  : () async {
+                      await onToggleFavorite!(section);
+                    },
               onTap: () => onSectionChanged(section),
             ),
           ),
@@ -265,6 +289,9 @@ class _SidebarNavItem extends StatefulWidget {
     required this.selected,
     required this.collapsed,
     required this.emphasis,
+    required this.favorite,
+    required this.showFavoriteToggle,
+    this.onToggleFavorite,
     required this.onTap,
   });
 
@@ -272,6 +299,9 @@ class _SidebarNavItem extends StatefulWidget {
   final bool selected;
   final bool collapsed;
   final _SidebarItemEmphasis emphasis;
+  final bool favorite;
+  final bool showFavoriteToggle;
+  final Future<void> Function()? onToggleFavorite;
   final VoidCallback onTap;
 
   @override
@@ -352,6 +382,29 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                                       ),
                             ),
                           ),
+                          if (widget.showFavoriteToggle)
+                            IconButton(
+                              key: ValueKey<String>(
+                                'sidebar-favorite-${widget.section.name}',
+                              ),
+                              tooltip: widget.favorite
+                                  ? appText('取消关注', 'Remove from focused panel')
+                                  : appText('加入关注', 'Add to focused panel'),
+                              visualDensity: VisualDensity.compact,
+                              splashRadius: 16,
+                              onPressed: () async {
+                                await widget.onToggleFavorite?.call();
+                              },
+                              icon: Icon(
+                                widget.favorite
+                                    ? Icons.star_rounded
+                                    : Icons.star_outline_rounded,
+                                size: 18,
+                                color: widget.favorite
+                                    ? palette.accent
+                                    : palette.textMuted,
+                              ),
+                            ),
                         ],
                       ),
               ),
@@ -494,6 +547,8 @@ class SidebarFooter extends StatelessWidget {
           selected: currentSection == WorkspaceDestination.settings,
           collapsed: false,
           emphasis: _SidebarItemEmphasis.secondary,
+          favorite: false,
+          showFavoriteToggle: false,
           onTap: onOpenSettings,
         ),
         const SizedBox(height: AppSpacing.xs),

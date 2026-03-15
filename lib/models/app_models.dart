@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../i18n/app_language.dart';
 
- enum WorkspaceDestination {
+enum WorkspaceDestination {
   assistant,
   tasks,
   skills,
@@ -14,7 +14,7 @@ import '../i18n/app_language.dart';
   aiGateway,
   settings,
   account,
- }
+}
 
 extension WorkspaceDestinationCopy on WorkspaceDestination {
   String get label => switch (this) {
@@ -91,6 +91,55 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
       'Identity, workspace switching, and session management.',
     ),
   };
+
+  static WorkspaceDestination? fromJsonValue(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return null;
+    }
+    for (final item in WorkspaceDestination.values) {
+      if (item.name == value.trim()) {
+        return item;
+      }
+    }
+    return null;
+  }
+}
+
+const List<WorkspaceDestination> kAssistantNavigationDestinationDefaults =
+    <WorkspaceDestination>[
+      WorkspaceDestination.tasks,
+      WorkspaceDestination.skills,
+      WorkspaceDestination.nodes,
+      WorkspaceDestination.agents,
+      WorkspaceDestination.aiGateway,
+    ];
+
+const List<WorkspaceDestination> kAssistantNavigationDestinationCandidates =
+    <WorkspaceDestination>[
+      WorkspaceDestination.tasks,
+      WorkspaceDestination.skills,
+      WorkspaceDestination.nodes,
+      WorkspaceDestination.agents,
+      WorkspaceDestination.mcpServer,
+      WorkspaceDestination.clawHub,
+      WorkspaceDestination.secrets,
+      WorkspaceDestination.aiGateway,
+      WorkspaceDestination.settings,
+    ];
+
+List<WorkspaceDestination> normalizeAssistantNavigationDestinations(
+  Iterable<WorkspaceDestination> destinations,
+) {
+  final allowed = kAssistantNavigationDestinationCandidates.toSet();
+  final seen = <WorkspaceDestination>{};
+  final normalized = <WorkspaceDestination>[];
+  for (final destination in destinations) {
+    if (!allowed.contains(destination) || !seen.add(destination)) {
+      continue;
+    }
+    normalized.add(destination);
+  }
+  return normalized;
 }
 
 enum StatusTone { neutral, accent, success, warning, danger }

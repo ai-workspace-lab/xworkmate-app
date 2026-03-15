@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
@@ -17,6 +18,11 @@ void main() {
         accountWorkspace: 'QA',
         codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
         codexCliPath: '/opt/homebrew/bin/codex',
+        assistantNavigationDestinations: const <WorkspaceDestination>[
+          WorkspaceDestination.tasks,
+          WorkspaceDestination.aiGateway,
+          WorkspaceDestination.secrets,
+        ],
         gateway: GatewayConnectionProfile.defaults().copyWith(
           host: 'gateway.example.com',
           port: 9443,
@@ -39,6 +45,14 @@ void main() {
         CodeAgentRuntimeMode.externalCli,
       );
       expect(loadedSnapshot.codexCliPath, '/opt/homebrew/bin/codex');
+      expect(
+        loadedSnapshot.assistantNavigationDestinations,
+        const <WorkspaceDestination>[
+          WorkspaceDestination.tasks,
+          WorkspaceDestination.aiGateway,
+          WorkspaceDestination.secrets,
+        ],
+      );
       expect(loadedSnapshot.gateway.host, 'gateway.example.com');
       expect(loadedSnapshot.gateway.port, 9443);
       expect(secureRefs['gateway_token'], 'token-secret');
