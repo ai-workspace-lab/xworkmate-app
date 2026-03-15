@@ -12,7 +12,7 @@ void main() {
   ) async {
     await pumpDesktopApp(tester);
 
-    await tester.tap(find.text('模块'));
+    await tester.tap(find.text('节点'));
     await settleIntegrationUi(tester);
     await tester.tap(find.text('接入模块'));
     await settleIntegrationUi(tester);
@@ -20,6 +20,6 @@ void main() {
     expect(find.textContaining('工作区、网关默认项'), findsOneWidget);
     await tester.tap(find.text('集成'));
     await settleIntegrationUi(tester);
-    expect(find.text('网关连接'), findsOneWidget);
+    expect(find.text('OpenClaw Gateway'), findsOneWidget);
   });
 }
