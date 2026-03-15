@@ -29,8 +29,9 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  static const _sidebarMinWidth = 90.0;
-  static const _sidebarMaxWidth = 320.0;
+  static const _sidebarMinWidth = 84.0;
+  static const _sidebarMaxWidth = 420.0;
+  static const _sidebarResponsiveMaxFactor = 0.36;
   double? _sidebarExpandedWidth;
 
   static const _mobileDestinations = [
@@ -42,7 +43,7 @@ class _AppShellState extends State<AppShell> {
   ];
 
   double _clampSidebarWidth(double value, double viewportWidth) {
-    final responsiveMax = (viewportWidth * 0.28).clamp(
+    final responsiveMax = (viewportWidth * _sidebarResponsiveMaxFactor).clamp(
       _sidebarMinWidth,
       _sidebarMaxWidth,
     );

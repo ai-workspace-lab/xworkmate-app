@@ -40,6 +40,11 @@ class AssistantPage extends StatefulWidget {
 class _AssistantPageState extends State<AssistantPage> {
   static const List<String> _modes = ['craft', 'ask', 'plan'];
   static const List<String> _thinkingModes = ['low', 'medium', 'high', 'max'];
+  static const double _sidePaneMinWidth = 228;
+  static const double _sidePaneMaxWidth = 520;
+  static const double _sidePaneContentMinWidth = 160;
+  static const double _sidePaneResponsiveMaxFactor = 0.42;
+  static const double _sideTabRailWidth = 58;
 
   late final TextEditingController _inputController;
   late final TextEditingController _threadSearchController;
@@ -48,7 +53,7 @@ class _AssistantPageState extends State<AssistantPage> {
   String _mode = 'ask';
   String _thinkingLabel = 'high';
   double _conversationPaneRatio = 0.7;
-  double _threadRailWidth = 304;
+  double _threadRailWidth = 312;
   String _threadQuery = '';
   bool _sidePaneCollapsed = false;
   bool _taskRailOverviewExpanded = false;
@@ -136,15 +141,15 @@ class _AssistantPageState extends State<AssistantPage> {
                 return mainWorkspace;
               }
 
-              final maxThreadRailWidth = (constraints.maxWidth * 0.28)
-                  .clamp(232.0, 340.0)
+              final maxThreadRailWidth =
+                  (constraints.maxWidth * _sidePaneResponsiveMaxFactor)
+                  .clamp(_sidePaneMinWidth, _sidePaneMaxWidth)
                   .toDouble();
               final threadRailWidth = _threadRailWidth
-                  .clamp(232.0, maxThreadRailWidth)
+                  .clamp(_sidePaneMinWidth, maxThreadRailWidth)
                   .toDouble();
 
               if (showUnifiedSidePane) {
-                const sideTabRailWidth = 58.0;
                 final favoriteDestinations =
                     controller.assistantNavigationDestinations;
                 final activeFocusedDestination = _resolveFocusedDestination(
@@ -156,8 +161,11 @@ class _AssistantPageState extends State<AssistantPage> {
                     ? _AssistantSidePane.navigation
                     : _activeSidePane;
                 final sidePanelContentWidth =
-                    (threadRailWidth - sideTabRailWidth - 6)
-                        .clamp(174.0, maxThreadRailWidth)
+                    (threadRailWidth - _sideTabRailWidth - 6)
+                        .clamp(
+                          _sidePaneContentMinWidth,
+                          _sidePaneMaxWidth,
+                        )
                         .toDouble();
                 return Row(
                   children: [
@@ -165,7 +173,7 @@ class _AssistantPageState extends State<AssistantPage> {
                       duration: const Duration(milliseconds: 220),
                       curve: Curves.easeOutCubic,
                       width: _sidePaneCollapsed
-                          ? sideTabRailWidth
+                          ? _sideTabRailWidth
                           : threadRailWidth,
                       child: _AssistantUnifiedSidePane(
                         activePane: effectiveActiveSidePane,
@@ -297,7 +305,7 @@ class _AssistantPageState extends State<AssistantPage> {
                           onDelta: (delta) {
                             setState(() {
                               _threadRailWidth = (_threadRailWidth + delta)
-                                  .clamp(232.0, maxThreadRailWidth)
+                                  .clamp(_sidePaneMinWidth, maxThreadRailWidth)
                                   .toDouble();
                             });
                           },
@@ -359,7 +367,7 @@ class _AssistantPageState extends State<AssistantPage> {
                       onDelta: (delta) {
                         setState(() {
                           _threadRailWidth = (_threadRailWidth + delta)
-                              .clamp(232.0, maxThreadRailWidth)
+                              .clamp(_sidePaneMinWidth, maxThreadRailWidth)
                               .toDouble();
                         });
                       },
