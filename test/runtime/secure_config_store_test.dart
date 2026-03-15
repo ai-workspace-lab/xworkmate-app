@@ -19,7 +19,6 @@ void main() {
         codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
         codexCliPath: '/opt/homebrew/bin/codex',
         assistantNavigationDestinations: const <WorkspaceDestination>[
-          WorkspaceDestination.tasks,
           WorkspaceDestination.aiGateway,
           WorkspaceDestination.secrets,
         ],
@@ -48,7 +47,6 @@ void main() {
       expect(
         loadedSnapshot.assistantNavigationDestinations,
         const <WorkspaceDestination>[
-          WorkspaceDestination.tasks,
           WorkspaceDestination.aiGateway,
           WorkspaceDestination.secrets,
         ],

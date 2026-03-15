@@ -6,7 +6,7 @@ import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/models/app_models.dart';
 
 void main() {
-  test('AppController toggles focused navigation destinations', () async {
+  test('AppController omits fixed task entry from focused destinations', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final controller = AppController();
     addTearDown(controller.dispose);
@@ -17,6 +17,32 @@ void main() {
       controller.settings.copyWith(
         assistantNavigationDestinations: const <WorkspaceDestination>[
           WorkspaceDestination.tasks,
+          WorkspaceDestination.skills,
+          WorkspaceDestination.aiGateway,
+        ],
+      ),
+      refreshAfterSave: false,
+    );
+
+    expect(
+      controller.assistantNavigationDestinations,
+      const <WorkspaceDestination>[
+        WorkspaceDestination.skills,
+        WorkspaceDestination.aiGateway,
+      ],
+    );
+  });
+
+  test('AppController toggles focused navigation destinations', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final controller = AppController();
+    addTearDown(controller.dispose);
+
+    await _waitFor(() => !controller.initializing);
+
+    await controller.saveSettings(
+      controller.settings.copyWith(
+        assistantNavigationDestinations: const <WorkspaceDestination>[
           WorkspaceDestination.skills,
         ],
       ),
@@ -29,21 +55,17 @@ void main() {
     expect(
       controller.assistantNavigationDestinations,
       const <WorkspaceDestination>[
-        WorkspaceDestination.tasks,
         WorkspaceDestination.skills,
         WorkspaceDestination.aiGateway,
       ],
     );
 
     await controller.toggleAssistantNavigationDestination(
-      WorkspaceDestination.tasks,
+      WorkspaceDestination.skills,
     );
     expect(
       controller.assistantNavigationDestinations,
-      const <WorkspaceDestination>[
-        WorkspaceDestination.skills,
-        WorkspaceDestination.aiGateway,
-      ],
+      const <WorkspaceDestination>[WorkspaceDestination.aiGateway],
     );
   });
 }

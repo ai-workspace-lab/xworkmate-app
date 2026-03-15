@@ -16,27 +16,32 @@ class AssistantFocusPanel extends StatefulWidget {
   State<AssistantFocusPanel> createState() => _AssistantFocusPanelState();
 }
 
+class AssistantFocusDestinationCard extends StatelessWidget {
+  const AssistantFocusDestinationCard({
+    super.key,
+    required this.controller,
+    required this.destination,
+    required this.onOpenPage,
+    required this.onRemoveFavorite,
+  });
+
+  final AppController controller;
+  final WorkspaceDestination destination;
+  final VoidCallback onOpenPage;
+  final Future<void> Function() onRemoveFavorite;
+
+  @override
+  Widget build(BuildContext context) {
+    return _AssistantFocusWorkbench(
+      controller: controller,
+      destination: destination,
+      onOpenPage: onOpenPage,
+      onRemoveFavorite: onRemoveFavorite,
+    );
+  }
+}
+
 class _AssistantFocusPanelState extends State<AssistantFocusPanel> {
-  WorkspaceDestination? _selectedDestination;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedDestination = _normalizeSelection(
-      widget.controller.assistantNavigationDestinations,
-      _selectedDestination,
-    );
-  }
-
-  @override
-  void didUpdateWidget(covariant AssistantFocusPanel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _selectedDestination = _normalizeSelection(
-      widget.controller.assistantNavigationDestinations,
-      _selectedDestination,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -45,7 +50,6 @@ class _AssistantFocusPanelState extends State<AssistantFocusPanel> {
     final available = kAssistantNavigationDestinationCandidates
         .where((item) => !favorites.contains(item))
         .toList(growable: false);
-    final selected = _normalizeSelection(favorites, _selectedDestination);
 
     return SurfaceCard(
       borderRadius: 16,
@@ -71,8 +75,8 @@ class _AssistantFocusPanelState extends State<AssistantFocusPanel> {
                       const SizedBox(height: 6),
                       Text(
                         appText(
-                          '像侧边工作区一样切换常用入口。点 tab 只切左侧预览，不会打断当前主页面。',
-                          'Switch frequent destinations like a side workspace. Tabs update the left preview without replacing the main page.',
+                          '添加后的入口会直接出现在最左侧侧板。这里负责管理关注项和查看摘要，需要完整页面时再单独打开。',
+                          'Added entries appear directly in the far-left rail. Manage focused destinations and review summaries here, then open the full page only when needed.',
                         ),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: palette.textSecondary,
@@ -124,60 +128,26 @@ class _AssistantFocusPanelState extends State<AssistantFocusPanel> {
             child: favorites.isEmpty
                 ? _AssistantFocusEmptyState(
                     message: appText(
-                      '还没有关注入口。给左侧菜单点星标，或从右上角添加一个常用入口。',
-                      'No focused entries yet. Star a menu item on the left or add a frequent destination from the top-right menu.',
+                      '还没有关注入口。给功能菜单点星标，或从右上角添加一个入口，加入最左侧侧板。',
+                      'No focused entries yet. Star a destination or add one from the top-right menu to place it in the far-left rail.',
                     ),
                     available: available,
                     onAdd: _addFavorite,
                   )
-                : Row(
-                    children: [
-                      Container(
-                        width: 56,
-                        margin: const EdgeInsets.fromLTRB(10, 12, 0, 10),
-                        decoration: BoxDecoration(
-                          color: palette.surfaceSecondary,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: palette.strokeSoft),
-                        ),
-                        child: ListView(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          children: favorites
-                              .map(
-                                (destination) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 6),
-                                  child: _AssistantFocusRailButton(
-                                    destination: destination,
-                                    selected: destination == selected,
-                                    onTap: () {
-                                      setState(() {
-                                        _selectedDestination = destination;
-                                      });
-                                    },
-                                  ),
-                                ),
-                              )
-                              .toList(growable: false),
-                        ),
-                      ),
-                      VerticalDivider(
-                        width: 20,
-                        thickness: 1,
-                        color: palette.strokeSoft,
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(0, 12, 10, 10),
-                          child: _AssistantFocusWorkbench(
-                            controller: widget.controller,
-                            destination: selected!,
-                            onOpenPage: () =>
-                                widget.controller.navigateTo(selected),
-                            onRemoveFavorite: () => _removeFavorite(selected),
-                          ),
-                        ),
-                      ),
-                    ],
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                    itemCount: favorites.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final destination = favorites[index];
+                      return AssistantFocusDestinationCard(
+                        controller: widget.controller,
+                        destination: destination,
+                        onOpenPage: () =>
+                            widget.controller.navigateTo(destination),
+                        onRemoveFavorite: () => _removeFavorite(destination),
+                      );
+                    },
                   ),
           ),
         ],
@@ -185,78 +155,18 @@ class _AssistantFocusPanelState extends State<AssistantFocusPanel> {
     );
   }
 
-  WorkspaceDestination? _normalizeSelection(
-    List<WorkspaceDestination> favorites,
-    WorkspaceDestination? current,
-  ) {
-    if (favorites.isEmpty) {
-      return null;
-    }
-    if (current != null && favorites.contains(current)) {
-      return current;
-    }
-    return favorites.first;
-  }
-
   Future<void> _addFavorite(WorkspaceDestination destination) async {
     await widget.controller.toggleAssistantNavigationDestination(destination);
-    if (!mounted) {
-      return;
+    if (mounted) {
+      setState(() {});
     }
-    setState(() {
-      _selectedDestination = destination;
-    });
   }
 
   Future<void> _removeFavorite(WorkspaceDestination destination) async {
     await widget.controller.toggleAssistantNavigationDestination(destination);
-    if (!mounted) {
-      return;
+    if (mounted) {
+      setState(() {});
     }
-    setState(() {
-      final favorites = widget.controller.assistantNavigationDestinations;
-      _selectedDestination = _normalizeSelection(favorites, _selectedDestination);
-    });
-  }
-}
-
-class _AssistantFocusRailButton extends StatelessWidget {
-  const _AssistantFocusRailButton({
-    required this.destination,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final WorkspaceDestination destination;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-
-    return Tooltip(
-      message: destination.label,
-      child: InkWell(
-        key: ValueKey<String>('assistant-focus-tab-${destination.name}'),
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          width: 40,
-          height: 40,
-          margin: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: selected ? palette.accentMuted : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(
-            destination.icon,
-            size: 20,
-            color: selected ? palette.accent : palette.textSecondary,
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -285,6 +195,7 @@ class _AssistantFocusWorkbench extends StatelessWidget {
         border: Border.all(color: palette.strokeSoft),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 10, 10),
@@ -310,7 +221,9 @@ class _AssistantFocusWorkbench extends StatelessWidget {
                     children: [
                       Text(
                         destination.label,
-                        key: const Key('assistant-focus-active-title'),
+                        key: ValueKey<String>(
+                          'assistant-focus-active-title-${destination.name}',
+                        ),
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
@@ -329,7 +242,9 @@ class _AssistantFocusWorkbench extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  key: const Key('assistant-focus-open-page'),
+                  key: ValueKey<String>(
+                    'assistant-focus-open-page-${destination.name}',
+                  ),
                   tooltip: appText('打开全页', 'Open full page'),
                   onPressed: onOpenPage,
                   icon: const Icon(Icons.open_in_new_rounded, size: 18),
@@ -348,13 +263,11 @@ class _AssistantFocusWorkbench extends StatelessWidget {
             ),
           ),
           Divider(height: 1, color: palette.strokeSoft),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-              child: _AssistantFocusPreview(
-                controller: controller,
-                destination: destination,
-              ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+            child: _AssistantFocusPreview(
+              controller: controller,
+              destination: destination,
             ),
           ),
         ],
