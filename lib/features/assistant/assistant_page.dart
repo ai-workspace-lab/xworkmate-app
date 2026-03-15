@@ -41,9 +41,9 @@ class _AssistantPageState extends State<AssistantPage> {
   static const List<String> _modes = ['craft', 'ask', 'plan'];
   static const List<String> _thinkingModes = ['low', 'medium', 'high', 'max'];
   static const double _sidePaneMinWidth = 228;
-  static const double _sidePaneMaxWidth = 520;
   static const double _sidePaneContentMinWidth = 160;
-  static const double _sidePaneResponsiveMaxFactor = 0.42;
+  static const double _mainWorkspaceMinWidth = 620;
+  static const double _sidePaneViewportPadding = 120;
   static const double _sideTabRailWidth = 58;
 
   late final TextEditingController _inputController;
@@ -141,10 +141,9 @@ class _AssistantPageState extends State<AssistantPage> {
                 return mainWorkspace;
               }
 
-              final maxThreadRailWidth =
-                  (constraints.maxWidth * _sidePaneResponsiveMaxFactor)
-                  .clamp(_sidePaneMinWidth, _sidePaneMaxWidth)
-                  .toDouble();
+              final maxThreadRailWidth = _resolveMaxSidePaneWidth(
+                constraints.maxWidth,
+              );
               final threadRailWidth = _threadRailWidth
                   .clamp(_sidePaneMinWidth, maxThreadRailWidth)
                   .toDouble();
@@ -164,12 +163,13 @@ class _AssistantPageState extends State<AssistantPage> {
                     (threadRailWidth - _sideTabRailWidth - 6)
                         .clamp(
                           _sidePaneContentMinWidth,
-                          _sidePaneMaxWidth,
+                          threadRailWidth,
                         )
                         .toDouble();
                 return Row(
                   children: [
                     AnimatedContainer(
+                      key: const Key('assistant-unified-side-pane-shell'),
                       duration: const Duration(milliseconds: 220),
                       curve: Curves.easeOutCubic,
                       width: _sidePaneCollapsed
@@ -1007,6 +1007,15 @@ class _AssistantPageState extends State<AssistantPage> {
       return _activeFocusedDestination;
     }
     return favorites.first;
+  }
+
+  double _resolveMaxSidePaneWidth(double viewportWidth) {
+    final maxWidthByViewport =
+        viewportWidth - _mainWorkspaceMinWidth - _sidePaneViewportPadding;
+    return maxWidthByViewport.clamp(
+      _sidePaneMinWidth,
+      viewportWidth - _sidePaneViewportPadding,
+    ).toDouble();
   }
 }
 
