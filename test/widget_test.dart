@@ -15,7 +15,7 @@ void main() {
     await tester.pumpWidget(const XWorkmateApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('新线程'), findsWidgets);
-    expect(find.text('连接 Gateway 后可开始对话和运行任务。'), findsOneWidget);
+    expect(find.text('新对话'), findsWidgets);
+    expect(find.text('连接 Gateway 后，当前对话会自动作为默认任务开始执行。'), findsOneWidget);
   });
 }

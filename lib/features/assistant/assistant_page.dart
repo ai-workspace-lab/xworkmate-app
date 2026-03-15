@@ -73,10 +73,10 @@ class _AssistantPageState extends State<AssistantPage> {
         final controller = widget.controller;
         final messages = List<GatewayChatMessage>.from(controller.chatMessages);
         final timelineItems = _buildTimelineItems(controller, messages);
-        final threads = _buildThreadEntries(controller);
-        final visibleThreads = _filterThreads(threads);
-        final currentThread = _resolveCurrentThread(
-          threads,
+        final tasks = _buildTaskEntries(controller);
+        final visibleTasks = _filterTasks(tasks);
+        final currentTask = _resolveCurrentTask(
+          tasks,
           controller.currentSessionKey,
         );
 
@@ -92,14 +92,14 @@ class _AssistantPageState extends State<AssistantPage> {
         });
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+          padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final showThreadRail = constraints.maxWidth >= 1180;
               final mainWorkspace = _buildMainWorkspace(
                 controller: controller,
                 timelineItems: timelineItems,
-                currentThreadTitle: currentThread.title,
+                currentTask: currentTask,
               );
               if (!showThreadRail) {
                 return mainWorkspace;
@@ -116,10 +116,10 @@ class _AssistantPageState extends State<AssistantPage> {
                 children: [
                   SizedBox(
                     width: threadRailWidth,
-                    child: _AssistantThreadRail(
-                      key: const Key('assistant-thread-rail'),
+                    child: _AssistantTaskRail(
+                      key: const Key('assistant-task-rail'),
                       controller: controller,
-                      threads: visibleThreads,
+                      tasks: visibleTasks,
                       query: _threadQuery,
                       searchController: _threadSearchController,
                       onQueryChanged: (value) {
@@ -133,15 +133,15 @@ class _AssistantPageState extends State<AssistantPage> {
                           _threadQuery = '';
                         });
                       },
-                      onRefreshSessions: controller.refreshSessions,
-                      onCreateThread: _createNewThread,
+                      onRefreshTasks: controller.refreshSessions,
+                      onCreateTask: _createNewThread,
                       onOpenTasks: () {
                         controller.navigateTo(WorkspaceDestination.tasks);
                       },
                       onOpenSkills: () {
                         controller.navigateTo(WorkspaceDestination.skills);
                       },
-                      onSelectThread: (sessionKey) async {
+                      onSelectTask: (sessionKey) async {
                         await controller.switchSession(sessionKey);
                         _focusComposer();
                       },
@@ -174,7 +174,7 @@ class _AssistantPageState extends State<AssistantPage> {
   Widget _buildMainWorkspace({
     required AppController controller,
     required List<_TimelineItem> timelineItems,
-    required String currentThreadTitle,
+    required _AssistantTaskEntry currentTask,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -214,7 +214,7 @@ class _AssistantPageState extends State<AssistantPage> {
               height: conversationHeight,
               child: _ConversationArea(
                 controller: controller,
-                currentThreadTitle: currentThreadTitle,
+                currentTask: currentTask,
                 items: timelineItems,
                 scrollController: _conversationController,
                 onOpenDetail: widget.onOpenDetail,
@@ -582,7 +582,7 @@ class _AssistantPageState extends State<AssistantPage> {
     _focusComposer();
   }
 
-  List<_AssistantThreadEntry> _buildThreadEntries(AppController controller) {
+  List<_AssistantTaskEntry> _buildTaskEntries(AppController controller) {
     final sessions = controller.sessions.toList(growable: false)
       ..sort(
         (left, right) =>
@@ -590,18 +590,20 @@ class _AssistantPageState extends State<AssistantPage> {
       );
     final entries = sessions
         .map(
-          (session) => _AssistantThreadEntry(
+          (session) => _AssistantTaskEntry(
             sessionKey: session.key,
             title: _sessionDisplayTitle(session),
             preview:
                 _sessionPreview(session) ??
-                appText('等待继续对话', 'Waiting to continue the thread'),
+                appText('等待继续执行这个任务', 'Waiting to continue this task'),
             status: _sessionStatus(
               session,
               currentSessionKey: controller.currentSessionKey,
               hasPendingRun: controller.chatController.hasPendingRun,
             ),
             updatedAtLabel: _sessionUpdatedAtLabel(session.updatedAtMs),
+            owner: controller.activeAgentName,
+            surface: session.surface ?? session.kind ?? 'Assistant',
             isCurrent: _sessionKeysMatch(
               session.key,
               controller.currentSessionKey,
@@ -614,15 +616,17 @@ class _AssistantPageState extends State<AssistantPage> {
     )) {
       entries.insert(
         0,
-        _AssistantThreadEntry(
+        _AssistantTaskEntry(
           sessionKey: controller.currentSessionKey,
           title: _fallbackSessionTitle(controller.currentSessionKey),
           preview: appText(
-            '等待发送第一条消息',
-            'Waiting for the first message',
+            '等待描述这个任务的第一条消息',
+            'Waiting for the first message of this task',
           ),
           status: 'queued',
           updatedAtLabel: appText('现在', 'Now'),
+          owner: controller.activeAgentName,
+          surface: 'Assistant',
           isCurrent: true,
           draft: true,
         ),
@@ -631,7 +635,7 @@ class _AssistantPageState extends State<AssistantPage> {
     return entries;
   }
 
-  List<_AssistantThreadEntry> _filterThreads(List<_AssistantThreadEntry> items) {
+  List<_AssistantTaskEntry> _filterTasks(List<_AssistantTaskEntry> items) {
     final query = _threadQuery.trim().toLowerCase();
     if (query.isEmpty) {
       return items;
@@ -643,8 +647,8 @@ class _AssistantPageState extends State<AssistantPage> {
     }).toList(growable: false);
   }
 
-  _AssistantThreadEntry _resolveCurrentThread(
-    List<_AssistantThreadEntry> items,
+  _AssistantTaskEntry _resolveCurrentTask(
+    List<_AssistantTaskEntry> items,
     String sessionKey,
   ) {
     for (final item in items) {
@@ -652,12 +656,14 @@ class _AssistantPageState extends State<AssistantPage> {
         return item;
       }
     }
-    return _AssistantThreadEntry(
+    return _AssistantTaskEntry(
       sessionKey: sessionKey,
       title: _fallbackSessionTitle(sessionKey),
       preview: '',
       status: 'queued',
       updatedAtLabel: appText('现在', 'Now'),
+      owner: widget.controller.activeAgentName,
+      surface: 'Assistant',
       isCurrent: true,
       draft: true,
     );
@@ -716,26 +722,29 @@ class _AssistantLowerPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      physics: const ClampingScrollPhysics(),
-      child: _ComposerBar(
-        controller: controller,
-        inputController: inputController,
-        focusNode: focusNode,
-        mode: mode,
-        thinkingLabel: thinkingLabel,
-        modelLabel: modelLabel,
-        modelOptions: modelOptions,
-        attachments: attachments,
-        autoAgentLabel: autoAgentLabel,
-        onModeChanged: onModeChanged,
-        onThinkingChanged: onThinkingChanged,
-        onModelChanged: onModelChanged,
-        onRemoveAttachment: onRemoveAttachment,
-        onOpenGateway: onOpenGateway,
-        onReconnectGateway: onReconnectGateway,
-        onPickAttachments: onPickAttachments,
-        onSend: onSend,
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
+        child: _ComposerBar(
+          controller: controller,
+          inputController: inputController,
+          focusNode: focusNode,
+          mode: mode,
+          thinkingLabel: thinkingLabel,
+          modelLabel: modelLabel,
+          modelOptions: modelOptions,
+          attachments: attachments,
+          autoAgentLabel: autoAgentLabel,
+          onModeChanged: onModeChanged,
+          onThinkingChanged: onThinkingChanged,
+          onModelChanged: onModelChanged,
+          onRemoveAttachment: onRemoveAttachment,
+          onOpenGateway: onOpenGateway,
+          onReconnectGateway: onReconnectGateway,
+          onPickAttachments: onPickAttachments,
+          onSend: onSend,
+        ),
       ),
     );
   }
@@ -744,7 +753,7 @@ class _AssistantLowerPane extends StatelessWidget {
 class _ConversationArea extends StatelessWidget {
   const _ConversationArea({
     required this.controller,
-    required this.currentThreadTitle,
+    required this.currentTask,
     required this.items,
     required this.scrollController,
     required this.onOpenDetail,
@@ -754,7 +763,7 @@ class _ConversationArea extends StatelessWidget {
   });
 
   final AppController controller;
-  final String currentThreadTitle;
+  final _AssistantTaskEntry currentTask;
   final List<_TimelineItem> items;
   final ScrollController scrollController;
   final ValueChanged<DetailPanelData> onOpenDetail;
@@ -766,6 +775,17 @@ class _ConversationArea extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final theme = Theme.of(context);
+    final statusStyle = _pillStyleForStatus(context, currentTask.status);
+    final taskHint = controller.connection.status ==
+            RuntimeConnectionStatus.connected
+        ? appText(
+            '当前对话会作为任务上下文持续执行，切换左侧任务即可回到对应会话。',
+            'This conversation stays attached to the selected task. Pick another task on the left to jump back into it.',
+          )
+        : appText(
+            '连接 Gateway 后，当前对话会自动作为默认任务开始执行。',
+            'After connecting a gateway, this conversation starts as the default task.',
+          );
 
     return SurfaceCard(
       borderRadius: 12,
@@ -781,23 +801,36 @@ class _ConversationArea extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        currentThreadTitle,
+                        currentTask.title,
                         key: const Key('assistant-conversation-title'),
                         style: theme.textTheme.titleLarge,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        controller.connection.status ==
-                                RuntimeConnectionStatus.connected
-                            ? appText(
-                                '自然描述任务即可，XWorkmate 会自动路由执行。',
-                                'Describe the task naturally. XWorkmate will route execution.',
-                              )
-                            : appText(
-                                '连接 Gateway 后可开始对话和运行任务。',
-                                'Connect a gateway to start chatting and running tasks.',
-                              ),
+                        taskHint,
                         style: theme.textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _StatusPill(
+                            label: currentTask.draft
+                                ? appText('草稿任务', 'Draft task')
+                                : _taskStatusLabel(currentTask.status),
+                            backgroundColor: statusStyle.backgroundColor,
+                            textColor: statusStyle.foregroundColor,
+                          ),
+                          _MetaPill(
+                            label: currentTask.owner,
+                            icon: Icons.smart_toy_outlined,
+                          ),
+                          _MetaPill(
+                            label: currentTask.surface,
+                            icon: Icons.forum_outlined,
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -939,38 +972,44 @@ class _ConversationArea extends StatelessWidget {
   }
 }
 
-class _AssistantThreadRail extends StatelessWidget {
-  const _AssistantThreadRail({
+class _AssistantTaskRail extends StatelessWidget {
+  const _AssistantTaskRail({
     super.key,
     required this.controller,
-    required this.threads,
+    required this.tasks,
     required this.query,
     required this.searchController,
     required this.onQueryChanged,
     required this.onClearQuery,
-    required this.onRefreshSessions,
-    required this.onCreateThread,
+    required this.onRefreshTasks,
+    required this.onCreateTask,
     required this.onOpenTasks,
     required this.onOpenSkills,
-    required this.onSelectThread,
+    required this.onSelectTask,
   });
 
   final AppController controller;
-  final List<_AssistantThreadEntry> threads;
+  final List<_AssistantTaskEntry> tasks;
   final String query;
   final TextEditingController searchController;
   final ValueChanged<String> onQueryChanged;
   final VoidCallback onClearQuery;
-  final Future<void> Function() onRefreshSessions;
-  final Future<void> Function() onCreateThread;
+  final Future<void> Function() onRefreshTasks;
+  final Future<void> Function() onCreateTask;
   final VoidCallback onOpenTasks;
   final VoidCallback onOpenSkills;
-  final Future<void> Function(String sessionKey) onSelectThread;
+  final Future<void> Function(String sessionKey) onSelectTask;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = context.palette;
+    final runningCount = tasks
+        .where((task) => _normalizedTaskStatus(task.status) == 'running')
+        .length;
+    final completedCount = tasks
+        .where((task) => _normalizedTaskStatus(task.status) == 'completed')
+        .length;
 
     return SurfaceCard(
       borderRadius: 16,
@@ -986,11 +1025,11 @@ class _AssistantThreadRail extends StatelessWidget {
                   children: [
                     Expanded(
                       child: TextField(
-                        key: const Key('assistant-thread-search'),
+                        key: const Key('assistant-task-search'),
                         controller: searchController,
                         onChanged: onQueryChanged,
                         decoration: InputDecoration(
-                          hintText: appText('搜索线程', 'Search threads'),
+                          hintText: appText('搜索任务', 'Search tasks'),
                           prefixIcon: const Icon(Icons.search_rounded),
                           suffixIcon: query.isEmpty
                               ? null
@@ -1004,10 +1043,10 @@ class _AssistantThreadRail extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      key: const Key('assistant-thread-refresh'),
-                      tooltip: appText('刷新线程', 'Refresh threads'),
+                      key: const Key('assistant-task-refresh'),
+                      tooltip: appText('刷新任务', 'Refresh tasks'),
                       onPressed: () async {
-                        await onRefreshSessions();
+                        await onRefreshTasks();
                       },
                       icon: const Icon(Icons.refresh_rounded),
                     ),
@@ -1017,51 +1056,85 @@ class _AssistantThreadRail extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.tonalIcon(
-                    key: const Key('assistant-new-thread-button'),
+                    key: const Key('assistant-new-task-button'),
                     onPressed: () async {
-                      await onCreateThread();
+                      await onCreateTask();
                     },
                     icon: const Icon(Icons.edit_note_rounded),
-                    label: Text(appText('新线程', 'New thread')),
+                    label: Text(appText('新对话', 'New conversation')),
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  appText('工作台', 'Workspace'),
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: palette.textSecondary,
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: palette.surfaceSecondary,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: palette.strokeSoft),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _AssistantRailAction(
-                        icon: Icons.play_circle_outline_rounded,
-                        label: appText('运行中', 'Running'),
-                        value: '${controller.tasksController.running.length}',
-                        onTap: onOpenTasks,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        appText('当前对话就是默认任务', 'This chat is the default task'),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _AssistantRailAction(
-                        icon: Icons.event_repeat_rounded,
-                        label: appText('计划中', 'Scheduled'),
-                        value: '${controller.tasksController.scheduled.length}',
-                        onTap: onOpenTasks,
+                      const SizedBox(height: 4),
+                      Text(
+                        appText(
+                          '左侧选择任一任务，会直接切到这个任务对应的会话上下文。',
+                          'Selecting a task on the left jumps straight into that task conversation.',
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: palette.textSecondary,
+                          height: 1.35,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _AssistantRailAction(
-                        icon: Icons.auto_awesome_rounded,
-                        label: appText('技能', 'Skills'),
-                        value: '${controller.skills.length}',
-                        onTap: onOpenSkills,
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _MetaPill(
+                            label:
+                                '${appText('运行中', 'Running')} $runningCount',
+                            icon: Icons.play_circle_outline_rounded,
+                          ),
+                          _MetaPill(
+                            label:
+                                '${appText('已完成', 'Completed')} $completedCount',
+                            icon: Icons.check_circle_outline_rounded,
+                          ),
+                          _MetaPill(
+                            label:
+                                '${appText('技能', 'Skills')} ${controller.skills.length}',
+                            icon: Icons.auto_awesome_rounded,
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          TextButton.icon(
+                            onPressed: onOpenTasks,
+                            icon: const Icon(Icons.layers_outlined, size: 18),
+                            label: Text(appText('打开任务页', 'Open tasks')),
+                          ),
+                          TextButton.icon(
+                            onPressed: onOpenSkills,
+                            icon: const Icon(Icons.hub_outlined, size: 18),
+                            label: Text(appText('查看技能', 'Open skills')),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1072,12 +1145,12 @@ class _AssistantThreadRail extends StatelessWidget {
             child: Row(
               children: [
                 Text(
-                  appText('线程', 'Threads'),
+                  appText('任务列表', 'Task list'),
                   style: theme.textTheme.titleSmall,
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${threads.length}',
+                  '${tasks.length}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: palette.textMuted,
                   ),
@@ -1086,14 +1159,14 @@ class _AssistantThreadRail extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: threads.isEmpty
+            child: tasks.isEmpty
                 ? Center(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Text(
                         appText(
-                          '没有匹配的线程，试试新建一个。',
-                          'No matching threads. Start a new one.',
+                          '没有匹配的任务，试试新建一个。',
+                          'No matching tasks. Start a new one.',
                         ),
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(
@@ -1104,14 +1177,14 @@ class _AssistantThreadRail extends StatelessWidget {
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                    itemCount: threads.length,
+                    itemCount: tasks.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 6),
                     itemBuilder: (context, index) {
-                      final thread = threads[index];
-                      return _AssistantThreadTile(
-                        entry: thread,
+                      final task = tasks[index];
+                      return _AssistantTaskTile(
+                        entry: task,
                         onTap: () async {
-                          await onSelectThread(thread.sessionKey);
+                          await onSelectTask(task.sessionKey);
                         },
                       );
                     },
@@ -1123,64 +1196,10 @@ class _AssistantThreadRail extends StatelessWidget {
   }
 }
 
-class _AssistantRailAction extends StatelessWidget {
-  const _AssistantRailAction({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.onTap,
-  });
+class _AssistantTaskTile extends StatelessWidget {
+  const _AssistantTaskTile({required this.entry, required this.onTap});
 
-  final IconData icon;
-  final String label;
-  final String value;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final theme = Theme.of(context);
-
-    return Material(
-      color: palette.surfaceSecondary,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, size: 18, color: palette.textMuted),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: palette.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AssistantThreadTile extends StatelessWidget {
-  const _AssistantThreadTile({required this.entry, required this.onTap});
-
-  final _AssistantThreadEntry entry;
+  final _AssistantTaskEntry entry;
   final VoidCallback onTap;
 
   @override
@@ -1195,7 +1214,7 @@ class _AssistantThreadTile extends StatelessWidget {
           : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        key: ValueKey<String>('assistant-thread-${entry.sessionKey}'),
+        key: ValueKey<String>('assistant-task-${entry.sessionKey}'),
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Container(
@@ -1213,12 +1232,20 @@ class _AssistantThreadTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 8,
-                    height: 8,
-                    margin: const EdgeInsets.only(top: 6),
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
+                      color: statusStyle.backgroundColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      entry.draft
+                          ? Icons.edit_note_rounded
+                          : _normalizedTaskStatus(entry.status) == 'running'
+                          ? Icons.play_arrow_rounded
+                          : Icons.task_alt_rounded,
+                      size: 18,
                       color: statusStyle.foregroundColor,
-                      shape: BoxShape.circle,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1259,10 +1286,24 @@ class _AssistantThreadTile extends StatelessWidget {
                 children: [
                   _StatusPill(
                     label: entry.draft
-                        ? appText('草稿', 'Draft')
+                        ? appText('草稿任务', 'Draft task')
                         : _taskStatusLabel(entry.status),
                     backgroundColor: statusStyle.backgroundColor,
                     textColor: statusStyle.foregroundColor,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: _MetaPill(
+                      label: entry.owner,
+                      icon: Icons.smart_toy_outlined,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: _MetaPill(
+                      label: entry.surface,
+                      icon: Icons.forum_outlined,
+                    ),
                   ),
                   const Spacer(),
                   if (entry.isCurrent)
@@ -2384,13 +2425,15 @@ class _TimelineItem {
   final bool error;
 }
 
-class _AssistantThreadEntry {
-  const _AssistantThreadEntry({
+class _AssistantTaskEntry {
+  const _AssistantTaskEntry({
     required this.sessionKey,
     required this.title,
     required this.preview,
     required this.status,
     required this.updatedAtLabel,
+    required this.owner,
+    required this.surface,
     required this.isCurrent,
     this.draft = false,
   });
@@ -2400,6 +2443,8 @@ class _AssistantThreadEntry {
   final String preview;
   final String status;
   final String updatedAtLabel;
+  final String owner;
+  final String surface;
   final bool isCurrent;
   final bool draft;
 }
@@ -2412,6 +2457,45 @@ class _PillStyle {
 
   final Color backgroundColor;
   final Color foregroundColor;
+}
+
+class _MetaPill extends StatelessWidget {
+  const _MetaPill({required this.label, required this.icon});
+
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: palette.surfaceSecondary,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: palette.strokeSoft),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: palette.textMuted),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: palette.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 _PillStyle _pillStyleForStatus(BuildContext context, String label) {
@@ -2495,16 +2579,16 @@ String _sessionDisplayTitle(GatewaySessionSummary session) {
 String _fallbackSessionTitle(String sessionKey) {
   final trimmed = sessionKey.trim();
   if (trimmed == 'main' || trimmed == 'agent:main:main') {
-    return appText('主线程', 'Main thread');
+    return appText('默认任务', 'Default task');
   }
   if (trimmed.startsWith('draft:')) {
-    return appText('新线程', 'New thread');
+    return appText('新对话', 'New conversation');
   }
   final parts = trimmed.split(':');
   if (parts.length >= 3 && parts.first == 'agent' && parts.last == 'main') {
-    return appText('主线程', 'Main thread');
+    return appText('默认任务', 'Default task');
   }
-  return trimmed.isEmpty ? appText('未命名线程', 'Untitled thread') : trimmed;
+  return trimmed.isEmpty ? appText('未命名对话', 'Untitled conversation') : trimmed;
 }
 
 String? _sessionPreview(GatewaySessionSummary session) {
