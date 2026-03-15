@@ -288,7 +288,7 @@ class _AppShellState extends State<AppShell> {
                       Positioned(
                         left: 0,
                         top: 18,
-                        bottom: 18,
+                        bottom: 0,
                         child: _SidebarRevealRail(
                           onExpand: () => controller.setSidebarState(
                             AppSidebarState.expanded,

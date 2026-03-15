@@ -15,20 +15,20 @@ void main() {
       child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
     );
 
-    expect(find.byKey(const Key('assistant-thread-rail')), findsOneWidget);
+    expect(find.byKey(const Key('assistant-task-rail')), findsOneWidget);
 
     final titleBefore = tester.widget<Text>(
       find.byKey(const Key('assistant-conversation-title')),
     );
-    expect(titleBefore.data, '主线程');
+    expect(titleBefore.data, '默认任务');
 
-    await tester.tap(find.byKey(const Key('assistant-new-thread-button')));
+    await tester.tap(find.byKey(const Key('assistant-new-task-button')));
     await tester.pumpAndSettle();
 
     final titleAfter = tester.widget<Text>(
       find.byKey(const Key('assistant-conversation-title')),
     );
-    expect(titleAfter.data, '新线程');
+    expect(titleAfter.data, '新对话');
   });
 
   testWidgets('AssistantPage narrow layout keeps existing single-pane flow', (
@@ -42,7 +42,7 @@ void main() {
       child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
     );
 
-    expect(find.byKey(const Key('assistant-thread-rail')), findsNothing);
+    expect(find.byKey(const Key('assistant-task-rail')), findsNothing);
     expect(find.byKey(const Key('assistant-conversation-title')), findsOneWidget);
   });
 

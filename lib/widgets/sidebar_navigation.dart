@@ -373,7 +373,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
 
   String _sectionLabel(WorkspaceDestination section) {
     return switch (section) {
-      WorkspaceDestination.assistant => appText('新线程', 'New thread'),
+      WorkspaceDestination.assistant => appText('新对话', 'New conversation'),
       WorkspaceDestination.tasks => appText('自动化', 'Automation'),
       WorkspaceDestination.skills => appText('技能', 'Skills'),
       WorkspaceDestination.nodes => appText('节点', 'Nodes'),

@@ -12,7 +12,7 @@ void main() {
   ) async {
     await pumpDesktopApp(tester);
 
-    expect(find.text('新线程'), findsWidgets);
+    expect(find.text('新对话'), findsWidgets);
 
     await tester.tap(find.text('节点'));
     await settleIntegrationUi(tester);
