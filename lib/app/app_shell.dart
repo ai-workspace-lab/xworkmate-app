@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
- import '../features/account/account_page.dart';
- import '../features/ai_gateway/ai_gateway_page.dart';
- import '../features/assistant/assistant_page.dart';
- import '../features/claw_hub/claw_hub_page.dart';
- import '../features/mcp_server/mcp_server_page.dart';
- import '../features/mobile/ios_mobile_shell.dart';
- import '../features/modules/modules_page.dart';
- import '../features/secrets/secrets_page.dart';
- import '../features/settings/settings_page.dart';
- import '../features/skills/skills_page.dart';
- import '../features/tasks/tasks_page.dart';
+import '../features/account/account_page.dart';
+import '../features/ai_gateway/ai_gateway_page.dart';
+import '../features/assistant/assistant_page.dart';
+import '../features/claw_hub/claw_hub_page.dart';
+import '../features/mcp_server/mcp_server_page.dart';
+import '../features/mobile/ios_mobile_shell.dart';
+import '../features/modules/modules_page.dart';
+import '../features/secrets/secrets_page.dart';
+import '../features/settings/settings_page.dart';
+import '../features/skills/skills_page.dart';
+import '../features/tasks/tasks_page.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
@@ -71,6 +71,9 @@ class _AppShellState extends State<AppShell> {
                 final isMobile = constraints.maxWidth < 900;
                 final sidebarState = controller.sidebarState;
                 final showSidebar = sidebarState != AppSidebarState.hidden;
+                final embedSidebarIntoAssistant =
+                    controller.destination == WorkspaceDestination.assistant &&
+                    showSidebar;
                 final expandedSidebarWidth = _clampSidebarWidth(
                   _sidebarExpandedWidth ??
                       _defaultSidebarWidth(
@@ -197,7 +200,7 @@ class _AppShellState extends State<AppShell> {
                   children: [
                     Row(
                       children: [
-                        if (showSidebar)
+                        if (showSidebar && !embedSidebarIntoAssistant)
                           SidebarNavigation(
                             currentSection: controller.destination,
                             sidebarState: sidebarState,
@@ -233,7 +236,8 @@ class _AppShellState extends State<AppShell> {
                                 ? expandedSidebarWidth
                                 : null,
                           ),
-                        if (sidebarState == AppSidebarState.expanded)
+                        if (sidebarState == AppSidebarState.expanded &&
+                            !embedSidebarIntoAssistant)
                           PaneResizeHandle(
                             axis: Axis.horizontal,
                             onDelta: (delta) {
@@ -322,6 +326,41 @@ class _AppShellState extends State<AppShell> {
       WorkspaceDestination.assistant => AssistantPage(
         controller: widget.controller,
         onOpenDetail: onOpenDetail,
+        navigationPanelBuilder:
+            widget.controller.sidebarState == AppSidebarState.hidden
+            ? null
+            : (contentWidth) => SidebarNavigation(
+                currentSection: widget.controller.destination,
+                sidebarState: AppSidebarState.expanded,
+                appLanguage: widget.controller.appLanguage,
+                themeMode: widget.controller.themeMode,
+                onSectionChanged: widget.controller.navigateTo,
+                onToggleLanguage: widget.controller.toggleAppLanguage,
+                onCycleSidebarState: widget.controller.cycleSidebarState,
+                onExpandFromCollapsed: () =>
+                    widget.controller.setSidebarState(AppSidebarState.expanded),
+                onOpenAccount: () =>
+                    widget.controller.navigateTo(WorkspaceDestination.account),
+                onOpenThemeToggle: () => widget.controller.setThemeMode(
+                  widget.controller.themeMode == ThemeMode.dark
+                      ? ThemeMode.light
+                      : ThemeMode.dark,
+                ),
+                accountName:
+                    widget.controller.settings.accountUsername.trim().isEmpty
+                    ? appText('本地操作员', 'Local Operator')
+                    : widget.controller.settings.accountUsername,
+                accountSubtitle:
+                    widget.controller.settings.accountWorkspace.trim().isEmpty
+                    ? appText('账号', 'Account')
+                    : widget.controller.settings.accountWorkspace,
+                expandedWidthOverride: contentWidth,
+                marginOverride: EdgeInsets.zero,
+                showCollapseControl: false,
+              ),
+        showStandaloneTaskRail: false,
+        unifiedPaneStartsCollapsed:
+            widget.controller.sidebarState == AppSidebarState.collapsed,
       ),
       WorkspaceDestination.tasks => TasksPage(
         controller: widget.controller,
