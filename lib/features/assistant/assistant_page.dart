@@ -95,7 +95,7 @@ class _AssistantPageState extends State<AssistantPage> {
           padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final showThreadRail = constraints.maxWidth >= 1180;
+              final showThreadRail = constraints.maxWidth >= 860;
               final mainWorkspace = _buildMainWorkspace(
                 controller: controller,
                 timelineItems: timelineItems,
@@ -105,11 +105,11 @@ class _AssistantPageState extends State<AssistantPage> {
                 return mainWorkspace;
               }
 
-              final maxThreadRailWidth = (constraints.maxWidth * 0.32)
-                  .clamp(272.0, 388.0)
+              final maxThreadRailWidth = (constraints.maxWidth * 0.28)
+                  .clamp(232.0, 340.0)
                   .toDouble();
               final threadRailWidth = _threadRailWidth
-                  .clamp(272.0, maxThreadRailWidth)
+                  .clamp(232.0, maxThreadRailWidth)
                   .toDouble();
 
               return Row(
@@ -154,7 +154,7 @@ class _AssistantPageState extends State<AssistantPage> {
                       onDelta: (delta) {
                         setState(() {
                           _threadRailWidth = (_threadRailWidth + delta)
-                              .clamp(272.0, maxThreadRailWidth)
+                              .clamp(232.0, maxThreadRailWidth)
                               .toDouble();
                         });
                       },

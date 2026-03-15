@@ -38,7 +38,7 @@ void main() {
 
     await pumpPage(
       tester,
-      size: const Size(1000, 900),
+      size: const Size(820, 900),
       child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
     );
 
