@@ -1,23 +1,32 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/agent_registry.dart';
+import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/runtime/secure_config_store.dart';
 
 // Mock GatewayRuntime for testing
-class MockGatewayRuntime extends ChangeNotifier implements GatewayRuntime {
+class MockGatewayRuntime extends GatewayRuntime {
+  MockGatewayRuntime()
+    : super(
+        store: SecureConfigStore(),
+        identityStore: DeviceIdentityStore(SecureConfigStore()),
+      );
+
   final Map<String, dynamic> _responses = {};
   final List<Map<String, dynamic>> _requests = [];
-  bool _isConnected = false;
   GatewayConnectionSnapshot _snapshot = GatewayConnectionSnapshot.initial();
 
   void setConnected(bool connected) {
-    _isConnected = connected;
-    _snapshot = GatewayConnectionSnapshot(
-      profile: GatewayConnectionProfile.defaults(),
-      status: connected ? RuntimeConnectionStatus.connected : RuntimeConnectionStatus.offline,
-    );
+    _snapshot =
+        GatewayConnectionSnapshot.initial(
+          mode: GatewayConnectionProfile.defaults().mode,
+        ).copyWith(
+          status: connected
+              ? RuntimeConnectionStatus.connected
+              : RuntimeConnectionStatus.offline,
+          statusText: connected ? 'Connected' : 'Offline',
+        );
     notifyListeners();
   }
 
@@ -28,22 +37,26 @@ class MockGatewayRuntime extends ChangeNotifier implements GatewayRuntime {
   List<Map<String, dynamic>> getRequests() => List.unmodifiable(_requests);
 
   @override
-  bool get isConnected => _isConnected;
+  bool get isConnected => _snapshot.status == RuntimeConnectionStatus.connected;
 
   @override
   GatewayConnectionSnapshot get snapshot => _snapshot;
 
   @override
-  Stream<GatewayPushEvent> get events => const Stream.empty();
+  Future<dynamic> request(
+    String method, {
+    Map<String, dynamic>? params,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    _requests.add({
+      'method': method,
+      'params': params ?? const <String, dynamic>{},
+    });
 
-  @override
-  Future<Map<String, dynamic>> request(String method, {Map<String, dynamic> params = const {}, Duration timeout = const Duration(seconds: 30)}) async {
-    _requests.add({'method': method, 'params': params});
-    
     if (_responses.containsKey(method)) {
       return _responses[method]!;
     }
-    
+
     return {'success': true};
   }
 
@@ -52,22 +65,14 @@ class MockGatewayRuntime extends ChangeNotifier implements GatewayRuntime {
   Future<void> initialize() async {}
 
   @override
-  Future<void> connectProfile(GatewayConnectionProfile profile, {String authTokenOverride = '', String authPasswordOverride = ''}) async {}
+  Future<void> connectProfile(
+    GatewayConnectionProfile profile, {
+    String authTokenOverride = '',
+    String authPasswordOverride = '',
+  }) async {}
 
   @override
-  Future<void> disconnect() async {}
-
-  @override
-  Future<void> clearLogs() async {}
-
-  @override
-  List<RuntimeLogEntry> get logs => [];
-
-  @override
-  List<RuntimeLogEntry> get logsForTest => [];
-
-  @override
-  void addRuntimeLogForTest({required String level, required String category, required String message}) {}
+  Future<void> disconnect({bool clearDesiredProfile = true}) async {}
 }
 
 void main() {
@@ -193,30 +198,52 @@ void main() {
         agentType: 'codex',
         name: 'Test Agent',
         version: '1.0.0',
+        transport: 'stdio-bridge',
         capabilities: [
-          AgentCapability(name: 'code-generation', description: 'Generate code'),
+          AgentCapability(
+            name: 'code-generation',
+            description: 'Generate code',
+          ),
         ],
+        metadata: const <String, dynamic>{
+          'providerId': 'codex',
+          'runtimeMode': 'externalCli',
+        },
       );
 
       expect(registration.agentId, equals('agent-123'));
       expect(registry.isRegistered, isTrue);
+
+      final request = mockGateway.getRequests().single;
+      expect(request['params']['transport'], 'stdio-bridge');
+      expect(
+        request['params']['metadata'],
+        containsPair('providerId', 'codex'),
+      );
     });
 
     test('listAgents fails when gateway not connected', () async {
       mockGateway.setConnected(false);
 
-      expect(
-        () => registry.listAgents(),
-        throwsA(isA<AgentException>()),
-      );
+      expect(() => registry.listAgents(), throwsA(isA<AgentException>()));
     });
 
     test('listAgents returns agents when gateway connected', () async {
       mockGateway.setConnected(true);
       mockGateway.setResponse('agent/list', {
         'agents': [
-          {'agentId': 'agent-1', 'agentType': 'codex', 'name': 'Agent 1', 'status': 'active'},
-          {'agentId': 'agent-2', 'agentType': 'assistant', 'name': 'Agent 2', 'status': 'idle'},
+          {
+            'agentId': 'agent-1',
+            'agentType': 'codex',
+            'name': 'Agent 1',
+            'status': 'active',
+          },
+          {
+            'agentId': 'agent-2',
+            'agentType': 'assistant',
+            'name': 'Agent 2',
+            'status': 'idle',
+          },
         ],
       });
 

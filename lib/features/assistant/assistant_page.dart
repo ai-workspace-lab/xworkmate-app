@@ -34,11 +34,14 @@ class _AssistantPageState extends State<AssistantPage> {
   static const List<String> _thinkingModes = ['low', 'medium', 'high', 'max'];
 
   late final TextEditingController _inputController;
+  late final TextEditingController _threadSearchController;
   late final ScrollController _conversationController;
   late final FocusNode _composerFocusNode;
   String _mode = 'ask';
   String _thinkingLabel = 'high';
   double _conversationPaneRatio = 0.7;
+  double _threadRailWidth = 304;
+  String _threadQuery = '';
   List<_ComposerAttachment> _attachments = const <_ComposerAttachment>[];
   String? _lastSubmittedPrompt;
   String? _lastAutoAgentLabel;
@@ -48,6 +51,7 @@ class _AssistantPageState extends State<AssistantPage> {
   void initState() {
     super.initState();
     _inputController = TextEditingController();
+    _threadSearchController = TextEditingController();
     _conversationController = ScrollController();
     _composerFocusNode = FocusNode();
   }
@@ -55,6 +59,7 @@ class _AssistantPageState extends State<AssistantPage> {
   @override
   void dispose() {
     _inputController.dispose();
+    _threadSearchController.dispose();
     _conversationController.dispose();
     _composerFocusNode.dispose();
     super.dispose();
@@ -68,6 +73,12 @@ class _AssistantPageState extends State<AssistantPage> {
         final controller = widget.controller;
         final messages = List<GatewayChatMessage>.from(controller.chatMessages);
         final timelineItems = _buildTimelineItems(controller, messages);
+        final threads = _buildThreadEntries(controller);
+        final visibleThreads = _filterThreads(threads);
+        final currentThread = _resolveCurrentThread(
+          threads,
+          controller.currentSessionKey,
+        );
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || !_conversationController.hasClients) {
@@ -84,107 +95,187 @@ class _AssistantPageState extends State<AssistantPage> {
           padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              const handleHeight = 10.0;
-              const paneGap = 6.0;
-              final availablePaneHeight =
-                  (constraints.maxHeight - handleHeight - paneGap)
-                      .clamp(0.0, double.infinity)
-                      .toDouble();
-              var minConversationHeight = availablePaneHeight >= 620
-                  ? 240.0
-                  : availablePaneHeight * 0.4;
-              var minComposerHeight = availablePaneHeight >= 620
-                  ? 176.0
-                  : availablePaneHeight * 0.24;
-              if (minConversationHeight + minComposerHeight >
-                  availablePaneHeight) {
-                minConversationHeight = availablePaneHeight * 0.52;
-                minComposerHeight = availablePaneHeight - minConversationHeight;
+              final showThreadRail = constraints.maxWidth >= 1180;
+              final mainWorkspace = _buildMainWorkspace(
+                controller: controller,
+                timelineItems: timelineItems,
+                currentThreadTitle: currentThread.title,
+              );
+              if (!showThreadRail) {
+                return mainWorkspace;
               }
-              final maxConversationHeight =
-                  (availablePaneHeight - minComposerHeight)
-                      .clamp(minConversationHeight, availablePaneHeight)
-                      .toDouble();
-              final conversationHeight = availablePaneHeight <= 0
-                  ? 0.0
-                  : (_conversationPaneRatio * availablePaneHeight)
-                        .clamp(minConversationHeight, maxConversationHeight)
-                        .toDouble();
-              final composerHeight = (availablePaneHeight - conversationHeight)
-                  .clamp(minComposerHeight, availablePaneHeight)
+
+              final maxThreadRailWidth = (constraints.maxWidth * 0.32)
+                  .clamp(272.0, 388.0)
+                  .toDouble();
+              final threadRailWidth = _threadRailWidth
+                  .clamp(272.0, maxThreadRailWidth)
                   .toDouble();
 
-              return Column(
+              return Row(
                 children: [
                   SizedBox(
-                    height: conversationHeight,
-                    child: _ConversationArea(
+                    width: threadRailWidth,
+                    child: _AssistantThreadRail(
+                      key: const Key('assistant-thread-rail'),
                       controller: controller,
-                      items: timelineItems,
-                      scrollController: _conversationController,
-                      onOpenDetail: widget.onOpenDetail,
-                      onFocusComposer: _focusComposer,
-                      onOpenGateway: _showConnectDialog,
-                      onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
+                      threads: visibleThreads,
+                      query: _threadQuery,
+                      searchController: _threadSearchController,
+                      onQueryChanged: (value) {
+                        setState(() {
+                          _threadQuery = value.trim();
+                        });
+                      },
+                      onClearQuery: () {
+                        _threadSearchController.clear();
+                        setState(() {
+                          _threadQuery = '';
+                        });
+                      },
+                      onRefreshSessions: controller.refreshSessions,
+                      onCreateThread: _createNewThread,
+                      onOpenTasks: () {
+                        controller.navigateTo(WorkspaceDestination.tasks);
+                      },
+                      onOpenSkills: () {
+                        controller.navigateTo(WorkspaceDestination.skills);
+                      },
+                      onSelectThread: (sessionKey) async {
+                        await controller.switchSession(sessionKey);
+                        _focusComposer();
+                      },
                     ),
                   ),
                   SizedBox(
-                    height: handleHeight,
+                    width: 10,
                     child: PaneResizeHandle(
-                      axis: Axis.vertical,
+                      axis: Axis.horizontal,
                       onDelta: (delta) {
-                        if (availablePaneHeight <= 0) {
-                          return;
-                        }
-                        final nextHeight = (conversationHeight + delta).clamp(
-                          minConversationHeight,
-                          maxConversationHeight,
-                        );
                         setState(() {
-                          _conversationPaneRatio =
-                              nextHeight / availablePaneHeight;
+                          _threadRailWidth = (_threadRailWidth + delta)
+                              .clamp(272.0, maxThreadRailWidth)
+                              .toDouble();
                         });
                       },
                     ),
                   ),
-                  const SizedBox(height: paneGap),
-                  SizedBox(
-                    height: composerHeight,
-                    child: _AssistantLowerPane(
-                      inputController: _inputController,
-                      focusNode: _composerFocusNode,
-                      mode: _mode,
-                      thinkingLabel: _thinkingLabel,
-                      modelLabel: controller.resolvedDefaultModel.isEmpty
-                          ? appText('未选择模型', 'No model selected')
-                          : controller.resolvedDefaultModel,
-                      modelOptions: controller.aiGatewayModelChoices,
-                      attachments: _attachments,
-                      autoAgentLabel: _lastAutoAgentLabel,
-                      controller: controller,
-                      onModeChanged: (value) => setState(() => _mode = value),
-                      onThinkingChanged: (value) {
-                        setState(() => _thinkingLabel = value);
-                      },
-                      onModelChanged: controller.selectDefaultModel,
-                      onRemoveAttachment: (attachment) {
-                        setState(() {
-                          _attachments = _attachments
-                              .where((item) => item.path != attachment.path)
-                              .toList(growable: false);
-                        });
-                      },
-                      onOpenGateway: _showConnectDialog,
-                      onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
-                      onPickAttachments: _pickAttachments,
-                      onFocusComposer: _focusComposer,
-                      onSend: _submitPrompt,
-                    ),
-                  ),
+                  const SizedBox(width: 6),
+                  Expanded(child: mainWorkspace),
                 ],
               );
             },
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMainWorkspace({
+    required AppController controller,
+    required List<_TimelineItem> timelineItems,
+    required String currentThreadTitle,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const handleHeight = 10.0;
+        const paneGap = 6.0;
+        final availablePaneHeight =
+            (constraints.maxHeight - handleHeight - paneGap)
+                .clamp(0.0, double.infinity)
+                .toDouble();
+        var minConversationHeight = availablePaneHeight >= 620
+            ? 240.0
+            : availablePaneHeight * 0.4;
+        var minComposerHeight = availablePaneHeight >= 620
+            ? 176.0
+            : availablePaneHeight * 0.24;
+        if (minConversationHeight + minComposerHeight >
+            availablePaneHeight) {
+          minConversationHeight = availablePaneHeight * 0.52;
+          minComposerHeight = availablePaneHeight - minConversationHeight;
+        }
+        final maxConversationHeight =
+            (availablePaneHeight - minComposerHeight)
+                .clamp(minConversationHeight, availablePaneHeight)
+                .toDouble();
+        final conversationHeight = availablePaneHeight <= 0
+            ? 0.0
+            : (_conversationPaneRatio * availablePaneHeight)
+                  .clamp(minConversationHeight, maxConversationHeight)
+                  .toDouble();
+        final composerHeight = (availablePaneHeight - conversationHeight)
+            .clamp(minComposerHeight, availablePaneHeight)
+            .toDouble();
+
+        return Column(
+          children: [
+            SizedBox(
+              height: conversationHeight,
+              child: _ConversationArea(
+                controller: controller,
+                currentThreadTitle: currentThreadTitle,
+                items: timelineItems,
+                scrollController: _conversationController,
+                onOpenDetail: widget.onOpenDetail,
+                onFocusComposer: _focusComposer,
+                onOpenGateway: _showConnectDialog,
+                onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
+              ),
+            ),
+            SizedBox(
+              height: handleHeight,
+              child: PaneResizeHandle(
+                axis: Axis.vertical,
+                onDelta: (delta) {
+                  if (availablePaneHeight <= 0) {
+                    return;
+                  }
+                  final nextHeight = (conversationHeight + delta).clamp(
+                    minConversationHeight,
+                    maxConversationHeight,
+                  );
+                  setState(() {
+                    _conversationPaneRatio = nextHeight / availablePaneHeight;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: paneGap),
+            SizedBox(
+              height: composerHeight,
+              child: _AssistantLowerPane(
+                inputController: _inputController,
+                focusNode: _composerFocusNode,
+                mode: _mode,
+                thinkingLabel: _thinkingLabel,
+                modelLabel: controller.resolvedDefaultModel.isEmpty
+                    ? appText('未选择模型', 'No model selected')
+                    : controller.resolvedDefaultModel,
+                modelOptions: controller.aiGatewayModelChoices,
+                attachments: _attachments,
+                autoAgentLabel: _lastAutoAgentLabel,
+                controller: controller,
+                onModeChanged: (value) => setState(() => _mode = value),
+                onThinkingChanged: (value) {
+                  setState(() => _thinkingLabel = value);
+                },
+                onModelChanged: controller.selectDefaultModel,
+                onRemoveAttachment: (attachment) {
+                  setState(() {
+                    _attachments = _attachments
+                        .where((item) => item.path != attachment.path)
+                        .toList(growable: false);
+                  });
+                },
+                onOpenGateway: _showConnectDialog,
+                onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
+                onPickAttachments: _pickAttachments,
+                onFocusComposer: _focusComposer,
+                onSend: _submitPrompt,
+              ),
+            ),
+          ],
         );
       },
     );
@@ -484,6 +575,102 @@ class _AssistantPageState extends State<AssistantPage> {
     }
     _composerFocusNode.requestFocus();
   }
+
+  Future<void> _createNewThread() async {
+    final sessionKey = _buildDraftSessionKey(widget.controller);
+    await widget.controller.switchSession(sessionKey);
+    _focusComposer();
+  }
+
+  List<_AssistantThreadEntry> _buildThreadEntries(AppController controller) {
+    final sessions = controller.sessions.toList(growable: false)
+      ..sort(
+        (left, right) =>
+            (right.updatedAtMs ?? 0).compareTo(left.updatedAtMs ?? 0),
+      );
+    final entries = sessions
+        .map(
+          (session) => _AssistantThreadEntry(
+            sessionKey: session.key,
+            title: _sessionDisplayTitle(session),
+            preview:
+                _sessionPreview(session) ??
+                appText('等待继续对话', 'Waiting to continue the thread'),
+            status: _sessionStatus(
+              session,
+              currentSessionKey: controller.currentSessionKey,
+              hasPendingRun: controller.chatController.hasPendingRun,
+            ),
+            updatedAtLabel: _sessionUpdatedAtLabel(session.updatedAtMs),
+            isCurrent: _sessionKeysMatch(
+              session.key,
+              controller.currentSessionKey,
+            ),
+          ),
+        )
+        .toList(growable: true);
+    if (!entries.any(
+      (item) => _sessionKeysMatch(item.sessionKey, controller.currentSessionKey),
+    )) {
+      entries.insert(
+        0,
+        _AssistantThreadEntry(
+          sessionKey: controller.currentSessionKey,
+          title: _fallbackSessionTitle(controller.currentSessionKey),
+          preview: appText(
+            '等待发送第一条消息',
+            'Waiting for the first message',
+          ),
+          status: 'queued',
+          updatedAtLabel: appText('现在', 'Now'),
+          isCurrent: true,
+          draft: true,
+        ),
+      );
+    }
+    return entries;
+  }
+
+  List<_AssistantThreadEntry> _filterThreads(List<_AssistantThreadEntry> items) {
+    final query = _threadQuery.trim().toLowerCase();
+    if (query.isEmpty) {
+      return items;
+    }
+    return items.where((item) {
+      final haystack =
+          '${item.title}\n${item.preview}\n${item.sessionKey}'.toLowerCase();
+      return haystack.contains(query);
+    }).toList(growable: false);
+  }
+
+  _AssistantThreadEntry _resolveCurrentThread(
+    List<_AssistantThreadEntry> items,
+    String sessionKey,
+  ) {
+    for (final item in items) {
+      if (_sessionKeysMatch(item.sessionKey, sessionKey)) {
+        return item;
+      }
+    }
+    return _AssistantThreadEntry(
+      sessionKey: sessionKey,
+      title: _fallbackSessionTitle(sessionKey),
+      preview: '',
+      status: 'queued',
+      updatedAtLabel: appText('现在', 'Now'),
+      isCurrent: true,
+      draft: true,
+    );
+  }
+
+  String _buildDraftSessionKey(AppController controller) {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final selectedAgentId = controller.selectedAgentId.trim();
+    if (selectedAgentId.isEmpty) {
+      return 'draft:$stamp';
+    }
+    return 'draft:$selectedAgentId:$stamp';
+  }
 }
 
 class _AssistantLowerPane extends StatelessWidget {
@@ -557,6 +744,7 @@ class _AssistantLowerPane extends StatelessWidget {
 class _ConversationArea extends StatelessWidget {
   const _ConversationArea({
     required this.controller,
+    required this.currentThreadTitle,
     required this.items,
     required this.scrollController,
     required this.onOpenDetail,
@@ -566,6 +754,7 @@ class _ConversationArea extends StatelessWidget {
   });
 
   final AppController controller;
+  final String currentThreadTitle;
   final List<_TimelineItem> items;
   final ScrollController scrollController;
   final ValueChanged<DetailPanelData> onOpenDetail;
@@ -592,7 +781,8 @@ class _ConversationArea extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        controller.currentSessionKey,
+                        currentThreadTitle,
+                        key: const Key('assistant-conversation-title'),
                         style: theme.textTheme.titleLarge,
                       ),
                       const SizedBox(height: 4),
@@ -745,6 +935,349 @@ class _ConversationArea extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _AssistantThreadRail extends StatelessWidget {
+  const _AssistantThreadRail({
+    super.key,
+    required this.controller,
+    required this.threads,
+    required this.query,
+    required this.searchController,
+    required this.onQueryChanged,
+    required this.onClearQuery,
+    required this.onRefreshSessions,
+    required this.onCreateThread,
+    required this.onOpenTasks,
+    required this.onOpenSkills,
+    required this.onSelectThread,
+  });
+
+  final AppController controller;
+  final List<_AssistantThreadEntry> threads;
+  final String query;
+  final TextEditingController searchController;
+  final ValueChanged<String> onQueryChanged;
+  final VoidCallback onClearQuery;
+  final Future<void> Function() onRefreshSessions;
+  final Future<void> Function() onCreateThread;
+  final VoidCallback onOpenTasks;
+  final VoidCallback onOpenSkills;
+  final Future<void> Function(String sessionKey) onSelectThread;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.palette;
+
+    return SurfaceCard(
+      borderRadius: 16,
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        key: const Key('assistant-thread-search'),
+                        controller: searchController,
+                        onChanged: onQueryChanged,
+                        decoration: InputDecoration(
+                          hintText: appText('搜索线程', 'Search threads'),
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          suffixIcon: query.isEmpty
+                              ? null
+                              : IconButton(
+                                  tooltip: appText('清除搜索', 'Clear search'),
+                                  onPressed: onClearQuery,
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      key: const Key('assistant-thread-refresh'),
+                      tooltip: appText('刷新线程', 'Refresh threads'),
+                      onPressed: () async {
+                        await onRefreshSessions();
+                      },
+                      icon: const Icon(Icons.refresh_rounded),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonalIcon(
+                    key: const Key('assistant-new-thread-button'),
+                    onPressed: () async {
+                      await onCreateThread();
+                    },
+                    icon: const Icon(Icons.edit_note_rounded),
+                    label: Text(appText('新线程', 'New thread')),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  appText('工作台', 'Workspace'),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: palette.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _AssistantRailAction(
+                        icon: Icons.play_circle_outline_rounded,
+                        label: appText('运行中', 'Running'),
+                        value: '${controller.tasksController.running.length}',
+                        onTap: onOpenTasks,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _AssistantRailAction(
+                        icon: Icons.event_repeat_rounded,
+                        label: appText('计划中', 'Scheduled'),
+                        value: '${controller.tasksController.scheduled.length}',
+                        onTap: onOpenTasks,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _AssistantRailAction(
+                        icon: Icons.auto_awesome_rounded,
+                        label: appText('技能', 'Skills'),
+                        value: '${controller.skills.length}',
+                        onTap: onOpenSkills,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: palette.strokeSoft),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+            child: Row(
+              children: [
+                Text(
+                  appText('线程', 'Threads'),
+                  style: theme.textTheme.titleSmall,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${threads.length}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: threads.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        appText(
+                          '没有匹配的线程，试试新建一个。',
+                          'No matching threads. Start a new one.',
+                        ),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: palette.textSecondary,
+                        ),
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                    itemCount: threads.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 6),
+                    itemBuilder: (context, index) {
+                      final thread = threads[index];
+                      return _AssistantThreadTile(
+                        entry: thread,
+                        onTap: () async {
+                          await onSelectThread(thread.sessionKey);
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AssistantRailAction extends StatelessWidget {
+  const _AssistantRailAction({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+
+    return Material(
+      color: palette.surfaceSecondary,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 18, color: palette.textMuted),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: palette.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AssistantThreadTile extends StatelessWidget {
+  const _AssistantThreadTile({required this.entry, required this.onTap});
+
+  final _AssistantThreadEntry entry;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    final statusStyle = _pillStyleForStatus(context, entry.status);
+
+    return Material(
+      color: entry.isCurrent
+          ? palette.accentMuted.withValues(alpha: 0.55)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        key: ValueKey<String>('assistant-thread-${entry.sessionKey}'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: entry.isCurrent ? palette.accent : palette.strokeSoft,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(top: 6),
+                    decoration: BoxDecoration(
+                      color: statusStyle.foregroundColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      entry.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                        fontWeight: entry.isCurrent
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    entry.updatedAtLabel,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                entry.preview,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: palette.textSecondary,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _StatusPill(
+                    label: entry.draft
+                        ? appText('草稿', 'Draft')
+                        : _taskStatusLabel(entry.status),
+                    backgroundColor: statusStyle.backgroundColor,
+                    textColor: statusStyle.foregroundColor,
+                  ),
+                  const Spacer(),
+                  if (entry.isCurrent)
+                    Text(
+                      appText('当前', 'Current'),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: palette.textMuted,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1851,6 +2384,26 @@ class _TimelineItem {
   final bool error;
 }
 
+class _AssistantThreadEntry {
+  const _AssistantThreadEntry({
+    required this.sessionKey,
+    required this.title,
+    required this.preview,
+    required this.status,
+    required this.updatedAtLabel,
+    required this.isCurrent,
+    this.draft = false,
+  });
+
+  final String sessionKey;
+  final String title;
+  final String preview;
+  final String status;
+  final String updatedAtLabel;
+  final bool isCurrent;
+  final bool draft;
+}
+
 class _PillStyle {
   const _PillStyle({
     required this.backgroundColor,
@@ -1926,6 +2479,91 @@ String _assistantThinkingLabel(String level) => switch (level) {
   'max' => appText('超高', 'Max'),
   _ => appText('高', 'High'),
 };
+
+String _sessionDisplayTitle(GatewaySessionSummary session) {
+  final label = session.label.trim();
+  if (label.isEmpty || label == session.key) {
+    return _fallbackSessionTitle(session.key);
+  }
+  if ((label == 'main' || label == 'agent:main:main') &&
+      (session.derivedTitle ?? '').trim().toLowerCase() == 'main') {
+    return _fallbackSessionTitle(session.key);
+  }
+  return label;
+}
+
+String _fallbackSessionTitle(String sessionKey) {
+  final trimmed = sessionKey.trim();
+  if (trimmed == 'main' || trimmed == 'agent:main:main') {
+    return appText('主线程', 'Main thread');
+  }
+  if (trimmed.startsWith('draft:')) {
+    return appText('新线程', 'New thread');
+  }
+  final parts = trimmed.split(':');
+  if (parts.length >= 3 && parts.first == 'agent' && parts.last == 'main') {
+    return appText('主线程', 'Main thread');
+  }
+  return trimmed.isEmpty ? appText('未命名线程', 'Untitled thread') : trimmed;
+}
+
+String? _sessionPreview(GatewaySessionSummary session) {
+  final preview = session.lastMessagePreview?.trim();
+  if (preview != null && preview.isNotEmpty) {
+    return preview;
+  }
+  final subject = session.subject?.trim();
+  if (subject != null && subject.isNotEmpty) {
+    return subject;
+  }
+  return null;
+}
+
+String _sessionStatus(
+  GatewaySessionSummary session, {
+  required String currentSessionKey,
+  required bool hasPendingRun,
+}) {
+  if (session.abortedLastRun == true) {
+    return 'failed';
+  }
+  if (hasPendingRun && _sessionKeysMatch(session.key, currentSessionKey)) {
+    return 'running';
+  }
+  if ((session.lastMessagePreview ?? '').trim().isEmpty) {
+    return 'queued';
+  }
+  return 'completed';
+}
+
+String _sessionUpdatedAtLabel(double? updatedAtMs) {
+  if (updatedAtMs == null) {
+    return appText('未知', 'Unknown');
+  }
+  final delta = DateTime.now().difference(
+    DateTime.fromMillisecondsSinceEpoch(updatedAtMs.toInt()),
+  );
+  if (delta.inMinutes < 1) {
+    return appText('刚刚', 'Now');
+  }
+  if (delta.inHours < 1) {
+    return '${delta.inMinutes}m';
+  }
+  if (delta.inDays < 1) {
+    return '${delta.inHours}h';
+  }
+  return '${delta.inDays}d';
+}
+
+bool _sessionKeysMatch(String incoming, String current) {
+  final left = incoming.trim().toLowerCase();
+  final right = current.trim().toLowerCase();
+  if (left == right) {
+    return true;
+  }
+  return (left == 'agent:main:main' && right == 'main') ||
+      (left == 'main' && right == 'agent:main:main');
+}
 
 class _ComposerAttachment {
   const _ComposerAttachment({

@@ -528,6 +528,8 @@ class GatewayRuntime extends ChangeNotifier {
     required String thinking,
     List<GatewayChatAttachmentPayload> attachments =
         const <GatewayChatAttachmentPayload>[],
+    String? agentId,
+    Map<String, dynamic>? metadata,
   }) async {
     final runId = _randomId();
     final payload = asMap(
@@ -539,6 +541,9 @@ class GatewayRuntime extends ChangeNotifier {
           'thinking': thinking,
           'timeoutMs': 30000,
           'idempotencyKey': runId,
+          if (agentId != null && agentId.trim().isNotEmpty)
+            'agentId': agentId.trim(),
+          if (metadata != null && metadata.isNotEmpty) 'metadata': metadata,
           if (attachments.isNotEmpty)
             'attachments': attachments
                 .map((attachment) => attachment.toJson())

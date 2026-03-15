@@ -902,6 +902,8 @@ class GatewayChatController extends ChangeNotifier {
     required String thinking,
     List<GatewayChatAttachmentPayload> attachments =
         const <GatewayChatAttachmentPayload>[],
+    String? agentId,
+    Map<String, dynamic>? metadata,
   }) async {
     final trimmed = message.trim();
     if ((trimmed.isEmpty && attachments.isEmpty) || !_runtime.isConnected) {
@@ -932,6 +934,8 @@ class GatewayChatController extends ChangeNotifier {
         message: trimmed.isEmpty ? 'See attached.' : trimmed,
         thinking: thinking,
         attachments: attachments,
+        agentId: agentId,
+        metadata: metadata,
       );
       _pendingRuns.add(runId);
     } catch (error) {

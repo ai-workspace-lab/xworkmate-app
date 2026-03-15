@@ -21,4 +21,23 @@ void main() {
 
     expect(controller.destination, WorkspaceDestination.assistant);
   });
+
+  testWidgets('TasksPage scheduled tab is read-only', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+    controller.navigateTo(WorkspaceDestination.tasks);
+
+    await pumpPage(
+      tester,
+      child: TasksPage(controller: controller, onOpenDetail: (_) {}),
+    );
+
+    await tester.tap(find.text('计划中').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Scheduled 只读'), findsOneWidget);
+    expect(find.text('这些项目来自 Gateway cron 调度器，本页当前仅支持只读展示。'), findsOneWidget);
+    expect(find.text('新建任务'), findsNothing);
+  });
 }

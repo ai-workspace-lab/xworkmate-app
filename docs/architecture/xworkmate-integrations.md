@@ -1,142 +1,141 @@
-# XWorkmate 集成架构说明
+# XWorkmate 集成架构
 
 ## 概述
 
-XWorkmate 的"设置 > 集成"页面包含三个独立的集成服务，每个服务有不同的用途：
+XWorkmate 当前有三组独立但可组合的集成面：
 
-## 1. OpenClaw Gateway (网关连接)
+1. **OpenClaw Gateway**
+   - 设备配对
+   - Agent 列表与聊天
+   - `cron.list` 只读任务视图
+   - `memory/sync` 同步能力
+2. **AI Gateway**
+   - 统一模型入口
+   - 模型目录同步
+   - 给 Codex CLI 提供模型桥接
+3. **Code Agent Runtime**
+   - 当前唯一可交付路径是外部 `Codex CLI`
+   - 内置 Rust FFI 仍是 future work
+   - 所有 runtime 都挂在 `XWorkmate App node` 后面，而不是直接挂到 Gateway
 
-**用途：** AI Agent OS 调度中心
+## 当前真实链路
 
-> **注意：** 设置页面中显示为"OpenClaw Gateway"，避免与"AI Gateway"混淆
+```mermaid
+flowchart LR
+    X["XWorkmate App Node"] -->|JSON-RPC over stdio| C["Codex CLI"]
+    C -->|HTTP| A["AI Gateway"]
+    X -->|WebSocket RPC| G["OpenClaw Gateway"]
+    X -->|agent/register + chat.send metadata| G
+```
 
-**功能：**
-- **记忆管理** - 跨终端的云端记忆存储与检索
-- **任务调度** - 任务队列、重试、执行跟踪
-- **多 Agent 协调** - 多个 AI Agent 的编排和协同
-- **设备配对** - 安全的设备身份管理和配对审批
+关键点：
 
-**连接模式：**
-- **本地模式** - `ws://127.0.0.1:18789` - 本地运行，无需云端
-- **远程模式** - `wss://openclaw.svc.plus:443` - 云端增强，支持跨设备记忆
+- `Codex CLI` 不直接连接 `OpenClaw Gateway`
+- `XWorkmate App` 是唯一的 cooperative node
+- 本地内置/扩展/外部 CLI 都是 node 后端 runtime
+- AI Gateway 与 OpenClaw Gateway 是两套不同职责的集成面
 
-**配置项：**
-- Host (默认: openclaw.svc.plus)
-- Port (默认: 443)
-- TLS (远程模式必须启用)
-- 设备 ID、Role、Auth Token
+## 1. OpenClaw Gateway
+
+用途：运行时协同、响应返回和设备信任边界。
+
+当前已用到的能力：
+
+- `health`
+- `status`
+- `agents.list`
+- `sessions.list`
+- `chat.send`
+- `device.pair.*`
+- `cron.list`
+- `agent/register`
+- `memory/sync`
+
+当前产品边界：
+
+- Scheduled Tasks 只读展示 `cron.list`
+- Memory 只暴露同步语义，不提供 CRUD UI
+- 远程模式必须保持 TLS 显式配置
+- Gateway 接收到的是来自 `XWorkmate App node` 的交互和 metadata，不是 CLI 直连 RPC
 
 ## 2. AI Gateway
 
-**用途：** AI 模型提供商统一管理网关 (APISIX AI 代理模式)
+用途：为外部 Codex CLI 提供统一模型桥接。
 
-**功能：**
-- **模型聚合** - 统一接入多个 AI Provider (OpenAI、Anthropic、Ollama 等)
-- **API 路由** - 智能模型选择和请求转发
-- **密钥管理** - 多 Provider 的 API Key 统一管理
-- **模型同步** - 从 Gateway 拉取可用模型列表
+当前链路：
 
-**配置项：**
-- Gateway URL (如: https://ai.example.com)
-- API Key Ref (安全存储的密钥引用)
-- Profile Name (配置名称)
-- 选择/管理的模型列表
+1. 用户在设置中配置 AI Gateway URL、模型和 API Key。
+2. `CodexConfigBridge` 把配置写入 `~/.codex/config.toml`。
+3. 外部 `codex app-server` 通过该配置把推理请求转发到 AI Gateway。
 
-**支持的模式：**
-- **在线模式** - 通过 AI Gateway 调用云端大模型
-- **离线模式** - 使用内置 Codex Agent (通过 Rust FFI)
+这部分不负责：
 
-## 3. Vault Server
+- 设备配对
+- 任务调度
+- Agent 注册
 
-**用途：** 密钥与凭证的安全存储与审计
+## 3. Code Agent Runtime
 
-**功能：**
-- **密钥保险箱** - 安全存储 API Keys、数据库凭证等
-- **审计日志** - 完整的密钥访问和使用审计
-- **细粒度权限** - 基于角色的密钥访问控制
-- **本地存储备选** - 对于小型部署，支持使用本地密钥存储
+### 当前可用路径
 
-**配置项：**
-- Vault Server Address
-- Namespace
-- Auth Mode
-- Token Ref
-- 实际 Vault Token (安全输入)
+- `RuntimeCoordinator`
+- `CodexRuntime.startStdio()`
+- `ExternalCodeAgentProvider`
+- `CodeAgentNodeOrchestrator`
 
-## 三大集成的关系
+已支持：
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     XWorkmate Settings > 集成               │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐ │
-│  │ OpenClaw       │  │ AI Gateway     │  │ Vault Server │ │
-│  │ Gateway        │  │                │  │              │ │
-│  │                 │  │                │  │              │ │
-│  │ • 记忆管理      │  │ • 模型聚合      │  │ • 密钥保险箱 │ │
-│  │ • 任务调度      │  │ • API 路由      │  │ • 审计日志   │ │
-│  │ • 多 Agent 协调 │  │ • 密钥管理      │  │ • 访问控制   │ │
-│  │ • 设备配对      │  │ • 模型同步      │  │ • 本地备选   │ │
-│  │                 │  │                │  │              │ │
-│  │ ws://或         │  │ Online:        │  │ Vault/Local  │ │
-│  │ wss://          │  │ Cloud Models   │  │              │ │
-│  └─────────────────┘  └─────────────────┘  └──────────────┘ │
-│           │                    │                  │         │
-│           ▼                    ▼                  ▼         │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │              统一运行时协调器 (RuntimeCoordinator)   │   │
-│  │                                                     │   │
-│  │  • 离线模式：内置 Codex Agent (Rust FFI)           │   │
-│  │  • 代理模式：通过 AI Gateway 调用模型             │   │
-│  │  • 完整模式：OpenClaw + AI Gateway + Vault        │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
+- 显式启用 / 停用 bridge
+- 手动覆盖 Codex 二进制路径
+- Gateway 已连接时注册为 `code-agent-bridge`
+- `chat.send` 携带 node / provider / bridge dispatch metadata
+- 为未来其他外部 CLI 预留统一 provider contract
 
-## 离线模式说明
+### 当前不可用路径
 
-在离线模式下（无 OpenClaw Gateway 连接）：
+Built-in Codex / Rust FFI 仍不可用。
 
-- ✅ **内置 Codex Agent 可用** - 通过 Rust FFI (`libcodex_ffi.dylib`) 运行
-- ✅ **本地文件访问** - 可以读写工作区文件
-- ❌ **云端记忆** - 不支持跨设备记忆
-- ❌ **任务队列** - 不支持云端任务调度
-- ❌ **云端模型** - 需连接 AI Gateway 才能使用云端大模型
+现状：
 
-离线模式仍然可以通过 AI Gateway 使用本地运行的 Ollama 等模型。
+- `builtIn` 只保留配置位
+- UI 只显示 `Experimental / Unavailable`
+- Rust FFI 核心 TODO 尚未补完
 
-## 相关文件
+## 4. 外部 Provider 预留
 
-| 集成 | 主要文件 |
-|------|----------|
-| OpenClaw Gateway | `lib/runtime/gateway_runtime.dart`, `lib/runtime/runtime_coordinator.dart` |
-| AI Gateway | `lib/features/settings/settings_page.dart` (Gateway 标签) |
-| Vault Server | `lib/models/app_models.dart` (`VaultConfig`), Settings Page |
-| 离线 Codex | `lib/runtime/codex_runtime.dart`, `rust/src/lib.rs`, `rust/src/runtime.rs` |
+当前统一 contract：
 
-## 测试检查清单
+- `ExternalCodeAgentProvider.id`
+- `name`
+- `command`
+- `defaultArgs`
+- `capabilities`
+- `CodeAgentNodeOrchestrator.buildGatewayDispatch()`
 
-```bash
-# 1. 测试内置 Codex FFI
-dart test_codex_ffi.dart
+当前 active provider：
 
-# 2. 测试 OpenClaw Gateway 连接
-# - 在设置 > 集成 > 网关连接中配置
-# - 检查 127.0.0.1:18789 (本地) 或 wss://openclaw.svc.plus:443 (远程)
+- `codex`
 
-# 3. 测试 AI Gateway
-# - 在设置 > 集成 > AI Gateway 中配置 URL 和 API Key
-# - 测试模型同步和调用
+暂不实现：
 
-# 4. 测试 Vault 连接
-# - 在设置 > 集成 > Vault Server 中配置
-# - 点击"测试 Vault"按钮
-```
+- provider 切换 UI
+- capability discovery UI
+- 多 provider 调度策略
 
-## 安全规则
+## 5. 安全边界
 
-- 所有密钥通过 `FlutterSecureStorage` 安全存储，不写入 `.env`
-- `.env` 仅用于本地开发预填充，不会触自动连接
-- OpenClaw 本地模式可使用 `ws://` (非 TLS)，远程模式必须使用 `wss://` (TLS)
-- Vault Token 从不记录到日志、错误消息或截图
+- `.env` 仅用于开发预填充，不自动连接，不作为持久化真值源
+- AI Gateway API Key 和 Gateway 凭证继续走 secure storage
+- 外部 Codex CLI 路径仅保存文件路径，不保存 secret
+- `chat.send` 的 node metadata 仅上传 node/provider 状态，不上传 Gateway secret 或本地 CLI 绝对路径
+- 远程 Gateway 不允许静默降级为非 TLS
+
+## 相关代码
+
+- `lib/app/app_controller.dart`
+- `lib/runtime/runtime_coordinator.dart`
+- `lib/runtime/codex_runtime.dart`
+- `lib/runtime/codex_config_bridge.dart`
+- `lib/runtime/code_agent_node_orchestrator.dart`
+- `lib/runtime/agent_registry.dart`
+- `lib/runtime/gateway_runtime.dart`

@@ -72,6 +72,25 @@ extension AssistantPermissionLevelCopy on AssistantPermissionLevel {
   }
 }
 
+enum CodeAgentRuntimeMode { builtIn, externalCli }
+
+extension CodeAgentRuntimeModeCopy on CodeAgentRuntimeMode {
+  String get label => switch (this) {
+    CodeAgentRuntimeMode.externalCli => appText(
+      '外部 Codex CLI',
+      'External Codex CLI',
+    ),
+    CodeAgentRuntimeMode.builtIn => appText('内置 Codex', 'Built-in Codex'),
+  };
+
+  static CodeAgentRuntimeMode fromJsonValue(String? value) {
+    return CodeAgentRuntimeMode.values.firstWhere(
+      (item) => item.name == value,
+      orElse: () => CodeAgentRuntimeMode.externalCli,
+    );
+  }
+}
+
 class GatewayConnectionProfile {
   const GatewayConnectionProfile({
     required this.mode,
@@ -490,6 +509,8 @@ class SettingsSnapshot {
     required this.workspacePath,
     required this.remoteProjectRoot,
     required this.cliPath,
+    required this.codeAgentRuntimeMode,
+    required this.codexCliPath,
     required this.defaultModel,
     required this.defaultProvider,
     required this.gateway,
@@ -515,6 +536,8 @@ class SettingsSnapshot {
   final String workspacePath;
   final String remoteProjectRoot;
   final String cliPath;
+  final CodeAgentRuntimeMode codeAgentRuntimeMode;
+  final String codexCliPath;
   final String defaultModel;
   final String defaultProvider;
   final GatewayConnectionProfile gateway;
@@ -541,6 +564,8 @@ class SettingsSnapshot {
       workspacePath: '/opt/data',
       remoteProjectRoot: '/opt/data/workspace',
       cliPath: 'openclaw',
+      codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
+      codexCliPath: '',
       defaultModel: '',
       defaultProvider: 'gateway',
       gateway: GatewayConnectionProfile.defaults(),
@@ -568,6 +593,8 @@ class SettingsSnapshot {
     String? workspacePath,
     String? remoteProjectRoot,
     String? cliPath,
+    CodeAgentRuntimeMode? codeAgentRuntimeMode,
+    String? codexCliPath,
     String? defaultModel,
     String? defaultProvider,
     GatewayConnectionProfile? gateway,
@@ -593,6 +620,8 @@ class SettingsSnapshot {
       workspacePath: workspacePath ?? this.workspacePath,
       remoteProjectRoot: remoteProjectRoot ?? this.remoteProjectRoot,
       cliPath: cliPath ?? this.cliPath,
+      codeAgentRuntimeMode: codeAgentRuntimeMode ?? this.codeAgentRuntimeMode,
+      codexCliPath: codexCliPath ?? this.codexCliPath,
       defaultModel: defaultModel ?? this.defaultModel,
       defaultProvider: defaultProvider ?? this.defaultProvider,
       gateway: gateway ?? this.gateway,
@@ -623,6 +652,8 @@ class SettingsSnapshot {
       'workspacePath': workspacePath,
       'remoteProjectRoot': remoteProjectRoot,
       'cliPath': cliPath,
+      'codeAgentRuntimeMode': codeAgentRuntimeMode.name,
+      'codexCliPath': codexCliPath,
       'defaultModel': defaultModel,
       'defaultProvider': defaultProvider,
       'gateway': gateway.toJson(),
@@ -658,6 +689,12 @@ class SettingsSnapshot {
           SettingsSnapshot.defaults().remoteProjectRoot,
       cliPath:
           json['cliPath'] as String? ?? SettingsSnapshot.defaults().cliPath,
+      codeAgentRuntimeMode: CodeAgentRuntimeModeCopy.fromJsonValue(
+        json['codeAgentRuntimeMode'] as String?,
+      ),
+      codexCliPath:
+          json['codexCliPath'] as String? ??
+          SettingsSnapshot.defaults().codexCliPath,
       defaultModel:
           json['defaultModel'] as String? ??
           SettingsSnapshot.defaults().defaultModel,
