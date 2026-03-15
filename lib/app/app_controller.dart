@@ -254,6 +254,23 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void navigateHome() {
+    final mainSessionKey = _runtime.snapshot.mainSessionKey?.trim().isNotEmpty ==
+            true
+        ? _runtime.snapshot.mainSessionKey!.trim()
+        : 'main';
+    final destinationChanged = _destination != WorkspaceDestination.assistant;
+    final detailChanged = _detailPanel != null;
+    _destination = WorkspaceDestination.assistant;
+    _detailPanel = null;
+    if (destinationChanged || detailChanged) {
+      notifyListeners();
+    }
+    if (_sessionsController.currentSessionKey != mainSessionKey) {
+      unawaited(switchSession(mainSessionKey));
+    }
+  }
+
   void cycleSidebarState() {
     _sidebarState = switch (_sidebarState) {
       AppSidebarState.expanded => AppSidebarState.collapsed,

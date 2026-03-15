@@ -72,6 +72,15 @@ class _TasksPageState extends State<TasksPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
+                breadcrumbs: [
+                  AppBreadcrumbItem(
+                    label: appText('主页', 'Home'),
+                    icon: Icons.home_rounded,
+                    onTap: controller.navigateHome,
+                  ),
+                  AppBreadcrumbItem(label: appText('任务', 'Tasks')),
+                  AppBreadcrumbItem(label: _tab.label),
+                ],
                 title: appText('任务', 'Tasks'),
                 subtitle: appText(
                   '查看任务队列、执行状态与历史记录',

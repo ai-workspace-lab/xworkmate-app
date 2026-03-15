@@ -14,6 +14,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/gateway_connect_dialog.dart';
 import '../../widgets/pane_resize_handle.dart';
 import '../../widgets/surface_card.dart';
+import '../../widgets/top_bar.dart';
 
 class AssistantPage extends StatefulWidget {
   const AssistantPage({
@@ -200,6 +201,10 @@ class _AssistantPageState extends State<AssistantPage> {
                         ),
                         onSelectPane: (pane) {
                           setState(() {
+                            if (_activeSidePane == pane) {
+                              _sidePaneCollapsed = !_sidePaneCollapsed;
+                              return;
+                            }
                             _activeSidePane = pane;
                             _sidePaneCollapsed = false;
                           });
@@ -1197,6 +1202,17 @@ class _ConversationArea extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      AppBreadcrumbs(
+                        items: [
+                          AppBreadcrumbItem(
+                            label: appText('主页', 'Home'),
+                            icon: Icons.home_rounded,
+                            onTap: controller.navigateHome,
+                          ),
+                          AppBreadcrumbItem(label: currentTask.title),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
                       Text(
                         currentTask.title,
                         key: const Key('assistant-conversation-title'),

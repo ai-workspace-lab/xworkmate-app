@@ -163,4 +163,29 @@ void main() {
 
     expect(find.text('Gateway 访问'), findsOneWidget);
   });
+
+  testWidgets('AssistantPage breadcrumb returns to default task home', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+    );
+
+    await tester.tap(find.byKey(const Key('assistant-new-task-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('新对话'), findsWidgets);
+
+    await tester.tap(find.byKey(const ValueKey<String>('workspace-breadcrumb-0')));
+    await tester.pumpAndSettle();
+
+    final titleAfter = tester.widget<Text>(
+      find.byKey(const Key('assistant-conversation-title')),
+    );
+    expect(titleAfter.data, '默认任务');
+    expect(controller.currentSessionKey, 'main');
+  });
 }

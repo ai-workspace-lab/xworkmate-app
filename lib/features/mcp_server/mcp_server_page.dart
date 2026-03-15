@@ -30,6 +30,14 @@ class McpServerPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
+                breadcrumbs: [
+                  AppBreadcrumbItem(
+                    label: appText('主页', 'Home'),
+                    icon: Icons.home_rounded,
+                    onTap: controller.navigateHome,
+                  ),
+                  const AppBreadcrumbItem(label: 'MCP Hub'),
+                ],
                 title: 'MCP Hub',
                 subtitle: appText(
                   '管理 MCP 服务器连接与工具配置。',
