@@ -1,54 +1,180 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xworkmate/features/mobile/ios_mobile_shell.dart';
+import 'package:xworkmate/app/app_shell.dart';
+import 'package:xworkmate/features/mobile/mobile_shell.dart';
+import 'package:xworkmate/models/app_models.dart';
+import 'package:xworkmate/widgets/detail_drawer.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
 import '../../test_support.dart';
 
 void main() {
-  testWidgets(
-    'IosMobileShell saves local account entry from the account page',
-    (WidgetTester tester) async {
-      final controller = await createTestController(tester);
+  Future<void> pumpMobileShell(
+    WidgetTester tester, {
+    required Widget child,
+    required TargetPlatform platform,
+  }) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1200);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
 
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(430, 1200);
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        supportedLocales: const [Locale('zh'), Locale('en')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        theme: AppTheme.light().copyWith(platform: platform),
+        darkTheme: AppTheme.dark().copyWith(platform: platform),
+        home: child,
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
 
-      await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('zh'),
-          supportedLocales: const [Locale('zh'), Locale('en')],
-          localizationsDelegates: GlobalMaterialLocalizations.delegates,
-          theme: AppTheme.light().copyWith(platform: TargetPlatform.iOS),
-          darkTheme: AppTheme.dark().copyWith(platform: TargetPlatform.iOS),
-          home: IosMobileShell(controller: controller),
-        ),
-      );
-      await tester.pumpAndSettle();
+  for (final platform in <TargetPlatform>[
+    TargetPlatform.iOS,
+    TargetPlatform.android,
+  ]) {
+    testWidgets(
+      'MobileShell saves local account entry from the workspace account page on $platform',
+      (WidgetTester tester) async {
+        final controller = await createTestController(tester);
 
-      await tester.tap(find.text('账号登录').first);
-      await tester.pumpAndSettle();
+        await pumpMobileShell(
+          tester,
+          child: MobileShell(controller: controller),
+          platform: platform,
+        );
 
-      final fields = find.byType(TextField);
-      await tester.enterText(fields.at(0), 'https://accounts.qa.example');
-      await tester.enterText(fields.at(1), 'qa@example.com');
-      await tester.enterText(fields.at(2), 'secret');
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('工作区'));
+        await tester.pumpAndSettle();
+        final accountEntry = find.text('账号').first;
+        await tester.ensureVisible(accountEntry);
+        await tester.pumpAndSettle();
+        await tester.tap(accountEntry);
+        await tester.pumpAndSettle();
 
-      final saveButton = find.widgetWithText(FilledButton, '保存本地入口');
-      await tester.ensureVisible(saveButton);
-      await tester.pumpAndSettle();
-      await tester.tap(saveButton);
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('account-base-url-field')),
+          'https://accounts.qa.example',
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('account-username-field')),
+          'qa@example.com',
+        );
+        await tester.pumpAndSettle();
 
-      expect(controller.settings.accountBaseUrl, 'https://accounts.qa.example');
-      expect(controller.settings.accountUsername, 'qa@example.com');
-    },
-  );
+        final saveButton = find.widgetWithText(FilledButton, '保存本地入口');
+        await tester.ensureVisible(saveButton);
+        await tester.pumpAndSettle();
+        await tester.tap(saveButton);
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pumpAndSettle();
+
+        expect(
+          controller.settings.accountBaseUrl,
+          'https://accounts.qa.example',
+        );
+        expect(controller.settings.accountUsername, 'qa@example.com');
+      },
+    );
+  }
+
+  testWidgets('MobileShell workspace launcher routes into module pages', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpMobileShell(
+      tester,
+      child: MobileShell(controller: controller),
+      platform: TargetPlatform.android,
+    );
+
+    await tester.tap(find.text('工作区'));
+    await tester.pumpAndSettle();
+    expect(find.text('MCP Hub'), findsOneWidget);
+
+    await tester.tap(find.text('节点').first);
+    await tester.pumpAndSettle();
+    expect(controller.destination, WorkspaceDestination.nodes);
+    expect(find.text('模块'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('MobileShell renders detail panels as bottom sheets', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpMobileShell(
+      tester,
+      child: MobileShell(controller: controller),
+      platform: TargetPlatform.android,
+    );
+
+    controller.openDetail(
+      DetailPanelData(
+        title: 'Test Detail',
+        subtitle: 'Mobile',
+        icon: Icons.extension_rounded,
+        status: const StatusInfo('Ready', StatusTone.success),
+        description: 'Detail content',
+        meta: const <String>[],
+        sections: const <DetailSection>[],
+        actions: const <String>[],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DetailSheet), findsOneWidget);
+  });
+
+  testWidgets('AppShell uses MobileShell on compact iOS and Android only', (
+    WidgetTester tester,
+  ) async {
+    final compactController = await createTestController(tester);
+
+    await pumpMobileShell(
+      tester,
+      child: AppShell(controller: compactController),
+      platform: TargetPlatform.android,
+    );
+
+    expect(find.byType(MobileShell), findsOneWidget);
+
+    final compactIosController = await createTestController(tester);
+    await pumpMobileShell(
+      tester,
+      child: AppShell(controller: compactIosController),
+      platform: TargetPlatform.iOS,
+    );
+    expect(find.byType(MobileShell), findsOneWidget);
+
+    final desktopAndroidController = await createTestController(tester);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1200, 1000);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        supportedLocales: const [Locale('zh'), Locale('en')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        theme: AppTheme.light().copyWith(platform: TargetPlatform.android),
+        darkTheme: AppTheme.dark().copyWith(platform: TargetPlatform.android),
+        home: AppShell(controller: desktopAndroidController),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MobileShell), findsNothing);
+  });
 }
