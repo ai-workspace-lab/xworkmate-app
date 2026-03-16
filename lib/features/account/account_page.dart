@@ -28,11 +28,20 @@ class _AccountPageState extends State<AccountPage> {
       animation: controller,
       builder: (context, _) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(32, 32, 32, 40),
+          padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
+                breadcrumbs: [
+                  AppBreadcrumbItem(
+                    label: appText('主页', 'Home'),
+                    icon: Icons.home_rounded,
+                    onTap: controller.navigateHome,
+                  ),
+                  AppBreadcrumbItem(label: appText('账号', 'Account')),
+                  AppBreadcrumbItem(label: _tab.label),
+                ],
                 title: appText('账号', 'Account'),
                 subtitle: appText(
                   '用户身份、工作区切换与登录会话。',

@@ -14,6 +14,7 @@ void main() {
     var themeToggled = 0;
     var sidebarCycled = 0;
     var accountOpened = 0;
+    var favoriteToggled = 0;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -32,25 +33,42 @@ void main() {
             onOpenThemeToggle: () => themeToggled++,
             accountName: 'Tester',
             accountSubtitle: 'Workspace',
+            favoriteDestinations: const <WorkspaceDestination>{
+              WorkspaceDestination.skills,
+            },
+            onToggleFavorite: (value) async {
+              if (value == WorkspaceDestination.skills) {
+                favoriteToggled++;
+              }
+            },
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('任务'));
+    expect(find.text('工具'), findsOneWidget);
+    expect(find.text('MCP Hub'), findsOneWidget);
+
+    await tester.tap(find.text('自动化'));
     await tester.pumpAndSettle();
     expect(selected, WorkspaceDestination.tasks);
 
-    await tester.tap(find.text('语言'));
+    await tester.tap(
+      find.byKey(const ValueKey<String>('sidebar-favorite-skills')),
+    );
+    await tester.pumpAndSettle();
+    expect(favoriteToggled, 1);
+
+    await tester.tap(find.byTooltip('切换语言'));
     await tester.pumpAndSettle();
     expect(languageToggled, 1);
 
-    await tester.tap(find.text('切换深色'));
+    await tester.tap(find.byTooltip('切换深色'));
     await tester.pumpAndSettle();
     expect(themeToggled, 1);
 
-    await tester.tap(find.text('折叠导航'));
+    await tester.tap(find.byTooltip('收起侧边栏'));
     await tester.pumpAndSettle();
     expect(sidebarCycled, 1);
 

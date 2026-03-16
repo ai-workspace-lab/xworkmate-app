@@ -13,22 +13,32 @@ import '../../widgets/status_badge.dart';
 import '../../widgets/surface_card.dart';
 import '../../widgets/top_bar.dart';
 
-class ModulesPage extends StatefulWidget {
+ class ModulesPage extends StatefulWidget {
   const ModulesPage({
     super.key,
     required this.controller,
     required this.onOpenDetail,
+    this.initialTab,
   });
 
   final AppController controller;
   final ValueChanged<DetailPanelData> onOpenDetail;
+  final ModulesTab? initialTab;
 
   @override
   State<ModulesPage> createState() => _ModulesPageState();
 }
 
-class _ModulesPageState extends State<ModulesPage> {
+ class _ModulesPageState extends State<ModulesPage> {
   ModulesTab _tab = ModulesTab.gateway;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialTab != null) {
+      _tab = widget.initialTab!;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,11 +72,20 @@ class _ModulesPageState extends State<ModulesPage> {
       animation: controller,
       builder: (context, _) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(32, 32, 32, 40),
+          padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
+                breadcrumbs: [
+                  AppBreadcrumbItem(
+                    label: appText('主页', 'Home'),
+                    icon: Icons.home_rounded,
+                    onTap: controller.navigateHome,
+                  ),
+                  AppBreadcrumbItem(label: appText('模块', 'Modules')),
+                  AppBreadcrumbItem(label: _tab.label),
+                ],
                 title: appText('模块', 'Modules'),
                 subtitle: appText(
                   '管理 Gateway、代理、节点、技能和平台服务。',
@@ -741,16 +760,19 @@ class _FallbackHubPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = controller.models;
     if (items.isEmpty) {
+      final hasAiGateway = controller.settings.aiGateway.baseUrl
+          .trim()
+          .isNotEmpty;
       return SurfaceCard(
         child: Text(
-          controller.connection.status == RuntimeConnectionStatus.connected
+          hasAiGateway
               ? appText(
-                  '当前网关没有返回模型目录。',
-                  'No model catalog returned by the gateway.',
+                  '当前 AI Gateway 没有返回模型目录。',
+                  'No model catalog returned by the AI Gateway.',
                 )
               : appText(
-                  '连接 Gateway 后可加载模型能力目录。',
-                  'Connect a gateway to load the model catalog.',
+                  '先在设置 -> 集成 中同步 AI Gateway 模型目录。',
+                  'Sync the AI Gateway model catalog from Settings -> Integrations.',
                 ),
         ),
       );
@@ -770,8 +792,8 @@ class _FallbackHubPanel extends StatelessWidget {
                     icon: Icons.psychology_alt_rounded,
                     status: StatusInfo(model.provider, StatusTone.accent),
                     description: appText(
-                      '来自 OpenClaw Gateway 的可用模型目录项。',
-                      'Model catalog entry exposed by the OpenClaw gateway.',
+                      '来自 AI Gateway 的可用模型目录项。',
+                      'Model catalog entry exposed by the AI Gateway.',
                     ),
                     meta: [model.id, model.provider],
                     actions: [appText('刷新', 'Refresh')],

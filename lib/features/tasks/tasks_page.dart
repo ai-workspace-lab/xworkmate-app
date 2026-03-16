@@ -67,11 +67,20 @@ class _TasksPageState extends State<TasksPage> {
       animation: controller,
       builder: (context, _) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(32, 32, 32, 40),
+          padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
+                breadcrumbs: [
+                  AppBreadcrumbItem(
+                    label: appText('主页', 'Home'),
+                    icon: Icons.home_rounded,
+                    onTap: controller.navigateHome,
+                  ),
+                  AppBreadcrumbItem(label: appText('任务', 'Tasks')),
+                  AppBreadcrumbItem(label: _tab.label),
+                ],
                 title: appText('任务', 'Tasks'),
                 subtitle: appText(
                   '查看任务队列、执行状态与历史记录',
@@ -95,12 +104,24 @@ class _TasksPageState extends State<TasksPage> {
                       onPressed: controller.refreshSessions,
                       icon: const Icon(Icons.refresh_rounded),
                     ),
-                    FilledButton.tonalIcon(
-                      onPressed: () =>
-                          controller.navigateTo(WorkspaceDestination.assistant),
-                      icon: const Icon(Icons.add_rounded),
-                      label: Text(appText('新建任务', 'New Task')),
-                    ),
+                    if (_tab != TasksTab.scheduled)
+                      FilledButton.tonalIcon(
+                        onPressed: () => controller.navigateTo(
+                          WorkspaceDestination.assistant,
+                        ),
+                        icon: const Icon(Icons.add_rounded),
+                        label: Text(appText('新建任务', 'New Task')),
+                      )
+                    else
+                      Chip(
+                        avatar: const Icon(
+                          Icons.lock_outline_rounded,
+                          size: 16,
+                        ),
+                        label: Text(
+                          appText('Scheduled 只读', 'Scheduled read-only'),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -136,6 +157,18 @@ class _TasksPageState extends State<TasksPage> {
                   );
                 },
               ),
+              if (_tab == TasksTab.scheduled) ...[
+                const SizedBox(height: 16),
+                SurfaceCard(
+                  child: Text(
+                    appText(
+                      '这些项目来自 Gateway cron 调度器，本页当前仅支持只读展示。',
+                      'These items come from the gateway cron scheduler and are read-only in this build.',
+                    ),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               if (_tab == TasksTab.scheduled && items.isEmpty)
                 SurfaceCard(

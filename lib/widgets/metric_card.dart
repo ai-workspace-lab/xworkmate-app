@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 import 'status_badge.dart';
 import 'surface_card.dart';
 
@@ -25,7 +26,7 @@ class MetricCard extends StatelessWidget {
                 height: 40,
                 decoration: BoxDecoration(
                   color: palette.accentMuted,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadius.card),
                 ),
                 child: Icon(metric.icon, color: palette.accent, size: 20),
               ),
@@ -34,11 +35,11 @@ class MetricCard extends StatelessWidget {
                 StatusBadge(status: metric.status!, compact: true),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg),
           Text(metric.label, style: Theme.of(context).textTheme.bodyMedium),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.xxs),
           Text(metric.value, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.xxs),
           Text(metric.caption, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),

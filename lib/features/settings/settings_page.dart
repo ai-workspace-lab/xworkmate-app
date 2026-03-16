@@ -22,17 +22,28 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   SettingsTab _tab = SettingsTab.general;
-  late final TextEditingController _apisixYamlController;
+  late final TextEditingController _aiGatewayNameController;
+  late final TextEditingController _aiGatewayUrlController;
+  late final TextEditingController _aiGatewayApiKeyRefController;
+  late final TextEditingController _aiGatewayApiKeyController;
+  late final TextEditingController _aiGatewayModelSearchController;
   late final TextEditingController _vaultTokenController;
   late final TextEditingController _ollamaApiKeyController;
   late final TextEditingController _runtimeLogFilterController;
+  bool _aiGatewayTesting = false;
+  bool _aiGatewaySyncing = false;
+  String _aiGatewayTestState = 'idle';
+  String _aiGatewayTestMessage = '';
+  String _aiGatewayTestEndpoint = '';
 
   @override
   void initState() {
     super.initState();
-    _apisixYamlController = TextEditingController(
-      text: widget.controller.settings.apisix.inlineYaml,
-    );
+    _aiGatewayNameController = TextEditingController();
+    _aiGatewayUrlController = TextEditingController();
+    _aiGatewayApiKeyRefController = TextEditingController();
+    _aiGatewayApiKeyController = TextEditingController();
+    _aiGatewayModelSearchController = TextEditingController();
     _vaultTokenController = TextEditingController();
     _ollamaApiKeyController = TextEditingController();
     _runtimeLogFilterController = TextEditingController();
@@ -40,7 +51,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   void dispose() {
-    _apisixYamlController.dispose();
+    _aiGatewayNameController.dispose();
+    _aiGatewayUrlController.dispose();
+    _aiGatewayApiKeyRefController.dispose();
+    _aiGatewayApiKeyController.dispose();
+    _aiGatewayModelSearchController.dispose();
     _vaultTokenController.dispose();
     _ollamaApiKeyController.dispose();
     _runtimeLogFilterController.dispose();
@@ -55,11 +70,20 @@ class _SettingsPageState extends State<SettingsPage> {
       builder: (context, _) {
         final settings = controller.settings;
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(32, 32, 32, 40),
+          padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
+                breadcrumbs: [
+                  AppBreadcrumbItem(
+                    label: appText('主页', 'Home'),
+                    icon: Icons.home_rounded,
+                    onTap: controller.navigateHome,
+                  ),
+                  AppBreadcrumbItem(label: appText('设置', 'Settings')),
+                  AppBreadcrumbItem(label: _tab.label),
+                ],
                 title: appText('设置', 'Settings'),
                 subtitle: appText(
                   '配置 $kProductBrandName 工作区、网关默认项、界面与诊断选项',
@@ -398,13 +422,33 @@ class _SettingsPageState extends State<SettingsPage> {
     AppController controller,
     SettingsSnapshot settings,
   ) {
+    _syncControllerValue(_aiGatewayNameController, settings.aiGateway.name);
+    _syncControllerValue(_aiGatewayUrlController, settings.aiGateway.baseUrl);
+    _syncControllerValue(
+      _aiGatewayApiKeyRefController,
+      settings.aiGateway.apiKeyRef,
+    );
+    final selectedModels = settings.aiGateway.selectedModels.isNotEmpty
+        ? settings.aiGateway.selectedModels
+        : settings.aiGateway.availableModels.take(5).toList(growable: false);
+    final filteredModels = _filterAiGatewayModels(
+      settings.aiGateway.availableModels,
+    );
+    final hasStoredAiGatewayApiKey =
+        controller.settingsController.secureRefs['ai_gateway_api_key'] != null;
+    final statusTheme = _aiGatewayFeedbackTheme(
+      context,
+      _aiGatewayTestMessage.isEmpty
+          ? settings.aiGateway.syncState
+          : _aiGatewayTestState,
+    );
     return [
       SurfaceCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              appText('网关连接', 'Gateway Connection'),
+              'OpenClaw Gateway',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
@@ -538,51 +582,50 @@ class _SettingsPageState extends State<SettingsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              appText('APISIX YAML', 'APISIX YAML'),
+              appText('AI Gateway', 'AI Gateway'),
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
-            _EditableField(
-              label: appText('配置名称', 'Profile Name'),
-              value: settings.apisix.name,
-              onSubmitted: (value) => _saveSettings(
-                controller,
-                settings.copyWith(
-                  apisix: settings.apisix.copyWith(name: value),
-                ),
+            TextField(
+              controller: _aiGatewayNameController,
+              decoration: InputDecoration(
+                labelText: appText('配置名称', 'Profile Name'),
               ),
+              onSubmitted: (_) => _saveAiGatewayDraft(controller, settings),
             ),
-            _EditableField(
-              label: appText('来源类型', 'Source Type'),
-              value: settings.apisix.sourceType,
-              onSubmitted: (value) => _saveSettings(
-                controller,
-                settings.copyWith(
-                  apisix: settings.apisix.copyWith(sourceType: value),
-                ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _aiGatewayUrlController,
+              decoration: InputDecoration(
+                labelText: appText('Gateway URL', 'Gateway URL'),
               ),
+              onSubmitted: (_) => _saveAiGatewayDraft(controller, settings),
             ),
-            _EditableField(
-              label: appText('文件路径', 'File Path'),
-              value: settings.apisix.filePath,
-              onSubmitted: (value) => _saveSettings(
-                controller,
-                settings.copyWith(
-                  apisix: settings.apisix.copyWith(filePath: value),
-                ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _aiGatewayApiKeyRefController,
+              decoration: InputDecoration(
+                labelText: appText('API Key 引用', 'API Key Ref'),
               ),
+              onSubmitted: (_) => _saveAiGatewayDraft(controller, settings),
             ),
             TextField(
-              controller: _apisixYamlController,
-              minLines: 6,
-              maxLines: 10,
+              controller: _aiGatewayApiKeyController,
+              obscureText: true,
               decoration: InputDecoration(
-                labelText: appText('内联 YAML', 'Inline YAML'),
-                hintText: appText(
-                  '粘贴 APISIX 路由或 upstream YAML 用于校验',
-                  'Paste APISIX route / upstream YAML for validation',
-                ),
+                labelText:
+                    '${appText('API Key', 'API Key')} (${_aiGatewayApiKeyRefController.text.trim().isEmpty ? settings.aiGateway.apiKeyRef : _aiGatewayApiKeyRefController.text.trim()})',
+                helperText: hasStoredAiGatewayApiKey
+                    ? appText(
+                        '已安全保存，可直接同步模型。',
+                        'Stored securely and ready to sync.',
+                      )
+                    : appText(
+                        '输入后点击保存或同步模型。',
+                        'Save or sync to persist securely.',
+                      ),
               ),
+              onSubmitted: controller.settingsController.saveAiGatewayApiKey,
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -590,41 +633,206 @@ class _SettingsPageState extends State<SettingsPage> {
               runSpacing: 10,
               children: [
                 FilledButton.tonal(
-                  onPressed: () => _saveSettings(
-                    controller,
-                    settings.copyWith(
-                      apisix: settings.apisix.copyWith(
-                        inlineYaml: _apisixYamlController.text,
-                      ),
-                    ),
-                  ),
+                  onPressed: _aiGatewayTesting || _aiGatewaySyncing
+                      ? null
+                      : () => _saveAiGatewayDraft(controller, settings),
                   child: Text(appText('保存草稿', 'Save Draft')),
                 ),
                 OutlinedButton(
+                  key: const ValueKey('ai-gateway-test-button'),
+                  onPressed: _aiGatewayTesting || _aiGatewaySyncing
+                      ? null
+                      : () => _testAiGatewayConnection(controller, settings),
+                  child: Text(
+                    _aiGatewayTesting
+                        ? appText('测试中...', 'Testing...')
+                        : appText('测试连接', 'Test Connection'),
+                  ),
+                ),
+                OutlinedButton(
+                  key: const ValueKey('ai-gateway-sync-button'),
                   onPressed: () async {
-                    final messenger = ScaffoldMessenger.of(context);
-                    final updated = settings.apisix.copyWith(
-                      inlineYaml: _apisixYamlController.text,
-                    );
-                    final result = await controller.validateApisixYaml(updated);
-                    if (!mounted) {
+                    if (_aiGatewayTesting || _aiGatewaySyncing) {
                       return;
                     }
-                    messenger.showSnackBar(
-                      SnackBar(content: Text(result.validationMessage)),
-                    );
+                    final messenger = ScaffoldMessenger.of(context);
+                    final draft = _buildAiGatewayDraft(settings);
+                    final apiKey = _aiGatewayApiKeyController.text.trim();
+                    setState(() => _aiGatewaySyncing = true);
+                    try {
+                      if (apiKey.isNotEmpty) {
+                        await controller.settingsController.saveAiGatewayApiKey(
+                          apiKey,
+                        );
+                      }
+                      await _saveSettings(
+                        controller,
+                        settings.copyWith(aiGateway: draft),
+                      );
+                      final result = await controller.syncAiGatewayCatalog(
+                        draft,
+                        apiKeyOverride: apiKey,
+                      );
+                      if (!mounted) {
+                        return;
+                      }
+                      setState(() {
+                        _aiGatewayTestState = result.syncState;
+                        _aiGatewayTestMessage =
+                            'Catalog synced · ${result.availableModels.length} model(s) ready';
+                        _aiGatewayTestEndpoint = _previewAiGatewayEndpoint(
+                          draft.baseUrl,
+                        );
+                      });
+                      messenger.showSnackBar(
+                        SnackBar(content: Text(result.syncMessage)),
+                      );
+                    } finally {
+                      if (mounted) {
+                        setState(() => _aiGatewaySyncing = false);
+                      }
+                    }
                   },
                   child: Text(
-                    '${appText('校验', 'Validate')} · ${settings.apisix.validationState}',
+                    _aiGatewaySyncing
+                        ? appText('同步中...', 'Syncing...')
+                        : '${appText('同步模型', 'Sync Models')} · ${settings.aiGateway.syncState}',
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             Text(
-              settings.apisix.validationMessage,
+              settings.aiGateway.syncMessage,
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            if (_aiGatewayTestMessage.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                key: const ValueKey('ai-gateway-test-feedback'),
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: statusTheme.background,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: statusTheme.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _aiGatewayTestMessage,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: statusTheme.foreground,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (_aiGatewayTestEndpoint.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _aiGatewayTestEndpoint,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: statusTheme.foreground,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+            if (settings.aiGateway.availableModels.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              TextField(
+                key: const ValueKey('ai-gateway-model-search'),
+                controller: _aiGatewayModelSearchController,
+                decoration: InputDecoration(
+                  labelText: appText('搜索模型', 'Search models'),
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon:
+                      _aiGatewayModelSearchController.text.trim().isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: appText('清空搜索', 'Clear search'),
+                          onPressed: () {
+                            _aiGatewayModelSearchController.clear();
+                            setState(() {});
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    appText(
+                      '已选 ${selectedModels.length} / ${settings.aiGateway.availableModels.length}',
+                      'Selected ${selectedModels.length} / ${settings.aiGateway.availableModels.length}',
+                    ),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  OutlinedButton(
+                    key: const ValueKey('ai-gateway-select-filtered'),
+                    onPressed: filteredModels.isEmpty
+                        ? null
+                        : () async {
+                            await controller.updateAiGatewaySelection(
+                              <String>{
+                                ...selectedModels,
+                                ...filteredModels,
+                              }.toList(growable: false),
+                            );
+                          },
+                    child: Text(appText('选择筛选结果', 'Select filtered')),
+                  ),
+                  OutlinedButton(
+                    key: const ValueKey('ai-gateway-reset-default'),
+                    onPressed: () async {
+                      await controller.updateAiGatewaySelection(
+                        settings.aiGateway.availableModels
+                            .take(5)
+                            .toList(growable: false),
+                      );
+                    },
+                    child: Text(appText('恢复默认 5 个', 'Reset default 5')),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (filteredModels.isEmpty)
+                Text(
+                  appText('没有匹配的模型。', 'No matching models.'),
+                  style: Theme.of(context).textTheme.bodySmall,
+                )
+              else
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: filteredModels
+                      .map((modelId) {
+                        final selected = selectedModels.contains(modelId);
+                        return FilterChip(
+                          label: Text(modelId),
+                          selected: selected,
+                          onSelected: (_) async {
+                            final nextSelection = selected
+                                ? selectedModels
+                                      .where((item) => item != modelId)
+                                      .toList(growable: true)
+                                : <String>[...selectedModels, modelId];
+                            await controller.updateAiGatewaySelection(
+                              nextSelection,
+                            );
+                          },
+                        );
+                      })
+                      .toList(growable: false),
+                ),
+            ],
           ],
         ),
       ),
@@ -927,6 +1135,129 @@ class _SettingsPageState extends State<SettingsPage> {
     return controller.saveSettings(snapshot);
   }
 
+  AiGatewayProfile _buildAiGatewayDraft(SettingsSnapshot settings) {
+    return settings.aiGateway.copyWith(
+      name: _aiGatewayNameController.text.trim(),
+      baseUrl: _aiGatewayUrlController.text.trim(),
+      apiKeyRef: _aiGatewayApiKeyRefController.text.trim(),
+    );
+  }
+
+  Future<void> _saveAiGatewayDraft(
+    AppController controller,
+    SettingsSnapshot settings,
+  ) async {
+    final apiKey = _aiGatewayApiKeyController.text.trim();
+    if (apiKey.isNotEmpty) {
+      await controller.settingsController.saveAiGatewayApiKey(apiKey);
+    }
+    await _saveSettings(
+      controller,
+      settings.copyWith(aiGateway: _buildAiGatewayDraft(settings)),
+    );
+  }
+
+  Future<void> _testAiGatewayConnection(
+    AppController controller,
+    SettingsSnapshot settings,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final draft = _buildAiGatewayDraft(settings);
+    final apiKey = _aiGatewayApiKeyController.text.trim();
+    setState(() => _aiGatewayTesting = true);
+    try {
+      final result = await controller.settingsController
+          .testAiGatewayConnection(draft, apiKeyOverride: apiKey);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _aiGatewayTestState = result.state;
+        _aiGatewayTestMessage = result.message;
+        _aiGatewayTestEndpoint = result.endpoint;
+      });
+      messenger.showSnackBar(SnackBar(content: Text(result.message)));
+    } finally {
+      if (mounted) {
+        setState(() => _aiGatewayTesting = false);
+      }
+    }
+  }
+
+  List<String> _filterAiGatewayModels(List<String> models) {
+    final query = _aiGatewayModelSearchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return models;
+    }
+    return models
+        .where((modelId) => modelId.toLowerCase().contains(query))
+        .toList(growable: false);
+  }
+
+  String _previewAiGatewayEndpoint(String rawUrl) {
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+    final candidate = trimmed.contains('://') ? trimmed : 'https://$trimmed';
+    final uri = Uri.tryParse(candidate);
+    if (uri == null || uri.host.trim().isEmpty) {
+      return '';
+    }
+    final pathSegments = uri.pathSegments
+        .where((item) => item.isNotEmpty)
+        .toList(growable: true);
+    if (pathSegments.isEmpty) {
+      pathSegments.add('v1');
+    }
+    if (pathSegments.last != 'models') {
+      pathSegments.add('models');
+    }
+    return uri
+        .replace(pathSegments: pathSegments, query: null, fragment: null)
+        .toString();
+  }
+
+  _AiGatewayFeedbackTheme _aiGatewayFeedbackTheme(
+    BuildContext context,
+    String state,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return switch (state) {
+      'ready' => _AiGatewayFeedbackTheme(
+        background: colorScheme.primaryContainer,
+        border: colorScheme.primary,
+        foreground: colorScheme.onPrimaryContainer,
+      ),
+      'empty' => _AiGatewayFeedbackTheme(
+        background: colorScheme.secondaryContainer,
+        border: colorScheme.secondary,
+        foreground: colorScheme.onSecondaryContainer,
+      ),
+      'error' || 'invalid' => _AiGatewayFeedbackTheme(
+        background: colorScheme.errorContainer,
+        border: colorScheme.error,
+        foreground: colorScheme.onErrorContainer,
+      ),
+      _ => _AiGatewayFeedbackTheme(
+        background: colorScheme.surfaceContainerHighest,
+        border: colorScheme.outlineVariant,
+        foreground: colorScheme.onSurfaceVariant,
+      ),
+    };
+  }
+
+  void _syncControllerValue(TextEditingController controller, String value) {
+    if (controller.text == value) {
+      return;
+    }
+    controller.value = controller.value.copyWith(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+      composing: TextRange.empty,
+    );
+  }
+
   bool _matchesRuntimeLogFilter(RuntimeLogEntry entry) {
     final query = _runtimeLogFilterController.text.trim().toLowerCase();
     if (query.isEmpty) {
@@ -1216,16 +1547,39 @@ class _SettingsPageState extends State<SettingsPage> {
                 style: theme.textTheme.bodySmall,
               )
             else
-              ...item.tokens.map(
-                (token) => Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: _buildTokenRow(context, controller, item, token),
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: _buildTokenRow(
+                  context,
+                  controller,
+                  item,
+                  _latestDeviceToken(item.tokens),
                 ),
               ),
           ],
         ),
       ),
     );
+  }
+
+  GatewayDeviceTokenSummary _latestDeviceToken(
+    List<GatewayDeviceTokenSummary> tokens,
+  ) {
+    final sorted = List<GatewayDeviceTokenSummary>.from(tokens)
+      ..sort((left, right) {
+        final rightTime = _deviceTokenStatusTime(right);
+        final leftTime = _deviceTokenStatusTime(left);
+        return rightTime.compareTo(leftTime);
+      });
+    return sorted.first;
+  }
+
+  int _deviceTokenStatusTime(GatewayDeviceTokenSummary token) {
+    return token.lastUsedAtMs ??
+        token.rotatedAtMs ??
+        token.revokedAtMs ??
+        token.createdAtMs ??
+        0;
   }
 
   Widget _buildTokenRow(
@@ -1238,9 +1592,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final details = <String>[
       token.revoked ? appText('已撤销', 'revoked') : appText('有效', 'active'),
       if (token.scopes.isNotEmpty) token.scopes.join(', '),
-      _relativeTime(
-        token.rotatedAtMs ?? token.createdAtMs ?? token.lastUsedAtMs,
-      ),
+      _relativeTime(_deviceTokenStatusTime(token)),
     ];
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -1464,6 +1816,18 @@ class _SwitchRow extends StatelessWidget {
       onChanged: onChanged,
     );
   }
+}
+
+class _AiGatewayFeedbackTheme {
+  const _AiGatewayFeedbackTheme({
+    required this.background,
+    required this.border,
+    required this.foreground,
+  });
+
+  final Color background;
+  final Color border;
+  final Color foreground;
 }
 
 class _InfoRow extends StatelessWidget {

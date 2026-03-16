@@ -12,9 +12,9 @@ void main() {
   ) async {
     await pumpDesktopApp(tester);
 
-    expect(find.text('助手'), findsWidgets);
+    expect(find.text('新对话'), findsWidgets);
 
-    await tester.tap(find.text('模块'));
+    await tester.tap(find.text('节点'));
     await settleIntegrationUi(tester);
     expect(find.text('管理 Gateway、代理、节点、技能和平台服务。'), findsOneWidget);
   });

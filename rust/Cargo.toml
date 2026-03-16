@@ -1,0 +1,30 @@
+[package]
+name = "codex-ffi"
+version = "0.1.0"
+edition = "2021"
+description = "FFI bindings for Codex CLI integration"
+license = "Apache-2.0"
+
+[lib]
+name = "codex_ffi"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+# Minimal dependencies for FFI
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+
+[features]
+default = []
+flutter = []
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true

@@ -46,3 +46,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Rust / FFI artifacts
+/rust/target/
+/rust/Cargo.lock
+/macos/Frameworks/*.dylib
+/macos/Frameworks/*.a

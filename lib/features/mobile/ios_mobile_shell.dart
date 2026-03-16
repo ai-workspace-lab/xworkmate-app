@@ -610,19 +610,19 @@ class _IosMobileShellState extends State<IosMobileShell> {
           ],
         ),
         const SizedBox(height: 22),
-        const _SectionTitle('APISIX YAML'),
+        const _SectionTitle('AI Gateway'),
         const SizedBox(height: 14),
         _GroupCard(
           children: [
             _GroupedRow(
-              title: settings.apisix.name,
+              title: settings.aiGateway.name,
               subtitle:
-                  '${settings.apisix.filePath} · ${settings.apisix.validationState}',
+                  '${settings.aiGateway.baseUrl.isEmpty ? 'Not configured' : settings.aiGateway.baseUrl} · ${settings.aiGateway.syncState}',
               onTap: () => _openSettingsEditor(
-                title: 'APISIX YAML',
-                child: _ApisixEditor(
+                title: 'AI Gateway',
+                child: _AiGatewayEditor(
                   controller: controller,
-                  profile: settings.apisix,
+                  profile: settings.aiGateway,
                 ),
               ),
             ),
@@ -984,121 +984,372 @@ class _MobileChatSheetState extends State<_MobileChatSheet> {
   }
 }
 
-class _ApisixEditor extends StatefulWidget {
-  const _ApisixEditor({required this.controller, required this.profile});
+class _AiGatewayEditor extends StatefulWidget {
+  const _AiGatewayEditor({required this.controller, required this.profile});
 
   final AppController controller;
-  final ApisixYamlProfile profile;
+  final AiGatewayProfile profile;
 
   @override
-  State<_ApisixEditor> createState() => _ApisixEditorState();
+  State<_AiGatewayEditor> createState() => _AiGatewayEditorState();
 }
 
-class _ApisixEditorState extends State<_ApisixEditor> {
-  late final TextEditingController _pathController;
-  late final TextEditingController _yamlController;
+class _AiGatewayEditorState extends State<_AiGatewayEditor> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _urlController;
+  late final TextEditingController _apiKeyRefController;
+  late final TextEditingController _apiKeyController;
+  late final TextEditingController _modelSearchController;
+  bool _testing = false;
+  bool _syncing = false;
+  String _testState = 'idle';
+  String _testMessage = '';
+  String _testEndpoint = '';
 
   @override
   void initState() {
     super.initState();
-    _pathController = TextEditingController(text: widget.profile.filePath);
-    _yamlController = TextEditingController(text: widget.profile.inlineYaml);
+    _nameController = TextEditingController(text: widget.profile.name);
+    _urlController = TextEditingController(text: widget.profile.baseUrl);
+    _apiKeyRefController = TextEditingController(
+      text: widget.profile.apiKeyRef,
+    );
+    _apiKeyController = TextEditingController();
+    _modelSearchController = TextEditingController();
   }
 
   @override
   void dispose() {
-    _pathController.dispose();
-    _yamlController.dispose();
+    _nameController.dispose();
+    _urlController.dispose();
+    _apiKeyRefController.dispose();
+    _apiKeyController.dispose();
+    _modelSearchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('APISIX YAML', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 16),
-        _RoundedTextField(
-          initialValue: widget.profile.name,
-          icon: Icons.tag_rounded,
-          hintText: 'Profile Name',
-          onSubmitted: (value) => widget.controller.saveSettings(
-            widget.controller.settings.copyWith(
-              apisix: widget.controller.settings.apisix.copyWith(name: value),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _pathController,
-          decoration: _roundedInputDecoration(
-            hintText: widget.profile.filePath,
-            icon: Icons.folder_outlined,
-          ),
-          onSubmitted: (value) => widget.controller.saveSettings(
-            widget.controller.settings.copyWith(
-              apisix: widget.controller.settings.apisix.copyWith(
-                filePath: value,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _yamlController,
-          minLines: 8,
-          maxLines: 12,
-          decoration: _roundedInputDecoration(
-            hintText: 'Inline YAML',
-            icon: Icons.code_rounded,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
+    return AnimatedBuilder(
+      animation: widget.controller,
+      builder: (context, _) {
+        final profile = widget.controller.settings.aiGateway;
+        final selectedModels = profile.selectedModels.isNotEmpty
+            ? profile.selectedModels
+            : profile.availableModels.take(5).toList(growable: false);
+        final filteredModels = _filterModels(profile.availableModels);
+        final feedbackTheme = _feedbackTheme(
+          _testMessage.isEmpty ? profile.syncState : _testState,
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => widget.controller.saveSettings(
-                  widget.controller.settings.copyWith(
-                    apisix: widget.controller.settings.apisix.copyWith(
-                      inlineYaml: _yamlController.text,
-                    ),
-                  ),
+            Text(
+              'AI Gateway',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _nameController,
+              decoration: _roundedInputDecoration(
+                hintText: 'Profile Name',
+                icon: Icons.tag_rounded,
+              ),
+              onSubmitted: (_) => _saveDraft(),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _urlController,
+              decoration: _roundedInputDecoration(
+                hintText: 'Gateway URL',
+                icon: Icons.link_rounded,
+              ),
+              onSubmitted: (_) => _saveDraft(),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _apiKeyRefController,
+              decoration: _roundedInputDecoration(
+                hintText: 'API Key Ref',
+                icon: Icons.vpn_key_outlined,
+              ),
+              onSubmitted: (_) => _saveDraft(),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _apiKeyController,
+              obscureText: true,
+              decoration: _roundedInputDecoration(
+                hintText: 'API Key',
+                icon: Icons.password_rounded,
+              ),
+              onSubmitted:
+                  widget.controller.settingsController.saveAiGatewayApiKey,
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                OutlinedButton(
+                  onPressed: _testing || _syncing ? null : _saveDraft,
+                  child: const Text('保存草稿'),
                 ),
-                child: const Text('保存草稿'),
-              ),
+                OutlinedButton(
+                  onPressed: _testing || _syncing ? null : _testConnection,
+                  child: Text(_testing ? '测试中...' : '测试连接'),
+                ),
+                FilledButton.tonal(
+                  onPressed: _testing || _syncing ? null : _syncModels,
+                  child: Text(_syncing ? '同步中...' : profile.syncState),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton.tonal(
-                onPressed: () async {
-                  final messenger = ScaffoldMessenger.of(context);
-                  final result = await widget.controller.validateApisixYaml(
-                    widget.controller.settings.apisix.copyWith(
-                      filePath: _pathController.text,
-                      inlineYaml: _yamlController.text,
+            const SizedBox(height: 12),
+            Text(
+              profile.syncMessage,
+              style: const TextStyle(color: _textSecondary),
+            ),
+            if (_testMessage.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: feedbackTheme.$1,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: feedbackTheme.$2),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _testMessage,
+                      style: TextStyle(
+                        color: feedbackTheme.$3,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  );
-                  if (!mounted) {
-                    return;
-                  }
-                  messenger.showSnackBar(
-                    SnackBar(content: Text(result.validationMessage)),
-                  );
-                },
-                child: Text(widget.profile.validationState),
+                    if (_testEndpoint.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _testEndpoint,
+                        style: TextStyle(color: feedbackTheme.$3),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
+            ],
+            if (profile.availableModels.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              TextField(
+                controller: _modelSearchController,
+                decoration: _roundedInputDecoration(
+                  hintText: 'Search models',
+                  icon: Icons.search_rounded,
+                  suffixIcon: _modelSearchController.text.trim().isEmpty
+                      ? null
+                      : IconButton(
+                          onPressed: () {
+                            _modelSearchController.clear();
+                            setState(() {});
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  Text(
+                    '已选 ${selectedModels.length} / ${profile.availableModels.length}',
+                    style: const TextStyle(color: _textSecondary),
+                  ),
+                  OutlinedButton(
+                    onPressed: filteredModels.isEmpty
+                        ? null
+                        : () async {
+                            await widget.controller.updateAiGatewaySelection(
+                              <String>{
+                                ...selectedModels,
+                                ...filteredModels,
+                              }.toList(growable: false),
+                            );
+                          },
+                    child: const Text('选择筛选结果'),
+                  ),
+                  OutlinedButton(
+                    onPressed: () async {
+                      await widget.controller.updateAiGatewaySelection(
+                        profile.availableModels.take(5).toList(growable: false),
+                      );
+                    },
+                    child: const Text('恢复默认 5 个'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (filteredModels.isEmpty)
+                const Text('没有匹配的模型。', style: TextStyle(color: _textSecondary))
+              else
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: filteredModels
+                      .map((modelId) {
+                        final selected = selectedModels.contains(modelId);
+                        return FilterChip(
+                          label: Text(modelId),
+                          selected: selected,
+                          onSelected: (_) async {
+                            final nextSelection = selected
+                                ? selectedModels
+                                      .where((item) => item != modelId)
+                                      .toList(growable: true)
+                                : <String>[...selectedModels, modelId];
+                            await widget.controller.updateAiGatewaySelection(
+                              nextSelection,
+                            );
+                          },
+                        );
+                      })
+                      .toList(growable: false),
+                ),
+            ],
           ],
-        ),
-        const SizedBox(height: 12),
-        Text(
-          widget.profile.validationMessage,
-          style: const TextStyle(color: _textSecondary),
-        ),
-      ],
+        );
+      },
     );
+  }
+
+  AiGatewayProfile get _draftProfile {
+    return widget.controller.settings.aiGateway.copyWith(
+      name: _nameController.text.trim(),
+      baseUrl: _urlController.text.trim(),
+      apiKeyRef: _apiKeyRefController.text.trim(),
+    );
+  }
+
+  Future<void> _saveDraft() async {
+    final apiKey = _apiKeyController.text.trim();
+    if (apiKey.isNotEmpty) {
+      await widget.controller.settingsController.saveAiGatewayApiKey(apiKey);
+    }
+    await widget.controller.saveSettings(
+      widget.controller.settings.copyWith(aiGateway: _draftProfile),
+    );
+  }
+
+  Future<void> _testConnection() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final apiKey = _apiKeyController.text.trim();
+    setState(() => _testing = true);
+    try {
+      final result = await widget.controller.settingsController
+          .testAiGatewayConnection(_draftProfile, apiKeyOverride: apiKey);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _testState = result.state;
+        _testMessage = result.message;
+        _testEndpoint = result.endpoint;
+      });
+      messenger.showSnackBar(SnackBar(content: Text(result.message)));
+    } finally {
+      if (mounted) {
+        setState(() => _testing = false);
+      }
+    }
+  }
+
+  Future<void> _syncModels() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final apiKey = _apiKeyController.text.trim();
+    setState(() => _syncing = true);
+    try {
+      if (apiKey.isNotEmpty) {
+        await widget.controller.settingsController.saveAiGatewayApiKey(apiKey);
+      }
+      await _saveDraft();
+      final result = await widget.controller.syncAiGatewayCatalog(
+        _draftProfile,
+        apiKeyOverride: apiKey,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _testState = result.syncState;
+        _testMessage =
+            'Catalog synced · ${result.availableModels.length} model(s) ready';
+        _testEndpoint = _previewEndpoint(_draftProfile.baseUrl);
+      });
+      messenger.showSnackBar(SnackBar(content: Text(result.syncMessage)));
+    } finally {
+      if (mounted) {
+        setState(() => _syncing = false);
+      }
+    }
+  }
+
+  List<String> _filterModels(List<String> models) {
+    final query = _modelSearchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return models;
+    }
+    return models
+        .where((modelId) => modelId.toLowerCase().contains(query))
+        .toList(growable: false);
+  }
+
+  String _previewEndpoint(String rawUrl) {
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+    final candidate = trimmed.contains('://') ? trimmed : 'https://$trimmed';
+    final uri = Uri.tryParse(candidate);
+    if (uri == null || uri.host.trim().isEmpty) {
+      return '';
+    }
+    final pathSegments = uri.pathSegments
+        .where((item) => item.isNotEmpty)
+        .toList(growable: true);
+    if (pathSegments.isEmpty) {
+      pathSegments.add('v1');
+    }
+    if (pathSegments.last != 'models') {
+      pathSegments.add('models');
+    }
+    return uri
+        .replace(pathSegments: pathSegments, query: null, fragment: null)
+        .toString();
+  }
+
+  (Color, Color, Color) _feedbackTheme(String state) {
+    return switch (state) {
+      'ready' => (
+        const Color(0xFFDCEFE2),
+        const Color(0xFF62C56A),
+        _textPrimary,
+      ),
+      'empty' => (
+        const Color(0xFFF5E7D9),
+        const Color(0xFFE1913E),
+        _textPrimary,
+      ),
+      'error' || 'invalid' => (
+        const Color(0xFFF8D9DE),
+        const Color(0xFFD14C68),
+        _textPrimary,
+      ),
+      _ => (_surfaceSoft, _stroke, _textPrimary),
+    };
   }
 }
 
@@ -1682,10 +1933,12 @@ class _RoundedTextField extends StatelessWidget {
 InputDecoration _roundedInputDecoration({
   required String hintText,
   required IconData icon,
+  Widget? suffixIcon,
 }) {
   return InputDecoration(
     hintText: hintText,
     prefixIcon: Icon(icon, color: _textSecondary, size: 30),
+    suffixIcon: suffixIcon,
     filled: true,
     fillColor: _surface,
     border: OutlineInputBorder(

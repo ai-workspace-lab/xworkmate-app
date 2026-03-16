@@ -1,0 +1,153 @@
+name: Build Rust FFI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'rust/**'
+      - '.github/workflows/build-rust-ffi.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'rust/**'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build Rust library
+        run: |
+          cd rust
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libcodex-ffi-${{ matrix.target }}
+          path: |
+            rust/target/${{ matrix.target }}/release/libcodex_ffi.dylib
+            rust/target/${{ matrix.target }}/release/libcodex_ffi.a
+
+  build-universal:
+    needs: build-macos
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download aarch64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: libcodex-ffi-aarch64-apple-darwin
+          path: target/aarch64
+
+      - name: Download x86_64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: libcodex-ffi-x86_64-apple-darwin
+          path: target/x86_64
+
+      - name: Create universal binary
+        run: |
+          mkdir -p rust/target/universal
+          lipo -create \
+            target/aarch64/libcodex_ffi.dylib \
+            target/x86_64/libcodex_ffi.dylib \
+            -output rust/target/universal/libcodex_ffi.dylib
+          lipo -create \
+            target/aarch64/libcodex_ffi.a \
+            target/x86_64/libcodex_ffi.a \
+            -output rust/target/universal/libcodex_ffi.a
+
+      - name: Upload universal artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libcodex-ffi-universal
+          path: |
+            rust/target/universal/libcodex_ffi.dylib
+            rust/target/universal/libcodex_ffi.a
+
+  test:
+    runs-on: macos-latest
+    needs: build-universal
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run Rust tests
+        run: |
+          cd rust
+          cargo test --release
+
+  integrate-flutter:
+    runs-on: macos-latest
+    needs: build-universal
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download universal artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: libcodex-ffi-universal
+          path: rust/target/universal
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.3'
+          channel: 'stable'
+
+      - name: Copy FFI library to Frameworks
+        run: |
+          mkdir -p macos/Frameworks
+          cp rust/target/universal/libcodex_ffi.dylib macos/Frameworks/
+
+      - name: Analyze Flutter code
+        run: flutter analyze lib/runtime/
+
+      - name: Run Flutter tests
+        run: flutter test test/runtime/

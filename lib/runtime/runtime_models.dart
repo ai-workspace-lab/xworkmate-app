@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../i18n/app_language.dart';
+import '../models/app_models.dart';
 
 enum RuntimeConnectionMode { unconfigured, local, remote }
 
@@ -68,6 +69,25 @@ extension AssistantPermissionLevelCopy on AssistantPermissionLevel {
     return AssistantPermissionLevel.values.firstWhere(
       (item) => item.name == value,
       orElse: () => AssistantPermissionLevel.defaultAccess,
+    );
+  }
+}
+
+enum CodeAgentRuntimeMode { builtIn, externalCli }
+
+extension CodeAgentRuntimeModeCopy on CodeAgentRuntimeMode {
+  String get label => switch (this) {
+    CodeAgentRuntimeMode.externalCli => appText(
+      '外部 Codex CLI',
+      'External Codex CLI',
+    ),
+    CodeAgentRuntimeMode.builtIn => appText('内置 Codex', 'Built-in Codex'),
+  };
+
+  static CodeAgentRuntimeMode fromJsonValue(String? value) {
+    return CodeAgentRuntimeMode.values.firstWhere(
+      (item) => item.name == value,
+      orElse: () => CodeAgentRuntimeMode.externalCli,
     );
   }
 }
@@ -367,80 +387,118 @@ class VaultConfig {
   }
 }
 
-class ApisixYamlProfile {
-  const ApisixYamlProfile({
+class AiGatewayProfile {
+  const AiGatewayProfile({
     required this.name,
-    required this.sourceType,
-    required this.filePath,
-    required this.inlineYaml,
-    required this.validationState,
-    required this.validationMessage,
+    required this.baseUrl,
+    required this.apiKeyRef,
+    required this.availableModels,
+    required this.selectedModels,
+    required this.syncState,
+    required this.syncMessage,
   });
 
   final String name;
-  final String sourceType;
-  final String filePath;
-  final String inlineYaml;
-  final String validationState;
-  final String validationMessage;
+  final String baseUrl;
+  final String apiKeyRef;
+  final List<String> availableModels;
+  final List<String> selectedModels;
+  final String syncState;
+  final String syncMessage;
 
-  factory ApisixYamlProfile.defaults() {
-    return const ApisixYamlProfile(
-      name: 'default',
-      sourceType: 'workspace-file',
-      filePath: '/opt/data/apisix/openclaw.yaml',
-      inlineYaml: '',
-      validationState: 'idle',
-      validationMessage: 'Ready to validate',
+  factory AiGatewayProfile.defaults() {
+    return const AiGatewayProfile(
+      name: 'AI Gateway',
+      baseUrl: '',
+      apiKeyRef: 'ai_gateway_api_key',
+      availableModels: <String>[],
+      selectedModels: <String>[],
+      syncState: 'idle',
+      syncMessage: 'Ready to sync models',
     );
   }
 
-  ApisixYamlProfile copyWith({
+  AiGatewayProfile copyWith({
     String? name,
-    String? sourceType,
-    String? filePath,
-    String? inlineYaml,
-    String? validationState,
-    String? validationMessage,
+    String? baseUrl,
+    String? apiKeyRef,
+    List<String>? availableModels,
+    List<String>? selectedModels,
+    String? syncState,
+    String? syncMessage,
   }) {
-    return ApisixYamlProfile(
+    return AiGatewayProfile(
       name: name ?? this.name,
-      sourceType: sourceType ?? this.sourceType,
-      filePath: filePath ?? this.filePath,
-      inlineYaml: inlineYaml ?? this.inlineYaml,
-      validationState: validationState ?? this.validationState,
-      validationMessage: validationMessage ?? this.validationMessage,
+      baseUrl: baseUrl ?? this.baseUrl,
+      apiKeyRef: apiKeyRef ?? this.apiKeyRef,
+      availableModels: availableModels ?? this.availableModels,
+      selectedModels: selectedModels ?? this.selectedModels,
+      syncState: syncState ?? this.syncState,
+      syncMessage: syncMessage ?? this.syncMessage,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'name': name,
-      'sourceType': sourceType,
-      'filePath': filePath,
-      'inlineYaml': inlineYaml,
-      'validationState': validationState,
-      'validationMessage': validationMessage,
+      'baseUrl': baseUrl,
+      'apiKeyRef': apiKeyRef,
+      'availableModels': availableModels,
+      'selectedModels': selectedModels,
+      'syncState': syncState,
+      'syncMessage': syncMessage,
     };
   }
 
-  factory ApisixYamlProfile.fromJson(Map<String, dynamic> json) {
-    return ApisixYamlProfile(
-      name: json['name'] as String? ?? ApisixYamlProfile.defaults().name,
-      sourceType:
-          json['sourceType'] as String? ??
-          ApisixYamlProfile.defaults().sourceType,
-      filePath:
-          json['filePath'] as String? ?? ApisixYamlProfile.defaults().filePath,
-      inlineYaml: json['inlineYaml'] as String? ?? '',
-      validationState:
-          json['validationState'] as String? ??
-          ApisixYamlProfile.defaults().validationState,
-      validationMessage:
-          json['validationMessage'] as String? ??
-          ApisixYamlProfile.defaults().validationMessage,
+  factory AiGatewayProfile.fromJson(Map<String, dynamic> json) {
+    List<String> normalizeList(Object? value) {
+      if (value is! List) {
+        return const <String>[];
+      }
+      return value
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false);
+    }
+
+    final defaults = AiGatewayProfile.defaults();
+    final availableModels = normalizeList(json['availableModels']);
+    final selectedModels = normalizeList(json['selectedModels'])
+        .where(
+          (item) => availableModels.isEmpty || availableModels.contains(item),
+        )
+        .toList(growable: false);
+    final legacyFilePath = json['filePath'] as String?;
+    final legacyBaseUrl =
+        legacyFilePath != null && legacyFilePath.trim().startsWith('http')
+        ? legacyFilePath.trim()
+        : null;
+    return AiGatewayProfile(
+      name: json['name'] as String? ?? defaults.name,
+      baseUrl: json['baseUrl'] as String? ?? legacyBaseUrl ?? defaults.baseUrl,
+      apiKeyRef: json['apiKeyRef'] as String? ?? defaults.apiKeyRef,
+      availableModels: availableModels,
+      selectedModels: selectedModels,
+      syncState: json['syncState'] as String? ?? defaults.syncState,
+      syncMessage: json['syncMessage'] as String? ?? defaults.syncMessage,
     );
   }
+}
+
+class AiGatewayConnectionCheck {
+  const AiGatewayConnectionCheck({
+    required this.state,
+    required this.message,
+    required this.endpoint,
+    required this.modelCount,
+  });
+
+  final String state;
+  final String message;
+  final String endpoint;
+  final int modelCount;
+
+  bool get success => state == 'ready' || state == 'empty';
 }
 
 class SettingsSnapshot {
@@ -452,13 +510,15 @@ class SettingsSnapshot {
     required this.workspacePath,
     required this.remoteProjectRoot,
     required this.cliPath,
+    required this.codeAgentRuntimeMode,
+    required this.codexCliPath,
     required this.defaultModel,
     required this.defaultProvider,
     required this.gateway,
     required this.ollamaLocal,
     required this.ollamaCloud,
     required this.vault,
-    required this.apisix,
+    required this.aiGateway,
     required this.experimentalCanvas,
     required this.experimentalBridge,
     required this.experimentalDebug,
@@ -468,6 +528,7 @@ class SettingsSnapshot {
     required this.accountLocalMode,
     required this.assistantExecutionTarget,
     required this.assistantPermissionLevel,
+    required this.assistantNavigationDestinations,
   });
 
   final AppLanguage appLanguage;
@@ -477,13 +538,15 @@ class SettingsSnapshot {
   final String workspacePath;
   final String remoteProjectRoot;
   final String cliPath;
+  final CodeAgentRuntimeMode codeAgentRuntimeMode;
+  final String codexCliPath;
   final String defaultModel;
   final String defaultProvider;
   final GatewayConnectionProfile gateway;
   final OllamaLocalConfig ollamaLocal;
   final OllamaCloudConfig ollamaCloud;
   final VaultConfig vault;
-  final ApisixYamlProfile apisix;
+  final AiGatewayProfile aiGateway;
   final bool experimentalCanvas;
   final bool experimentalBridge;
   final bool experimentalDebug;
@@ -493,6 +556,7 @@ class SettingsSnapshot {
   final bool accountLocalMode;
   final AssistantExecutionTarget assistantExecutionTarget;
   final AssistantPermissionLevel assistantPermissionLevel;
+  final List<WorkspaceDestination> assistantNavigationDestinations;
 
   factory SettingsSnapshot.defaults() {
     return SettingsSnapshot(
@@ -503,13 +567,15 @@ class SettingsSnapshot {
       workspacePath: '/opt/data',
       remoteProjectRoot: '/opt/data/workspace',
       cliPath: 'openclaw',
-      defaultModel: 'gpt-5.4',
+      codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
+      codexCliPath: '',
+      defaultModel: '',
       defaultProvider: 'gateway',
       gateway: GatewayConnectionProfile.defaults(),
       ollamaLocal: OllamaLocalConfig.defaults(),
       ollamaCloud: OllamaCloudConfig.defaults(),
       vault: VaultConfig.defaults(),
-      apisix: ApisixYamlProfile.defaults(),
+      aiGateway: AiGatewayProfile.defaults(),
       experimentalCanvas: false,
       experimentalBridge: false,
       experimentalDebug: false,
@@ -519,6 +585,7 @@ class SettingsSnapshot {
       accountLocalMode: true,
       assistantExecutionTarget: AssistantExecutionTarget.local,
       assistantPermissionLevel: AssistantPermissionLevel.defaultAccess,
+      assistantNavigationDestinations: kAssistantNavigationDestinationDefaults,
     );
   }
 
@@ -530,13 +597,15 @@ class SettingsSnapshot {
     String? workspacePath,
     String? remoteProjectRoot,
     String? cliPath,
+    CodeAgentRuntimeMode? codeAgentRuntimeMode,
+    String? codexCliPath,
     String? defaultModel,
     String? defaultProvider,
     GatewayConnectionProfile? gateway,
     OllamaLocalConfig? ollamaLocal,
     OllamaCloudConfig? ollamaCloud,
     VaultConfig? vault,
-    ApisixYamlProfile? apisix,
+    AiGatewayProfile? aiGateway,
     bool? experimentalCanvas,
     bool? experimentalBridge,
     bool? experimentalDebug,
@@ -546,6 +615,7 @@ class SettingsSnapshot {
     bool? accountLocalMode,
     AssistantExecutionTarget? assistantExecutionTarget,
     AssistantPermissionLevel? assistantPermissionLevel,
+    List<WorkspaceDestination>? assistantNavigationDestinations,
   }) {
     return SettingsSnapshot(
       appLanguage: appLanguage ?? this.appLanguage,
@@ -555,13 +625,15 @@ class SettingsSnapshot {
       workspacePath: workspacePath ?? this.workspacePath,
       remoteProjectRoot: remoteProjectRoot ?? this.remoteProjectRoot,
       cliPath: cliPath ?? this.cliPath,
+      codeAgentRuntimeMode: codeAgentRuntimeMode ?? this.codeAgentRuntimeMode,
+      codexCliPath: codexCliPath ?? this.codexCliPath,
       defaultModel: defaultModel ?? this.defaultModel,
       defaultProvider: defaultProvider ?? this.defaultProvider,
       gateway: gateway ?? this.gateway,
       ollamaLocal: ollamaLocal ?? this.ollamaLocal,
       ollamaCloud: ollamaCloud ?? this.ollamaCloud,
       vault: vault ?? this.vault,
-      apisix: apisix ?? this.apisix,
+      aiGateway: aiGateway ?? this.aiGateway,
       experimentalCanvas: experimentalCanvas ?? this.experimentalCanvas,
       experimentalBridge: experimentalBridge ?? this.experimentalBridge,
       experimentalDebug: experimentalDebug ?? this.experimentalDebug,
@@ -573,6 +645,9 @@ class SettingsSnapshot {
           assistantExecutionTarget ?? this.assistantExecutionTarget,
       assistantPermissionLevel:
           assistantPermissionLevel ?? this.assistantPermissionLevel,
+      assistantNavigationDestinations:
+          assistantNavigationDestinations ??
+          this.assistantNavigationDestinations,
     );
   }
 
@@ -585,13 +660,15 @@ class SettingsSnapshot {
       'workspacePath': workspacePath,
       'remoteProjectRoot': remoteProjectRoot,
       'cliPath': cliPath,
+      'codeAgentRuntimeMode': codeAgentRuntimeMode.name,
+      'codexCliPath': codexCliPath,
       'defaultModel': defaultModel,
       'defaultProvider': defaultProvider,
       'gateway': gateway.toJson(),
       'ollamaLocal': ollamaLocal.toJson(),
       'ollamaCloud': ollamaCloud.toJson(),
       'vault': vault.toJson(),
-      'apisix': apisix.toJson(),
+      'aiGateway': aiGateway.toJson(),
       'experimentalCanvas': experimentalCanvas,
       'experimentalBridge': experimentalBridge,
       'experimentalDebug': experimentalDebug,
@@ -601,10 +678,26 @@ class SettingsSnapshot {
       'accountLocalMode': accountLocalMode,
       'assistantExecutionTarget': assistantExecutionTarget.name,
       'assistantPermissionLevel': assistantPermissionLevel.name,
+      'assistantNavigationDestinations': assistantNavigationDestinations
+          .map((item) => item.name)
+          .toList(growable: false),
     };
   }
 
   factory SettingsSnapshot.fromJson(Map<String, dynamic> json) {
+    final rawAssistantNavigationDestinations =
+        json['assistantNavigationDestinations'];
+    final assistantNavigationDestinations =
+        rawAssistantNavigationDestinations is List
+        ? normalizeAssistantNavigationDestinations(
+            rawAssistantNavigationDestinations
+                .map(
+                  (item) =>
+                      WorkspaceDestinationCopy.fromJsonValue(item?.toString()),
+                )
+                .whereType<WorkspaceDestination>(),
+          )
+        : kAssistantNavigationDestinationDefaults;
     return SettingsSnapshot(
       appLanguage: AppLanguageCopy.fromJsonValue(
         json['appLanguage'] as String?,
@@ -620,6 +713,12 @@ class SettingsSnapshot {
           SettingsSnapshot.defaults().remoteProjectRoot,
       cliPath:
           json['cliPath'] as String? ?? SettingsSnapshot.defaults().cliPath,
+      codeAgentRuntimeMode: CodeAgentRuntimeModeCopy.fromJsonValue(
+        json['codeAgentRuntimeMode'] as String?,
+      ),
+      codexCliPath:
+          json['codexCliPath'] as String? ??
+          SettingsSnapshot.defaults().codexCliPath,
       defaultModel:
           json['defaultModel'] as String? ??
           SettingsSnapshot.defaults().defaultModel,
@@ -638,8 +737,10 @@ class SettingsSnapshot {
       vault: VaultConfig.fromJson(
         (json['vault'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
-      apisix: ApisixYamlProfile.fromJson(
-        (json['apisix'] as Map?)?.cast<String, dynamic>() ?? const {},
+      aiGateway: AiGatewayProfile.fromJson(
+        (json['aiGateway'] as Map?)?.cast<String, dynamic>() ??
+            (json['apisix'] as Map?)?.cast<String, dynamic>() ??
+            const {},
       ),
       experimentalCanvas: json['experimentalCanvas'] as bool? ?? false,
       experimentalBridge: json['experimentalBridge'] as bool? ?? false,
@@ -658,6 +759,7 @@ class SettingsSnapshot {
       assistantPermissionLevel: AssistantPermissionLevelCopy.fromJsonValue(
         json['assistantPermissionLevel'] as String?,
       ),
+      assistantNavigationDestinations: assistantNavigationDestinations,
     );
   }
 

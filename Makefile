@@ -45,3 +45,29 @@ install-mac: ## Package and install the macOS app into /Applications
 clean: ## Remove generated artifacts
 	$(FLUTTER) clean
 	rm -rf build dist
+
+# Rust FFI targets
+.PHONY: rust-build rust-build-release rust-build-debug rust-test ffi-copy ffi-generate
+
+rust-build: rust-build-release ## Build Rust FFI library (release mode)
+
+rust-build-release: ## Build Rust FFI library for macOS (arm64)
+	cd rust && cargo build --release --target aarch64-apple-darwin
+	@echo "Rust FFI library built successfully"
+
+rust-build-debug: ## Build Rust FFI library in debug mode
+	cd rust && cargo build --target aarch64-apple-darwin
+
+rust-test: ## Run Rust tests
+	cd rust && cargo test
+
+ffi-copy: ## Copy FFI library to macOS Frameworks
+	bash scripts/copy_ffi_framework.sh
+
+ffi-generate: ## Generate FFI bindings using flutter_rust_bridge
+	bash scripts/generate_ffi_bindings.sh
+
+ffi-integrate: rust-build-release ffi-copy ## Build and copy FFI library (full integration)
+
+# Build with FFI integration
+build-macos-ffi: rust-build-release ffi-copy build-macos ## Build macOS app with FFI integration

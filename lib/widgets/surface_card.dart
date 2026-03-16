@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 
 class SurfaceCard extends StatefulWidget {
   const SurfaceCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(16),
+    this.padding = const EdgeInsets.all(AppSpacing.md),
     this.onTap,
-    this.borderRadius = 16,
+    this.borderRadius = AppRadius.card,
     this.color,
   });
 
@@ -42,9 +43,9 @@ class _SurfaceCardState extends State<SurfaceCard> {
           border: Border.all(color: palette.strokeSoft),
           boxShadow: [
             BoxShadow(
-              color: palette.shadow.withValues(alpha: _hovered ? 0.12 : 0.07),
-              blurRadius: _hovered ? 12 : 8,
-              offset: const Offset(0, 4),
+              color: palette.shadow.withValues(alpha: _hovered ? 0.08 : 0.05),
+              blurRadius: _hovered ? 10 : 6,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
