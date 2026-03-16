@@ -1,8 +1,66 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/features/settings/settings_page.dart';
+import 'package:xworkmate/runtime/desktop_platform_service.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
 
 import '../test_support.dart';
+
+class _DesktopServiceStub implements DesktopPlatformService {
+  @override
+  DesktopIntegrationState get state =>
+      DesktopIntegrationState.fromJson(const <String, dynamic>{
+        'isSupported': true,
+        'environment': 'kde',
+        'mode': 'proxy',
+        'trayAvailable': true,
+        'trayEnabled': true,
+        'autostartEnabled': false,
+        'networkManagerAvailable': true,
+        'systemProxy': {
+          'enabled': true,
+          'host': '127.0.0.1',
+          'port': 7890,
+          'backend': 'kioslaverc',
+          'lastAppliedMode': 'proxy',
+        },
+        'tunnel': {
+          'available': true,
+          'connected': false,
+          'connectionName': 'XWorkmate Tunnel',
+          'backend': 'nmcli',
+          'lastError': '',
+        },
+        'statusMessage': '',
+      });
+
+  @override
+  bool get isSupported => state.isSupported;
+
+  @override
+  Future<void> initialize(LinuxDesktopConfig config) async {}
+
+  @override
+  Future<void> syncConfig(LinuxDesktopConfig config) async {}
+
+  @override
+  Future<void> refresh() async {}
+
+  @override
+  Future<void> setMode(VpnMode mode) async {}
+
+  @override
+  Future<void> connectTunnel() async {}
+
+  @override
+  Future<void> disconnectTunnel() async {}
+
+  @override
+  Future<void> setLaunchAtLogin(bool enabled) async {}
+
+  @override
+  void dispose() {}
+}
 
 void main() {
   testWidgets('SettingsPage theme chips update controller theme mode', (
@@ -41,6 +99,25 @@ void main() {
     );
   });
 
+  testWidgets('SettingsPage shows Linux desktop integration controls', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(
+      tester,
+      desktopPlatformService: _DesktopServiceStub(),
+    );
+
+    await pumpPage(tester, child: SettingsPage(controller: controller));
+
+    expect(
+      find.byKey(const ValueKey('linux-desktop-integration-card')),
+      findsOneWidget,
+    );
+    expect(find.text('Linux 桌面集成'), findsOneWidget);
+    expect(find.text('切换到代理'), findsOneWidget);
+    expect(find.text('连接隧道'), findsOneWidget);
+  });
+
   testWidgets('SettingsPage diagnostics tab filters and clears runtime logs', (
     WidgetTester tester,
   ) async {
@@ -77,6 +154,6 @@ void main() {
     await tester.tap(find.text('清空'));
     await tester.pumpAndSettle();
 
-    expect(find.text('当前没有运行日志。'), findsOneWidget);
+    expect(controller.runtimeLogs, isEmpty);
   });
 }

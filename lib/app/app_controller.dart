@@ -8,6 +8,7 @@ import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/device_identity_store.dart';
 import '../runtime/runtime_bootstrap.dart';
+import '../runtime/desktop_platform_service.dart';
 import '../runtime/gateway_runtime.dart';
 import '../runtime/runtime_controllers.dart';
 import '../runtime/runtime_models.dart';
@@ -25,6 +26,7 @@ class AppController extends ChangeNotifier {
   AppController({
     SecureConfigStore? store,
     RuntimeCoordinator? runtimeCoordinator,
+    DesktopPlatformService? desktopPlatformService,
   }) {
     _store = store ?? SecureConfigStore();
 
@@ -58,6 +60,8 @@ class AppController extends ChangeNotifier {
     _cronJobsController = CronJobsController(_runtimeCoordinator.gateway);
     _devicesController = DevicesController(_runtimeCoordinator.gateway);
     _tasksController = DerivedTasksController();
+    _desktopPlatformService =
+        desktopPlatformService ?? createDesktopPlatformService();
     _attachChildListeners();
     unawaited(_initialize());
   }
@@ -78,6 +82,7 @@ class AppController extends ChangeNotifier {
   late final CronJobsController _cronJobsController;
   late final DevicesController _devicesController;
   late final DerivedTasksController _tasksController;
+  late final DesktopPlatformService _desktopPlatformService;
 
   WorkspaceDestination _destination = WorkspaceDestination.assistant;
   ThemeMode _themeMode = ThemeMode.light;
@@ -118,6 +123,10 @@ class AppController extends ChangeNotifier {
   CronJobsController get cronJobsController => _cronJobsController;
   DevicesController get devicesController => _devicesController;
   DerivedTasksController get tasksController => _tasksController;
+  DesktopIntegrationState get desktopIntegration =>
+      _desktopPlatformService.state;
+  bool get supportsDesktopIntegration => desktopIntegration.isSupported;
+  bool get desktopPlatformBusy => _desktopPlatformBusy;
 
   GatewayConnectionSnapshot get connection => _runtime.snapshot;
   SettingsSnapshot get settings => _settingsController.snapshot;
@@ -160,6 +169,7 @@ class AppController extends ChangeNotifier {
   CodeAgentRuntimeMode get effectiveCodeAgentRuntimeMode =>
       configuredCodeAgentRuntimeMode;
   CodexCooperationState get codexCooperationState => _codexCooperationState;
+  bool _desktopPlatformBusy = false;
 
   Future<String> loadAiGatewayApiKey() async {
     return (await _store.loadAiGatewayApiKey())?.trim() ?? '';
@@ -255,8 +265,8 @@ class AppController extends ChangeNotifier {
   }
 
   void navigateHome() {
-    final mainSessionKey = _runtime.snapshot.mainSessionKey?.trim().isNotEmpty ==
-            true
+    final mainSessionKey =
+        _runtime.snapshot.mainSessionKey?.trim().isNotEmpty == true
         ? _runtime.snapshot.mainSessionKey!.trim()
         : 'main';
     final destinationChanged = _destination != WorkspaceDestination.assistant;
@@ -643,9 +653,77 @@ class AppController extends ChangeNotifier {
       _registerCodexExternalProvider(codexPath: sanitized.codexCliPath);
       await _refreshCodexCliAvailability();
     }
+    if (current.linuxDesktop.toJson().toString() !=
+            sanitized.linuxDesktop.toJson().toString() ||
+        current.launchAtLogin != sanitized.launchAtLogin) {
+      await _desktopPlatformService.syncConfig(sanitized.linuxDesktop);
+      await _desktopPlatformService.setLaunchAtLogin(sanitized.launchAtLogin);
+    }
     if (refreshAfterSave) {
       _recomputeTasks();
     }
+    notifyListeners();
+  }
+
+  Future<void> refreshDesktopIntegration() async {
+    _desktopPlatformBusy = true;
+    notifyListeners();
+    try {
+      await _desktopPlatformService.refresh();
+    } finally {
+      _desktopPlatformBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> saveLinuxDesktopConfig(LinuxDesktopConfig config) async {
+    await saveSettings(settings.copyWith(linuxDesktop: config));
+  }
+
+  Future<void> setDesktopVpnMode(VpnMode mode) async {
+    _desktopPlatformBusy = true;
+    notifyListeners();
+    try {
+      await saveSettings(
+        settings.copyWith(
+          linuxDesktop: settings.linuxDesktop.copyWith(preferredMode: mode),
+        ),
+        refreshAfterSave: false,
+      );
+      await _desktopPlatformService.setMode(mode);
+    } finally {
+      _desktopPlatformBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> connectDesktopTunnel() async {
+    _desktopPlatformBusy = true;
+    notifyListeners();
+    try {
+      await _desktopPlatformService.connectTunnel();
+    } finally {
+      _desktopPlatformBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> disconnectDesktopTunnel() async {
+    _desktopPlatformBusy = true;
+    notifyListeners();
+    try {
+      await _desktopPlatformService.disconnectTunnel();
+    } finally {
+      _desktopPlatformBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> setLaunchAtLogin(bool enabled) async {
+    await saveSettings(
+      settings.copyWith(launchAtLogin: enabled),
+      refreshAfterSave: false,
+    );
   }
 
   Future<void> toggleAssistantNavigationDestination(
@@ -785,6 +863,7 @@ class AppController extends ChangeNotifier {
     _cronJobsController.dispose();
     _devicesController.dispose();
     _tasksController.dispose();
+    _desktopPlatformService.dispose();
     super.dispose();
   }
 
@@ -808,6 +887,8 @@ class AppController extends ChangeNotifier {
       }
       _modelsController.restoreFromSettings(settings.aiGateway);
       setActiveAppLanguage(settings.appLanguage);
+      await _desktopPlatformService.initialize(settings.linuxDesktop);
+      await _desktopPlatformService.setLaunchAtLogin(settings.launchAtLogin);
       _registerCodexExternalProvider();
       await _refreshCodexCliAvailability();
       _agentsController.restoreSelection(settings.gateway.selectedAgentId);

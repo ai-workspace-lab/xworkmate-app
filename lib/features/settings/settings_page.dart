@@ -174,7 +174,9 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             _SwitchRow(
-              label: appText('显示 Dock 图标', 'Show dock icon'),
+              label: controller.supportsDesktopIntegration
+                  ? appText('显示托盘图标', 'Show tray icon')
+                  : appText('显示 Dock 图标', 'Show dock icon'),
               value: settings.showDockIcon,
               onChanged: (value) => _saveSettings(
                 controller,
@@ -192,6 +194,8 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
       ),
+      if (controller.supportsDesktopIntegration)
+        _buildLinuxDesktopIntegration(context, controller, settings),
       SurfaceCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,6 +233,159 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
     ];
+  }
+
+  Widget _buildLinuxDesktopIntegration(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
+    final desktop = controller.desktopIntegration;
+    final config = settings.linuxDesktop;
+    final theme = Theme.of(context);
+    return SurfaceCard(
+      key: const ValueKey('linux-desktop-integration-card'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            appText('Linux 桌面集成', 'Linux Desktop Integration'),
+            style: theme.textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            appText(
+              '统一管理 GNOME / KDE 的代理模式、隧道连接、托盘菜单与开机自启。',
+              'Manage GNOME / KDE proxy mode, tunnel session, tray menu, and autostart from one surface.',
+            ),
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          _InfoRow(
+            label: appText('桌面环境', 'Desktop'),
+            value: desktop.environment.label,
+          ),
+          _InfoRow(
+            label: 'NetworkManager',
+            value: desktop.networkManagerAvailable
+                ? appText('可用', 'Available')
+                : appText('不可用', 'Unavailable'),
+          ),
+          _InfoRow(
+            label: appText('当前模式', 'Current Mode'),
+            value: desktop.mode.label,
+          ),
+          _InfoRow(
+            label: appText('隧道状态', 'Tunnel'),
+            value: desktop.tunnel.connected
+                ? appText('已连接', 'Connected')
+                : desktop.tunnel.available
+                ? appText('可连接', 'Ready')
+                : appText('未检测到配置', 'No profile detected'),
+          ),
+          _InfoRow(
+            label: appText('系统代理', 'System Proxy'),
+            value: desktop.systemProxy.enabled
+                ? '${desktop.systemProxy.host}:${desktop.systemProxy.port}'
+                : appText('未启用', 'Disabled'),
+          ),
+          _SwitchRow(
+            label: appText('开机启动', 'Launch at login'),
+            value: settings.launchAtLogin,
+            onChanged: (value) => controller.setLaunchAtLogin(value),
+          ),
+          _SwitchRow(
+            label: appText('托盘菜单', 'Tray menu'),
+            value: config.trayEnabled,
+            onChanged: (value) => controller.saveLinuxDesktopConfig(
+              config.copyWith(trayEnabled: value),
+            ),
+          ),
+          _EditableField(
+            label: appText('隧道连接名称', 'Tunnel Connection Name'),
+            value: config.vpnConnectionName,
+            onSubmitted: (value) => controller.saveLinuxDesktopConfig(
+              config.copyWith(vpnConnectionName: value.trim()),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: _EditableField(
+                  label: appText('代理主机', 'Proxy Host'),
+                  value: config.proxyHost,
+                  onSubmitted: (value) => controller.saveLinuxDesktopConfig(
+                    config.copyWith(proxyHost: value.trim()),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _EditableField(
+                  label: appText('代理端口', 'Proxy Port'),
+                  value: config.proxyPort.toString(),
+                  onSubmitted: (value) {
+                    final parsed = int.tryParse(value.trim());
+                    if (parsed == null || parsed <= 0) {
+                      return;
+                    }
+                    controller.saveLinuxDesktopConfig(
+                      config.copyWith(proxyPort: parsed),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              FilledButton.tonal(
+                onPressed: controller.desktopPlatformBusy
+                    ? null
+                    : () => controller.setDesktopVpnMode(VpnMode.proxy),
+                child: Text(appText('切换到代理', 'Use Proxy')),
+              ),
+              FilledButton.tonal(
+                onPressed: controller.desktopPlatformBusy
+                    ? null
+                    : () => controller.setDesktopVpnMode(VpnMode.tunnel),
+                child: Text(appText('切换到隧道', 'Use Tunnel')),
+              ),
+              OutlinedButton(
+                onPressed: controller.desktopPlatformBusy
+                    ? null
+                    : controller.connectDesktopTunnel,
+                child: Text(appText('连接隧道', 'Connect Tunnel')),
+              ),
+              OutlinedButton(
+                onPressed: controller.desktopPlatformBusy
+                    ? null
+                    : controller.disconnectDesktopTunnel,
+                child: Text(appText('断开隧道', 'Disconnect Tunnel')),
+              ),
+              OutlinedButton(
+                onPressed: controller.desktopPlatformBusy
+                    ? null
+                    : controller.refreshDesktopIntegration,
+                child: Text(appText('刷新状态', 'Refresh Status')),
+              ),
+            ],
+          ),
+          if (desktop.statusMessage.trim().isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildNotice(
+              context,
+              tone: theme.colorScheme.surfaceContainerHighest,
+              title: appText('桌面状态', 'Desktop Status'),
+              message: desktop.statusMessage,
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   List<Widget> _buildWorkspace(
