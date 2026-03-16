@@ -33,14 +33,22 @@ DIST_DMG_PATH="$DIST_DIR/$APP_NAME-$APP_VERSION.dmg"
 mkdir -p "$DIST_DIR"
 
 echo "Building $APP_NAME $APP_VERSION ($APP_BUILD) for macOS..."
+BUILD_ARGS=(
+  flutter build macos
+  "--$BUILD_MODE"
+  --build-name="$APP_VERSION"
+  --build-number="$APP_BUILD"
+  --dart-define="XWORKMATE_DISPLAY_VERSION=$APP_VERSION"
+  --dart-define="XWORKMATE_BUILD_NUMBER=$APP_BUILD"
+)
+
+if [[ -f "$APP_DIR/.dart_tool/package_config.json" ]]; then
+  BUILD_ARGS+=(--no-pub)
+fi
+
 (
   cd "$APP_DIR"
-  flutter build macos \
-    "--$BUILD_MODE" \
-    --build-name="$APP_VERSION" \
-    --build-number="$APP_BUILD" \
-    --dart-define="XWORKMATE_DISPLAY_VERSION=$APP_VERSION" \
-    --dart-define="XWORKMATE_BUILD_NUMBER=$APP_BUILD"
+  "${BUILD_ARGS[@]}"
 )
 
 if [[ ! -d "$BUILD_APP_PATH" ]]; then

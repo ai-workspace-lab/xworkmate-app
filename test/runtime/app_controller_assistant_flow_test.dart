@@ -29,6 +29,7 @@ void main() {
 
       expect(controller.connection.status, RuntimeConnectionStatus.connected);
       expect(gateway.connectAuthToken, _FakeGatewayServer.sharedToken);
+      await controller.selectAgent('main');
 
       await controller.sendChatMessage('请只回复一行：XWORKMATE_OK', thinking: 'low');
 
@@ -55,6 +56,17 @@ void main() {
         ),
         isTrue,
       );
+      expect(gateway.lastChatSendParams?['agentId'], 'main');
+      expect(
+        ((gateway.lastChatSendParams?['metadata'] as Map?)?['node']
+            as Map?)?['kind'],
+        'app-mediated-cooperative-node',
+      );
+      expect(
+        ((gateway.lastChatSendParams?['metadata'] as Map?)?['dispatch']
+            as Map?)?['mode'],
+        'gateway-only',
+      );
     },
   );
 }
@@ -67,6 +79,7 @@ class _FakeGatewayServer {
   final HttpServer _server;
   WebSocket? _socket;
   String? connectAuthToken;
+  Map<String, dynamic>? lastChatSendParams;
   final List<Map<String, dynamic>> _history = <Map<String, dynamic>>[];
   String _lastMessagePreview = '';
   double _updatedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
@@ -228,6 +241,7 @@ class _FakeGatewayServer {
             });
             break;
           case 'chat.send':
+            lastChatSendParams = params;
             final sessionKey =
                 params['sessionKey'] as String? ?? 'agent:main:main';
             final runId = params['idempotencyKey'] as String? ?? 'run-1';

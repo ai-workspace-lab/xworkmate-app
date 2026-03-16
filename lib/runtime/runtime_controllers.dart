@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:yaml/yaml.dart';
 
 import 'gateway_runtime.dart';
 import 'runtime_models.dart';
@@ -19,12 +18,14 @@ class SettingsController extends ChangeNotifier {
   List<SecretAuditEntry> _auditTrail = const <SecretAuditEntry>[];
   String _ollamaStatus = 'Idle';
   String _vaultStatus = 'Idle';
+  String _aiGatewayStatus = 'Idle';
 
   SettingsSnapshot get snapshot => _snapshot;
   Map<String, String> get secureRefs => _secureRefs;
   List<SecretAuditEntry> get auditTrail => _auditTrail;
   String get ollamaStatus => _ollamaStatus;
   String get vaultStatus => _vaultStatus;
+  String get aiGatewayStatus => _aiGatewayStatus;
 
   Future<void> initialize() async {
     _snapshot = await _store.loadSettingsSnapshot();
@@ -154,6 +155,26 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> saveAiGatewayApiKey(String value) async {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    await _store.saveAiGatewayApiKey(trimmed);
+    await appendAudit(
+      SecretAuditEntry(
+        timeLabel: _timeLabel(),
+        action: 'Updated',
+        provider: 'AI Gateway',
+        target: _snapshot.aiGateway.apiKeyRef,
+        module: 'Settings',
+        status: 'Success',
+      ),
+    );
+    await _reloadDerivedState();
+    notifyListeners();
+  }
+
   Future<void> appendAudit(SecretAuditEntry entry) async {
     await _store.appendAudit(entry);
     _auditTrail = await _store.loadAuditTrail();
@@ -232,40 +253,162 @@ class SettingsController extends ChangeNotifier {
     }
   }
 
-  Future<ApisixYamlProfile> validateApisixYaml(
-    ApisixYamlProfile profile,
-  ) async {
-    final sourceText = profile.inlineYaml.trim().isNotEmpty
-        ? profile.inlineYaml
-        : await _loadYamlFromProfile(profile);
-    try {
-      final yaml = loadYaml(sourceText);
-      final root = yaml is YamlMap ? yaml : null;
-      final routeCount = _yamlSequenceLength(root?['routes']);
-      final upstreamCount = _yamlSequenceLength(root?['upstreams']);
-      final message = [
-        if (routeCount > 0) '$routeCount route(s)',
-        if (upstreamCount > 0) '$upstreamCount upstream(s)',
-        if (routeCount == 0 && upstreamCount == 0) 'YAML parsed successfully',
-      ].join(' · ');
+  Future<AiGatewayProfile> syncAiGatewayCatalog(
+    AiGatewayProfile profile, {
+    String apiKeyOverride = '',
+  }) async {
+    final normalizedBaseUrl = _normalizeAiGatewayBaseUrl(profile.baseUrl);
+    if (normalizedBaseUrl == null) {
       final next = profile.copyWith(
-        validationState: 'valid',
-        validationMessage: message,
+        syncState: 'invalid',
+        syncMessage: 'Missing AI Gateway URL',
       );
-      _snapshot = _snapshot.copyWith(apisix: next);
-      await _store.saveSettingsSnapshot(_snapshot);
-      notifyListeners();
-      return next;
-    } catch (error) {
-      final next = profile.copyWith(
-        validationState: 'invalid',
-        validationMessage: error.toString(),
-      );
-      _snapshot = _snapshot.copyWith(apisix: next);
+      _aiGatewayStatus = next.syncMessage;
+      _snapshot = _snapshot.copyWith(aiGateway: next);
       await _store.saveSettingsSnapshot(_snapshot);
       notifyListeners();
       return next;
     }
+    final apiKey = apiKeyOverride.trim().isNotEmpty
+        ? apiKeyOverride.trim()
+        : (await _store.loadAiGatewayApiKey())?.trim() ?? '';
+    if (apiKey.isEmpty) {
+      final next = profile.copyWith(
+        baseUrl: normalizedBaseUrl.toString(),
+        syncState: 'invalid',
+        syncMessage: 'Missing AI Gateway API key',
+      );
+      _aiGatewayStatus = next.syncMessage;
+      _snapshot = _snapshot.copyWith(aiGateway: next);
+      await _store.saveSettingsSnapshot(_snapshot);
+      notifyListeners();
+      return next;
+    }
+    try {
+      final models = await loadAiGatewayModels(
+        profile: profile.copyWith(baseUrl: normalizedBaseUrl.toString()),
+        apiKeyOverride: apiKey,
+      );
+      final availableModels = models
+          .map((item) => item.id)
+          .toList(growable: false);
+      final retainedSelected = profile.selectedModels
+          .where(availableModels.contains)
+          .toList(growable: false);
+      final selectedModels = retainedSelected.isNotEmpty
+          ? retainedSelected
+          : availableModels.take(5).toList(growable: false);
+      final currentDefaultModel = _snapshot.defaultModel.trim();
+      final resolvedDefaultModel = selectedModels.contains(currentDefaultModel)
+          ? currentDefaultModel
+          : selectedModels.isNotEmpty
+          ? selectedModels.first
+          : availableModels.isNotEmpty
+          ? availableModels.first
+          : '';
+      final next = profile.copyWith(
+        baseUrl: normalizedBaseUrl.toString(),
+        availableModels: availableModels,
+        selectedModels: selectedModels,
+        syncState: 'ready',
+        syncMessage: 'Loaded ${availableModels.length} model(s)',
+      );
+      _aiGatewayStatus = 'Ready (${availableModels.length})';
+      _snapshot = _snapshot.copyWith(
+        aiGateway: next,
+        defaultModel: resolvedDefaultModel,
+      );
+      await _store.saveSettingsSnapshot(_snapshot);
+      await _reloadDerivedState();
+      notifyListeners();
+      return next;
+    } catch (error) {
+      final next = profile.copyWith(
+        baseUrl: normalizedBaseUrl.toString(),
+        syncState: 'error',
+        syncMessage: _networkErrorLabel(error),
+      );
+      _aiGatewayStatus = next.syncMessage;
+      _snapshot = _snapshot.copyWith(aiGateway: next);
+      await _store.saveSettingsSnapshot(_snapshot);
+      notifyListeners();
+      return next;
+    }
+  }
+
+  Future<AiGatewayConnectionCheck> testAiGatewayConnection(
+    AiGatewayProfile profile, {
+    String apiKeyOverride = '',
+  }) async {
+    final normalizedBaseUrl = _normalizeAiGatewayBaseUrl(profile.baseUrl);
+    if (normalizedBaseUrl == null) {
+      return const AiGatewayConnectionCheck(
+        state: 'invalid',
+        message: 'Missing AI Gateway URL',
+        endpoint: '',
+        modelCount: 0,
+      );
+    }
+    final apiKey = apiKeyOverride.trim().isNotEmpty
+        ? apiKeyOverride.trim()
+        : (await _store.loadAiGatewayApiKey())?.trim() ?? '';
+    final endpoint = _aiGatewayModelsUri(normalizedBaseUrl).toString();
+    if (apiKey.isEmpty) {
+      return AiGatewayConnectionCheck(
+        state: 'invalid',
+        message: 'Missing AI Gateway API key',
+        endpoint: endpoint,
+        modelCount: 0,
+      );
+    }
+    try {
+      final models = await _requestAiGatewayModels(
+        uri: _aiGatewayModelsUri(normalizedBaseUrl),
+        apiKey: apiKey,
+      );
+      if (models.isEmpty) {
+        return AiGatewayConnectionCheck(
+          state: 'empty',
+          message: 'Authenticated but no models were returned',
+          endpoint: endpoint,
+          modelCount: 0,
+        );
+      }
+      return AiGatewayConnectionCheck(
+        state: 'ready',
+        message: 'Authenticated · ${models.length} model(s) available',
+        endpoint: endpoint,
+        modelCount: models.length,
+      );
+    } catch (error) {
+      return AiGatewayConnectionCheck(
+        state: 'error',
+        message: _networkErrorLabel(error),
+        endpoint: endpoint,
+        modelCount: 0,
+      );
+    }
+  }
+
+  Future<List<GatewayModelSummary>> loadAiGatewayModels({
+    AiGatewayProfile? profile,
+    String apiKeyOverride = '',
+  }) async {
+    final activeProfile = profile ?? _snapshot.aiGateway;
+    final normalizedBaseUrl = _normalizeAiGatewayBaseUrl(activeProfile.baseUrl);
+    if (normalizedBaseUrl == null) {
+      return const <GatewayModelSummary>[];
+    }
+    final apiKey = apiKeyOverride.trim().isNotEmpty
+        ? apiKeyOverride.trim()
+        : (await _store.loadAiGatewayApiKey())?.trim() ?? '';
+    if (apiKey.isEmpty) {
+      return const <GatewayModelSummary>[];
+    }
+    return _requestAiGatewayModels(
+      uri: _aiGatewayModelsUri(normalizedBaseUrl),
+      apiKey: apiKey,
+    );
   }
 
   List<SecretReferenceEntry> buildSecretReferences() {
@@ -280,11 +423,13 @@ class SettingsController extends ChangeNotifier {
         ),
       ),
       SecretReferenceEntry(
-        name: _snapshot.apisix.name,
-        provider: 'APISIX YAML',
+        name: _snapshot.aiGateway.name,
+        provider: 'AI Gateway',
         module: 'Settings',
-        maskedValue: _snapshot.apisix.filePath,
-        status: _snapshot.apisix.validationState,
+        maskedValue: _snapshot.aiGateway.baseUrl.trim().isEmpty
+            ? 'Not set'
+            : _snapshot.aiGateway.baseUrl,
+        status: _snapshot.aiGateway.syncState,
       ),
     ];
     return entries;
@@ -299,34 +444,15 @@ class SettingsController extends ChangeNotifier {
     _auditTrail = await _store.loadAuditTrail();
   }
 
-  Future<String> _loadYamlFromProfile(ApisixYamlProfile profile) async {
-    final path = profile.filePath.trim();
-    if (path.isEmpty) {
-      throw const FormatException('Missing YAML source');
-    }
-    final file = File(path);
-    if (!await file.exists()) {
-      throw FileSystemException('YAML file not found', path);
-    }
-    return file.readAsString();
-  }
-
-  int _yamlSequenceLength(Object? value) {
-    if (value is YamlList) {
-      return value.length;
-    }
-    if (value is List) {
-      return value.length;
-    }
-    return 0;
-  }
-
   String _providerNameForSecret(String key) {
     if (key.contains('vault')) {
       return 'Vault';
     }
     if (key.contains('ollama')) {
       return 'Ollama Cloud';
+    }
+    if (key.contains('ai_gateway')) {
+      return 'AI Gateway';
     }
     if (key.contains('gateway')) {
       return 'Gateway';
@@ -341,10 +467,203 @@ class SettingsController extends ChangeNotifier {
     if (key.contains('ollama')) {
       return 'Settings';
     }
+    if (key.contains('ai_gateway')) {
+      return 'Settings';
+    }
     if (key.contains('vault')) {
       return 'Secrets';
     }
     return 'Workspace';
+  }
+
+  Uri? _normalizeAiGatewayBaseUrl(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    final candidate = trimmed.contains('://') ? trimmed : 'https://$trimmed';
+    final uri = Uri.tryParse(candidate);
+    if (uri == null || uri.host.trim().isEmpty) {
+      return null;
+    }
+    final pathSegments = uri.pathSegments.where((item) => item.isNotEmpty);
+    return uri.replace(
+      pathSegments: pathSegments.isEmpty ? const <String>['v1'] : pathSegments,
+      query: null,
+      fragment: null,
+    );
+  }
+
+  Uri _aiGatewayModelsUri(Uri baseUrl) {
+    final pathSegments = baseUrl.pathSegments
+        .where((item) => item.isNotEmpty)
+        .toList(growable: true);
+    if (pathSegments.isEmpty) {
+      pathSegments.add('v1');
+    }
+    if (pathSegments.last != 'models') {
+      pathSegments.add('models');
+    }
+    return baseUrl.replace(
+      pathSegments: pathSegments,
+      query: null,
+      fragment: null,
+    );
+  }
+
+  Future<List<GatewayModelSummary>> _requestAiGatewayModels({
+    required Uri uri,
+    required String apiKey,
+  }) async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 6);
+    try {
+      final request = await client
+          .getUrl(uri)
+          .timeout(const Duration(seconds: 6));
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $apiKey');
+      request.headers.set('x-api-key', apiKey);
+      final response = await request.close().timeout(
+        const Duration(seconds: 6),
+      );
+      final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw _AiGatewayResponseException(
+          statusCode: response.statusCode,
+          message: _aiGatewayHttpErrorLabel(
+            response.statusCode,
+            _extractAiGatewayErrorDetail(body),
+          ),
+        );
+      }
+      final decoded = jsonDecode(_extractFirstJsonDocument(body));
+      final rawModels = decoded is Map<String, dynamic>
+          ? [
+              ...asList(decoded['data']),
+              if (asList(decoded['data']).isEmpty) ...asList(decoded['models']),
+            ]
+          : const <Object>[];
+      final seen = <String>{};
+      final items = <GatewayModelSummary>[];
+      for (final item in rawModels) {
+        final map = asMap(item);
+        final modelId =
+            stringValue(map['id']) ?? stringValue(map['name']) ?? '';
+        if (modelId.trim().isEmpty || !seen.add(modelId)) {
+          continue;
+        }
+        items.add(
+          GatewayModelSummary(
+            id: modelId,
+            name: stringValue(map['name']) ?? modelId,
+            provider:
+                stringValue(map['provider']) ??
+                stringValue(map['owned_by']) ??
+                'AI Gateway',
+            contextWindow:
+                intValue(map['contextWindow']) ??
+                intValue(map['context_window']),
+            maxOutputTokens:
+                intValue(map['maxOutputTokens']) ??
+                intValue(map['max_output_tokens']),
+          ),
+        );
+      }
+      return items;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  String _networkErrorLabel(Object error) {
+    if (error is _AiGatewayResponseException) {
+      return error.message;
+    }
+    if (error is SocketException) {
+      return 'Unable to reach the AI Gateway';
+    }
+    if (error is HandshakeException) {
+      return 'TLS handshake failed';
+    }
+    if (error is TimeoutException) {
+      return 'Connection timed out';
+    }
+    if (error is FormatException) {
+      return 'AI Gateway returned invalid JSON';
+    }
+    return 'Failed: $error';
+  }
+
+  String _aiGatewayHttpErrorLabel(int statusCode, String detail) {
+    final base = switch (statusCode) {
+      400 => 'Bad request (400)',
+      401 => 'Authentication failed (401)',
+      403 => 'Access denied (403)',
+      404 => 'Model catalog endpoint not found (404)',
+      429 => 'Rate limited by AI Gateway (429)',
+      >= 500 => 'AI Gateway unavailable ($statusCode)',
+      _ => 'AI Gateway responded $statusCode',
+    };
+    return detail.isEmpty ? base : '$base · $detail';
+  }
+
+  String _extractAiGatewayErrorDetail(String body) {
+    if (body.trim().isEmpty) {
+      return '';
+    }
+    try {
+      final decoded = jsonDecode(_extractFirstJsonDocument(body));
+      final map = asMap(decoded);
+      final error = asMap(map['error']);
+      return (stringValue(error['message']) ??
+              stringValue(map['message']) ??
+              stringValue(map['detail']) ??
+              '')
+          .trim();
+    } on FormatException {
+      return '';
+    }
+  }
+
+  String _extractFirstJsonDocument(String body) {
+    final trimmed = body.trimLeft();
+    if (trimmed.isEmpty) {
+      throw const FormatException('Empty response body');
+    }
+    final start = trimmed.indexOf(RegExp(r'[\{\[]'));
+    if (start < 0) {
+      throw const FormatException('Missing JSON document');
+    }
+    var depth = 0;
+    var inString = false;
+    var escaped = false;
+    for (var index = start; index < trimmed.length; index++) {
+      final char = trimmed[index];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char == r'\') {
+        escaped = true;
+        continue;
+      }
+      if (char == '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) {
+        continue;
+      }
+      if (char == '{' || char == '[') {
+        depth += 1;
+      } else if (char == '}' || char == ']') {
+        depth -= 1;
+        if (depth == 0) {
+          return trimmed.substring(start, index + 1);
+        }
+      }
+    }
+    throw const FormatException('Unterminated JSON document');
   }
 
   Future<HttpClientResponse> _simpleGet(
@@ -369,6 +688,16 @@ class SettingsController extends ChangeNotifier {
     final now = DateTime.now();
     return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
+}
+
+class _AiGatewayResponseException implements Exception {
+  const _AiGatewayResponseException({
+    required this.statusCode,
+    required this.message,
+  });
+
+  final int statusCode;
+  final String message;
 }
 
 class GatewayAgentsController extends ChangeNotifier {
@@ -573,6 +902,8 @@ class GatewayChatController extends ChangeNotifier {
     required String thinking,
     List<GatewayChatAttachmentPayload> attachments =
         const <GatewayChatAttachmentPayload>[],
+    String? agentId,
+    Map<String, dynamic>? metadata,
   }) async {
     final trimmed = message.trim();
     if ((trimmed.isEmpty && attachments.isEmpty) || !_runtime.isConnected) {
@@ -603,6 +934,8 @@ class GatewayChatController extends ChangeNotifier {
         message: trimmed.isEmpty ? 'See attached.' : trimmed,
         thinking: thinking,
         attachments: attachments,
+        agentId: agentId,
+        metadata: metadata,
       );
       _pendingRuns.add(runId);
     } catch (error) {
@@ -804,9 +1137,10 @@ class ConnectorsController extends ChangeNotifier {
 }
 
 class ModelsController extends ChangeNotifier {
-  ModelsController(this._runtime);
+  ModelsController(this._runtime, this._settingsController);
 
   final GatewayRuntime _runtime;
+  final SettingsController _settingsController;
 
   List<GatewayModelSummary> _items = const <GatewayModelSummary>[];
   bool _loading = false;
@@ -816,24 +1150,58 @@ class ModelsController extends ChangeNotifier {
   bool get loading => _loading;
   String? get error => _error;
 
-  Future<void> refresh() async {
-    if (!_runtime.isConnected) {
-      _items = const <GatewayModelSummary>[];
-      _error = null;
-      notifyListeners();
+  void restoreFromSettings(AiGatewayProfile profile) {
+    final models = _modelsFromProfile(profile);
+    if (models.length == _items.length &&
+        models.every(
+          (item) => _items.any((current) => current.id == item.id),
+        )) {
       return;
     }
+    _items = models;
+    notifyListeners();
+  }
+
+  Future<void> refresh() async {
     _loading = true;
     _error = null;
     notifyListeners();
     try {
-      _items = await _runtime.listModels();
+      final profile = _settingsController.snapshot.aiGateway;
+      if (profile.baseUrl.trim().isNotEmpty) {
+        final synced = await _settingsController.syncAiGatewayCatalog(profile);
+        _items = _modelsFromProfile(synced);
+      } else if (_runtime.isConnected) {
+        _items = await _runtime.listModels();
+      } else {
+        _items = _modelsFromProfile(profile);
+      }
     } catch (error) {
       _error = error.toString();
     } finally {
       _loading = false;
       notifyListeners();
     }
+  }
+
+  List<GatewayModelSummary> _modelsFromProfile(AiGatewayProfile profile) {
+    final selected = profile.selectedModels
+        .where(profile.availableModels.contains)
+        .toList(growable: false);
+    final candidates = selected.isNotEmpty
+        ? selected
+        : profile.availableModels.take(5).toList(growable: false);
+    return candidates
+        .map(
+          (item) => GatewayModelSummary(
+            id: item,
+            name: item,
+            provider: 'AI Gateway',
+            contextWindow: null,
+            maxOutputTokens: null,
+          ),
+        )
+        .toList(growable: false);
   }
 }
 

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
@@ -15,6 +16,12 @@ void main() {
       final snapshot = SettingsSnapshot.defaults().copyWith(
         accountUsername: 'tester',
         accountWorkspace: 'QA',
+        codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
+        codexCliPath: '/opt/homebrew/bin/codex',
+        assistantNavigationDestinations: const <WorkspaceDestination>[
+          WorkspaceDestination.aiGateway,
+          WorkspaceDestination.secrets,
+        ],
         gateway: GatewayConnectionProfile.defaults().copyWith(
           host: 'gateway.example.com',
           port: 9443,
@@ -25,17 +32,31 @@ void main() {
       await store.saveGatewayToken('token-secret');
       await store.saveGatewayPassword('password-secret');
       await store.saveVaultToken('vault-secret');
+      await store.saveAiGatewayApiKey('ai-gateway-secret');
 
       final loadedSnapshot = await store.loadSettingsSnapshot();
       final secureRefs = await store.loadSecureRefs();
 
       expect(loadedSnapshot.accountUsername, 'tester');
       expect(loadedSnapshot.accountWorkspace, 'QA');
+      expect(
+        loadedSnapshot.codeAgentRuntimeMode,
+        CodeAgentRuntimeMode.externalCli,
+      );
+      expect(loadedSnapshot.codexCliPath, '/opt/homebrew/bin/codex');
+      expect(
+        loadedSnapshot.assistantNavigationDestinations,
+        const <WorkspaceDestination>[
+          WorkspaceDestination.aiGateway,
+          WorkspaceDestination.secrets,
+        ],
+      );
       expect(loadedSnapshot.gateway.host, 'gateway.example.com');
       expect(loadedSnapshot.gateway.port, 9443);
       expect(secureRefs['gateway_token'], 'token-secret');
       expect(secureRefs['gateway_password'], 'password-secret');
       expect(secureRefs['vault_token'], 'vault-secret');
+      expect(secureRefs['ai_gateway_api_key'], 'ai-gateway-secret');
       expect(SecureConfigStore.maskValue('token-secret'), 'tok••••ret');
       expect(SecureConfigStore.maskValue(''), 'Not set');
     },

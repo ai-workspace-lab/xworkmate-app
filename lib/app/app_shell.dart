@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../features/account/account_page.dart';
+import '../features/ai_gateway/ai_gateway_page.dart';
 import '../features/assistant/assistant_page.dart';
+import '../features/claw_hub/claw_hub_page.dart';
+import '../features/mcp_server/mcp_server_page.dart';
 import '../features/mobile/ios_mobile_shell.dart';
 import '../features/modules/modules_page.dart';
 import '../features/secrets/secrets_page.dart';
 import '../features/settings/settings_page.dart';
+import '../features/skills/skills_page.dart';
 import '../features/tasks/tasks_page.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
+import '../widgets/assistant_focus_panel.dart';
 import '../widgets/detail_drawer.dart';
 import '../widgets/pane_resize_handle.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -24,23 +29,24 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  static const _sidebarMinWidth = 90.0;
-  static const _sidebarMaxWidth = 320.0;
+  static const _sidebarMinWidth = 84.0;
+  static const _sidebarViewportPadding = 120.0;
+  static const _mainContentMinWidth = 640.0;
   double? _sidebarExpandedWidth;
 
   static const _mobileDestinations = [
     WorkspaceDestination.assistant,
     WorkspaceDestination.tasks,
-    WorkspaceDestination.modules,
+    WorkspaceDestination.skills,
     WorkspaceDestination.secrets,
     WorkspaceDestination.settings,
   ];
 
   double _clampSidebarWidth(double value, double viewportWidth) {
-    final responsiveMax = (viewportWidth * 0.28).clamp(
-      _sidebarMinWidth,
-      _sidebarMaxWidth,
-    );
+    final responsiveMax = (viewportWidth -
+            _mainContentMinWidth -
+            _sidebarViewportPadding)
+        .clamp(_sidebarMinWidth, viewportWidth - _sidebarViewportPadding);
     return value.clamp(_sidebarMinWidth, responsiveMax).toDouble();
   }
 
@@ -57,6 +63,7 @@ class _AppShellState extends State<AppShell> {
         final controller = widget.controller;
         return Scaffold(
           body: SafeArea(
+            bottom: false,
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final palette = context.palette;
@@ -66,6 +73,9 @@ class _AppShellState extends State<AppShell> {
                 final isMobile = constraints.maxWidth < 900;
                 final sidebarState = controller.sidebarState;
                 final showSidebar = sidebarState != AppSidebarState.hidden;
+                final embedSidebarIntoAssistant =
+                    controller.destination == WorkspaceDestination.assistant &&
+                    showSidebar;
                 final expandedSidebarWidth = _clampSidebarWidth(
                   _sidebarExpandedWidth ??
                       _defaultSidebarWidth(
@@ -192,7 +202,7 @@ class _AppShellState extends State<AppShell> {
                   children: [
                     Row(
                       children: [
-                        if (showSidebar)
+                        if (showSidebar && !embedSidebarIntoAssistant)
                           SidebarNavigation(
                             currentSection: controller.destination,
                             sidebarState: sidebarState,
@@ -227,8 +237,14 @@ class _AppShellState extends State<AppShell> {
                                 sidebarState == AppSidebarState.expanded
                                 ? expandedSidebarWidth
                                 : null,
+                            favoriteDestinations: controller
+                                .assistantNavigationDestinations
+                                .toSet(),
+                            onToggleFavorite:
+                                controller.toggleAssistantNavigationDestination,
                           ),
-                        if (sidebarState == AppSidebarState.expanded)
+                        if (sidebarState == AppSidebarState.expanded &&
+                            !embedSidebarIntoAssistant)
                           PaneResizeHandle(
                             axis: Axis.horizontal,
                             onDelta: (delta) {
@@ -245,7 +261,7 @@ class _AppShellState extends State<AppShell> {
                             padding: const EdgeInsets.only(
                               top: 10,
                               right: 10,
-                              bottom: 10,
+                              bottom: 0,
                             ),
                             child: AnimatedPadding(
                               duration: const Duration(milliseconds: 220),
@@ -283,7 +299,7 @@ class _AppShellState extends State<AppShell> {
                       Positioned(
                         left: 0,
                         top: 18,
-                        bottom: 18,
+                        bottom: 0,
                         child: _SidebarRevealRail(
                           onExpand: () => controller.setSidebarState(
                             AppSidebarState.expanded,
@@ -317,16 +333,45 @@ class _AppShellState extends State<AppShell> {
       WorkspaceDestination.assistant => AssistantPage(
         controller: widget.controller,
         onOpenDetail: onOpenDetail,
+        navigationPanelBuilder:
+            widget.controller.sidebarState == AppSidebarState.hidden
+            ? null
+            : (_) => AssistantFocusPanel(controller: widget.controller),
+        showStandaloneTaskRail: false,
+        unifiedPaneStartsCollapsed:
+            widget.controller.sidebarState == AppSidebarState.collapsed,
       ),
       WorkspaceDestination.tasks => TasksPage(
         controller: widget.controller,
         onOpenDetail: onOpenDetail,
       ),
-      WorkspaceDestination.modules => ModulesPage(
+      WorkspaceDestination.skills => SkillsPage(
+        controller: widget.controller,
+        onOpenDetail: onOpenDetail,
+      ),
+      WorkspaceDestination.nodes => ModulesPage(
+        controller: widget.controller,
+        onOpenDetail: onOpenDetail,
+        initialTab: ModulesTab.nodes,
+      ),
+      WorkspaceDestination.agents => ModulesPage(
+        controller: widget.controller,
+        onOpenDetail: onOpenDetail,
+        initialTab: ModulesTab.agents,
+      ),
+      WorkspaceDestination.mcpServer => McpServerPage(
+        controller: widget.controller,
+        onOpenDetail: onOpenDetail,
+      ),
+      WorkspaceDestination.clawHub => ClawHubPage(
         controller: widget.controller,
         onOpenDetail: onOpenDetail,
       ),
       WorkspaceDestination.secrets => SecretsPage(
+        controller: widget.controller,
+        onOpenDetail: onOpenDetail,
+      ),
+      WorkspaceDestination.aiGateway => AiGatewayPage(
         controller: widget.controller,
         onOpenDetail: onOpenDetail,
       ),

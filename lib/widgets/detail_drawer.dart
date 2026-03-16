@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 import 'status_badge.dart';
 
 class DetailDrawer extends StatelessWidget {
@@ -16,10 +17,10 @@ class DetailDrawer extends StatelessWidget {
 
     return Container(
       width: 360,
-      margin: const EdgeInsets.fromLTRB(0, 24, 24, 24),
+      margin: const EdgeInsets.fromLTRB(0, AppSpacing.lg, AppSpacing.lg, AppSpacing.lg),
       decoration: BoxDecoration(
         color: palette.surfacePrimary,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(AppRadius.dialog),
         border: Border.all(color: palette.strokeSoft),
         boxShadow: [
           BoxShadow(
@@ -46,23 +47,14 @@ class DetailSheet extends StatelessWidget {
     final mediaQuery = MediaQuery.of(context);
 
     return Container(
-      margin: EdgeInsets.fromLTRB(12, mediaQuery.padding.top + 12, 12, 12),
+      margin: EdgeInsets.fromLTRB(AppSpacing.sm, mediaQuery.padding.top + AppSpacing.sm, AppSpacing.sm, AppSpacing.sm),
       decoration: BoxDecoration(
         color: palette.surfacePrimary,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(AppRadius.dialog),
         border: Border.all(color: palette.strokeSoft),
-        boxShadow: [
-          BoxShadow(
-            color: palette.shadow.withValues(alpha: 0.16),
-            blurRadius: 28,
-            offset: const Offset(0, 18),
-          ),
-        ],
       ),
-      child: SafeArea(
-        top: false,
-        child: _DetailPanelContent(data: data, onClose: onClose),
-      ),
+      constraints: const BoxConstraints(maxWidth: 480),
+      child: _DetailPanelContent(data: data, onClose: onClose),
     );
   }
 }
@@ -75,11 +67,14 @@ class _DetailPanelContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.palette;
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(22, 22, 16, 16),
+          padding: const EdgeInsets.all(AppSpacing.md),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -87,81 +82,92 @@ class _DetailPanelContent extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: context.palette.accentMuted,
-                  borderRadius: BorderRadius.circular(14),
+                  color: palette.accentMuted,
+                  borderRadius: BorderRadius.circular(AppRadius.button),
                 ),
-                child: Icon(data.icon, color: context.palette.accent),
+                child: Icon(data.icon, color: palette.accent, size: 22),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      data.subtitle,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      data.title,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 10),
-                    StatusBadge(status: data.status, compact: true),
+                    Text(data.title, style: theme.textTheme.headlineSmall),
+                    const SizedBox(height: AppSpacing.xxs),
+                    if (data.status != null)
+                      StatusBadge(status: data.status!, compact: true),
                   ],
                 ),
               ),
+              const SizedBox(width: AppSpacing.xs),
               IconButton(
                 onPressed: onClose,
                 icon: const Icon(Icons.close_rounded),
+                iconSize: 20,
+                style: IconButton.styleFrom(
+                  foregroundColor: palette.textSecondary,
+                  backgroundColor: palette.surfaceSecondary,
+                ),
               ),
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 22),
-          child: Text(
-            data.description,
-            style: Theme.of(context).textTheme.bodyMedium,
+        Divider(height: 1, color: palette.strokeSoft),
+        if (data.subtitle != null && data.subtitle!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Text(
+              data.subtitle!,
+              style: theme.textTheme.bodySmall,
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 22),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: data.meta
-                .map(
-                  (item) => Chip(
-                    label: Text(item),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                )
-                .toList(),
-          ),
-        ),
-        const SizedBox(height: 18),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
             children: [
-              ...data.sections.map(
-                (section) => Padding(
-                  padding: const EdgeInsets.only(bottom: 18),
-                  child: _DetailSectionCard(section: section),
+              if (data.description.isNotEmpty)
+                Text(data.description, style: theme.textTheme.bodyMedium),
+              if (data.meta.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xxs,
+                  children: data.meta.map((item) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                      decoration: BoxDecoration(
+                        color: palette.surfaceSecondary,
+                        borderRadius: BorderRadius.circular(AppRadius.badge),
+                      ),
+                      child: Text(
+                        item,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: palette.textSecondary,
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
-              ),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: data.actions
-                    .map(
-                      (action) =>
-                          OutlinedButton(onPressed: () {}, child: Text(action)),
-                    )
-                    .toList(),
-              ),
+              ],
+              if (data.actions.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
+                  children: data.actions.map((action) {
+                    return TextButton(
+                      onPressed: () {},
+                      child: Text(action),
+                    );
+                  }).toList(),
+                ),
+              ],
+              ...data.sections.map((section) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.md),
+                  child: _DetailSection(section: section),
+                );
+              }),
             ],
           ),
         ),
@@ -170,52 +176,52 @@ class _DetailPanelContent extends StatelessWidget {
   }
 }
 
-class _DetailSectionCard extends StatelessWidget {
-  const _DetailSectionCard({required this.section});
+class _DetailSection extends StatelessWidget {
+  const _DetailSection({required this.section});
 
   final DetailSection section;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final palette = context.palette;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: palette.strokeSoft),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(section.title, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 12),
-          ...section.items.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      item.label,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Flexible(
-                    child: Text(
-                      item.value,
-                      textAlign: TextAlign.right,
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          section.title,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: palette.textSecondary,
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        ...section.items.map((item) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 80,
+                  child: Text(
+                    item.label,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    item.value,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 
 class StatusBadge extends StatelessWidget {
   const StatusBadge({super.key, required this.status, this.compact = false});
@@ -31,18 +32,18 @@ class StatusBadge extends StatelessWidget {
 
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 10 : 12,
-        vertical: compact ? 5 : 7,
+        horizontal: compact ? AppSpacing.xs : 10,
+        vertical: compact ? 4 : 6,
       ),
       decoration: BoxDecoration(
         color: tone.$1,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.badge),
       ),
       child: Text(
         status.label,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
           color: tone.$2,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );

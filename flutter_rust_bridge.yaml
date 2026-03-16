@@ -1,0 +1,20 @@
+# Flutter Rust Bridge Configuration
+# This file configures code generation for FFI bindings
+
+rust_input:
+  - rust/src/lib.rs
+
+dart_output:
+  - lib/runtime/codex_ffi_generated.dart
+
+# Class names for generated Dart code
+rust_root_namespace: codex_ffi
+
+# Output configuration
+dart_format_line_length: 120
+
+# FFI library name (without extension)
+c_symbol_prefix: codex_
+
+# Generate documentation
+dart_type_name_length_limit: 60

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 
 class SidebarNavigation extends StatelessWidget {
   const SidebarNavigation({
@@ -20,6 +21,10 @@ class SidebarNavigation extends StatelessWidget {
     required this.accountName,
     required this.accountSubtitle,
     this.expandedWidthOverride,
+    this.marginOverride,
+    this.showCollapseControl = true,
+    this.favoriteDestinations = const <WorkspaceDestination>{},
+    this.onToggleFavorite,
   });
 
   final WorkspaceDestination currentSection;
@@ -35,13 +40,27 @@ class SidebarNavigation extends StatelessWidget {
   final String accountName;
   final String accountSubtitle;
   final double? expandedWidthOverride;
+  final EdgeInsetsGeometry? marginOverride;
+  final bool showCollapseControl;
+  final Set<WorkspaceDestination> favoriteDestinations;
+  final Future<void> Function(WorkspaceDestination section)? onToggleFavorite;
 
-  static const _mainSections = [
+  static const _primarySections = <WorkspaceDestination>[
     WorkspaceDestination.assistant,
     WorkspaceDestination.tasks,
-    WorkspaceDestination.modules,
+    WorkspaceDestination.skills,
+  ];
+
+  static const _workspaceSections = <WorkspaceDestination>[
+    WorkspaceDestination.nodes,
+    WorkspaceDestination.agents,
+  ];
+
+  static const _toolSections = <WorkspaceDestination>[
+    WorkspaceDestination.mcpServer,
+    WorkspaceDestination.clawHub,
     WorkspaceDestination.secrets,
-    WorkspaceDestination.settings,
+    WorkspaceDestination.aiGateway,
   ];
 
   @override
@@ -51,25 +70,27 @@ class SidebarNavigation extends StatelessWidget {
     final isCollapsed = sidebarState == AppSidebarState.collapsed;
     final expandedWidth =
         expandedWidthOverride ??
-        (appLanguage == AppLanguage.zh ? 204.0 : 220.0);
+        (appLanguage == AppLanguage.zh ? AppSizes.sidebarExpandedWidth : 220.0);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
-      width: isExpanded ? expandedWidth : 72,
+      width: isExpanded ? expandedWidth : AppSizes.sidebarCollapsedWidth,
       height: double.infinity,
-      margin: const EdgeInsets.fromLTRB(8, 8, 6, 8),
+      margin:
+          marginOverride ??
+          const EdgeInsets.fromLTRB(AppSpacing.xs, AppSpacing.xs, 6, 0),
       decoration: BoxDecoration(
         color: palette.sidebar,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.sidebar),
         border: Border.all(
           color: palette.sidebarBorder.withValues(alpha: 0.72),
         ),
       ),
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: isExpanded ? 10 : 8,
-          vertical: 10,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: AppSpacing.xs,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -78,29 +99,55 @@ class SidebarNavigation extends StatelessWidget {
               isCollapsed: !isExpanded,
               onTap: isCollapsed ? onExpandFromCollapsed : null,
             ),
-            const SizedBox(height: 12),
-            Container(height: 1, color: palette.sidebarBorder),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ..._mainSections.map(
-                    (section) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: SidebarNavItem(
-                        section: section,
-                        selected: currentSection == section,
-                        collapsed: isCollapsed,
-                        onTap: () => onSectionChanged(section),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _SidebarSectionGroup(
+                            sections: _primarySections,
+                            currentSection: currentSection,
+                            collapsed: isCollapsed,
+                            emphasis: _SidebarItemEmphasis.primary,
+                            favoriteDestinations: favoriteDestinations,
+                            onToggleFavorite: onToggleFavorite,
+                            onSectionChanged: onSectionChanged,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _SidebarSectionGroup(
+                            title: appText('工作区', 'Workspace'),
+                            sections: _workspaceSections,
+                            currentSection: currentSection,
+                            collapsed: isCollapsed,
+                            emphasis: _SidebarItemEmphasis.secondary,
+                            favoriteDestinations: favoriteDestinations,
+                            onToggleFavorite: onToggleFavorite,
+                            onSectionChanged: onSectionChanged,
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Container(height: 1, color: palette.sidebarBorder),
-                  const SizedBox(height: 10),
+                  _SidebarSectionGroup(
+                    title: appText('工具', 'Tools'),
+                    sections: _toolSections,
+                    currentSection: currentSection,
+                    collapsed: isCollapsed,
+                    emphasis: _SidebarItemEmphasis.secondary,
+                    favoriteDestinations: favoriteDestinations,
+                    onToggleFavorite: onToggleFavorite,
+                    onSectionChanged: onSectionChanged,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
                   SidebarFooter(
                     isCollapsed: isCollapsed,
+                    currentSection: currentSection,
                     appLanguage: appLanguage,
                     themeMode: themeMode,
                     onToggleLanguage: onToggleLanguage,
@@ -114,6 +161,7 @@ class SidebarNavigation extends StatelessWidget {
                     accountSubtitle: accountSubtitle,
                     accountSelected:
                         currentSection == WorkspaceDestination.account,
+                    showCollapseControl: showCollapseControl,
                   ),
                 ],
               ),
@@ -136,13 +184,18 @@ class SidebarHeader extends StatelessWidget {
     final palette = context.palette;
 
     final content = Container(
-      width: isCollapsed ? 38 : 34,
-      height: isCollapsed ? 38 : 34,
+      width: isCollapsed ? AppSizes.sidebarItemHeight : 36,
+      height: isCollapsed ? AppSizes.sidebarItemHeight : 36,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: palette.accentMuted,
+        color: palette.surfaceSecondary,
+        border: Border.all(color: palette.strokeSoft),
       ),
-      child: Icon(Icons.auto_awesome_rounded, color: palette.accent, size: 20),
+      child: Icon(
+        Icons.crop_square_rounded,
+        color: palette.textSecondary,
+        size: AppSizes.sidebarIconSize,
+      ),
     );
 
     if (onTap == null) {
@@ -152,10 +205,10 @@ class SidebarHeader extends StatelessWidget {
     return Tooltip(
       message: appText('展开导航', 'Expand sidebar'),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.button),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: 2),
           child: content,
         ),
       ),
@@ -163,85 +216,235 @@ class SidebarHeader extends StatelessWidget {
   }
 }
 
-class SidebarNavItem extends StatefulWidget {
-  const SidebarNavItem({
-    super.key,
+class _SidebarSectionGroup extends StatelessWidget {
+  const _SidebarSectionGroup({
+    this.title,
+    required this.sections,
+    required this.currentSection,
+    required this.collapsed,
+    required this.emphasis,
+    required this.favoriteDestinations,
+    this.onToggleFavorite,
+    required this.onSectionChanged,
+  });
+
+  final String? title;
+  final List<WorkspaceDestination> sections;
+  final WorkspaceDestination currentSection;
+  final bool collapsed;
+  final _SidebarItemEmphasis emphasis;
+  final Set<WorkspaceDestination> favoriteDestinations;
+  final Future<void> Function(WorkspaceDestination section)? onToggleFavorite;
+  final ValueChanged<WorkspaceDestination> onSectionChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!collapsed && title != null) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
+            child: Text(
+              title!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: palette.textMuted,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+        ...sections.map(
+          (section) => Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
+            child: _SidebarNavItem(
+              section: section,
+              selected: currentSection == section,
+              collapsed: collapsed,
+              emphasis: emphasis,
+              favorite: favoriteDestinations.contains(section),
+              showFavoriteToggle:
+                  !collapsed &&
+                  onToggleFavorite != null &&
+                  kAssistantNavigationDestinationCandidates.contains(section),
+              onToggleFavorite: onToggleFavorite == null
+                  ? null
+                  : () async {
+                      await onToggleFavorite!(section);
+                    },
+              onTap: () => onSectionChanged(section),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SidebarNavItem extends StatefulWidget {
+  const _SidebarNavItem({
     required this.section,
     required this.selected,
     required this.collapsed,
+    required this.emphasis,
+    required this.favorite,
+    required this.showFavoriteToggle,
+    this.onToggleFavorite,
     required this.onTap,
   });
 
   final WorkspaceDestination section;
   final bool selected;
   final bool collapsed;
+  final _SidebarItemEmphasis emphasis;
+  final bool favorite;
+  final bool showFavoriteToggle;
+  final Future<void> Function()? onToggleFavorite;
   final VoidCallback onTap;
 
   @override
-  State<SidebarNavItem> createState() => _SidebarNavItemState();
+  State<_SidebarNavItem> createState() => _SidebarNavItemState();
 }
 
-class _SidebarNavItemState extends State<SidebarNavItem> {
+class _SidebarNavItemState extends State<_SidebarNavItem> {
   bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final active = widget.selected;
-    final background = active
+    final theme = Theme.of(context);
+    final isPrimary = widget.emphasis == _SidebarItemEmphasis.primary;
+    final background = widget.selected
         ? palette.accentMuted
         : _hovered
         ? palette.hover
         : Colors.transparent;
-    final foreground = active ? palette.accent : palette.textSecondary;
+    final iconColor = widget.selected ? palette.accent : palette.textSecondary;
+    final height = isPrimary ? 46.0 : AppSizes.sidebarItemHeight;
+    final radius = isPrimary ? 14.0 : AppRadius.button;
 
-    final item = AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
-      curve: Curves.easeOutCubic,
-      width: widget.collapsed ? null : double.infinity,
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: widget.onTap,
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: widget.collapsed ? 0 : 10,
-              vertical: widget.collapsed ? 10 : 9,
-            ),
-            child: Row(
-              mainAxisAlignment: widget.collapsed
-                  ? MainAxisAlignment.center
-                  : MainAxisAlignment.start,
-              children: [
-                Icon(widget.section.icon, color: foreground, size: 18),
-                if (!widget.collapsed) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    widget.section.label,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelLarge?.copyWith(color: foreground),
-                  ),
-                ],
-              ],
+    return Tooltip(
+      message: widget.collapsed ? _sectionLabel(widget.section) : '',
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(radius),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(radius),
+              onTap: widget.onTap,
+              child: Container(
+                height: height,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                child: widget.collapsed
+                    ? Center(
+                        child: Icon(
+                          _sectionIcon(widget.section),
+                          size: AppSizes.sidebarIconSize,
+                          color: iconColor,
+                        ),
+                      )
+                    : Row(
+                        children: [
+                          SizedBox(
+                            width: isPrimary ? 28 : 24,
+                            child: Icon(
+                              _sectionIcon(widget.section),
+                              size: AppSizes.sidebarIconSize,
+                              color: iconColor,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          Expanded(
+                            child: Text(
+                              _sectionLabel(widget.section),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style:
+                                  (isPrimary
+                                          ? theme.textTheme.titleMedium
+                                          : theme.textTheme.labelLarge)
+                                      ?.copyWith(
+                                        color: widget.selected
+                                            ? palette.textPrimary
+                                            : palette.textSecondary,
+                                        fontWeight: isPrimary
+                                            ? FontWeight.w600
+                                            : FontWeight.w500,
+                                      ),
+                            ),
+                          ),
+                          if (widget.showFavoriteToggle)
+                            IconButton(
+                              key: ValueKey<String>(
+                                'sidebar-favorite-${widget.section.name}',
+                              ),
+                              tooltip: widget.favorite
+                                  ? appText('取消关注', 'Remove from focused panel')
+                                  : appText('加入关注', 'Add to focused panel'),
+                              visualDensity: VisualDensity.compact,
+                              splashRadius: 16,
+                              onPressed: () async {
+                                await widget.onToggleFavorite?.call();
+                              },
+                              icon: Icon(
+                                widget.favorite
+                                    ? Icons.star_rounded
+                                    : Icons.star_outline_rounded,
+                                size: 18,
+                                color: widget.favorite
+                                    ? palette.accent
+                                    : palette.textMuted,
+                              ),
+                            ),
+                        ],
+                      ),
+              ),
             ),
           ),
         ),
       ),
     );
+  }
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: widget.collapsed
-          ? Tooltip(message: widget.section.label, child: item)
-          : item,
-    );
+  IconData _sectionIcon(WorkspaceDestination section) {
+    return switch (section) {
+      WorkspaceDestination.assistant => Icons.edit_outlined,
+      WorkspaceDestination.tasks => Icons.schedule_rounded,
+      WorkspaceDestination.skills => Icons.blur_on_rounded,
+      WorkspaceDestination.nodes => Icons.developer_board_rounded,
+      WorkspaceDestination.agents => Icons.hub_rounded,
+      WorkspaceDestination.mcpServer => Icons.dns_rounded,
+      WorkspaceDestination.clawHub => Icons.extension_rounded,
+      WorkspaceDestination.secrets => Icons.key_rounded,
+      WorkspaceDestination.aiGateway => Icons.smart_toy_rounded,
+      WorkspaceDestination.settings => Icons.tune_rounded,
+      WorkspaceDestination.account => Icons.account_circle_rounded,
+    };
+  }
+
+  String _sectionLabel(WorkspaceDestination section) {
+    return switch (section) {
+      WorkspaceDestination.assistant => appText('新对话', 'New conversation'),
+      WorkspaceDestination.tasks => appText('自动化', 'Automation'),
+      WorkspaceDestination.skills => appText('技能', 'Skills'),
+      WorkspaceDestination.nodes => appText('节点', 'Nodes'),
+      WorkspaceDestination.agents => appText('代理', 'Agents'),
+      WorkspaceDestination.mcpServer => 'MCP Hub',
+      WorkspaceDestination.clawHub => 'ClawHub',
+      WorkspaceDestination.secrets => appText('密钥', 'Secrets'),
+      WorkspaceDestination.aiGateway => 'AI Gateway',
+      WorkspaceDestination.settings => appText('设置', 'Settings'),
+      WorkspaceDestination.account => appText('账户', 'Account'),
+    };
   }
 }
 
@@ -249,239 +452,213 @@ class SidebarFooter extends StatelessWidget {
   const SidebarFooter({
     super.key,
     required this.isCollapsed,
-    required this.sidebarState,
+    required this.currentSection,
     required this.appLanguage,
     required this.themeMode,
     required this.onToggleLanguage,
     required this.onOpenThemeToggle,
     required this.onOpenSettings,
+    required this.sidebarState,
     required this.onCycleSidebarState,
     required this.onOpenAccount,
     required this.accountName,
     required this.accountSubtitle,
     required this.accountSelected,
+    required this.showCollapseControl,
   });
 
   final bool isCollapsed;
-  final AppSidebarState sidebarState;
+  final WorkspaceDestination currentSection;
   final AppLanguage appLanguage;
   final ThemeMode themeMode;
   final VoidCallback onToggleLanguage;
   final VoidCallback onOpenThemeToggle;
   final VoidCallback onOpenSettings;
+  final AppSidebarState sidebarState;
   final VoidCallback onCycleSidebarState;
   final VoidCallback onOpenAccount;
   final String accountName;
   final String accountSubtitle;
   final bool accountSelected;
+  final bool showCollapseControl;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final themeLabel = themeMode == ThemeMode.dark
+    final themeToggleTooltip = themeMode == ThemeMode.dark
         ? appText('切换浅色', 'Switch to light')
         : appText('切换深色', 'Switch to dark');
-    final collapseLabel = switch (sidebarState) {
-      AppSidebarState.expanded => appText('折叠导航', 'Collapse sidebar'),
-      AppSidebarState.collapsed => appText('隐藏导航', 'Hide sidebar'),
-      AppSidebarState.hidden => appText('展开导航', 'Expand sidebar'),
-    };
-    final languageButton = Tooltip(
-      message: appText('切换语言', 'Switch language'),
-      child: _SidebarLanguageButton(
-        appLanguage: appLanguage,
-        compact: isCollapsed,
-        onPressed: onToggleLanguage,
-      ),
-    );
 
-    final themeButton = Tooltip(
-      message: themeLabel,
-      child: IconButton(
-        iconSize: 20,
-        onPressed: onOpenThemeToggle,
-        icon: Icon(
-          themeMode == ThemeMode.dark
-              ? Icons.light_mode_rounded
-              : Icons.dark_mode_rounded,
-        ),
-      ),
-    );
-
-    final settingsButton = Tooltip(
-      message: appText('打开设置', 'Open settings'),
-      child: IconButton(
-        iconSize: 20,
-        onPressed: onOpenSettings,
-        icon: const Icon(Icons.settings_rounded),
-      ),
-    );
-
-    final collapseButton = Tooltip(
-      message: collapseLabel,
-      child: IconButton(
-        iconSize: 20,
-        onPressed: onCycleSidebarState,
-        icon: Icon(switch (sidebarState) {
-          AppSidebarState.expanded => Icons.keyboard_double_arrow_left_rounded,
-          AppSidebarState.collapsed => Icons.visibility_off_outlined,
-          AppSidebarState.hidden => Icons.keyboard_double_arrow_right_rounded,
-        }),
-      ),
-    );
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (isCollapsed)
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              themeButton,
-              const SizedBox(height: 6),
-              languageButton,
-              const SizedBox(height: 6),
-              settingsButton,
-              const SizedBox(height: 6),
-              collapseButton,
-            ],
-          )
-        else
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _SidebarFooterActionTile(
-                icon: themeMode == ThemeMode.dark
-                    ? Icons.light_mode_rounded
-                    : Icons.dark_mode_rounded,
-                label: themeLabel,
-                onTap: onOpenThemeToggle,
-              ),
-              const SizedBox(height: 6),
-              _SidebarFooterActionTile(
-                icon: Icons.translate_rounded,
-                label: appText('语言', 'Language'),
-                trailingText: appLanguage == AppLanguage.zh ? '中文' : 'EN',
-                onTap: onToggleLanguage,
-              ),
-              const SizedBox(height: 6),
-              _SidebarFooterActionTile(
-                icon: Icons.settings_rounded,
-                label: appText('打开设置', 'Open settings'),
-                onTap: onOpenSettings,
-              ),
-              const SizedBox(height: 6),
-              _SidebarFooterActionTile(
-                icon: switch (sidebarState) {
-                  AppSidebarState.expanded =>
-                    Icons.keyboard_double_arrow_left_rounded,
-                  AppSidebarState.collapsed => Icons.visibility_off_outlined,
-                  AppSidebarState.hidden =>
-                    Icons.keyboard_double_arrow_right_rounded,
-                },
-                label: collapseLabel,
-                onTap: onCycleSidebarState,
-              ),
-            ],
+    if (isCollapsed) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(height: 1, color: palette.sidebarBorder),
+          const SizedBox(height: AppSpacing.xs),
+          _SidebarLanguageButton(
+            appLanguage: appLanguage,
+            compact: true,
+            tooltip: appText('切换语言', 'Toggle language'),
+            onPressed: onToggleLanguage,
           ),
-        const SizedBox(height: 8),
-        if (isCollapsed)
-          Tooltip(
-            message: appText('账号', 'Account'),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(18),
-              onTap: onOpenAccount,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: accountSelected
-                      ? palette.accentMuted
-                      : palette.surfaceSecondary,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: palette.strokeSoft),
-                ),
-                child: const Icon(Icons.account_circle_rounded),
-              ),
+          const SizedBox(height: AppSpacing.xs),
+          _SidebarActionButton(
+            icon: themeMode == ThemeMode.dark
+                ? Icons.dark_mode_rounded
+                : themeMode == ThemeMode.light
+                ? Icons.light_mode_rounded
+                : Icons.brightness_auto_rounded,
+            tooltip: themeToggleTooltip,
+            onPressed: onOpenThemeToggle,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          if (showCollapseControl) ...[
+            _SidebarActionButton(
+              icon: _sidebarStateIcon(sidebarState),
+              tooltip: _sidebarStateLabel(sidebarState),
+              onPressed: onCycleSidebarState,
             ),
-          )
-        else
+            const SizedBox(height: AppSpacing.xs),
+          ],
+          _SidebarActionButton(
+            icon: Icons.tune_rounded,
+            tooltip: appText('设置', 'Settings'),
+            onPressed: onOpenSettings,
+          ),
+          const SizedBox(height: AppSpacing.xs),
           _SidebarAccountTile(
             selected: accountSelected,
             onTap: onOpenAccount,
             name: accountName,
             subtitle: accountSubtitle,
           ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(height: 1, color: palette.sidebarBorder),
+        const SizedBox(height: AppSpacing.xs),
+        _SidebarNavItem(
+          section: WorkspaceDestination.settings,
+          selected: currentSection == WorkspaceDestination.settings,
+          collapsed: false,
+          emphasis: _SidebarItemEmphasis.secondary,
+          favorite: false,
+          showFavoriteToggle: false,
+          onTap: onOpenSettings,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Row(
+          children: [
+            Expanded(
+              child: _SidebarLanguageButton(
+                appLanguage: appLanguage,
+                compact: false,
+                tooltip: appText('切换语言', 'Toggle language'),
+                onPressed: onToggleLanguage,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            _SidebarActionButton(
+              icon: themeMode == ThemeMode.dark
+                  ? Icons.dark_mode_rounded
+                  : themeMode == ThemeMode.light
+                  ? Icons.light_mode_rounded
+                  : Icons.brightness_auto_rounded,
+              tooltip: themeToggleTooltip,
+              onPressed: onOpenThemeToggle,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            if (showCollapseControl)
+              _SidebarActionButton(
+                icon: _sidebarStateIcon(sidebarState),
+                tooltip: _sidebarStateLabel(sidebarState),
+                onPressed: onCycleSidebarState,
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        _SidebarAccountTile(
+          selected: accountSelected,
+          onTap: onOpenAccount,
+          name: accountName,
+          subtitle: accountSubtitle,
+        ),
       ],
     );
   }
+
+  IconData _sidebarStateIcon(AppSidebarState state) {
+    return switch (state) {
+      AppSidebarState.expanded => Icons.view_sidebar_rounded,
+      AppSidebarState.collapsed => Icons.menu_rounded,
+      AppSidebarState.hidden => Icons.view_sidebar_rounded,
+    };
+  }
+
+  String _sidebarStateLabel(AppSidebarState state) {
+    return switch (state) {
+      AppSidebarState.expanded => appText('收起侧边栏', 'Collapse sidebar'),
+      AppSidebarState.collapsed => appText('展开侧边栏', 'Expand sidebar'),
+      AppSidebarState.hidden => appText('展开侧边栏', 'Expand sidebar'),
+    };
+  }
 }
 
-class _SidebarFooterActionTile extends StatefulWidget {
-  const _SidebarFooterActionTile({
+enum _SidebarItemEmphasis { primary, secondary }
+
+class _SidebarActionButton extends StatefulWidget {
+  const _SidebarActionButton({
     required this.icon,
-    required this.label,
-    required this.onTap,
-    this.trailingText,
+    this.tooltip,
+    required this.onPressed,
   });
 
   final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final String? trailingText;
+  final String? tooltip;
+  final VoidCallback onPressed;
 
   @override
-  State<_SidebarFooterActionTile> createState() =>
-      _SidebarFooterActionTileState();
+  State<_SidebarActionButton> createState() => _SidebarActionButtonState();
 }
 
-class _SidebarFooterActionTileState extends State<_SidebarFooterActionTile> {
+class _SidebarActionButtonState extends State<_SidebarActionButton> {
   bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final background = _hovered ? palette.hover : Colors.transparent;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Align(
-        alignment: Alignment.centerLeft,
+    return Tooltip(
+      message: widget.tooltip ?? '',
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           decoration: BoxDecoration(
-            color: _hovered ? palette.hover : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            color: background,
+            borderRadius: BorderRadius.circular(AppRadius.button),
           ),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: widget.onTap,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(widget.icon, size: 20, color: palette.textSecondary),
-                    const SizedBox(width: 8),
-                    Text(
-                      widget.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
-                    if (widget.trailingText != null) ...[
-                      const SizedBox(width: 12),
-                      Text(
-                        widget.trailingText!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: palette.textSecondary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ],
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              onTap: widget.onPressed,
+              child: Container(
+                height: AppSizes.sidebarItemHeight,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                child: Center(
+                  child: Icon(
+                    widget.icon,
+                    size: AppSizes.sidebarIconSize,
+                    color: palette.textSecondary,
+                  ),
                 ),
               ),
             ),
@@ -530,27 +707,28 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
           duration: const Duration(milliseconds: 160),
           decoration: BoxDecoration(
             color: background,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.button),
           ),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.button),
               onTap: widget.onTap,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Container(
+                height: AppSizes.sidebarItemHeight,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                 child: Row(
                   mainAxisSize: MainAxisSize.max,
                   children: [
                     CircleAvatar(
-                      radius: 16,
+                      radius: 14,
                       child: Text(
                         widget.name.trim().isEmpty
                             ? 'X'
                             : widget.name.trim().substring(0, 1).toUpperCase(),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.xs),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -562,7 +740,7 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.labelLarge,
                           ),
-                          const SizedBox(height: 1),
+                          const SizedBox(height: 2),
                           Text(
                             widget.subtitle,
                             maxLines: 1,
@@ -587,11 +765,13 @@ class _SidebarLanguageButton extends StatefulWidget {
   const _SidebarLanguageButton({
     required this.appLanguage,
     required this.compact,
+    required this.tooltip,
     required this.onPressed,
   });
 
   final AppLanguage appLanguage;
   final bool compact;
+  final String tooltip;
   final VoidCallback onPressed;
 
   @override
@@ -604,29 +784,32 @@ class _SidebarLanguageButtonState extends State<_SidebarLanguageButton> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final size = widget.compact ? 44.0 : 58.0;
+    final size = widget.compact ? AppSizes.sidebarItemHeight : 44.0;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: widget.onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          width: size,
-          height: size,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: _hovered ? palette.hover : palette.surfaceSecondary,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: palette.strokeSoft),
-          ),
-          child: Text(
-            widget.appLanguage.compactLabel,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: palette.textPrimary,
-              fontWeight: FontWeight.w700,
+      child: Tooltip(
+        message: widget.tooltip,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.button),
+          onTap: widget.onPressed,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: size,
+            height: size,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: _hovered ? palette.hover : palette.surfaceSecondary,
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              border: Border.all(color: palette.strokeSoft),
+            ),
+            child: Text(
+              widget.appLanguage.compactLabel,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: palette.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
