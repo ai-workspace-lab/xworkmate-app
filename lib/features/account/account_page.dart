@@ -4,6 +4,7 @@ import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
+import '../../runtime/runtime_models.dart';
 import '../../widgets/section_tabs.dart';
 import '../../widgets/surface_card.dart';
 import '../../widgets/top_bar.dart';
@@ -19,11 +20,80 @@ class AccountPage extends StatefulWidget {
 
 class _AccountPageState extends State<AccountPage> {
   AccountTab _tab = AccountTab.profile;
+  late final TextEditingController _accountBaseUrlController;
+  late final TextEditingController _accountUsernameController;
+  late final TextEditingController _accountWorkspaceController;
+  String _lastSavedAccountBaseUrl = '';
+  String _lastSavedAccountUsername = '';
+  String _lastSavedAccountWorkspace = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final settings = widget.controller.settings;
+    _lastSavedAccountBaseUrl = settings.accountBaseUrl;
+    _lastSavedAccountUsername = settings.accountUsername;
+    _lastSavedAccountWorkspace = settings.accountWorkspace;
+    _accountBaseUrlController = TextEditingController(
+      text: _lastSavedAccountBaseUrl,
+    );
+    _accountUsernameController = TextEditingController(
+      text: _lastSavedAccountUsername,
+    );
+    _accountWorkspaceController = TextEditingController(
+      text: _lastSavedAccountWorkspace,
+    );
+  }
+
+  @override
+  void dispose() {
+    _accountBaseUrlController.dispose();
+    _accountUsernameController.dispose();
+    _accountWorkspaceController.dispose();
+    super.dispose();
+  }
+
+  void _syncControllers(SettingsSnapshot settings) {
+    if (_accountBaseUrlController.text == _lastSavedAccountBaseUrl &&
+        settings.accountBaseUrl != _lastSavedAccountBaseUrl) {
+      _accountBaseUrlController.text = settings.accountBaseUrl;
+    }
+    if (_accountUsernameController.text == _lastSavedAccountUsername &&
+        settings.accountUsername != _lastSavedAccountUsername) {
+      _accountUsernameController.text = settings.accountUsername;
+    }
+    if (_accountWorkspaceController.text == _lastSavedAccountWorkspace &&
+        settings.accountWorkspace != _lastSavedAccountWorkspace) {
+      _accountWorkspaceController.text = settings.accountWorkspace;
+    }
+    _lastSavedAccountBaseUrl = settings.accountBaseUrl;
+    _lastSavedAccountUsername = settings.accountUsername;
+    _lastSavedAccountWorkspace = settings.accountWorkspace;
+  }
+
+  Future<void> _saveProfile(SettingsSnapshot settings) async {
+    final nextSettings = settings.copyWith(
+      accountBaseUrl: _accountBaseUrlController.text.trim(),
+      accountUsername: _accountUsernameController.text.trim(),
+    );
+    await widget.controller.saveSettings(nextSettings);
+    _lastSavedAccountBaseUrl = nextSettings.accountBaseUrl;
+    _lastSavedAccountUsername = nextSettings.accountUsername;
+  }
+
+  Future<void> _saveWorkspace(SettingsSnapshot settings) async {
+    final nextSettings = settings.copyWith(
+      accountWorkspace: _accountWorkspaceController.text.trim(),
+    );
+    await widget.controller.saveSettings(nextSettings);
+    _lastSavedAccountWorkspace = nextSettings.accountWorkspace;
+  }
 
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
     final settings = controller.settings;
+    _syncControllers(settings);
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
@@ -85,24 +155,28 @@ class _AccountPageState extends State<AccountPage> {
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
-                        key: ValueKey(settings.accountBaseUrl),
-                        initialValue: settings.accountBaseUrl,
+                        key: const ValueKey('account-base-url-field'),
+                        controller: _accountBaseUrlController,
                         decoration: InputDecoration(
                           labelText: appText('服务地址', 'Service URL'),
                         ),
-                        onFieldSubmitted: (value) => controller.saveSettings(
-                          settings.copyWith(accountBaseUrl: value),
-                        ),
+                        onFieldSubmitted: (_) => _saveProfile(settings),
                       ),
                       const SizedBox(height: 14),
                       TextFormField(
-                        key: ValueKey(settings.accountUsername),
-                        initialValue: settings.accountUsername,
+                        key: const ValueKey('account-username-field'),
+                        controller: _accountUsernameController,
                         decoration: InputDecoration(
                           labelText: appText('邮箱 / 用户名', 'Email / Username'),
                         ),
-                        onFieldSubmitted: (value) => controller.saveSettings(
-                          settings.copyWith(accountUsername: value),
+                        onFieldSubmitted: (_) => _saveProfile(settings),
+                      ),
+                      const SizedBox(height: 16),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilledButton(
+                          onPressed: () => _saveProfile(settings),
+                          child: Text(appText('保存本地入口', 'Save Local Entry')),
                         ),
                       ),
                     ],
@@ -126,13 +200,19 @@ class _AccountPageState extends State<AccountPage> {
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
-                        key: ValueKey(settings.accountWorkspace),
-                        initialValue: settings.accountWorkspace,
+                        key: const ValueKey('account-workspace-field'),
+                        controller: _accountWorkspaceController,
                         decoration: InputDecoration(
                           labelText: appText('工作区名称', 'Workspace Label'),
                         ),
-                        onFieldSubmitted: (value) => controller.saveSettings(
-                          settings.copyWith(accountWorkspace: value),
+                        onFieldSubmitted: (_) => _saveWorkspace(settings),
+                      ),
+                      const SizedBox(height: 16),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilledButton(
+                          onPressed: () => _saveWorkspace(settings),
+                          child: Text(appText('保存工作区', 'Save Workspace')),
                         ),
                       ),
                     ],
