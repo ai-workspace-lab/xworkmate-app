@@ -7,7 +7,7 @@ PNPM ?= pnpm
 DART ?= dart
 DEVICE ?= macos
 
-.PHONY: help deps analyze test check format run build-macos build-ios-sim package-mac install-mac clean
+.PHONY: help deps analyze test check format run build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -29,11 +29,23 @@ format: ## Format Dart sources
 run: ## Run the app on a device or desktop target (DEVICE=macos by default)
 	$(FLUTTER) run -d $(DEVICE)
 
+build-linux: ## Build the Linux app in release mode
+	$(FLUTTER) build linux --release
+
 build-macos: ## Build the macOS app in release mode
 	$(FLUTTER) build macos --release
 
 build-ios-sim: ## Build the iOS app for the simulator
 	$(FLUTTER) build ios --simulator
+
+package-deb: ## Create the Linux .deb package
+	bash scripts/package-linux-deb.sh
+
+package-rpm: ## Create the Linux .rpm package
+	bash scripts/package-linux-rpm.sh
+
+package-linux: ## Create both Linux packages
+	bash scripts/package-linux.sh
 
 package-mac: ## Create the macOS .app and DMG
 	bash scripts/package-flutter-mac-app.sh

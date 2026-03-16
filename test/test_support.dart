@@ -4,10 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/theme/app_theme.dart';
+import 'package:xworkmate/runtime/desktop_platform_service.dart';
 
-Future<AppController> createTestController(WidgetTester tester) async {
+Future<AppController> createTestController(
+  WidgetTester tester, {
+  DesktopPlatformService? desktopPlatformService,
+}) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
-  final controller = AppController();
+  final controller = AppController(
+    desktopPlatformService: desktopPlatformService,
+  );
   addTearDown(controller.dispose);
   await tester.pump(const Duration(milliseconds: 100));
   await tester.pumpAndSettle();

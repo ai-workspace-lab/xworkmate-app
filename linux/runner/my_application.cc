@@ -5,11 +5,13 @@
 #include <gdk/gdkx.h>
 #endif
 
+#include "desktop_platform_channel.h"
 #include "flutter/generated_plugin_registrant.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
+  DesktopPlatformChannel* desktop_platform_channel;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
@@ -75,6 +77,8 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+  self->desktop_platform_channel =
+      desktop_platform_channel_new(self, window, view);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
@@ -111,9 +115,10 @@ static void my_application_startup(GApplication* application) {
 
 // Implements GApplication::shutdown.
 static void my_application_shutdown(GApplication* application) {
-  // MyApplication* self = MY_APPLICATION(object);
+  MyApplication* self = MY_APPLICATION(application);
 
-  // Perform any actions required at application shutdown.
+  desktop_platform_channel_free(self->desktop_platform_channel);
+  self->desktop_platform_channel = nullptr;
 
   G_APPLICATION_CLASS(my_application_parent_class)->shutdown(application);
 }
