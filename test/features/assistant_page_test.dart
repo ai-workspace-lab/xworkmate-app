@@ -164,7 +164,7 @@ void main() {
     expect(find.text('Gateway 访问'), findsOneWidget);
   });
 
-  testWidgets('AssistantPage uses persistent composer with suggestion chips', (
+  testWidgets('AssistantPage keeps a minimal composer action menu', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
@@ -175,17 +175,18 @@ void main() {
     );
 
     expect(find.textContaining('Claw'), findsNothing);
-    expect(find.text('幻灯片'), findsOneWidget);
+    expect(find.text('幻灯片'), findsNothing);
+    expect(find.text('视频生成'), findsNothing);
+    expect(find.text('深度研究'), findsNothing);
+    expect(find.text('自动化'), findsNothing);
     expect(find.textContaining('输入需求、补充上下文、继续追问'), findsOneWidget);
 
-    await tester.ensureVisible(
-      find.byKey(const ValueKey<String>('assistant-suggestion-幻灯片')),
-    );
-    await tester.tap(
-      find.byKey(const ValueKey<String>('assistant-suggestion-幻灯片')),
-    );
+    await tester.tap(find.byTooltip('输入区操作'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('帮我整理一份演示文稿'), findsOneWidget);
+    expect(find.text('添加照片和文件'), findsOneWidget);
+    expect(find.text('计划模式'), findsNothing);
+    expect(find.text('连接网关'), findsNothing);
+    expect(find.text('浏览器 / 编码 / 研究'), findsNothing);
   });
 }

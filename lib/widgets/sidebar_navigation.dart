@@ -85,9 +85,13 @@ class SidebarNavigation extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.sidebar,
         borderRadius: BorderRadius.circular(AppRadius.sidebar),
-        border: Border.all(
-          color: palette.sidebarBorder.withValues(alpha: 0.72),
-        ),
+        boxShadow: [
+          BoxShadow(
+            color: palette.shadow.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -190,9 +194,15 @@ class SidebarHeader extends StatelessWidget {
       width: isCollapsed ? AppSizes.sidebarItemHeight : 36,
       height: isCollapsed ? AppSizes.sidebarItemHeight : 36,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         color: palette.surfaceSecondary,
-        border: Border.all(color: palette.strokeSoft),
+        boxShadow: [
+          BoxShadow(
+            color: palette.shadow.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Icon(
         Icons.crop_square_rounded,
@@ -320,13 +330,15 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
     final theme = Theme.of(context);
     final isPrimary = widget.emphasis == _SidebarItemEmphasis.primary;
     final background = widget.selected
-        ? palette.accentMuted
+        ? palette.surfacePrimary
         : _hovered
-        ? palette.hover
+        ? palette.surfaceTertiary
         : Colors.transparent;
-    final iconColor = widget.selected ? palette.accent : palette.textSecondary;
-    final height = isPrimary ? 46.0 : AppSizes.sidebarItemHeight;
-    final radius = isPrimary ? 14.0 : AppRadius.button;
+    final iconColor = widget.selected
+        ? palette.textPrimary
+        : palette.textSecondary;
+    final height = isPrimary ? 48.0 : AppSizes.sidebarItemHeight;
+    final radius = isPrimary ? 16.0 : AppRadius.button;
 
     return Tooltip(
       message: widget.collapsed ? _sectionLabel(widget.section) : '',
@@ -338,6 +350,15 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
           decoration: BoxDecoration(
             color: background,
             borderRadius: BorderRadius.circular(radius),
+            boxShadow: widget.selected
+                ? [
+                    BoxShadow(
+                      color: palette.shadow.withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : const [],
           ),
           child: Material(
             color: Colors.transparent,
@@ -350,7 +371,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                 child: widget.collapsed
                     ? Center(
                         child: Icon(
-                          _sectionIcon(widget.section),
+                          _sectionIcon(widget.section, active: widget.selected),
                           size: AppSizes.sidebarIconSize,
                           color: iconColor,
                         ),
@@ -360,7 +381,10 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                           SizedBox(
                             width: isPrimary ? 28 : 24,
                             child: Icon(
-                              _sectionIcon(widget.section),
+                              _sectionIcon(
+                                widget.section,
+                                active: widget.selected,
+                              ),
                               size: AppSizes.sidebarIconSize,
                               color: iconColor,
                             ),
@@ -418,19 +442,44 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
     );
   }
 
-  IconData _sectionIcon(WorkspaceDestination section) {
+  IconData _sectionIcon(
+    WorkspaceDestination section, {
+    required bool active,
+  }) {
     return switch (section) {
-      WorkspaceDestination.assistant => Icons.edit_outlined,
-      WorkspaceDestination.tasks => Icons.schedule_rounded,
-      WorkspaceDestination.skills => Icons.blur_on_rounded,
-      WorkspaceDestination.nodes => Icons.developer_board_rounded,
-      WorkspaceDestination.agents => Icons.hub_rounded,
-      WorkspaceDestination.mcpServer => Icons.dns_rounded,
-      WorkspaceDestination.clawHub => Icons.extension_rounded,
-      WorkspaceDestination.secrets => Icons.key_rounded,
-      WorkspaceDestination.aiGateway => Icons.smart_toy_rounded,
-      WorkspaceDestination.settings => Icons.tune_rounded,
-      WorkspaceDestination.account => Icons.account_circle_rounded,
+      WorkspaceDestination.assistant => active
+          ? Icons.chat_bubble_rounded
+          : Icons.chat_bubble_outline_rounded,
+      WorkspaceDestination.tasks => active
+          ? Icons.layers_rounded
+          : Icons.layers_outlined,
+      WorkspaceDestination.skills => active
+          ? Icons.auto_awesome_rounded
+          : Icons.auto_awesome_outlined,
+      WorkspaceDestination.nodes => active
+          ? Icons.developer_board_rounded
+          : Icons.developer_board_outlined,
+      WorkspaceDestination.agents => active
+          ? Icons.hub_rounded
+          : Icons.hub_outlined,
+      WorkspaceDestination.mcpServer => active
+          ? Icons.dns_rounded
+          : Icons.dns_outlined,
+      WorkspaceDestination.clawHub => active
+          ? Icons.extension_rounded
+          : Icons.extension_outlined,
+      WorkspaceDestination.secrets => active
+          ? Icons.key_rounded
+          : Icons.key_outlined,
+      WorkspaceDestination.aiGateway => active
+          ? Icons.smart_toy_rounded
+          : Icons.smart_toy_outlined,
+      WorkspaceDestination.settings => active
+          ? Icons.settings_rounded
+          : Icons.settings_outlined,
+      WorkspaceDestination.account => active
+          ? Icons.account_circle_rounded
+          : Icons.account_circle_outlined,
     };
   }
 
@@ -498,7 +547,7 @@ class SidebarFooter extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(height: 1, color: palette.sidebarBorder),
+          Container(height: 1, color: palette.sidebarBorder.withValues(alpha: 0.7)),
           const SizedBox(height: AppSpacing.xs),
           _SidebarLanguageButton(
             appLanguage: appLanguage,
@@ -555,7 +604,7 @@ class SidebarFooter extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(height: 1, color: palette.sidebarBorder),
+        Container(height: 1, color: palette.sidebarBorder.withValues(alpha: 0.7)),
         const SizedBox(height: AppSpacing.xs),
         _SidebarNavItem(
           section: WorkspaceDestination.settings,
@@ -649,7 +698,7 @@ class _SidebarActionButtonState extends State<_SidebarActionButton> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final background = _hovered ? palette.hover : Colors.transparent;
+    final resolvedBackground = _hovered ? palette.surfaceTertiary : palette.surfaceSecondary;
 
     return Tooltip(
       message: widget.tooltip ?? '',
@@ -659,8 +708,15 @@ class _SidebarActionButtonState extends State<_SidebarActionButton> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           decoration: BoxDecoration(
-            color: background,
+            color: resolvedBackground,
             borderRadius: BorderRadius.circular(AppRadius.button),
+            boxShadow: [
+              BoxShadow(
+                color: palette.shadow.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Material(
             color: Colors.transparent,
@@ -714,9 +770,9 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final background = widget.selected
-        ? palette.accentMuted
+        ? palette.surfacePrimary
         : _hovered
-        ? palette.hover
+        ? palette.surfaceTertiary
         : Colors.transparent;
 
     return MouseRegion(
@@ -729,6 +785,15 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
           decoration: BoxDecoration(
             color: background,
             borderRadius: BorderRadius.circular(AppRadius.button),
+            boxShadow: widget.selected
+                ? [
+                    BoxShadow(
+                      color: palette.shadow.withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : const [],
           ),
           child: Material(
             color: Colors.transparent,
@@ -746,6 +811,7 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
                   children: [
                     CircleAvatar(
                       radius: 14,
+                      backgroundColor: palette.accentMuted,
                       child: Text(
                         widget.name.trim().isEmpty
                             ? 'X'
@@ -836,9 +902,15 @@ class _SidebarLanguageButtonState extends State<_SidebarLanguageButton> {
             height: size,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: _hovered ? palette.hover : palette.surfaceSecondary,
+              color: _hovered ? palette.surfaceTertiary : palette.surfaceSecondary,
               borderRadius: BorderRadius.circular(AppRadius.button),
-              border: Border.all(color: palette.strokeSoft),
+              boxShadow: [
+                BoxShadow(
+                  color: palette.shadow.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Text(
               widget.appLanguage.compactLabel,

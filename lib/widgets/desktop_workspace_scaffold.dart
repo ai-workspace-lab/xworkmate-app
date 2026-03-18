@@ -95,12 +95,22 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
               ),
             ),
           Expanded(
-            child: Container(
+            child: DecoratedBox(
               decoration: BoxDecoration(
                 color: palette.surfacePrimary,
-                border: Border.all(color: palette.strokeSoft),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: palette.shadow.withValues(alpha: 0.06),
+                    blurRadius: 16,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: child,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: child,
+              ),
             ),
           ),
         ],

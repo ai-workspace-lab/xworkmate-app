@@ -14,18 +14,18 @@ class StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final tone = switch (status.tone) {
-      StatusTone.neutral => (palette.surfaceTertiary, palette.textSecondary),
+      StatusTone.neutral => (palette.surfaceSecondary, palette.textSecondary),
       StatusTone.accent => (palette.accentMuted, palette.accent),
       StatusTone.success => (
-        palette.success.withValues(alpha: 0.14),
+        palette.surfacePrimary,
         palette.success,
       ),
       StatusTone.warning => (
-        palette.warning.withValues(alpha: 0.14),
+        palette.surfacePrimary,
         palette.warning,
       ),
       StatusTone.danger => (
-        palette.danger.withValues(alpha: 0.14),
+        palette.surfacePrimary,
         palette.danger,
       ),
     };
@@ -38,12 +38,19 @@ class StatusBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: tone.$1,
         borderRadius: BorderRadius.circular(AppRadius.badge),
+        boxShadow: [
+          BoxShadow(
+            color: palette.shadow.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Text(
         status.label,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
           color: tone.$2,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

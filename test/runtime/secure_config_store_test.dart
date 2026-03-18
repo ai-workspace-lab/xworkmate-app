@@ -11,7 +11,19 @@ void main() {
     'SecureConfigStore persists settings and secure refs in test runners',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final store = SecureConfigStore();
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final databasePath = '${tempDirectory.path}/settings.sqlite3';
+      final store = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
 
       final snapshot = SettingsSnapshot.defaults().copyWith(
         accountUsername: 'tester',
@@ -59,6 +71,95 @@ void main() {
       expect(secureRefs['ai_gateway_api_key'], 'ai-gateway-secret');
       expect(SecureConfigStore.maskValue('token-secret'), 'tok••••ret');
       expect(SecureConfigStore.maskValue(''), 'Not set');
+    },
+  );
+
+  test(
+    'SecureConfigStore persists sqlite-backed settings across instances',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-cross-instance-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final databasePath = '${tempDirectory.path}/settings.sqlite3';
+
+      final snapshot = SettingsSnapshot.defaults().copyWith(
+        accountUsername: 'sqlite-user',
+        accountWorkspace: 'sqlite-workspace',
+        gateway: GatewayConnectionProfile.defaults().copyWith(
+          host: 'sqlite.example.com',
+          port: 443,
+        ),
+      );
+      final entry = SecretAuditEntry(
+        timeLabel: '10:00',
+        action: 'Updated',
+        provider: 'Vault',
+        target: 'vault_token',
+        module: 'Settings',
+        status: 'Success',
+      );
+
+      final firstStore = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await firstStore.saveSettingsSnapshot(snapshot);
+      await firstStore.appendAudit(entry);
+
+      final secondStore = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final loadedSnapshot = await secondStore.loadSettingsSnapshot();
+      final loadedAudit = await secondStore.loadAuditTrail();
+
+      expect(loadedSnapshot.accountUsername, 'sqlite-user');
+      expect(loadedSnapshot.accountWorkspace, 'sqlite-workspace');
+      expect(loadedSnapshot.gateway.host, 'sqlite.example.com');
+      expect(loadedAudit, hasLength(1));
+      expect(loadedAudit.first.provider, 'Vault');
+      expect(loadedAudit.first.target, 'vault_token');
+    },
+  );
+
+  test(
+    'SecureConfigStore dispose closes sqlite handle and allows reopening the same database path',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-dispose-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final databasePath = '${tempDirectory.path}/settings.sqlite3';
+      final firstStore = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final snapshot = SettingsSnapshot.defaults().copyWith(
+        accountUsername: 'dispose-user',
+      );
+
+      await firstStore.saveSettingsSnapshot(snapshot);
+      firstStore.dispose();
+      firstStore.dispose();
+
+      final secondStore = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final reloadedSnapshot = await secondStore.loadSettingsSnapshot();
+
+      expect(reloadedSnapshot.accountUsername, 'dispose-user');
     },
   );
 

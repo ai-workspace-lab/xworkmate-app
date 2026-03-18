@@ -7,6 +7,7 @@ import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../widgets/desktop_workspace_scaffold.dart';
 import '../../widgets/status_badge.dart';
+import '../../widgets/surface_card.dart';
 
 class SkillsPage extends StatefulWidget {
   const SkillsPage({
@@ -101,33 +102,37 @@ class _SkillsPageState extends State<SkillsPage> {
               ),
             ],
           ),
-          child: Container(
-            margin: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(color: context.palette.strokeSoft),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 360,
-                  child: _SkillsListPanel(
-                    skills: skills,
-                    selectedSkillKey: selected?.skillKey,
-                    onSelectSkill: (skill) {
-                      setState(() {
-                        _selectedSkillKey = skill.skillKey;
-                      });
-                    },
-                  ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: SurfaceCard(
+              padding: EdgeInsets.zero,
+              borderRadius: 20,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 360,
+                      child: _SkillsListPanel(
+                        skills: skills,
+                        selectedSkillKey: selected?.skillKey,
+                        onSelectSkill: (skill) {
+                          setState(() {
+                            _selectedSkillKey = skill.skillKey;
+                          });
+                        },
+                      ),
+                    ),
+                    Container(width: 1, color: context.palette.strokeSoft),
+                    Expanded(
+                      child: _SkillDetailPanel(
+                        controller: controller,
+                        selected: selected,
+                      ),
+                    ),
+                  ],
                 ),
-                Container(width: 1, color: context.palette.strokeSoft),
-                Expanded(
-                  child: _SkillDetailPanel(
-                    controller: controller,
-                    selected: selected,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );
@@ -249,15 +254,25 @@ class _SkillListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     return Material(
-      color: selected ? palette.accentMuted.withValues(alpha: 0.4) : null,
+      color: selected ? palette.surfacePrimary : Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            border: Border.all(
-              color: selected ? palette.accent : palette.strokeSoft,
-            ),
+            borderRadius: BorderRadius.circular(18),
+            color: selected ? palette.surfaceSecondary : Colors.transparent,
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: palette.shadow.withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : const [],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,7 +412,14 @@ class _SkillDetailPanel extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: palette.surfaceSecondary,
-              border: Border.all(color: palette.strokeSoft),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: palette.shadow.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -464,7 +486,14 @@ class _DependencyCard extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: palette.surfaceSecondary,
-        border: Border.all(color: palette.strokeSoft),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: palette.shadow.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -4,15 +4,24 @@ import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'runtime_models.dart';
 
 class SecureConfigStore {
-  SecureConfigStore({Future<String?> Function()? fallbackDirectoryPathResolver})
-    : _fallbackDirectoryPathResolver = fallbackDirectoryPathResolver;
+  SecureConfigStore({
+    Future<String?> Function()? fallbackDirectoryPathResolver,
+    Future<String?> Function()? databasePathResolver,
+    bool enableSecureStorage = true,
+  }) : _fallbackDirectoryPathResolver = fallbackDirectoryPathResolver,
+       _databasePathResolver = databasePathResolver,
+       _enableSecureStorage = enableSecureStorage;
 
   static const _settingsKey = 'xworkmate.settings.snapshot';
   static const _auditKey = 'xworkmate.secrets.audit';
+  static const _databaseFileName = 'config-store.sqlite3';
+  static const _databaseTableName = 'config_entries';
+  static const _secureStorageTimeout = Duration(milliseconds: 400);
 
   static const _gatewayTokenKey = 'xworkmate.gateway.token';
   static const _gatewayPasswordKey = 'xworkmate.gateway.password';
@@ -27,10 +36,13 @@ class SecureConfigStore {
   static const _aiGatewayApiKeyKey = 'xworkmate.ai_gateway.api_key';
 
   SharedPreferences? _prefs;
+  sqlite.Database? _database;
   FlutterSecureStorage? _secureStorage;
-  final Map<String, Object?> _memoryPrefs = <String, Object?>{};
+  final Map<String, String> _memoryStore = <String, String>{};
   final Map<String, String> _memorySecure = <String, String>{};
   final Future<String?> Function()? _fallbackDirectoryPathResolver;
+  final Future<String?> Function()? _databasePathResolver;
+  final bool _enableSecureStorage;
   bool _initialized = false;
 
   Future<void> initialize() async {
@@ -42,27 +54,32 @@ class SecureConfigStore {
     } catch (_) {
       _prefs = null;
     }
-    try {
-      _secureStorage = const FlutterSecureStorage();
-    } catch (_) {
-      _secureStorage = null;
+    await _initializeDatabase();
+    if (_enableSecureStorage) {
+      try {
+        _secureStorage = const FlutterSecureStorage();
+      } catch (_) {
+        _secureStorage = null;
+      }
     }
     _initialized = true;
   }
 
   Future<SettingsSnapshot> loadSettingsSnapshot() async {
     await initialize();
-    return SettingsSnapshot.fromJsonString(await _readPrefString(_settingsKey));
+    return SettingsSnapshot.fromJsonString(
+      await _readStoredString(_settingsKey),
+    );
   }
 
   Future<void> saveSettingsSnapshot(SettingsSnapshot snapshot) async {
     await initialize();
-    await _writePrefString(_settingsKey, snapshot.toJsonString());
+    await _writeStoredString(_settingsKey, snapshot.toJsonString());
   }
 
   Future<List<SecretAuditEntry>> loadAuditTrail() async {
     await initialize();
-    final raw = await _readPrefString(_auditKey);
+    final raw = await _readStoredString(_auditKey);
     if (raw == null || raw.trim().isEmpty) {
       return const [];
     }
@@ -86,7 +103,7 @@ class SecureConfigStore {
     if (items.length > 40) {
       items.removeRange(40, items.length);
     }
-    await _writePrefString(
+    await _writeStoredString(
       _auditKey,
       jsonEncode(items.map((item) => item.toJson()).toList(growable: false)),
     );
@@ -237,27 +254,151 @@ class SecureConfigStore {
     };
   }
 
-  Future<String?> _readPrefString(String key) async {
-    if (_prefs != null) {
-      return _prefs!.getString(key);
+  Future<void> _initializeDatabase() async {
+    final resolvedPath = await _resolveDatabasePath();
+    if (resolvedPath != null && resolvedPath.trim().isNotEmpty) {
+      try {
+        final file = File(resolvedPath);
+        await file.parent.create(recursive: true);
+        final database = sqlite.sqlite3.open(file.path);
+        _configureDatabase(database);
+        _database = database;
+      } catch (_) {
+        _database = null;
+      }
     }
-    final value = _memoryPrefs[key];
-    return value is String ? value : null;
+    if (_database == null) {
+      try {
+        final database = sqlite.sqlite3.openInMemory();
+        _configureDatabase(database);
+        _database = database;
+      } catch (_) {
+        _database = null;
+      }
+    }
+    await _migrateLegacyPrefs();
   }
 
-  Future<void> _writePrefString(String key, String value) async {
-    if (_prefs != null) {
-      await _prefs!.setString(key, value);
+  void _configureDatabase(sqlite.Database database) {
+    database.execute('''
+      CREATE TABLE IF NOT EXISTS $_databaseTableName (
+        storage_key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at_ms INTEGER NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _migrateLegacyPrefs() async {
+    if (_database == null || _prefs == null) {
       return;
     }
-    _memoryPrefs[key] = value;
+    await _migrateLegacyPrefEntry(_settingsKey);
+    await _migrateLegacyPrefEntry(_auditKey);
+  }
+
+  Future<void> _migrateLegacyPrefEntry(String key) async {
+    if (_database == null || _prefs == null) {
+      return;
+    }
+    try {
+      final existing = _database!.select(
+        'SELECT value FROM $_databaseTableName WHERE storage_key = ? LIMIT 1',
+        <Object?>[key],
+      );
+      if (existing.isNotEmpty) {
+        return;
+      }
+      final legacyValue = _prefs!.getString(key);
+      if (legacyValue == null || legacyValue.trim().isEmpty) {
+        return;
+      }
+      _writeStoredStringInternal(key, legacyValue);
+    } catch (_) {
+      return;
+    }
+  }
+
+  Future<String?> _resolveDatabasePath() async {
+    try {
+      final resolvedPath = await _databasePathResolver?.call();
+      final trimmed = resolvedPath?.trim() ?? '';
+      if (trimmed.isNotEmpty) {
+        return trimmed;
+      }
+    } catch (_) {
+      // Fall through to the default locations.
+    }
+    try {
+      final supportDirectory = await getApplicationSupportDirectory();
+      return '${supportDirectory.path}/xworkmate/$_databaseFileName';
+    } catch (_) {
+      final fallbackRoot = await _fallbackDirectoryPathResolver?.call();
+      final trimmed = fallbackRoot?.trim() ?? '';
+      if (trimmed.isEmpty) {
+        return null;
+      }
+      return '$trimmed/$_databaseFileName';
+    }
+  }
+
+  Future<String?> _readStoredString(String key) async {
+    if (_database != null) {
+      try {
+        final result = _database!.select(
+          'SELECT value FROM $_databaseTableName WHERE storage_key = ? LIMIT 1',
+          <Object?>[key],
+        );
+        if (result.isNotEmpty) {
+          final value = result.first['value'];
+          if (value is String) {
+            return value;
+          }
+        }
+      } catch (_) {
+        // Fall through to the in-memory fallback.
+      }
+    }
+    return _memoryStore[key];
+  }
+
+  Future<void> _writeStoredString(String key, String value) async {
+    if (_database != null) {
+      try {
+        _writeStoredStringInternal(key, value);
+        return;
+      } catch (_) {
+        // Fall through to the in-memory fallback.
+      }
+    }
+    _memoryStore[key] = value;
+  }
+
+  void _writeStoredStringInternal(String key, String value) {
+    if (_database == null) {
+      _memoryStore[key] = value;
+      return;
+    }
+    _database!.execute(
+      '''
+      INSERT INTO $_databaseTableName (storage_key, value, updated_at_ms)
+      VALUES (?, ?, ?)
+      ON CONFLICT(storage_key) DO UPDATE SET
+        value = excluded.value,
+        updated_at_ms = excluded.updated_at_ms
+      ''',
+      <Object?>[key, value, DateTime.now().millisecondsSinceEpoch],
+    );
   }
 
   Future<String?> _readSecure(String key) async {
     if (_secureStorage != null) {
       try {
-        return await _secureStorage!.read(key: key);
+        return await _secureStorage!
+            .read(key: key)
+            .timeout(_secureStorageTimeout);
       } catch (_) {
+        _secureStorage = null;
         // Fall back to in-memory storage for tests and unsupported runners.
       }
     }
@@ -267,9 +408,12 @@ class SecureConfigStore {
   Future<void> _writeSecure(String key, String value) async {
     if (_secureStorage != null) {
       try {
-        await _secureStorage!.write(key: key, value: value);
+        await _secureStorage!
+            .write(key: key, value: value)
+            .timeout(_secureStorageTimeout);
         return;
       } catch (_) {
+        _secureStorage = null;
         // Fall back to in-memory storage for tests and unsupported runners.
       }
     }
@@ -279,12 +423,30 @@ class SecureConfigStore {
   Future<void> _deleteSecure(String key) async {
     if (_secureStorage != null) {
       try {
-        await _secureStorage!.delete(key: key);
+        await _secureStorage!.delete(key: key).timeout(_secureStorageTimeout);
       } catch (_) {
+        _secureStorage = null;
         // Keep the in-memory fallback in sync.
       }
     }
     _memorySecure.remove(key);
+  }
+
+  void dispose() {
+    final database = _database;
+    _database = null;
+    if (database != null) {
+      try {
+        database.dispose();
+      } catch (_) {
+        // Ignore close errors during teardown.
+      }
+    }
+    _prefs = null;
+    _secureStorage = null;
+    _initialized = false;
+    _memoryStore.clear();
+    _memorySecure.clear();
   }
 
   static String maskValue(String value) {

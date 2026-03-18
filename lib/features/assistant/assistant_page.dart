@@ -389,7 +389,6 @@ class _AssistantPageState extends State<AssistantPage> {
                     : controller.resolvedDefaultModel,
                 modelOptions: controller.aiGatewayModelChoices,
                 attachments: _attachments,
-                autoAgentLabel: _lastAutoAgentLabel,
                 controller: controller,
                 onModeChanged: (value) => setState(() => _mode = value),
                 onThinkingChanged: (value) {
@@ -406,8 +405,6 @@ class _AssistantPageState extends State<AssistantPage> {
                 onOpenGateway: _showConnectDialog,
                 onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
                 onPickAttachments: _pickAttachments,
-                suggestions: _buildSuggestions(controller),
-                onSuggestionSelected: _applySuggestion,
                 onSend: _submitPrompt,
               ),
             ),
@@ -532,105 +529,6 @@ class _AssistantPageState extends State<AssistantPage> {
         ...files.map(_ComposerAttachment.fromXFile),
       ];
     });
-  }
-
-  void _applySuggestion(_AssistantSuggestion suggestion) {
-    final current = _inputController.text.trim();
-    final next = current.isEmpty
-        ? suggestion.prompt
-        : '$current\n${suggestion.prompt}';
-    _inputController.value = TextEditingValue(
-      text: next,
-      selection: TextSelection.collapsed(offset: next.length),
-    );
-    _focusComposer();
-  }
-
-  List<_AssistantSuggestion> _buildSuggestions(AppController controller) {
-    final skillSuggestions = controller.skills
-        .where((item) => !item.disabled)
-        .take(6)
-        .map(_suggestionFromSkill)
-        .whereType<_AssistantSuggestion>()
-        .toList(growable: false);
-    if (skillSuggestions.isNotEmpty) {
-      return skillSuggestions;
-    }
-    return const [
-      _AssistantSuggestion(
-        label: '幻灯片',
-        prompt: '帮我整理一份演示文稿的大纲和页面结构。',
-        icon: Icons.slideshow_outlined,
-      ),
-      _AssistantSuggestion(
-        label: '视频生成',
-        prompt: '帮我规划一个视频脚本、镜头拆解和生成步骤。',
-        icon: Icons.video_library_outlined,
-      ),
-      _AssistantSuggestion(
-        label: '深度研究',
-        prompt: '围绕这个主题先做深度研究，再给我结构化结论。',
-        icon: Icons.travel_explore_outlined,
-      ),
-      _AssistantSuggestion(
-        label: '自动化',
-        prompt: '帮我把这个重复流程拆成可执行的自动化任务。',
-        icon: Icons.auto_mode_outlined,
-      ),
-    ];
-  }
-
-  _AssistantSuggestion? _suggestionFromSkill(GatewaySkillSummary skill) {
-    final name = skill.name.trim();
-    final lower = '$name ${skill.description}'.toLowerCase();
-    if (lower.contains('ppt') ||
-        lower.contains('slide') ||
-        lower.contains('幻灯')) {
-      return _AssistantSuggestion(
-        label: appText('幻灯片', 'Slides'),
-        prompt: '使用 $name 帮我整理一份清晰的演示文稿结构。',
-        icon: Icons.slideshow_outlined,
-      );
-    }
-    if (lower.contains('video') || lower.contains('视频')) {
-      return _AssistantSuggestion(
-        label: appText('视频生成', 'Video'),
-        prompt: '使用 $name 帮我规划视频脚本与生成步骤。',
-        icon: Icons.video_library_outlined,
-      );
-    }
-    if (lower.contains('research') ||
-        lower.contains('研究') ||
-        lower.contains('paper')) {
-      return _AssistantSuggestion(
-        label: appText('深度研究', 'Research'),
-        prompt: '使用 $name 对这个主题做深度研究并输出结论。',
-        icon: Icons.travel_explore_outlined,
-      );
-    }
-    if (lower.contains('browser') ||
-        lower.contains('search') ||
-        lower.contains('crawl')) {
-      return _AssistantSuggestion(
-        label: appText('网页处理', 'Web task'),
-        prompt: '使用 $name 帮我浏览网页并提取关键信息。',
-        icon: Icons.language_rounded,
-      );
-    }
-    if (lower.contains('automation') ||
-        lower.contains('workflow') ||
-        lower.contains('自动')) {
-      return _AssistantSuggestion(
-        label: appText('自动化', 'Automation'),
-        prompt: '使用 $name 帮我设计一个自动化流程。',
-        icon: Icons.auto_mode_outlined,
-      );
-    }
-    return _AssistantSuggestion(
-      label: name,
-      prompt: '使用 $name 处理这个任务：',
-      icon: Icons.auto_awesome_rounded,
-    );
   }
 
   Future<void> _submitPrompt() async {
@@ -1141,10 +1039,14 @@ class _AssistantSideTabRail extends StatelessWidget {
       width: 58,
       decoration: BoxDecoration(
         color: palette.sidebar,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: palette.sidebarBorder.withValues(alpha: 0.72),
-        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: palette.shadow.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -1245,13 +1147,22 @@ class _AssistantSideTabButton extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: selected ? palette.accentMuted : Colors.transparent,
+              color: selected ? palette.surfacePrimary : Colors.transparent,
               borderRadius: BorderRadius.circular(14),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: palette.shadow.withValues(alpha: 0.06),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : const [],
             ),
             child: Icon(
               icon,
               size: 20,
-              color: selected ? palette.accent : palette.textSecondary,
+              color: selected ? palette.textPrimary : palette.textSecondary,
             ),
           ),
         ),
@@ -1270,7 +1181,6 @@ class _AssistantLowerPane extends StatelessWidget {
     required this.modelLabel,
     required this.modelOptions,
     required this.attachments,
-    required this.autoAgentLabel,
     required this.onModeChanged,
     required this.onThinkingChanged,
     required this.onModelChanged,
@@ -1278,8 +1188,6 @@ class _AssistantLowerPane extends StatelessWidget {
     required this.onOpenGateway,
     required this.onReconnectGateway,
     required this.onPickAttachments,
-    required this.suggestions,
-    required this.onSuggestionSelected,
     required this.onSend,
   });
 
@@ -1291,7 +1199,6 @@ class _AssistantLowerPane extends StatelessWidget {
   final String modelLabel;
   final List<String> modelOptions;
   final List<_ComposerAttachment> attachments;
-  final String? autoAgentLabel;
   final ValueChanged<String> onModeChanged;
   final ValueChanged<String> onThinkingChanged;
   final Future<void> Function(String modelId) onModelChanged;
@@ -1299,8 +1206,6 @@ class _AssistantLowerPane extends StatelessWidget {
   final VoidCallback onOpenGateway;
   final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
-  final List<_AssistantSuggestion> suggestions;
-  final ValueChanged<_AssistantSuggestion> onSuggestionSelected;
   final Future<void> Function() onSend;
 
   @override
@@ -1318,7 +1223,6 @@ class _AssistantLowerPane extends StatelessWidget {
           modelLabel: modelLabel,
           modelOptions: modelOptions,
           attachments: attachments,
-          autoAgentLabel: autoAgentLabel,
           onModeChanged: onModeChanged,
           onThinkingChanged: onThinkingChanged,
           onModelChanged: onModelChanged,
@@ -1326,8 +1230,6 @@ class _AssistantLowerPane extends StatelessWidget {
           onOpenGateway: onOpenGateway,
           onReconnectGateway: onReconnectGateway,
           onPickAttachments: onPickAttachments,
-          suggestions: suggestions,
-          onSuggestionSelected: onSuggestionSelected,
           onSend: onSend,
         ),
       ),
@@ -1420,7 +1322,9 @@ class _ConversationArea extends StatelessWidget {
           Divider(height: 1, color: palette.strokeSoft),
           Expanded(
             child: Container(
-              color: palette.surfaceSecondary,
+              decoration: BoxDecoration(
+                color: palette.canvas,
+              ),
               child: items.isEmpty
                   ? _AssistantEmptyState(
                       controller: controller,
@@ -1702,9 +1606,7 @@ class _AssistantTaskTile extends StatelessWidget {
     final statusStyle = _pillStyleForStatus(context, entry.status);
 
     return Material(
-      color: entry.isCurrent
-          ? palette.accentMuted.withValues(alpha: 0.55)
-          : Colors.transparent,
+      color: entry.isCurrent ? palette.surfacePrimary : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         key: ValueKey<String>('assistant-task-item-${entry.sessionKey}'),
@@ -1713,10 +1615,17 @@ class _AssistantTaskTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           decoration: BoxDecoration(
+            color: entry.isCurrent ? palette.surfaceSecondary : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: entry.isCurrent ? palette.accent : palette.strokeSoft,
-            ),
+            boxShadow: entry.isCurrent
+                ? [
+                    BoxShadow(
+                      color: palette.shadow.withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : const [],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1877,50 +1786,64 @@ class _AssistantEmptyState extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 520),
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: theme.textTheme.headlineSmall),
-              const SizedBox(height: 8),
-              Text(description, style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  FilledButton.icon(
-                    onPressed: connected
-                        ? onFocusComposer
-                        : reconnectAvailable
-                        ? () async {
-                            await onReconnectGateway();
-                          }
-                        : onOpenGateway,
-                    icon: Icon(
-                      connected
-                          ? Icons.edit_rounded
-                          : reconnectAvailable
-                          ? Icons.refresh_rounded
-                          : Icons.link_rounded,
-                    ),
-                    label: Text(
-                      connected
-                          ? appText('开始输入', 'Start typing')
-                          : reconnectAvailable
-                          ? appText('重新连接', 'Reconnect')
-                          : appText('连接 Gateway', 'Connect gateway'),
-                    ),
-                  ),
-                  if (!connected)
-                    OutlinedButton.icon(
-                      onPressed: onOpenGateway,
-                      icon: const Icon(Icons.settings_rounded),
-                      label: Text(appText('编辑连接', 'Edit connection')),
-                    ),
-                ],
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: context.palette.surfacePrimary.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(26),
+            boxShadow: [
+              BoxShadow(
+                color: context.palette.shadow.withValues(alpha: 0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 2),
               ),
             ],
+          ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.headlineSmall),
+                const SizedBox(height: 8),
+                Text(description, style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: connected
+                          ? onFocusComposer
+                          : reconnectAvailable
+                          ? () async {
+                              await onReconnectGateway();
+                            }
+                          : onOpenGateway,
+                      icon: Icon(
+                        connected
+                            ? Icons.edit_rounded
+                            : reconnectAvailable
+                            ? Icons.refresh_rounded
+                            : Icons.link_rounded,
+                      ),
+                      label: Text(
+                        connected
+                            ? appText('开始输入', 'Start typing')
+                            : reconnectAvailable
+                            ? appText('重新连接', 'Reconnect')
+                            : appText('连接 Gateway', 'Connect gateway'),
+                      ),
+                    ),
+                    if (!connected)
+                      OutlinedButton.icon(
+                        onPressed: onOpenGateway,
+                        icon: const Icon(Icons.settings_rounded),
+                        label: Text(appText('编辑连接', 'Edit connection')),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1938,7 +1861,6 @@ class _ComposerBar extends StatelessWidget {
     required this.modelLabel,
     required this.modelOptions,
     required this.attachments,
-    required this.autoAgentLabel,
     required this.onModeChanged,
     required this.onThinkingChanged,
     required this.onModelChanged,
@@ -1946,8 +1868,6 @@ class _ComposerBar extends StatelessWidget {
     required this.onOpenGateway,
     required this.onReconnectGateway,
     required this.onPickAttachments,
-    required this.suggestions,
-    required this.onSuggestionSelected,
     required this.onSend,
   });
 
@@ -1959,7 +1879,6 @@ class _ComposerBar extends StatelessWidget {
   final String modelLabel;
   final List<String> modelOptions;
   final List<_ComposerAttachment> attachments;
-  final String? autoAgentLabel;
   final ValueChanged<String> onModeChanged;
   final ValueChanged<String> onThinkingChanged;
   final Future<void> Function(String modelId) onModelChanged;
@@ -1967,8 +1886,6 @@ class _ComposerBar extends StatelessWidget {
   final VoidCallback onOpenGateway;
   final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
-  final List<_AssistantSuggestion> suggestions;
-  final ValueChanged<_AssistantSuggestion> onSuggestionSelected;
   final Future<void> Function() onSend;
 
   @override
@@ -1987,12 +1904,8 @@ class _ComposerBar extends StatelessWidget {
         : palette.textSecondary;
     final permissionBackgroundColor =
         permissionLevel == AssistantPermissionLevel.fullAccess
-        ? const Color(0xFFFFF1E7)
+        ? palette.surfacePrimary
         : palette.surfaceSecondary;
-    final permissionBorderColor =
-        permissionLevel == AssistantPermissionLevel.fullAccess
-        ? const Color(0xFFFFD5B5)
-        : palette.strokeSoft;
     final submitLabel = connected
         ? (mode == 'ask'
               ? appText('提交', 'Submit')
@@ -2004,7 +1917,7 @@ class _ComposerBar extends StatelessWidget {
         : appText('连接', 'Connect');
 
     return SurfaceCard(
-      borderRadius: 0,
+      borderRadius: 24,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2031,38 +1944,28 @@ class _ComposerBar extends StatelessWidget {
             minLines: 3,
             maxLines: 6,
             decoration: InputDecoration(
-              border: InputBorder.none,
               isCollapsed: true,
+              filled: true,
+              fillColor: palette.surfacePrimary,
+              contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(22),
+                borderSide: const BorderSide(color: Colors.transparent),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(22),
+                borderSide: BorderSide(
+                  color: palette.accent.withValues(alpha: 0.18),
+                ),
+              ),
               hintText: appText(
-                '输入需求、补充上下文、继续追问，WorkBuddy 会沿用当前任务上下文持续处理。',
-                'Describe the task, add context, or continue the thread. WorkBuddy keeps the current task context.',
+                '输入需求、补充上下文、继续追问，XWorkmate 会沿用当前任务上下文持续处理。',
+                'Describe the task, add context, or continue the thread. XWorkmate keeps the current task context.',
               ),
             ),
             onSubmitted: (_) => onSend(),
           ),
           const SizedBox(height: 8),
-          if (suggestions.isNotEmpty) ...[
-            SizedBox(
-              height: 34,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: suggestions.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final suggestion = suggestions[index];
-                  return ActionChip(
-                    key: ValueKey<String>(
-                      'assistant-suggestion-${suggestion.label}',
-                    ),
-                    label: Text(suggestion.label),
-                    avatar: Icon(suggestion.icon, size: 16),
-                    onPressed: () => onSuggestionSelected(suggestion),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
           Row(
             children: [
               Expanded(
@@ -2079,14 +1982,6 @@ class _ComposerBar extends StatelessWidget {
                             case 'attach':
                               onPickAttachments();
                               break;
-                            case 'plan':
-                              onModeChanged(mode == 'plan' ? 'ask' : 'plan');
-                              break;
-                            case 'gateway':
-                              onOpenGateway();
-                              break;
-                            case 'route':
-                              break;
                           }
                         },
                         itemBuilder: (context) => [
@@ -2096,48 +1991,6 @@ class _ComposerBar extends StatelessWidget {
                               contentPadding: EdgeInsets.zero,
                               leading: Icon(Icons.attach_file_rounded),
                               title: Text('添加照片和文件'),
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'plan',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(
-                                mode == 'plan'
-                                    ? Icons.task_alt_rounded
-                                    : Icons.alt_route_rounded,
-                              ),
-                              title: Text(
-                                mode == 'plan'
-                                    ? appText('退出计划模式', 'Exit plan mode')
-                                    : appText('计划模式', 'Plan mode'),
-                              ),
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'gateway',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(
-                                connected
-                                    ? Icons.lan_rounded
-                                    : Icons.link_rounded,
-                              ),
-                              title: Text(appText('连接网关', 'Connect gateway')),
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'route',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(Icons.hub_rounded),
-                              title: Text(
-                                autoAgentLabel ??
-                                    appText(
-                                      '浏览器 / 编码 / 研究',
-                                      'Browser / Coding / Research',
-                                    ),
-                              ),
                             ),
                           ),
                         ],
@@ -2221,7 +2074,6 @@ class _ComposerBar extends StatelessWidget {
                           showChevron: true,
                           maxLabelWidth: 112,
                           backgroundColor: permissionBackgroundColor,
-                          borderColor: permissionBorderColor,
                           foregroundColor: permissionForegroundColor,
                         ),
                       ),
@@ -2326,12 +2178,12 @@ class _ComposerBar extends StatelessWidget {
                       : onOpenGateway,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
+                      horizontal: 16,
+                      vertical: 10,
                     ),
-                    minimumSize: const Size(80, 34),
+                    minimumSize: const Size(94, 42),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(18),
                     ),
                   ),
                   child: Row(
@@ -2373,8 +2225,14 @@ class _ComposerIconButton extends StatelessWidget {
       height: 32,
       decoration: BoxDecoration(
         color: context.palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: context.palette.strokeSoft),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: context.palette.shadow.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Icon(icon, size: 16, color: context.palette.textMuted),
     );
@@ -2387,7 +2245,6 @@ class _ComposerToolbarChip extends StatelessWidget {
     required this.label,
     required this.showChevron,
     this.backgroundColor,
-    this.borderColor,
     this.foregroundColor,
     this.maxLabelWidth = 220,
   });
@@ -2396,7 +2253,6 @@ class _ComposerToolbarChip extends StatelessWidget {
   final String label;
   final bool showChevron;
   final Color? backgroundColor;
-  final Color? borderColor;
   final Color? foregroundColor;
   final double maxLabelWidth;
 
@@ -2413,7 +2269,13 @@ class _ComposerToolbarChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: backgroundColor ?? palette.surfaceSecondary,
         borderRadius: BorderRadius.circular(AppRadius.chip),
-        border: Border.all(color: borderColor ?? palette.strokeSoft),
+        boxShadow: [
+          BoxShadow(
+            color: palette.shadow.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2463,9 +2325,9 @@ class _MessageBubble extends StatelessWidget {
     final theme = Theme.of(context);
     final palette = context.palette;
     final borderColor = switch (tone) {
-      _BubbleTone.user => theme.colorScheme.primary.withValues(alpha: 0.18),
-      _BubbleTone.agent => theme.colorScheme.tertiary.withValues(alpha: 0.18),
-      _BubbleTone.assistant => palette.strokeSoft,
+      _BubbleTone.user => theme.colorScheme.primary.withValues(alpha: 0.10),
+      _BubbleTone.agent => theme.colorScheme.tertiary.withValues(alpha: 0.10),
+      _BubbleTone.assistant => palette.surfaceSecondary,
     };
 
     return Align(
@@ -2475,9 +2337,15 @@ class _MessageBubble extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: alignRight ? palette.accentMuted : palette.surfacePrimary,
             borderRadius: BorderRadius.circular(AppRadius.card),
-            border: Border.all(color: borderColor),
+            boxShadow: [
+              BoxShadow(
+                color: borderColor.withValues(alpha: 0.24),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2546,13 +2414,20 @@ class _TaskStatusCard extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 760),
         child: Material(
-          color: Colors.white,
+          color: palette.surfacePrimary,
           borderRadius: BorderRadius.circular(AppRadius.card),
           child: Container(
             padding: const EdgeInsets.all(AppSpacing.sm),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppRadius.card),
-              border: Border.all(color: palette.strokeSoft),
+              color: palette.surfacePrimary,
+              boxShadow: [
+                BoxShadow(
+                  color: palette.shadow.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2697,9 +2572,15 @@ class _ToolCallTileState extends State<_ToolCallTile> {
         constraints: const BoxConstraints(maxWidth: 760),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: palette.surfacePrimary,
             borderRadius: BorderRadius.circular(AppRadius.card),
-            border: Border.all(color: palette.strokeSoft),
+            boxShadow: [
+              BoxShadow(
+                color: palette.shadow.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             children: [
@@ -2826,6 +2707,13 @@ class _StatusPill extends StatelessWidget {
             backgroundColor ??
             Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.badge),
+        boxShadow: [
+          BoxShadow(
+            color: context.palette.shadow.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Text(
         label,
@@ -2847,12 +2735,11 @@ class _ConnectionChip extends StatelessWidget {
     final theme = Theme.of(context);
     final connection = controller.connection;
     final color = switch (connection.status) {
-      RuntimeConnectionStatus.connected => theme.colorScheme.primaryContainer,
-      RuntimeConnectionStatus.connecting =>
-        theme.colorScheme.secondaryContainer,
-      RuntimeConnectionStatus.error => theme.colorScheme.errorContainer,
-      RuntimeConnectionStatus.offline =>
-        theme.colorScheme.surfaceContainerHighest,
+      RuntimeConnectionStatus.connected => context.palette.accentMuted,
+      RuntimeConnectionStatus.connecting => context.palette.surfaceSecondary,
+      RuntimeConnectionStatus.error =>
+        context.palette.danger.withValues(alpha: 0.10),
+      RuntimeConnectionStatus.offline => context.palette.surfaceSecondary,
     };
 
     return Container(
@@ -2863,6 +2750,13 @@ class _ConnectionChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(AppRadius.chip),
+        boxShadow: [
+          BoxShadow(
+            color: context.palette.shadow.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Text(
         '${connection.status.label} · ${connection.remoteAddress ?? appText('未连接目标', 'No target')}',
@@ -3061,7 +2955,13 @@ class _MetaPill extends StatelessWidget {
           decoration: BoxDecoration(
             color: palette.surfaceSecondary,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: palette.strokeSoft),
+            boxShadow: [
+              BoxShadow(
+                color: palette.shadow.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -3093,19 +2993,19 @@ _PillStyle _pillStyleForStatus(BuildContext context, String label) {
   final normalized = _normalizedTaskStatus(label);
   return switch (normalized) {
     'running' => _PillStyle(
-      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.10),
+      backgroundColor: context.palette.accentMuted,
       foregroundColor: theme.colorScheme.primary,
     ),
     'queued' => _PillStyle(
-      backgroundColor: theme.colorScheme.secondary.withValues(alpha: 0.10),
-      foregroundColor: theme.colorScheme.secondary,
+      backgroundColor: context.palette.surfaceSecondary,
+      foregroundColor: context.palette.textSecondary,
     ),
     'failed' || 'error' => _PillStyle(
-      backgroundColor: theme.colorScheme.error.withValues(alpha: 0.10),
+      backgroundColor: context.palette.surfacePrimary,
       foregroundColor: theme.colorScheme.error,
     ),
     _ => _PillStyle(
-      backgroundColor: theme.colorScheme.tertiary.withValues(alpha: 0.12),
+      backgroundColor: context.palette.surfacePrimary,
       foregroundColor: theme.colorScheme.tertiary,
     ),
   };
@@ -3279,16 +3179,4 @@ class _ComposerAttachment {
       mimeType: mimeType,
     );
   }
-}
-
-class _AssistantSuggestion {
-  const _AssistantSuggestion({
-    required this.label,
-    required this.prompt,
-    required this.icon,
-  });
-
-  final String label;
-  final String prompt;
-  final IconData icon;
 }

@@ -9,6 +9,7 @@ import '../../widgets/desktop_workspace_scaffold.dart';
 import '../../widgets/metric_card.dart';
 import '../../widgets/section_tabs.dart';
 import '../../widgets/status_badge.dart';
+import '../../widgets/surface_card.dart';
 
 class TasksPage extends StatefulWidget {
   const TasksPage({
@@ -166,34 +167,36 @@ class _TasksPageState extends State<TasksPage> {
                 ),
                 const SizedBox(height: 16),
                 Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: palette.strokeSoft),
-                    ),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 360,
-                          child: _TaskListPanel(
-                            tab: _tab,
-                            items: items,
-                            selectedTaskId: selected?.id,
-                            onSelectTask: (task) {
-                              setState(() {
-                                _selectedTaskId = task.id;
-                              });
-                            },
+                  child: SurfaceCard(
+                    padding: EdgeInsets.zero,
+                    borderRadius: 20,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 360,
+                            child: _TaskListPanel(
+                              tab: _tab,
+                              items: items,
+                              selectedTaskId: selected?.id,
+                              onSelectTask: (task) {
+                                setState(() {
+                                  _selectedTaskId = task.id;
+                                });
+                              },
+                            ),
                           ),
-                        ),
-                        Container(width: 1, color: palette.strokeSoft),
-                        Expanded(
-                          child: _TaskDetailPanel(
-                            controller: controller,
-                            tab: _tab,
-                            selected: selected,
+                          Container(width: 1, color: palette.strokeSoft),
+                          Expanded(
+                            child: _TaskDetailPanel(
+                              controller: controller,
+                              tab: _tab,
+                              selected: selected,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -325,16 +328,26 @@ class _TaskListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     return Material(
-      color: selected ? palette.accentMuted.withValues(alpha: 0.4) : null,
+      color: selected ? palette.surfacePrimary : Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
         key: ValueKey<String>('tasks-list-item-${task.id}'),
         onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            border: Border.all(
-              color: selected ? palette.accent : palette.strokeSoft,
-            ),
+            color: selected ? palette.surfaceSecondary : Colors.transparent,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: palette.shadow.withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : const [],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -466,7 +479,14 @@ class _TaskDetailPanel extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: palette.surfaceSecondary,
-              border: Border.all(color: palette.strokeSoft),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: palette.shadow.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -525,7 +545,14 @@ class _DetailStat extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: palette.surfaceSecondary,
-        border: Border.all(color: palette.strokeSoft),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: palette.shadow.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

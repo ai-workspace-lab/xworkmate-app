@@ -43,10 +43,11 @@ class _AppShellState extends State<AppShell> {
   ];
 
   double _clampSidebarWidth(double value, double viewportWidth) {
-    final responsiveMax = (viewportWidth -
-            _mainContentMinWidth -
-            _sidebarViewportPadding)
-        .clamp(_sidebarMinWidth, viewportWidth - _sidebarViewportPadding);
+    final responsiveMax =
+        (viewportWidth - _mainContentMinWidth - _sidebarViewportPadding).clamp(
+          _sidebarMinWidth,
+          viewportWidth - _sidebarViewportPadding,
+        );
     return value.clamp(_sidebarMinWidth, responsiveMax).toDouble();
   }
 
@@ -271,9 +272,45 @@ class _AppShellState extends State<AppShell> {
                               padding: EdgeInsets.only(
                                 right: showPinnedDetail ? 392 : 0,
                               ),
-                              child: Container(
-                                color: palette.canvas,
-                                child: _buildCurrentPage(controller.openDetail),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      palette.canvas,
+                                      palette.surfaceSecondary.withValues(
+                                        alpha: 0.54,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                child: Stack(
+                                  children: [
+                                    Positioned(
+                                      top: -120,
+                                      right: -80,
+                                      child: IgnorePointer(
+                                        child: Container(
+                                          width: 360,
+                                          height: 360,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            gradient: RadialGradient(
+                                              colors: [
+                                                palette.surfacePrimary
+                                                    .withValues(alpha: 0.78),
+                                                palette.surfacePrimary
+                                                    .withValues(alpha: 0),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    _buildCurrentPage(controller.openDetail),
+                                  ],
+                                ),
                               ),
                             ),
                           ),

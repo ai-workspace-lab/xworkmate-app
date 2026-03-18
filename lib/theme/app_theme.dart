@@ -3,15 +3,9 @@ import 'package:flutter/material.dart';
 
 import 'app_palette.dart';
 
-/// Design tokens for the XWorkmate design system.
-/// Follows a modern AI developer tool design language with:
-/// - 8px grid spacing
-/// - Compact, neutral, professional aesthetic
-/// - Consistent border radii
 class AppSpacing {
   AppSpacing._();
 
-  // 8px grid system
   static const double xxs = 4.0;
   static const double xs = 8.0;
   static const double sm = 12.0;
@@ -23,57 +17,54 @@ class AppSpacing {
 class AppRadius {
   AppRadius._();
 
-  static const double card = 6.0;
-  static const double button = 6.0;
-  static const double input = 6.0;
+  static const double card = 16.0;
+  static const double button = 12.0;
+  static const double input = 16.0;
   static const double chip = 999.0;
   static const double badge = 999.0;
-  static const double dialog = 10.0;
-  static const double sidebar = 8.0;
-  static const double icon = 6.0;
+  static const double dialog = 16.0;
+  static const double sidebar = 20.0;
+  static const double icon = 12.0;
 }
 
 class AppTypography {
   AppTypography._();
 
-  // H1 - 22px weight 600
-  static const double h1Size = 22.0;
-  static const FontWeight h1Weight = FontWeight.w600;
-  static const double h1Height = 1.25;
+  static const double displaySize = 28.0;
+  static const FontWeight displayWeight = FontWeight.w600;
+  static const double displayHeight = 32 / 28;
 
-  // H2 - 18px weight 600
-  static const double h2Size = 18.0;
-  static const FontWeight h2Weight = FontWeight.w600;
-  static const double h2Height = 1.3;
+  static const double titleSize = 20.0;
+  static const FontWeight titleWeight = FontWeight.w600;
+  static const double titleHeight = 24 / 20;
 
-  // Body - 14px weight 400
+  static const double sectionSize = 16.0;
+  static const FontWeight sectionWeight = FontWeight.w500;
+  static const double sectionHeight = 20 / 16;
+
   static const double bodySize = 14.0;
   static const FontWeight bodyWeight = FontWeight.w400;
-  static const double bodyHeight = 1.4;
+  static const double bodyHeight = 18 / 14;
 
-  // Meta - 12px weight 400
-  static const double metaSize = 12.0;
-  static const FontWeight metaWeight = FontWeight.w400;
-  static const double metaHeight = 1.45;
+  static const double captionSize = 12.0;
+  static const FontWeight captionWeight = FontWeight.w400;
+  static const double captionHeight = 16 / 12;
 }
 
 class AppSizes {
   AppSizes._();
 
-  // Sidebar
-  static const double sidebarItemHeight = 36.0;
-  static const double sidebarIconSize = 18.0;
+  static const double sidebarItemHeight = 40.0;
+  static const double sidebarIconSize = 20.0;
   static const double sidebarTextSize = 14.0;
-  static const double sidebarExpandedWidth = 204.0;
+  static const double sidebarExpandedWidth = 212.0;
   static const double sidebarCollapsedWidth = 72.0;
 
-  // Input area
   static const double textareaHeight = 48.0;
-  static const double toolbarHeight = 36.0;
+  static const double toolbarHeight = 40.0;
 
-  // Buttons
-  static const double buttonHeightDesktop = 34.0;
-  static const double buttonHeightMobile = 36.0;
+  static const double buttonHeightDesktop = 40.0;
+  static const double buttonHeightMobile = 40.0;
 }
 
 class AppTheme {
@@ -115,7 +106,7 @@ class AppTheme {
           onInverseSurface: palette.surfacePrimary,
           shadow: palette.shadow,
           scrim: Colors.black.withValues(
-            alpha: brightness == Brightness.dark ? 0.62 : 0.14,
+            alpha: brightness == Brightness.dark ? 0.62 : 0.12,
           ),
         );
 
@@ -127,11 +118,7 @@ class AppTheme {
       scaffoldBackgroundColor: palette.canvas,
       extensions: [palette],
     );
-    final tunedTextTheme = _textTheme(
-      base.textTheme,
-      palette: palette,
-      isDesktop: isDesktop,
-    );
+    final tunedTextTheme = _textTheme(base.textTheme, palette: palette);
 
     return base.copyWith(
       splashFactory: NoSplash.splashFactory,
@@ -157,22 +144,30 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.card),
-          side: BorderSide(color: palette.strokeSoft),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
         backgroundColor: palette.surfaceSecondary,
-        side: BorderSide(color: palette.strokeSoft),
+        selectedColor: palette.surfacePrimary,
+        secondarySelectedColor: palette.surfacePrimary,
+        disabledColor: palette.surfaceSecondary,
+        side: BorderSide.none,
+        checkmarkColor: Colors.transparent,
         labelStyle: tunedTextTheme.labelMedium,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.chip),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          backgroundColor: palette.accent,
+          foregroundColor: Colors.white,
+          shadowColor: palette.shadow,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
           textStyle: tunedTextTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
           minimumSize: Size(
             0,
@@ -180,9 +175,9 @@ class AppTheme {
                 ? AppSizes.buttonHeightDesktop
                 : AppSizes.buttonHeightMobile,
           ),
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.xs,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button),
@@ -191,9 +186,13 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
+          backgroundColor: palette.surfaceSecondary,
           foregroundColor: palette.textPrimary,
+          shadowColor: palette.shadow,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
           textStyle: tunedTextTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
           minimumSize: Size(
             0,
@@ -201,14 +200,14 @@ class AppTheme {
                 ? AppSizes.buttonHeightDesktop
                 : AppSizes.buttonHeightMobile,
           ),
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.xs,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button),
           ),
-          side: BorderSide(color: palette.strokeSoft),
+          side: BorderSide.none,
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -218,8 +217,8 @@ class AppTheme {
             fontWeight: FontWeight.w500,
           ),
           minimumSize: Size(0, isDesktop ? 32 : 34),
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
             vertical: AppSpacing.xs,
           ),
           shape: RoundedRectangleBorder(
@@ -231,43 +230,48 @@ class AppTheme {
         style: IconButton.styleFrom(
           foregroundColor: palette.textSecondary,
           backgroundColor: palette.surfaceSecondary,
+          surfaceTintColor: Colors.transparent,
+          minimumSize: const Size(40, 40),
+          padding: const EdgeInsets.all(10),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.icon),
-            side: BorderSide(color: palette.strokeSoft),
           ),
-          minimumSize: const Size(34, 34),
-          padding: const EdgeInsets.all(8),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: palette.surfaceSecondary,
+        fillColor: palette.surfacePrimary,
         hintStyle: tunedTextTheme.bodyMedium?.copyWith(
           color: palette.textMuted,
         ),
         labelStyle: tunedTextTheme.bodyMedium?.copyWith(
           color: palette.textMuted,
         ),
-        contentPadding: EdgeInsets.symmetric(
+        floatingLabelStyle: tunedTextTheme.bodyMedium?.copyWith(
+          color: palette.textSecondary,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
           vertical: AppSpacing.sm,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
-          borderSide: BorderSide(color: palette.strokeSoft),
+          borderSide: const BorderSide(color: Colors.transparent),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
-          borderSide: BorderSide(color: palette.strokeSoft),
+          borderSide: const BorderSide(color: Colors.transparent),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
-          borderSide: BorderSide(color: palette.accent.withValues(alpha: 0.42)),
+          borderSide: BorderSide(
+            color: palette.accent.withValues(alpha: 0.18),
+          ),
         ),
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
-          side: WidgetStatePropertyAll(BorderSide(color: palette.strokeSoft)),
+          side: const WidgetStatePropertyAll(BorderSide.none),
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
               return palette.surfacePrimary;
@@ -298,8 +302,16 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: palette.surfaceTertiary,
+        backgroundColor: palette.surfacePrimary,
         contentTextStyle: TextStyle(color: palette.textPrimary),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.dialog),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: palette.surfacePrimary,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.dialog),
         ),
@@ -310,16 +322,19 @@ class AppTheme {
   static TextTheme _textTheme(
     TextTheme base, {
     required AppPalette palette,
-    required bool isDesktop,
   }) {
     final fallbackFonts = switch (defaultTargetPlatform) {
       TargetPlatform.macOS || TargetPlatform.iOS => const <String>[
-        '.SF NS Text',
         '.SF Pro Text',
+        '.SF NS Text',
         'PingFang SC',
-        'Helvetica Neue',
       ],
-      _ => const <String>['Inter', 'Noto Sans CJK SC', 'PingFang SC'],
+      _ => const <String>[
+        'Inter',
+        'Segoe UI',
+        'Noto Sans CJK SC',
+        'PingFang SC',
+      ],
     };
 
     TextStyle withUiFont(TextStyle? style) {
@@ -330,48 +345,50 @@ class AppTheme {
     }
 
     return base.copyWith(
-      // H1: 22px weight 600
       displaySmall: withUiFont(
         base.displaySmall?.copyWith(
-          fontSize: AppTypography.h1Size,
-          fontWeight: AppTypography.h1Weight,
-          letterSpacing: -0.24,
-          height: AppTypography.h1Height,
+          fontSize: AppTypography.displaySize,
+          fontWeight: AppTypography.displayWeight,
+          letterSpacing: -0.32,
+          height: AppTypography.displayHeight,
+          color: palette.textPrimary,
         ),
       ),
       headlineSmall: withUiFont(
         base.headlineSmall?.copyWith(
-          fontSize: AppTypography.h1Size,
-          fontWeight: AppTypography.h1Weight,
-          letterSpacing: -0.24,
-          height: AppTypography.h1Height,
+          fontSize: AppTypography.titleSize,
+          fontWeight: AppTypography.titleWeight,
+          letterSpacing: -0.18,
+          height: AppTypography.titleHeight,
+          color: palette.textPrimary,
         ),
       ),
-      // H2: 18px weight 600
       titleLarge: withUiFont(
         base.titleLarge?.copyWith(
-          fontSize: AppTypography.h2Size,
-          fontWeight: AppTypography.h2Weight,
-          letterSpacing: -0.16,
-          height: AppTypography.h2Height,
+          fontSize: AppTypography.sectionSize,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.08,
+          height: AppTypography.sectionHeight,
+          color: palette.textPrimary,
         ),
       ),
       titleMedium: withUiFont(
         base.titleMedium?.copyWith(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
+          fontSize: AppTypography.sectionSize,
+          fontWeight: AppTypography.sectionWeight,
           letterSpacing: -0.08,
-          height: 1.35,
+          height: AppTypography.sectionHeight,
+          color: palette.textPrimary,
         ),
       ),
       titleSmall: withUiFont(
         base.titleSmall?.copyWith(
-          fontSize: isDesktop ? 14 : 15,
-          fontWeight: FontWeight.w500,
-          height: 1.4,
+          fontSize: AppTypography.bodySize,
+          fontWeight: FontWeight.w600,
+          height: AppTypography.bodyHeight,
+          color: palette.textPrimary,
         ),
       ),
-      // Body: 14px weight 400
       bodyLarge: withUiFont(
         base.bodyLarge?.copyWith(
           fontSize: AppTypography.bodySize,
@@ -388,34 +405,36 @@ class AppTheme {
           color: palette.textSecondary,
         ),
       ),
-      // Meta: 12px weight 400
       bodySmall: withUiFont(
         base.bodySmall?.copyWith(
-          fontSize: AppTypography.metaSize,
-          fontWeight: AppTypography.metaWeight,
-          height: AppTypography.metaHeight,
+          fontSize: AppTypography.captionSize,
+          fontWeight: AppTypography.captionWeight,
+          height: AppTypography.captionHeight,
           color: palette.textMuted,
         ),
       ),
       labelLarge: withUiFont(
         base.labelLarge?.copyWith(
-          fontSize: isDesktop ? 13 : 14,
-          fontWeight: FontWeight.w500,
-          height: 1.2,
+          fontSize: AppTypography.bodySize,
+          fontWeight: FontWeight.w600,
+          height: AppTypography.bodyHeight,
+          color: palette.textPrimary,
         ),
       ),
       labelMedium: withUiFont(
         base.labelMedium?.copyWith(
-          fontSize: 12,
+          fontSize: AppTypography.captionSize,
           fontWeight: FontWeight.w500,
-          height: 1.2,
+          height: AppTypography.captionHeight,
+          color: palette.textSecondary,
         ),
       ),
       labelSmall: withUiFont(
         base.labelSmall?.copyWith(
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-          height: 1.2,
+          fontSize: AppTypography.captionSize,
+          fontWeight: FontWeight.w400,
+          height: AppTypography.captionHeight,
+          color: palette.textMuted,
         ),
       ),
     );
