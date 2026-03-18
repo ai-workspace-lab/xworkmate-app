@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../app/app_metadata.dart';
+import 'platform_environment.dart';
 
 /// Codex sandbox mode for controlling file system access.
 enum CodexSandboxMode {
@@ -62,11 +63,11 @@ class CodexThread {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        if (path != null) 'path': path,
-        'ephemeral': ephemeral,
-        if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
-      };
+    'id': id,
+    if (path != null) 'path': path,
+    'ephemeral': ephemeral,
+    if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+  };
 }
 
 /// Codex turn information.
@@ -122,7 +123,8 @@ class CodexAccount {
       plan: json['plan'] as String?,
       hasCredits: json['hasCredits'] as bool? ?? false,
       creditsBalance: (json['creditsBalance'] as num?)?.toDouble(),
-      rateLimits: (json['rateLimits'] as List?)
+      rateLimits:
+          (json['rateLimits'] as List?)
               ?.map((e) => CodexRateLimit.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -166,11 +168,11 @@ class CodexUserInput {
   });
 
   Map<String, dynamic> toJson() => {
-        'type': type,
-        'content': content,
-        if (attachments != null && attachments!.isNotEmpty)
-          'attachments': attachments!.map((a) => a.toJson()).toList(),
-      };
+    'type': type,
+    'content': content,
+    if (attachments != null && attachments!.isNotEmpty)
+      'attachments': attachments!.map((a) => a.toJson()).toList(),
+  };
 }
 
 /// Codex file attachment.
@@ -181,9 +183,9 @@ class CodexAttachment {
   const CodexAttachment({required this.path, this.name});
 
   Map<String, dynamic> toJson() => {
-        'path': path,
-        if (name != null) 'name': name,
-      };
+    'path': path,
+    if (name != null) 'name': name,
+  };
 }
 
 /// Base class for Codex events.
@@ -209,10 +211,7 @@ class CodexNotificationEvent extends CodexEvent {
   final String method;
   final Map<String, dynamic> params;
 
-  const CodexNotificationEvent({
-    required this.method,
-    required this.params,
-  });
+  const CodexNotificationEvent({required this.method, required this.params});
 }
 
 /// Turn event (item/started, item/completed, etc.).
@@ -255,11 +254,7 @@ class CodexRpcError implements Exception {
   final String message;
   final dynamic data;
 
-  const CodexRpcError({
-    required this.code,
-    required this.message,
-    this.data,
-  });
+  const CodexRpcError({required this.code, required this.message, this.data});
 
   factory CodexRpcError.fromJson(Map<String, dynamic> json) {
     return CodexRpcError(
@@ -295,8 +290,6 @@ class CodexRuntime extends ChangeNotifier {
 
   CodexConnectionState _state = CodexConnectionState.disconnected;
   String? _lastError;
-  String? _codexPath;
-  String? _workingDirectory;
   bool _isInitialized = false;
   CodexAccount? _account;
 
@@ -320,29 +313,29 @@ class CodexRuntime extends ChangeNotifier {
     }
 
     // Try common locations
-    final home = Platform.environment['HOME'] ?? '';
-    final paths = [
-      '/usr/local/bin/codex',
-      '/opt/homebrew/bin/codex',
-      '$home/.cargo/bin/codex',
-      '$home/.local/bin/codex',
-    ];
+    final paths = defaultCodexBinaryCandidates();
 
     for (final path in paths) {
-      final expanded = path.replaceAll('\$HOME', home).replaceAll('~', home);
-      final file = File(expanded);
+      final file = File(path);
       if (await file.exists()) {
-        return expanded;
+        return path;
       }
     }
 
-    // Try to find via 'which'
+    // Try to find via platform-native lookup.
     try {
-      final result = await Process.run('which', ['codex']);
+      final result = await Process.run(
+        _lookupExecutableProgram(),
+        _lookupExecutableArguments(),
+      );
       if (result.exitCode == 0) {
-        final path = (result.stdout as String).trim();
-        if (path.isNotEmpty) {
-          return path;
+        final lines = LineSplitter.split(
+          result.stdout as String,
+        ).map((line) => line.trim()).where((line) => line.isNotEmpty);
+        for (final path in lines) {
+          if (await File(path).exists()) {
+            return path;
+          }
         }
       }
     } catch (_) {
@@ -364,8 +357,6 @@ class CodexRuntime extends ChangeNotifier {
       throw StateError('Codex already running');
     }
 
-    _codexPath = codexPath;
-    _workingDirectory = cwd;
     _state = CodexConnectionState.connecting;
     _lastError = null;
     notifyListeners();
@@ -373,16 +364,21 @@ class CodexRuntime extends ChangeNotifier {
     try {
       final args = [
         'app-server',
-        '--listen', 'stdio://',
-        '-s', sandbox.value,
-        '-a', approval.value,
+        '--listen',
+        'stdio://',
+        '-s',
+        sandbox.value,
+        '-a',
+        approval.value,
         ...extraArgs,
       ];
+      final launch = _resolveLaunchConfiguration(codexPath, args);
 
       _process = await Process.start(
-        codexPath,
-        args,
+        launch.executable,
+        launch.arguments,
         workingDirectory: cwd,
+        runInShell: launch.runInShell,
       );
 
       _setupStdioStreams();
@@ -395,6 +391,52 @@ class CodexRuntime extends ChangeNotifier {
     }
   }
 
+  @visibleForTesting
+  static CodexLaunchConfiguration resolveLaunchConfigurationForTest(
+    String codexPath,
+    List<String> arguments, {
+    String? operatingSystem,
+  }) {
+    return _resolveLaunchConfiguration(
+      codexPath,
+      arguments,
+      operatingSystem: operatingSystem,
+    );
+  }
+
+  static CodexLaunchConfiguration _resolveLaunchConfiguration(
+    String codexPath,
+    List<String> arguments, {
+    String? operatingSystem,
+  }) {
+    final host = detectRuntimeHostPlatform(operatingSystem: operatingSystem);
+    final normalizedPath = codexPath.toLowerCase();
+    final isBatchWrapper =
+        host == RuntimeHostPlatform.windows &&
+        (normalizedPath.endsWith('.cmd') || normalizedPath.endsWith('.bat'));
+    if (isBatchWrapper) {
+      return CodexLaunchConfiguration(
+        executable: 'cmd.exe',
+        arguments: <String>['/c', codexPath, ...arguments],
+      );
+    }
+    return CodexLaunchConfiguration(
+      executable: codexPath,
+      arguments: arguments,
+    );
+  }
+
+  static String _lookupExecutableProgram({String? operatingSystem}) {
+    return detectRuntimeHostPlatform(operatingSystem: operatingSystem) ==
+            RuntimeHostPlatform.windows
+        ? 'where'
+        : 'which';
+  }
+
+  static List<String> _lookupExecutableArguments() {
+    return const <String>['codex'];
+  }
+
   void _setupStdioStreams() {
     final process = _process!;
     final stdoutLines = <String>[];
@@ -405,67 +447,77 @@ class CodexRuntime extends ChangeNotifier {
         .transform(utf8.decoder)
         .transform(LineSplitter())
         .listen(
-      (line) {
-        final trimmed = line.trim();
-        if (trimmed.isEmpty) return;
+          (line) {
+            final trimmed = line.trim();
+            if (trimmed.isEmpty) return;
 
-        // Try to parse as JSON-RPC
-        if (trimmed.startsWith('{')) {
-          _handleMessage(trimmed);
-        } else {
-          // Non-JSON output, emit as log
-          stdoutLines.add(trimmed);
-          if (stdoutLines.length > 100) stdoutLines.removeAt(0);
-          _events.add(CodexLogEvent(
-            level: 'debug',
-            message: trimmed,
-            timestamp: DateTime.now(),
-          ));
-        }
-      },
-      onError: (error) {
-        _events.add(CodexLogEvent(
-          level: 'error',
-          message: 'stdout error: $error',
-          timestamp: DateTime.now(),
-        ));
-      },
-    );
+            // Try to parse as JSON-RPC
+            if (trimmed.startsWith('{')) {
+              _handleMessage(trimmed);
+            } else {
+              // Non-JSON output, emit as log
+              stdoutLines.add(trimmed);
+              if (stdoutLines.length > 100) stdoutLines.removeAt(0);
+              _events.add(
+                CodexLogEvent(
+                  level: 'debug',
+                  message: trimmed,
+                  timestamp: DateTime.now(),
+                ),
+              );
+            }
+          },
+          onError: (error) {
+            _events.add(
+              CodexLogEvent(
+                level: 'error',
+                message: 'stdout error: $error',
+                timestamp: DateTime.now(),
+              ),
+            );
+          },
+        );
 
     // stderr: Log output
     _stderrSubscription = process.stderr
         .transform(utf8.decoder)
         .transform(LineSplitter())
         .listen(
-      (line) {
-        final trimmed = line.trim();
-        if (trimmed.isEmpty) return;
+          (line) {
+            final trimmed = line.trim();
+            if (trimmed.isEmpty) return;
 
-        stderrLines.add(trimmed);
-        if (stderrLines.length > 100) stderrLines.removeAt(0);
+            stderrLines.add(trimmed);
+            if (stderrLines.length > 100) stderrLines.removeAt(0);
 
-        _events.add(CodexLogEvent(
-          level: 'info',
-          message: trimmed,
-          timestamp: DateTime.now(),
-        ));
-      },
-      onError: (error) {
-        _events.add(CodexLogEvent(
-          level: 'error',
-          message: 'stderr error: $error',
-          timestamp: DateTime.now(),
-        ));
-      },
-    );
+            _events.add(
+              CodexLogEvent(
+                level: 'info',
+                message: trimmed,
+                timestamp: DateTime.now(),
+              ),
+            );
+          },
+          onError: (error) {
+            _events.add(
+              CodexLogEvent(
+                level: 'error',
+                message: 'stderr error: $error',
+                timestamp: DateTime.now(),
+              ),
+            );
+          },
+        );
 
     // Handle process exit
     process.exitCode.then((exitCode) {
-      _events.add(CodexLogEvent(
-        level: exitCode == 0 ? 'info' : 'warn',
-        message: 'Codex exited with code $exitCode',
-        timestamp: DateTime.now(),
-      ));
+      _events.add(
+        CodexLogEvent(
+          level: exitCode == 0 ? 'info' : 'warn',
+          message: 'Codex exited with code $exitCode',
+          timestamp: DateTime.now(),
+        ),
+      );
       _process = null;
       _state = CodexConnectionState.disconnected;
       _isInitialized = false;
@@ -478,19 +530,19 @@ class CodexRuntime extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final result = await request('initialize', params: {
-        'clientInfo': {
-          'name': 'xworkmate',
-          'version': kAppVersion,
+      final result = await request(
+        'initialize',
+        params: {
+          'clientInfo': {'name': 'xworkmate', 'version': kAppVersion},
+          'capabilities': {'optOutNotificationMethods': []},
         },
-        'capabilities': {
-          'optOutNotificationMethods': [],
-        },
-      });
+      );
 
       // Store any account info from response
       if (result.containsKey('account')) {
-        _account = CodexAccount.fromJson(result['account'] as Map<String, dynamic>);
+        _account = CodexAccount.fromJson(
+          result['account'] as Map<String, dynamic>,
+        );
       }
 
       // Send initialized notification
@@ -523,7 +575,9 @@ class CodexRuntime extends ChangeNotifier {
         final id = json['id'].toString();
         final completer = _pendingRequests.remove(id);
         if (completer != null && !completer.isCompleted) {
-          completer.completeError(CodexRpcError.fromJson(json['error'] as Map<String, dynamic>));
+          completer.completeError(
+            CodexRpcError.fromJson(json['error'] as Map<String, dynamic>),
+          );
         }
       } else if (json.containsKey('method')) {
         // Notification
@@ -532,11 +586,13 @@ class CodexRuntime extends ChangeNotifier {
         _events.add(CodexNotificationEvent(method: method, params: params));
       }
     } catch (e) {
-      _events.add(CodexLogEvent(
-        level: 'warn',
-        message: 'Failed to parse message: $e',
-        timestamp: DateTime.now(),
-      ));
+      _events.add(
+        CodexLogEvent(
+          level: 'warn',
+          message: 'Failed to parse message: $e',
+          timestamp: DateTime.now(),
+        ),
+      );
     }
   }
 
@@ -574,7 +630,10 @@ class CodexRuntime extends ChangeNotifier {
   }
 
   /// Send notification (no response expected).
-  Future<void> _sendNotification(String method, {required Map<String, dynamic> params}) async {
+  Future<void> _sendNotification(
+    String method, {
+    required Map<String, dynamic> params,
+  }) async {
     final process = _process;
     if (process == null) {
       throw StateError('Codex not running');
@@ -600,11 +659,13 @@ class CodexRuntime extends ChangeNotifier {
   }) async {
     final params = <String, dynamic>{
       'cwd': cwd,
-      if (model != null) 'model': model,
-      if (sandbox != null) 'sandbox': sandbox.value,
-      if (approval != null) 'approvalPolicy': approval.value,
+      ...?model == null ? null : <String, dynamic>{'model': model},
+      ...?sandbox == null ? null : <String, dynamic>{'sandbox': sandbox.value},
+      ...?approval == null
+          ? null
+          : <String, dynamic>{'approvalPolicy': approval.value},
       if (ephemeral) 'ephemeral': true,
-      if (settings != null) 'settings': settings,
+      ...?settings == null ? null : <String, dynamic>{'settings': settings},
     };
 
     final result = await request('thread/start', params: params);
@@ -618,7 +679,7 @@ class CodexRuntime extends ChangeNotifier {
   }) async {
     final params = <String, dynamic>{
       'threadId': threadId,
-      if (cwd != null) 'cwd': cwd,
+      ...?cwd == null ? null : <String, dynamic>{'cwd': cwd},
     };
 
     final result = await request('thread/resume', params: params);
@@ -633,15 +694,16 @@ class CodexRuntime extends ChangeNotifier {
     Duration timeout = const Duration(minutes: 10),
   }) async* {
     // Start turn
-    final turnResult = await request('turn/start', params: {
-      'threadId': threadId,
-      'userInput': CodexUserInput(
-        content: prompt,
-        attachments: attachments,
-      ).toJson(),
-    });
-
-    final turnId = turnResult['turnId'] as String;
+    await request(
+      'turn/start',
+      params: {
+        'threadId': threadId,
+        'userInput': CodexUserInput(
+          content: prompt,
+          attachments: attachments,
+        ).toJson(),
+      },
+    );
 
     // Listen for events until turn/completed
     await for (final event in _events.stream) {
@@ -675,16 +737,24 @@ class CodexRuntime extends ChangeNotifier {
   }
 
   /// List available models.
-  Future<List<Map<String, dynamic>>> listModels({bool includeHidden = false}) async {
-    final result = await request('model/list', params: {
-      'includeHidden': includeHidden,
-    });
+  Future<List<Map<String, dynamic>>> listModels({
+    bool includeHidden = false,
+  }) async {
+    final result = await request(
+      'model/list',
+      params: {'includeHidden': includeHidden},
+    );
     return (result['models'] as List).cast<Map<String, dynamic>>();
   }
 
   /// List available skills.
   Future<List<Map<String, dynamic>>> listSkills({required String cwd}) async {
-    final result = await request('skills/list', params: {'cwds': [cwd]});
+    final result = await request(
+      'skills/list',
+      params: {
+        'cwds': [cwd],
+      },
+    );
     return (result['skills'] as List?)?.cast<Map<String, dynamic>>() ?? [];
   }
 
@@ -718,4 +788,16 @@ class CodexRuntime extends ChangeNotifier {
     _events.close();
     super.dispose();
   }
+}
+
+class CodexLaunchConfiguration {
+  const CodexLaunchConfiguration({
+    required this.executable,
+    required this.arguments,
+    this.runInShell = false,
+  });
+
+  final String executable;
+  final List<String> arguments;
+  final bool runInShell;
 }

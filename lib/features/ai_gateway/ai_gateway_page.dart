@@ -1,9 +1,9 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
+import '../../runtime/platform_environment.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../widgets/metric_card.dart';
@@ -816,8 +816,7 @@ class _CodexIntegrationCardState extends State<_CodexIntegrationCard> {
     });
 
     try {
-      final home = Platform.environment['HOME'] ?? '';
-      final codexHome = Platform.environment['CODEX_HOME'] ?? '$home/.codex';
+      final codexHome = resolveCodexHomeDirectory();
       final configPath = '$codexHome/config.toml';
 
       final gatewayUrl = widget.controller.aiGatewayUrl;
