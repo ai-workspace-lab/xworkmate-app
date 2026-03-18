@@ -6,7 +6,7 @@ import 'package:xworkmate/models/app_models.dart';
 import '../test_support.dart';
 
 void main() {
-  testWidgets('TasksPage new task button routes back to assistant', (
+  testWidgets('TasksPage continue button routes back to assistant', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
@@ -17,7 +17,7 @@ void main() {
       child: TasksPage(controller: controller, onOpenDetail: (_) {}),
     );
 
-    await tester.tap(find.text('新建任务'));
+    await tester.tap(find.text('继续对话'));
     await tester.pumpAndSettle();
 
     expect(controller.destination, WorkspaceDestination.assistant);
@@ -37,12 +37,11 @@ void main() {
     await tester.tap(find.text('计划中').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Scheduled 只读'), findsOneWidget);
-    expect(find.text('这些项目来自 Gateway cron 调度器，本页当前仅支持只读展示。'), findsOneWidget);
-    expect(find.text('新建任务'), findsNothing);
+    expect(find.text('计划任务只读'), findsOneWidget);
+    expect(find.text('当前没有计划任务。'), findsOneWidget);
   });
 
-  testWidgets('TasksPage breadcrumb routes back to assistant home', (
+  testWidgets('TasksPage keeps list/detail workspace structure', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
@@ -53,10 +52,7 @@ void main() {
       child: TasksPage(controller: controller, onOpenDetail: (_) {}),
     );
 
-    await tester.tap(find.byKey(const ValueKey<String>('workspace-breadcrumb-0')));
-    await tester.pumpAndSettle();
-
-    expect(controller.destination, WorkspaceDestination.assistant);
-    expect(controller.currentSessionKey, 'main');
+    expect(find.text('任务列表'), findsOneWidget);
+    expect(find.text('选择左侧任务查看详情。'), findsOneWidget);
   });
 }

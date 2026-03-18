@@ -20,6 +20,7 @@ class SidebarNavigation extends StatelessWidget {
     required this.onOpenThemeToggle,
     required this.accountName,
     required this.accountSubtitle,
+    this.onOpenOnlineWorkspace,
     this.expandedWidthOverride,
     this.marginOverride,
     this.showCollapseControl = true,
@@ -39,6 +40,7 @@ class SidebarNavigation extends StatelessWidget {
   final VoidCallback onOpenThemeToggle;
   final String accountName;
   final String accountSubtitle;
+  final VoidCallback? onOpenOnlineWorkspace;
   final double? expandedWidthOverride;
   final EdgeInsetsGeometry? marginOverride;
   final bool showCollapseControl;
@@ -162,6 +164,7 @@ class SidebarNavigation extends StatelessWidget {
                     accountSelected:
                         currentSection == WorkspaceDestination.account,
                     showCollapseControl: showCollapseControl,
+                    onOpenOnlineWorkspace: onOpenOnlineWorkspace,
                   ),
                 ],
               ),
@@ -465,6 +468,7 @@ class SidebarFooter extends StatelessWidget {
     required this.accountSubtitle,
     required this.accountSelected,
     required this.showCollapseControl,
+    this.onOpenOnlineWorkspace,
   });
 
   final bool isCollapsed;
@@ -481,6 +485,7 @@ class SidebarFooter extends StatelessWidget {
   final String accountSubtitle;
   final bool accountSelected;
   final bool showCollapseControl;
+  final VoidCallback? onOpenOnlineWorkspace;
 
   @override
   Widget build(BuildContext context) {
@@ -526,11 +531,21 @@ class SidebarFooter extends StatelessWidget {
             onPressed: onOpenSettings,
           ),
           const SizedBox(height: AppSpacing.xs),
+          if (onOpenOnlineWorkspace != null) ...[
+            _SidebarActionButton(
+              icon: Icons.open_in_new_rounded,
+              tooltip: appText('打开在线版', 'Open online workspace'),
+              onPressed: onOpenOnlineWorkspace!,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
           _SidebarAccountTile(
             selected: accountSelected,
             onTap: onOpenAccount,
             name: accountName,
             subtitle: accountSubtitle,
+            onlineActionLabel: appText('在线版', 'Online'),
+            onOpenOnlineWorkspace: onOpenOnlineWorkspace,
           ),
         ],
       );
@@ -587,6 +602,8 @@ class SidebarFooter extends StatelessWidget {
           onTap: onOpenAccount,
           name: accountName,
           subtitle: accountSubtitle,
+          onlineActionLabel: appText('在线版', 'Online'),
+          onOpenOnlineWorkspace: onOpenOnlineWorkspace,
         ),
       ],
     );
@@ -675,12 +692,16 @@ class _SidebarAccountTile extends StatefulWidget {
     required this.onTap,
     required this.name,
     required this.subtitle,
+    this.onlineActionLabel,
+    this.onOpenOnlineWorkspace,
   });
 
   final bool selected;
   final VoidCallback onTap;
   final String name;
   final String subtitle;
+  final String? onlineActionLabel;
+  final VoidCallback? onOpenOnlineWorkspace;
 
   @override
   State<_SidebarAccountTile> createState() => _SidebarAccountTileState();
@@ -715,10 +736,13 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
               borderRadius: BorderRadius.circular(AppRadius.button),
               onTap: widget.onTap,
               child: Container(
-                height: AppSizes.sidebarItemHeight,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xs,
+                  vertical: 6,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.max,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     CircleAvatar(
                       radius: 14,
@@ -750,6 +774,18 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
                         ],
                       ),
                     ),
+                    if (widget.onOpenOnlineWorkspace != null &&
+                        widget.onlineActionLabel != null) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      TextButton(
+                        onPressed: widget.onOpenOnlineWorkspace,
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, 28),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: Text(widget.onlineActionLabel!),
+                      ),
+                    ],
                   ],
                 ),
               ),
