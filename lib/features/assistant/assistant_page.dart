@@ -13,9 +13,9 @@ import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/assistant_focus_panel.dart';
 import '../../widgets/gateway_connect_dialog.dart';
+import '../../widgets/desktop_workspace_scaffold.dart';
 import '../../widgets/pane_resize_handle.dart';
 import '../../widgets/surface_card.dart';
-import '../../widgets/top_bar.dart';
 
 class AssistantPage extends StatefulWidget {
   const AssistantPage({
@@ -52,11 +52,9 @@ class _AssistantPageState extends State<AssistantPage> {
   late final FocusNode _composerFocusNode;
   String _mode = 'ask';
   String _thinkingLabel = 'high';
-  double _conversationPaneRatio = 0.7;
   double _threadRailWidth = 312;
   String _threadQuery = '';
   bool _sidePaneCollapsed = false;
-  bool _taskRailOverviewExpanded = false;
   _AssistantSidePane _activeSidePane = _AssistantSidePane.tasks;
   WorkspaceDestination? _activeFocusedDestination;
   final Map<String, _AssistantTaskSeed> _taskSeeds =
@@ -121,7 +119,7 @@ class _AssistantPageState extends State<AssistantPage> {
           );
         });
 
-        return Padding(
+        return DesktopWorkspaceScaffold(
           padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -161,10 +159,7 @@ class _AssistantPageState extends State<AssistantPage> {
                     : _activeSidePane;
                 final sidePanelContentWidth =
                     (threadRailWidth - _sideTabRailWidth - 6)
-                        .clamp(
-                          _sidePaneContentMinWidth,
-                          threadRailWidth,
-                        )
+                        .clamp(_sidePaneContentMinWidth, threadRailWidth)
                         .toDouble();
                 return Row(
                   children: [
@@ -199,24 +194,11 @@ class _AssistantPageState extends State<AssistantPage> {
                           },
                           onRefreshTasks: controller.refreshSessions,
                           onCreateTask: _createNewThread,
-                          onOpenTasks: () {
-                            controller.navigateTo(WorkspaceDestination.tasks);
-                          },
-                          onOpenSkills: () {
-                            controller.navigateTo(WorkspaceDestination.skills);
-                          },
                           onSelectTask: (sessionKey) async {
                             await controller.switchSession(sessionKey);
                             _focusComposer();
                           },
                           onArchiveTask: _archiveTask,
-                          overviewExpanded: _taskRailOverviewExpanded,
-                          onToggleOverview: () {
-                            setState(() {
-                              _taskRailOverviewExpanded =
-                                  !_taskRailOverviewExpanded;
-                            });
-                          },
                         ),
                         navigationPanel: widget.navigationPanelBuilder!(
                           sidePanelContentWidth,
@@ -340,24 +322,11 @@ class _AssistantPageState extends State<AssistantPage> {
                       },
                       onRefreshTasks: controller.refreshSessions,
                       onCreateTask: _createNewThread,
-                      onOpenTasks: () {
-                        controller.navigateTo(WorkspaceDestination.tasks);
-                      },
-                      onOpenSkills: () {
-                        controller.navigateTo(WorkspaceDestination.skills);
-                      },
                       onSelectTask: (sessionKey) async {
                         await controller.switchSession(sessionKey);
                         _focusComposer();
                       },
                       onArchiveTask: _archiveTask,
-                      overviewExpanded: _taskRailOverviewExpanded,
-                      onToggleOverview: () {
-                        setState(() {
-                          _taskRailOverviewExpanded =
-                              !_taskRailOverviewExpanded;
-                        });
-                      },
                     ),
                   ),
                   SizedBox(
@@ -391,38 +360,11 @@ class _AssistantPageState extends State<AssistantPage> {
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        const handleHeight = 10.0;
-        const paneGap = 6.0;
-        final availablePaneHeight =
-            (constraints.maxHeight - handleHeight - paneGap)
-                .clamp(0.0, double.infinity)
-                .toDouble();
-        var minConversationHeight = availablePaneHeight >= 620
-            ? 240.0
-            : availablePaneHeight * 0.4;
-        var minComposerHeight = availablePaneHeight >= 620
-            ? 176.0
-            : availablePaneHeight * 0.24;
-        if (minConversationHeight + minComposerHeight > availablePaneHeight) {
-          minConversationHeight = availablePaneHeight * 0.52;
-          minComposerHeight = availablePaneHeight - minConversationHeight;
-        }
-        final maxConversationHeight = (availablePaneHeight - minComposerHeight)
-            .clamp(minConversationHeight, availablePaneHeight)
-            .toDouble();
-        final conversationHeight = availablePaneHeight <= 0
-            ? 0.0
-            : (_conversationPaneRatio * availablePaneHeight)
-                  .clamp(minConversationHeight, maxConversationHeight)
-                  .toDouble();
-        final composerHeight = (availablePaneHeight - conversationHeight)
-            .clamp(minComposerHeight, availablePaneHeight)
-            .toDouble();
+        final composerHeight = constraints.maxHeight >= 900 ? 254.0 : 224.0;
 
         return Column(
           children: [
-            SizedBox(
-              height: conversationHeight,
+            Expanded(
               child: _ConversationArea(
                 controller: controller,
                 currentTask: currentTask,
@@ -434,25 +376,7 @@ class _AssistantPageState extends State<AssistantPage> {
                 onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
               ),
             ),
-            SizedBox(
-              height: handleHeight,
-              child: PaneResizeHandle(
-                axis: Axis.vertical,
-                onDelta: (delta) {
-                  if (availablePaneHeight <= 0) {
-                    return;
-                  }
-                  final nextHeight = (conversationHeight + delta).clamp(
-                    minConversationHeight,
-                    maxConversationHeight,
-                  );
-                  setState(() {
-                    _conversationPaneRatio = nextHeight / availablePaneHeight;
-                  });
-                },
-              ),
-            ),
-            const SizedBox(height: paneGap),
+            const SizedBox(height: 6),
             SizedBox(
               height: composerHeight,
               child: _AssistantLowerPane(
@@ -482,7 +406,8 @@ class _AssistantPageState extends State<AssistantPage> {
                 onOpenGateway: _showConnectDialog,
                 onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
                 onPickAttachments: _pickAttachments,
-                onFocusComposer: _focusComposer,
+                suggestions: _buildSuggestions(controller),
+                onSuggestionSelected: _applySuggestion,
                 onSend: _submitPrompt,
               ),
             ),
@@ -607,6 +532,105 @@ class _AssistantPageState extends State<AssistantPage> {
         ...files.map(_ComposerAttachment.fromXFile),
       ];
     });
+  }
+
+  void _applySuggestion(_AssistantSuggestion suggestion) {
+    final current = _inputController.text.trim();
+    final next = current.isEmpty
+        ? suggestion.prompt
+        : '$current\n${suggestion.prompt}';
+    _inputController.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
+    );
+    _focusComposer();
+  }
+
+  List<_AssistantSuggestion> _buildSuggestions(AppController controller) {
+    final skillSuggestions = controller.skills
+        .where((item) => !item.disabled)
+        .take(6)
+        .map(_suggestionFromSkill)
+        .whereType<_AssistantSuggestion>()
+        .toList(growable: false);
+    if (skillSuggestions.isNotEmpty) {
+      return skillSuggestions;
+    }
+    return const [
+      _AssistantSuggestion(
+        label: '幻灯片',
+        prompt: '帮我整理一份演示文稿的大纲和页面结构。',
+        icon: Icons.slideshow_outlined,
+      ),
+      _AssistantSuggestion(
+        label: '视频生成',
+        prompt: '帮我规划一个视频脚本、镜头拆解和生成步骤。',
+        icon: Icons.video_library_outlined,
+      ),
+      _AssistantSuggestion(
+        label: '深度研究',
+        prompt: '围绕这个主题先做深度研究，再给我结构化结论。',
+        icon: Icons.travel_explore_outlined,
+      ),
+      _AssistantSuggestion(
+        label: '自动化',
+        prompt: '帮我把这个重复流程拆成可执行的自动化任务。',
+        icon: Icons.auto_mode_outlined,
+      ),
+    ];
+  }
+
+  _AssistantSuggestion? _suggestionFromSkill(GatewaySkillSummary skill) {
+    final name = skill.name.trim();
+    final lower = '$name ${skill.description}'.toLowerCase();
+    if (lower.contains('ppt') ||
+        lower.contains('slide') ||
+        lower.contains('幻灯')) {
+      return _AssistantSuggestion(
+        label: appText('幻灯片', 'Slides'),
+        prompt: '使用 $name 帮我整理一份清晰的演示文稿结构。',
+        icon: Icons.slideshow_outlined,
+      );
+    }
+    if (lower.contains('video') || lower.contains('视频')) {
+      return _AssistantSuggestion(
+        label: appText('视频生成', 'Video'),
+        prompt: '使用 $name 帮我规划视频脚本与生成步骤。',
+        icon: Icons.video_library_outlined,
+      );
+    }
+    if (lower.contains('research') ||
+        lower.contains('研究') ||
+        lower.contains('paper')) {
+      return _AssistantSuggestion(
+        label: appText('深度研究', 'Research'),
+        prompt: '使用 $name 对这个主题做深度研究并输出结论。',
+        icon: Icons.travel_explore_outlined,
+      );
+    }
+    if (lower.contains('browser') ||
+        lower.contains('search') ||
+        lower.contains('crawl')) {
+      return _AssistantSuggestion(
+        label: appText('网页处理', 'Web task'),
+        prompt: '使用 $name 帮我浏览网页并提取关键信息。',
+        icon: Icons.language_rounded,
+      );
+    }
+    if (lower.contains('automation') ||
+        lower.contains('workflow') ||
+        lower.contains('自动')) {
+      return _AssistantSuggestion(
+        label: appText('自动化', 'Automation'),
+        prompt: '使用 $name 帮我设计一个自动化流程。',
+        icon: Icons.auto_mode_outlined,
+      );
+    }
+    return _AssistantSuggestion(
+      label: name,
+      prompt: '使用 $name 处理这个任务：',
+      icon: Icons.auto_awesome_rounded,
+    );
   }
 
   Future<void> _submitPrompt() async {
@@ -1012,10 +1036,9 @@ class _AssistantPageState extends State<AssistantPage> {
   double _resolveMaxSidePaneWidth(double viewportWidth) {
     final maxWidthByViewport =
         viewportWidth - _mainWorkspaceMinWidth - _sidePaneViewportPadding;
-    return maxWidthByViewport.clamp(
-      _sidePaneMinWidth,
-      viewportWidth - _sidePaneViewportPadding,
-    ).toDouble();
+    return maxWidthByViewport
+        .clamp(_sidePaneMinWidth, viewportWidth - _sidePaneViewportPadding)
+        .toDouble();
   }
 }
 
@@ -1048,8 +1071,7 @@ class _AssistantUnifiedSidePane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sidePaneContent =
-        activePane == _AssistantSidePane.tasks
+    final sidePaneContent = activePane == _AssistantSidePane.tasks
         ? taskPanel
         : activePane == _AssistantSidePane.focused && focusedPanel != null
         ? focusedPanel!
@@ -1074,15 +1096,13 @@ class _AssistantUnifiedSidePane extends StatelessWidget {
               switchInCurve: Curves.easeOutCubic,
               switchOutCurve: Curves.easeInCubic,
               child: KeyedSubtree(
-                key: ValueKey<String>(
-                  switch (activePane) {
-                    _AssistantSidePane.tasks => 'assistant-side-pane-tasks',
-                    _AssistantSidePane.navigation =>
-                      'assistant-side-pane-navigation',
-                    _AssistantSidePane.focused =>
-                      'assistant-side-pane-focused-${activeFocusedDestination?.name ?? 'none'}',
-                  },
-                ),
+                key: ValueKey<String>(switch (activePane) {
+                  _AssistantSidePane.tasks => 'assistant-side-pane-tasks',
+                  _AssistantSidePane.navigation =>
+                    'assistant-side-pane-navigation',
+                  _AssistantSidePane.focused =>
+                    'assistant-side-pane-focused-${activeFocusedDestination?.name ?? 'none'}',
+                }),
                 child: sidePaneContent,
               ),
             ),
@@ -1146,11 +1166,7 @@ class _AssistantSideTabRail extends StatelessWidget {
           ),
           if (favoriteDestinations.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Container(
-              width: 24,
-              height: 1,
-              color: palette.strokeSoft,
-            ),
+            Container(width: 24, height: 1, color: palette.strokeSoft),
             const SizedBox(height: 8),
             Expanded(
               child: SingleChildScrollView(
@@ -1262,7 +1278,8 @@ class _AssistantLowerPane extends StatelessWidget {
     required this.onOpenGateway,
     required this.onReconnectGateway,
     required this.onPickAttachments,
-    required this.onFocusComposer,
+    required this.suggestions,
+    required this.onSuggestionSelected,
     required this.onSend,
   });
 
@@ -1282,7 +1299,8 @@ class _AssistantLowerPane extends StatelessWidget {
   final VoidCallback onOpenGateway;
   final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
-  final VoidCallback onFocusComposer;
+  final List<_AssistantSuggestion> suggestions;
+  final ValueChanged<_AssistantSuggestion> onSuggestionSelected;
   final Future<void> Function() onSend;
 
   @override
@@ -1308,6 +1326,8 @@ class _AssistantLowerPane extends StatelessWidget {
           onOpenGateway: onOpenGateway,
           onReconnectGateway: onReconnectGateway,
           onPickAttachments: onPickAttachments,
+          suggestions: suggestions,
+          onSuggestionSelected: onSuggestionSelected,
           onSend: onSend,
         ),
       ),
@@ -1341,49 +1361,29 @@ class _ConversationArea extends StatelessWidget {
     final palette = context.palette;
     final theme = Theme.of(context);
     final statusStyle = _pillStyleForStatus(context, currentTask.status);
-    final taskHint =
-        controller.connection.status == RuntimeConnectionStatus.connected
-        ? appText(
-            '当前对话会作为任务上下文持续执行，切换左侧任务即可回到对应会话。',
-            'This conversation stays attached to the selected task. Pick another task on the left to jump back into it.',
-          )
-        : appText(
-            '连接 Gateway 后，当前对话会自动作为默认任务开始执行。',
-            'After connecting a gateway, this conversation starts as the default task.',
-          );
 
     return SurfaceCard(
-      borderRadius: 12,
+      borderRadius: 0,
       padding: EdgeInsets.zero,
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      AppBreadcrumbs(
-                        items: [
-                          AppBreadcrumbItem(
-                            label: appText('主页', 'Home'),
-                            icon: Icons.home_rounded,
-                            onTap: controller.navigateHome,
-                          ),
-                          AppBreadcrumbItem(label: currentTask.title),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
                       Text(
                         currentTask.title,
                         key: const Key('assistant-conversation-title'),
-                        style: theme.textTheme.titleLarge,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(taskHint, style: theme.textTheme.bodySmall),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 6),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -1403,11 +1403,16 @@ class _ConversationArea extends StatelessWidget {
                             label: currentTask.surface,
                             icon: Icons.forum_outlined,
                           ),
+                          _MetaPill(
+                            label: controller.currentSessionKey,
+                            icon: Icons.tag_rounded,
+                          ),
                         ],
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 12),
                 _ConnectionChip(controller: controller),
               ],
             ),
@@ -1425,7 +1430,7 @@ class _ConversationArea extends StatelessWidget {
                     )
                   : ListView.separated(
                       controller: scrollController,
-                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                       physics: const BouncingScrollPhysics(),
                       itemCount: items.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 8),
@@ -1493,7 +1498,6 @@ class _ConversationArea extends StatelessWidget {
                             },
                             onOpenTasks: () {
                               controller.navigateTo(WorkspaceDestination.tasks);
-                              onOpenDetail(_buildTaskDetail(item));
                             },
                           ),
                         };
@@ -1503,44 +1507,6 @@ class _ConversationArea extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  DetailPanelData _buildTaskDetail(_TimelineItem item) {
-    return DetailPanelData(
-      title: item.title!,
-      subtitle: appText('会话任务', 'Conversation Task'),
-      icon: Icons.task_alt_rounded,
-      status: _statusInfoForTask(item.status ?? 'completed'),
-      description: item.summary ?? '',
-      meta: [
-        item.owner ?? appText('自动路由', 'Auto route'),
-        item.sessionKey ?? controller.currentSessionKey,
-      ],
-      actions: [appText('继续', 'Continue'), appText('打开任务', 'Open Tasks')],
-      sections: [
-        DetailSection(
-          title: appText('执行', 'Execution'),
-          items: [
-            DetailItem(
-              label: appText('状态', 'Status'),
-              value: _taskStatusLabel(item.status ?? 'completed'),
-            ),
-            DetailItem(
-              label: appText('代理', 'Agent'),
-              value: item.owner ?? controller.activeAgentName,
-            ),
-            DetailItem(
-              label: appText('会话', 'Session'),
-              value: item.sessionKey ?? controller.currentSessionKey,
-            ),
-            DetailItem(
-              label: appText('详情', 'Detail'),
-              value: item.detail ?? appText('暂无详情', 'No detail'),
-            ),
-          ],
-        ),
-      ],
     );
   }
 }
@@ -1556,12 +1522,8 @@ class _AssistantTaskRail extends StatelessWidget {
     required this.onClearQuery,
     required this.onRefreshTasks,
     required this.onCreateTask,
-    required this.onOpenTasks,
-    required this.onOpenSkills,
     required this.onSelectTask,
     required this.onArchiveTask,
-    required this.overviewExpanded,
-    required this.onToggleOverview,
   });
 
   final AppController controller;
@@ -1572,12 +1534,8 @@ class _AssistantTaskRail extends StatelessWidget {
   final VoidCallback onClearQuery;
   final Future<void> Function() onRefreshTasks;
   final Future<void> Function() onCreateTask;
-  final VoidCallback onOpenTasks;
-  final VoidCallback onOpenSkills;
   final Future<void> Function(String sessionKey) onSelectTask;
   final Future<void> Function(String sessionKey) onArchiveTask;
-  final bool overviewExpanded;
-  final VoidCallback onToggleOverview;
 
   @override
   Widget build(BuildContext context) {
@@ -1591,7 +1549,7 @@ class _AssistantTaskRail extends StatelessWidget {
         .length;
 
     return SurfaceCard(
-      borderRadius: 16,
+      borderRadius: 0,
       padding: EdgeInsets.zero,
       child: Column(
         children: [
@@ -1644,120 +1602,24 @@ class _AssistantTaskRail extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: palette.surfaceSecondary,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: palette.strokeSoft),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      InkWell(
-                        key: const Key('assistant-task-overview-toggle'),
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: onToggleOverview,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      appText(
-                                        '当前对话就是默认任务',
-                                        'This chat is the default task',
-                                      ),
-                                      style: theme.textTheme.titleSmall
-                                          ?.copyWith(
-                                            color: theme.colorScheme.onSurface,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      appText(
-                                        '点击展开任务说明与快捷入口',
-                                        'Tap to expand task guidance and shortcuts',
-                                      ),
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: palette.textSecondary,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Icon(
-                                overviewExpanded
-                                    ? Icons.keyboard_arrow_up_rounded
-                                    : Icons.keyboard_arrow_down_rounded,
-                                color: palette.textMuted,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (overviewExpanded) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          appText(
-                            '左侧选择任一任务，会直接切到这个任务对应的会话上下文。',
-                            'Selecting a task on the left jumps straight into that task conversation.',
-                          ),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: palette.textSecondary,
-                            height: 1.35,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _MetaPill(
-                              label:
-                                  '${appText('运行中', 'Running')} $runningCount',
-                              icon: Icons.play_circle_outline_rounded,
-                            ),
-                            _MetaPill(
-                              label:
-                                  '${appText('已完成', 'Completed')} $completedCount',
-                              icon: Icons.check_circle_outline_rounded,
-                            ),
-                            _MetaPill(
-                              label:
-                                  '${appText('技能', 'Skills')} ${controller.skills.length}',
-                              icon: Icons.auto_awesome_rounded,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            TextButton.icon(
-                              onPressed: onOpenTasks,
-                              icon: const Icon(Icons.layers_outlined, size: 18),
-                              label: Text(appText('打开任务页', 'Open tasks')),
-                            ),
-                            TextButton.icon(
-                              onPressed: onOpenSkills,
-                              icon: const Icon(Icons.hub_outlined, size: 18),
-                              label: Text(appText('查看技能', 'Open skills')),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _MetaPill(
+                      label: '${appText('运行中', 'Running')} $runningCount',
+                      icon: Icons.play_circle_outline_rounded,
+                    ),
+                    _MetaPill(
+                      label: '${appText('已完成', 'Completed')} $completedCount',
+                      icon: Icons.check_circle_outline_rounded,
+                    ),
+                    _MetaPill(
+                      label:
+                          '${appText('技能', 'Skills')} ${controller.skills.length}',
+                      icon: Icons.auto_awesome_rounded,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -2012,56 +1874,53 @@ class _AssistantEmptyState extends StatelessWidget {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 500),
+        constraints: const BoxConstraints(maxWidth: 520),
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: SurfaceCard(
-            borderRadius: 12,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: theme.textTheme.headlineSmall),
-                const SizedBox(height: 8),
-                Text(description, style: theme.textTheme.bodyMedium),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: connected
-                          ? onFocusComposer
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: theme.textTheme.headlineSmall),
+              const SizedBox(height: 8),
+              Text(description, style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton.icon(
+                    onPressed: connected
+                        ? onFocusComposer
+                        : reconnectAvailable
+                        ? () async {
+                            await onReconnectGateway();
+                          }
+                        : onOpenGateway,
+                    icon: Icon(
+                      connected
+                          ? Icons.edit_rounded
                           : reconnectAvailable
-                          ? () async {
-                              await onReconnectGateway();
-                            }
-                          : onOpenGateway,
-                      icon: Icon(
-                        connected
-                            ? Icons.edit_rounded
-                            : reconnectAvailable
-                            ? Icons.refresh_rounded
-                            : Icons.link_rounded,
-                      ),
-                      label: Text(
-                        connected
-                            ? appText('开始输入', 'Start typing')
-                            : reconnectAvailable
-                            ? appText('重新连接', 'Reconnect')
-                            : appText('连接 Gateway', 'Connect gateway'),
-                      ),
+                          ? Icons.refresh_rounded
+                          : Icons.link_rounded,
                     ),
-                    if (!connected)
-                      OutlinedButton.icon(
-                        onPressed: onOpenGateway,
-                        icon: const Icon(Icons.settings_rounded),
-                        label: Text(appText('编辑连接', 'Edit connection')),
-                      ),
-                  ],
-                ),
-              ],
-            ),
+                    label: Text(
+                      connected
+                          ? appText('开始输入', 'Start typing')
+                          : reconnectAvailable
+                          ? appText('重新连接', 'Reconnect')
+                          : appText('连接 Gateway', 'Connect gateway'),
+                    ),
+                  ),
+                  if (!connected)
+                    OutlinedButton.icon(
+                      onPressed: onOpenGateway,
+                      icon: const Icon(Icons.settings_rounded),
+                      label: Text(appText('编辑连接', 'Edit connection')),
+                    ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -2087,6 +1946,8 @@ class _ComposerBar extends StatelessWidget {
     required this.onOpenGateway,
     required this.onReconnectGateway,
     required this.onPickAttachments,
+    required this.suggestions,
+    required this.onSuggestionSelected,
     required this.onSend,
   });
 
@@ -2106,6 +1967,8 @@ class _ComposerBar extends StatelessWidget {
   final VoidCallback onOpenGateway;
   final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
+  final List<_AssistantSuggestion> suggestions;
+  final ValueChanged<_AssistantSuggestion> onSuggestionSelected;
   final Future<void> Function() onSend;
 
   @override
@@ -2141,7 +2004,7 @@ class _ComposerBar extends StatelessWidget {
         : appText('连接', 'Connect');
 
     return SurfaceCard(
-      borderRadius: 12,
+      borderRadius: 0,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2165,19 +2028,41 @@ class _ComposerBar extends StatelessWidget {
             controller: inputController,
             focusNode: focusNode,
             autofocus: true,
-            minLines: 2,
+            minLines: 3,
             maxLines: 6,
             decoration: InputDecoration(
               border: InputBorder.none,
               isCollapsed: true,
               hintText: appText(
-                '直接描述需求：运行任务、分析日志、部署节点……',
-                'Type naturally: run job autopilot, analyze logs, deploy node…',
+                '输入需求、补充上下文、继续追问，WorkBuddy 会沿用当前任务上下文持续处理。',
+                'Describe the task, add context, or continue the thread. WorkBuddy keeps the current task context.',
               ),
             ),
             onSubmitted: (_) => onSend(),
           ),
           const SizedBox(height: 8),
+          if (suggestions.isNotEmpty) ...[
+            SizedBox(
+              height: 34,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: suggestions.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final suggestion = suggestions[index];
+                  return ActionChip(
+                    key: ValueKey<String>(
+                      'assistant-suggestion-${suggestion.label}',
+                    ),
+                    label: Text(suggestion.label),
+                    avatar: Icon(suggestion.icon, size: 16),
+                    onPressed: () => onSuggestionSelected(suggestion),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           Row(
             children: [
               Expanded(
@@ -3394,4 +3279,16 @@ class _ComposerAttachment {
       mimeType: mimeType,
     );
   }
+}
+
+class _AssistantSuggestion {
+  const _AssistantSuggestion({
+    required this.label,
+    required this.prompt,
+    required this.icon,
+  });
+
+  final String label;
+  final String prompt;
+  final IconData icon;
 }

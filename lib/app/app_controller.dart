@@ -165,6 +165,25 @@ class AppController extends ChangeNotifier {
     return (await _store.loadAiGatewayApiKey())?.trim() ?? '';
   }
 
+  Future<void> openOnlineWorkspace() async {
+    const url = 'https://www.svc.plus/Xworkmate';
+    try {
+      if (Platform.isMacOS) {
+        await Process.run('open', [url]);
+        return;
+      }
+      if (Platform.isWindows) {
+        await Process.run('cmd', ['/c', 'start', '', url]);
+        return;
+      }
+      if (Platform.isLinux) {
+        await Process.run('xdg-open', [url]);
+      }
+    } catch (_) {
+      // Best effort only. Do not surface a blocking error from a convenience link.
+    }
+  }
+
   List<String> get aiGatewayModelChoices {
     final selected = settings.aiGateway.selectedModels
         .where(settings.aiGateway.availableModels.contains)
@@ -255,8 +274,8 @@ class AppController extends ChangeNotifier {
   }
 
   void navigateHome() {
-    final mainSessionKey = _runtime.snapshot.mainSessionKey?.trim().isNotEmpty ==
-            true
+    final mainSessionKey =
+        _runtime.snapshot.mainSessionKey?.trim().isNotEmpty == true
         ? _runtime.snapshot.mainSessionKey!.trim()
         : 'main';
     final destinationChanged = _destination != WorkspaceDestination.assistant;

@@ -1,14 +1,14 @@
- import 'package:flutter/material.dart';
- 
- import '../../app/app_controller.dart';
- import '../../i18n/app_language.dart';
- import '../../models/app_models.dart';
- import '../../runtime/runtime_models.dart';
- import '../../widgets/status_badge.dart';
- import '../../widgets/surface_card.dart';
- import '../../widgets/top_bar.dart';
+import 'package:flutter/material.dart';
 
-class SkillsPage extends StatelessWidget {
+import '../../app/app_controller.dart';
+import '../../i18n/app_language.dart';
+import '../../models/app_models.dart';
+import '../../runtime/runtime_models.dart';
+import '../../theme/app_palette.dart';
+import '../../widgets/desktop_workspace_scaffold.dart';
+import '../../widgets/status_badge.dart';
+
+class SkillsPage extends StatefulWidget {
   const SkillsPage({
     super.key,
     required this.controller,
@@ -19,181 +19,486 @@ class SkillsPage extends StatelessWidget {
   final ValueChanged<DetailPanelData> onOpenDetail;
 
   @override
-  Widget build(BuildContext context) {
-    final items = controller.skills;
+  State<SkillsPage> createState() => _SkillsPageState();
+}
 
+class _SkillsPageState extends State<SkillsPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+  String? _selectedSkillKey;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: controller,
+      animation: widget.controller,
       builder: (context, _) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        final controller = widget.controller;
+        final skills = controller.skills
+            .where(_matchesQuery)
+            .toList(growable: false);
+        final selected = _resolveSelectedSkill(skills);
+        return DesktopWorkspaceScaffold(
+          eyebrow: appText('技能与能力包', 'Skills and capabilities'),
+          title: appText('技能工作台', 'Skills workspace'),
+          subtitle: appText(
+            '左侧浏览技能包，右侧查看描述、依赖和使用建议。',
+            'Browse skills on the left, inspect descriptions, dependencies, and usage on the right.',
+          ),
+          toolbar: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              TopBar(
-                breadcrumbs: [
-                  AppBreadcrumbItem(
-                    label: appText('主页', 'Home'),
-                    icon: Icons.home_rounded,
-                    onTap: controller.navigateHome,
+              SizedBox(
+                width: 240,
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) {
+                    setState(() {
+                      _query = value.trim().toLowerCase();
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: appText('搜索技能', 'Search skills'),
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: appText('清除', 'Clear'),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _query = '';
+                              });
+                            },
+                            icon: const Icon(Icons.close_rounded),
+                          ),
                   ),
-                  AppBreadcrumbItem(label: appText('技能', 'Skills')),
-                ],
-                title: appText('技能', 'Skills'),
-                subtitle: appText(
-                  '管理已安装的技能包，查看技能状态与依赖。',
-                  'Manage installed skill packages, view status and dependencies.',
-                ),
-                trailing: Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    SizedBox(
-                      width: 220,
-                      child: TextField(
-                        decoration: InputDecoration(
-                          hintText: appText('搜索技能', 'Search skills'),
-                          prefixIcon: Icon(Icons.search_rounded),
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () async {
-                        await controller.skillsController.refresh(
-                          agentId: controller.selectedAgentId.isEmpty
-                              ? null
-                              : controller.selectedAgentId,
-                        );
-                      },
-                      icon: const Icon(Icons.refresh_rounded),
-                    ),
-                  ],
                 ),
               ),
-              const SizedBox(height: 24),
-              if (items.isEmpty)
-                SurfaceCard(
-                  child: Text(
-                    controller.connection.status ==
-                            RuntimeConnectionStatus.connected
-                        ? appText(
-                            '当前网关或代理没有加载技能。',
-                            'No skills loaded for the active gateway / agent.',
-                          )
-                        : appText(
-                            '连接 Gateway 后可加载技能。',
-                            'Connect a gateway to load skills.',
-                          ),
-                  ),
-                )
-              else
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: items
-                      .map(
-                        (skill) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: SurfaceCard(
-                            onTap: () => onOpenDetail(
-                              DetailPanelData(
-                                title: skill.name,
-                                subtitle: appText('技能', 'Skill'),
-                                icon: Icons.extension_rounded,
-                                status: skill.disabled
-                                    ? StatusInfo(
-                                        appText('已禁用', 'Disabled'),
-                                        StatusTone.warning,
-                                      )
-                                    : StatusInfo(
-                                        appText('已启用', 'Enabled'),
-                                        StatusTone.success,
-                                      ),
-                                description: skill.description,
-                                meta: [skill.source, skill.skillKey],
-                                actions: [appText('刷新', 'Refresh')],
-                                sections: [
-                                  DetailSection(
-                                    title: appText('依赖要求', 'Requirements'),
-                                    items: [
-                                      DetailItem(
-                                        label: appText(
-                                            '缺失二进制', 'Missing bins'),
-                                        value: skill.missingBins.isEmpty
-                                            ? appText('无', 'None')
-                                            : skill.missingBins.join(', '),
-                                      ),
-                                      DetailItem(
-                                        label: appText(
-                                            '缺失环境变量', 'Missing env'),
-                                        value: skill.missingEnv.isEmpty
-                                            ? appText('无', 'None')
-                                            : skill.missingEnv.join(', '),
-                                      ),
-                                      DetailItem(
-                                        label: appText('缺失配置', 'Missing config'),
-                                        value: skill.missingConfig.isEmpty
-                                            ? appText('无', 'None')
-                                            : skill.missingConfig.join(', '),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  flex: 4,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        skill.name,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium,
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        skill.description,
-                                        style:
-                                            Theme.of(context).textTheme.bodySmall,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 2,
-                                  child: StatusBadge(
-                                    status: skill.disabled
-                                        ? StatusInfo(
-                                            appText('已禁用', 'Disabled'),
-                                            StatusTone.warning,
-                                          )
-                                        : StatusInfo(
-                                            appText('已启用', 'Enabled'),
-                                            StatusTone.success,
-                                          ),
-                                  ),
-                                ),
-                                Expanded(flex: 2, child: Text(skill.source)),
-                                Expanded(
-                                  flex: 2,
-                                  child: Text(skill.primaryEnv ?? 'workspace'),
-                                ),
-                                const Icon(Icons.chevron_right_rounded),
-                              ],
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
+              IconButton(
+                tooltip: appText('刷新技能', 'Refresh skills'),
+                onPressed: () async {
+                  await controller.skillsController.refresh(
+                    agentId: controller.selectedAgentId.isEmpty
+                        ? null
+                        : controller.selectedAgentId,
+                  );
+                },
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: () =>
+                    controller.navigateTo(WorkspaceDestination.assistant),
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: Text(appText('回到对话使用', 'Use in assistant')),
+              ),
             ],
+          ),
+          child: Container(
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(color: context.palette.strokeSoft),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 360,
+                  child: _SkillsListPanel(
+                    skills: skills,
+                    selectedSkillKey: selected?.skillKey,
+                    onSelectSkill: (skill) {
+                      setState(() {
+                        _selectedSkillKey = skill.skillKey;
+                      });
+                    },
+                  ),
+                ),
+                Container(width: 1, color: context.palette.strokeSoft),
+                Expanded(
+                  child: _SkillDetailPanel(
+                    controller: controller,
+                    selected: selected,
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
     );
   }
+
+  bool _matchesQuery(GatewaySkillSummary skill) {
+    if (_query.isEmpty) {
+      return true;
+    }
+    final haystack = [
+      skill.name,
+      skill.description,
+      skill.source,
+      skill.skillKey,
+      skill.primaryEnv ?? '',
+    ].join(' ').toLowerCase();
+    return haystack.contains(_query);
+  }
+
+  GatewaySkillSummary? _resolveSelectedSkill(List<GatewaySkillSummary> skills) {
+    if (skills.isEmpty) {
+      return null;
+    }
+    for (final skill in skills) {
+      if (skill.skillKey == _selectedSkillKey) {
+        return skill;
+      }
+    }
+    return skills.first;
+  }
 }
+
+class _SkillsListPanel extends StatelessWidget {
+  const _SkillsListPanel({
+    required this.skills,
+    required this.selectedSkillKey,
+    required this.onSelectSkill,
+  });
+
+  final List<GatewaySkillSummary> skills;
+  final String? selectedSkillKey;
+  final ValueChanged<GatewaySkillSummary> onSelectSkill;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+          child: Row(
+            children: [
+              Text(
+                appText('技能列表', 'Skill list'),
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${skills.length}',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: palette.textMuted),
+              ),
+            ],
+          ),
+        ),
+        Container(height: 1, color: palette.strokeSoft),
+        Expanded(
+          child: skills.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Text(
+                      appText(
+                        '当前没有可展示的技能。',
+                        'No skills are available right now.',
+                      ),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: palette.textSecondary,
+                      ),
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(10),
+                  itemCount: skills.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final skill = skills[index];
+                    return _SkillListTile(
+                      skill: skill,
+                      selected: skill.skillKey == selectedSkillKey,
+                      onTap: () => onSelectSkill(skill),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SkillListTile extends StatelessWidget {
+  const _SkillListTile({
+    required this.skill,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final GatewaySkillSummary skill;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Material(
+      color: selected ? palette.accentMuted.withValues(alpha: 0.4) : null,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: selected ? palette.accent : palette.strokeSoft,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      skill.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  StatusBadge(
+                    status: skill.disabled
+                        ? _skillStatus(
+                            appText('已禁用', 'Disabled'),
+                            StatusTone.warning,
+                          )
+                        : _skillStatus(
+                            appText('已启用', 'Enabled'),
+                            StatusTone.success,
+                          ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                skill.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: palette.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                runSpacing: 6,
+                children: [
+                  _SkillMeta(label: skill.source),
+                  _SkillMeta(label: skill.primaryEnv ?? 'workspace'),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SkillDetailPanel extends StatelessWidget {
+  const _SkillDetailPanel({required this.controller, required this.selected});
+
+  final AppController controller;
+  final GatewaySkillSummary? selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    if (selected == null) {
+      return Center(
+        child: Text(
+          appText('选择左侧技能查看详情。', 'Select a skill on the left.'),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyLarge?.copyWith(color: palette.textSecondary),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Text(
+                selected!.name,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              StatusBadge(
+                status: selected!.disabled
+                    ? _skillStatus(
+                        appText('已禁用', 'Disabled'),
+                        StatusTone.warning,
+                      )
+                    : _skillStatus(
+                        appText('已启用', 'Enabled'),
+                        StatusTone.success,
+                      ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            selected!.description,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: palette.textSecondary,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _DependencyCard(
+                title: appText('缺失二进制', 'Missing bins'),
+                values: selected!.missingBins,
+              ),
+              _DependencyCard(
+                title: appText('缺失环境变量', 'Missing env'),
+                values: selected!.missingEnv,
+              ),
+              _DependencyCard(
+                title: appText('缺失配置', 'Missing config'),
+                values: selected!.missingConfig,
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: palette.surfaceSecondary,
+              border: Border.all(color: palette.strokeSoft),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  appText('在对话中使用', 'Use in the assistant'),
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  appText(
+                    '回到 Assistant 后，可通过下方建议按钮或直接描述需求来调用该技能上下文。',
+                    'After returning to Assistant, use the suggested chips or describe the task directly to route into this skill context.',
+                  ),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: palette.textSecondary,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Spacer(),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              FilledButton.icon(
+                onPressed: () =>
+                    controller.navigateTo(WorkspaceDestination.assistant),
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: Text(appText('去对话中使用', 'Use in assistant')),
+              ),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await controller.skillsController.refresh(
+                    agentId: controller.selectedAgentId.isEmpty
+                        ? null
+                        : controller.selectedAgentId,
+                  );
+                },
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(appText('刷新', 'Refresh')),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DependencyCard extends StatelessWidget {
+  const _DependencyCard({required this.title, required this.values});
+
+  final String title;
+  final List<String> values;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: palette.surfaceSecondary,
+        border: Border.all(color: palette.strokeSoft),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          Text(
+            values.isEmpty ? appText('无', 'None') : values.join(', '),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: palette.textSecondary,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkillMeta extends StatelessWidget {
+  const _SkillMeta({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: Theme.of(
+        context,
+      ).textTheme.bodySmall?.copyWith(color: context.palette.textMuted),
+    );
+  }
+}
+
+StatusInfo _skillStatus(String label, StatusTone tone) =>
+    StatusInfo(label, tone);
