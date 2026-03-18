@@ -1086,9 +1086,17 @@ class _AssistantSideTabRail extends StatelessWidget {
       key: const Key('assistant-side-pane'),
       width: 46,
       decoration: BoxDecoration(
-        color: palette.sidebar,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            palette.chromeHighlight.withValues(alpha: 0.96),
+            palette.chromeSurface,
+          ],
+        ),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: palette.sidebarBorder),
+        border: Border.all(color: palette.chromeStroke),
+        boxShadow: [palette.chromeShadowAmbient],
       ),
       child: Column(
         children: [
@@ -1110,7 +1118,7 @@ class _AssistantSideTabRail extends StatelessWidget {
           ),
           if (favoriteDestinations.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Container(width: 24, height: 1, color: palette.strokeSoft),
+            Container(width: 24, height: 1, color: palette.chromeStroke),
             const SizedBox(height: 4),
             Expanded(
               child: SingleChildScrollView(
@@ -1146,6 +1154,14 @@ class _AssistantSideTabRail extends StatelessWidget {
                 ? appText('展开侧板', 'Expand side pane')
                 : appText('收起侧板', 'Collapse side pane'),
             onPressed: onToggleCollapsed,
+            style: IconButton.styleFrom(
+              backgroundColor: palette.chromeSurface,
+              foregroundColor: palette.textSecondary,
+              side: BorderSide(color: palette.chromeStroke),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
             icon: Icon(
               collapsed
                   ? Icons.keyboard_double_arrow_right_rounded
@@ -1160,7 +1176,7 @@ class _AssistantSideTabRail extends StatelessWidget {
   }
 }
 
-class _AssistantSideTabButton extends StatelessWidget {
+class _AssistantSideTabButton extends StatefulWidget {
   const _AssistantSideTabButton({
     super.key,
     required this.icon,
@@ -1175,30 +1191,63 @@ class _AssistantSideTabButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_AssistantSideTabButton> createState() =>
+      _AssistantSideTabButtonState();
+}
+
+class _AssistantSideTabButtonState extends State<_AssistantSideTabButton> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final palette = context.palette;
 
     return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: onTap,
-          child: Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: selected ? palette.surfacePrimary : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: selected ? palette.strokeSoft : Colors.transparent,
+      message: widget.tooltip,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: widget.onTap,
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                gradient: widget.selected || _hovered
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          palette.chromeHighlight.withValues(
+                            alpha: widget.selected ? 0.96 : 0.84,
+                          ),
+                          widget.selected
+                              ? palette.chromeSurface
+                              : palette.chromeSurfacePressed,
+                        ],
+                      )
+                    : null,
+                color: widget.selected || _hovered ? null : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: widget.selected || _hovered
+                      ? palette.chromeStroke
+                      : Colors.transparent,
+                ),
+                boxShadow: widget.selected
+                    ? [palette.chromeShadowLift]
+                    : const [],
               ),
-            ),
-            child: Icon(
-              icon,
-              size: 18,
-              color: selected ? palette.textPrimary : palette.textSecondary,
+              child: Icon(
+                widget.icon,
+                size: 18,
+                color: widget.selected
+                    ? palette.textPrimary
+                    : palette.textSecondary,
+              ),
             ),
           ),
         ),
@@ -1306,6 +1355,7 @@ class _ConversationArea extends StatelessWidget {
     return SurfaceCard(
       borderRadius: 0,
       padding: EdgeInsets.zero,
+      tone: SurfaceCardTone.chrome,
       child: Column(
         children: [
           Padding(
@@ -1492,6 +1542,7 @@ class _AssistantTaskRail extends StatelessWidget {
     return SurfaceCard(
       borderRadius: 0,
       padding: EdgeInsets.zero,
+      tone: SurfaceCardTone.chrome,
       child: Column(
         children: [
           Padding(
@@ -1970,6 +2021,7 @@ class _ComposerBar extends StatelessWidget {
 
     return SurfaceCard(
       borderRadius: 10,
+      tone: SurfaceCardTone.chrome,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2060,11 +2112,11 @@ class _ComposerBar extends StatelessWidget {
             decoration: InputDecoration(
               isCollapsed: true,
               filled: true,
-              fillColor: palette.surfacePrimary,
+              fillColor: palette.chromeSurface,
               contentPadding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: palette.strokeSoft),
+                borderSide: BorderSide(color: palette.chromeStroke),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -2376,27 +2428,50 @@ class _ComposerBar extends StatelessWidget {
   }
 }
 
-class _ComposerIconButton extends StatelessWidget {
+class _ComposerIconButton extends StatefulWidget {
   const _ComposerIconButton({required this.icon});
 
   final IconData icon;
 
   @override
+  State<_ComposerIconButton> createState() => _ComposerIconButtonState();
+}
+
+class _ComposerIconButtonState extends State<_ComposerIconButton> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 34,
-      height: 34,
-      decoration: BoxDecoration(
-        color: context.palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: context.palette.strokeSoft),
+    final palette = context.palette;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              palette.chromeHighlight.withValues(alpha: _hovered ? 0.94 : 0.88),
+              _hovered ? palette.chromeSurfacePressed : palette.chromeSurface,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: palette.chromeStroke),
+          boxShadow: [
+            _hovered ? palette.chromeShadowLift : palette.chromeShadowAmbient,
+          ],
+        ),
+        child: Icon(widget.icon, size: 18, color: palette.textMuted),
       ),
-      child: Icon(icon, size: 18, color: context.palette.textMuted),
     );
   }
 }
 
-class _ComposerToolbarChip extends StatelessWidget {
+class _ComposerToolbarChip extends StatefulWidget {
   const _ComposerToolbarChip({
     super.key,
     required this.icon,
@@ -2416,42 +2491,63 @@ class _ComposerToolbarChip extends StatelessWidget {
   final EdgeInsetsGeometry padding;
 
   @override
+  State<_ComposerToolbarChip> createState() => _ComposerToolbarChipState();
+}
+
+class _ComposerToolbarChipState extends State<_ComposerToolbarChip> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = context.palette;
 
-    return Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(AppRadius.chip),
-        border: Border.all(color: palette.strokeSoft),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: palette.textMuted),
-          const SizedBox(width: 4),
-          ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxLabelWidth),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.onSurface,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Container(
+        padding: widget.padding,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              palette.chromeHighlight.withValues(alpha: _hovered ? 0.94 : 0.88),
+              _hovered ? palette.chromeSurfacePressed : palette.chromeSurface,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+          border: Border.all(color: palette.chromeStroke),
+          boxShadow: [
+            _hovered ? palette.chromeShadowLift : palette.chromeShadowAmbient,
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(widget.icon, size: 13, color: palette.textMuted),
+            const SizedBox(width: 4),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: widget.maxLabelWidth),
+              child: Text(
+                widget.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
               ),
             ),
-          ),
-          if (showChevron) ...[
-            const SizedBox(width: 2),
-            Icon(
-              Icons.keyboard_arrow_down_rounded,
-              size: 14,
-              color: palette.textMuted,
-            ),
+            if (widget.showChevron) ...[
+              const SizedBox(width: 2),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 14,
+                color: palette.textMuted,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

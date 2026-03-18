@@ -54,6 +54,7 @@ class _AssistantFocusPanelState extends State<AssistantFocusPanel> {
     return SurfaceCard(
       borderRadius: 16,
       padding: EdgeInsets.zero,
+      tone: SurfaceCardTone.chrome,
       child: Column(
         children: [
           Padding(
@@ -109,9 +110,17 @@ class _AssistantFocusPanelState extends State<AssistantFocusPanel> {
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: palette.surfaceSecondary,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            palette.chromeHighlight.withValues(alpha: 0.94),
+                            palette.chromeSurfacePressed,
+                          ],
+                        ),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: palette.strokeSoft),
+                        border: Border.all(color: palette.chromeStroke),
+                        boxShadow: [palette.chromeShadowLift],
                       ),
                       child: Icon(
                         Icons.add_rounded,
@@ -289,10 +298,16 @@ class _AssistantFocusPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     return switch (destination) {
       WorkspaceDestination.tasks => _TasksFocusPreview(controller: controller),
-      WorkspaceDestination.skills => _SkillsFocusPreview(controller: controller),
+      WorkspaceDestination.skills => _SkillsFocusPreview(
+        controller: controller,
+      ),
       WorkspaceDestination.nodes => _NodesFocusPreview(controller: controller),
-      WorkspaceDestination.agents => _AgentsFocusPreview(controller: controller),
-      WorkspaceDestination.mcpServer => _McpFocusPreview(controller: controller),
+      WorkspaceDestination.agents => _AgentsFocusPreview(
+        controller: controller,
+      ),
+      WorkspaceDestination.mcpServer => _McpFocusPreview(
+        controller: controller,
+      ),
       WorkspaceDestination.clawHub => _ClawHubFocusPreview(
         controller: controller,
       ),
@@ -353,10 +368,14 @@ class _TasksFocusPreview extends StatelessWidget {
         const SizedBox(height: 12),
         if (items.isEmpty)
           _PreviewEmptyState(
-            message: controller.connection.status ==
+            message:
+                controller.connection.status ==
                     RuntimeConnectionStatus.connected
                 ? appText('当前没有任务摘要。', 'No task summary yet.')
-                : appText('连接 Gateway 后这里会显示任务摘要。', 'Connect a gateway to load task summaries.'),
+                : appText(
+                    '连接 Gateway 后这里会显示任务摘要。',
+                    'Connect a gateway to load task summaries.',
+                  ),
           )
         else
           ...items.map(
@@ -384,9 +403,16 @@ class _SkillsFocusPreview extends StatelessWidget {
     final items = controller.skills.take(4).toList(growable: false);
     if (items.isEmpty) {
       return _PreviewEmptyState(
-        message: controller.connection.status == RuntimeConnectionStatus.connected
-            ? appText('当前代理没有已加载技能。', 'No skills are loaded for the active agent.')
-            : appText('连接 Gateway 后可查看技能摘要。', 'Connect a gateway to inspect skills here.'),
+        message:
+            controller.connection.status == RuntimeConnectionStatus.connected
+            ? appText(
+                '当前代理没有已加载技能。',
+                'No skills are loaded for the active agent.',
+              )
+            : appText(
+                '连接 Gateway 后可查看技能摘要。',
+                'Connect a gateway to inspect skills here.',
+              ),
       );
     }
     return Column(
@@ -430,11 +456,11 @@ class _NodesFocusPreview extends StatelessWidget {
                 title: instance.host?.trim().isNotEmpty == true
                     ? instance.host!
                     : instance.id,
-                subtitle: [
-                  instance.platform,
-                  instance.deviceFamily,
-                  instance.ip,
-                ].whereType<String>().where((item) => item.trim().isNotEmpty).join(' · '),
+                subtitle:
+                    [instance.platform, instance.deviceFamily, instance.ip]
+                        .whereType<String>()
+                        .where((item) => item.trim().isNotEmpty)
+                        .join(' · '),
                 trailing: instance.mode ?? appText('未知', 'Unknown'),
               ),
             ),
@@ -662,13 +688,19 @@ class _SettingsFocusPreview extends StatelessWidget {
         const SizedBox(height: 8),
         _FocusListTile(
           title: appText('执行目标', 'Execution target'),
-          subtitle: appText('Assistant 默认运行位置', 'Default assistant execution target'),
+          subtitle: appText(
+            'Assistant 默认运行位置',
+            'Default assistant execution target',
+          ),
           trailing: controller.assistantExecutionTarget.label,
         ),
         const SizedBox(height: 8),
         _FocusListTile(
           title: appText('权限', 'Permissions'),
-          subtitle: appText('Assistant 默认权限级别', 'Default assistant permission level'),
+          subtitle: appText(
+            'Assistant 默认权限级别',
+            'Default assistant permission level',
+          ),
           trailing: controller.assistantPermissionLevel.label,
         ),
       ],
