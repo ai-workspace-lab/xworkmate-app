@@ -38,9 +38,9 @@ class AppTypography {
   static const FontWeight titleWeight = FontWeight.w600;
   static const double titleHeight = 24 / 20;
 
-  static const double sectionSize = 16.0;
+  static const double sectionSize = 13.0;
   static const FontWeight sectionWeight = FontWeight.w600;
-  static const double sectionHeight = 20 / 16;
+  static const double sectionHeight = 14 / 13;
 
   static const double bodySize = 14.0;
   static const FontWeight bodyWeight = FontWeight.w400;
@@ -357,17 +357,17 @@ class AppTheme {
         base.titleLarge?.copyWith(
           fontSize: AppTypography.sectionSize,
           fontWeight: FontWeight.w600,
-          letterSpacing: -0.08,
+          letterSpacing: 0,
           height: AppTypography.sectionHeight,
           color: palette.textPrimary,
         ),
       ),
       titleMedium: withUiFont(
         base.titleMedium?.copyWith(
-          fontSize: AppTypography.emphasizedBodySize,
+          fontSize: AppTypography.sectionSize,
           fontWeight: AppTypography.sectionWeight,
-          letterSpacing: -0.04,
-          height: AppTypography.emphasizedBodyHeight,
+          letterSpacing: 0,
+          height: AppTypography.sectionHeight,
           color: palette.textPrimary,
         ),
       ),
@@ -405,9 +405,9 @@ class AppTheme {
       ),
       labelLarge: withUiFont(
         base.labelLarge?.copyWith(
-          fontSize: AppTypography.emphasizedBodySize,
+          fontSize: AppTypography.sectionSize,
           fontWeight: AppTypography.emphasizedBodyWeight,
-          height: AppTypography.emphasizedBodyHeight,
+          height: AppTypography.sectionHeight,
           color: palette.textPrimary,
         ),
       ),
