@@ -69,6 +69,7 @@ class _AppShellState extends State<AppShell> {
               builder: (context, constraints) {
                 final palette = context.palette;
                 final platform = Theme.of(context).platform;
+                final brightness = Theme.of(context).brightness;
                 final isCompactMobile =
                     (platform == TargetPlatform.iOS ||
                         platform == TargetPlatform.android) &&
@@ -272,10 +273,71 @@ class _AppShellState extends State<AppShell> {
                               ),
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
-                                  color: palette.canvas,
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      palette.chromeBackground,
+                                      palette.canvas,
+                                    ],
+                                  ),
                                 ),
                                 child: Stack(
                                   children: [
+                                    Positioned(
+                                      top: -180,
+                                      right: -80,
+                                      child: IgnorePointer(
+                                        child: Container(
+                                          width: 420,
+                                          height: 420,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            gradient: RadialGradient(
+                                              colors: [
+                                                palette.chromeHighlight
+                                                    .withValues(
+                                                      alpha:
+                                                          brightness ==
+                                                              Brightness.dark
+                                                          ? 0.10
+                                                          : 0.58,
+                                                    ),
+                                                palette.chromeHighlight
+                                                    .withValues(alpha: 0),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: -220,
+                                      left: -140,
+                                      child: IgnorePointer(
+                                        child: Container(
+                                          width: 360,
+                                          height: 360,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            gradient: RadialGradient(
+                                              colors: [
+                                                palette.chromeInset.withValues(
+                                                  alpha:
+                                                      brightness ==
+                                                          Brightness.dark
+                                                      ? 0.10
+                                                      : 0.36,
+                                                ),
+                                                palette.chromeInset.withValues(
+                                                  alpha: 0,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                     _buildCurrentPage(controller.openDetail),
                                   ],
                                 ),
@@ -419,13 +481,24 @@ class _SidebarRevealRailState extends State<_SidebarRevealRail> {
             duration: const Duration(milliseconds: 180),
             width: _hovered ? 22 : 10,
             decoration: BoxDecoration(
-              color: _hovered ? palette.surfaceSecondary : Colors.transparent,
+              gradient: _hovered
+                  ? LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        palette.chromeHighlight.withValues(alpha: 0.92),
+                        palette.chromeSurface,
+                      ],
+                    )
+                  : null,
+              color: _hovered ? null : Colors.transparent,
               borderRadius: const BorderRadius.horizontal(
                 right: Radius.circular(14),
               ),
               border: Border.all(
-                color: _hovered ? palette.strokeSoft : Colors.transparent,
+                color: _hovered ? palette.chromeStroke : Colors.transparent,
               ),
+              boxShadow: _hovered ? [palette.chromeShadowLift] : const [],
             ),
             child: _hovered
                 ? Icon(

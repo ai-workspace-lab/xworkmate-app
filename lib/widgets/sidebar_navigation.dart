@@ -81,9 +81,17 @@ class SidebarNavigation extends StatelessWidget {
       height: double.infinity,
       margin: marginOverride ?? const EdgeInsets.fromLTRB(4, 4, 4, 0),
       decoration: BoxDecoration(
-        color: palette.sidebar,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            palette.chromeHighlight.withValues(alpha: 0.96),
+            palette.chromeSurface,
+          ],
+        ),
         borderRadius: BorderRadius.circular(AppRadius.sidebar),
-        border: Border.all(color: palette.sidebarBorder),
+        border: Border.all(color: palette.chromeStroke),
+        boxShadow: [palette.chromeShadowAmbient],
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -184,8 +192,16 @@ class SidebarHeader extends StatelessWidget {
       height: isCollapsed ? 36 : 28,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        color: palette.surfaceSecondary,
-        border: Border.all(color: palette.strokeSoft),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            palette.chromeHighlight.withValues(alpha: 0.94),
+            palette.chromeSurfacePressed,
+          ],
+        ),
+        border: Border.all(color: palette.chromeStroke),
+        boxShadow: [palette.chromeShadowLift],
       ),
       child: Icon(
         Icons.crop_square_rounded,
@@ -310,9 +326,9 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
     final theme = Theme.of(context);
     final isPrimary = widget.emphasis == _SidebarItemEmphasis.primary;
     final background = widget.selected
-        ? palette.surfacePrimary
+        ? palette.chromeSurface
         : _hovered
-        ? palette.surfaceTertiary
+        ? palette.chromeSurfacePressed
         : Colors.transparent;
     final iconColor = widget.selected
         ? palette.textPrimary
@@ -328,11 +344,26 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           decoration: BoxDecoration(
-            color: background,
+            gradient: widget.selected || _hovered
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      palette.chromeHighlight.withValues(
+                        alpha: widget.selected ? 0.96 : 0.82,
+                      ),
+                      background,
+                    ],
+                  )
+                : null,
+            color: widget.selected || _hovered ? null : Colors.transparent,
             borderRadius: BorderRadius.circular(radius),
             border: Border.all(
-              color: widget.selected ? palette.strokeSoft : Colors.transparent,
+              color: widget.selected || _hovered
+                  ? palette.chromeStroke
+                  : Colors.transparent,
             ),
+            boxShadow: widget.selected ? [palette.chromeShadowLift] : const [],
           ),
           child: Material(
             color: Colors.transparent,
@@ -509,7 +540,7 @@ class SidebarFooter extends StatelessWidget {
         children: [
           Container(
             height: 1,
-            color: palette.sidebarBorder.withValues(alpha: 0.7),
+            color: palette.chromeStroke.withValues(alpha: 0.9),
           ),
           const SizedBox(height: 6),
           _SidebarLanguageButton(
@@ -569,7 +600,7 @@ class SidebarFooter extends StatelessWidget {
       children: [
         Container(
           height: 1,
-          color: palette.sidebarBorder.withValues(alpha: 0.7),
+          color: palette.chromeStroke.withValues(alpha: 0.9),
         ),
         const SizedBox(height: AppSpacing.xs),
         _SidebarNavItem(
@@ -665,8 +696,8 @@ class _SidebarActionButtonState extends State<_SidebarActionButton> {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final resolvedBackground = _hovered
-        ? palette.surfaceTertiary
-        : palette.surfaceSecondary;
+        ? palette.chromeSurfacePressed
+        : palette.chromeSurface;
 
     return Tooltip(
       message: widget.tooltip ?? '',
@@ -676,9 +707,21 @@ class _SidebarActionButtonState extends State<_SidebarActionButton> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           decoration: BoxDecoration(
-            color: resolvedBackground,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                palette.chromeHighlight.withValues(
+                  alpha: _hovered ? 0.94 : 0.88,
+                ),
+                resolvedBackground,
+              ],
+            ),
             borderRadius: BorderRadius.circular(AppRadius.button),
-            border: Border.all(color: palette.strokeSoft),
+            border: Border.all(color: palette.chromeStroke),
+            boxShadow: [
+              _hovered ? palette.chromeShadowLift : palette.chromeShadowAmbient,
+            ],
           ),
           child: Material(
             color: Colors.transparent,
@@ -732,9 +775,9 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final background = widget.selected
-        ? palette.surfacePrimary
+        ? palette.chromeSurface
         : _hovered
-        ? palette.surfaceTertiary
+        ? palette.chromeSurfacePressed
         : Colors.transparent;
 
     return MouseRegion(
@@ -745,11 +788,26 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           decoration: BoxDecoration(
-            color: background,
+            gradient: widget.selected || _hovered
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      palette.chromeHighlight.withValues(
+                        alpha: widget.selected ? 0.96 : 0.84,
+                      ),
+                      background,
+                    ],
+                  )
+                : null,
+            color: widget.selected || _hovered ? null : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.button),
             border: Border.all(
-              color: widget.selected ? palette.strokeSoft : Colors.transparent,
+              color: widget.selected || _hovered
+                  ? palette.chromeStroke
+                  : Colors.transparent,
             ),
+            boxShadow: widget.selected ? [palette.chromeShadowLift] : const [],
           ),
           child: Material(
             color: Colors.transparent,
@@ -858,11 +916,25 @@ class _SidebarLanguageButtonState extends State<_SidebarLanguageButton> {
             height: size,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: _hovered
-                  ? palette.surfaceTertiary
-                  : palette.surfaceSecondary,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  palette.chromeHighlight.withValues(
+                    alpha: _hovered ? 0.94 : 0.88,
+                  ),
+                  _hovered
+                      ? palette.chromeSurfacePressed
+                      : palette.chromeSurface,
+                ],
+              ),
               borderRadius: BorderRadius.circular(AppRadius.button),
-              border: Border.all(color: palette.strokeSoft),
+              border: Border.all(color: palette.chromeStroke),
+              boxShadow: [
+                _hovered
+                    ? palette.chromeShadowLift
+                    : palette.chromeShadowAmbient,
+              ],
             ),
             child: Text(
               widget.appLanguage.compactLabel,

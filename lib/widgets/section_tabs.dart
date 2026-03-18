@@ -36,9 +36,17 @@ class SectionTabs extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.xxs),
       decoration: BoxDecoration(
-        color: palette.surfaceSecondary,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            palette.chromeHighlight.withValues(alpha: 0.94),
+            palette.chromeSurfacePressed,
+          ],
+        ),
         borderRadius: BorderRadius.circular(AppRadius.chip),
-        border: Border.all(color: palette.strokeSoft),
+        border: Border.all(color: palette.chromeStroke),
+        boxShadow: [palette.chromeShadowAmbient],
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -92,15 +100,28 @@ class _SectionTabChipState extends State<_SectionTabChip> {
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeInOut,
         decoration: BoxDecoration(
-          color: widget.selected
-              ? palette.surfacePrimary
-              : _hovered
-              ? palette.surfaceTertiary
-              : Colors.transparent,
+          gradient: widget.selected || _hovered
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    palette.chromeHighlight.withValues(
+                      alpha: widget.selected ? 0.96 : 0.86,
+                    ),
+                    widget.selected
+                        ? palette.chromeSurface
+                        : palette.chromeSurfacePressed,
+                  ],
+                )
+              : null,
+          color: widget.selected || _hovered ? null : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadius.button),
           border: Border.all(
-            color: widget.selected ? palette.stroke : Colors.transparent,
+            color: widget.selected || _hovered
+                ? palette.chromeStroke
+                : Colors.transparent,
           ),
+          boxShadow: widget.selected ? [palette.chromeShadowLift] : const [],
         ),
         child: Material(
           color: Colors.transparent,
