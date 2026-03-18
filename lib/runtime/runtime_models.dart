@@ -92,6 +92,373 @@ extension CodeAgentRuntimeModeCopy on CodeAgentRuntimeMode {
   }
 }
 
+enum VpnMode { tunnel, proxy }
+
+extension VpnModeCopy on VpnMode {
+  String get label => switch (this) {
+    VpnMode.tunnel => appText('隧道', 'Tunnel'),
+    VpnMode.proxy => appText('代理', 'Proxy'),
+  };
+
+  static VpnMode fromJsonValue(String? value) {
+    return VpnMode.values.firstWhere(
+      (item) => item.name == value,
+      orElse: () => VpnMode.proxy,
+    );
+  }
+}
+
+enum DesktopEnvironment { unknown, gnome, kde }
+
+extension DesktopEnvironmentCopy on DesktopEnvironment {
+  String get label => switch (this) {
+    DesktopEnvironment.unknown => appText('未知桌面', 'Unknown Desktop'),
+    DesktopEnvironment.gnome => 'GNOME',
+    DesktopEnvironment.kde => 'KDE Plasma',
+  };
+
+  static DesktopEnvironment fromJsonValue(String? value) {
+    return DesktopEnvironment.values.firstWhere(
+      (item) => item.name == value,
+      orElse: () => DesktopEnvironment.unknown,
+    );
+  }
+}
+
+class LinuxDesktopConfig {
+  const LinuxDesktopConfig({
+    required this.preferredMode,
+    required this.vpnConnectionName,
+    required this.proxyHost,
+    required this.proxyPort,
+    required this.trayEnabled,
+  });
+
+  final VpnMode preferredMode;
+  final String vpnConnectionName;
+  final String proxyHost;
+  final int proxyPort;
+  final bool trayEnabled;
+
+  factory LinuxDesktopConfig.defaults() {
+    return const LinuxDesktopConfig(
+      preferredMode: VpnMode.proxy,
+      vpnConnectionName: 'XWorkmate Tunnel',
+      proxyHost: '127.0.0.1',
+      proxyPort: 7890,
+      trayEnabled: true,
+    );
+  }
+
+  LinuxDesktopConfig copyWith({
+    VpnMode? preferredMode,
+    String? vpnConnectionName,
+    String? proxyHost,
+    int? proxyPort,
+    bool? trayEnabled,
+  }) {
+    return LinuxDesktopConfig(
+      preferredMode: preferredMode ?? this.preferredMode,
+      vpnConnectionName: vpnConnectionName ?? this.vpnConnectionName,
+      proxyHost: proxyHost ?? this.proxyHost,
+      proxyPort: proxyPort ?? this.proxyPort,
+      trayEnabled: trayEnabled ?? this.trayEnabled,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'preferredMode': preferredMode.name,
+      'vpnConnectionName': vpnConnectionName,
+      'proxyHost': proxyHost,
+      'proxyPort': proxyPort,
+      'trayEnabled': trayEnabled,
+    };
+  }
+
+  factory LinuxDesktopConfig.fromJson(Map<String, dynamic> json) {
+    final defaults = LinuxDesktopConfig.defaults();
+    return LinuxDesktopConfig(
+      preferredMode: VpnModeCopy.fromJsonValue(
+        json['preferredMode'] as String?,
+      ),
+      vpnConnectionName:
+          json['vpnConnectionName'] as String? ?? defaults.vpnConnectionName,
+      proxyHost: json['proxyHost'] as String? ?? defaults.proxyHost,
+      proxyPort: json['proxyPort'] as int? ?? defaults.proxyPort,
+      trayEnabled: json['trayEnabled'] as bool? ?? defaults.trayEnabled,
+    );
+  }
+}
+
+class SystemProxyState {
+  const SystemProxyState({
+    required this.enabled,
+    required this.host,
+    required this.port,
+    required this.backend,
+    required this.lastAppliedMode,
+  });
+
+  final bool enabled;
+  final String host;
+  final int port;
+  final String backend;
+  final VpnMode lastAppliedMode;
+
+  factory SystemProxyState.defaults({LinuxDesktopConfig? config}) {
+    final resolvedConfig = config ?? LinuxDesktopConfig.defaults();
+    return SystemProxyState(
+      enabled: resolvedConfig.preferredMode == VpnMode.proxy,
+      host: resolvedConfig.proxyHost,
+      port: resolvedConfig.proxyPort,
+      backend: '',
+      lastAppliedMode: resolvedConfig.preferredMode,
+    );
+  }
+
+  SystemProxyState copyWith({
+    bool? enabled,
+    String? host,
+    int? port,
+    String? backend,
+    VpnMode? lastAppliedMode,
+  }) {
+    return SystemProxyState(
+      enabled: enabled ?? this.enabled,
+      host: host ?? this.host,
+      port: port ?? this.port,
+      backend: backend ?? this.backend,
+      lastAppliedMode: lastAppliedMode ?? this.lastAppliedMode,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'enabled': enabled,
+      'host': host,
+      'port': port,
+      'backend': backend,
+      'lastAppliedMode': lastAppliedMode.name,
+    };
+  }
+
+  factory SystemProxyState.fromJson(
+    Map<String, dynamic> json, {
+    LinuxDesktopConfig? config,
+  }) {
+    final defaults = SystemProxyState.defaults(config: config);
+    return SystemProxyState(
+      enabled: json['enabled'] as bool? ?? defaults.enabled,
+      host: json['host'] as String? ?? defaults.host,
+      port: json['port'] as int? ?? defaults.port,
+      backend: json['backend'] as String? ?? defaults.backend,
+      lastAppliedMode: VpnModeCopy.fromJsonValue(
+        json['lastAppliedMode'] as String?,
+      ),
+    );
+  }
+}
+
+class TunnelSessionState {
+  const TunnelSessionState({
+    required this.available,
+    required this.connected,
+    required this.connectionName,
+    required this.backend,
+    required this.lastError,
+  });
+
+  final bool available;
+  final bool connected;
+  final String connectionName;
+  final String backend;
+  final String lastError;
+
+  factory TunnelSessionState.defaults({LinuxDesktopConfig? config}) {
+    final resolvedConfig = config ?? LinuxDesktopConfig.defaults();
+    return TunnelSessionState(
+      available: false,
+      connected: false,
+      connectionName: resolvedConfig.vpnConnectionName,
+      backend: '',
+      lastError: '',
+    );
+  }
+
+  TunnelSessionState copyWith({
+    bool? available,
+    bool? connected,
+    String? connectionName,
+    String? backend,
+    String? lastError,
+  }) {
+    return TunnelSessionState(
+      available: available ?? this.available,
+      connected: connected ?? this.connected,
+      connectionName: connectionName ?? this.connectionName,
+      backend: backend ?? this.backend,
+      lastError: lastError ?? this.lastError,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'available': available,
+      'connected': connected,
+      'connectionName': connectionName,
+      'backend': backend,
+      'lastError': lastError,
+    };
+  }
+
+  factory TunnelSessionState.fromJson(
+    Map<String, dynamic> json, {
+    LinuxDesktopConfig? config,
+  }) {
+    final defaults = TunnelSessionState.defaults(config: config);
+    return TunnelSessionState(
+      available: json['available'] as bool? ?? defaults.available,
+      connected: json['connected'] as bool? ?? defaults.connected,
+      connectionName:
+          json['connectionName'] as String? ?? defaults.connectionName,
+      backend: json['backend'] as String? ?? defaults.backend,
+      lastError: json['lastError'] as String? ?? defaults.lastError,
+    );
+  }
+}
+
+class DesktopIntegrationState {
+  const DesktopIntegrationState({
+    required this.isSupported,
+    required this.environment,
+    required this.mode,
+    required this.trayAvailable,
+    required this.trayEnabled,
+    required this.autostartEnabled,
+    required this.networkManagerAvailable,
+    required this.systemProxy,
+    required this.tunnel,
+    required this.statusMessage,
+  });
+
+  final bool isSupported;
+  final DesktopEnvironment environment;
+  final VpnMode mode;
+  final bool trayAvailable;
+  final bool trayEnabled;
+  final bool autostartEnabled;
+  final bool networkManagerAvailable;
+  final SystemProxyState systemProxy;
+  final TunnelSessionState tunnel;
+  final String statusMessage;
+
+  factory DesktopIntegrationState.loading() {
+    final config = LinuxDesktopConfig.defaults();
+    return DesktopIntegrationState(
+      isSupported: true,
+      environment: DesktopEnvironment.unknown,
+      mode: config.preferredMode,
+      trayAvailable: false,
+      trayEnabled: config.trayEnabled,
+      autostartEnabled: false,
+      networkManagerAvailable: false,
+      systemProxy: SystemProxyState.defaults(config: config),
+      tunnel: TunnelSessionState.defaults(config: config),
+      statusMessage: '',
+    );
+  }
+
+  factory DesktopIntegrationState.unsupported({
+    LinuxDesktopConfig? config,
+    String message = '',
+  }) {
+    final resolvedConfig = config ?? LinuxDesktopConfig.defaults();
+    return DesktopIntegrationState(
+      isSupported: false,
+      environment: DesktopEnvironment.unknown,
+      mode: resolvedConfig.preferredMode,
+      trayAvailable: false,
+      trayEnabled: false,
+      autostartEnabled: false,
+      networkManagerAvailable: false,
+      systemProxy: SystemProxyState.defaults(config: resolvedConfig),
+      tunnel: TunnelSessionState.defaults(config: resolvedConfig),
+      statusMessage: message,
+    );
+  }
+
+  DesktopIntegrationState copyWith({
+    bool? isSupported,
+    DesktopEnvironment? environment,
+    VpnMode? mode,
+    bool? trayAvailable,
+    bool? trayEnabled,
+    bool? autostartEnabled,
+    bool? networkManagerAvailable,
+    SystemProxyState? systemProxy,
+    TunnelSessionState? tunnel,
+    String? statusMessage,
+  }) {
+    return DesktopIntegrationState(
+      isSupported: isSupported ?? this.isSupported,
+      environment: environment ?? this.environment,
+      mode: mode ?? this.mode,
+      trayAvailable: trayAvailable ?? this.trayAvailable,
+      trayEnabled: trayEnabled ?? this.trayEnabled,
+      autostartEnabled: autostartEnabled ?? this.autostartEnabled,
+      networkManagerAvailable:
+          networkManagerAvailable ?? this.networkManagerAvailable,
+      systemProxy: systemProxy ?? this.systemProxy,
+      tunnel: tunnel ?? this.tunnel,
+      statusMessage: statusMessage ?? this.statusMessage,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'isSupported': isSupported,
+      'environment': environment.name,
+      'mode': mode.name,
+      'trayAvailable': trayAvailable,
+      'trayEnabled': trayEnabled,
+      'autostartEnabled': autostartEnabled,
+      'networkManagerAvailable': networkManagerAvailable,
+      'systemProxy': systemProxy.toJson(),
+      'tunnel': tunnel.toJson(),
+      'statusMessage': statusMessage,
+    };
+  }
+
+  factory DesktopIntegrationState.fromJson(
+    Map<String, dynamic> json, {
+    LinuxDesktopConfig? fallbackConfig,
+  }) {
+    final config = fallbackConfig ?? LinuxDesktopConfig.defaults();
+    return DesktopIntegrationState(
+      isSupported: json['isSupported'] as bool? ?? true,
+      environment: DesktopEnvironmentCopy.fromJsonValue(
+        json['environment'] as String?,
+      ),
+      mode: VpnModeCopy.fromJsonValue(json['mode'] as String?),
+      trayAvailable: json['trayAvailable'] as bool? ?? false,
+      trayEnabled: json['trayEnabled'] as bool? ?? config.trayEnabled,
+      autostartEnabled: json['autostartEnabled'] as bool? ?? false,
+      networkManagerAvailable:
+          json['networkManagerAvailable'] as bool? ?? false,
+      systemProxy: SystemProxyState.fromJson(
+        (json['systemProxy'] as Map?)?.cast<String, dynamic>() ?? const {},
+        config: config,
+      ),
+      tunnel: TunnelSessionState.fromJson(
+        (json['tunnel'] as Map?)?.cast<String, dynamic>() ?? const {},
+        config: config,
+      ),
+      statusMessage: json['statusMessage'] as String? ?? '',
+    );
+  }
+}
+
 class GatewayConnectionProfile {
   const GatewayConnectionProfile({
     required this.mode,
@@ -526,6 +893,7 @@ class SettingsSnapshot {
     required this.accountUsername,
     required this.accountWorkspace,
     required this.accountLocalMode,
+    required this.linuxDesktop,
     required this.assistantExecutionTarget,
     required this.assistantPermissionLevel,
     required this.assistantNavigationDestinations,
@@ -554,6 +922,7 @@ class SettingsSnapshot {
   final String accountUsername;
   final String accountWorkspace;
   final bool accountLocalMode;
+  final LinuxDesktopConfig linuxDesktop;
   final AssistantExecutionTarget assistantExecutionTarget;
   final AssistantPermissionLevel assistantPermissionLevel;
   final List<WorkspaceDestination> assistantNavigationDestinations;
@@ -583,6 +952,7 @@ class SettingsSnapshot {
       accountUsername: '',
       accountWorkspace: 'Default Workspace',
       accountLocalMode: true,
+      linuxDesktop: LinuxDesktopConfig.defaults(),
       assistantExecutionTarget: AssistantExecutionTarget.local,
       assistantPermissionLevel: AssistantPermissionLevel.defaultAccess,
       assistantNavigationDestinations: kAssistantNavigationDestinationDefaults,
@@ -613,6 +983,7 @@ class SettingsSnapshot {
     String? accountUsername,
     String? accountWorkspace,
     bool? accountLocalMode,
+    LinuxDesktopConfig? linuxDesktop,
     AssistantExecutionTarget? assistantExecutionTarget,
     AssistantPermissionLevel? assistantPermissionLevel,
     List<WorkspaceDestination>? assistantNavigationDestinations,
@@ -641,6 +1012,7 @@ class SettingsSnapshot {
       accountUsername: accountUsername ?? this.accountUsername,
       accountWorkspace: accountWorkspace ?? this.accountWorkspace,
       accountLocalMode: accountLocalMode ?? this.accountLocalMode,
+      linuxDesktop: linuxDesktop ?? this.linuxDesktop,
       assistantExecutionTarget:
           assistantExecutionTarget ?? this.assistantExecutionTarget,
       assistantPermissionLevel:
@@ -676,6 +1048,7 @@ class SettingsSnapshot {
       'accountUsername': accountUsername,
       'accountWorkspace': accountWorkspace,
       'accountLocalMode': accountLocalMode,
+      'linuxDesktop': linuxDesktop.toJson(),
       'assistantExecutionTarget': assistantExecutionTarget.name,
       'assistantPermissionLevel': assistantPermissionLevel.name,
       'assistantNavigationDestinations': assistantNavigationDestinations
@@ -753,6 +1126,9 @@ class SettingsSnapshot {
           json['accountWorkspace'] as String? ??
           SettingsSnapshot.defaults().accountWorkspace,
       accountLocalMode: json['accountLocalMode'] as bool? ?? true,
+      linuxDesktop: LinuxDesktopConfig.fromJson(
+        (json['linuxDesktop'] as Map?)?.cast<String, dynamic>() ?? const {},
+      ),
       assistantExecutionTarget: AssistantExecutionTargetCopy.fromJsonValue(
         json['assistantExecutionTarget'] as String?,
       ),

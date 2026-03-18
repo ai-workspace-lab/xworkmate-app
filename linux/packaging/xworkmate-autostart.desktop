@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=XWorkmate
+Exec=/opt/xworkmate/xworkmate
+Icon=xworkmate
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
