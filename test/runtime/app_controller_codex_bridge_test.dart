@@ -11,6 +11,9 @@ import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
+const String _manualCodexBridgeSkipReason =
+    'Disabled by default: reserved for manual validation with a dedicated Codex environment only.';
+
 class _FakeGatewayRuntime extends GatewayRuntime {
   _FakeGatewayRuntime({required bool connected})
     : super(
@@ -121,163 +124,180 @@ class _FakeCodexRuntime extends CodexRuntime {
 }
 
 void main() {
-  test(
-    'AppController enables external Codex bridge and registers to gateway',
-    () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final store = SecureConfigStore();
-      final gateway = _FakeGatewayRuntime(connected: true);
-      final codex = _FakeCodexRuntime();
-      final coordinator = RuntimeCoordinator(gateway: gateway, codex: codex);
-      final controller = AppController(
-        store: store,
-        runtimeCoordinator: coordinator,
+  group(
+    'Manual Codex bridge validation',
+    () {
+      test(
+        'AppController enables external Codex bridge and registers to gateway',
+        () async {
+          SharedPreferences.setMockInitialValues(<String, Object>{});
+          final store = SecureConfigStore();
+          final gateway = _FakeGatewayRuntime(connected: true);
+          final codex = _FakeCodexRuntime();
+          final coordinator = RuntimeCoordinator(
+            gateway: gateway,
+            codex: codex,
+          );
+          final controller = AppController(
+            store: store,
+            runtimeCoordinator: coordinator,
+          );
+          addTearDown(controller.dispose);
+
+          await _waitFor(() => !controller.initializing);
+
+          final tempDir = await Directory.systemTemp.createTemp('codex-bridge-');
+          addTearDown(() async {
+            if (await tempDir.exists()) {
+              await tempDir.delete(recursive: true);
+            }
+          });
+          final codexBinary = File('${tempDir.path}/codex');
+          await codexBinary.writeAsString('#!/bin/sh\nexit 0\n');
+
+          await controller.settingsController.saveAiGatewayApiKey(
+            'bridge-secret',
+          );
+          await controller.saveSettings(
+            controller.settings.copyWith(
+              workspacePath: tempDir.path,
+              codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
+              codexCliPath: codexBinary.path,
+              aiGateway: controller.settings.aiGateway.copyWith(
+                baseUrl: 'https://gateway.example.com',
+              ),
+            ),
+          );
+
+          await controller.enableCodexBridge();
+
+          expect(controller.isCodexBridgeEnabled, isTrue);
+          expect(
+            controller.codexCooperationState,
+            CodexCooperationState.registered,
+          );
+          expect(codex.startCalled, isTrue);
+          expect(codex.startedCodexPath, codexBinary.path);
+          expect(codex.startedCwd, tempDir.path);
+
+          final registrationCall = gateway.requests.firstWhere(
+            (request) => request['method'] == 'agent/register',
+          );
+          final params = registrationCall['params'] as Map<String, dynamic>;
+          expect(params['transport'], 'stdio-bridge');
+          expect(params['metadata'], containsPair('providerId', 'codex'));
+          expect(params['metadata'], containsPair('runtimeMode', 'externalCli'));
+          expect(
+            (params['metadata']['node'] as Map<String, dynamic>)['kind'],
+            'app-mediated-cooperative-node',
+          );
+        },
       );
-      addTearDown(controller.dispose);
 
-      await _waitFor(() => !controller.initializing);
+      test(
+        'AppController keeps bridge running when gateway registration is unavailable',
+        () async {
+          SharedPreferences.setMockInitialValues(<String, Object>{});
+          final store = SecureConfigStore();
+          final gateway = _FakeGatewayRuntime(connected: false);
+          final codex = _FakeCodexRuntime();
+          final coordinator = RuntimeCoordinator(
+            gateway: gateway,
+            codex: codex,
+          );
+          final controller = AppController(
+            store: store,
+            runtimeCoordinator: coordinator,
+          );
+          addTearDown(controller.dispose);
 
-      final tempDir = await Directory.systemTemp.createTemp('codex-bridge-');
-      addTearDown(() async {
-        if (await tempDir.exists()) {
-          await tempDir.delete(recursive: true);
-        }
-      });
-      final codexBinary = File('${tempDir.path}/codex');
-      await codexBinary.writeAsString('#!/bin/sh\nexit 0\n');
+          await _waitFor(() => !controller.initializing);
 
-      await controller.settingsController.saveAiGatewayApiKey('bridge-secret');
-      await controller.saveSettings(
-        controller.settings.copyWith(
-          workspacePath: tempDir.path,
-          codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
-          codexCliPath: codexBinary.path,
-          aiGateway: controller.settings.aiGateway.copyWith(
-            baseUrl: 'https://gateway.example.com',
-          ),
-        ),
+          final tempDir = await Directory.systemTemp.createTemp(
+            'codex-bridge-offline-',
+          );
+          addTearDown(() async {
+            if (await tempDir.exists()) {
+              await tempDir.delete(recursive: true);
+            }
+          });
+          final codexBinary = File('${tempDir.path}/codex');
+          await codexBinary.writeAsString('#!/bin/sh\nexit 0\n');
+
+          await controller.saveSettings(
+            controller.settings.copyWith(
+              codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
+              codexCliPath: codexBinary.path,
+              aiGateway: controller.settings.aiGateway.copyWith(
+                baseUrl: 'https://gateway.example.com',
+              ),
+            ),
+          );
+
+          await controller.enableCodexBridge();
+
+          expect(controller.isCodexBridgeEnabled, isTrue);
+          expect(
+            controller.codexCooperationState,
+            CodexCooperationState.bridgeOnly,
+          );
+          expect(codex.startCalled, isTrue);
+          expect(
+            gateway.requests.where(
+              (request) => request['method'] == 'agent/register',
+            ),
+            isEmpty,
+          );
+        },
       );
 
-      await controller.enableCodexBridge();
+      test(
+        'AppController preserves built-in mode and does not require external codex binary',
+        () async {
+          SharedPreferences.setMockInitialValues(<String, Object>{});
+          final store = SecureConfigStore();
+          final gateway = _FakeGatewayRuntime(connected: false);
+          final codex = _FakeCodexRuntime();
+          final coordinator = RuntimeCoordinator(
+            gateway: gateway,
+            codex: codex,
+          );
+          final controller = AppController(
+            store: store,
+            runtimeCoordinator: coordinator,
+          );
+          addTearDown(controller.dispose);
 
-      expect(controller.isCodexBridgeEnabled, isTrue);
-      expect(
-        controller.codexCooperationState,
-        CodexCooperationState.registered,
-      );
-      expect(codex.startCalled, isTrue);
-      expect(codex.startedCodexPath, codexBinary.path);
-      expect(codex.startedCwd, tempDir.path);
+          await _waitFor(() => !controller.initializing);
 
-      final registrationCall = gateway.requests.firstWhere(
-        (request) => request['method'] == 'agent/register',
-      );
-      final params = registrationCall['params'] as Map<String, dynamic>;
-      expect(params['transport'], 'stdio-bridge');
-      expect(params['metadata'], containsPair('providerId', 'codex'));
-      expect(params['metadata'], containsPair('runtimeMode', 'externalCli'));
-      expect(
-        (params['metadata']['node'] as Map<String, dynamic>)['kind'],
-        'app-mediated-cooperative-node',
+          await controller.saveSettings(
+            controller.settings.copyWith(
+              codeAgentRuntimeMode: CodeAgentRuntimeMode.builtIn,
+              aiGateway: controller.settings.aiGateway.copyWith(
+                baseUrl: 'https://gateway.example.com',
+              ),
+            ),
+          );
+
+          expect(
+            controller.settings.codeAgentRuntimeMode,
+            CodeAgentRuntimeMode.builtIn,
+          );
+          expect(controller.codexRuntimeWarning, isNotNull);
+
+          await controller.enableCodexBridge();
+
+          expect(controller.isCodexBridgeEnabled, isTrue);
+          expect(
+            controller.codexCooperationState,
+            CodexCooperationState.bridgeOnly,
+          );
+          expect(codex.startCalled, isFalse);
+          expect(coordinator.runtimeMode, CodeAgentRuntimeMode.builtIn);
+        },
       );
     },
-  );
-
-  test(
-    'AppController keeps bridge running when gateway registration is unavailable',
-    () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final store = SecureConfigStore();
-      final gateway = _FakeGatewayRuntime(connected: false);
-      final codex = _FakeCodexRuntime();
-      final coordinator = RuntimeCoordinator(gateway: gateway, codex: codex);
-      final controller = AppController(
-        store: store,
-        runtimeCoordinator: coordinator,
-      );
-      addTearDown(controller.dispose);
-
-      await _waitFor(() => !controller.initializing);
-
-      final tempDir = await Directory.systemTemp.createTemp(
-        'codex-bridge-offline-',
-      );
-      addTearDown(() async {
-        if (await tempDir.exists()) {
-          await tempDir.delete(recursive: true);
-        }
-      });
-      final codexBinary = File('${tempDir.path}/codex');
-      await codexBinary.writeAsString('#!/bin/sh\nexit 0\n');
-
-      await controller.saveSettings(
-        controller.settings.copyWith(
-          codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
-          codexCliPath: codexBinary.path,
-          aiGateway: controller.settings.aiGateway.copyWith(
-            baseUrl: 'https://gateway.example.com',
-          ),
-        ),
-      );
-
-      await controller.enableCodexBridge();
-
-      expect(controller.isCodexBridgeEnabled, isTrue);
-      expect(
-        controller.codexCooperationState,
-        CodexCooperationState.bridgeOnly,
-      );
-      expect(codex.startCalled, isTrue);
-      expect(
-        gateway.requests.where(
-          (request) => request['method'] == 'agent/register',
-        ),
-        isEmpty,
-      );
-    },
-  );
-
-  test(
-    'AppController preserves built-in mode and does not require external codex binary',
-    () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final store = SecureConfigStore();
-      final gateway = _FakeGatewayRuntime(connected: false);
-      final codex = _FakeCodexRuntime();
-      final coordinator = RuntimeCoordinator(gateway: gateway, codex: codex);
-      final controller = AppController(
-        store: store,
-        runtimeCoordinator: coordinator,
-      );
-      addTearDown(controller.dispose);
-
-      await _waitFor(() => !controller.initializing);
-
-      await controller.saveSettings(
-        controller.settings.copyWith(
-          codeAgentRuntimeMode: CodeAgentRuntimeMode.builtIn,
-          aiGateway: controller.settings.aiGateway.copyWith(
-            baseUrl: 'https://gateway.example.com',
-          ),
-        ),
-      );
-
-      expect(
-        controller.settings.codeAgentRuntimeMode,
-        CodeAgentRuntimeMode.builtIn,
-      );
-      expect(controller.codexRuntimeWarning, isNotNull);
-
-      await controller.enableCodexBridge();
-
-      expect(controller.isCodexBridgeEnabled, isTrue);
-      expect(
-        controller.codexCooperationState,
-        CodexCooperationState.bridgeOnly,
-      );
-      expect(codex.startCalled, isFalse);
-      expect(coordinator.runtimeMode, CodeAgentRuntimeMode.builtIn);
-    },
+    skip: _manualCodexBridgeSkipReason,
   );
 }
 

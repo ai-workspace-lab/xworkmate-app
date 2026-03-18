@@ -180,6 +180,12 @@ void main() {
     expect(find.text('深度研究'), findsNothing);
     expect(find.text('自动化'), findsNothing);
     expect(find.textContaining('输入需求、补充上下文、继续追问'), findsOneWidget);
+    expect(find.byKey(const Key('assistant-skill-picker-button')), findsOneWidget);
+    expect(find.byTooltip('执行目标'), findsNothing);
+    expect(find.byTooltip('权限'), findsNothing);
+    expect(find.byTooltip('模型'), findsNothing);
+    expect(find.byTooltip('模式'), findsNothing);
+    expect(find.byTooltip('推理强度'), findsNothing);
 
     await tester.tap(find.byTooltip('输入区操作'));
     await tester.pumpAndSettle();
@@ -188,5 +194,20 @@ void main() {
     expect(find.text('计划模式'), findsNothing);
     expect(find.text('连接网关'), findsNothing);
     expect(find.text('浏览器 / 编码 / 研究'), findsNothing);
+
+    await tester.tapAt(const Offset(24, 24));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const Key('assistant-skill-picker-button')),
+    );
+    await tester.tap(find.byKey(const Key('assistant-skill-picker-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('assistant-skill-picker-dialog')), findsOneWidget);
+    expect(find.byKey(const Key('assistant-skill-picker-search')), findsOneWidget);
+    expect(find.text('1password'), findsOneWidget);
+    expect(find.text('xlsx'), findsOneWidget);
+    expect(find.text('网页处理'), findsOneWidget);
   });
 }

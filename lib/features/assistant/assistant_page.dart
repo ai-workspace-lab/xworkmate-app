@@ -38,8 +38,6 @@ class AssistantPage extends StatefulWidget {
 }
 
 class _AssistantPageState extends State<AssistantPage> {
-  static const List<String> _modes = ['craft', 'ask', 'plan'];
-  static const List<String> _thinkingModes = ['low', 'medium', 'high', 'max'];
   static const double _sidePaneMinWidth = 228;
   static const double _sidePaneContentMinWidth = 160;
   static const double _mainWorkspaceMinWidth = 620;
@@ -50,8 +48,8 @@ class _AssistantPageState extends State<AssistantPage> {
   late final TextEditingController _threadSearchController;
   late final ScrollController _conversationController;
   late final FocusNode _composerFocusNode;
-  String _mode = 'ask';
-  String _thinkingLabel = 'high';
+  final String _mode = 'ask';
+  final String _thinkingLabel = 'high';
   double _threadRailWidth = 312;
   String _threadQuery = '';
   bool _sidePaneCollapsed = false;
@@ -61,6 +59,7 @@ class _AssistantPageState extends State<AssistantPage> {
       <String, _AssistantTaskSeed>{};
   final Set<String> _archivedTaskKeys = <String>{};
   List<_ComposerAttachment> _attachments = const <_ComposerAttachment>[];
+  List<String> _selectedSkillKeys = const <String>[];
   String? _lastSubmittedPrompt;
   String? _lastAutoAgentLabel;
   List<String> _lastSubmittedAttachments = const <String>[];
@@ -382,19 +381,10 @@ class _AssistantPageState extends State<AssistantPage> {
               child: _AssistantLowerPane(
                 inputController: _inputController,
                 focusNode: _composerFocusNode,
-                mode: _mode,
-                thinkingLabel: _thinkingLabel,
-                modelLabel: controller.resolvedDefaultModel.isEmpty
-                    ? appText('未选择模型', 'No model selected')
-                    : controller.resolvedDefaultModel,
-                modelOptions: controller.aiGatewayModelChoices,
                 attachments: _attachments,
+                availableSkills: _availableSkillOptions(controller),
+                selectedSkillKeys: _selectedSkillKeys,
                 controller: controller,
-                onModeChanged: (value) => setState(() => _mode = value),
-                onThinkingChanged: (value) {
-                  setState(() => _thinkingLabel = value);
-                },
-                onModelChanged: controller.selectDefaultModel,
                 onRemoveAttachment: (attachment) {
                   setState(() {
                     _attachments = _attachments
@@ -402,6 +392,7 @@ class _AssistantPageState extends State<AssistantPage> {
                         .toList(growable: false);
                   });
                 },
+                onToggleSkill: _toggleSelectedSkill,
                 onOpenGateway: _showConnectDialog,
                 onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
                 onPickAttachments: _pickAttachments,
@@ -547,10 +538,12 @@ class _AssistantPageState extends State<AssistantPage> {
     final attachmentNames = _attachments
         .map((item) => item.name)
         .toList(growable: false);
+    final selectedSkillLabels = _resolveSelectedSkillLabels(controller);
     final prompt = _composePrompt(
       mode: _mode,
       prompt: rawPrompt,
       attachmentNames: attachmentNames,
+      selectedSkillLabels: selectedSkillLabels,
       executionTarget: settings.assistantExecutionTarget,
       permissionLevel: settings.assistantPermissionLevel,
       workspacePath: settings.workspacePath,
@@ -666,10 +659,56 @@ class _AssistantPageState extends State<AssistantPage> {
     return byName('coding') ?? byName('browser') ?? byName('research');
   }
 
+  List<_ComposerSkillOption> _availableSkillOptions(AppController controller) {
+    final options = <_ComposerSkillOption>[];
+    final seenKeys = <String>{};
+
+    void addOption(_ComposerSkillOption option) {
+      if (seenKeys.add(option.key)) {
+        options.add(option);
+      }
+    }
+
+    for (final skill in controller.skills) {
+      final option = _skillOptionFromGateway(skill);
+      addOption(option);
+    }
+
+    for (final option in _fallbackSkillOptions) {
+      addOption(option);
+    }
+
+    return options;
+  }
+
+  List<String> _resolveSelectedSkillLabels(AppController controller) {
+    final optionsByKey = <String, _ComposerSkillOption>{
+      for (final option in _availableSkillOptions(controller)) option.key: option,
+    };
+    return _selectedSkillKeys
+        .map((key) => optionsByKey[key]?.label)
+        .whereType<String>()
+        .toList(growable: false);
+  }
+
+  void _toggleSelectedSkill(String key) {
+    setState(() {
+      final selected = List<String>.from(_selectedSkillKeys);
+      if (selected.contains(key)) {
+        selected.remove(key);
+      } else {
+        selected.add(key);
+      }
+      _selectedSkillKeys = selected;
+    });
+    _focusComposer();
+  }
+
   String _composePrompt({
     required String mode,
     required String prompt,
     required List<String> attachmentNames,
+    required List<String> selectedSkillLabels,
     required AssistantExecutionTarget executionTarget,
     required AssistantPermissionLevel permissionLevel,
     required String workspacePath,
@@ -678,6 +717,9 @@ class _AssistantPageState extends State<AssistantPage> {
     final attachmentBlock = attachmentNames.isEmpty
         ? ''
         : 'Attached files:\n${attachmentNames.map((name) => '- $name').join('\n')}\n\n';
+    final skillBlock = selectedSkillLabels.isEmpty
+        ? ''
+        : 'Preferred skills:\n${selectedSkillLabels.map((name) => '- $name').join('\n')}\n\n';
     final targetRoot = executionTarget == AssistantExecutionTarget.local
         ? workspacePath.trim()
         : remoteProjectRoot.trim();
@@ -689,12 +731,12 @@ class _AssistantPageState extends State<AssistantPage> {
 
     return switch (mode) {
       'craft' =>
-        '$attachmentBlock$executionContext'
+        '$attachmentBlock$skillBlock$executionContext'
             'Craft a polished result for this request:\n$prompt',
       'plan' =>
-        '$attachmentBlock$executionContext'
+        '$attachmentBlock$skillBlock$executionContext'
             'Create a clear execution plan for this task:\n$prompt',
-      _ => '$attachmentBlock$executionContext$prompt',
+      _ => '$attachmentBlock$skillBlock$executionContext$prompt',
     };
   }
 
@@ -742,6 +784,7 @@ class _AssistantPageState extends State<AssistantPage> {
         surface: 'Assistant',
         draft: true,
       );
+      _selectedSkillKeys = const <String>[];
     });
     await widget.controller.switchSession(sessionKey);
     _focusComposer();
@@ -1176,15 +1219,11 @@ class _AssistantLowerPane extends StatelessWidget {
     required this.controller,
     required this.inputController,
     required this.focusNode,
-    required this.mode,
-    required this.thinkingLabel,
-    required this.modelLabel,
-    required this.modelOptions,
     required this.attachments,
-    required this.onModeChanged,
-    required this.onThinkingChanged,
-    required this.onModelChanged,
+    required this.availableSkills,
+    required this.selectedSkillKeys,
     required this.onRemoveAttachment,
+    required this.onToggleSkill,
     required this.onOpenGateway,
     required this.onReconnectGateway,
     required this.onPickAttachments,
@@ -1194,15 +1233,11 @@ class _AssistantLowerPane extends StatelessWidget {
   final AppController controller;
   final TextEditingController inputController;
   final FocusNode focusNode;
-  final String mode;
-  final String thinkingLabel;
-  final String modelLabel;
-  final List<String> modelOptions;
   final List<_ComposerAttachment> attachments;
-  final ValueChanged<String> onModeChanged;
-  final ValueChanged<String> onThinkingChanged;
-  final Future<void> Function(String modelId) onModelChanged;
+  final List<_ComposerSkillOption> availableSkills;
+  final List<String> selectedSkillKeys;
   final ValueChanged<_ComposerAttachment> onRemoveAttachment;
+  final ValueChanged<String> onToggleSkill;
   final VoidCallback onOpenGateway;
   final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
@@ -1218,15 +1253,11 @@ class _AssistantLowerPane extends StatelessWidget {
           controller: controller,
           inputController: inputController,
           focusNode: focusNode,
-          mode: mode,
-          thinkingLabel: thinkingLabel,
-          modelLabel: modelLabel,
-          modelOptions: modelOptions,
           attachments: attachments,
-          onModeChanged: onModeChanged,
-          onThinkingChanged: onThinkingChanged,
-          onModelChanged: onModelChanged,
+          availableSkills: availableSkills,
+          selectedSkillKeys: selectedSkillKeys,
           onRemoveAttachment: onRemoveAttachment,
+          onToggleSkill: onToggleSkill,
           onOpenGateway: onOpenGateway,
           onReconnectGateway: onReconnectGateway,
           onPickAttachments: onPickAttachments,
@@ -1856,15 +1887,11 @@ class _ComposerBar extends StatelessWidget {
     required this.controller,
     required this.inputController,
     required this.focusNode,
-    required this.mode,
-    required this.thinkingLabel,
-    required this.modelLabel,
-    required this.modelOptions,
     required this.attachments,
-    required this.onModeChanged,
-    required this.onThinkingChanged,
-    required this.onModelChanged,
+    required this.availableSkills,
+    required this.selectedSkillKeys,
     required this.onRemoveAttachment,
+    required this.onToggleSkill,
     required this.onOpenGateway,
     required this.onReconnectGateway,
     required this.onPickAttachments,
@@ -1874,15 +1901,11 @@ class _ComposerBar extends StatelessWidget {
   final AppController controller;
   final TextEditingController inputController;
   final FocusNode focusNode;
-  final String mode;
-  final String thinkingLabel;
-  final String modelLabel;
-  final List<String> modelOptions;
   final List<_ComposerAttachment> attachments;
-  final ValueChanged<String> onModeChanged;
-  final ValueChanged<String> onThinkingChanged;
-  final Future<void> Function(String modelId) onModelChanged;
+  final List<_ComposerSkillOption> availableSkills;
+  final List<String> selectedSkillKeys;
   final ValueChanged<_ComposerAttachment> onRemoveAttachment;
+  final ValueChanged<String> onToggleSkill;
   final VoidCallback onOpenGateway;
   final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
@@ -1896,20 +1919,11 @@ class _ComposerBar extends StatelessWidget {
     final reconnectAvailable = controller.canQuickConnectGateway;
     final connecting =
         controller.connection.status == RuntimeConnectionStatus.connecting;
-    final executionTarget = controller.assistantExecutionTarget;
-    final permissionLevel = controller.assistantPermissionLevel;
-    final permissionForegroundColor =
-        permissionLevel == AssistantPermissionLevel.fullAccess
-        ? const Color(0xFFE16A12)
-        : palette.textSecondary;
-    final permissionBackgroundColor =
-        permissionLevel == AssistantPermissionLevel.fullAccess
-        ? palette.surfacePrimary
-        : palette.surfaceSecondary;
+    final selectedSkills = availableSkills
+        .where((skill) => selectedSkillKeys.contains(skill.key))
+        .toList(growable: false);
     final submitLabel = connected
-        ? (mode == 'ask'
-              ? appText('提交', 'Submit')
-              : appText('运行任务', 'Run Task'))
+        ? appText('提交', 'Submit')
         : connecting
         ? appText('连接中…', 'Connecting…')
         : reconnectAvailable
@@ -1965,6 +1979,22 @@ class _ComposerBar extends StatelessWidget {
             ),
             onSubmitted: (_) => onSend(),
           ),
+          if (selectedSkills.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: selectedSkills
+                  .map(
+                    (skill) => _ComposerSelectedSkillChip(
+                      key: ValueKey<String>('assistant-selected-skill-${skill.key}'),
+                      option: skill,
+                      onDeleted: () => onToggleSkill(skill.key),
+                    ),
+                  )
+                  .toList(growable: false),
+            ),
+          ],
           const SizedBox(height: 8),
           Row(
             children: [
@@ -1999,164 +2029,20 @@ class _ComposerBar extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      PopupMenuButton<AssistantExecutionTarget>(
-                        tooltip: appText('执行目标', 'Execution target'),
-                        onSelected: (value) {
-                          controller.setAssistantExecutionTarget(value);
-                        },
-                        itemBuilder: (context) => AssistantExecutionTarget
-                            .values
-                            .map(
-                              (value) =>
-                                  PopupMenuItem<AssistantExecutionTarget>(
-                                    value: value,
-                                    child: Row(
-                                      children: [
-                                        Icon(value.icon, size: 18),
-                                        const SizedBox(width: 10),
-                                        Expanded(child: Text(value.label)),
-                                        if (value == executionTarget)
-                                          const Icon(
-                                            Icons.check_rounded,
-                                            size: 18,
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                            )
-                            .toList(),
+                      InkWell(
+                        key: const Key('assistant-skill-picker-button'),
+                        borderRadius: BorderRadius.circular(AppRadius.chip),
+                        onTap: () => _showSkillPickerDialog(context),
                         child: _ComposerToolbarChip(
-                          icon: executionTarget.icon,
-                          label: executionTarget.label,
-                          showChevron: true,
-                          maxLabelWidth: 72,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      PopupMenuButton<AssistantPermissionLevel>(
-                        tooltip: appText('权限', 'Permissions'),
-                        onSelected: (value) {
-                          controller.setAssistantPermissionLevel(value);
-                        },
-                        itemBuilder: (context) => AssistantPermissionLevel
-                            .values
-                            .map(
-                              (value) =>
-                                  PopupMenuItem<AssistantPermissionLevel>(
-                                    value: value,
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          value.icon,
-                                          size: 18,
-                                          color:
-                                              value ==
-                                                  AssistantPermissionLevel
-                                                      .fullAccess
-                                              ? const Color(0xFFE16A12)
-                                              : null,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(child: Text(value.label)),
-                                        if (value == permissionLevel)
-                                          const Icon(
-                                            Icons.check_rounded,
-                                            size: 18,
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                            )
-                            .toList(),
-                        child: _ComposerToolbarChip(
-                          icon: permissionLevel.icon,
-                          label: permissionLevel.label,
-                          showChevron: true,
-                          maxLabelWidth: 112,
-                          backgroundColor: permissionBackgroundColor,
-                          foregroundColor: permissionForegroundColor,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      modelOptions.isEmpty
-                          ? _ComposerToolbarChip(
-                              icon: Icons.bolt_rounded,
-                              label: modelLabel,
-                              showChevron: false,
-                            )
-                          : PopupMenuButton<String>(
-                              tooltip: appText('模型', 'Model'),
-                              onSelected: (value) {
-                                onModelChanged(value);
-                              },
-                              itemBuilder: (context) => modelOptions
-                                  .map(
-                                    (value) => PopupMenuItem<String>(
-                                      value: value,
-                                      child: Row(
-                                        children: [
-                                          Expanded(child: Text(value)),
-                                          if (value == modelLabel)
-                                            const Icon(
-                                              Icons.check_rounded,
-                                              size: 18,
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              child: _ComposerToolbarChip(
-                                icon: Icons.bolt_rounded,
-                                label: modelLabel,
-                                showChevron: true,
-                              ),
-                            ),
-                      const SizedBox(width: 8),
-                      PopupMenuButton<String>(
-                        tooltip: appText('模式', 'Mode'),
-                        onSelected: onModeChanged,
-                        itemBuilder: (context) => _AssistantPageState._modes
-                            .map(
-                              (value) => PopupMenuItem<String>(
-                                value: value,
-                                child: Text(_assistantModeLabel(value)),
-                              ),
-                            )
-                            .toList(),
-                        child: _ComposerToolbarChip(
-                          icon: Icons.tune_rounded,
-                          label: _assistantModeLabel(mode),
-                          showChevron: true,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      PopupMenuButton<String>(
-                        tooltip: appText('推理强度', 'Reasoning'),
-                        onSelected: onThinkingChanged,
-                        itemBuilder: (context) => _AssistantPageState
-                            ._thinkingModes
-                            .map(
-                              (value) => PopupMenuItem<String>(
-                                value: value,
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        _assistantThinkingLabel(value),
-                                      ),
-                                    ),
-                                    if (value == thinkingLabel)
-                                      const Icon(Icons.check_rounded, size: 18),
-                                  ],
+                          icon: Icons.auto_awesome_rounded,
+                          label: selectedSkills.isEmpty
+                              ? appText('技能', 'Skills')
+                              : appText(
+                                  '已选技能 ${selectedSkills.length}',
+                                  'Skills ${selectedSkills.length}',
                                 ),
-                              ),
-                            )
-                            .toList(),
-                        child: _ComposerToolbarChip(
-                          icon: Icons.psychology_alt_outlined,
-                          label: _assistantThinkingLabel(thinkingLabel),
                           showChevron: true,
+                          maxLabelWidth: 132,
                         ),
                       ),
                     ],
@@ -2191,9 +2077,7 @@ class _ComposerBar extends StatelessWidget {
                     children: [
                       Icon(
                         connected
-                            ? (mode == 'ask'
-                                  ? Icons.arrow_upward_rounded
-                                  : Icons.play_arrow_rounded)
+                            ? Icons.arrow_upward_rounded
                             : reconnectAvailable
                             ? Icons.refresh_rounded
                             : Icons.link_rounded,
@@ -2210,6 +2094,102 @@ class _ComposerBar extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _showSkillPickerDialog(BuildContext context) async {
+    final searchController = TextEditingController();
+    String query = '';
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final filteredSkills = availableSkills.where((skill) {
+              if (query.trim().isEmpty) {
+                return true;
+              }
+              final haystack =
+                  '${skill.label}\n${skill.description}\n${skill.sourceLabel}'
+                      .toLowerCase();
+              return haystack.contains(query.trim().toLowerCase());
+            }).toList(growable: false);
+
+            return Dialog(
+              key: const Key('assistant-skill-picker-dialog'),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 32,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 560,
+                  maxHeight: 520,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                  child: Column(
+                    children: [
+                      TextField(
+                        key: const Key('assistant-skill-picker-search'),
+                        controller: searchController,
+                        autofocus: true,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            query = value;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          hintText: appText('搜索技能', 'Search skills'),
+                          prefixIcon: const Icon(Icons.search_rounded),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: filteredSkills.isEmpty
+                            ? Center(
+                                child: Text(
+                                  appText(
+                                    '没有匹配的技能。',
+                                    'No matching skills.',
+                                  ),
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: context.palette.textSecondary,
+                                      ),
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: filteredSkills.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(height: 8),
+                                itemBuilder: (context, index) {
+                                  final skill = filteredSkills[index];
+                                  final selected =
+                                      selectedSkillKeys.contains(skill.key);
+                                  return _SkillPickerTile(
+                                    key: ValueKey<String>(
+                                      'assistant-skill-option-${skill.key}',
+                                    ),
+                                    option: skill,
+                                    selected: selected,
+                                    onTap: () {
+                                      onToggleSkill(skill.key);
+                                      Navigator.of(dialogContext).pop();
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    searchController.dispose();
   }
 }
 
@@ -2244,16 +2224,12 @@ class _ComposerToolbarChip extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.showChevron,
-    this.backgroundColor,
-    this.foregroundColor,
     this.maxLabelWidth = 220,
   });
 
   final IconData icon;
   final String label;
   final bool showChevron;
-  final Color? backgroundColor;
-  final Color? foregroundColor;
   final double maxLabelWidth;
 
   @override
@@ -2267,7 +2243,7 @@ class _ComposerToolbarChip extends StatelessWidget {
         vertical: 6,
       ),
       decoration: BoxDecoration(
-        color: backgroundColor ?? palette.surfaceSecondary,
+        color: palette.surfaceSecondary,
         borderRadius: BorderRadius.circular(AppRadius.chip),
         boxShadow: [
           BoxShadow(
@@ -2280,7 +2256,7 @@ class _ComposerToolbarChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: foregroundColor ?? palette.textMuted),
+          Icon(icon, size: 14, color: palette.textMuted),
           const SizedBox(width: 6),
           ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxLabelWidth),
@@ -2289,7 +2265,7 @@ class _ComposerToolbarChip extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.labelLarge?.copyWith(
-                color: foregroundColor ?? theme.colorScheme.onSurface,
+                color: theme.colorScheme.onSurface,
               ),
             ),
           ),
@@ -2298,7 +2274,7 @@ class _ComposerToolbarChip extends StatelessWidget {
             Icon(
               Icons.keyboard_arrow_down_rounded,
               size: 14,
-              color: foregroundColor ?? palette.textMuted,
+              color: palette.textMuted,
             ),
           ],
         ],
@@ -2766,20 +2742,6 @@ class _ConnectionChip extends StatelessWidget {
   }
 }
 
-extension on AssistantExecutionTarget {
-  IconData get icon => switch (this) {
-    AssistantExecutionTarget.local => Icons.computer_outlined,
-    AssistantExecutionTarget.remote => Icons.cloud_outlined,
-  };
-}
-
-extension on AssistantPermissionLevel {
-  IconData get icon => switch (this) {
-    AssistantPermissionLevel.defaultAccess => Icons.shield_outlined,
-    AssistantPermissionLevel.fullAccess => Icons.admin_panel_settings_outlined,
-  };
-}
-
 enum _BubbleTone { user, assistant, agent }
 
 enum _TimelineItemKind { user, assistant, agent, taskCard, toolCall }
@@ -3041,19 +3003,6 @@ String _toolCallStatusLabel(String status) =>
       _ => appText('已完成', 'Completed'),
     };
 
-String _assistantModeLabel(String mode) => switch (mode) {
-  'craft' => appText('创作', 'Craft'),
-  'plan' => appText('计划', 'Plan'),
-  _ => appText('问答', 'Ask'),
-};
-
-String _assistantThinkingLabel(String level) => switch (level) {
-  'low' => appText('低', 'Low'),
-  'medium' => appText('中', 'Medium'),
-  'max' => appText('超高', 'Max'),
-  _ => appText('高', 'High'),
-};
-
 String _sessionDisplayTitle(GatewaySessionSummary session) {
   final label = session.label.trim();
   if (label.isEmpty || label == session.key) {
@@ -3137,6 +3086,192 @@ bool _sessionKeysMatch(String incoming, String current) {
   }
   return (left == 'agent:main:main' && right == 'main') ||
       (left == 'main' && right == 'agent:main:main');
+}
+
+const List<_ComposerSkillOption> _fallbackSkillOptions = <_ComposerSkillOption>[
+  _ComposerSkillOption(
+    key: '1password',
+    label: '1password',
+    description: '安全读取和注入本地凭据。',
+    sourceLabel: 'Local',
+    icon: Icons.auto_awesome_rounded,
+  ),
+  _ComposerSkillOption(
+    key: 'xlsx',
+    label: 'xlsx',
+    description: '读取、整理和生成表格文件。',
+    sourceLabel: 'Local',
+    icon: Icons.auto_awesome_rounded,
+  ),
+  _ComposerSkillOption(
+    key: 'web-processing',
+    label: '网页处理',
+    description: '打开网页、提取内容并完成网页操作。',
+    sourceLabel: 'Web',
+    icon: Icons.language_rounded,
+  ),
+  _ComposerSkillOption(
+    key: 'apple-reminders',
+    label: 'apple-reminders',
+    description: '管理提醒事项和任务提醒。',
+    sourceLabel: 'Local',
+    icon: Icons.auto_awesome_rounded,
+  ),
+  _ComposerSkillOption(
+    key: 'blogwatcher',
+    label: 'blogwatcher',
+    description: '跟踪博客更新并生成摘要。',
+    sourceLabel: 'Local',
+    icon: Icons.auto_awesome_rounded,
+  ),
+];
+
+_ComposerSkillOption _skillOptionFromGateway(GatewaySkillSummary skill) {
+  final normalizedKey = skill.skillKey.trim().toLowerCase();
+  final normalizedName = skill.name.trim().toLowerCase();
+  final isWebSkill =
+      normalizedKey.contains('browser') ||
+      normalizedKey.contains('open-link') ||
+      normalizedKey.contains('web') ||
+      normalizedName.contains('browser') ||
+      normalizedName.contains('网页');
+  final label = isWebSkill ? '网页处理' : skill.name.trim();
+  final key = isWebSkill ? 'web-processing' : normalizedKey;
+  final sourceLabel = skill.source.trim().isEmpty ? 'Gateway' : skill.source;
+  final description = skill.description.trim().isEmpty
+      ? appText('可在当前任务中调用的技能。', 'Skill available in the current task.')
+      : skill.description.trim();
+
+  return _ComposerSkillOption(
+    key: key,
+    label: label,
+    description: description,
+    sourceLabel: sourceLabel,
+    icon: isWebSkill ? Icons.language_rounded : Icons.auto_awesome_rounded,
+  );
+}
+
+class _ComposerSkillOption {
+  const _ComposerSkillOption({
+    required this.key,
+    required this.label,
+    required this.description,
+    required this.sourceLabel,
+    required this.icon,
+  });
+
+  final String key;
+  final String label;
+  final String description;
+  final String sourceLabel;
+  final IconData icon;
+}
+
+class _ComposerSelectedSkillChip extends StatelessWidget {
+  const _ComposerSelectedSkillChip({
+    super.key,
+    required this.option,
+    required this.onDeleted,
+  });
+
+  final _ComposerSkillOption option;
+  final VoidCallback onDeleted;
+
+  @override
+  Widget build(BuildContext context) {
+    return InputChip(
+      avatar: Icon(option.icon, size: 16, color: context.palette.accent),
+      label: Text(option.label),
+      onDeleted: onDeleted,
+      side: BorderSide.none,
+      backgroundColor: context.palette.surfaceSecondary,
+      deleteIconColor: context.palette.textMuted,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.chip),
+      ),
+    );
+  }
+}
+
+class _SkillPickerTile extends StatelessWidget {
+  const _SkillPickerTile({
+    super.key,
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _ComposerSkillOption option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.palette;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            color: selected ? palette.surfaceSecondary : palette.surfacePrimary,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: palette.shadow.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Icon(option.icon, size: 20, color: palette.accent),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      option.label,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      option.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.textSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                option.sourceLabel,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: palette.textMuted,
+                ),
+              ),
+              if (selected) ...[
+                const SizedBox(width: 8),
+                Icon(Icons.check_rounded, size: 18, color: palette.accent),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ComposerAttachment {
