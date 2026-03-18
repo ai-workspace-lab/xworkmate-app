@@ -10,7 +10,7 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
     this.title,
     this.subtitle,
     this.toolbar,
-    this.padding = const EdgeInsets.fromLTRB(16, 16, 16, 0),
+    this.padding = const EdgeInsets.fromLTRB(6, 6, 6, 0),
   });
 
   final Widget child;
@@ -35,7 +35,7 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
         children: [
           if (hasHeader)
             Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 14),
+              padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final compact = constraints.maxWidth < 920;
@@ -76,7 +76,7 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
                       children: [
                         header,
                         if (toolbar != null) ...[
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           toolbar!,
                         ],
                       ],
@@ -87,7 +87,7 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(child: header),
-                      const SizedBox(width: 20),
+                      const SizedBox(width: 8),
                       Flexible(child: toolbar!),
                     ],
                   );
@@ -98,17 +98,11 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: palette.surfacePrimary,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: palette.shadow.withValues(alpha: 0.06),
-                    blurRadius: 16,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: palette.strokeSoft),
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(8),
                 child: child,
               ),
             ),

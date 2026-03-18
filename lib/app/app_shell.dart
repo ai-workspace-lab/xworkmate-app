@@ -29,8 +29,8 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  static const _sidebarMinWidth = 84.0;
-  static const _sidebarViewportPadding = 120.0;
+  static const _sidebarMinWidth = 56.0;
+  static const _sidebarViewportPadding = 72.0;
   static const _mainContentMinWidth = 640.0;
   double? _sidebarExpandedWidth;
 
@@ -52,7 +52,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   double _defaultSidebarWidth(AppLanguage language, double viewportWidth) {
-    final baseWidth = language == AppLanguage.zh ? 204.0 : 220.0;
+    final baseWidth = language == AppLanguage.zh ? 176.0 : 188.0;
     return _clampSidebarWidth(baseWidth, viewportWidth);
   }
 
@@ -89,7 +89,7 @@ class _AppShellState extends State<AppShell> {
                 );
                 final showPinnedDetail =
                     controller.detailPanel != null &&
-                    constraints.maxWidth > 1460;
+                    constraints.maxWidth > 1280;
                 final mobileDestination =
                     controller.destination == WorkspaceDestination.account
                     ? WorkspaceDestination.assistant
@@ -263,53 +263,19 @@ class _AppShellState extends State<AppShell> {
                           ),
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.only(
-                              top: 10,
-                              right: 10,
-                              bottom: 0,
-                            ),
+                            padding: const EdgeInsets.only(top: 4, right: 4),
                             child: AnimatedPadding(
                               duration: const Duration(milliseconds: 220),
                               curve: Curves.easeOutCubic,
                               padding: EdgeInsets.only(
-                                right: showPinnedDetail ? 392 : 0,
+                                right: showPinnedDetail ? 336 : 0,
                               ),
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      palette.canvas,
-                                      palette.surfaceSecondary.withValues(
-                                        alpha: 0.54,
-                                      ),
-                                    ],
-                                  ),
+                                  color: palette.canvas,
                                 ),
                                 child: Stack(
                                   children: [
-                                    Positioned(
-                                      top: -120,
-                                      right: -80,
-                                      child: IgnorePointer(
-                                        child: Container(
-                                          width: 360,
-                                          height: 360,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            gradient: RadialGradient(
-                                              colors: [
-                                                palette.surfacePrimary
-                                                    .withValues(alpha: 0.78),
-                                                palette.surfacePrimary
-                                                    .withValues(alpha: 0),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
                                     _buildCurrentPage(controller.openDetail),
                                   ],
                                 ),
@@ -339,7 +305,7 @@ class _AppShellState extends State<AppShell> {
                     if (!showSidebar)
                       Positioned(
                         left: 0,
-                        top: 18,
+                        top: 8,
                         bottom: 0,
                         child: _SidebarRevealRail(
                           onExpand: () => controller.setSidebarState(
