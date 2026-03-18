@@ -16,6 +16,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('新对话'), findsWidgets);
-    expect(find.text('连接 Gateway 后，当前对话会自动作为默认任务开始执行。'), findsOneWidget);
+    expect(find.byKey(const Key('assistant-task-rail')), findsOneWidget);
+    expect(find.text('幻灯片'), findsOneWidget);
   });
 }

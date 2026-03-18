@@ -1,6 +1,13 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'test_support.dart';
+
+Finder _textEither(String zh, String en) {
+  return find.byWidgetPredicate(
+    (widget) => widget is Text && (widget.data == zh || widget.data == en),
+  );
+}
 
 void main() {
   initializeIntegrationHarness();
@@ -12,13 +19,17 @@ void main() {
   ) async {
     await pumpDesktopApp(tester);
 
-    await tester.tap(find.text('节点'));
+    await tester.tap(find.byKey(const Key('assistant-side-pane-tab-navigation')));
     await settleIntegrationUi(tester);
-    await tester.tap(find.text('接入模块'));
+    await tester.tap(find.byKey(const Key('assistant-focus-add-menu')));
     await settleIntegrationUi(tester);
-
-    expect(find.textContaining('工作区、网关默认项'), findsOneWidget);
-    await tester.tap(find.text('集成'));
+    await tester.tap(_textEither('设置', 'Settings').last);
+    await settleIntegrationUi(tester);
+    await tester.tap(
+      find.byKey(const ValueKey<String>('assistant-focus-open-page-settings')),
+    );
+    await settleIntegrationUi(tester);
+    await tester.tap(_textEither('集成', 'Integrations'));
     await settleIntegrationUi(tester);
     expect(find.text('OpenClaw Gateway'), findsOneWidget);
   });

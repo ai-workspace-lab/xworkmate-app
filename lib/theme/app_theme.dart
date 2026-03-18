@@ -23,14 +23,14 @@ class AppSpacing {
 class AppRadius {
   AppRadius._();
 
-  static const double card = 12.0;
-  static const double button = 8.0;
-  static const double input = 10.0;
-  static const double chip = 12.0;
-  static const double badge = 10.0;
-  static const double dialog = 16.0;
-  static const double sidebar = 14.0;
-  static const double icon = 8.0;
+  static const double card = 6.0;
+  static const double button = 6.0;
+  static const double input = 6.0;
+  static const double chip = 999.0;
+  static const double badge = 999.0;
+  static const double dialog = 10.0;
+  static const double sidebar = 8.0;
+  static const double icon = 6.0;
 }
 
 class AppTypography {
@@ -164,7 +164,9 @@ class AppTheme {
         backgroundColor: palette.surfaceSecondary,
         side: BorderSide(color: palette.strokeSoft),
         labelStyle: tunedTextTheme.labelMedium,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -172,7 +174,12 @@ class AppTheme {
           textStyle: tunedTextTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w500,
           ),
-          minimumSize: Size(0, isDesktop ? AppSizes.buttonHeightDesktop : AppSizes.buttonHeightMobile),
+          minimumSize: Size(
+            0,
+            isDesktop
+                ? AppSizes.buttonHeightDesktop
+                : AppSizes.buttonHeightMobile,
+          ),
           padding: EdgeInsets.symmetric(
             horizontal: AppSpacing.sm,
             vertical: AppSpacing.xs,
@@ -188,7 +195,12 @@ class AppTheme {
           textStyle: tunedTextTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w500,
           ),
-          minimumSize: Size(0, isDesktop ? AppSizes.buttonHeightDesktop : AppSizes.buttonHeightMobile),
+          minimumSize: Size(
+            0,
+            isDesktop
+                ? AppSizes.buttonHeightDesktop
+                : AppSizes.buttonHeightMobile,
+          ),
           padding: EdgeInsets.symmetric(
             horizontal: AppSpacing.sm,
             vertical: AppSpacing.xs,
@@ -269,10 +281,15 @@ class AppTheme {
             return palette.textSecondary;
           }),
           padding: const WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+            EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xs,
+            ),
           ),
           shape: WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.chip),
+            ),
           ),
           textStyle: WidgetStatePropertyAll(
             tunedTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500),
@@ -283,7 +300,9 @@ class AppTheme {
         behavior: SnackBarBehavior.floating,
         backgroundColor: palette.surfaceTertiary,
         contentTextStyle: TextStyle(color: palette.textPrimary),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.dialog)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.dialog),
+        ),
       ),
     );
   }
