@@ -1,7 +1,3 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 
@@ -10,7 +6,10 @@ void main() {
     test('has correct values', () {
       expect(CodexSandboxMode.readOnly.value, equals('read-only'));
       expect(CodexSandboxMode.workspaceWrite.value, equals('workspace-write'));
-      expect(CodexSandboxMode.dangerFullAccess.value, equals('danger-full-access'));
+      expect(
+        CodexSandboxMode.dangerFullAccess.value,
+        equals('danger-full-access'),
+      );
     });
   });
 
@@ -131,6 +130,34 @@ void main() {
       // May or may not find codex depending on environment
       // Just check it doesn't throw
       expect(path, anyOf(isNull, isA<String>()));
+    });
+
+    test('wraps windows cmd launch via cmd.exe', () {
+      final launch = CodexRuntime.resolveLaunchConfigurationForTest(
+        r'C:\Users\tester\AppData\Roaming\npm\codex.cmd',
+        const <String>['app-server', '--listen', 'stdio://'],
+        operatingSystem: 'windows',
+      );
+
+      expect(launch.executable, 'cmd.exe');
+      expect(launch.arguments, <String>[
+        '/c',
+        r'C:\Users\tester\AppData\Roaming\npm\codex.cmd',
+        'app-server',
+        '--listen',
+        'stdio://',
+      ]);
+    });
+
+    test('passes executable launch through for native binaries', () {
+      final launch = CodexRuntime.resolveLaunchConfigurationForTest(
+        r'C:\Users\tester\.cargo\bin\codex.exe',
+        const <String>['app-server'],
+        operatingSystem: 'windows',
+      );
+
+      expect(launch.executable, r'C:\Users\tester\.cargo\bin\codex.exe');
+      expect(launch.arguments, <String>['app-server']);
     });
 
     test('request throws when not connected', () async {

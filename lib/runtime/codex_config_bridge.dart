@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'platform_environment.dart';
+
 /// Bridge for generating Codex configuration files.
 ///
 /// This class generates `~/.codex/config.toml` and `~/.codex/auth.json`
@@ -12,10 +14,7 @@ class CodexConfigBridge {
   final String codexHome;
 
   CodexConfigBridge({String? codexHome})
-    : codexHome =
-          codexHome ??
-          Platform.environment['CODEX_HOME'] ??
-          '${Platform.environment['HOME']}/.codex';
+    : codexHome = codexHome ?? resolveCodexHomeDirectory();
 
   /// Generate config.toml to use XWorkmate AI Gateway.
   Future<void> configureForGateway({

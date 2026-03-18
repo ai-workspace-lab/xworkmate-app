@@ -10,6 +10,7 @@ import 'package:web_socket_channel/io.dart';
 
 import '../app/app_metadata.dart';
 import 'device_identity_store.dart';
+import 'platform_environment.dart';
 import 'runtime_models.dart';
 import 'secure_config_store.dart';
 
@@ -79,10 +80,10 @@ class GatewayRuntime extends ChangeNotifier {
     version: kAppVersion,
     buildNumber: kAppBuildNumber,
   );
-  RuntimeDeviceInfo _deviceInfo = const RuntimeDeviceInfo(
-    platform: 'macos',
+  RuntimeDeviceInfo _deviceInfo = RuntimeDeviceInfo(
+    platform: Platform.operatingSystem,
     platformVersion: '',
-    deviceFamily: 'Mac',
+    deviceFamily: 'Desktop',
     modelIdentifier: 'unknown',
   );
 
@@ -1303,16 +1304,7 @@ class GatewayRuntime extends ChangeNotifier {
   }
 
   String _resolveClientId() {
-    if (Platform.isMacOS) {
-      return 'openclaw-macos';
-    }
-    if (Platform.isIOS) {
-      return 'openclaw-ios';
-    }
-    if (Platform.isAndroid) {
-      return 'openclaw-android';
-    }
-    return 'gateway-client';
+    return resolveGatewayClientId();
   }
 
   Future<RuntimePackageInfo> _loadPackageInfo() async {
