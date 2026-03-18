@@ -38,11 +38,11 @@ class AssistantPage extends StatefulWidget {
 }
 
 class _AssistantPageState extends State<AssistantPage> {
-  static const double _sidePaneMinWidth = 228;
-  static const double _sidePaneContentMinWidth = 160;
+  static const double _sidePaneMinWidth = 184;
+  static const double _sidePaneContentMinWidth = 140;
   static const double _mainWorkspaceMinWidth = 620;
-  static const double _sidePaneViewportPadding = 120;
-  static const double _sideTabRailWidth = 58;
+  static const double _sidePaneViewportPadding = 72;
+  static const double _sideTabRailWidth = 46;
 
   late final TextEditingController _inputController;
   late final TextEditingController _threadSearchController;
@@ -50,7 +50,7 @@ class _AssistantPageState extends State<AssistantPage> {
   late final FocusNode _composerFocusNode;
   final String _mode = 'ask';
   String _thinkingLabel = 'high';
-  double _threadRailWidth = 312;
+  double _threadRailWidth = 248;
   String _threadQuery = '';
   bool _sidePaneCollapsed = false;
   _AssistantSidePane _activeSidePane = _AssistantSidePane.tasks;
@@ -119,7 +119,7 @@ class _AssistantPageState extends State<AssistantPage> {
         });
 
         return DesktopWorkspaceScaffold(
-          padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
+          padding: EdgeInsets.zero,
           child: LayoutBuilder(
             builder: (context, constraints) {
               final showUnifiedSidePane =
@@ -157,7 +157,7 @@ class _AssistantPageState extends State<AssistantPage> {
                     ? _AssistantSidePane.navigation
                     : _activeSidePane;
                 final sidePanelContentWidth =
-                    (threadRailWidth - _sideTabRailWidth - 6)
+                    (threadRailWidth - _sideTabRailWidth - 2)
                         .clamp(_sidePaneContentMinWidth, threadRailWidth)
                         .toDouble();
                 return Row(
@@ -205,12 +205,7 @@ class _AssistantPageState extends State<AssistantPage> {
                         focusedPanel: activeFocusedDestination == null
                             ? null
                             : SingleChildScrollView(
-                                padding: const EdgeInsets.fromLTRB(
-                                  12,
-                                  12,
-                                  12,
-                                  12,
-                                ),
+                                padding: const EdgeInsets.all(6),
                                 child: AssistantFocusDestinationCard(
                                   controller: controller,
                                   destination: activeFocusedDestination,
@@ -280,7 +275,7 @@ class _AssistantPageState extends State<AssistantPage> {
                     ),
                     if (!_sidePaneCollapsed)
                       SizedBox(
-                        width: 10,
+                        width: 6,
                         child: PaneResizeHandle(
                           axis: Axis.horizontal,
                           onDelta: (delta) {
@@ -292,7 +287,7 @@ class _AssistantPageState extends State<AssistantPage> {
                           },
                         ),
                       ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 2),
                     Expanded(child: mainWorkspace),
                   ],
                 );
@@ -329,7 +324,7 @@ class _AssistantPageState extends State<AssistantPage> {
                     ),
                   ),
                   SizedBox(
-                    width: 10,
+                    width: 6,
                     child: PaneResizeHandle(
                       axis: Axis.horizontal,
                       onDelta: (delta) {
@@ -341,7 +336,7 @@ class _AssistantPageState extends State<AssistantPage> {
                       },
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 2),
                   Expanded(child: mainWorkspace),
                 ],
               );
@@ -359,7 +354,7 @@ class _AssistantPageState extends State<AssistantPage> {
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final composerHeight = constraints.maxHeight >= 900 ? 254.0 : 224.0;
+        final composerHeight = constraints.maxHeight >= 900 ? 180.0 : 152.0;
 
         return Column(
           children: [
@@ -375,7 +370,7 @@ class _AssistantPageState extends State<AssistantPage> {
                 onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 2),
             SizedBox(
               height: composerHeight,
               child: _AssistantLowerPane(
@@ -692,7 +687,8 @@ class _AssistantPageState extends State<AssistantPage> {
 
   List<String> _resolveSelectedSkillLabels(AppController controller) {
     final optionsByKey = <String, _ComposerSkillOption>{
-      for (final option in _availableSkillOptions(controller)) option.key: option,
+      for (final option in _availableSkillOptions(controller))
+        option.key: option,
     };
     return _selectedSkillKeys
         .map((key) => optionsByKey[key]?.label)
@@ -1088,21 +1084,15 @@ class _AssistantSideTabRail extends StatelessWidget {
 
     return Container(
       key: const Key('assistant-side-pane'),
-      width: 58,
+      width: 46,
       decoration: BoxDecoration(
         color: palette.sidebar,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: palette.shadow.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: palette.sidebarBorder),
       ),
       child: Column(
         children: [
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           _AssistantSideTabButton(
             key: const Key('assistant-side-pane-tab-tasks'),
             icon: Icons.checklist_rtl_rounded,
@@ -1110,7 +1100,7 @@ class _AssistantSideTabRail extends StatelessWidget {
             tooltip: appText('任务', 'Tasks'),
             onTap: () => onSelectPane(_AssistantSidePane.tasks),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           _AssistantSideTabButton(
             key: const Key('assistant-side-pane-tab-navigation'),
             icon: Icons.dashboard_customize_outlined,
@@ -1119,9 +1109,9 @@ class _AssistantSideTabRail extends StatelessWidget {
             onTap: () => onSelectPane(_AssistantSidePane.navigation),
           ),
           if (favoriteDestinations.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Container(width: 24, height: 1, color: palette.strokeSoft),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Expanded(
               child: SingleChildScrollView(
                 padding: EdgeInsets.zero,
@@ -1129,7 +1119,7 @@ class _AssistantSideTabRail extends StatelessWidget {
                   children: favoriteDestinations
                       .map(
                         (destination) => Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.only(bottom: 4),
                           child: _AssistantSideTabButton(
                             key: ValueKey<String>(
                               'assistant-side-pane-tab-focus-${destination.name}',
@@ -1163,7 +1153,7 @@ class _AssistantSideTabRail extends StatelessWidget {
               size: 18,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
         ],
       ),
     );
@@ -1193,27 +1183,21 @@ class _AssistantSideTabButton extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(8),
           onTap: onTap,
           child: Container(
-            width: 42,
-            height: 42,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
               color: selected ? palette.surfacePrimary : Colors.transparent,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: selected
-                  ? [
-                      BoxShadow(
-                        color: palette.shadow.withValues(alpha: 0.06),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : const [],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: selected ? palette.strokeSoft : Colors.transparent,
+              ),
             ),
             child: Icon(
               icon,
-              size: 20,
+              size: 18,
               color: selected ? palette.textPrimary : palette.textSecondary,
             ),
           ),
@@ -1325,7 +1309,7 @@ class _ConversationArea extends StatelessWidget {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1340,10 +1324,10 @@ class _ConversationArea extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                        spacing: 6,
+                        runSpacing: 6,
                         children: [
                           _StatusPill(
                             label: currentTask.draft
@@ -1369,7 +1353,7 @@ class _ConversationArea extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 _ConnectionChip(controller: controller),
               ],
             ),
@@ -1377,9 +1361,7 @@ class _ConversationArea extends StatelessWidget {
           Divider(height: 1, color: palette.strokeSoft),
           Expanded(
             child: Container(
-              decoration: BoxDecoration(
-                color: palette.canvas,
-              ),
+              decoration: BoxDecoration(color: palette.canvas),
               child: items.isEmpty
                   ? _AssistantEmptyState(
                       controller: controller,
@@ -1389,10 +1371,10 @@ class _ConversationArea extends StatelessWidget {
                     )
                   : ListView.separated(
                       controller: scrollController,
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                       physics: const BouncingScrollPhysics(),
                       itemCount: items.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      separatorBuilder: (_, _) => const SizedBox(height: 6),
                       itemBuilder: (context, index) {
                         final item = items[index];
                         return switch (item.kind) {
@@ -1513,7 +1495,7 @@ class _AssistantTaskRail extends StatelessWidget {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1537,7 +1519,7 @@ class _AssistantTaskRail extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     IconButton(
                       key: const Key('assistant-task-refresh'),
                       tooltip: appText('刷新任务', 'Refresh tasks'),
@@ -1548,7 +1530,7 @@ class _AssistantTaskRail extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 6),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.tonalIcon(
@@ -1558,12 +1540,22 @@ class _AssistantTaskRail extends StatelessWidget {
                     },
                     icon: const Icon(Icons.edit_note_rounded),
                     label: Text(appText('新对话', 'New conversation')),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 32),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 6),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
                     _MetaPill(
                       label: '${appText('运行中', 'Running')} $runningCount',
@@ -1585,14 +1577,14 @@ class _AssistantTaskRail extends StatelessWidget {
           ),
           Divider(height: 1, color: palette.strokeSoft),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
             child: Row(
               children: [
                 Text(
                   appText('任务列表', 'Task list'),
                   style: theme.textTheme.titleSmall,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Text(
                   '${tasks.length}',
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -1606,7 +1598,7 @@ class _AssistantTaskRail extends StatelessWidget {
             child: tasks.isEmpty
                 ? Center(
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(8),
                       child: Text(
                         appText(
                           '没有匹配的任务，试试新建一个。',
@@ -1620,9 +1612,9 @@ class _AssistantTaskRail extends StatelessWidget {
                     ),
                   )
                 : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
                     itemCount: tasks.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 6),
+                    separatorBuilder: (_, _) => const SizedBox(height: 4),
                     itemBuilder: (context, index) {
                       final task = tasks[index];
                       return _AssistantTaskTile(
@@ -1662,25 +1654,21 @@ class _AssistantTaskTile extends StatelessWidget {
 
     return Material(
       color: entry.isCurrent ? palette.surfacePrimary : Colors.transparent,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(8),
       child: InkWell(
         key: ValueKey<String>('assistant-task-item-${entry.sessionKey}'),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
-            color: entry.isCurrent ? palette.surfaceSecondary : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: entry.isCurrent
-                ? [
-                    BoxShadow(
-                      color: palette.shadow.withValues(alpha: 0.06),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : const [],
+            color: entry.isCurrent
+                ? palette.surfaceSecondary
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: entry.isCurrent ? palette.strokeSoft : Colors.transparent,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1689,11 +1677,11 @@ class _AssistantTaskTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 32,
-                    height: 32,
+                    width: 26,
+                    height: 26,
                     decoration: BoxDecoration(
                       color: statusStyle.backgroundColor,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Icon(
                       entry.draft
@@ -1701,11 +1689,11 @@ class _AssistantTaskTile extends StatelessWidget {
                           : _normalizedTaskStatus(entry.status) == 'running'
                           ? Icons.play_arrow_rounded
                           : Icons.task_alt_rounded,
-                      size: 18,
+                      size: 16,
                       color: statusStyle.foregroundColor,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       entry.title,
@@ -1719,7 +1707,7 @@ class _AssistantTaskTile extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1736,7 +1724,7 @@ class _AssistantTaskTile extends StatelessWidget {
                         ),
                         tooltip: appText('归档任务', 'Archive task'),
                         visualDensity: VisualDensity.compact,
-                        splashRadius: 16,
+                        splashRadius: 12,
                         onPressed: onArchive,
                         icon: Icon(
                           Icons.archive_outlined,
@@ -1748,7 +1736,7 @@ class _AssistantTaskTile extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 entry.preview,
                 maxLines: 2,
@@ -1758,10 +1746,10 @@ class _AssistantTaskTile extends StatelessWidget {
                   height: 1.35,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Wrap(
-                spacing: 6,
-                runSpacing: 6,
+                spacing: 4,
+                runSpacing: 4,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   _StatusPill(
@@ -1838,33 +1826,27 @@ class _AssistantEmptyState extends StatelessWidget {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
+        constraints: const BoxConstraints(maxWidth: 420),
         child: Padding(
-          padding: const EdgeInsets.all(20),
-        child: Container(
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            color: context.palette.surfacePrimary.withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(26),
-            boxShadow: [
-              BoxShadow(
-                color: context.palette.shadow.withValues(alpha: 0.06),
-                blurRadius: 12,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
+          padding: const EdgeInsets.all(8),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: context.palette.surfacePrimary.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: context.palette.strokeSoft),
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: theme.textTheme.headlineSmall),
-                const SizedBox(height: 8),
+                Text(title, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 6),
                 Text(description, style: theme.textTheme.bodyMedium),
-                const SizedBox(height: 14),
+                const SizedBox(height: 8),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
                     FilledButton.icon(
                       onPressed: connected
@@ -1888,12 +1870,32 @@ class _AssistantEmptyState extends StatelessWidget {
                             ? appText('重新连接', 'Reconnect')
                             : appText('连接 Gateway', 'Connect gateway'),
                       ),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 28),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
                     if (!connected)
                       OutlinedButton.icon(
                         onPressed: onOpenGateway,
                         icon: const Icon(Icons.settings_rounded),
                         label: Text(appText('编辑连接', 'Edit connection')),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 28),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
                       ),
                   ],
                 ),
@@ -1967,7 +1969,7 @@ class _ComposerBar extends StatelessWidget {
         : appText('连接', 'Connect');
 
     return SurfaceCard(
-      borderRadius: 24,
+      borderRadius: 10,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1994,11 +1996,9 @@ class _ComposerBar extends StatelessWidget {
                     ),
                   ),
                 ],
-                child: const _ComposerIconButton(
-                  icon: Icons.add_rounded,
-                ),
+                child: const _ComposerIconButton(icon: Icons.add_rounded),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 6),
               PopupMenuButton<AssistantExecutionTarget>(
                 key: const Key('assistant-execution-target-button'),
                 tooltip: appText('本地或远程', 'Local or remote'),
@@ -2027,18 +2027,18 @@ class _ComposerBar extends StatelessWidget {
                   showChevron: true,
                   maxLabelWidth: 96,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 11,
+                    horizontal: 10,
+                    vertical: 6,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           if (attachments.isNotEmpty) ...[
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 6,
+              runSpacing: 6,
               children: attachments
                   .map(
                     (attachment) => InputChip(
@@ -2049,25 +2049,25 @@ class _ComposerBar extends StatelessWidget {
                   )
                   .toList(),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
           ],
           TextField(
             controller: inputController,
             focusNode: focusNode,
             autofocus: true,
-            minLines: 3,
-            maxLines: 6,
+            minLines: 2,
+            maxLines: 4,
             decoration: InputDecoration(
               isCollapsed: true,
               filled: true,
               fillColor: palette.surfacePrimary,
-              contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              contentPadding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(22),
-                borderSide: const BorderSide(color: Colors.transparent),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: palette.strokeSoft),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
                   color: palette.accent.withValues(alpha: 0.18),
                 ),
@@ -2080,14 +2080,16 @@ class _ComposerBar extends StatelessWidget {
             onSubmitted: (_) => onSend(),
           ),
           if (selectedSkills.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 6,
+              runSpacing: 6,
               children: selectedSkills
                   .map(
                     (skill) => _ComposerSelectedSkillChip(
-                      key: ValueKey<String>('assistant-selected-skill-${skill.key}'),
+                      key: ValueKey<String>(
+                        'assistant-selected-skill-${skill.key}',
+                      ),
                       option: skill,
                       onDeleted: () => onToggleSkill(skill.key),
                     ),
@@ -2095,7 +2097,7 @@ class _ComposerBar extends StatelessWidget {
                   .toList(growable: false),
             ),
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Row(
             children: [
               Expanded(
@@ -2120,27 +2122,32 @@ class _ComposerBar extends StatelessWidget {
                           maxLabelWidth: 132,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       PopupMenuButton<AssistantPermissionLevel>(
                         key: const Key('assistant-permission-button'),
                         tooltip: appText('权限', 'Permissions'),
                         onSelected: (value) {
                           controller.setAssistantPermissionLevel(value);
                         },
-                        itemBuilder: (context) => AssistantPermissionLevel.values
+                        itemBuilder: (context) => AssistantPermissionLevel
+                            .values
                             .map(
-                              (value) => PopupMenuItem<AssistantPermissionLevel>(
-                                value: value,
-                                child: Row(
-                                  children: [
-                                    Icon(value.icon, size: 18),
-                                    const SizedBox(width: 10),
-                                    Expanded(child: Text(value.label)),
-                                    if (value == permissionLevel)
-                                      const Icon(Icons.check_rounded, size: 18),
-                                  ],
-                                ),
-                              ),
+                              (value) =>
+                                  PopupMenuItem<AssistantPermissionLevel>(
+                                    value: value,
+                                    child: Row(
+                                      children: [
+                                        Icon(value.icon, size: 18),
+                                        const SizedBox(width: 10),
+                                        Expanded(child: Text(value.label)),
+                                        if (value == permissionLevel)
+                                          const Icon(
+                                            Icons.check_rounded,
+                                            size: 18,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
                             )
                             .toList(),
                         child: _ComposerToolbarChip(
@@ -2150,7 +2157,7 @@ class _ComposerBar extends StatelessWidget {
                           maxLabelWidth: 120,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       modelOptions.isEmpty
                           ? _ComposerToolbarChip(
                               key: const Key('assistant-model-button'),
@@ -2187,34 +2194,33 @@ class _ComposerBar extends StatelessWidget {
                                 maxLabelWidth: 140,
                               ),
                             ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       PopupMenuButton<String>(
                         key: const Key('assistant-thinking-button'),
                         tooltip: appText('推理强度', 'Reasoning'),
                         onSelected: onThinkingChanged,
-                        itemBuilder: (context) => const <String>[
-                          'low',
-                          'medium',
-                          'high',
-                          'max',
-                        ]
-                            .map(
-                              (value) => PopupMenuItem<String>(
-                                value: value,
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        _assistantThinkingLabel(value),
-                                      ),
+                        itemBuilder: (context) =>
+                            const <String>['low', 'medium', 'high', 'max']
+                                .map(
+                                  (value) => PopupMenuItem<String>(
+                                    value: value,
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            _assistantThinkingLabel(value),
+                                          ),
+                                        ),
+                                        if (value == thinkingLabel)
+                                          const Icon(
+                                            Icons.check_rounded,
+                                            size: 18,
+                                          ),
+                                      ],
                                     ),
-                                    if (value == thinkingLabel)
-                                      const Icon(Icons.check_rounded, size: 18),
-                                  ],
-                                ),
-                              ),
-                            )
-                            .toList(),
+                                  ),
+                                )
+                                .toList(),
                         child: _ComposerToolbarChip(
                           icon: Icons.psychology_alt_outlined,
                           label: _assistantThinkingLabel(thinkingLabel),
@@ -2226,7 +2232,7 @@ class _ComposerBar extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Tooltip(
                 message: submitLabel,
                 child: FilledButton(
@@ -2241,12 +2247,12 @@ class _ComposerBar extends StatelessWidget {
                       : onOpenGateway,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
+                      horizontal: 10,
+                      vertical: 4,
                     ),
-                    minimumSize: const Size(94, 42),
+                    minimumSize: const Size(64, 28),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                   child: Row(
@@ -2260,7 +2266,7 @@ class _ComposerBar extends StatelessWidget {
                             : Icons.link_rounded,
                         size: 18,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 4),
                       Text(submitLabel),
                     ],
                   ),
@@ -2281,15 +2287,17 @@ class _ComposerBar extends StatelessWidget {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final filteredSkills = availableSkills.where((skill) {
-              if (query.trim().isEmpty) {
-                return true;
-              }
-              final haystack =
-                  '${skill.label}\n${skill.description}\n${skill.sourceLabel}'
-                      .toLowerCase();
-              return haystack.contains(query.trim().toLowerCase());
-            }).toList(growable: false);
+            final filteredSkills = availableSkills
+                .where((skill) {
+                  if (query.trim().isEmpty) {
+                    return true;
+                  }
+                  final haystack =
+                      '${skill.label}\n${skill.description}\n${skill.sourceLabel}'
+                          .toLowerCase();
+                  return haystack.contains(query.trim().toLowerCase());
+                })
+                .toList(growable: false);
 
             return Dialog(
               key: const Key('assistant-skill-picker-dialog'),
@@ -2325,10 +2333,7 @@ class _ComposerBar extends StatelessWidget {
                         child: filteredSkills.isEmpty
                             ? Center(
                                 child: Text(
-                                  appText(
-                                    '没有匹配的技能。',
-                                    'No matching skills.',
-                                  ),
+                                  appText('没有匹配的技能。', 'No matching skills.'),
                                   style: Theme.of(context).textTheme.bodyMedium
                                       ?.copyWith(
                                         color: context.palette.textSecondary,
@@ -2341,8 +2346,9 @@ class _ComposerBar extends StatelessWidget {
                                     const SizedBox(height: 8),
                                 itemBuilder: (context, index) {
                                   final skill = filteredSkills[index];
-                                  final selected =
-                                      selectedSkillKeys.contains(skill.key);
+                                  final selected = selectedSkillKeys.contains(
+                                    skill.key,
+                                  );
                                   return _SkillPickerTile(
                                     key: ValueKey<String>(
                                       'assistant-skill-option-${skill.key}',
@@ -2378,20 +2384,14 @@ class _ComposerIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 44,
-      height: 44,
+      width: 34,
+      height: 34,
       decoration: BoxDecoration(
         color: context.palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: context.palette.shadow.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.palette.strokeSoft),
       ),
-      child: Icon(icon, size: 20, color: context.palette.textMuted),
+      child: Icon(icon, size: 18, color: context.palette.textMuted),
     );
   }
 }
@@ -2425,19 +2425,13 @@ class _ComposerToolbarChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.surfaceSecondary,
         borderRadius: BorderRadius.circular(AppRadius.chip),
-        boxShadow: [
-          BoxShadow(
-            color: palette.shadow.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: palette.strokeSoft),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: palette.textMuted),
-          const SizedBox(width: 6),
+          Icon(icon, size: 13, color: palette.textMuted),
+          const SizedBox(width: 4),
           ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxLabelWidth),
             child: Text(
@@ -2772,7 +2766,7 @@ class _ToolCallTileState extends State<_ToolCallTile> {
                           shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: RichText(
                           maxLines: 1,
@@ -2907,8 +2901,9 @@ class _ConnectionChip extends StatelessWidget {
     final color = switch (connection.status) {
       RuntimeConnectionStatus.connected => context.palette.accentMuted,
       RuntimeConnectionStatus.connecting => context.palette.surfaceSecondary,
-      RuntimeConnectionStatus.error =>
-        context.palette.danger.withValues(alpha: 0.10),
+      RuntimeConnectionStatus.error => context.palette.danger.withValues(
+        alpha: 0.10,
+      ),
       RuntimeConnectionStatus.offline => context.palette.surfaceSecondary,
     };
 
@@ -3432,7 +3427,7 @@ class _SkillPickerTile extends StatelessWidget {
           child: Row(
             children: [
               Icon(option.icon, size: 20, color: palette.accent),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

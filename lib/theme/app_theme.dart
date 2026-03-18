@@ -24,7 +24,7 @@ class SimpleRadius {
   static const double card = 6.0;
   static const double button = 8.0;
   static const double input = 8.0;
-  static const double chip = 999.0;
+  static const double chip = 8.0;
   static const double badge = 999.0;
   static const double dialog = 5.0;
   static const double sidebar = 8.0;
@@ -66,11 +66,11 @@ class SimpleTypography {
 class SimpleSizes {
   SimpleSizes._();
 
-  static const double sidebarItemHeight = 40.0;
-  static const double sidebarIconSize = 20.0;
+  static const double sidebarItemHeight = 32.0;
+  static const double sidebarIconSize = 18.0;
   static const double sidebarTextSize = 13.0;
-  static const double sidebarExpandedWidth = 212.0;
-  static const double sidebarCollapsedWidth = 72.0;
+  static const double sidebarExpandedWidth = 176.0;
+  static const double sidebarCollapsedWidth = 52.0;
 
   static const double textareaHeight = 36.0;
   static const double toolbarHeight = 40.0;
