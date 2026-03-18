@@ -180,20 +180,30 @@ void main() {
     expect(find.text('深度研究'), findsNothing);
     expect(find.text('自动化'), findsNothing);
     expect(find.textContaining('输入需求、补充上下文、继续追问'), findsOneWidget);
+    expect(find.byKey(const Key('assistant-attachment-menu-button')), findsOneWidget);
+    expect(find.byKey(const Key('assistant-execution-target-button')), findsOneWidget);
     expect(find.byKey(const Key('assistant-skill-picker-button')), findsOneWidget);
-    expect(find.byTooltip('执行目标'), findsNothing);
-    expect(find.byTooltip('权限'), findsNothing);
-    expect(find.byTooltip('模型'), findsNothing);
+    expect(find.byKey(const Key('assistant-permission-button')), findsOneWidget);
+    expect(find.byKey(const Key('assistant-model-button')), findsOneWidget);
+    expect(find.byKey(const Key('assistant-thinking-button')), findsOneWidget);
     expect(find.byTooltip('模式'), findsNothing);
-    expect(find.byTooltip('推理强度'), findsNothing);
 
-    await tester.tap(find.byTooltip('输入区操作'));
+    await tester.tap(find.byKey(const Key('assistant-attachment-menu-button')));
     await tester.pumpAndSettle();
 
     expect(find.text('添加照片和文件'), findsOneWidget);
     expect(find.text('计划模式'), findsNothing);
     expect(find.text('连接网关'), findsNothing);
     expect(find.text('浏览器 / 编码 / 研究'), findsNothing);
+
+    await tester.tapAt(const Offset(24, 24));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('assistant-execution-target-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('本地'), findsWidgets);
+    expect(find.text('远程'), findsOneWidget);
 
     await tester.tapAt(const Offset(24, 24));
     await tester.pumpAndSettle();
