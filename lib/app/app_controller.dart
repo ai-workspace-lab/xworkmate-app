@@ -580,6 +580,13 @@ class AppController extends ChangeNotifier {
       settings.copyWith(assistantExecutionTarget: target),
       refreshAfterSave: false,
     );
+    final targetProfile = _gatewayProfileForAssistantExecutionTarget(target);
+    try {
+      await _connectProfile(targetProfile);
+    } catch (_) {
+      // Keep the selected execution target even when the immediate reconnect
+      // fails so the user can retry or adjust gateway settings manually.
+    }
   }
 
   Future<void> setAssistantPermissionLevel(
@@ -1143,5 +1150,39 @@ class AppController extends ChangeNotifier {
       return RuntimeConnectionMode.local;
     }
     return RuntimeConnectionMode.remote;
+  }
+
+  GatewayConnectionProfile _gatewayProfileForAssistantExecutionTarget(
+    AssistantExecutionTarget target,
+  ) {
+    final desiredMode = switch (target) {
+      AssistantExecutionTarget.local => RuntimeConnectionMode.local,
+      AssistantExecutionTarget.remote => RuntimeConnectionMode.remote,
+    };
+    final savedProfile = settings.gateway;
+    if (savedProfile.mode == desiredMode) {
+      return savedProfile;
+    }
+
+    if (desiredMode == RuntimeConnectionMode.local) {
+      return savedProfile.copyWith(
+        mode: RuntimeConnectionMode.local,
+        useSetupCode: false,
+        setupCode: '',
+        host: '127.0.0.1',
+        port: 18789,
+        tls: false,
+      );
+    }
+
+    final defaults = GatewayConnectionProfile.defaults();
+    return savedProfile.copyWith(
+      mode: RuntimeConnectionMode.remote,
+      useSetupCode: false,
+      setupCode: '',
+      host: defaults.host,
+      port: defaults.port,
+      tls: defaults.tls,
+    );
   }
 }
