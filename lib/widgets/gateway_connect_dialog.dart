@@ -70,7 +70,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
     final willUseStoredGatewayToken =
         typedGatewayToken.isEmpty && hasStoredGatewayToken;
     final body = SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpacing.page),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -79,7 +79,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
             appText('Gateway 访问', 'Gateway Access'),
             style: theme.textTheme.headlineSmall,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.section),
           Text(
             appText(
               '通过配置码或手动 Host / TLS 将 XWorkmate 连接到 OpenClaw Gateway。',
@@ -87,7 +87,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
             ),
             style: theme.textTheme.bodyMedium,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.section),
           SectionTabs(
             items: [appText('配置码', 'Setup Code'), appText('手动配置', 'Manual')],
             value: _mode == 'setup'
@@ -100,9 +100,9 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                   : 'manual',
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.section),
           _StatusBanner(controller: widget.controller),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.section),
           if (_mode == 'setup') ...[
             TextField(
               controller: _setupCodeController,
@@ -144,12 +144,12 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                 });
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.section),
             TextField(
               controller: _hostController,
               decoration: InputDecoration(labelText: appText('主机', 'Host')),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.section),
             Row(
               children: [
                 Expanded(
@@ -161,7 +161,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: AppSpacing.section),
                 Expanded(
                   child: SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
@@ -175,7 +175,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
               ],
             ),
           ],
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.section),
           TextField(
             controller: _tokenController,
             obscureText: _obscureSharedToken,
@@ -203,7 +203,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
             onChanged: (_) => setState(() {}),
           ),
           if (willUseStoredGatewayToken || typedGatewayToken.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.section),
             _SharedTokenStatusCard(
               hasStoredGatewayToken: hasStoredGatewayToken,
               storedGatewayTokenMask: storedGatewayTokenMask,
@@ -220,7 +220,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                   : null,
             ),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.section),
           TextField(
             controller: _passwordController,
             obscureText: true,
@@ -229,10 +229,10 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
               hintText: appText('可选：共享密码', 'Optional shared password'),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.section),
           Wrap(
-            spacing: 12,
-            runSpacing: 12,
+            spacing: AppSpacing.section,
+            runSpacing: AppSpacing.section,
             alignment: WrapAlignment.end,
             children: [
               if (widget.controller.connection.status ==
@@ -270,6 +270,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
     }
 
     return Dialog(
+      insetPadding: const EdgeInsets.all(AppSpacing.page),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560),
         child: body,
@@ -373,10 +374,11 @@ class _SharedTokenStatusCard extends StatelessWidget {
           );
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.section),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor),
+        borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,7 +389,7 @@ class _SharedTokenStatusCard extends StatelessWidget {
                 : Icons.inventory_2_rounded,
             size: 18,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppSpacing.compact),
           Expanded(child: Text(message, style: theme.textTheme.bodySmall)),
           if (onClearStoredToken != null)
             TextButton(
@@ -419,29 +421,30 @@ class _StatusBanner extends StatelessWidget {
     };
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.section),
       decoration: BoxDecoration(
         color: tone,
-        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.dividerColor),
+        borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(connection.status.label, style: theme.textTheme.titleMedium),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.compact),
           Text(
             connection.remoteAddress ?? 'No active gateway target',
             style: theme.textTheme.bodyMedium,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.section),
           Text(
             appText('认证诊断', 'Auth Diagnostics'),
             style: theme.textTheme.labelLarge,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.compact),
           Text(connection.connectAuthSummary, style: theme.textTheme.bodySmall),
           if (connection.pairingRequired) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.section),
             Text(
               appText(
                 '当前设备需要先完成配对审批。请在已授权设备上批准该请求后重试。',
@@ -450,7 +453,7 @@ class _StatusBanner extends StatelessWidget {
               style: theme.textTheme.bodySmall,
             ),
             if ((connection.deviceId ?? '').isNotEmpty) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: AppSpacing.compact),
               Text(
                 appText(
                   '当前设备 ID: ${connection.deviceId}',
@@ -460,7 +463,7 @@ class _StatusBanner extends StatelessWidget {
               ),
             ],
           ] else if (connection.gatewayTokenMissing) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.section),
             Text(
               appText(
                 '首次连接请提供共享 Token；配对完成后可继续使用本机 device token。',
@@ -470,7 +473,7 @@ class _StatusBanner extends StatelessWidget {
             ),
           ],
           if ((connection.lastError ?? '').isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.section),
             Text(connection.lastError!, style: theme.textTheme.bodySmall),
           ],
         ],

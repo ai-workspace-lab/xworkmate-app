@@ -38,13 +38,16 @@ class _SurfaceCardState extends State<SurfaceCard> {
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeInOut,
         decoration: BoxDecoration(
-          color: _hovered && widget.onTap != null ? palette.surfaceSecondary : baseColor,
+          color: _hovered && widget.onTap != null
+              ? palette.surfaceSecondary
+              : baseColor,
+          border: Border.all(color: palette.strokeSoft),
           borderRadius: BorderRadius.circular(widget.borderRadius),
           boxShadow: [
             BoxShadow(
-              color: palette.shadow.withValues(alpha: _hovered ? 0.10 : 0.06),
-              blurRadius: _hovered ? 12 : 8,
-              offset: const Offset(0, 2),
+              color: palette.shadow.withValues(alpha: _hovered ? 0.04 : 0.02),
+              blurRadius: _hovered ? 6 : 4,
+              offset: const Offset(0, 1),
             ),
           ],
         ),

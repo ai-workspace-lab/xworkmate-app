@@ -3,32 +3,36 @@ import 'package:flutter/material.dart';
 
 import 'app_palette.dart';
 
-class AppSpacing {
-  AppSpacing._();
+// Default theme token set: simple
+class SimpleSpacing {
+  SimpleSpacing._();
 
+  static const double page = 0.0;
+  static const double compact = 6.0;
+  static const double section = 8.0;
   static const double xxs = 4.0;
-  static const double xs = 8.0;
-  static const double sm = 12.0;
-  static const double md = 16.0;
-  static const double lg = 24.0;
-  static const double xl = 32.0;
+  static const double xs = compact;
+  static const double sm = section;
+  static const double md = section;
+  static const double lg = section;
+  static const double xl = 12.0;
 }
 
-class AppRadius {
-  AppRadius._();
+class SimpleRadius {
+  SimpleRadius._();
 
-  static const double card = 16.0;
-  static const double button = 12.0;
-  static const double input = 16.0;
+  static const double card = 6.0;
+  static const double button = 8.0;
+  static const double input = 8.0;
   static const double chip = 999.0;
   static const double badge = 999.0;
-  static const double dialog = 16.0;
-  static const double sidebar = 20.0;
-  static const double icon = 12.0;
+  static const double dialog = 5.0;
+  static const double sidebar = 8.0;
+  static const double icon = 8.0;
 }
 
-class AppTypography {
-  AppTypography._();
+class SimpleTypography {
+  SimpleTypography._();
 
   static const double displaySize = 28.0;
   static const FontWeight displayWeight = FontWeight.w600;
@@ -42,25 +46,25 @@ class AppTypography {
   static const FontWeight sectionWeight = FontWeight.w600;
   static const double sectionHeight = 14 / 13;
 
-  static const double bodySize = 14.0;
+  static const double bodySize = 13.0;
   static const FontWeight bodyWeight = FontWeight.w400;
-  static const double bodyHeight = 20 / 14;
+  static const double bodyHeight = 15 / 13;
 
   static const double compactBodySize = 13.0;
   static const FontWeight compactBodyWeight = FontWeight.w400;
   static const double compactBodyHeight = 15 / 13;
 
-  static const double emphasizedBodySize = 14.0;
+  static const double emphasizedBodySize = 13.0;
   static const FontWeight emphasizedBodyWeight = FontWeight.w600;
-  static const double emphasizedBodyHeight = 14 / 14;
+  static const double emphasizedBodyHeight = 14 / 13;
 
   static const double captionSize = 12.0;
   static const FontWeight captionWeight = FontWeight.w400;
   static const double captionHeight = 16 / 12;
 }
 
-class AppSizes {
-  AppSizes._();
+class SimpleSizes {
+  SimpleSizes._();
 
   static const double sidebarItemHeight = 40.0;
   static const double sidebarIconSize = 20.0;
@@ -68,11 +72,91 @@ class AppSizes {
   static const double sidebarExpandedWidth = 212.0;
   static const double sidebarCollapsedWidth = 72.0;
 
-  static const double textareaHeight = 48.0;
+  static const double textareaHeight = 36.0;
   static const double toolbarHeight = 40.0;
 
-  static const double buttonHeightDesktop = 40.0;
-  static const double buttonHeightMobile = 40.0;
+  static const double inputHeight = 36.0;
+  static const double buttonHeightDesktop = 16.0;
+  static const double buttonHeightMobile = 16.0;
+}
+
+class AppSpacing {
+  AppSpacing._();
+
+  static const double page = SimpleSpacing.page;
+  static const double compact = SimpleSpacing.compact;
+  static const double section = SimpleSpacing.section;
+  static const double xxs = SimpleSpacing.xxs;
+  static const double xs = SimpleSpacing.xs;
+  static const double sm = SimpleSpacing.sm;
+  static const double md = SimpleSpacing.md;
+  static const double lg = SimpleSpacing.lg;
+  static const double xl = SimpleSpacing.xl;
+}
+
+class AppRadius {
+  AppRadius._();
+
+  static const double card = SimpleRadius.card;
+  static const double button = SimpleRadius.button;
+  static const double input = SimpleRadius.input;
+  static const double chip = SimpleRadius.chip;
+  static const double badge = SimpleRadius.badge;
+  static const double dialog = SimpleRadius.dialog;
+  static const double sidebar = SimpleRadius.sidebar;
+  static const double icon = SimpleRadius.icon;
+}
+
+class AppTypography {
+  AppTypography._();
+
+  static const double displaySize = SimpleTypography.displaySize;
+  static const FontWeight displayWeight = SimpleTypography.displayWeight;
+  static const double displayHeight = SimpleTypography.displayHeight;
+
+  static const double titleSize = SimpleTypography.titleSize;
+  static const FontWeight titleWeight = SimpleTypography.titleWeight;
+  static const double titleHeight = SimpleTypography.titleHeight;
+
+  static const double sectionSize = SimpleTypography.sectionSize;
+  static const FontWeight sectionWeight = SimpleTypography.sectionWeight;
+  static const double sectionHeight = SimpleTypography.sectionHeight;
+
+  static const double bodySize = SimpleTypography.bodySize;
+  static const FontWeight bodyWeight = SimpleTypography.bodyWeight;
+  static const double bodyHeight = SimpleTypography.bodyHeight;
+
+  static const double compactBodySize = SimpleTypography.compactBodySize;
+  static const FontWeight compactBodyWeight =
+      SimpleTypography.compactBodyWeight;
+  static const double compactBodyHeight = SimpleTypography.compactBodyHeight;
+
+  static const double emphasizedBodySize = SimpleTypography.emphasizedBodySize;
+  static const FontWeight emphasizedBodyWeight =
+      SimpleTypography.emphasizedBodyWeight;
+  static const double emphasizedBodyHeight =
+      SimpleTypography.emphasizedBodyHeight;
+
+  static const double captionSize = SimpleTypography.captionSize;
+  static const FontWeight captionWeight = SimpleTypography.captionWeight;
+  static const double captionHeight = SimpleTypography.captionHeight;
+}
+
+class AppSizes {
+  AppSizes._();
+
+  static const double sidebarItemHeight = SimpleSizes.sidebarItemHeight;
+  static const double sidebarIconSize = SimpleSizes.sidebarIconSize;
+  static const double sidebarTextSize = SimpleSizes.sidebarTextSize;
+  static const double sidebarExpandedWidth = SimpleSizes.sidebarExpandedWidth;
+  static const double sidebarCollapsedWidth = SimpleSizes.sidebarCollapsedWidth;
+
+  static const double textareaHeight = SimpleSizes.textareaHeight;
+  static const double toolbarHeight = SimpleSizes.toolbarHeight;
+
+  static const double inputHeight = SimpleSizes.inputHeight;
+  static const double buttonHeightDesktop = SimpleSizes.buttonHeightDesktop;
+  static const double buttonHeightMobile = SimpleSizes.buttonHeightMobile;
 }
 
 class AppTheme {
@@ -152,6 +236,7 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.card),
+          side: BorderSide(color: palette.strokeSoft),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
@@ -184,8 +269,8 @@ class AppTheme {
                 : AppSizes.buttonHeightMobile,
           ),
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm,
+            horizontal: AppSpacing.sm,
+            vertical: 0,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button),
@@ -209,13 +294,13 @@ class AppTheme {
                 : AppSizes.buttonHeightMobile,
           ),
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm,
+            horizontal: AppSpacing.sm,
+            vertical: 0,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button),
           ),
-          side: BorderSide.none,
+          side: BorderSide(color: palette.strokeSoft),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -224,10 +309,15 @@ class AppTheme {
           textStyle: tunedTextTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w500,
           ),
-          minimumSize: Size(0, isDesktop ? 32 : 34),
+          minimumSize: Size(
+            0,
+            isDesktop
+                ? AppSizes.buttonHeightDesktop
+                : AppSizes.buttonHeightMobile,
+          ),
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.xs,
+            horizontal: AppSpacing.xs,
+            vertical: 0,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button),
@@ -247,6 +337,7 @@ class AppTheme {
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
+        isDense: true,
         filled: true,
         fillColor: palette.surfacePrimary,
         hintStyle: tunedTextTheme.bodyMedium?.copyWith(
@@ -259,16 +350,17 @@ class AppTheme {
           color: palette.textSecondary,
         ),
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.compact,
         ),
+        constraints: const BoxConstraints(minHeight: AppSizes.inputHeight),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
-          borderSide: const BorderSide(color: Colors.transparent),
+          borderSide: BorderSide(color: palette.strokeSoft),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
-          borderSide: const BorderSide(color: Colors.transparent),
+          borderSide: BorderSide(color: palette.strokeSoft),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
@@ -293,7 +385,7 @@ class AppTheme {
           padding: const WidgetStatePropertyAll(
             EdgeInsets.symmetric(
               horizontal: AppSpacing.sm,
-              vertical: AppSpacing.xs,
+              vertical: AppSpacing.compact,
             ),
           ),
           shape: WidgetStatePropertyAll(
