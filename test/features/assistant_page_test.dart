@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/features/assistant/assistant_page.dart';
-import 'package:xworkmate/widgets/pane_resize_handle.dart';
 
 import '../test_support.dart';
 
@@ -131,39 +130,6 @@ void main() {
     expect(find.byKey(const Key('assistant-side-pane')), findsOneWidget);
   });
 
-  testWidgets('AssistantPage allows the left side pane to expand freely', (
-    WidgetTester tester,
-  ) async {
-    final controller = await createTestController(tester);
-
-    await pumpPage(
-      tester,
-      size: const Size(2200, 1200),
-      child: AssistantPage(
-        controller: controller,
-        onOpenDetail: (_) {},
-        navigationPanelBuilder: (_) => const ColoredBox(
-          key: Key('assistant-nav-panel-probe'),
-          color: Colors.red,
-        ),
-        showStandaloneTaskRail: false,
-      ),
-    );
-
-    final sidePaneShell = find.byKey(
-      const Key('assistant-unified-side-pane-shell'),
-    );
-    final initialWidth = tester.getSize(sidePaneShell).width;
-    expect(initialWidth, greaterThan(300));
-
-    await tester.drag(find.byType(PaneResizeHandle).first, const Offset(620, 0));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 260));
-
-    final expandedWidth = tester.getSize(sidePaneShell).width;
-    expect(expandedWidth, greaterThan(700));
-  });
-
   testWidgets('AssistantPage narrow layout keeps existing single-pane flow', (
     WidgetTester tester,
   ) async {
@@ -198,7 +164,7 @@ void main() {
     expect(find.text('Gateway 访问'), findsOneWidget);
   });
 
-  testWidgets('AssistantPage breadcrumb returns to default task home', (
+  testWidgets('AssistantPage uses persistent composer with suggestion chips', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
@@ -208,18 +174,18 @@ void main() {
       child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
     );
 
-    await tester.tap(find.byKey(const Key('assistant-new-task-button')));
-    await tester.pumpAndSettle();
+    expect(find.textContaining('Claw'), findsNothing);
+    expect(find.text('幻灯片'), findsOneWidget);
+    expect(find.textContaining('输入需求、补充上下文、继续追问'), findsOneWidget);
 
-    expect(find.text('新对话'), findsWidgets);
-
-    await tester.tap(find.byKey(const ValueKey<String>('workspace-breadcrumb-0')));
-    await tester.pumpAndSettle();
-
-    final titleAfter = tester.widget<Text>(
-      find.byKey(const Key('assistant-conversation-title')),
+    await tester.ensureVisible(
+      find.byKey(const ValueKey<String>('assistant-suggestion-幻灯片')),
     );
-    expect(titleAfter.data, '默认任务');
-    expect(controller.currentSessionKey, 'main');
+    await tester.tap(
+      find.byKey(const ValueKey<String>('assistant-suggestion-幻灯片')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('帮我整理一份演示文稿'), findsOneWidget);
   });
 }

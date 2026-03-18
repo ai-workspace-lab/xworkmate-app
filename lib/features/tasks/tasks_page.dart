@@ -4,11 +4,11 @@ import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
+import '../../theme/app_palette.dart';
+import '../../widgets/desktop_workspace_scaffold.dart';
 import '../../widgets/metric_card.dart';
 import '../../widgets/section_tabs.dart';
 import '../../widgets/status_badge.dart';
-import '../../widgets/surface_card.dart';
-import '../../widgets/top_bar.dart';
 
 class TasksPage extends StatefulWidget {
   const TasksPage({
@@ -26,39 +26,47 @@ class TasksPage extends StatefulWidget {
 
 class _TasksPageState extends State<TasksPage> {
   TasksTab _tab = TasksTab.queue;
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+  String? _selectedTaskId;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
-    final items = controller.taskItemsForTab(_tabKey);
+    final allItems = controller.taskItemsForTab(_tabKey);
+    final items = allItems.where(_matchesQuery).toList(growable: false);
+    final selected = _resolveSelectedTask(items);
     final metrics = [
       MetricSummary(
         label: appText('总数', 'Total'),
         value: '${controller.tasksController.totalCount}',
-        caption: appText('从会话与对话中派生', 'Derived from sessions / chat'),
+        caption: appText('任务 / 会话聚合', 'Task / session aggregate'),
         icon: Icons.layers_rounded,
       ),
       MetricSummary(
         label: appText('运行中', 'Running'),
         value: '${controller.tasksController.running.length}',
-        caption: appText('当前活跃运行', 'Current active runs'),
+        caption: appText('当前活跃执行', 'Active executions'),
         icon: Icons.play_circle_outline_rounded,
-        status: _statusInfoForTask('Running'),
+        status: _taskStatusInfo('Running'),
       ),
       MetricSummary(
         label: appText('失败', 'Failed'),
         value: '${controller.tasksController.failed.length}',
-        caption: appText('中断或报错的运行', 'Aborted / error runs'),
+        caption: appText('中断或报错', 'Interrupted or failed'),
         icon: Icons.error_outline_rounded,
-        status: _statusInfoForTask('Failed'),
+        status: _taskStatusInfo('Failed'),
       ),
       MetricSummary(
         label: appText('计划中', 'Scheduled'),
         value: '${controller.tasksController.scheduled.length}',
-        caption: appText(
-          '来自 Gateway cron 调度器',
-          'Loaded from the gateway cron scheduler',
-        ),
+        caption: appText('来自 cron 调度器', 'Loaded from cron scheduler'),
         icon: Icons.event_repeat_rounded,
       ),
     ];
@@ -66,289 +74,498 @@ class _TasksPageState extends State<TasksPage> {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        final palette = context.palette;
+        return DesktopWorkspaceScaffold(
+          eyebrow: appText('任务与线程', 'Tasks and sessions'),
+          title: appText('任务工作台', 'Task workspace'),
+          subtitle: appText(
+            '左侧筛选和切换任务，右侧查看当前任务详情并回到对话。',
+            'Filter and switch tasks on the left, inspect the current task on the right.',
+          ),
+          toolbar: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              TopBar(
-                breadcrumbs: [
-                  AppBreadcrumbItem(
-                    label: appText('主页', 'Home'),
-                    icon: Icons.home_rounded,
-                    onTap: controller.navigateHome,
-                  ),
-                  AppBreadcrumbItem(label: appText('任务', 'Tasks')),
-                  AppBreadcrumbItem(label: _tab.label),
-                ],
-                title: appText('任务', 'Tasks'),
-                subtitle: appText(
-                  '查看任务队列、执行状态与历史记录',
-                  'Review queue, execution state, and history.',
-                ),
-                trailing: Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 220,
-                      child: TextField(
-                        decoration: InputDecoration(
-                          hintText: appText('搜索任务', 'Search tasks'),
-                          prefixIcon: Icon(Icons.search_rounded),
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: controller.refreshSessions,
-                      icon: const Icon(Icons.refresh_rounded),
-                    ),
-                    if (_tab != TasksTab.scheduled)
-                      FilledButton.tonalIcon(
-                        onPressed: () => controller.navigateTo(
-                          WorkspaceDestination.assistant,
-                        ),
-                        icon: const Icon(Icons.add_rounded),
-                        label: Text(appText('新建任务', 'New Task')),
-                      )
-                    else
-                      Chip(
-                        avatar: const Icon(
-                          Icons.lock_outline_rounded,
-                          size: 16,
-                        ),
-                        label: Text(
-                          appText('Scheduled 只读', 'Scheduled read-only'),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              SectionTabs(
-                items: TasksTab.values.map((item) => item.label).toList(),
-                value: _tab.label,
-                onChanged: (value) => setState(
-                  () => _tab = TasksTab.values.firstWhere(
-                    (item) => item.label == value,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final width = constraints.maxWidth > 980
-                      ? (constraints.maxWidth - 48) / 4
-                      : constraints.maxWidth > 640
-                      ? (constraints.maxWidth - 16) / 2
-                      : constraints.maxWidth;
-                  return Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    children: metrics
-                        .map(
-                          (metric) => SizedBox(
-                            width: width,
-                            child: MetricCard(metric: metric),
+              SizedBox(
+                width: 240,
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) {
+                    setState(() {
+                      _query = value.trim().toLowerCase();
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: appText('搜索任务 / 会话', 'Search tasks / sessions'),
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: appText('清除', 'Clear'),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _query = '';
+                              });
+                            },
+                            icon: const Icon(Icons.close_rounded),
                           ),
-                        )
-                        .toList(),
-                  );
-                },
+                  ),
+                ),
               ),
-              if (_tab == TasksTab.scheduled) ...[
+              IconButton(
+                tooltip: appText('刷新任务', 'Refresh tasks'),
+                onPressed: controller.refreshSessions,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+              if (_tab != TasksTab.scheduled)
+                FilledButton.tonalIcon(
+                  onPressed: () =>
+                      controller.navigateTo(WorkspaceDestination.assistant),
+                  icon: const Icon(Icons.edit_note_rounded),
+                  label: Text(appText('继续对话', 'Continue in assistant')),
+                )
+              else
+                Chip(
+                  avatar: const Icon(Icons.lock_outline_rounded, size: 16),
+                  label: Text(
+                    appText('计划任务只读', 'Scheduled tasks are read-only'),
+                  ),
+                ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                SectionTabs(
+                  items: TasksTab.values.map((item) => item.label).toList(),
+                  value: _tab.label,
+                  onChanged: (value) {
+                    setState(() {
+                      _tab = TasksTab.values.firstWhere(
+                        (item) => item.label == value,
+                      );
+                      _selectedTaskId = null;
+                    });
+                  },
+                ),
                 const SizedBox(height: 16),
-                SurfaceCard(
-                  child: Text(
-                    appText(
-                      '这些项目来自 Gateway cron 调度器，本页当前仅支持只读展示。',
-                      'These items come from the gateway cron scheduler and are read-only in this build.',
+                SizedBox(
+                  height: 172,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: metrics.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) => SizedBox(
+                      width: 240,
+                      child: MetricCard(metric: metrics[index]),
                     ),
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: palette.strokeSoft),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 360,
+                          child: _TaskListPanel(
+                            tab: _tab,
+                            items: items,
+                            selectedTaskId: selected?.id,
+                            onSelectTask: (task) {
+                              setState(() {
+                                _selectedTaskId = task.id;
+                              });
+                            },
+                          ),
+                        ),
+                        Container(width: 1, color: palette.strokeSoft),
+                        Expanded(
+                          child: _TaskDetailPanel(
+                            controller: controller,
+                            tab: _tab,
+                            selected: selected,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
-              const SizedBox(height: 24),
-              if (_tab == TasksTab.scheduled && items.isEmpty)
-                SurfaceCard(
-                  child: Text(
-                    appText(
-                      '当前网关还没有计划任务。',
-                      'No scheduled jobs are currently exposed by the gateway.',
-                    ),
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                )
-              else if (items.isEmpty)
-                SurfaceCard(
-                  child: Text(
-                    controller.connection.status ==
-                            RuntimeConnectionStatus.connected
-                        ? appText('当前页签暂无任务。', 'No tasks in this tab.')
-                        : appText(
-                            '连接 Gateway 后，这里会显示真实的队列、运行中、历史和失败任务。',
-                            'Connect a gateway to load live queue, running, history, and failed tasks.',
-                          ),
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                )
-              else
-                ...items.map(
-                  (task) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: SurfaceCard(
-                      onTap: () => widget.onOpenDetail(_taskDetail(task)),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          if (constraints.maxWidth < 820) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  task.title,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleMedium,
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  task.summary,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                const SizedBox(height: 14),
-                                Wrap(
-                                  spacing: 12,
-                                  runSpacing: 12,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    StatusBadge(
-                                      status: _statusInfoForTask(task.status),
-                                    ),
-                                    Text(task.owner),
-                                    Text(task.startedAtLabel),
-                                    const Icon(Icons.chevron_right_rounded),
-                                  ],
-                                ),
-                              ],
-                            );
-                          }
-
-                          return Row(
-                            children: [
-                              Expanded(
-                                flex: 4,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      task.title,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleMedium,
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      task.summary,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Expanded(
-                                flex: 2,
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: StatusBadge(
-                                    status: _statusInfoForTask(task.status),
-                                  ),
-                                ),
-                              ),
-                              Expanded(flex: 2, child: Text(task.owner)),
-                              Expanded(
-                                flex: 2,
-                                child: Text(task.startedAtLabel),
-                              ),
-                              const Icon(Icons.chevron_right_rounded),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  appText(
-                    '点击任务项后会打开详情侧栏',
-                    'Click a task to open the detail drawer.',
-                  ),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-            ],
+            ),
           ),
         );
       },
     );
   }
 
-  DetailPanelData _taskDetail(DerivedTaskItem task) {
-    return DetailPanelData(
-      title: task.title,
-      subtitle: appText('会话派生任务', 'Session-derived Task'),
-      icon: Icons.layers_rounded,
-      status: _statusInfoForTask(task.status),
-      description: task.summary,
-      meta: [task.surface, task.sessionKey],
-      actions: [appText('打开会话', 'Open Session'), appText('刷新', 'Refresh')],
-      sections: [
-        DetailSection(
-          title: appText('任务', 'Task'),
-          items: [
-            DetailItem(label: appText('负责人', 'Owner'), value: task.owner),
-            DetailItem(
-              label: appText('状态', 'Status'),
-              value: _statusLabel(task.status),
-            ),
-            DetailItem(
-              label: appText('开始时间', 'Started'),
-              value: task.startedAtLabel,
-            ),
-            DetailItem(
-              label: appText('更新时间', 'Updated'),
-              value: task.durationLabel,
-            ),
-            DetailItem(
-              label: appText('会话 Key', 'Session Key'),
-              value: task.sessionKey,
-            ),
-          ],
+  String get _tabKey => _tab.label;
+
+  bool _matchesQuery(DerivedTaskItem item) {
+    if (_query.isEmpty) {
+      return true;
+    }
+    final haystack = [
+      item.title,
+      item.summary,
+      item.owner,
+      item.surface,
+      item.sessionKey,
+    ].join(' ').toLowerCase();
+    return haystack.contains(_query);
+  }
+
+  DerivedTaskItem? _resolveSelectedTask(List<DerivedTaskItem> items) {
+    if (items.isEmpty) {
+      return null;
+    }
+    for (final item in items) {
+      if (item.id == _selectedTaskId) {
+        return item;
+      }
+    }
+    return items.first;
+  }
+}
+
+class _TaskListPanel extends StatelessWidget {
+  const _TaskListPanel({
+    required this.tab,
+    required this.items,
+    required this.selectedTaskId,
+    required this.onSelectTask,
+  });
+
+  final TasksTab tab;
+  final List<DerivedTaskItem> items;
+  final String? selectedTaskId;
+  final ValueChanged<DerivedTaskItem> onSelectTask;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final emptyLabel = tab == TasksTab.scheduled
+        ? appText('当前没有计划任务。', 'No scheduled tasks right now.')
+        : appText('当前筛选下没有任务。', 'No tasks match the current filter.');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+          child: Row(
+            children: [
+              Text(
+                appText('任务列表', 'Task list'),
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${items.length}',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: palette.textMuted),
+              ),
+            ],
+          ),
+        ),
+        Container(height: 1, color: palette.strokeSoft),
+        Expanded(
+          child: items.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Text(
+                      emptyLabel,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: palette.textSecondary,
+                      ),
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(10),
+                  itemCount: items.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final task = items[index];
+                    final selected = task.id == selectedTaskId;
+                    return _TaskListTile(
+                      task: task,
+                      selected: selected,
+                      onTap: () => onSelectTask(task),
+                    );
+                  },
+                ),
         ),
       ],
     );
   }
-
-  String get _tabKey => switch (_tab) {
-    TasksTab.queue => 'Queue',
-    TasksTab.running => 'Running',
-    TasksTab.history => 'History',
-    TasksTab.failed => 'Failed',
-    TasksTab.scheduled => 'Scheduled',
-  };
 }
 
-StatusInfo _statusInfoForTask(String status) => switch (status) {
+class _TaskListTile extends StatelessWidget {
+  const _TaskListTile({
+    required this.task,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final DerivedTaskItem task;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Material(
+      color: selected ? palette.accentMuted.withValues(alpha: 0.4) : null,
+      child: InkWell(
+        key: ValueKey<String>('tasks-list-item-${task.id}'),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: selected ? palette.accent : palette.strokeSoft,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      task.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  StatusBadge(status: _taskStatusInfo(task.status)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                task.summary,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: palette.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                runSpacing: 6,
+                children: [
+                  _InlineMeta(label: task.owner),
+                  _InlineMeta(label: task.startedAtLabel),
+                  _InlineMeta(label: task.surface),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskDetailPanel extends StatelessWidget {
+  const _TaskDetailPanel({
+    required this.controller,
+    required this.tab,
+    required this.selected,
+  });
+
+  final AppController controller;
+  final TasksTab tab;
+  final DerivedTaskItem? selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    if (selected == null) {
+      return Center(
+        child: Text(
+          appText('选择左侧任务查看详情。', 'Select a task on the left.'),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyLarge?.copyWith(color: palette.textSecondary),
+        ),
+      );
+    }
+
+    return Padding(
+      key: const Key('tasks-detail-panel'),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                selected!.title,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              StatusBadge(status: _taskStatusInfo(selected!.status)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            selected!.summary,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: palette.textSecondary,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _DetailStat(
+                label: appText('任务来源', 'Surface'),
+                value: selected!.surface,
+              ),
+              _DetailStat(
+                label: appText('执行代理', 'Owner'),
+                value: selected!.owner,
+              ),
+              _DetailStat(
+                label: appText('开始时间', 'Started'),
+                value: selected!.startedAtLabel,
+              ),
+              _DetailStat(
+                label: appText('耗时', 'Duration'),
+                value: selected!.durationLabel,
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: palette.surfaceSecondary,
+              border: Border.all(color: palette.strokeSoft),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  appText('会话上下文', 'Conversation context'),
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                SelectableText(
+                  selected!.sessionKey,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+          const Spacer(),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              FilledButton.icon(
+                onPressed: tab == TasksTab.scheduled
+                    ? null
+                    : () async {
+                        await controller.switchSession(selected!.sessionKey);
+                        controller.navigateTo(WorkspaceDestination.assistant);
+                      },
+                icon: const Icon(Icons.forum_outlined),
+                label: Text(appText('回到持续对话', 'Open conversation')),
+              ),
+              OutlinedButton.icon(
+                onPressed: controller.refreshSessions,
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(appText('刷新', 'Refresh')),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailStat extends StatelessWidget {
+  const _DetailStat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      constraints: const BoxConstraints(minWidth: 160),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: palette.surfaceSecondary,
+        border: Border.all(color: palette.strokeSoft),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: palette.textMuted),
+          ),
+          const SizedBox(height: 4),
+          Text(value, style: Theme.of(context).textTheme.labelLarge),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineMeta extends StatelessWidget {
+  const _InlineMeta({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: Theme.of(
+        context,
+      ).textTheme.bodySmall?.copyWith(color: context.palette.textMuted),
+    );
+  }
+}
+
+StatusInfo _taskStatusInfo(String status) => switch (status) {
+  'running' ||
   'Running' => StatusInfo(appText('运行中', 'Running'), StatusTone.accent),
+  'failed' ||
   'Failed' => StatusInfo(appText('失败', 'Failed'), StatusTone.danger),
+  'queued' ||
   'Queued' => StatusInfo(appText('排队中', 'Queued'), StatusTone.neutral),
-  'Scheduled' => StatusInfo(appText('计划中', 'Scheduled'), StatusTone.accent),
-  'Disabled' => StatusInfo(appText('已禁用', 'Disabled'), StatusTone.neutral),
   _ => StatusInfo(appText('已完成', 'Completed'), StatusTone.success),
 };
-
-String _statusLabel(String status) => _statusInfoForTask(status).label;

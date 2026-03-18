@@ -1,6 +1,13 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'test_support.dart';
+
+Finder _textEither(String zh, String en) {
+  return find.byWidgetPredicate(
+    (widget) => widget is Text && (widget.data == zh || widget.data == en),
+  );
+}
 
 void main() {
   initializeIntegrationHarness();
@@ -12,10 +19,12 @@ void main() {
   ) async {
     await pumpDesktopApp(tester);
 
-    expect(find.text('新对话'), findsWidgets);
-
-    await tester.tap(find.text('节点'));
+    expect(_textEither('新对话', 'New conversation'), findsWidgets);
+    await tester.tap(find.byKey(const Key('assistant-side-pane-tab-navigation')));
     await settleIntegrationUi(tester);
-    expect(find.text('管理 Gateway、代理、节点、技能和平台服务。'), findsOneWidget);
+    expect(
+      find.byKey(const Key('assistant-focus-panel-title')),
+      findsOneWidget,
+    );
   });
 }

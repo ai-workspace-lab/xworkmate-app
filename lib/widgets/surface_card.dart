@@ -41,13 +41,7 @@ class _SurfaceCardState extends State<SurfaceCard> {
           color: _hovered ? palette.surfaceSecondary : baseColor,
           borderRadius: BorderRadius.circular(widget.borderRadius),
           border: Border.all(color: palette.strokeSoft),
-          boxShadow: [
-            BoxShadow(
-              color: palette.shadow.withValues(alpha: _hovered ? 0.08 : 0.05),
-              blurRadius: _hovered ? 10 : 6,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          boxShadow: const [],
         ),
         child: Material(
           color: Colors.transparent,
