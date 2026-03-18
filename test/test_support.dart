@@ -27,6 +27,7 @@ Future<void> pumpPage(
   WidgetTester tester, {
   required Widget child,
   Size size = const Size(1600, 1000),
+  TargetPlatform? platform,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -39,8 +40,12 @@ Future<void> pumpPage(
       locale: const Locale('zh'),
       supportedLocales: const [Locale('zh'), Locale('en')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: platform == null
+          ? AppTheme.light()
+          : AppTheme.light().copyWith(platform: platform),
+      darkTheme: platform == null
+          ? AppTheme.dark()
+          : AppTheme.dark().copyWith(platform: platform),
       home: Scaffold(body: child),
     ),
   );

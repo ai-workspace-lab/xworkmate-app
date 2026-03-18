@@ -5,7 +5,7 @@ import '../features/ai_gateway/ai_gateway_page.dart';
 import '../features/assistant/assistant_page.dart';
 import '../features/claw_hub/claw_hub_page.dart';
 import '../features/mcp_server/mcp_server_page.dart';
-import '../features/mobile/ios_mobile_shell.dart';
+import '../features/mobile/mobile_shell.dart';
 import '../features/modules/modules_page.dart';
 import '../features/secrets/secrets_page.dart';
 import '../features/settings/settings_page.dart';
@@ -68,8 +68,10 @@ class _AppShellState extends State<AppShell> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final palette = context.palette;
-                final isIosCompact =
-                    Theme.of(context).platform == TargetPlatform.iOS &&
+                final platform = Theme.of(context).platform;
+                final isCompactMobile =
+                    (platform == TargetPlatform.iOS ||
+                        platform == TargetPlatform.android) &&
                     constraints.maxWidth < 900;
                 final isMobile = constraints.maxWidth < 900;
                 final sidebarState = controller.sidebarState;
@@ -137,8 +139,8 @@ class _AppShellState extends State<AppShell> {
                   );
                 }
 
-                if (isIosCompact) {
-                  return IosMobileShell(controller: controller);
+                if (isCompactMobile) {
+                  return MobileShell(controller: controller);
                 }
 
                 if (isMobile) {
