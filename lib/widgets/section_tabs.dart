@@ -25,11 +25,11 @@ class SectionTabs extends StatelessWidget {
     final padding = switch (size) {
       SectionTabsSize.small => const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
-        vertical: 6,
+        vertical: AppSpacing.compact,
       ),
       SectionTabsSize.medium => const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
+        vertical: AppSpacing.compact,
       ),
     };
 
@@ -38,13 +38,7 @@ class SectionTabs extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.surfaceSecondary,
         borderRadius: BorderRadius.circular(AppRadius.chip),
-        boxShadow: [
-          BoxShadow(
-            color: palette.shadow.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: palette.strokeSoft),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -104,15 +98,9 @@ class _SectionTabChipState extends State<_SectionTabChip> {
               ? palette.surfaceTertiary
               : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadius.button),
-          boxShadow: widget.selected
-              ? [
-                  BoxShadow(
-                    color: palette.shadow.withValues(alpha: 0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : const [],
+          border: Border.all(
+            color: widget.selected ? palette.stroke : Colors.transparent,
+          ),
         ),
         child: Material(
           color: Colors.transparent,
@@ -127,7 +115,9 @@ class _SectionTabChipState extends State<_SectionTabChip> {
                   color: widget.selected
                       ? palette.textPrimary
                       : palette.textSecondary,
-                  fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
+                  fontWeight: widget.selected
+                      ? FontWeight.w600
+                      : FontWeight.w500,
                 ),
               ),
             ),
