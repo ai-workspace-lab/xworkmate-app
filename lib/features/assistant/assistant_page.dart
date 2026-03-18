@@ -49,7 +49,7 @@ class _AssistantPageState extends State<AssistantPage> {
   late final ScrollController _conversationController;
   late final FocusNode _composerFocusNode;
   final String _mode = 'ask';
-  final String _thinkingLabel = 'high';
+  String _thinkingLabel = 'high';
   double _threadRailWidth = 312;
   String _threadQuery = '';
   bool _sidePaneCollapsed = false;
@@ -381,6 +381,11 @@ class _AssistantPageState extends State<AssistantPage> {
               child: _AssistantLowerPane(
                 inputController: _inputController,
                 focusNode: _composerFocusNode,
+                thinkingLabel: _thinkingLabel,
+                modelLabel: controller.resolvedDefaultModel.isEmpty
+                    ? appText('未选择模型', 'No model selected')
+                    : controller.resolvedDefaultModel,
+                modelOptions: controller.aiGatewayModelChoices,
                 attachments: _attachments,
                 availableSkills: _availableSkillOptions(controller),
                 selectedSkillKeys: _selectedSkillKeys,
@@ -393,6 +398,10 @@ class _AssistantPageState extends State<AssistantPage> {
                   });
                 },
                 onToggleSkill: _toggleSelectedSkill,
+                onThinkingChanged: (value) {
+                  setState(() => _thinkingLabel = value);
+                },
+                onModelChanged: controller.selectDefaultModel,
                 onOpenGateway: _showConnectDialog,
                 onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
                 onPickAttachments: _pickAttachments,
@@ -1219,11 +1228,16 @@ class _AssistantLowerPane extends StatelessWidget {
     required this.controller,
     required this.inputController,
     required this.focusNode,
+    required this.thinkingLabel,
+    required this.modelLabel,
+    required this.modelOptions,
     required this.attachments,
     required this.availableSkills,
     required this.selectedSkillKeys,
     required this.onRemoveAttachment,
     required this.onToggleSkill,
+    required this.onThinkingChanged,
+    required this.onModelChanged,
     required this.onOpenGateway,
     required this.onReconnectGateway,
     required this.onPickAttachments,
@@ -1233,11 +1247,16 @@ class _AssistantLowerPane extends StatelessWidget {
   final AppController controller;
   final TextEditingController inputController;
   final FocusNode focusNode;
+  final String thinkingLabel;
+  final String modelLabel;
+  final List<String> modelOptions;
   final List<_ComposerAttachment> attachments;
   final List<_ComposerSkillOption> availableSkills;
   final List<String> selectedSkillKeys;
   final ValueChanged<_ComposerAttachment> onRemoveAttachment;
   final ValueChanged<String> onToggleSkill;
+  final ValueChanged<String> onThinkingChanged;
+  final Future<void> Function(String modelId) onModelChanged;
   final VoidCallback onOpenGateway;
   final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
@@ -1253,11 +1272,16 @@ class _AssistantLowerPane extends StatelessWidget {
           controller: controller,
           inputController: inputController,
           focusNode: focusNode,
+          thinkingLabel: thinkingLabel,
+          modelLabel: modelLabel,
+          modelOptions: modelOptions,
           attachments: attachments,
           availableSkills: availableSkills,
           selectedSkillKeys: selectedSkillKeys,
           onRemoveAttachment: onRemoveAttachment,
           onToggleSkill: onToggleSkill,
+          onThinkingChanged: onThinkingChanged,
+          onModelChanged: onModelChanged,
           onOpenGateway: onOpenGateway,
           onReconnectGateway: onReconnectGateway,
           onPickAttachments: onPickAttachments,
@@ -1887,11 +1911,16 @@ class _ComposerBar extends StatelessWidget {
     required this.controller,
     required this.inputController,
     required this.focusNode,
+    required this.thinkingLabel,
+    required this.modelLabel,
+    required this.modelOptions,
     required this.attachments,
     required this.availableSkills,
     required this.selectedSkillKeys,
     required this.onRemoveAttachment,
     required this.onToggleSkill,
+    required this.onThinkingChanged,
+    required this.onModelChanged,
     required this.onOpenGateway,
     required this.onReconnectGateway,
     required this.onPickAttachments,
@@ -1901,11 +1930,16 @@ class _ComposerBar extends StatelessWidget {
   final AppController controller;
   final TextEditingController inputController;
   final FocusNode focusNode;
+  final String thinkingLabel;
+  final String modelLabel;
+  final List<String> modelOptions;
   final List<_ComposerAttachment> attachments;
   final List<_ComposerSkillOption> availableSkills;
   final List<String> selectedSkillKeys;
   final ValueChanged<_ComposerAttachment> onRemoveAttachment;
   final ValueChanged<String> onToggleSkill;
+  final ValueChanged<String> onThinkingChanged;
+  final Future<void> Function(String modelId) onModelChanged;
   final VoidCallback onOpenGateway;
   final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
@@ -1919,6 +1953,8 @@ class _ComposerBar extends StatelessWidget {
     final reconnectAvailable = controller.canQuickConnectGateway;
     final connecting =
         controller.connection.status == RuntimeConnectionStatus.connecting;
+    final executionTarget = controller.assistantExecutionTarget;
+    final permissionLevel = controller.assistantPermissionLevel;
     final selectedSkills = availableSkills
         .where((skill) => selectedSkillKeys.contains(skill.key))
         .toList(growable: false);
@@ -1935,6 +1971,70 @@ class _ComposerBar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              PopupMenuButton<String>(
+                key: const Key('assistant-attachment-menu-button'),
+                tooltip: appText('添加文件等', 'Add files'),
+                offset: const Offset(0, 48),
+                onSelected: (value) {
+                  switch (value) {
+                    case 'attach':
+                      onPickAttachments();
+                      break;
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem<String>(
+                    value: 'attach',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.attach_file_rounded),
+                      title: Text('添加照片和文件'),
+                    ),
+                  ),
+                ],
+                child: const _ComposerIconButton(
+                  icon: Icons.add_rounded,
+                ),
+              ),
+              const SizedBox(width: 10),
+              PopupMenuButton<AssistantExecutionTarget>(
+                key: const Key('assistant-execution-target-button'),
+                tooltip: appText('本地或远程', 'Local or remote'),
+                onSelected: (value) {
+                  controller.setAssistantExecutionTarget(value);
+                },
+                itemBuilder: (context) => AssistantExecutionTarget.values
+                    .map(
+                      (value) => PopupMenuItem<AssistantExecutionTarget>(
+                        value: value,
+                        child: Row(
+                          children: [
+                            Icon(value.icon, size: 18),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(value.label)),
+                            if (value == executionTarget)
+                              const Icon(Icons.check_rounded, size: 18),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
+                child: _ComposerToolbarChip(
+                  icon: executionTarget.icon,
+                  label: executionTarget.label,
+                  showChevron: true,
+                  maxLabelWidth: 96,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           if (attachments.isNotEmpty) ...[
             Wrap(
               spacing: 8,
@@ -2004,31 +2104,6 @@ class _ComposerBar extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      PopupMenuButton<String>(
-                        tooltip: appText('输入区操作', 'Composer actions'),
-                        offset: const Offset(0, -180),
-                        onSelected: (value) {
-                          switch (value) {
-                            case 'attach':
-                              onPickAttachments();
-                              break;
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          const PopupMenuItem<String>(
-                            value: 'attach',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(Icons.attach_file_rounded),
-                              title: Text('添加照片和文件'),
-                            ),
-                          ),
-                        ],
-                        child: const _ComposerIconButton(
-                          icon: Icons.add_rounded,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
                       InkWell(
                         key: const Key('assistant-skill-picker-button'),
                         borderRadius: BorderRadius.circular(AppRadius.chip),
@@ -2043,6 +2118,108 @@ class _ComposerBar extends StatelessWidget {
                                 ),
                           showChevron: true,
                           maxLabelWidth: 132,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      PopupMenuButton<AssistantPermissionLevel>(
+                        key: const Key('assistant-permission-button'),
+                        tooltip: appText('权限', 'Permissions'),
+                        onSelected: (value) {
+                          controller.setAssistantPermissionLevel(value);
+                        },
+                        itemBuilder: (context) => AssistantPermissionLevel.values
+                            .map(
+                              (value) => PopupMenuItem<AssistantPermissionLevel>(
+                                value: value,
+                                child: Row(
+                                  children: [
+                                    Icon(value.icon, size: 18),
+                                    const SizedBox(width: 10),
+                                    Expanded(child: Text(value.label)),
+                                    if (value == permissionLevel)
+                                      const Icon(Icons.check_rounded, size: 18),
+                                  ],
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        child: _ComposerToolbarChip(
+                          icon: permissionLevel.icon,
+                          label: permissionLevel.label,
+                          showChevron: true,
+                          maxLabelWidth: 120,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      modelOptions.isEmpty
+                          ? _ComposerToolbarChip(
+                              key: const Key('assistant-model-button'),
+                              icon: Icons.bolt_rounded,
+                              label: modelLabel,
+                              showChevron: false,
+                              maxLabelWidth: 140,
+                            )
+                          : PopupMenuButton<String>(
+                              key: const Key('assistant-model-button'),
+                              tooltip: appText('模型', 'Model'),
+                              onSelected: onModelChanged,
+                              itemBuilder: (context) => modelOptions
+                                  .map(
+                                    (value) => PopupMenuItem<String>(
+                                      value: value,
+                                      child: Row(
+                                        children: [
+                                          Expanded(child: Text(value)),
+                                          if (value == modelLabel)
+                                            const Icon(
+                                              Icons.check_rounded,
+                                              size: 18,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              child: _ComposerToolbarChip(
+                                icon: Icons.bolt_rounded,
+                                label: modelLabel,
+                                showChevron: true,
+                                maxLabelWidth: 140,
+                              ),
+                            ),
+                      const SizedBox(width: 8),
+                      PopupMenuButton<String>(
+                        key: const Key('assistant-thinking-button'),
+                        tooltip: appText('推理强度', 'Reasoning'),
+                        onSelected: onThinkingChanged,
+                        itemBuilder: (context) => const <String>[
+                          'low',
+                          'medium',
+                          'high',
+                          'max',
+                        ]
+                            .map(
+                              (value) => PopupMenuItem<String>(
+                                value: value,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _assistantThinkingLabel(value),
+                                      ),
+                                    ),
+                                    if (value == thinkingLabel)
+                                      const Icon(Icons.check_rounded, size: 18),
+                                  ],
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        child: _ComposerToolbarChip(
+                          icon: Icons.psychology_alt_outlined,
+                          label: _assistantThinkingLabel(thinkingLabel),
+                          showChevron: true,
+                          maxLabelWidth: 96,
                         ),
                       ),
                     ],
@@ -2201,11 +2378,11 @@ class _ComposerIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 32,
-      height: 32,
+      width: 44,
+      height: 44,
       decoration: BoxDecoration(
         color: context.palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: context.palette.shadow.withValues(alpha: 0.04),
@@ -2214,23 +2391,29 @@ class _ComposerIconButton extends StatelessWidget {
           ),
         ],
       ),
-      child: Icon(icon, size: 16, color: context.palette.textMuted),
+      child: Icon(icon, size: 20, color: context.palette.textMuted),
     );
   }
 }
 
 class _ComposerToolbarChip extends StatelessWidget {
   const _ComposerToolbarChip({
+    super.key,
     required this.icon,
     required this.label,
     required this.showChevron,
     this.maxLabelWidth = 220,
+    this.padding = const EdgeInsets.symmetric(
+      horizontal: AppSpacing.xs,
+      vertical: 6,
+    ),
   });
 
   final IconData icon;
   final String label;
   final bool showChevron;
   final double maxLabelWidth;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
@@ -2238,10 +2421,7 @@ class _ComposerToolbarChip extends StatelessWidget {
     final palette = context.palette;
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xs,
-        vertical: 6,
-      ),
+      padding: padding,
       decoration: BoxDecoration(
         color: palette.surfaceSecondary,
         borderRadius: BorderRadius.circular(AppRadius.chip),
@@ -2281,6 +2461,20 @@ class _ComposerToolbarChip extends StatelessWidget {
       ),
     );
   }
+}
+
+extension on AssistantExecutionTarget {
+  IconData get icon => switch (this) {
+    AssistantExecutionTarget.local => Icons.computer_outlined,
+    AssistantExecutionTarget.remote => Icons.cloud_outlined,
+  };
+}
+
+extension on AssistantPermissionLevel {
+  IconData get icon => switch (this) {
+    AssistantPermissionLevel.defaultAccess => Icons.verified_user_outlined,
+    AssistantPermissionLevel.fullAccess => Icons.error_outline_rounded,
+  };
 }
 
 class _MessageBubble extends StatelessWidget {
@@ -3002,6 +3196,13 @@ String _toolCallStatusLabel(String status) =>
       'failed' || 'error' => appText('错误', 'Error'),
       _ => appText('已完成', 'Completed'),
     };
+
+String _assistantThinkingLabel(String level) => switch (level) {
+  'low' => appText('低', 'Low'),
+  'medium' => appText('中', 'Medium'),
+  'max' => appText('超高', 'Max'),
+  _ => appText('高', 'High'),
+};
 
 String _sessionDisplayTitle(GatewaySessionSummary session) {
   final label = session.label.trim();
