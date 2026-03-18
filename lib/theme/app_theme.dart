@@ -39,12 +39,20 @@ class AppTypography {
   static const double titleHeight = 24 / 20;
 
   static const double sectionSize = 16.0;
-  static const FontWeight sectionWeight = FontWeight.w500;
+  static const FontWeight sectionWeight = FontWeight.w600;
   static const double sectionHeight = 20 / 16;
 
   static const double bodySize = 14.0;
   static const FontWeight bodyWeight = FontWeight.w400;
-  static const double bodyHeight = 18 / 14;
+  static const double bodyHeight = 20 / 14;
+
+  static const double compactBodySize = 13.0;
+  static const FontWeight compactBodyWeight = FontWeight.w400;
+  static const double compactBodyHeight = 18 / 13;
+
+  static const double emphasizedBodySize = 14.0;
+  static const FontWeight emphasizedBodyWeight = FontWeight.w600;
+  static const double emphasizedBodyHeight = 18 / 14;
 
   static const double captionSize = 12.0;
   static const FontWeight captionWeight = FontWeight.w400;
@@ -56,7 +64,7 @@ class AppSizes {
 
   static const double sidebarItemHeight = 40.0;
   static const double sidebarIconSize = 20.0;
-  static const double sidebarTextSize = 14.0;
+  static const double sidebarTextSize = 13.0;
   static const double sidebarExpandedWidth = 212.0;
   static const double sidebarCollapsedWidth = 72.0;
 
@@ -264,9 +272,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
-          borderSide: BorderSide(
-            color: palette.accent.withValues(alpha: 0.18),
-          ),
+          borderSide: BorderSide(color: palette.accent.withValues(alpha: 0.18)),
         ),
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
@@ -319,27 +325,11 @@ class AppTheme {
     );
   }
 
-  static TextTheme _textTheme(
-    TextTheme base, {
-    required AppPalette palette,
-  }) {
-    final fallbackFonts = switch (defaultTargetPlatform) {
-      TargetPlatform.macOS || TargetPlatform.iOS => const <String>[
-        '.SF Pro Text',
-        '.SF NS Text',
-        'PingFang SC',
-      ],
-      _ => const <String>[
-        'Inter',
-        'Segoe UI',
-        'Noto Sans CJK SC',
-        'PingFang SC',
-      ],
-    };
-
+  static TextTheme _textTheme(TextTheme base, {required AppPalette palette}) {
     TextStyle withUiFont(TextStyle? style) {
       return (style ?? const TextStyle()).copyWith(
-        fontFamilyFallback: fallbackFonts,
+        fontFamily: null,
+        fontFamilyFallback: const <String>[],
         package: null,
       );
     }
@@ -374,10 +364,10 @@ class AppTheme {
       ),
       titleMedium: withUiFont(
         base.titleMedium?.copyWith(
-          fontSize: AppTypography.sectionSize,
+          fontSize: AppTypography.emphasizedBodySize,
           fontWeight: AppTypography.sectionWeight,
-          letterSpacing: -0.08,
-          height: AppTypography.sectionHeight,
+          letterSpacing: -0.04,
+          height: AppTypography.emphasizedBodyHeight,
           color: palette.textPrimary,
         ),
       ),
@@ -399,9 +389,9 @@ class AppTheme {
       ),
       bodyMedium: withUiFont(
         base.bodyMedium?.copyWith(
-          fontSize: AppTypography.bodySize,
-          fontWeight: AppTypography.bodyWeight,
-          height: AppTypography.bodyHeight,
+          fontSize: AppTypography.compactBodySize,
+          fontWeight: AppTypography.compactBodyWeight,
+          height: AppTypography.compactBodyHeight,
           color: palette.textSecondary,
         ),
       ),
@@ -415,9 +405,9 @@ class AppTheme {
       ),
       labelLarge: withUiFont(
         base.labelLarge?.copyWith(
-          fontSize: AppTypography.bodySize,
-          fontWeight: FontWeight.w600,
-          height: AppTypography.bodyHeight,
+          fontSize: AppTypography.emphasizedBodySize,
+          fontWeight: AppTypography.emphasizedBodyWeight,
+          height: AppTypography.emphasizedBodyHeight,
           color: palette.textPrimary,
         ),
       ),
