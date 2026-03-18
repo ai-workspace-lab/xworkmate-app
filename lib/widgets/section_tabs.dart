@@ -38,7 +38,13 @@ class SectionTabs extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.surfaceSecondary,
         borderRadius: BorderRadius.circular(AppRadius.chip),
-        border: Border.all(color: palette.strokeSoft),
+        boxShadow: [
+          BoxShadow(
+            color: palette.shadow.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -90,14 +96,23 @@ class _SectionTabChipState extends State<_SectionTabChip> {
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        curve: Curves.easeOutCubic,
+        curve: Curves.easeInOut,
         decoration: BoxDecoration(
           color: widget.selected
               ? palette.surfacePrimary
               : _hovered
-              ? palette.hover
+              ? palette.surfaceTertiary
               : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadius.button),
+          boxShadow: widget.selected
+              ? [
+                  BoxShadow(
+                    color: palette.shadow.withValues(alpha: 0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : const [],
         ),
         child: Material(
           color: Colors.transparent,
@@ -112,6 +127,7 @@ class _SectionTabChipState extends State<_SectionTabChip> {
                   color: widget.selected
                       ? palette.textPrimary
                       : palette.textSecondary,
+                  fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
                 ),
               ),
             ),

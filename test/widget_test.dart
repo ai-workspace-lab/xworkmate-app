@@ -17,6 +17,7 @@ void main() {
 
     expect(find.text('新对话'), findsWidgets);
     expect(find.byKey(const Key('assistant-task-rail')), findsOneWidget);
-    expect(find.text('幻灯片'), findsOneWidget);
+    expect(find.text('幻灯片'), findsNothing);
+    expect(find.textContaining('输入需求、补充上下文、继续追问'), findsOneWidget);
   });
 }

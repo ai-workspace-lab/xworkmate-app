@@ -1,13 +1,22 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
 Future<AppController> createTestController(WidgetTester tester) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
-  final controller = AppController();
+  final controller = AppController(
+    store: SecureConfigStore(
+      enableSecureStorage: false,
+      fallbackDirectoryPathResolver: () async =>
+          '${Directory.systemTemp.path}/xworkmate-widget-tests',
+    ),
+  );
   addTearDown(controller.dispose);
   await tester.pump(const Duration(milliseconds: 100));
   await tester.pumpAndSettle();

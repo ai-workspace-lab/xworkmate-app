@@ -135,6 +135,10 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<String> loadOllamaCloudApiKey() async {
+    return (await _store.loadOllamaCloudApiKey())?.trim() ?? '';
+  }
+
   Future<void> saveVaultToken(String value) async {
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
@@ -155,6 +159,10 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<String> loadVaultToken() async {
+    return (await _store.loadVaultToken())?.trim() ?? '';
+  }
+
   Future<void> saveAiGatewayApiKey(String value) async {
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
@@ -173,6 +181,10 @@ class SettingsController extends ChangeNotifier {
     );
     await _reloadDerivedState();
     notifyListeners();
+  }
+
+  Future<String> loadAiGatewayApiKey() async {
+    return (await _store.loadAiGatewayApiKey())?.trim() ?? '';
   }
 
   Future<void> appendAudit(SecretAuditEntry entry) async {

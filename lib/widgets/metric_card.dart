@@ -25,10 +25,10 @@ class MetricCard extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: palette.accentMuted,
+                  color: palette.surfaceSecondary,
                   borderRadius: BorderRadius.circular(AppRadius.card),
                 ),
-                child: Icon(metric.icon, color: palette.accent, size: 20),
+                child: Icon(metric.icon, color: palette.textPrimary, size: 20),
               ),
               const Spacer(),
               if (metric.status != null)

@@ -12,16 +12,23 @@ import '../../widgets/surface_card.dart';
 import '../../widgets/top_bar.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key, required this.controller});
+  const SettingsPage({
+    super.key,
+    required this.controller,
+    this.initialTab = SettingsTab.general,
+  });
 
   final AppController controller;
+  final SettingsTab initialTab;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  SettingsTab _tab = SettingsTab.general;
+  static const _storedSecretMask = '****';
+
+  late SettingsTab _tab;
   late final TextEditingController _aiGatewayNameController;
   late final TextEditingController _aiGatewayUrlController;
   late final TextEditingController _aiGatewayApiKeyRefController;
@@ -35,10 +42,14 @@ class _SettingsPageState extends State<SettingsPage> {
   String _aiGatewayTestState = 'idle';
   String _aiGatewayTestMessage = '';
   String _aiGatewayTestEndpoint = '';
+  _SecretFieldUiState _aiGatewayApiKeyState = const _SecretFieldUiState();
+  _SecretFieldUiState _vaultTokenState = const _SecretFieldUiState();
+  _SecretFieldUiState _ollamaApiKeyState = const _SecretFieldUiState();
 
   @override
   void initState() {
     super.initState();
+    _tab = widget.initialTab;
     _aiGatewayNameController = TextEditingController();
     _aiGatewayUrlController = TextEditingController();
     _aiGatewayApiKeyRefController = TextEditingController();
@@ -236,6 +247,9 @@ class _SettingsPageState extends State<SettingsPage> {
     AppController controller,
     SettingsSnapshot settings,
   ) {
+    final hasStoredOllamaApiKey =
+        controller.settingsController.secureRefs['ollama_cloud_api_key'] !=
+        null;
     return [
       SurfaceCard(
         child: Column(
@@ -392,20 +406,36 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
             ),
-            TextField(
+            _buildSecureField(
               controller: _ollamaApiKeyController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText:
-                    '${appText('API Key', 'API Key')} (${settings.ollamaCloud.apiKeyRef})',
-              ),
+              label:
+                  '${appText('API Key', 'API Key')} (${settings.ollamaCloud.apiKeyRef})',
+              hasStoredValue: hasStoredOllamaApiKey,
+              fieldState: _ollamaApiKeyState,
+              onStateChanged: (value) =>
+                  setState(() => _ollamaApiKeyState = value),
+              loadValue: controller.settingsController.loadOllamaCloudApiKey,
               onSubmitted: controller.settingsController.saveOllamaCloudApiKey,
+              storedHelperText: appText(
+                '已安全保存，默认以 **** 显示，点击查看后读取真实值。',
+                'Stored securely. Shows as **** until you reveal it.',
+              ),
+              emptyHelperText: appText(
+                '输入后会安全保存到本机密钥存储。',
+                'Saving writes to secure local key storage.',
+              ),
             ),
             const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerLeft,
               child: OutlinedButton(
-                onPressed: () => controller.testOllamaConnection(cloud: true),
+                onPressed: () async {
+                  await _persistOllamaApiKeyIfNeeded(
+                    controller,
+                    hasStoredValue: hasStoredOllamaApiKey,
+                  );
+                  await controller.testOllamaConnection(cloud: true);
+                },
                 child: Text(
                   '${appText('测试云端', 'Test Cloud')} · ${controller.settingsController.ollamaStatus}',
                 ),
@@ -436,6 +466,8 @@ class _SettingsPageState extends State<SettingsPage> {
     );
     final hasStoredAiGatewayApiKey =
         controller.settingsController.secureRefs['ai_gateway_api_key'] != null;
+    final hasStoredVaultToken =
+        controller.settingsController.secureRefs['vault_token'] != null;
     final statusTheme = _aiGatewayFeedbackTheme(
       context,
       _aiGatewayTestMessage.isEmpty
@@ -554,20 +586,36 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
             ),
-            TextField(
+            _buildSecureField(
               controller: _vaultTokenController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText:
-                    '${appText('Vault Token', 'Vault Token')} (${settings.vault.tokenRef})',
-              ),
+              label:
+                  '${appText('Vault Token', 'Vault Token')} (${settings.vault.tokenRef})',
+              hasStoredValue: hasStoredVaultToken,
+              fieldState: _vaultTokenState,
+              onStateChanged: (value) =>
+                  setState(() => _vaultTokenState = value),
+              loadValue: controller.settingsController.loadVaultToken,
               onSubmitted: controller.settingsController.saveVaultToken,
+              storedHelperText: appText(
+                '已安全保存，默认以 **** 显示，点击查看后读取真实值。',
+                'Stored securely. Shows as **** until you reveal it.',
+              ),
+              emptyHelperText: appText(
+                '输入后会安全保存到本机密钥存储。',
+                'Saving writes to secure local key storage.',
+              ),
             ),
             const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerLeft,
               child: OutlinedButton(
-                onPressed: controller.testVaultConnection,
+                onPressed: () async {
+                  await _persistVaultTokenIfNeeded(
+                    controller,
+                    hasStoredValue: hasStoredVaultToken,
+                  );
+                  await controller.testVaultConnection();
+                },
                 child: Text(
                   '${appText('测试 Vault', 'Test Vault')} · ${controller.settingsController.vaultStatus}',
                 ),
@@ -609,23 +657,24 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               onSubmitted: (_) => _saveAiGatewayDraft(controller, settings),
             ),
-            TextField(
+            _buildSecureField(
               controller: _aiGatewayApiKeyController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText:
-                    '${appText('API Key', 'API Key')} (${_aiGatewayApiKeyRefController.text.trim().isEmpty ? settings.aiGateway.apiKeyRef : _aiGatewayApiKeyRefController.text.trim()})',
-                helperText: hasStoredAiGatewayApiKey
-                    ? appText(
-                        '已安全保存，可直接同步模型。',
-                        'Stored securely and ready to sync.',
-                      )
-                    : appText(
-                        '输入后点击保存或同步模型。',
-                        'Save or sync to persist securely.',
-                      ),
-              ),
+              label:
+                  '${appText('API Key', 'API Key')} (${_aiGatewayApiKeyRefController.text.trim().isEmpty ? settings.aiGateway.apiKeyRef : _aiGatewayApiKeyRefController.text.trim()})',
+              hasStoredValue: hasStoredAiGatewayApiKey,
+              fieldState: _aiGatewayApiKeyState,
+              onStateChanged: (value) =>
+                  setState(() => _aiGatewayApiKeyState = value),
+              loadValue: controller.settingsController.loadAiGatewayApiKey,
               onSubmitted: controller.settingsController.saveAiGatewayApiKey,
+              storedHelperText: appText(
+                '已安全保存，默认以 **** 显示；可直接测试/同步，也可点击查看。',
+                'Stored securely. Test or sync directly, or reveal it on demand.',
+              ),
+              emptyHelperText: appText(
+                '输入后点击保存或同步模型。',
+                'Save or sync to persist securely.',
+              ),
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -657,14 +706,16 @@ class _SettingsPageState extends State<SettingsPage> {
                     }
                     final messenger = ScaffoldMessenger.of(context);
                     final draft = _buildAiGatewayDraft(settings);
-                    final apiKey = _aiGatewayApiKeyController.text.trim();
+                    final apiKey = _secretOverride(
+                      _aiGatewayApiKeyController,
+                      _aiGatewayApiKeyState,
+                    );
                     setState(() => _aiGatewaySyncing = true);
                     try {
-                      if (apiKey.isNotEmpty) {
-                        await controller.settingsController.saveAiGatewayApiKey(
-                          apiKey,
-                        );
-                      }
+                      await _persistAiGatewayApiKeyIfNeeded(
+                        controller,
+                        hasStoredValue: hasStoredAiGatewayApiKey,
+                      );
                       await _saveSettings(
                         controller,
                         settings.copyWith(aiGateway: draft),
@@ -1147,10 +1198,12 @@ class _SettingsPageState extends State<SettingsPage> {
     AppController controller,
     SettingsSnapshot settings,
   ) async {
-    final apiKey = _aiGatewayApiKeyController.text.trim();
-    if (apiKey.isNotEmpty) {
-      await controller.settingsController.saveAiGatewayApiKey(apiKey);
-    }
+    final hasStoredAiGatewayApiKey =
+        controller.settingsController.secureRefs['ai_gateway_api_key'] != null;
+    await _persistAiGatewayApiKeyIfNeeded(
+      controller,
+      hasStoredValue: hasStoredAiGatewayApiKey,
+    );
     await _saveSettings(
       controller,
       settings.copyWith(aiGateway: _buildAiGatewayDraft(settings)),
@@ -1163,7 +1216,10 @@ class _SettingsPageState extends State<SettingsPage> {
   ) async {
     final messenger = ScaffoldMessenger.of(context);
     final draft = _buildAiGatewayDraft(settings);
-    final apiKey = _aiGatewayApiKeyController.text.trim();
+    final apiKey = _secretOverride(
+      _aiGatewayApiKeyController,
+      _aiGatewayApiKeyState,
+    );
     setState(() => _aiGatewayTesting = true);
     try {
       final result = await controller.settingsController
@@ -1216,6 +1272,218 @@ class _SettingsPageState extends State<SettingsPage> {
     return uri
         .replace(pathSegments: pathSegments, query: null, fragment: null)
         .toString();
+  }
+
+  Widget _buildSecureField({
+    required TextEditingController controller,
+    required String label,
+    required bool hasStoredValue,
+    required _SecretFieldUiState fieldState,
+    required ValueChanged<_SecretFieldUiState> onStateChanged,
+    required Future<String> Function() loadValue,
+    required Future<void> Function(String) onSubmitted,
+    required String storedHelperText,
+    required String emptyHelperText,
+  }) {
+    _primeSecureFieldController(
+      controller,
+      hasStoredValue: hasStoredValue,
+      fieldState: fieldState,
+    );
+    final showMaskedPlaceholder =
+        hasStoredValue && !fieldState.showPlaintext && !fieldState.hasDraft;
+    return TextField(
+      controller: controller,
+      obscureText: !fieldState.showPlaintext && fieldState.hasDraft,
+      autocorrect: false,
+      enableSuggestions: false,
+      decoration: InputDecoration(
+        labelText: label,
+        helperText: hasStoredValue ? storedHelperText : emptyHelperText,
+        suffixIcon: fieldState.loading
+            ? const Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : IconButton(
+                tooltip: fieldState.showPlaintext
+                    ? appText('隐藏', 'Hide')
+                    : appText('查看', 'Reveal'),
+                onPressed: () => _toggleSecureFieldVisibility(
+                  controller: controller,
+                  hasStoredValue: hasStoredValue,
+                  fieldState: fieldState,
+                  onStateChanged: onStateChanged,
+                  loadValue: loadValue,
+                ),
+                icon: Icon(
+                  fieldState.showPlaintext
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
+                ),
+              ),
+      ),
+      onTap: () {
+        if (!showMaskedPlaceholder) {
+          return;
+        }
+        controller.clear();
+        onStateChanged(fieldState.copyWith(hasDraft: true));
+      },
+      onChanged: (value) {
+        if (value == _storedSecretMask) {
+          return;
+        }
+        final nextHasDraft = value.trim().isNotEmpty;
+        if (nextHasDraft == fieldState.hasDraft) {
+          return;
+        }
+        onStateChanged(fieldState.copyWith(hasDraft: nextHasDraft));
+      },
+      onSubmitted: (_) => _persistSecureFieldIfNeeded(
+        controller: controller,
+        hasStoredValue: hasStoredValue,
+        fieldState: fieldState,
+        onStateChanged: onStateChanged,
+        onSubmitted: onSubmitted,
+      ),
+    );
+  }
+
+  Future<void> _toggleSecureFieldVisibility({
+    required TextEditingController controller,
+    required bool hasStoredValue,
+    required _SecretFieldUiState fieldState,
+    required ValueChanged<_SecretFieldUiState> onStateChanged,
+    required Future<String> Function() loadValue,
+  }) async {
+    if (fieldState.showPlaintext) {
+      if (fieldState.hasDraft) {
+        onStateChanged(fieldState.copyWith(showPlaintext: false));
+        return;
+      }
+      if (hasStoredValue) {
+        _syncControllerValue(controller, _storedSecretMask);
+      } else {
+        controller.clear();
+      }
+      onStateChanged(const _SecretFieldUiState());
+      return;
+    }
+    if (fieldState.hasDraft || !hasStoredValue) {
+      onStateChanged(fieldState.copyWith(showPlaintext: true, loading: false));
+      return;
+    }
+    onStateChanged(fieldState.copyWith(loading: true));
+    final value = (await loadValue()).trim();
+    if (!mounted) {
+      return;
+    }
+    if (value.isNotEmpty) {
+      _syncControllerValue(controller, value);
+    } else {
+      controller.clear();
+    }
+    onStateChanged(
+      const _SecretFieldUiState(showPlaintext: true, hasDraft: false),
+    );
+  }
+
+  Future<void> _persistSecureFieldIfNeeded({
+    required TextEditingController controller,
+    required bool hasStoredValue,
+    required _SecretFieldUiState fieldState,
+    required ValueChanged<_SecretFieldUiState> onStateChanged,
+    required Future<void> Function(String) onSubmitted,
+  }) async {
+    final value = _normalizeSecretValue(controller.text);
+    if (value.isEmpty) {
+      return;
+    }
+    if (!fieldState.hasDraft && hasStoredValue) {
+      return;
+    }
+    await onSubmitted(value);
+    if (!mounted) {
+      return;
+    }
+    _syncControllerValue(controller, _storedSecretMask);
+    onStateChanged(const _SecretFieldUiState());
+  }
+
+  Future<void> _persistAiGatewayApiKeyIfNeeded(
+    AppController controller, {
+    required bool hasStoredValue,
+  }) {
+    return _persistSecureFieldIfNeeded(
+      controller: _aiGatewayApiKeyController,
+      hasStoredValue: hasStoredValue,
+      fieldState: _aiGatewayApiKeyState,
+      onStateChanged: (value) => setState(() => _aiGatewayApiKeyState = value),
+      onSubmitted: controller.settingsController.saveAiGatewayApiKey,
+    );
+  }
+
+  Future<void> _persistVaultTokenIfNeeded(
+    AppController controller, {
+    required bool hasStoredValue,
+  }) {
+    return _persistSecureFieldIfNeeded(
+      controller: _vaultTokenController,
+      hasStoredValue: hasStoredValue,
+      fieldState: _vaultTokenState,
+      onStateChanged: (value) => setState(() => _vaultTokenState = value),
+      onSubmitted: controller.settingsController.saveVaultToken,
+    );
+  }
+
+  Future<void> _persistOllamaApiKeyIfNeeded(
+    AppController controller, {
+    required bool hasStoredValue,
+  }) {
+    return _persistSecureFieldIfNeeded(
+      controller: _ollamaApiKeyController,
+      hasStoredValue: hasStoredValue,
+      fieldState: _ollamaApiKeyState,
+      onStateChanged: (value) => setState(() => _ollamaApiKeyState = value),
+      onSubmitted: controller.settingsController.saveOllamaCloudApiKey,
+    );
+  }
+
+  void _primeSecureFieldController(
+    TextEditingController controller, {
+    required bool hasStoredValue,
+    required _SecretFieldUiState fieldState,
+  }) {
+    if (fieldState.showPlaintext || fieldState.hasDraft) {
+      return;
+    }
+    final nextValue = hasStoredValue ? _storedSecretMask : '';
+    if (controller.text == nextValue) {
+      return;
+    }
+    _syncControllerValue(controller, nextValue);
+  }
+
+  String _secretOverride(
+    TextEditingController controller,
+    _SecretFieldUiState fieldState,
+  ) {
+    if (!fieldState.showPlaintext && !fieldState.hasDraft) {
+      return '';
+    }
+    return _normalizeSecretValue(controller.text);
+  }
+
+  String _normalizeSecretValue(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed == _storedSecretMask) {
+      return '';
+    }
+    return trimmed;
   }
 
   _AiGatewayFeedbackTheme _aiGatewayFeedbackTheme(
@@ -1828,6 +2096,30 @@ class _AiGatewayFeedbackTheme {
   final Color background;
   final Color border;
   final Color foreground;
+}
+
+class _SecretFieldUiState {
+  const _SecretFieldUiState({
+    this.showPlaintext = false,
+    this.hasDraft = false,
+    this.loading = false,
+  });
+
+  final bool showPlaintext;
+  final bool hasDraft;
+  final bool loading;
+
+  _SecretFieldUiState copyWith({
+    bool? showPlaintext,
+    bool? hasDraft,
+    bool? loading,
+  }) {
+    return _SecretFieldUiState(
+      showPlaintext: showPlaintext ?? this.showPlaintext,
+      hasDraft: hasDraft ?? this.hasDraft,
+      loading: loading ?? this.loading,
+    );
+  }
 }
 
 class _InfoRow extends StatelessWidget {

@@ -86,6 +86,7 @@ class AppController extends ChangeNotifier {
   bool _initializing = true;
   String? _bootstrapError;
   StreamSubscription<GatewayPushEvent>? _runtimeEventsSubscription;
+  bool _disposed = false;
 
   WorkspaceDestination get destination => _destination;
   ThemeMode get themeMode => _themeMode;
@@ -693,6 +694,7 @@ class AppController extends ChangeNotifier {
 
   void clearRuntimeLogs() {
     _runtimeCoordinator.gateway.clearLogs();
+    _notifyIfActive();
   }
 
   List<DerivedTaskItem> taskItemsForTab(String tab) => switch (tab) {
@@ -790,6 +792,10 @@ class AppController extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (_disposed) {
+      return;
+    }
+    _disposed = true;
     _runtimeEventsSubscription?.cancel();
     _detachChildListeners();
     _runtimeCoordinator.dispose();
@@ -804,19 +810,29 @@ class AppController extends ChangeNotifier {
     _cronJobsController.dispose();
     _devicesController.dispose();
     _tasksController.dispose();
+    _store.dispose();
     super.dispose();
   }
 
   Future<void> _initialize() async {
     try {
       await _settingsController.initialize();
+      if (_disposed) {
+        return;
+      }
       final bootstrap = await RuntimeBootstrapConfig.load(
         workspacePathHint: settings.workspacePath,
         cliPathHint: settings.cliPath,
       );
+      if (_disposed) {
+        return;
+      }
       final seeded = bootstrap.mergeIntoSettings(settings);
       if (seeded.toJsonString() != settings.toJsonString()) {
         await _settingsController.saveSnapshot(seeded);
+        if (_disposed) {
+          return;
+        }
       }
       final normalized = _sanitizeCodeAgentSettings(
         _settingsController.snapshot,
@@ -824,11 +840,17 @@ class AppController extends ChangeNotifier {
       if (normalized.toJsonString() !=
           _settingsController.snapshot.toJsonString()) {
         await _settingsController.saveSnapshot(normalized);
+        if (_disposed) {
+          return;
+        }
       }
       _modelsController.restoreFromSettings(settings.aiGateway);
       setActiveAppLanguage(settings.appLanguage);
       _registerCodexExternalProvider();
       await _refreshCodexCliAvailability();
+      if (_disposed) {
+        return;
+      }
       _agentsController.restoreSelection(settings.gateway.selectedAgentId);
       _sessionsController.configure(
         mainSessionKey: _runtime.snapshot.mainSessionKey ?? 'main',
@@ -849,10 +871,15 @@ class AppController extends ChangeNotifier {
         }
       }
     } catch (error) {
+      if (_disposed) {
+        return;
+      }
       _bootstrapError = error.toString();
     } finally {
-      _initializing = false;
-      notifyListeners();
+      if (!_disposed) {
+        _initializing = false;
+        _notifyIfActive();
+      }
     }
   }
 
@@ -921,7 +948,7 @@ class AppController extends ChangeNotifier {
     _resolvedCodexCliPath = await _runtimeCoordinator.resolveCodexPath(
       codexPath: settings.codexCliPath,
     );
-    notifyListeners();
+    _notifyIfActive();
   }
 
   Future<String?> _resolveCodexCliPath() async {
@@ -1100,6 +1127,13 @@ class AppController extends ChangeNotifier {
   }
 
   void _relayChildChange() {
+    _notifyIfActive();
+  }
+
+  void _notifyIfActive() {
+    if (_disposed) {
+      return;
+    }
     notifyListeners();
   }
 
