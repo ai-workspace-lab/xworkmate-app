@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=XWorkmate
+Comment=Desktop AI workspace shell with Linux proxy and tunnel integration
+Exec=/opt/xworkmate/xworkmate
+Icon=xworkmate
+Terminal=false
+Categories=Network;Utility;Development;
+StartupNotify=true
