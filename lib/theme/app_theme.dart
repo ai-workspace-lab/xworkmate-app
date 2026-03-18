@@ -48,11 +48,11 @@ class AppTypography {
 
   static const double compactBodySize = 13.0;
   static const FontWeight compactBodyWeight = FontWeight.w400;
-  static const double compactBodyHeight = 18 / 13;
+  static const double compactBodyHeight = 15 / 13;
 
   static const double emphasizedBodySize = 14.0;
   static const FontWeight emphasizedBodyWeight = FontWeight.w600;
-  static const double emphasizedBodyHeight = 18 / 14;
+  static const double emphasizedBodyHeight = 14 / 14;
 
   static const double captionSize = 12.0;
   static const FontWeight captionWeight = FontWeight.w400;
