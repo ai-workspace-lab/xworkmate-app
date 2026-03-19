@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
@@ -42,6 +44,9 @@ class _SettingsPageState extends State<SettingsPage> {
   String _aiGatewayTestState = 'idle';
   String _aiGatewayTestMessage = '';
   String _aiGatewayTestEndpoint = '';
+  String _aiGatewayNameSyncedValue = '';
+  String _aiGatewayUrlSyncedValue = '';
+  String _aiGatewayApiKeyRefSyncedValue = '';
   _SecretFieldUiState _aiGatewayApiKeyState = const _SecretFieldUiState();
   _SecretFieldUiState _vaultTokenState = const _SecretFieldUiState();
   _SecretFieldUiState _ollamaApiKeyState = const _SecretFieldUiState();
@@ -614,11 +619,23 @@ class _SettingsPageState extends State<SettingsPage> {
     AppController controller,
     SettingsSnapshot settings,
   ) {
-    _syncControllerValue(_aiGatewayNameController, settings.aiGateway.name);
-    _syncControllerValue(_aiGatewayUrlController, settings.aiGateway.baseUrl);
-    _syncControllerValue(
+    _syncDraftControllerValue(
+      _aiGatewayNameController,
+      settings.aiGateway.name,
+      syncedValue: _aiGatewayNameSyncedValue,
+      onSyncedValueChanged: (value) => _aiGatewayNameSyncedValue = value,
+    );
+    _syncDraftControllerValue(
+      _aiGatewayUrlController,
+      settings.aiGateway.baseUrl,
+      syncedValue: _aiGatewayUrlSyncedValue,
+      onSyncedValueChanged: (value) => _aiGatewayUrlSyncedValue = value,
+    );
+    _syncDraftControllerValue(
       _aiGatewayApiKeyRefController,
       settings.aiGateway.apiKeyRef,
+      syncedValue: _aiGatewayApiKeyRefSyncedValue,
+      onSyncedValueChanged: (value) => _aiGatewayApiKeyRefSyncedValue = value,
     );
     final selectedModels = settings.aiGateway.selectedModels.isNotEmpty
         ? settings.aiGateway.selectedModels
@@ -797,6 +814,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 16),
             TextField(
+              key: const ValueKey('ai-gateway-name-field'),
               controller: _aiGatewayNameController,
               decoration: InputDecoration(
                 labelText: appText('配置名称', 'Profile Name'),
@@ -805,6 +823,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 14),
             TextField(
+              key: const ValueKey('ai-gateway-url-field'),
               controller: _aiGatewayUrlController,
               decoration: InputDecoration(
                 labelText: appText('Gateway URL', 'Gateway URL'),
@@ -813,6 +832,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 14),
             TextField(
+              key: const ValueKey('ai-gateway-api-key-ref-field'),
               controller: _aiGatewayApiKeyRefController,
               decoration: InputDecoration(
                 labelText: appText('API Key 引用', 'API Key Ref'),
@@ -820,6 +840,7 @@ class _SettingsPageState extends State<SettingsPage> {
               onSubmitted: (_) => _saveAiGatewayDraft(controller, settings),
             ),
             _buildSecureField(
+              fieldKey: const ValueKey('ai-gateway-api-key-field'),
               controller: _aiGatewayApiKeyController,
               label:
                   '${appText('API Key', 'API Key')} (${_aiGatewayApiKeyRefController.text.trim().isEmpty ? settings.aiGateway.apiKeyRef : _aiGatewayApiKeyRefController.text.trim()})',
@@ -844,6 +865,7 @@ class _SettingsPageState extends State<SettingsPage> {
               runSpacing: 10,
               children: [
                 FilledButton.tonal(
+                  key: const ValueKey('ai-gateway-save-button'),
                   onPressed: _aiGatewayTesting || _aiGatewaySyncing
                       ? null
                       : () => _saveAiGatewayDraft(controller, settings),
@@ -874,13 +896,15 @@ class _SettingsPageState extends State<SettingsPage> {
                     );
                     setState(() => _aiGatewaySyncing = true);
                     try {
-                      await _persistAiGatewayApiKeyIfNeeded(
-                        controller,
-                        hasStoredValue: hasStoredAiGatewayApiKey,
-                      );
                       await _saveSettings(
                         controller,
                         settings.copyWith(aiGateway: draft),
+                      );
+                      unawaited(
+                        _persistAiGatewayApiKeyIfNeeded(
+                          controller,
+                          hasStoredValue: hasStoredAiGatewayApiKey,
+                        ).catchError((_) {}),
                       );
                       final result = await controller.syncAiGatewayCatalog(
                         draft,
@@ -891,11 +915,12 @@ class _SettingsPageState extends State<SettingsPage> {
                       }
                       setState(() {
                         _aiGatewayTestState = result.syncState;
-                        _aiGatewayTestMessage =
-                            'Catalog synced · ${result.availableModels.length} model(s) ready';
-                        _aiGatewayTestEndpoint = _previewAiGatewayEndpoint(
-                          draft.baseUrl,
-                        );
+                        _aiGatewayTestMessage = result.syncState == 'ready'
+                            ? 'Catalog synced · ${result.availableModels.length} model(s) ready'
+                            : result.syncMessage;
+                        _aiGatewayTestEndpoint = result.syncState == 'ready'
+                            ? _previewAiGatewayEndpoint(draft.baseUrl)
+                            : '';
                       });
                       messenger.showSnackBar(
                         SnackBar(content: Text(result.syncMessage)),
@@ -1291,36 +1316,54 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        appText('多 Agent 协作', 'Multi-Agent Collaboration'),
-                        style: theme.textTheme.titleLarge,
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 760;
+                final info = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      appText('多 Agent 协作', 'Multi-Agent Collaboration'),
+                      style: theme.textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      appText(
+                        '通过 Ollama 驱动多个 CLI 工具协同工作，实现 Architect → Engineer → Tester 的完整工作流。',
+                        'Orchestrate multiple CLI agents via Ollama for Architect → Engineer → Tester workflows.',
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        appText(
-                          '通过 Ollama 驱动多个 CLI 工具协同工作，实现 Architect → Engineer → Tester 的完整工作流。',
-                          'Orchestrate multiple CLI agents via Ollama for Architect → Engineer → Tester workflows.',
-                        ),
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-                _SwitchRow(
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ],
+                );
+                final toggle = _InlineSwitchField(
                   label: appText('启用协作模式', 'Enable Collaboration'),
                   value: config.enabled,
                   onChanged: (value) => _saveMultiAgentConfig(
                     controller,
                     config.copyWith(enabled: value),
                   ),
-                ),
-              ],
+                );
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [info, const SizedBox(height: 16), toggle],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: info),
+                    const SizedBox(width: 20),
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.topRight,
+                        child: toggle,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 16),
             _InfoRow(label: 'Ollama', value: config.ollamaEndpoint),
@@ -1502,35 +1545,46 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        appText('发现与分发', 'Discovery & Distribution'),
-                        style: theme.textTheme.titleLarge,
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 760;
+                final info = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      appText('发现与分发', 'Discovery & Distribution'),
+                      style: theme.textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      appText(
+                        'App 作为统一发现与分发中心，维护托管 skills、MCP server list 和 AI Gateway 默认注入，但不会覆盖用户原有 CLI 配置。',
+                        'The app acts as the discovery and distribution center for managed skills, MCP server lists, and AI Gateway defaults without overwriting existing CLI config.',
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        appText(
-                          'App 作为统一发现与分发中心，维护托管 skills、MCP server list 和 AI Gateway 默认注入，但不会覆盖用户原有 CLI 配置。',
-                          'The app acts as the discovery and distribution center for managed skills, MCP server lists, and AI Gateway defaults without overwriting existing CLI config.',
-                        ),
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                OutlinedButton(
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ],
+                );
+                final refreshButton = OutlinedButton(
                   onPressed: () =>
                       controller.refreshMultiAgentMounts(sync: config.autoSync),
                   child: Text(appText('刷新挂载', 'Refresh Mounts')),
-                ),
-              ],
+                );
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [info, const SizedBox(height: 12), refreshButton],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: info),
+                    const SizedBox(width: 16),
+                    refreshButton,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 16),
             _SwitchRow(
@@ -1644,17 +1698,16 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   List<String> _getLocalModelOptions(SettingsSnapshot settings) {
-    // 从 ollamaLocal 配置中获取可用模型
-    final defaultModel = settings.ollamaLocal.defaultModel;
-    if (defaultModel.isNotEmpty) {
-      return [
-        defaultModel,
-        'qwen2.5-coder:latest',
-        'gpt-oss:20b',
-        'glm-4.7-flash',
-      ];
-    }
-    return const ['qwen2.5-coder:latest', 'gpt-oss:20b', 'glm-4.7-flash'];
+    return <String>[
+          settings.ollamaLocal.defaultModel,
+          'qwen2.5-coder:latest',
+          'gpt-oss:20b',
+          'glm-4.7-flash',
+        ]
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
   }
 
   List<Widget> _buildExperimental(
@@ -1747,10 +1800,27 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   AiGatewayProfile _buildAiGatewayDraft(SettingsSnapshot settings) {
-    return settings.aiGateway.copyWith(
-      name: _aiGatewayNameController.text.trim(),
-      baseUrl: _aiGatewayUrlController.text.trim(),
-      apiKeyRef: _aiGatewayApiKeyRefController.text.trim(),
+    final draftName = _aiGatewayNameController.text.trim();
+    final draftBaseUrl = _aiGatewayUrlController.text.trim();
+    final draftApiKeyRef = _aiGatewayApiKeyRefController.text.trim();
+    final current = settings.aiGateway;
+    final defaults = AiGatewayProfile.defaults();
+    final connectionChanged =
+        draftBaseUrl != current.baseUrl || draftApiKeyRef != current.apiKeyRef;
+    return current.copyWith(
+      name: draftName,
+      baseUrl: draftBaseUrl,
+      apiKeyRef: draftApiKeyRef,
+      availableModels: connectionChanged
+          ? defaults.availableModels
+          : current.availableModels,
+      selectedModels: connectionChanged
+          ? defaults.selectedModels
+          : current.selectedModels,
+      syncState: connectionChanged ? defaults.syncState : current.syncState,
+      syncMessage: connectionChanged
+          ? defaults.syncMessage
+          : current.syncMessage,
     );
   }
 
@@ -1758,16 +1828,27 @@ class _SettingsPageState extends State<SettingsPage> {
     AppController controller,
     SettingsSnapshot settings,
   ) async {
+    final draft = _buildAiGatewayDraft(settings);
     final hasStoredAiGatewayApiKey =
         controller.settingsController.secureRefs['ai_gateway_api_key'] != null;
-    await _persistAiGatewayApiKeyIfNeeded(
-      controller,
-      hasStoredValue: hasStoredAiGatewayApiKey,
+    await _saveSettings(controller, settings.copyWith(aiGateway: draft));
+    unawaited(
+      _persistAiGatewayApiKeyIfNeeded(
+        controller,
+        hasStoredValue: hasStoredAiGatewayApiKey,
+      ).catchError((_) {}),
     );
-    await _saveSettings(
-      controller,
-      settings.copyWith(aiGateway: _buildAiGatewayDraft(settings)),
-    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _aiGatewayNameSyncedValue = draft.name;
+      _aiGatewayUrlSyncedValue = draft.baseUrl;
+      _aiGatewayApiKeyRefSyncedValue = draft.apiKeyRef;
+      _aiGatewayTestState = draft.syncState;
+      _aiGatewayTestMessage = '';
+      _aiGatewayTestEndpoint = '';
+    });
   }
 
   Future<void> _testAiGatewayConnection(
@@ -1835,6 +1916,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildSecureField({
+    Key? fieldKey,
     required TextEditingController controller,
     required String label,
     required bool hasStoredValue,
@@ -1853,6 +1935,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final showMaskedPlaceholder =
         hasStoredValue && !fieldState.showPlaintext && !fieldState.hasDraft;
     return TextField(
+      key: fieldKey,
       controller: controller,
       obscureText: !fieldState.showPlaintext && fieldState.hasDraft,
       autocorrect: false,
@@ -2084,6 +2167,22 @@ class _SettingsPageState extends State<SettingsPage> {
       selection: TextSelection.collapsed(offset: value.length),
       composing: TextRange.empty,
     );
+  }
+
+  void _syncDraftControllerValue(
+    TextEditingController controller,
+    String value, {
+    required String syncedValue,
+    required ValueChanged<String> onSyncedValueChanged,
+  }) {
+    final hasLocalDraft = controller.text != syncedValue;
+    if (hasLocalDraft && controller.text != value) {
+      return;
+    }
+    _syncControllerValue(controller, value);
+    if (syncedValue != value) {
+      onSyncedValueChanged(value);
+    }
   }
 
   bool _matchesRuntimeLogFilter(RuntimeLogEntry entry) {
@@ -2712,6 +2811,50 @@ class _MountTargetCard extends StatelessWidget {
   }
 }
 
+class _InlineSwitchField extends StatelessWidget {
+  const _InlineSwitchField({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                style: theme.textTheme.labelLarge,
+                softWrap: true,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Switch.adaptive(
+              value: value,
+              onChanged: onChanged,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _AiGatewayFeedbackTheme {
   const _AiGatewayFeedbackTheme({
     required this.background,
@@ -2811,96 +2954,120 @@ class _AgentRoleCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 720;
+              final info = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Text(description, style: theme.textTheme.bodySmall),
+                ],
+              );
+              final toggle = _InlineSwitchField(
+                label: appText('启用', 'Enabled'),
+                value: enabled,
+                onChanged: onEnabledChanged,
+              );
+              if (cliOptions.length <= 1) {
+                return info;
+              }
+              if (compact) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 4),
-                    Text(description, style: theme.textTheme.bodySmall),
-                  ],
-                ),
-              ),
-              if (cliOptions.length > 1)
-                _SwitchRow(
-                  label: appText('启用', 'Enabled'),
-                  value: enabled,
-                  onChanged: onEnabledChanged,
-                ),
-            ],
+                  children: [info, const SizedBox(height: 12), toggle],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: info),
+                  const SizedBox(width: 16),
+                  Flexible(
+                    child: Align(alignment: Alignment.topRight, child: toggle),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('CLI', style: theme.textTheme.labelMedium),
-                    const SizedBox(height: 4),
-                    DropdownButtonFormField<String>(
-                      initialValue: cliOptions.contains(cliTool)
-                          ? cliTool
-                          : cliOptions.first,
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 720;
+              final cliField = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('CLI', style: theme.textTheme.labelMedium),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<String>(
+                    initialValue: cliOptions.contains(cliTool)
+                        ? cliTool
+                        : cliOptions.first,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
-                      items: cliOptions
-                          .map(
-                            (t) => DropdownMenuItem(value: t, child: Text(t)),
-                          )
-                          .toList(),
-                      onChanged: (v) {
-                        if (v != null) onCliChanged(v);
-                      },
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      appText('模型', 'Model'),
-                      style: theme.textTheme.labelMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    DropdownButtonFormField<String>(
-                      initialValue: modelOptions.contains(model)
-                          ? model
-                          : modelOptions.first,
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
+                    items: cliOptions
+                        .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) onCliChanged(v);
+                    },
+                  ),
+                ],
+              );
+              final modelField = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appText('模型', 'Model'),
+                    style: theme.textTheme.labelMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<String>(
+                    initialValue: modelOptions.contains(model)
+                        ? model
+                        : modelOptions.first,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
-                      items: modelOptions
-                          .map(
-                            (m) => DropdownMenuItem(
-                              value: m,
-                              child: Text(m, overflow: TextOverflow.ellipsis),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) {
-                        if (v != null) onModelChanged(v);
-                      },
                     ),
-                  ],
-                ),
-              ),
-            ],
+                    items: modelOptions
+                        .map(
+                          (m) => DropdownMenuItem(
+                            value: m,
+                            child: Text(m, overflow: TextOverflow.ellipsis),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) onModelChanged(v);
+                    },
+                  ),
+                ],
+              );
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [cliField, const SizedBox(height: 12), modelField],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: cliField),
+                  const SizedBox(width: 12),
+                  Expanded(flex: 2, child: modelField),
+                ],
+              );
+            },
           ),
         ],
       ),

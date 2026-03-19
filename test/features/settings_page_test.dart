@@ -117,6 +117,35 @@ void main() {
     expect(find.text('切换到代理'), findsOneWidget);
     expect(find.text('连接隧道'), findsOneWidget);
   });
+
+  testWidgets('SettingsPage multi-agent tab keeps header readable', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: const SizedBox(width: 1100, height: 900, child: Placeholder()),
+    );
+    await pumpPage(
+      tester,
+      child: SizedBox(
+        width: 1100,
+        height: 900,
+        child: SettingsPage(controller: controller),
+      ),
+    );
+
+    await tester.tap(find.text('多 Agent'));
+    await tester.pumpAndSettle();
+
+    final titleFinder = find.text('多 Agent 协作');
+    expect(titleFinder, findsOneWidget);
+    expect(tester.getSize(titleFinder).width, greaterThan(80));
+    expect(find.text('启用协作模式'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('SettingsPage diagnostics tab filters and clears runtime logs', (
     WidgetTester tester,
   ) async {
@@ -132,10 +161,7 @@ void main() {
       message: 'pairing required',
     );
 
-    await pumpPage(
-      tester,
-      child: SettingsPage(controller: controller),
-    );
+    await pumpPage(tester, child: SettingsPage(controller: controller));
 
     await tester.tap(find.text('诊断'));
     await tester.pumpAndSettle();
