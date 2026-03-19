@@ -65,10 +65,13 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = context.palette;
+    final horizontalPadding = widget.compact ? 20.0 : 24.0;
+    final verticalPadding = widget.compact ? 18.0 : 22.0;
     final dialogTitleStyle = theme.textTheme.headlineSmall?.copyWith(
-      fontSize: widget.compact ? 17 : 18,
-      height: 20 / 17,
-      letterSpacing: -0.12,
+      fontSize: widget.compact ? 24 : 22,
+      height: widget.compact ? 28 / 24 : 26 / 22,
+      letterSpacing: -0.28,
+      fontWeight: FontWeight.w700,
     );
     final supportingCopyStyle = theme.textTheme.bodyMedium?.copyWith(
       fontSize: 12,
@@ -99,7 +102,12 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
         ),
       ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.page),
+        padding: EdgeInsets.fromLTRB(
+          horizontalPadding,
+          verticalPadding,
+          horizontalPadding,
+          verticalPadding,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -131,7 +139,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
             ),
             const SizedBox(height: AppSpacing.section),
             _StatusBanner(controller: widget.controller),
-            const SizedBox(height: AppSpacing.section),
+            const SizedBox(height: 14),
             if (_mode == 'setup') ...[
               TextField(
                 controller: _setupCodeController,
@@ -146,6 +154,8 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                 ),
               ),
             ] else ...[
+              _FormSectionLabel(label: appText('连接目标', 'Connection Target')),
+              const SizedBox(height: 8),
               DropdownButtonFormField<RuntimeConnectionMode>(
                 initialValue: _connectionMode,
                 decoration: InputDecoration(
@@ -173,15 +183,17 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                   });
                 },
               ),
-              const SizedBox(height: AppSpacing.section),
+              const SizedBox(height: 12),
               TextField(
                 controller: _hostController,
                 decoration: InputDecoration(labelText: appText('主机', 'Host')),
               ),
-              const SizedBox(height: AppSpacing.section),
+              const SizedBox(height: 12),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
+                    flex: 3,
                     child: TextField(
                       controller: _portController,
                       keyboardType: TextInputType.number,
@@ -190,15 +202,13 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.section),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
+                    flex: 2,
+                    child: _TlsToggleCard(
                       value: _tls,
-                      title: Text(
-                        appText('TLS', 'TLS'),
-                        style: floatingFieldLabelStyle,
-                      ),
+                      label: appText('TLS', 'TLS'),
+                      enabled: _connectionMode != RuntimeConnectionMode.local,
                       onChanged: _connectionMode == RuntimeConnectionMode.local
                           ? null
                           : (value) => setState(() => _tls = value),
@@ -207,7 +217,9 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                 ],
               ),
             ],
-            const SizedBox(height: AppSpacing.section),
+            const SizedBox(height: 14),
+            _FormSectionLabel(label: appText('凭证', 'Credentials')),
+            const SizedBox(height: 8),
             TextField(
               controller: _tokenController,
               obscureText: _obscureSharedToken,
@@ -236,7 +248,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
               onChanged: (_) => setState(() {}),
             ),
             if (willUseStoredGatewayToken || typedGatewayToken.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.section),
+              const SizedBox(height: 10),
               _SharedTokenStatusCard(
                 hasStoredGatewayToken: hasStoredGatewayToken,
                 storedGatewayTokenMask: storedGatewayTokenMask,
@@ -253,7 +265,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                     : null,
               ),
             ],
-            const SizedBox(height: AppSpacing.section),
+            const SizedBox(height: 12),
             TextField(
               controller: _passwordController,
               obscureText: true,
@@ -262,14 +274,11 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                 hintText: appText('可选：共享密码', 'Optional shared password'),
               ),
             ),
-            const SizedBox(height: AppSpacing.section),
-            Wrap(
-              spacing: AppSpacing.section,
-              runSpacing: AppSpacing.section,
-              alignment: WrapAlignment.end,
+            const SizedBox(height: 16),
+            Row(
               children: [
                 if (widget.controller.connection.status ==
-                    RuntimeConnectionStatus.connected)
+                    RuntimeConnectionStatus.connected) ...[
                   OutlinedButton.icon(
                     onPressed: _submitting
                         ? null
@@ -283,13 +292,17 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                     icon: const Icon(Icons.link_off_rounded),
                     label: Text(appText('断开连接', 'Disconnect')),
                   ),
-                FilledButton.icon(
-                  onPressed: _submitting ? null : _submit,
-                  icon: const Icon(Icons.wifi_tethering_rounded),
-                  label: Text(
-                    _submitting
-                        ? appText('连接中…', 'Connecting…')
-                        : appText('连接', 'Connect'),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _submitting ? null : _submit,
+                    icon: const Icon(Icons.wifi_tethering_rounded),
+                    label: Text(
+                      _submitting
+                          ? appText('连接中…', 'Connecting…')
+                          : appText('连接', 'Connect'),
+                    ),
                   ),
                 ),
               ],
@@ -409,10 +422,10 @@ class _SharedTokenStatusCard extends StatelessWidget {
           );
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.section),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        border: Border.all(color: theme.dividerColor),
+        color: palette.surfaceSecondary.withValues(alpha: 0.92),
+        border: Border.all(color: palette.strokeSoft),
         borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Row(
@@ -457,53 +470,65 @@ class _StatusBanner extends StatelessWidget {
     final palette = context.palette;
     final connection = controller.connection;
     final tone = switch (connection.status) {
-      RuntimeConnectionStatus.connected => theme.colorScheme.primaryContainer,
+      RuntimeConnectionStatus.connected => palette.accentMuted,
       RuntimeConnectionStatus.error => theme.colorScheme.errorContainer,
-      RuntimeConnectionStatus.connecting =>
-        theme.colorScheme.secondaryContainer,
-      RuntimeConnectionStatus.offline =>
-        theme.colorScheme.surfaceContainerHighest,
+      RuntimeConnectionStatus.connecting => palette.surfaceSecondary,
+      RuntimeConnectionStatus.offline => palette.surfaceSecondary,
+    };
+    final statusColor = switch (connection.status) {
+      RuntimeConnectionStatus.connected => palette.success,
+      RuntimeConnectionStatus.error => palette.danger,
+      RuntimeConnectionStatus.connecting => palette.accent,
+      RuntimeConnectionStatus.offline => palette.textSecondary,
     };
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.section),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       decoration: BoxDecoration(
         color: tone,
-        border: Border.all(color: theme.dividerColor),
+        border: Border.all(color: palette.strokeSoft),
         borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            connection.status.label,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontSize: 12,
-              height: 14 / 12,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: statusColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                connection.status.label,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontSize: 14,
+                  height: 16 / 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.compact),
+          const SizedBox(height: 8),
           Text(
             connection.remoteAddress ?? 'No active gateway target',
             style: theme.textTheme.bodyMedium?.copyWith(
-              fontSize: 12,
-              height: 16 / 12,
+              fontSize: 13,
+              height: 18 / 13,
               color: palette.textSecondary,
             ),
           ),
-          const SizedBox(height: AppSpacing.section),
-          Text(
-            appText('认证诊断', 'Auth Diagnostics'),
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontSize: 12,
-              height: 14 / 12,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.compact),
+          const SizedBox(height: 12),
+          _FormSectionLabel(label: appText('认证诊断', 'Auth Diagnostics')),
+          const SizedBox(height: 6),
           Text(
             connection.connectAuthSummary,
             style: theme.textTheme.bodySmall?.copyWith(
-              fontSize: 12,
+              fontSize: 13,
               height: 16 / 12,
               color: palette.textSecondary,
             ),
@@ -560,6 +585,65 @@ class _StatusBanner extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FormSectionLabel extends StatelessWidget {
+  const _FormSectionLabel({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Text(
+      label,
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        color: palette.textMuted,
+        letterSpacing: 0.32,
+      ),
+    );
+  }
+}
+
+class _TlsToggleCard extends StatelessWidget {
+  const _TlsToggleCard({
+    required this.value,
+    required this.label,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final String label;
+  final bool enabled;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      constraints: const BoxConstraints(minHeight: AppSizes.inputHeight),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: palette.surfacePrimary.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(AppRadius.input),
+        border: Border.all(color: palette.strokeSoft),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: enabled ? palette.textSecondary : palette.textMuted,
+              ),
+            ),
+          ),
+          Switch.adaptive(value: value, onChanged: enabled ? onChanged : null),
         ],
       ),
     );
