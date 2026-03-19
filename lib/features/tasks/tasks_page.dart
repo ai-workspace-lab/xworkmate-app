@@ -594,5 +594,5 @@ StatusInfo _taskStatusInfo(String status) => switch (status) {
   'Failed' => StatusInfo(appText('失败', 'Failed'), StatusTone.danger),
   'queued' ||
   'Queued' => StatusInfo(appText('排队中', 'Queued'), StatusTone.neutral),
-  _ => StatusInfo(appText('已完成', 'Completed'), StatusTone.success),
+  _ => StatusInfo(appText('可继续', 'Open'), StatusTone.success),
 };

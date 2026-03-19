@@ -19,6 +19,7 @@ class SecureConfigStore {
 
   static const _settingsKey = 'xworkmate.settings.snapshot';
   static const _auditKey = 'xworkmate.secrets.audit';
+  static const _assistantThreadsKey = 'xworkmate.assistant.threads';
   static const _databaseFileName = 'config-store.sqlite3';
   static const _databaseTableName = 'config_entries';
   static const _secureStorageTimeout = Duration(milliseconds: 400);
@@ -75,6 +76,36 @@ class SecureConfigStore {
   Future<void> saveSettingsSnapshot(SettingsSnapshot snapshot) async {
     await initialize();
     await _writeStoredString(_settingsKey, snapshot.toJsonString());
+  }
+
+  Future<List<AssistantThreadRecord>> loadAssistantThreadRecords() async {
+    await initialize();
+    final raw = await _readStoredString(_assistantThreadsKey);
+    if (raw == null || raw.trim().isEmpty) {
+      return const <AssistantThreadRecord>[];
+    }
+    try {
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      return decoded
+          .whereType<Map>()
+          .map(
+            (item) =>
+                AssistantThreadRecord.fromJson(item.cast<String, dynamic>()),
+          )
+          .toList(growable: false);
+    } catch (_) {
+      return const <AssistantThreadRecord>[];
+    }
+  }
+
+  Future<void> saveAssistantThreadRecords(
+    List<AssistantThreadRecord> records,
+  ) async {
+    await initialize();
+    await _writeStoredString(
+      _assistantThreadsKey,
+      jsonEncode(records.map((item) => item.toJson()).toList(growable: false)),
+    );
   }
 
   Future<List<SecretAuditEntry>> loadAuditTrail() async {

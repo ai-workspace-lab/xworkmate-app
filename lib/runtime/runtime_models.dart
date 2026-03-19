@@ -910,6 +910,7 @@ class SettingsSnapshot {
     required this.assistantPermissionLevel,
     required this.assistantNavigationDestinations,
     required this.assistantCustomTaskTitles,
+    required this.assistantArchivedTaskKeys,
   });
 
   final AppLanguage appLanguage;
@@ -941,6 +942,7 @@ class SettingsSnapshot {
   final AssistantPermissionLevel assistantPermissionLevel;
   final List<WorkspaceDestination> assistantNavigationDestinations;
   final Map<String, String> assistantCustomTaskTitles;
+  final List<String> assistantArchivedTaskKeys;
 
   factory SettingsSnapshot.defaults() {
     return SettingsSnapshot(
@@ -973,6 +975,7 @@ class SettingsSnapshot {
       assistantPermissionLevel: AssistantPermissionLevel.defaultAccess,
       assistantNavigationDestinations: kAssistantNavigationDestinationDefaults,
       assistantCustomTaskTitles: const <String, String>{},
+      assistantArchivedTaskKeys: const <String>[],
     );
   }
 
@@ -1006,6 +1009,7 @@ class SettingsSnapshot {
     AssistantPermissionLevel? assistantPermissionLevel,
     List<WorkspaceDestination>? assistantNavigationDestinations,
     Map<String, String>? assistantCustomTaskTitles,
+    List<String>? assistantArchivedTaskKeys,
   }) {
     return SettingsSnapshot(
       appLanguage: appLanguage ?? this.appLanguage,
@@ -1042,6 +1046,8 @@ class SettingsSnapshot {
           this.assistantNavigationDestinations,
       assistantCustomTaskTitles:
           assistantCustomTaskTitles ?? this.assistantCustomTaskTitles,
+      assistantArchivedTaskKeys:
+          assistantArchivedTaskKeys ?? this.assistantArchivedTaskKeys,
     );
   }
 
@@ -1078,6 +1084,7 @@ class SettingsSnapshot {
           .map((item) => item.name)
           .toList(growable: false),
       'assistantCustomTaskTitles': assistantCustomTaskTitles,
+      'assistantArchivedTaskKeys': assistantArchivedTaskKeys,
     };
   }
 
@@ -1095,6 +1102,22 @@ class SettingsSnapshot {
         }
         normalized[normalizedKey] = normalizedTitle;
       });
+      return normalized;
+    }
+
+    List<String> normalizeTaskKeys(Object? value) {
+      if (value is! List) {
+        return const <String>[];
+      }
+      final normalized = <String>[];
+      final seen = <String>{};
+      for (final item in value) {
+        final normalizedKey = item?.toString().trim() ?? '';
+        if (normalizedKey.isEmpty || !seen.add(normalizedKey)) {
+          continue;
+        }
+        normalized.add(normalizedKey);
+      }
       return normalized;
     }
 
@@ -1181,6 +1204,9 @@ class SettingsSnapshot {
       assistantNavigationDestinations: assistantNavigationDestinations,
       assistantCustomTaskTitles: normalizeTaskTitles(
         json['assistantCustomTaskTitles'],
+      ),
+      assistantArchivedTaskKeys: normalizeTaskKeys(
+        json['assistantArchivedTaskKeys'],
       ),
     );
   }
@@ -1509,6 +1535,41 @@ class GatewayChatMessage {
   final bool pending;
   final bool error;
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'role': role,
+      'text': text,
+      'timestampMs': timestampMs,
+      'toolCallId': toolCallId,
+      'toolName': toolName,
+      'stopReason': stopReason,
+      'pending': pending,
+      'error': error,
+    };
+  }
+
+  factory GatewayChatMessage.fromJson(Map<String, dynamic> json) {
+    double? asDouble(Object? value) {
+      if (value is num) {
+        return value.toDouble();
+      }
+      return double.tryParse(value?.toString() ?? '');
+    }
+
+    return GatewayChatMessage(
+      id: json['id']?.toString() ?? '',
+      role: json['role']?.toString() ?? 'assistant',
+      text: json['text']?.toString() ?? '',
+      timestampMs: asDouble(json['timestampMs']),
+      toolCallId: json['toolCallId']?.toString(),
+      toolName: json['toolName']?.toString(),
+      stopReason: json['stopReason']?.toString(),
+      pending: json['pending'] as bool? ?? false,
+      error: json['error'] as bool? ?? false,
+    );
+  }
+
   GatewayChatMessage copyWith({
     String? id,
     String? role,
@@ -1530,6 +1591,76 @@ class GatewayChatMessage {
       stopReason: stopReason ?? this.stopReason,
       pending: pending ?? this.pending,
       error: error ?? this.error,
+    );
+  }
+}
+
+class AssistantThreadRecord {
+  const AssistantThreadRecord({
+    required this.sessionKey,
+    required this.messages,
+    required this.updatedAtMs,
+    required this.title,
+    required this.archived,
+  });
+
+  final String sessionKey;
+  final List<GatewayChatMessage> messages;
+  final double? updatedAtMs;
+  final String title;
+  final bool archived;
+
+  AssistantThreadRecord copyWith({
+    String? sessionKey,
+    List<GatewayChatMessage>? messages,
+    double? updatedAtMs,
+    String? title,
+    bool? archived,
+  }) {
+    return AssistantThreadRecord(
+      sessionKey: sessionKey ?? this.sessionKey,
+      messages: messages ?? this.messages,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      title: title ?? this.title,
+      archived: archived ?? this.archived,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'sessionKey': sessionKey,
+      'messages': messages.map((item) => item.toJson()).toList(growable: false),
+      'updatedAtMs': updatedAtMs,
+      'title': title,
+      'archived': archived,
+    };
+  }
+
+  factory AssistantThreadRecord.fromJson(Map<String, dynamic> json) {
+    double? asDouble(Object? value) {
+      if (value is num) {
+        return value.toDouble();
+      }
+      return double.tryParse(value?.toString() ?? '');
+    }
+
+    final rawMessages = json['messages'];
+    final messages = rawMessages is List
+        ? rawMessages
+              .whereType<Map>()
+              .map(
+                (item) =>
+                    GatewayChatMessage.fromJson(item.cast<String, dynamic>()),
+              )
+              .toList(growable: false)
+        : const <GatewayChatMessage>[];
+
+    return AssistantThreadRecord(
+      sessionKey: json['sessionKey']?.toString() ?? '',
+      messages: messages,
+      updatedAtMs: asDouble(json['updatedAtMs']),
+      title: json['title']?.toString() ?? '',
+      archived: json['archived'] as bool? ?? false,
     );
   }
 }

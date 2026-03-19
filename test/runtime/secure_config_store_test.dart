@@ -200,6 +200,80 @@ void main() {
   );
 
   test(
+    'SecureConfigStore persists assistant thread records and archived task keys',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-assistant-threads-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final databasePath = '${tempDirectory.path}/settings.sqlite3';
+      final store = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+
+      final snapshot = SettingsSnapshot.defaults().copyWith(
+        assistantArchivedTaskKeys: const <String>['main'],
+        assistantCustomTaskTitles: const <String, String>{'main': '研发任务'},
+      );
+      const records = <AssistantThreadRecord>[
+        AssistantThreadRecord(
+          sessionKey: 'main',
+          title: '研发任务',
+          archived: true,
+          updatedAtMs: 1700000000000,
+          messages: <GatewayChatMessage>[
+            GatewayChatMessage(
+              id: 'user-1',
+              role: 'user',
+              text: '第一条消息',
+              timestampMs: 1700000000000,
+              toolCallId: null,
+              toolName: null,
+              stopReason: null,
+              pending: false,
+              error: false,
+            ),
+            GatewayChatMessage(
+              id: 'assistant-1',
+              role: 'assistant',
+              text: '第一条回复',
+              timestampMs: 1700000001000,
+              toolCallId: null,
+              toolName: null,
+              stopReason: null,
+              pending: false,
+              error: false,
+            ),
+          ],
+        ),
+      ];
+
+      await store.saveSettingsSnapshot(snapshot);
+      await store.saveAssistantThreadRecords(records);
+
+      final reloadedSnapshot = await store.loadSettingsSnapshot();
+      final reloadedRecords = await store.loadAssistantThreadRecords();
+
+      expect(reloadedSnapshot.assistantArchivedTaskKeys, const <String>[
+        'main',
+      ]);
+      expect(reloadedSnapshot.assistantCustomTaskTitles['main'], '研发任务');
+      expect(reloadedRecords, hasLength(1));
+      expect(reloadedRecords.first.sessionKey, 'main');
+      expect(reloadedRecords.first.archived, isTrue);
+      expect(reloadedRecords.first.title, '研发任务');
+      expect(reloadedRecords.first.messages, hasLength(2));
+      expect(reloadedRecords.first.messages.last.text, '第一条回复');
+    },
+  );
+
+  test(
     'SecureConfigStore dispose closes sqlite handle and allows reopening the same database path',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
