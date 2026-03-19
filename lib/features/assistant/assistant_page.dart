@@ -599,6 +599,7 @@ class _AssistantPageState extends State<AssistantPage> {
             : 'queued',
         owner: autoAgent?.name ?? _conversationOwnerLabel(controller),
         surface: 'Assistant',
+        executionTarget: settings.assistantExecutionTarget,
         draft: controller.currentSessionKey.trim().startsWith('draft:'),
       );
     });
@@ -838,6 +839,7 @@ class _AssistantPageState extends State<AssistantPage> {
         updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
         owner: _conversationOwnerLabel(widget.controller),
         surface: 'Assistant',
+        executionTarget: widget.controller.assistantExecutionTarget,
         draft: true,
       );
       _selectedSkillKeys = const <String>[];
@@ -906,6 +908,7 @@ class _AssistantPageState extends State<AssistantPage> {
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       owner: _conversationOwnerLabel(widget.controller),
       surface: 'Assistant',
+      executionTarget: widget.controller.assistantExecutionTarget,
       isCurrent: true,
       draft: true,
     );
@@ -916,6 +919,7 @@ class _AssistantPageState extends State<AssistantPage> {
       if (_isArchivedTask(session.key)) {
         continue;
       }
+      final existingSeed = _taskSeeds[session.key];
       _taskSeeds[session.key] = _AssistantTaskSeed(
         sessionKey: session.key,
         title: _resolvedTaskTitle(controller, session.key, session: session),
@@ -931,6 +935,9 @@ class _AssistantPageState extends State<AssistantPage> {
             DateTime.now().millisecondsSinceEpoch.toDouble(),
         owner: _conversationOwnerLabel(controller),
         surface: session.surface ?? session.kind ?? 'Assistant',
+        executionTarget:
+            existingSeed?.executionTarget ??
+            controller.assistantExecutionTarget,
         draft: session.key.trim().startsWith('draft:'),
       );
     }
@@ -963,6 +970,8 @@ class _AssistantPageState extends State<AssistantPage> {
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       owner: _conversationOwnerLabel(controller),
       surface: currentSeed?.surface ?? 'Assistant',
+      executionTarget:
+          currentSeed?.executionTarget ?? controller.assistantExecutionTarget,
       draft: controller.currentSessionKey.trim().startsWith('draft:'),
     );
   }
@@ -1019,6 +1028,7 @@ class _AssistantPageState extends State<AssistantPage> {
     required String status,
     required String owner,
     required String surface,
+    required AssistantExecutionTarget executionTarget,
     required bool draft,
   }) {
     _taskSeeds[sessionKey] = _AssistantTaskSeed(
@@ -1029,6 +1039,7 @@ class _AssistantPageState extends State<AssistantPage> {
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       owner: owner,
       surface: surface,
+      executionTarget: executionTarget,
       draft: draft,
     );
   }
@@ -1126,6 +1137,7 @@ class _AssistantPageState extends State<AssistantPage> {
           updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
           owner: existing.owner,
           surface: existing.surface,
+          executionTarget: existing.executionTarget,
           draft: existing.draft,
         );
       }
@@ -1753,6 +1765,7 @@ class _AssistantTaskRail extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = context.palette;
+    final groupedTasks = _groupTasksForRail(tasks);
     final runningCount = tasks
         .where((task) => _normalizedTaskStatus(task.status) == 'running')
         .length;
@@ -1885,23 +1898,47 @@ class _AssistantTaskRail extends StatelessWidget {
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
-                    itemCount: tasks.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 4),
+                    itemCount: groupedTasks.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
-                      final task = tasks[index];
-                      return _AssistantTaskTile(
-                        entry: task,
-                        archiveEnabled:
-                            _normalizedTaskStatus(task.status) != 'running',
-                        onTap: () async {
-                          await onSelectTask(task.sessionKey);
-                        },
-                        onRename: () async {
-                          await onRenameTask(task);
-                        },
-                        onArchive: () async {
-                          await onArchiveTask(task.sessionKey);
-                        },
+                      final group = groupedTasks[index];
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _AssistantTaskGroupHeader(
+                            executionTarget: group.executionTarget,
+                            count: group.items.length,
+                          ),
+                          const SizedBox(height: 4),
+                          for (
+                            var itemIndex = 0;
+                            itemIndex < group.items.length;
+                            itemIndex++
+                          ) ...[
+                            if (itemIndex > 0) const SizedBox(height: 4),
+                            _AssistantTaskTile(
+                              entry: group.items[itemIndex],
+                              archiveEnabled:
+                                  _normalizedTaskStatus(
+                                    group.items[itemIndex].status,
+                                  ) !=
+                                  'running',
+                              onTap: () async {
+                                await onSelectTask(
+                                  group.items[itemIndex].sessionKey,
+                                );
+                              },
+                              onRename: () async {
+                                await onRenameTask(group.items[itemIndex]);
+                              },
+                              onArchive: () async {
+                                await onArchiveTask(
+                                  group.items[itemIndex].sessionKey,
+                                );
+                              },
+                            ),
+                          ],
+                        ],
                       );
                     },
                   ),
@@ -1910,6 +1947,25 @@ class _AssistantTaskRail extends StatelessWidget {
       ),
     );
   }
+}
+
+List<_AssistantTaskGroup> _groupTasksForRail(List<_AssistantTaskEntry> tasks) {
+  final grouped = <AssistantExecutionTarget, List<_AssistantTaskEntry>>{
+    for (final target in AssistantExecutionTarget.values)
+      target: <_AssistantTaskEntry>[],
+  };
+  for (final task in tasks) {
+    grouped[task.executionTarget]!.add(task);
+  }
+  return AssistantExecutionTarget.values
+      .map(
+        (target) => _AssistantTaskGroup(
+          executionTarget: target,
+          items: grouped[target]!,
+        ),
+      )
+      .where((group) => group.items.isNotEmpty)
+      .toList(growable: false);
 }
 
 class _AssistantTaskTile extends StatelessWidget {
@@ -2011,6 +2067,50 @@ class _AssistantTaskTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AssistantTaskGroupHeader extends StatelessWidget {
+  const _AssistantTaskGroupHeader({
+    required this.executionTarget,
+    required this.count,
+  });
+
+  final AssistantExecutionTarget executionTarget;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    return Padding(
+      key: ValueKey<String>('assistant-task-group-${executionTarget.name}'),
+      padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+      child: Row(
+        children: [
+          Icon(executionTarget.icon, size: 14, color: palette.textMuted),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              executionTarget.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: palette.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$count',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: palette.textMuted,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3384,6 +3484,7 @@ class _AssistantTaskSeed {
     required this.updatedAtMs,
     required this.owner,
     required this.surface,
+    required this.executionTarget,
     required this.draft,
   });
 
@@ -3394,6 +3495,7 @@ class _AssistantTaskSeed {
   final double updatedAtMs;
   final String owner;
   final String surface;
+  final AssistantExecutionTarget executionTarget;
   final bool draft;
 
   _AssistantTaskEntry toEntry({required bool isCurrent}) {
@@ -3405,6 +3507,7 @@ class _AssistantTaskSeed {
       updatedAtMs: updatedAtMs,
       owner: owner,
       surface: surface,
+      executionTarget: executionTarget,
       isCurrent: isCurrent,
       draft: draft,
     );
@@ -3420,6 +3523,7 @@ class _AssistantTaskEntry {
     required this.updatedAtMs,
     required this.owner,
     required this.surface,
+    required this.executionTarget,
     required this.isCurrent,
     this.draft = false,
   });
@@ -3431,6 +3535,7 @@ class _AssistantTaskEntry {
   final double? updatedAtMs;
   final String owner;
   final String surface;
+  final AssistantExecutionTarget executionTarget;
   final bool isCurrent;
   final bool draft;
 
@@ -3442,6 +3547,7 @@ class _AssistantTaskEntry {
     double? updatedAtMs,
     String? owner,
     String? surface,
+    AssistantExecutionTarget? executionTarget,
     bool? isCurrent,
     bool? draft,
   }) {
@@ -3453,12 +3559,23 @@ class _AssistantTaskEntry {
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
       owner: owner ?? this.owner,
       surface: surface ?? this.surface,
+      executionTarget: executionTarget ?? this.executionTarget,
       isCurrent: isCurrent ?? this.isCurrent,
       draft: draft ?? this.draft,
     );
   }
 
   String get updatedAtLabel => _sessionUpdatedAtLabel(updatedAtMs);
+}
+
+class _AssistantTaskGroup {
+  const _AssistantTaskGroup({
+    required this.executionTarget,
+    required this.items,
+  });
+
+  final AssistantExecutionTarget executionTarget;
+  final List<_AssistantTaskEntry> items;
 }
 
 class _PillStyle {
