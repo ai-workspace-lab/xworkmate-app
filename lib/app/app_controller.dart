@@ -519,7 +519,9 @@ class AppController extends ChangeNotifier {
       );
 
   List<GatewayChatMessage> get chatMessages {
-    final sessionKey = _sessionsController.currentSessionKey;
+    final sessionKey = _normalizedAssistantSessionKey(
+      _sessionsController.currentSessionKey,
+    );
     final items = List<GatewayChatMessage>.from(
       isAiGatewayOnlyMode
           ? (_gatewayHistoryCache[sessionKey] ?? const <GatewayChatMessage>[])
@@ -548,6 +550,11 @@ class AppController extends ChangeNotifier {
       );
     }
     return items;
+  }
+
+  String _normalizedAssistantSessionKey(String sessionKey) {
+    final trimmed = sessionKey.trim();
+    return trimmed.isEmpty ? 'main' : trimmed;
   }
 
   void navigateTo(WorkspaceDestination destination) {
@@ -1555,7 +1562,10 @@ class AppController extends ChangeNotifier {
           .postUrl(uri)
           .timeout(const Duration(seconds: 20));
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      request.headers.set(
+        HttpHeaders.contentTypeHeader,
+        'application/json; charset=utf-8',
+      );
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $apiKey');
       request.headers.set('x-api-key', apiKey);
       final payload = <String, dynamic>{
@@ -1567,7 +1577,7 @@ class AppController extends ChangeNotifier {
       if (normalizedThinking.isNotEmpty && normalizedThinking != 'off') {
         payload['reasoning_effort'] = normalizedThinking;
       }
-      request.write(jsonEncode(payload));
+      request.add(utf8.encode(jsonEncode(payload)));
       final response = await request.close().timeout(
         const Duration(seconds: 60),
       );
