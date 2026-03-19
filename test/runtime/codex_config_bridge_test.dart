@@ -118,6 +118,45 @@ void main() {
       expect(content, contains('TEST = "value"'));
     });
 
+    test('configureManagedMcpServers preserves user MCP entries', () async {
+      final configFile = File('${tempDir.path}/config.toml');
+      await configFile.writeAsString('''
+[mcp_servers.user_server]
+command = "user-mcp"
+args = ["--stdio"]
+''');
+
+      await bridge.configureManagedMcpServers(
+        servers: const <CodexMcpServer>[
+          CodexMcpServer(
+            name: 'xworkmate_server',
+            command: 'xworkmate-mcp',
+            args: <String>['--port', '7777'],
+          ),
+        ],
+      );
+      await bridge.configureManagedMcpServers(
+        servers: const <CodexMcpServer>[
+          CodexMcpServer(
+            name: 'xworkmate_server',
+            command: 'xworkmate-mcp',
+            args: <String>['--port', '8888'],
+          ),
+        ],
+      );
+
+      final content = await configFile.readAsString();
+      expect(content, contains('[mcp_servers.user_server]'));
+      expect(content, contains('command = "user-mcp"'));
+      expect(content, contains('[mcp_servers.xworkmate_server]'));
+      expect(content, contains('"8888"'));
+      expect(
+        '# BEGIN XWORKMATE MANAGED MCP BLOCK'.allMatches(content).length,
+        1,
+      );
+      expect(content, isNot(contains('"7777"')));
+    });
+
     test('hasConfig returns correct value', () async {
       expect(await bridge.hasConfig(), isFalse);
 

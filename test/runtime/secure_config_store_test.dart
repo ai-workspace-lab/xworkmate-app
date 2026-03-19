@@ -129,6 +129,77 @@ void main() {
   );
 
   test(
+    'SecureConfigStore persists multi-agent settings without secrets in snapshot json',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-multi-agent-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final databasePath = '${tempDirectory.path}/settings.sqlite3';
+      final store = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+
+      final snapshot = SettingsSnapshot.defaults().copyWith(
+        multiAgent: MultiAgentConfig.defaults().copyWith(
+          enabled: true,
+          autoSync: false,
+          aiGatewayInjectionPolicy: AiGatewayInjectionPolicy.launchScoped,
+          architect: const AgentWorkerConfig(
+            role: MultiAgentRole.architect,
+            cliTool: 'gemini',
+            model: 'gemini-2.5-pro',
+            enabled: true,
+          ),
+          managedSkills: const <ManagedSkillEntry>[
+            ManagedSkillEntry(
+              key: 'calm_compact_workspace_system',
+              label: 'Calm Compact Workspace System',
+              source: '/Users/test/.codex/skills/calm_compact_workspace_system',
+              selected: true,
+            ),
+          ],
+          managedMcpServers: const <ManagedMcpServerEntry>[
+            ManagedMcpServerEntry(
+              id: 'xworkmate/gateway',
+              name: 'XWorkmate Gateway',
+              transport: 'stdio',
+              command: 'xworkmate-mcp',
+              url: '',
+              args: <String>['--stdio'],
+              envKeys: <String>[],
+              enabled: true,
+            ),
+          ],
+        ),
+      );
+
+      await store.saveSettingsSnapshot(snapshot);
+      final loadedSnapshot = await store.loadSettingsSnapshot();
+      final encoded = loadedSnapshot.toJsonString();
+
+      expect(loadedSnapshot.multiAgent.enabled, isTrue);
+      expect(loadedSnapshot.multiAgent.autoSync, isFalse);
+      expect(
+        loadedSnapshot.multiAgent.aiGatewayInjectionPolicy,
+        AiGatewayInjectionPolicy.launchScoped,
+      );
+      expect(loadedSnapshot.multiAgent.architect.model, 'gemini-2.5-pro');
+      expect(loadedSnapshot.multiAgent.managedSkills, hasLength(1));
+      expect(loadedSnapshot.multiAgent.managedMcpServers, hasLength(1));
+      expect(encoded, contains('"multiAgent"'));
+      expect(encoded, isNot(contains('ai-gateway-secret')));
+      expect(encoded, isNot(contains('gateway_token')));
+    },
+  );
+
+  test(
     'SecureConfigStore dispose closes sqlite handle and allows reopening the same database path',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});

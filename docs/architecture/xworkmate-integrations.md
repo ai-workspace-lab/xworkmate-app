@@ -2,44 +2,50 @@
 
 ## 概述
 
-XWorkmate 当前有三组独立但可组合的集成面：
+XWorkmate 现阶段的集成基线已经从“单一 Codex bridge”升级为“统一发现与分发中心”。App 负责发现、托管和分发三类协作资产：
 
-1. **OpenClaw Gateway**
-   - 设备配对
-   - Agent 列表与聊天
-   - `cron.list` 只读任务视图
-   - `memory/sync` 同步能力
-2. **AI Gateway**
-   - 统一模型入口
-   - 模型目录同步
-   - 给 Codex CLI 提供模型桥接
-3. **Code Agent Runtime**
-   - 当前唯一可交付路径是外部 `Codex CLI`
-   - 内置 Rust FFI 仍是 future work
-   - 所有 runtime 都挂在 `XWorkmate App node` 后面，而不是直接挂到 Gateway
+1. `skills`
+2. `MCP server list`
+3. `AI Gateway` 默认注入
 
-## 当前真实链路
+运行时上，XWorkmate 不再把 CLI 视为孤立工具，而是通过本地 broker 与编排层统一驱动 `OpenClaw / Codex / Claude / Gemini / OpenCode`。
+
+## 当前架构基线
 
 ```mermaid
 flowchart LR
-    X["XWorkmate App Node"] -->|JSON-RPC over stdio| C["Codex CLI"]
-    C -->|HTTP| A["AI Gateway"]
-    X -->|WebSocket RPC| G["OpenClaw Gateway"]
-    X -->|agent/register + chat.send metadata| G
+    X["XWorkmate App"] --> D["Discovery / Distribution Catalog"]
+    X --> B["MultiAgentBroker<br/>WebSocket JSON-RPC"]
+    X --> G["OpenClaw Gateway / Host"]
+    B --> O["MultiAgentOrchestrator"]
+    O --> C["Codex CLI"]
+    O --> L["Claude CLI"]
+    O --> M["Gemini CLI"]
+    O --> P["OpenCode CLI"]
+    C --> A["AI Gateway"]
+    L --> A
+    M --> A
+    P --> A
+    A --> OL["Ollama / Upstream Model Endpoints"]
 ```
 
 关键点：
 
-- `Codex CLI` 不直接连接 `OpenClaw Gateway`
-- `XWorkmate App` 是唯一的 cooperative node
-- 本地内置/扩展/外部 CLI 都是 node 后端 runtime
-- AI Gateway 与 OpenClaw Gateway 是两套不同职责的集成面
+- `XWorkmate App` 是唯一的 discovery / distribution center。
+- `MultiAgentBroker` 是多 CLI 协作的本地运行时入口。
+- `OpenClaw` 既是现有 Gateway 集成面，也是可被托管发现的宿主控制面。
+- `AI Gateway` 的语义是“XWorkmate 协作运行默认 provider”，不是用户全局 provider 替换器。
 
-## 1. OpenClaw Gateway
+## 1. OpenClaw Gateway / Host
 
-用途：运行时协同、响应返回和设备信任边界。
+用途：
 
-当前已用到的能力：
+- 运行时协同
+- 设备与信任边界
+- Agent / Session / Chat 通道
+- 宿主控制面发现
+
+已使用能力：
 
 - `health`
 - `status`
@@ -51,59 +57,87 @@ flowchart LR
 - `agent/register`
 - `memory/sync`
 
-当前产品边界：
+新的定位：
 
-- Scheduled Tasks 只读展示 `cron.list`
-- Memory 只暴露同步语义，不提供 CRUD UI
-- 远程模式必须保持 TLS 显式配置
-- Gateway 接收到的是来自 `XWorkmate App node` 的交互和 metadata，不是 CLI 直连 RPC
+- 继续作为 Gateway RPC 面存在。
+- 额外纳入“可挂载目标”集合。
+- 发现 `agents / skills / plugins` 状态，但不覆盖用户现有默认 agent。
 
 ## 2. AI Gateway
 
-用途：为外部 Codex CLI 提供统一模型桥接。
+用途：
 
-当前链路：
+- 统一模型入口
+- 作为 XWorkmate 协作运行的默认模型路由
+- 为外部 CLI 提供 launch-scoped 或托管 provider 注入
 
-1. 用户在设置中配置 AI Gateway URL、模型和 API Key。
-2. `CodexConfigBridge` 把配置写入 `~/.codex/config.toml`。
-3. 外部 `codex app-server` 通过该配置把推理请求转发到 AI Gateway。
+边界：
 
-这部分不负责：
+- 不负责设备配对
+- 不负责 session / agent 生命周期
+- 不替换用户现有默认 provider / model
 
-- 设备配对
-- 任务调度
-- Agent 注册
+当前策略：
 
-## 3. Code Agent Runtime
+- `Codex` 可以追加 `xworkmate` provider 托管块
+- `Claude / Gemini / OpenCode` 优先采用 launch-scoped 注入
+- Gateway 不可用时允许回退到 CLI 原有配置
 
-### 当前可用路径
+## 3. Multi-Agent Runtime
 
-- `RuntimeCoordinator`
-- `CodexRuntime.startStdio()`
-- `ExternalCodeAgentProvider`
-- `CodeAgentNodeOrchestrator`
+### 编排层
 
-已支持：
+`MultiAgentOrchestrator` 负责：
 
-- 显式启用 / 停用 bridge
-- 手动覆盖 Codex 二进制路径
-- Gateway 已连接时注册为 `code-agent-bridge`
-- `chat.send` 携带 node / provider / bridge dispatch metadata
-- 为未来其他外部 CLI 预留统一 provider contract
+- Architect 任务分析
+- Engineer 实现
+- Tester / Doc 审阅
+- 迭代评分与回退
 
-### 当前不可用路径
+### Broker 层
 
-Built-in Codex / Rust FFI 仍不可用。
+`MultiAgentBroker` 负责：
 
-现状：
+- 本地 `WebSocket JSON-RPC`
+- run lifecycle
+- worker CLI 启动
+- selected skills / MCP / Gateway 上下文注入
+- 结构化事件流回写当前会话
 
-- `builtIn` 只保留配置位
-- UI 只显示 `Experimental / Unavailable`
-- Rust FFI 核心 TODO 尚未补完
+### UI 接线
 
-## 4. 外部 Provider 预留
+- Assistant 继续复用现有 composer、附件、当前会话
+- Settings 继续复用现有 Multi-Agent 区块
+- 不新增独立任务页面
 
-当前统一 contract：
+## 4. 发现与分发
+
+XWorkmate 统一维护两类状态：
+
+- `managed`
+  - 由 App 创建与维护的托管项
+- `external`
+  - 外部已有配置或 CLI 自带配置
+
+统一规则：
+
+- 只更新 XWorkmate 托管项
+- 不删除外部已有项
+- 启动时与保存设置后自动 reconcile
+
+## 5. 挂载入口矩阵
+
+| 目标 | Skills 挂载入口 | MCP 挂载入口 | AI Gateway 挂载入口 |
+| --- | --- | --- | --- |
+| OpenClaw | 发现 `skills / plugins / agents`，broker 注入上下文 | 不作为 MCP 主挂载点 | XWorkmate 协作路径默认 route |
+| Codex | `AGENTS.md` / skill 上下文 / broker 注入 | `~/.codex/config.toml` 托管块 | `model_providers.xworkmate`，不替换用户默认 |
+| Claude | broker 注入 | `claude mcp list/add/remove` 发现与兼容 | 启动参数 / 环境注入 |
+| Gemini | broker 注入，后续可扩展 `extensions` | `gemini mcp list/add/remove` 发现与兼容 | 启动参数 / 环境注入 |
+| OpenCode | broker 注入，后续可扩展 agent preset | `~/.opencode/config.toml` 托管块 | 启动参数或托管 preset 注入 |
+
+## 6. 外部 Provider 与执行路径
+
+保留现有统一 contract：
 
 - `ExternalCodeAgentProvider.id`
 - `name`
@@ -112,30 +146,30 @@ Built-in Codex / Rust FFI 仍不可用。
 - `capabilities`
 - `CodeAgentNodeOrchestrator.buildGatewayDispatch()`
 
-当前 active provider：
+现状：
 
-- `codex`
+- `codex` 仍是当前最完整 provider
+- 其他 CLI 通过 `CliMountAdapter` 与 broker 接入
+- 多 provider 调度 UI 不是当前交付目标
 
-暂不实现：
-
-- provider 切换 UI
-- capability discovery UI
-- 多 provider 调度策略
-
-## 5. 安全边界
+## 7. 安全边界
 
 - `.env` 仅用于开发预填充，不自动连接，不作为持久化真值源
-- AI Gateway API Key 和 Gateway 凭证继续走 secure storage
-- 外部 Codex CLI 路径仅保存文件路径，不保存 secret
-- `chat.send` 的 node metadata 仅上传 node/provider 状态，不上传 Gateway secret 或本地 CLI 绝对路径
+- AI Gateway API Key 与 Gateway 凭证继续走 secure storage
+- 新增协作路径不得把 secret 写入 `SharedPreferences`
+- Launch-scoped 注入优先于全局配置改写
 - 远程 Gateway 不允许静默降级为非 TLS
+- 协作事件与 metadata 不上传本地 secret 或本机绝对路径
 
 ## 相关代码
 
 - `lib/app/app_controller.dart`
-- `lib/runtime/runtime_coordinator.dart`
-- `lib/runtime/codex_runtime.dart`
+- `lib/features/assistant/assistant_page.dart`
+- `lib/features/settings/settings_page.dart`
+- `lib/runtime/runtime_models.dart`
+- `lib/runtime/multi_agent_orchestrator.dart`
+- `lib/runtime/multi_agent_broker.dart`
+- `lib/runtime/multi_agent_mounts.dart`
 - `lib/runtime/codex_config_bridge.dart`
-- `lib/runtime/code_agent_node_orchestrator.dart`
-- `lib/runtime/agent_registry.dart`
-- `lib/runtime/gateway_runtime.dart`
+- `lib/runtime/opencode_config_bridge.dart`
+- `lib/runtime/runtime_coordinator.dart`

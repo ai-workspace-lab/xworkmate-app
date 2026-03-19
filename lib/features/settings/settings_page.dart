@@ -137,6 +137,11 @@ class _SettingsPageState extends State<SettingsPage> {
                   controller,
                   settings,
                 ),
+                SettingsTab.agents => _buildAgents(
+                  context,
+                  controller,
+                  settings,
+                ),
                 SettingsTab.appearance => _buildAppearance(context, controller),
                 SettingsTab.diagnostics => _buildDiagnostics(
                   context,
@@ -1261,6 +1266,397 @@ class _SettingsPageState extends State<SettingsPage> {
     ];
   }
 
+  List<Widget> _buildAgents(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
+    final orchestrator = controller.multiAgentOrchestrator;
+    final config = settings.multiAgent;
+    final theme = Theme.of(context);
+    final mountTargets = List<ManagedMountTargetState>.from(config.mountTargets)
+      ..sort(
+        (left, right) =>
+            left.label.toLowerCase().compareTo(right.label.toLowerCase()),
+      );
+    final managedSkillCount = config.managedSkills
+        .where((item) => item.selected)
+        .length;
+    final managedMcpCount = config.managedMcpServers
+        .where((item) => item.enabled)
+        .length;
+
+    return [
+      SurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        appText('多 Agent 协作', 'Multi-Agent Collaboration'),
+                        style: theme.textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        appText(
+                          '通过 Ollama 驱动多个 CLI 工具协同工作，实现 Architect → Engineer → Tester 的完整工作流。',
+                          'Orchestrate multiple CLI agents via Ollama for Architect → Engineer → Tester workflows.',
+                        ),
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+                _SwitchRow(
+                  label: appText('启用协作模式', 'Enable Collaboration'),
+                  value: config.enabled,
+                  onChanged: (value) => _saveMultiAgentConfig(
+                    controller,
+                    config.copyWith(enabled: value),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _InfoRow(label: 'Ollama', value: config.ollamaEndpoint),
+            _InfoRow(
+              label: appText('超时时间', 'Timeout'),
+              value: '${config.timeoutSeconds}s',
+            ),
+            _InfoRow(
+              label: appText('运行状态', 'Runtime'),
+              value: orchestrator.isRunning
+                  ? appText('协作执行中', 'Collaboration running')
+                  : config.enabled
+                  ? appText('已启用', 'Enabled')
+                  : appText('已停用', 'Disabled'),
+            ),
+          ],
+        ),
+      ),
+      SurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              appText('角色配置', 'Role Configuration'),
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            _AgentRoleCard(
+              title: '🎨 ${appText('Architect（调度者）', 'Architect (Scheduler)')}',
+              description: appText(
+                '负责任务分解、流程编排、宏观设计',
+                'Task decomposition, workflow orchestration, macro design',
+              ),
+              cliTool: config.architect.cliTool,
+              model: config.architect.model,
+              enabled: config.architect.enabled,
+              cliOptions: const ['gemini', 'claude', 'codex', 'opencode'],
+              modelOptions: const ['gemini-2.0-flash', 'gemini-2.5-pro'],
+              onCliChanged: (tool) => _saveMultiAgentConfig(
+                controller,
+                config.copyWith(
+                  architect: config.architect.copyWith(cliTool: tool),
+                ),
+              ),
+              onModelChanged: (model) => _saveMultiAgentConfig(
+                controller,
+                config.copyWith(
+                  architect: config.architect.copyWith(model: model),
+                ),
+              ),
+              onEnabledChanged: (enabled) => _saveMultiAgentConfig(
+                controller,
+                config.copyWith(
+                  architect: config.architect.copyWith(enabled: enabled),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _AgentRoleCard(
+              title: '🔧 ${appText('Engineer（工程师）', 'Engineer (Developer)')}',
+              description: appText(
+                '负责代码实现、重构、调试',
+                'Code implementation, refactoring, debugging',
+              ),
+              cliTool: config.engineer.cliTool,
+              model: config.engineer.model,
+              enabled: config.engineer.enabled,
+              cliOptions: const ['claude', 'codex', 'opencode'],
+              modelOptions: _getLocalModelOptions(settings),
+              onCliChanged: (tool) => _saveMultiAgentConfig(
+                controller,
+                config.copyWith(
+                  engineer: config.engineer.copyWith(cliTool: tool),
+                ),
+              ),
+              onModelChanged: (model) => _saveMultiAgentConfig(
+                controller,
+                config.copyWith(
+                  engineer: config.engineer.copyWith(model: model),
+                ),
+              ),
+              onEnabledChanged: (enabled) => _saveMultiAgentConfig(
+                controller,
+                config.copyWith(
+                  engineer: config.engineer.copyWith(enabled: enabled),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _AgentRoleCard(
+              title: '🔍 ${appText('Tester/Doc（评审）', 'Tester/Doc (Reviewer)')}',
+              description: appText(
+                '负责测试用例生成、代码审阅、文档撰写',
+                'Test generation, code review, documentation',
+              ),
+              cliTool: config.tester.cliTool,
+              model: config.tester.model,
+              enabled: config.tester.enabled,
+              cliOptions: const ['codex', 'claude', 'opencode'],
+              modelOptions: const [
+                'gpt-oss:20b',
+                'qwen2.5-coder:latest',
+                'glm-4.7-flash',
+              ],
+              onCliChanged: (tool) => _saveMultiAgentConfig(
+                controller,
+                config.copyWith(tester: config.tester.copyWith(cliTool: tool)),
+              ),
+              onModelChanged: (model) => _saveMultiAgentConfig(
+                controller,
+                config.copyWith(tester: config.tester.copyWith(model: model)),
+              ),
+              onEnabledChanged: (enabled) => _saveMultiAgentConfig(
+                controller,
+                config.copyWith(
+                  tester: config.tester.copyWith(enabled: enabled),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      SurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              appText('审阅策略', 'Review Strategy'),
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _EditableField(
+                    label: appText('最大迭代次数', 'Max Iterations'),
+                    value: config.maxIterations.toString(),
+                    onSubmitted: (value) {
+                      final parsed = int.tryParse(value.trim());
+                      if (parsed != null && parsed > 0) {
+                        _saveMultiAgentConfig(
+                          controller,
+                          config.copyWith(maxIterations: parsed),
+                        );
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _EditableField(
+                    label: appText('最低达标分数', 'Min Acceptable Score'),
+                    value: config.minAcceptableScore.toString(),
+                    onSubmitted: (value) {
+                      final parsed = int.tryParse(value.trim());
+                      if (parsed != null && parsed >= 1 && parsed <= 10) {
+                        _saveMultiAgentConfig(
+                          controller,
+                          config.copyWith(minAcceptableScore: parsed),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              appText(
+                '当 Tester 评分低于最低分数时，将进入迭代审阅循环。最多迭代指定次数。',
+                'When Tester score is below minimum, iteration loop runs until max iterations or score达标.',
+              ),
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+      SurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        appText('发现与分发', 'Discovery & Distribution'),
+                        style: theme.textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        appText(
+                          'App 作为统一发现与分发中心，维护托管 skills、MCP server list 和 AI Gateway 默认注入，但不会覆盖用户原有 CLI 配置。',
+                          'The app acts as the discovery and distribution center for managed skills, MCP server lists, and AI Gateway defaults without overwriting existing CLI config.',
+                        ),
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton(
+                  onPressed: () =>
+                      controller.refreshMultiAgentMounts(sync: config.autoSync),
+                  child: Text(appText('刷新挂载', 'Refresh Mounts')),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _SwitchRow(
+              label: appText('自动同步托管配置', 'Auto-sync managed config'),
+              value: config.autoSync,
+              onChanged: (value) => _saveMultiAgentConfig(
+                controller,
+                config.copyWith(autoSync: value),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              key: ValueKey(
+                'multi-agent-injection-${config.aiGatewayInjectionPolicy.name}',
+              ),
+              initialValue: config.aiGatewayInjectionPolicy.name,
+              decoration: InputDecoration(
+                labelText: appText('AI Gateway 注入策略', 'AI Gateway Injection'),
+              ),
+              items: AiGatewayInjectionPolicy.values
+                  .map(
+                    (policy) => DropdownMenuItem<String>(
+                      value: policy.name,
+                      child: Text(policy.label),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+                _saveMultiAgentConfig(
+                  controller,
+                  config.copyWith(
+                    aiGatewayInjectionPolicy:
+                        AiGatewayInjectionPolicyCopy.fromJsonValue(value),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            _InfoRow(
+              label: appText('托管 Skills', 'Managed Skills'),
+              value: '$managedSkillCount',
+            ),
+            _InfoRow(
+              label: appText('托管 MCP', 'Managed MCP'),
+              value: '$managedMcpCount',
+            ),
+            const SizedBox(height: 16),
+            ...mountTargets.map(
+              (target) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _MountTargetCard(target: target),
+              ),
+            ),
+          ],
+        ),
+      ),
+      SurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              appText('协作流程概览', 'Workflow Overview'),
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            _WorkflowStep(
+              label: '1',
+              emoji: '🎨',
+              title: 'Architect',
+              desc: appText(
+                '分析需求，分解任务',
+                'Analyze requirements, decompose tasks',
+              ),
+            ),
+            _WorkflowStep(
+              label: '2',
+              emoji: '🔧',
+              title: 'Engineer',
+              desc: appText('接收任务，实现代码', 'Receive tasks, implement code'),
+            ),
+            _WorkflowStep(
+              label: '3',
+              emoji: '🔍',
+              title: 'Tester',
+              desc: appText('审阅代码，生成测试', 'Review code, generate tests'),
+            ),
+            _WorkflowStep(
+              label: '↻',
+              emoji: '🔄',
+              title: appText('迭代（如需要）', 'Iterate (if needed)'),
+              desc: appText(
+                'Engineer 修复 → Tester 重新审阅',
+                'Engineer fixes → Tester re-reviews',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              appText(
+                '所有本地模型通过 Ollama（默认 http://127.0.0.1:11434）驱动，无需 API 密钥即可运行。',
+                'All local models powered by Ollama (default http://127.0.0.1:11434), no API key required.',
+              ),
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  List<String> _getLocalModelOptions(SettingsSnapshot settings) {
+    // 从 ollamaLocal 配置中获取可用模型
+    final defaultModel = settings.ollamaLocal.defaultModel;
+    if (defaultModel.isNotEmpty) {
+      return [
+        defaultModel,
+        'qwen2.5-coder:latest',
+        'gpt-oss:20b',
+        'glm-4.7-flash',
+      ];
+    }
+    return const ['qwen2.5-coder:latest', 'gpt-oss:20b', 'glm-4.7-flash'];
+  }
+
   List<Widget> _buildExperimental(
     BuildContext context,
     AppController controller,
@@ -1341,6 +1737,13 @@ class _SettingsPageState extends State<SettingsPage> {
     SettingsSnapshot snapshot,
   ) {
     return controller.saveSettings(snapshot);
+  }
+
+  Future<void> _saveMultiAgentConfig(
+    AppController controller,
+    MultiAgentConfig config,
+  ) {
+    return controller.saveMultiAgentConfig(config);
   }
 
   AiGatewayProfile _buildAiGatewayDraft(SettingsSnapshot settings) {
@@ -2243,6 +2646,72 @@ class _SwitchRow extends StatelessWidget {
   }
 }
 
+class _MountTargetCard extends StatelessWidget {
+  const _MountTargetCard({required this.target});
+
+  final ManagedMountTargetState target;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final statusColor = target.available
+        ? theme.colorScheme.primary
+        : theme.colorScheme.outline;
+    final summary = <String>[
+      '${appText('发现', 'Discovery')}: ${target.discoveryState}',
+      '${appText('同步', 'Sync')}: ${target.syncState}',
+      if (target.supportsSkills)
+        '${appText('技能', 'Skills')}: ${target.discoveredSkillCount}',
+      if (target.supportsMcp)
+        '${appText('MCP', 'MCP')}: ${target.discoveredMcpCount}',
+      if (target.supportsMcp)
+        '${appText('托管', 'Managed')}: ${target.managedMcpCount}',
+    ];
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(target.label, style: theme.textTheme.titleMedium),
+                ),
+                Text(
+                  target.available
+                      ? appText('可用', 'Available')
+                      : appText('未安装', 'Missing'),
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(summary.join(' · '), style: theme.textTheme.bodySmall),
+            if (target.detail.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(target.detail, style: theme.textTheme.bodyMedium),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _AiGatewayFeedbackTheme {
   const _AiGatewayFeedbackTheme({
     required this.background,
@@ -2298,6 +2767,190 @@ class _InfoRow extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           Expanded(child: SelectableText(value)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Agent 角色配置卡片
+class _AgentRoleCard extends StatelessWidget {
+  const _AgentRoleCard({
+    required this.title,
+    required this.description,
+    required this.cliTool,
+    required this.model,
+    required this.enabled,
+    required this.cliOptions,
+    required this.modelOptions,
+    required this.onCliChanged,
+    required this.onModelChanged,
+    required this.onEnabledChanged,
+  });
+
+  final String title;
+  final String description;
+  final String cliTool;
+  final String model;
+  final bool enabled;
+  final List<String> cliOptions;
+  final List<String> modelOptions;
+  final ValueChanged<String> onCliChanged;
+  final ValueChanged<String> onModelChanged;
+  final ValueChanged<bool> onEnabledChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.dividerColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 4),
+                    Text(description, style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              if (cliOptions.length > 1)
+                _SwitchRow(
+                  label: appText('启用', 'Enabled'),
+                  value: enabled,
+                  onChanged: onEnabledChanged,
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('CLI', style: theme.textTheme.labelMedium),
+                    const SizedBox(height: 4),
+                    DropdownButtonFormField<String>(
+                      initialValue: cliOptions.contains(cliTool)
+                          ? cliTool
+                          : cliOptions.first,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                      items: cliOptions
+                          .map(
+                            (t) => DropdownMenuItem(value: t, child: Text(t)),
+                          )
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) onCliChanged(v);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      appText('模型', 'Model'),
+                      style: theme.textTheme.labelMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    DropdownButtonFormField<String>(
+                      initialValue: modelOptions.contains(model)
+                          ? model
+                          : modelOptions.first,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                      items: modelOptions
+                          .map(
+                            (m) => DropdownMenuItem(
+                              value: m,
+                              child: Text(m, overflow: TextOverflow.ellipsis),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) onModelChanged(v);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 工作流步骤展示
+class _WorkflowStep extends StatelessWidget {
+  const _WorkflowStep({
+    required this.label,
+    required this.emoji,
+    required this.title,
+    required this.desc,
+  });
+
+  final String label;
+  final String emoji;
+  final String title;
+  final String desc;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: theme.colorScheme.primaryContainer,
+            ),
+            child: Text(label, style: theme.textTheme.labelSmall),
+          ),
+          const SizedBox(width: 12),
+          Text(emoji, style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.labelLarge),
+                Text(desc, style: theme.textTheme.bodySmall),
+              ],
+            ),
+          ),
         ],
       ),
     );
