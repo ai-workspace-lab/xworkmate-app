@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -8,6 +9,7 @@ import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
+import '../../runtime/multi_agent_orchestrator.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
@@ -574,12 +576,30 @@ class _AssistantPageState extends State<AssistantPage> {
       );
     });
 
-    final attachmentPayloads = await _buildAttachmentPayloads(_attachments);
-    await controller.sendChatMessage(
-      prompt,
-      thinking: _thinkingLabel,
-      attachments: attachmentPayloads,
-    );
+    if (controller.settings.multiAgent.enabled) {
+      final collaborationAttachments = _attachments
+          .map(
+            (item) => CollaborationAttachment(
+              name: item.name,
+              description: item.mimeType,
+              path: item.path,
+            ),
+          )
+          .toList(growable: false);
+      await controller.runMultiAgentCollaboration(
+        rawPrompt: rawPrompt,
+        composedPrompt: prompt,
+        attachments: collaborationAttachments,
+        selectedSkillLabels: selectedSkillLabels,
+      );
+    } else {
+      final attachmentPayloads = await _buildAttachmentPayloads(_attachments);
+      await controller.sendChatMessage(
+        prompt,
+        thinking: _thinkingLabel,
+        attachments: attachmentPayloads,
+      );
+    }
 
     if (!mounted) {
       return;
@@ -2082,6 +2102,39 @@ class _ComposerBar extends StatelessWidget {
                     horizontal: 10,
                     vertical: 6,
                   ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Tooltip(
+                message: appText(
+                  '多 Agent 协作模式（Architect → Engineer → Tester）',
+                  'Multi-Agent Collaboration Mode (Architect → Engineer → Tester)',
+                ),
+                child: AnimatedBuilder(
+                  animation: controller.multiAgentOrchestrator,
+                  builder: (context, _) {
+                    final collab = controller.multiAgentOrchestrator;
+                    final enabled = collab.config.enabled;
+                    return IconButton(
+                      key: const Key('assistant-collaboration-toggle'),
+                      icon: Icon(
+                        enabled
+                            ? Icons.auto_awesome
+                            : Icons.auto_awesome_outlined,
+                        size: 20,
+                        color: enabled ? Colors.orange : null,
+                      ),
+                      onPressed:
+                          collab.isRunning || controller.isMultiAgentRunPending
+                          ? null
+                          : () => unawaited(
+                              controller.saveMultiAgentConfig(
+                                collab.config.copyWith(enabled: !enabled),
+                              ),
+                            ),
+                      splashRadius: 18,
+                    );
+                  },
                 ),
               ),
             ],

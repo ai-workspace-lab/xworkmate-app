@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -19,6 +20,9 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
+import '../runtime/multi_agent_broker.dart';
+import '../runtime/multi_agent_mounts.dart';
+import '../runtime/multi_agent_orchestrator.dart';
 
 enum CodexCooperationState { notStarted, bridgeOnly, registered }
 
@@ -62,6 +66,11 @@ class AppController extends ChangeNotifier {
     _tasksController = DerivedTasksController();
     _desktopPlatformService =
         desktopPlatformService ?? createDesktopPlatformService();
+    _multiAgentMountManager = MultiAgentMountManager();
+    _multiAgentOrchestrator = MultiAgentOrchestrator(
+      config: _resolveMultiAgentConfig(_settingsController.snapshot),
+    );
+
     _attachChildListeners();
     unawaited(_initialize());
   }
@@ -83,6 +92,14 @@ class AppController extends ChangeNotifier {
   late final DevicesController _devicesController;
   late final DerivedTasksController _tasksController;
   late final DesktopPlatformService _desktopPlatformService;
+  late final MultiAgentMountManager _multiAgentMountManager;
+  late final MultiAgentOrchestrator _multiAgentOrchestrator;
+  MultiAgentBrokerServer? _multiAgentBrokerServer;
+  MultiAgentBrokerClient? _multiAgentBrokerClient;
+  final Map<String, List<GatewayChatMessage>> _localSessionMessages =
+      <String, List<GatewayChatMessage>>{};
+  bool _multiAgentRunPending = false;
+  int _localMessageCounter = 0;
 
   WorkspaceDestination _destination = WorkspaceDestination.assistant;
   ThemeMode _themeMode = ThemeMode.light;
@@ -116,6 +133,7 @@ class AppController extends ChangeNotifier {
   SettingsController get settingsController => _settingsController;
   GatewayAgentsController get agentsController => _agentsController;
   GatewaySessionsController get sessionsController => _sessionsController;
+  MultiAgentOrchestrator get multiAgentOrchestrator => _multiAgentOrchestrator;
   GatewayChatController get chatController => _chatController;
   InstancesController get instancesController => _instancesController;
   SkillsController get skillsController => _skillsController;
@@ -170,10 +188,140 @@ class AppController extends ChangeNotifier {
   CodeAgentRuntimeMode get effectiveCodeAgentRuntimeMode =>
       configuredCodeAgentRuntimeMode;
   CodexCooperationState get codexCooperationState => _codexCooperationState;
+  bool get isMultiAgentRunPending => _multiAgentRunPending;
   bool _desktopPlatformBusy = false;
 
   Future<String> loadAiGatewayApiKey() async {
     return (await _store.loadAiGatewayApiKey())?.trim() ?? '';
+  }
+
+  Future<void> saveMultiAgentConfig(MultiAgentConfig config) async {
+    final resolved = _resolveMultiAgentConfig(
+      settings.copyWith(multiAgent: config),
+    );
+    await saveSettings(
+      settings.copyWith(multiAgent: resolved),
+      refreshAfterSave: false,
+    );
+    await refreshMultiAgentMounts(sync: resolved.autoSync);
+  }
+
+  Future<void> refreshMultiAgentMounts({bool sync = false}) async {
+    final resolved = _resolveMultiAgentConfig(settings);
+    final reconciled = await _multiAgentMountManager.reconcile(
+      config: sync ? resolved : resolved.copyWith(autoSync: false),
+      aiGatewayUrl: aiGatewayUrl,
+    );
+    if (jsonEncode(reconciled.toJson()) !=
+        jsonEncode(settings.multiAgent.toJson())) {
+      await _settingsController.saveSnapshot(
+        settings.copyWith(multiAgent: reconciled),
+      );
+    }
+    _multiAgentOrchestrator.updateConfig(reconciled);
+    _notifyIfActive();
+  }
+
+  Future<void> runMultiAgentCollaboration({
+    required String rawPrompt,
+    required String composedPrompt,
+    required List<CollaborationAttachment> attachments,
+    required List<String> selectedSkillLabels,
+  }) async {
+    final sessionKey = currentSessionKey.trim().isEmpty
+        ? 'main'
+        : currentSessionKey;
+    final client = await _ensureMultiAgentBrokerClient();
+    final aiGatewayApiKey = await loadAiGatewayApiKey();
+    _multiAgentRunPending = true;
+    _appendLocalSessionMessage(
+      sessionKey,
+      GatewayChatMessage(
+        id: _nextLocalMessageId(),
+        role: 'user',
+        text: rawPrompt,
+        timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        toolCallId: null,
+        toolName: null,
+        stopReason: null,
+        pending: false,
+        error: false,
+      ),
+    );
+    _recomputeTasks();
+    try {
+      await for (final event in client.runTask(
+        taskPrompt: composedPrompt,
+        workingDirectory:
+            _resolveCodexWorkingDirectory() ?? Directory.current.path,
+        attachments: attachments,
+        selectedSkills: selectedSkillLabels,
+        aiGatewayBaseUrl: aiGatewayUrl,
+        aiGatewayApiKey: aiGatewayApiKey,
+      )) {
+        if (event.type == 'result') {
+          final success = event.data['success'] == true;
+          final finalScore = event.data['finalScore'];
+          final iterations = event.data['iterations'];
+          _appendLocalSessionMessage(
+            sessionKey,
+            GatewayChatMessage(
+              id: _nextLocalMessageId(),
+              role: 'assistant',
+              text: success
+                  ? appText(
+                      '多 Agent 协作完成，评分 ${finalScore ?? '-'}，迭代 ${iterations ?? 0} 次。',
+                      'Multi-agent collaboration completed with score ${finalScore ?? '-'} after ${iterations ?? 0} iteration(s).',
+                    )
+                  : appText(
+                      '多 Agent 协作失败：${event.data['error'] ?? event.message}',
+                      'Multi-agent collaboration failed: ${event.data['error'] ?? event.message}',
+                    ),
+              timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+              toolCallId: null,
+              toolName: null,
+              stopReason: null,
+              pending: false,
+              error: !success,
+            ),
+          );
+          continue;
+        }
+        _appendLocalSessionMessage(
+          sessionKey,
+          GatewayChatMessage(
+            id: _nextLocalMessageId(),
+            role: 'assistant',
+            text: event.message,
+            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            toolCallId: null,
+            toolName: event.title,
+            stopReason: null,
+            pending: event.pending,
+            error: event.error,
+          ),
+        );
+      }
+    } catch (error) {
+      _appendLocalSessionMessage(
+        sessionKey,
+        GatewayChatMessage(
+          id: _nextLocalMessageId(),
+          role: 'assistant',
+          text: error.toString(),
+          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          toolCallId: null,
+          toolName: 'Multi-Agent',
+          stopReason: null,
+          pending: false,
+          error: true,
+        ),
+      );
+    } finally {
+      _multiAgentRunPending = false;
+      _recomputeTasks();
+      _notifyIfActive();
+    }
   }
 
   Future<void> openOnlineWorkspace() async {
@@ -256,6 +404,11 @@ class AppController extends ChangeNotifier {
 
   List<GatewayChatMessage> get chatMessages {
     final items = List<GatewayChatMessage>.from(_chatController.messages);
+    final localItems =
+        _localSessionMessages[_sessionsController.currentSessionKey];
+    if (localItems != null && localItems.isNotEmpty) {
+      items.addAll(localItems);
+    }
     final streaming = _chatController.streamingAssistantText?.trim() ?? '';
     if (streaming.isNotEmpty) {
       items.add(
@@ -670,9 +823,12 @@ class AppController extends ChangeNotifier {
     bool refreshAfterSave = true,
   }) async {
     final current = settings;
-    final sanitized = _sanitizeCodeAgentSettings(snapshot);
+    final sanitized = _sanitizeMultiAgentSettings(
+      _sanitizeCodeAgentSettings(snapshot),
+    );
     setActiveAppLanguage(sanitized.appLanguage);
     await _settingsController.saveSnapshot(sanitized);
+    _multiAgentOrchestrator.updateConfig(sanitized.multiAgent);
     _agentsController.restoreSelection(sanitized.gateway.selectedAgentId);
     _modelsController.restoreFromSettings(sanitized.aiGateway);
     if (current.codexCliPath != sanitized.codexCliPath ||
@@ -689,6 +845,7 @@ class AppController extends ChangeNotifier {
     if (refreshAfterSave) {
       _recomputeTasks();
     }
+    unawaited(refreshMultiAgentMounts(sync: sanitized.multiAgent.autoSync));
     notifyListeners();
   }
 
@@ -897,6 +1054,7 @@ class AppController extends ChangeNotifier {
     _tasksController.dispose();
     _store.dispose();
     _desktopPlatformService.dispose();
+    unawaited(_multiAgentBrokerServer?.stop() ?? Future<void>.value());
     super.dispose();
   }
 
@@ -920,8 +1078,8 @@ class AppController extends ChangeNotifier {
           return;
         }
       }
-      final normalized = _sanitizeCodeAgentSettings(
-        _settingsController.snapshot,
+      final normalized = _sanitizeMultiAgentSettings(
+        _sanitizeCodeAgentSettings(_settingsController.snapshot),
       );
       if (normalized.toJsonString() !=
           _settingsController.snapshot.toJsonString()) {
@@ -931,6 +1089,7 @@ class AppController extends ChangeNotifier {
         }
       }
       _modelsController.restoreFromSettings(settings.aiGateway);
+      _multiAgentOrchestrator.updateConfig(settings.multiAgent);
       setActiveAppLanguage(settings.appLanguage);
       await _desktopPlatformService.initialize(settings.linuxDesktop);
       await _desktopPlatformService.setLaunchAtLogin(settings.launchAtLogin);
@@ -958,6 +1117,7 @@ class AppController extends ChangeNotifier {
           // Keep the shell usable when auto-connect fails.
         }
       }
+      await refreshMultiAgentMounts(sync: settings.multiAgent.autoSync);
     } catch (error) {
       if (_disposed) {
         return;
@@ -1015,6 +1175,71 @@ class AppController extends ChangeNotifier {
         event.event == 'device.pair.resolved') {
       unawaited(refreshDevices(quiet: true));
     }
+  }
+
+  SettingsSnapshot _sanitizeMultiAgentSettings(SettingsSnapshot snapshot) {
+    final resolved = _resolveMultiAgentConfig(snapshot);
+    if (jsonEncode(snapshot.multiAgent.toJson()) ==
+        jsonEncode(resolved.toJson())) {
+      return snapshot;
+    }
+    return snapshot.copyWith(multiAgent: resolved);
+  }
+
+  MultiAgentConfig _resolveMultiAgentConfig(SettingsSnapshot snapshot) {
+    final defaults = MultiAgentConfig.defaults();
+    final current = snapshot.multiAgent;
+    final ollamaEndpoint = snapshot.ollamaLocal.endpoint.trim().isEmpty
+        ? current.ollamaEndpoint
+        : snapshot.ollamaLocal.endpoint.trim();
+    final engineerModel = current.engineer.model.trim().isNotEmpty
+        ? current.engineer.model.trim()
+        : snapshot.ollamaLocal.defaultModel.trim().isNotEmpty
+        ? snapshot.ollamaLocal.defaultModel.trim()
+        : defaults.engineer.model;
+    final architectModel = current.architect.model.trim().isNotEmpty
+        ? current.architect.model.trim()
+        : defaults.architect.model;
+    final testerModel = current.tester.model.trim().isNotEmpty
+        ? current.tester.model.trim()
+        : defaults.tester.model;
+    return current.copyWith(
+      ollamaEndpoint: ollamaEndpoint,
+      architect: current.architect.copyWith(model: architectModel),
+      engineer: current.engineer.copyWith(model: engineerModel),
+      tester: current.tester.copyWith(model: testerModel),
+      mountTargets: current.mountTargets.isEmpty
+          ? MultiAgentConfig.defaults().mountTargets
+          : current.mountTargets,
+    );
+  }
+
+  Future<MultiAgentBrokerClient> _ensureMultiAgentBrokerClient() async {
+    _multiAgentBrokerServer ??= MultiAgentBrokerServer(_multiAgentOrchestrator);
+    await _multiAgentBrokerServer!.start();
+    final uri = _multiAgentBrokerServer!.wsUri;
+    if (uri == null) {
+      throw StateError('Multi-agent broker is unavailable');
+    }
+    _multiAgentBrokerClient = MultiAgentBrokerClient(uri);
+    return _multiAgentBrokerClient!;
+  }
+
+  void _appendLocalSessionMessage(
+    String sessionKey,
+    GatewayChatMessage message,
+  ) {
+    final key = sessionKey.trim().isEmpty ? 'main' : sessionKey.trim();
+    final next = List<GatewayChatMessage>.from(
+      _localSessionMessages[key] ?? const <GatewayChatMessage>[],
+    )..add(message);
+    _localSessionMessages[key] = next;
+    _notifyIfActive();
+  }
+
+  String _nextLocalMessageId() {
+    _localMessageCounter += 1;
+    return 'local-${DateTime.now().microsecondsSinceEpoch}-$_localMessageCounter';
   }
 
   SettingsSnapshot _sanitizeCodeAgentSettings(SettingsSnapshot snapshot) {
@@ -1179,7 +1404,7 @@ class AppController extends ChangeNotifier {
       sessions: _sessionsController.sessions,
       cronJobs: _cronJobsController.items,
       currentSessionKey: _sessionsController.currentSessionKey,
-      hasPendingRun: _chatController.hasPendingRun,
+      hasPendingRun: _chatController.hasPendingRun || _multiAgentRunPending,
       activeAgentName: _agentsController.activeAgentName,
     );
   }
@@ -1197,6 +1422,7 @@ class AppController extends ChangeNotifier {
     _cronJobsController.addListener(_relayChildChange);
     _devicesController.addListener(_relayChildChange);
     _tasksController.addListener(_relayChildChange);
+    _multiAgentOrchestrator.addListener(_relayChildChange);
   }
 
   void _detachChildListeners() {
@@ -1212,6 +1438,7 @@ class AppController extends ChangeNotifier {
     _cronJobsController.removeListener(_relayChildChange);
     _devicesController.removeListener(_relayChildChange);
     _tasksController.removeListener(_relayChildChange);
+    _multiAgentOrchestrator.removeListener(_relayChildChange);
   }
 
   void _relayChildChange() {
