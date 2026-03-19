@@ -17,7 +17,12 @@ class DetailDrawer extends StatelessWidget {
 
     return Container(
       width: 360,
-      margin: const EdgeInsets.fromLTRB(0, AppSpacing.lg, AppSpacing.lg, AppSpacing.lg),
+      margin: const EdgeInsets.fromLTRB(
+        0,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+      ),
       decoration: BoxDecoration(
         color: palette.surfacePrimary,
         borderRadius: BorderRadius.circular(AppRadius.dialog),
@@ -47,7 +52,12 @@ class DetailSheet extends StatelessWidget {
     final mediaQuery = MediaQuery.of(context);
 
     return Container(
-      margin: EdgeInsets.fromLTRB(AppSpacing.sm, mediaQuery.padding.top + AppSpacing.sm, AppSpacing.sm, AppSpacing.sm),
+      margin: EdgeInsets.fromLTRB(
+        AppSpacing.sm,
+        mediaQuery.padding.top + AppSpacing.sm,
+        AppSpacing.sm,
+        AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
         color: palette.surfacePrimary,
         borderRadius: BorderRadius.circular(AppRadius.dialog),
@@ -94,8 +104,7 @@ class _DetailPanelContent extends StatelessWidget {
                   children: [
                     Text(data.title, style: theme.textTheme.headlineSmall),
                     const SizedBox(height: AppSpacing.xxs),
-                    if (data.status != null)
-                      StatusBadge(status: data.status!, compact: true),
+                    StatusBadge(status: data.status, compact: true),
                   ],
                 ),
               ),
@@ -113,17 +122,19 @@ class _DetailPanelContent extends StatelessWidget {
           ),
         ),
         Divider(height: 1, color: palette.strokeSoft),
-        if (data.subtitle != null && data.subtitle!.isNotEmpty)
+        if (data.subtitle.isNotEmpty)
           Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
-            child: Text(
-              data.subtitle!,
-              style: theme.textTheme.bodySmall,
-            ),
+            child: Text(data.subtitle, style: theme.textTheme.bodySmall),
           ),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              0,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
             children: [
               if (data.description.isNotEmpty)
                 Text(data.description, style: theme.textTheme.bodyMedium),
@@ -134,7 +145,10 @@ class _DetailPanelContent extends StatelessWidget {
                   runSpacing: AppSpacing.xxs,
                   children: data.meta.map((item) {
                     return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                        vertical: AppSpacing.xxs,
+                      ),
                       decoration: BoxDecoration(
                         color: palette.surfaceSecondary,
                         borderRadius: BorderRadius.circular(AppRadius.badge),
@@ -155,10 +169,7 @@ class _DetailPanelContent extends StatelessWidget {
                   spacing: AppSpacing.xs,
                   runSpacing: AppSpacing.xs,
                   children: data.actions.map((action) {
-                    return TextButton(
-                      onPressed: () {},
-                      child: Text(action),
-                    );
+                    return TextButton(onPressed: () {}, child: Text(action));
                   }).toList(),
                 ),
               ],
@@ -212,10 +223,7 @@ class _DetailSection extends StatelessWidget {
                   ),
                 ),
                 Expanded(
-                  child: Text(
-                    item.value,
-                    style: theme.textTheme.bodyMedium,
-                  ),
+                  child: Text(item.value, style: theme.textTheme.bodyMedium),
                 ),
               ],
             ),

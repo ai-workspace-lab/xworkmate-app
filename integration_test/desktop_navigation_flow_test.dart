@@ -14,17 +14,23 @@ void main() {
 
   setUp(resetIntegrationPreferences);
 
-  testWidgets('desktop shell navigates across primary surfaces', (
+  testWidgets('desktop shell opens focused navigation surface', (
     WidgetTester tester,
   ) async {
     await pumpDesktopApp(tester);
 
     expect(_textEither('新对话', 'New conversation'), findsWidgets);
-    await tester.tap(find.byKey(const Key('assistant-side-pane-tab-navigation')));
+    await tester.tap(
+      find.byKey(const Key('assistant-side-pane-tab-navigation')),
+    );
     await settleIntegrationUi(tester);
     expect(
       find.byKey(const Key('assistant-focus-panel-title')),
       findsOneWidget,
     );
+    expect(_textEither('设置', 'Settings'), findsWidgets);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await settleIntegrationUi(tester);
   });
 }

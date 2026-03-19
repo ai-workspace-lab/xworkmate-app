@@ -1,11 +1,9 @@
-/// FFI bindings for Codex CLI integration.
-///
-/// These bindings provide direct access to the native Rust library.
-library codex_ffi_bindings;
+// FFI bindings for Codex CLI integration.
+//
+// These bindings provide direct access to the native Rust library.
 
 import 'dart:ffi';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
@@ -70,34 +68,53 @@ final class ThreadHandleFFI extends Struct {
 typedef _CodexInitNative = Int32 Function();
 typedef _CodexInitDart = int Function();
 
-typedef _CodexRuntimeCreateNative = Pointer<CodexRuntime> Function(
-    Pointer<CodexConfigFFI> config);
-typedef _CodexRuntimeCreateDart = Pointer<CodexRuntime> Function(
-    Pointer<CodexConfigFFI> config);
+typedef _CodexRuntimeCreateNative =
+    Pointer<CodexRuntime> Function(Pointer<CodexConfigFFI> config);
+typedef _CodexRuntimeCreateDart =
+    Pointer<CodexRuntime> Function(Pointer<CodexConfigFFI> config);
 
-typedef _CodexRuntimeDestroyNative = Void Function(Pointer<CodexRuntime> runtime);
+typedef _CodexRuntimeDestroyNative =
+    Void Function(Pointer<CodexRuntime> runtime);
 typedef _CodexRuntimeDestroyDart = void Function(Pointer<CodexRuntime> runtime);
 
-typedef _CodexStartThreadNative = ThreadHandleFFI Function(
-    Pointer<CodexRuntime> runtime, Pointer<Utf8> cwd);
-typedef _CodexStartThreadDart = ThreadHandleFFI Function(
-    Pointer<CodexRuntime> runtime, Pointer<Utf8> cwd);
+typedef _CodexStartThreadNative =
+    ThreadHandleFFI Function(Pointer<CodexRuntime> runtime, Pointer<Utf8> cwd);
+typedef _CodexStartThreadDart =
+    ThreadHandleFFI Function(Pointer<CodexRuntime> runtime, Pointer<Utf8> cwd);
 
-typedef _CodexSendMessageNative = Int32 Function(
-    Pointer<CodexRuntime> runtime, ThreadHandleFFI thread, Pointer<Utf8> message);
-typedef _CodexSendMessageDart = int Function(
-    Pointer<CodexRuntime> runtime, ThreadHandleFFI thread, Pointer<Utf8> message);
+typedef _CodexSendMessageNative =
+    Int32 Function(
+      Pointer<CodexRuntime> runtime,
+      ThreadHandleFFI thread,
+      Pointer<Utf8> message,
+    );
+typedef _CodexSendMessageDart =
+    int Function(
+      Pointer<CodexRuntime> runtime,
+      ThreadHandleFFI thread,
+      Pointer<Utf8> message,
+    );
 
-typedef _CodexPollEventsNative = UintPtr Function(
-    Pointer<CodexRuntime> runtime, Pointer<CodexEventFFI> events, UintPtr maxEvents);
-typedef _CodexPollEventsDart = int Function(
-    Pointer<CodexRuntime> runtime, Pointer<CodexEventFFI> events, int maxEvents);
+typedef _CodexPollEventsNative =
+    UintPtr Function(
+      Pointer<CodexRuntime> runtime,
+      Pointer<CodexEventFFI> events,
+      UintPtr maxEvents,
+    );
+typedef _CodexPollEventsDart =
+    int Function(
+      Pointer<CodexRuntime> runtime,
+      Pointer<CodexEventFFI> events,
+      int maxEvents,
+    );
 
 typedef _CodexShutdownNative = Int32 Function(Pointer<CodexRuntime> runtime);
 typedef _CodexShutdownDart = int Function(Pointer<CodexRuntime> runtime);
 
-typedef _CodexLastErrorNative = Pointer<Utf8> Function(Pointer<CodexRuntime> runtime);
-typedef _CodexLastErrorDart = Pointer<Utf8> Function(Pointer<CodexRuntime> runtime);
+typedef _CodexLastErrorNative =
+    Pointer<Utf8> Function(Pointer<CodexRuntime> runtime);
+typedef _CodexLastErrorDart =
+    Pointer<Utf8> Function(Pointer<CodexRuntime> runtime);
 
 // Opaque runtime type
 final class CodexRuntime extends Opaque {}
@@ -122,20 +139,33 @@ class CodexFFIBindings {
 
   CodexFFIBindings() : _lib = _loadLibrary() {
     _init = _lib.lookupFunction<_CodexInitNative, _CodexInitDart>('codex_init');
-    _runtimeCreate = _lib.lookupFunction<_CodexRuntimeCreateNative, _CodexRuntimeCreateDart>(
-        'codex_runtime_create');
-    _runtimeDestroy = _lib.lookupFunction<_CodexRuntimeDestroyNative, _CodexRuntimeDestroyDart>(
-        'codex_runtime_destroy');
-    _startThread = _lib.lookupFunction<_CodexStartThreadNative, _CodexStartThreadDart>(
-        'codex_start_thread');
-    _sendMessage = _lib.lookupFunction<_CodexSendMessageNative, _CodexSendMessageDart>(
-        'codex_send_message');
-    _pollEvents = _lib.lookupFunction<_CodexPollEventsNative, _CodexPollEventsDart>(
-        'codex_poll_events');
+    _runtimeCreate = _lib
+        .lookupFunction<_CodexRuntimeCreateNative, _CodexRuntimeCreateDart>(
+          'codex_runtime_create',
+        );
+    _runtimeDestroy = _lib
+        .lookupFunction<_CodexRuntimeDestroyNative, _CodexRuntimeDestroyDart>(
+          'codex_runtime_destroy',
+        );
+    _startThread = _lib
+        .lookupFunction<_CodexStartThreadNative, _CodexStartThreadDart>(
+          'codex_start_thread',
+        );
+    _sendMessage = _lib
+        .lookupFunction<_CodexSendMessageNative, _CodexSendMessageDart>(
+          'codex_send_message',
+        );
+    _pollEvents = _lib
+        .lookupFunction<_CodexPollEventsNative, _CodexPollEventsDart>(
+          'codex_poll_events',
+        );
     _shutdown = _lib.lookupFunction<_CodexShutdownNative, _CodexShutdownDart>(
-        'codex_shutdown');
-    _lastError = _lib.lookupFunction<_CodexLastErrorNative, _CodexLastErrorDart>(
-        'codex_last_error');
+      'codex_shutdown',
+    );
+    _lastError = _lib
+        .lookupFunction<_CodexLastErrorNative, _CodexLastErrorDart>(
+          'codex_last_error',
+        );
   }
 
   static DynamicLibrary _loadLibrary() {
@@ -254,7 +284,8 @@ class CodexFFIBindings {
   Pointer<CodexConfigFFI> _createConfigFFI(CodexConfig config) {
     final ptr = calloc<CodexConfigFFI>();
     ptr.ref.codexPath = config.codexPath?.toNativeUtf8() ?? nullptr;
-    ptr.ref.workingDirectory = config.workingDirectory?.toNativeUtf8() ?? nullptr;
+    ptr.ref.workingDirectory =
+        config.workingDirectory?.toNativeUtf8() ?? nullptr;
     ptr.ref.sandboxMode = config.sandboxMode;
     ptr.ref.approvalPolicy = config.approvalPolicy;
     ptr.ref.model = config.model?.toNativeUtf8() ?? nullptr;
@@ -265,11 +296,21 @@ class CodexFFIBindings {
   }
 
   void _freeConfigFFI(Pointer<CodexConfigFFI> ptr) {
-    if (ptr.ref.codexPath != nullptr) calloc.free(ptr.ref.codexPath);
-    if (ptr.ref.workingDirectory != nullptr) calloc.free(ptr.ref.workingDirectory);
-    if (ptr.ref.model != nullptr) calloc.free(ptr.ref.model);
-    if (ptr.ref.apiKey != nullptr) calloc.free(ptr.ref.apiKey);
-    if (ptr.ref.gatewayUrl != nullptr) calloc.free(ptr.ref.gatewayUrl);
+    if (ptr.ref.codexPath != nullptr) {
+      calloc.free(ptr.ref.codexPath);
+    }
+    if (ptr.ref.workingDirectory != nullptr) {
+      calloc.free(ptr.ref.workingDirectory);
+    }
+    if (ptr.ref.model != nullptr) {
+      calloc.free(ptr.ref.model);
+    }
+    if (ptr.ref.apiKey != nullptr) {
+      calloc.free(ptr.ref.apiKey);
+    }
+    if (ptr.ref.gatewayUrl != nullptr) {
+      calloc.free(ptr.ref.gatewayUrl);
+    }
     calloc.free(ptr);
   }
 }
