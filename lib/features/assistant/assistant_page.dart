@@ -369,6 +369,7 @@ class _AssistantPageState extends State<AssistantPage> {
                 onOpenDetail: widget.onOpenDetail,
                 onFocusComposer: _focusComposer,
                 onOpenGateway: _showConnectDialog,
+                onOpenAiGatewaySettings: _openAiGatewaySettings,
                 onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
               ),
             ),
@@ -379,9 +380,9 @@ class _AssistantPageState extends State<AssistantPage> {
                 inputController: _inputController,
                 focusNode: _composerFocusNode,
                 thinkingLabel: _thinkingLabel,
-                modelLabel: controller.resolvedDefaultModel.isEmpty
+                modelLabel: controller.resolvedAssistantModel.isEmpty
                     ? appText('未选择模型', 'No model selected')
-                    : controller.resolvedDefaultModel,
+                    : controller.resolvedAssistantModel,
                 modelOptions: controller.aiGatewayModelChoices,
                 attachments: _attachments,
                 availableSkills: _availableSkillOptions(controller),
@@ -400,6 +401,7 @@ class _AssistantPageState extends State<AssistantPage> {
                 },
                 onModelChanged: controller.selectDefaultModel,
                 onOpenGateway: _showConnectDialog,
+                onOpenAiGatewaySettings: _openAiGatewaySettings,
                 onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
                 onPickAttachments: _pickAttachments,
                 onSend: _submitPrompt,
@@ -416,6 +418,7 @@ class _AssistantPageState extends State<AssistantPage> {
     List<GatewayChatMessage> messages,
   ) {
     final items = <_TimelineItem>[];
+    final ownerLabel = _conversationOwnerLabel(controller);
 
     for (final message in messages) {
       if ((message.toolName ?? '').trim().isNotEmpty) {
@@ -455,7 +458,7 @@ class _AssistantPageState extends State<AssistantPage> {
         items.add(
           _TimelineItem.message(
             kind: _TimelineItemKind.agent,
-            label: _lastAutoAgentLabel ?? controller.activeAgentName,
+            label: _lastAutoAgentLabel ?? ownerLabel,
             text: message.text,
             pending: message.pending,
             error: message.error,
@@ -465,12 +468,14 @@ class _AssistantPageState extends State<AssistantPage> {
     }
 
     final hasPendingTask =
-        controller.chatController.hasPendingRun ||
-        controller.activeRunId != null;
-    final lastRole = messages.isEmpty ? null : messages.last.role.toLowerCase();
+        controller.hasAssistantPendingRun || controller.activeRunId != null;
+    final lastMessage = messages.isEmpty ? null : messages.last;
+    final lastRole = lastMessage?.role.toLowerCase();
     if (_lastSubmittedPrompt != null) {
       final status = hasPendingTask
           ? 'running'
+          : (lastMessage?.error ?? false)
+          ? 'failed'
           : (lastRole == 'user' ? 'queued' : 'completed');
       items.add(
         _TimelineItem.taskCard(
@@ -479,8 +484,12 @@ class _AssistantPageState extends State<AssistantPage> {
           summary: switch (status) {
             'queued' => appText('已提交到任务队列', 'Submitted to the task queue'),
             'running' => appText(
-              '正在由 ${_lastAutoAgentLabel ?? controller.activeAgentName} 执行',
-              'Executing with ${_lastAutoAgentLabel ?? controller.activeAgentName}',
+              '正在由 ${_lastAutoAgentLabel ?? ownerLabel} 执行',
+              'Executing with ${_lastAutoAgentLabel ?? ownerLabel}',
+            ),
+            'failed' => appText(
+              '这次执行返回了错误',
+              'This execution returned an error',
             ),
             _ => appText(
               '本次会话中的执行已结束',
@@ -488,12 +497,12 @@ class _AssistantPageState extends State<AssistantPage> {
             ),
           },
           detail: _lastSubmittedAttachments.isEmpty
-              ? '${controller.currentSessionKey} · ${_lastAutoAgentLabel ?? controller.activeAgentName}'
+              ? '${controller.currentSessionKey} · ${_lastAutoAgentLabel ?? ownerLabel}'
               : appText(
                   '${controller.currentSessionKey} · ${_lastSubmittedAttachments.length} 个附件',
                   '${controller.currentSessionKey} · ${_lastSubmittedAttachments.length} attachment(s)',
                 ),
-          owner: _lastAutoAgentLabel ?? controller.activeAgentName,
+          owner: _lastAutoAgentLabel ?? ownerLabel,
           sessionKey: controller.currentSessionKey,
         ),
       );
@@ -536,7 +545,12 @@ class _AssistantPageState extends State<AssistantPage> {
       return;
     }
 
-    final autoAgent = _pickAutoAgent(controller, rawPrompt);
+    final shouldUseGatewayAgent =
+        settings.assistantExecutionTarget !=
+        AssistantExecutionTarget.aiGatewayOnly;
+    final autoAgent = shouldUseGatewayAgent
+        ? _pickAutoAgent(controller, rawPrompt)
+        : null;
     if (autoAgent != null) {
       await controller.selectAgent(autoAgent.id);
     }
@@ -558,7 +572,8 @@ class _AssistantPageState extends State<AssistantPage> {
 
     setState(() {
       _lastSubmittedPrompt = rawPrompt;
-      _lastAutoAgentLabel = autoAgent?.name ?? controller.activeAgentName;
+      _lastAutoAgentLabel =
+          autoAgent?.name ?? _conversationOwnerLabel(controller);
       _lastSubmittedAttachments = attachmentNames;
       _touchTaskSeed(
         sessionKey: controller.currentSessionKey,
@@ -567,10 +582,14 @@ class _AssistantPageState extends State<AssistantPage> {
             _fallbackSessionTitle(controller.currentSessionKey),
         preview: rawPrompt,
         status:
-            controller.connection.status == RuntimeConnectionStatus.connected
+            controller.hasAssistantPendingRun ||
+                settings.assistantExecutionTarget ==
+                    AssistantExecutionTarget.aiGatewayOnly ||
+                controller.connection.status ==
+                    RuntimeConnectionStatus.connected
             ? 'running'
             : 'queued',
-        owner: autoAgent?.name ?? controller.activeAgentName,
+        owner: autoAgent?.name ?? _conversationOwnerLabel(controller),
         surface: 'Assistant',
         draft: controller.currentSessionKey.trim().startsWith('draft:'),
       );
@@ -783,6 +802,10 @@ class _AssistantPageState extends State<AssistantPage> {
     await widget.controller.connectSavedGateway();
   }
 
+  void _openAiGatewaySettings() {
+    widget.controller.navigateTo(WorkspaceDestination.aiGateway);
+  }
+
   void _focusComposer() {
     if (!mounted) {
       return;
@@ -805,7 +828,7 @@ class _AssistantPageState extends State<AssistantPage> {
         ),
         status: 'queued',
         updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        owner: widget.controller.activeAgentName,
+        owner: _conversationOwnerLabel(widget.controller),
         surface: 'Assistant',
         draft: true,
       );
@@ -820,14 +843,17 @@ class _AssistantPageState extends State<AssistantPage> {
     final entries =
         _taskSeeds.values
             .where((item) => !_isArchivedTask(item.sessionKey))
-            .map(
-              (item) => item.toEntry(
-                isCurrent: _sessionKeysMatch(
-                  item.sessionKey,
-                  controller.currentSessionKey,
-                ),
-              ),
-            )
+            .map((item) {
+              final isCurrent = _sessionKeysMatch(
+                item.sessionKey,
+                controller.currentSessionKey,
+              );
+              final entry = item.toEntry(isCurrent: isCurrent);
+              if (!isCurrent) {
+                return entry;
+              }
+              return entry.copyWith(owner: _conversationOwnerLabel(controller));
+            })
             .toList(growable: true)
           ..sort((left, right) {
             if (left.isCurrent != right.isCurrent) {
@@ -867,7 +893,7 @@ class _AssistantPageState extends State<AssistantPage> {
       preview: '',
       status: 'queued',
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      owner: widget.controller.activeAgentName,
+      owner: _conversationOwnerLabel(widget.controller),
       surface: 'Assistant',
       isCurrent: true,
       draft: true,
@@ -888,35 +914,44 @@ class _AssistantPageState extends State<AssistantPage> {
         status: _sessionStatus(
           session,
           currentSessionKey: controller.currentSessionKey,
-          hasPendingRun: controller.chatController.hasPendingRun,
+          hasPendingRun: controller.hasAssistantPendingRun,
         ),
         updatedAtMs:
             session.updatedAtMs ??
             DateTime.now().millisecondsSinceEpoch.toDouble(),
-        owner: controller.activeAgentName,
+        owner: _conversationOwnerLabel(controller),
         surface: session.surface ?? session.kind ?? 'Assistant',
         draft: session.key.trim().startsWith('draft:'),
       );
     }
 
+    final currentSeed = _taskSeeds[controller.currentSessionKey];
+    final currentPreview = _currentTaskPreview(controller.chatMessages);
+    final currentStatus = _currentTaskStatus(
+      controller.chatMessages,
+      controller,
+    );
+
     if (_isArchivedTask(controller.currentSessionKey)) {
       return;
     }
-    _taskSeeds.putIfAbsent(
-      controller.currentSessionKey,
-      () => _AssistantTaskSeed(
-        sessionKey: controller.currentSessionKey,
-        title: _fallbackSessionTitle(controller.currentSessionKey),
-        preview: appText(
-          '等待描述这个任务的第一条消息',
-          'Waiting for the first message of this task',
-        ),
-        status: 'queued',
-        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        owner: controller.activeAgentName,
-        surface: 'Assistant',
-        draft: controller.currentSessionKey.trim().startsWith('draft:'),
-      ),
+    _taskSeeds[controller.currentSessionKey] = _AssistantTaskSeed(
+      sessionKey: controller.currentSessionKey,
+      title:
+          currentSeed?.title ??
+          _fallbackSessionTitle(controller.currentSessionKey),
+      preview:
+          currentPreview ??
+          currentSeed?.preview ??
+          appText(
+            '等待描述这个任务的第一条消息',
+            'Waiting for the first message of this task',
+          ),
+      status: currentStatus ?? currentSeed?.status ?? 'queued',
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      owner: _conversationOwnerLabel(controller),
+      surface: currentSeed?.surface ?? 'Assistant',
+      draft: controller.currentSessionKey.trim().startsWith('draft:'),
     );
   }
 
@@ -979,6 +1014,9 @@ class _AssistantPageState extends State<AssistantPage> {
 
   String _buildDraftSessionKey(AppController controller) {
     final stamp = DateTime.now().millisecondsSinceEpoch;
+    if (controller.isAiGatewayOnlyMode) {
+      return 'draft:$stamp';
+    }
     final selectedAgentId = controller.selectedAgentId.trim();
     if (selectedAgentId.isEmpty) {
       return 'draft:$stamp';
@@ -1005,6 +1043,40 @@ class _AssistantPageState extends State<AssistantPage> {
     return maxWidthByViewport
         .clamp(_sidePaneMinWidth, viewportWidth - _sidePaneViewportPadding)
         .toDouble();
+  }
+
+  String _conversationOwnerLabel(AppController controller) {
+    return controller.assistantConversationOwnerLabel;
+  }
+
+  String? _currentTaskPreview(List<GatewayChatMessage> messages) {
+    for (final message in messages.reversed) {
+      final text = message.text.trim();
+      if (text.isNotEmpty) {
+        return text;
+      }
+    }
+    return null;
+  }
+
+  String? _currentTaskStatus(
+    List<GatewayChatMessage> messages,
+    AppController controller,
+  ) {
+    if (controller.hasAssistantPendingRun) {
+      return 'running';
+    }
+    if (messages.isEmpty) {
+      return null;
+    }
+    final last = messages.last;
+    if (last.error) {
+      return 'failed';
+    }
+    if (last.role.trim().toLowerCase() == 'user') {
+      return 'queued';
+    }
+    return 'completed';
   }
 }
 
@@ -1292,6 +1364,7 @@ class _AssistantLowerPane extends StatelessWidget {
     required this.onThinkingChanged,
     required this.onModelChanged,
     required this.onOpenGateway,
+    required this.onOpenAiGatewaySettings,
     required this.onReconnectGateway,
     required this.onPickAttachments,
     required this.onSend,
@@ -1311,6 +1384,7 @@ class _AssistantLowerPane extends StatelessWidget {
   final ValueChanged<String> onThinkingChanged;
   final Future<void> Function(String modelId) onModelChanged;
   final VoidCallback onOpenGateway;
+  final VoidCallback onOpenAiGatewaySettings;
   final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
   final Future<void> Function() onSend;
@@ -1336,6 +1410,7 @@ class _AssistantLowerPane extends StatelessWidget {
           onThinkingChanged: onThinkingChanged,
           onModelChanged: onModelChanged,
           onOpenGateway: onOpenGateway,
+          onOpenAiGatewaySettings: onOpenAiGatewaySettings,
           onReconnectGateway: onReconnectGateway,
           onPickAttachments: onPickAttachments,
           onSend: onSend,
@@ -1354,6 +1429,7 @@ class _ConversationArea extends StatelessWidget {
     required this.onOpenDetail,
     required this.onFocusComposer,
     required this.onOpenGateway,
+    required this.onOpenAiGatewaySettings,
     required this.onReconnectGateway,
   });
 
@@ -1364,6 +1440,7 @@ class _ConversationArea extends StatelessWidget {
   final ValueChanged<DetailPanelData> onOpenDetail;
   final VoidCallback onFocusComposer;
   final VoidCallback onOpenGateway;
+  final VoidCallback onOpenAiGatewaySettings;
   final Future<void> Function() onReconnectGateway;
 
   @override
@@ -1437,6 +1514,7 @@ class _ConversationArea extends StatelessWidget {
                       controller: controller,
                       onFocusComposer: onFocusComposer,
                       onOpenGateway: onOpenGateway,
+                      onOpenAiGatewaySettings: onOpenAiGatewaySettings,
                       onReconnectGateway: onReconnectGateway,
                     )
                   : ListView.separated(
@@ -1731,7 +1809,7 @@ class _AssistantTaskTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
           decoration: BoxDecoration(
             color: entry.isCurrent
                 ? palette.surfaceSecondary
@@ -1741,105 +1819,60 @@ class _AssistantTaskTile extends StatelessWidget {
               color: entry.isCurrent ? palette.strokeSoft : Colors.transparent,
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      color: statusStyle.backgroundColor,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Icon(
-                      entry.draft
-                          ? Icons.edit_note_rounded
-                          : _normalizedTaskStatus(entry.status) == 'running'
-                          ? Icons.play_arrow_rounded
-                          : Icons.task_alt_rounded,
-                      size: 16,
-                      color: statusStyle.foregroundColor,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      entry.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: theme.colorScheme.onSurface,
-                        fontWeight: entry.isCurrent
-                            ? FontWeight.w600
-                            : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        entry.updatedAtLabel,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: palette.textMuted,
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      IconButton(
-                        key: ValueKey<String>(
-                          'assistant-task-archive-${entry.sessionKey}',
-                        ),
-                        tooltip: appText('归档任务', 'Archive task'),
-                        visualDensity: VisualDensity.compact,
-                        splashRadius: 12,
-                        onPressed: onArchive,
-                        icon: Icon(
-                          Icons.archive_outlined,
-                          size: 18,
-                          color: palette.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                entry.preview,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: palette.textSecondary,
-                  height: 1.35,
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: statusStyle.backgroundColor,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  entry.draft
+                      ? Icons.edit_note_rounded
+                      : _normalizedTaskStatus(entry.status) == 'running'
+                      ? Icons.play_arrow_rounded
+                      : Icons.task_alt_rounded,
+                  size: 15,
+                  color: statusStyle.foregroundColor,
                 ),
               ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 4,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  _StatusPill(
-                    label: entry.draft
-                        ? appText('草稿任务', 'Draft task')
-                        : _taskStatusLabel(entry.status),
-                    backgroundColor: statusStyle.backgroundColor,
-                    textColor: statusStyle.foregroundColor,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  entry.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: entry.isCurrent
+                        ? FontWeight.w600
+                        : FontWeight.w500,
                   ),
-                  _MetaPill(label: entry.owner, icon: Icons.smart_toy_outlined),
-                  _MetaPill(label: entry.surface, icon: Icons.forum_outlined),
-                  if (entry.isCurrent)
-                    Text(
-                      appText('当前', 'Current'),
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: palette.textMuted,
-                      ),
-                    ),
-                ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                entry.updatedAtLabel,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: palette.textMuted,
+                ),
+              ),
+              const SizedBox(width: 2),
+              IconButton(
+                key: ValueKey<String>(
+                  'assistant-task-archive-${entry.sessionKey}',
+                ),
+                tooltip: appText('归档任务', 'Archive task'),
+                visualDensity: VisualDensity.compact,
+                splashRadius: 12,
+                onPressed: onArchive,
+                icon: Icon(
+                  Icons.archive_outlined,
+                  size: 18,
+                  color: palette.textMuted,
+                ),
               ),
             ],
           ),
@@ -1854,26 +1887,45 @@ class _AssistantEmptyState extends StatelessWidget {
     required this.controller,
     required this.onFocusComposer,
     required this.onOpenGateway,
+    required this.onOpenAiGatewaySettings,
     required this.onReconnectGateway,
   });
 
   final AppController controller;
   final VoidCallback onFocusComposer;
   final VoidCallback onOpenGateway;
+  final VoidCallback onOpenAiGatewaySettings;
   final Future<void> Function() onReconnectGateway;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final connection = controller.connection;
-    final connected = connection.status == RuntimeConnectionStatus.connected;
+    final aiGatewayOnly = controller.isAiGatewayOnlyMode;
+    final connected = aiGatewayOnly
+        ? controller.canUseAiGatewayConversation
+        : connection.status == RuntimeConnectionStatus.connected;
     final reconnectAvailable = controller.canQuickConnectGateway;
-    final title = connected
+    final title = aiGatewayOnly
+        ? connected
+              ? appText('开始 AI 对话', 'Start an AI conversation')
+              : appText('先配置 AI Gateway', 'Configure AI Gateway first')
+        : connected
         ? appText('开始对话或运行任务', 'Start a chat or run a task')
         : connection.status == RuntimeConnectionStatus.error
         ? appText('Gateway 连接失败', 'Gateway connection failed')
         : appText('先连接 Gateway', 'Connect a gateway first');
-    final description = connected
+    final description = aiGatewayOnly
+        ? connected
+              ? appText(
+                  '当前模式只通过 AI Gateway 处理当前任务，不会建立 OpenClaw Gateway 会话。',
+                  'This mode handles the current task through AI Gateway only and does not open an OpenClaw Gateway session.',
+                )
+              : appText(
+                  '请先在 Settings -> AI Gateway 中配置地址、API Key 和默认模型，然后继续当前任务。',
+                  'Set the AI Gateway URL, API key, and default model in Settings -> AI Gateway, then continue this task.',
+                )
+        : connected
         ? appText(
             '输入需求后即可开始执行，结果会回到当前会话并同步到任务页。',
             'Type a request to start execution. Results return to this session and the Tasks page.',
@@ -1922,6 +1974,8 @@ class _AssistantEmptyState extends StatelessWidget {
                     FilledButton.icon(
                       onPressed: connected
                           ? onFocusComposer
+                          : aiGatewayOnly
+                          ? onOpenAiGatewaySettings
                           : reconnectAvailable
                           ? () async {
                               await onReconnectGateway();
@@ -1930,6 +1984,8 @@ class _AssistantEmptyState extends StatelessWidget {
                       icon: Icon(
                         connected
                             ? Icons.edit_rounded
+                            : aiGatewayOnly
+                            ? Icons.tune_rounded
                             : reconnectAvailable
                             ? Icons.refresh_rounded
                             : Icons.link_rounded,
@@ -1937,6 +1993,8 @@ class _AssistantEmptyState extends StatelessWidget {
                       label: Text(
                         connected
                             ? appText('开始输入', 'Start typing')
+                            : aiGatewayOnly
+                            ? appText('配置 AI Gateway', 'Configure AI Gateway')
                             : reconnectAvailable
                             ? appText('重新连接', 'Reconnect')
                             : appText('连接 Gateway', 'Connect gateway'),
@@ -1954,9 +2012,19 @@ class _AssistantEmptyState extends StatelessWidget {
                     ),
                     if (!connected)
                       OutlinedButton.icon(
-                        onPressed: onOpenGateway,
-                        icon: const Icon(Icons.settings_rounded),
-                        label: Text(appText('编辑连接', 'Edit connection')),
+                        onPressed: aiGatewayOnly
+                            ? onOpenAiGatewaySettings
+                            : onOpenGateway,
+                        icon: Icon(
+                          aiGatewayOnly
+                              ? Icons.hub_outlined
+                              : Icons.settings_rounded,
+                        ),
+                        label: Text(
+                          aiGatewayOnly
+                              ? appText('打开 AI Gateway', 'Open AI Gateway')
+                              : appText('编辑连接', 'Edit connection'),
+                        ),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(0, 28),
                           padding: const EdgeInsets.symmetric(
@@ -1995,6 +2063,7 @@ class _ComposerBar extends StatelessWidget {
     required this.onThinkingChanged,
     required this.onModelChanged,
     required this.onOpenGateway,
+    required this.onOpenAiGatewaySettings,
     required this.onReconnectGateway,
     required this.onPickAttachments,
     required this.onSend,
@@ -2014,6 +2083,7 @@ class _ComposerBar extends StatelessWidget {
   final ValueChanged<String> onThinkingChanged;
   final Future<void> Function(String modelId) onModelChanged;
   final VoidCallback onOpenGateway;
+  final VoidCallback onOpenAiGatewaySettings;
   final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
   final Future<void> Function() onSend;
@@ -2021,10 +2091,13 @@ class _ComposerBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final connected =
-        controller.connection.status == RuntimeConnectionStatus.connected;
+    final aiGatewayOnly = controller.isAiGatewayOnlyMode;
+    final connected = aiGatewayOnly
+        ? controller.canUseAiGatewayConversation
+        : controller.connection.status == RuntimeConnectionStatus.connected;
     final reconnectAvailable = controller.canQuickConnectGateway;
     final connecting =
+        !aiGatewayOnly &&
         controller.connection.status == RuntimeConnectionStatus.connecting;
     final executionTarget = controller.assistantExecutionTarget;
     final permissionLevel = controller.assistantPermissionLevel;
@@ -2033,6 +2106,8 @@ class _ComposerBar extends StatelessWidget {
         .toList(growable: false);
     final submitLabel = connected
         ? appText('提交', 'Submit')
+        : aiGatewayOnly
+        ? appText('配置 AI Gateway', 'Configure AI Gateway')
         : connecting
         ? appText('连接中…', 'Connecting…')
         : reconnectAvailable
@@ -2345,6 +2420,8 @@ class _ComposerBar extends StatelessWidget {
                       ? null
                       : connected
                       ? onSend
+                      : aiGatewayOnly
+                      ? onOpenAiGatewaySettings
                       : reconnectAvailable
                       ? () async {
                           await onReconnectGateway();
@@ -2366,6 +2443,8 @@ class _ComposerBar extends StatelessWidget {
                       Icon(
                         connected
                             ? Icons.arrow_upward_rounded
+                            : aiGatewayOnly
+                            ? Icons.hub_outlined
                             : reconnectAvailable
                             ? Icons.refresh_rounded
                             : Icons.link_rounded,
@@ -3048,16 +3127,21 @@ class _ConnectionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final connection = controller.connection;
-    final color = switch (connection.status) {
-      RuntimeConnectionStatus.connected => context.palette.accentMuted,
-      RuntimeConnectionStatus.connecting => context.palette.surfaceSecondary,
-      RuntimeConnectionStatus.error => context.palette.danger.withValues(
-        alpha: 0.10,
-      ),
-      RuntimeConnectionStatus.offline => context.palette.surfaceSecondary,
-    };
+    final aiGatewayOnly = controller.isAiGatewayOnlyMode;
+    final color = aiGatewayOnly
+        ? context.palette.accentMuted
+        : switch (connection.status) {
+            RuntimeConnectionStatus.connected => context.palette.accentMuted,
+            RuntimeConnectionStatus.connecting =>
+              context.palette.surfaceSecondary,
+            RuntimeConnectionStatus.error => context.palette.danger.withValues(
+              alpha: 0.10,
+            ),
+            RuntimeConnectionStatus.offline => context.palette.surfaceSecondary,
+          };
 
     return Container(
+      key: const Key('assistant-connection-chip'),
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.xs,
         vertical: 5,
@@ -3074,7 +3158,7 @@ class _ConnectionChip extends StatelessWidget {
         ],
       ),
       child: Text(
-        '${connection.status.label} · ${connection.remoteAddress ?? appText('未连接目标', 'No target')}',
+        '${controller.assistantConnectionStatusLabel} · ${controller.assistantConnectionTargetLabel}',
         style: theme.textTheme.labelMedium,
       ),
     );
@@ -3215,6 +3299,30 @@ class _AssistantTaskEntry {
   final String surface;
   final bool isCurrent;
   final bool draft;
+
+  _AssistantTaskEntry copyWith({
+    String? sessionKey,
+    String? title,
+    String? preview,
+    String? status,
+    double? updatedAtMs,
+    String? owner,
+    String? surface,
+    bool? isCurrent,
+    bool? draft,
+  }) {
+    return _AssistantTaskEntry(
+      sessionKey: sessionKey ?? this.sessionKey,
+      title: title ?? this.title,
+      preview: preview ?? this.preview,
+      status: status ?? this.status,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      owner: owner ?? this.owner,
+      surface: surface ?? this.surface,
+      isCurrent: isCurrent ?? this.isCurrent,
+      draft: draft ?? this.draft,
+    );
+  }
 
   String get updatedAtLabel => _sessionUpdatedAtLabel(updatedAtMs);
 }

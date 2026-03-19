@@ -249,4 +249,44 @@ void main() {
     expect(find.text('xlsx'), findsOneWidget);
     expect(find.text('网页处理'), findsOneWidget);
   });
+
+  testWidgets(
+    'AssistantPage shows AI Gateway-only chip and keeps task rows minimal',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
+      await controller.settingsController.saveAiGatewayApiKey('live-key');
+      await controller.saveSettings(
+        controller.settings.copyWith(
+          aiGateway: controller.settings.aiGateway.copyWith(
+            baseUrl: 'http://127.0.0.1:11434/v1',
+            availableModels: const <String>['qwen2.5-coder:latest'],
+            selectedModels: const <String>['qwen2.5-coder:latest'],
+          ),
+          defaultModel: 'qwen2.5-coder:latest',
+          assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
+        ),
+        refreshAfterSave: false,
+      );
+
+      await pumpPage(
+        tester,
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+      );
+
+      expect(
+        find.byKey(const Key('assistant-connection-chip')),
+        findsOneWidget,
+      );
+      expect(
+        find.text('仅 AI Gateway · qwen2.5-coder:latest · 127.0.0.1:11434'),
+        findsOneWidget,
+      );
+      expect(find.text('等待描述这个任务的第一条消息'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('assistant-new-task-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('等待描述这个任务的第一条消息'), findsNothing);
+    },
+  );
 }

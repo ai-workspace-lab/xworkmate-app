@@ -98,6 +98,9 @@ class AppController extends ChangeNotifier {
   MultiAgentBrokerClient? _multiAgentBrokerClient;
   final Map<String, List<GatewayChatMessage>> _localSessionMessages =
       <String, List<GatewayChatMessage>>{};
+  final Map<String, List<GatewayChatMessage>> _gatewayHistoryCache =
+      <String, List<GatewayChatMessage>>{};
+  final Set<String> _aiGatewayPendingSessionKeys = <String>{};
   bool _multiAgentRunPending = false;
   int _localMessageCounter = 0;
 
@@ -177,6 +180,11 @@ class AppController extends ChangeNotifier {
   String? get storedGatewayTokenMask =>
       _settingsController.secureRefs['gateway_token'];
   String get aiGatewayUrl => settings.aiGateway.baseUrl.trim();
+  bool get hasStoredAiGatewayApiKey =>
+      _settingsController.secureRefs.containsKey('ai_gateway_api_key');
+  bool get isAiGatewayOnlyMode =>
+      settings.assistantExecutionTarget ==
+      AssistantExecutionTarget.aiGatewayOnly;
   bool get isCodexBridgeBusy => _isCodexBridgeBusy;
   String? get codexBridgeError => _codexBridgeError;
   String? get codexRuntimeWarning => _codexRuntimeWarning;
@@ -190,6 +198,70 @@ class AppController extends ChangeNotifier {
   CodexCooperationState get codexCooperationState => _codexCooperationState;
   bool get isMultiAgentRunPending => _multiAgentRunPending;
   bool _desktopPlatformBusy = false;
+
+  bool get hasAssistantPendingRun =>
+      _chatController.hasPendingRun ||
+      _multiAgentRunPending ||
+      _aiGatewayPendingSessionKeys.contains(currentSessionKey);
+
+  bool get canUseAiGatewayConversation =>
+      aiGatewayUrl.isNotEmpty &&
+      hasStoredAiGatewayApiKey &&
+      resolvedAssistantModel.isNotEmpty;
+
+  String get resolvedAssistantModel {
+    final resolved = resolvedDefaultModel.trim();
+    if (resolved.isNotEmpty) {
+      return resolved;
+    }
+    final localDefault = settings.ollamaLocal.defaultModel.trim();
+    if (localDefault.isNotEmpty) {
+      return localDefault;
+    }
+    final selected = settings.aiGateway.selectedModels
+        .where((item) => item.trim().isNotEmpty)
+        .toList(growable: false);
+    if (selected.isNotEmpty) {
+      return selected.first;
+    }
+    final available = settings.aiGateway.availableModels
+        .where((item) => item.trim().isNotEmpty)
+        .toList(growable: false);
+    if (available.isNotEmpty) {
+      return available.first;
+    }
+    return '';
+  }
+
+  String get assistantConversationOwnerLabel {
+    if (!isAiGatewayOnlyMode) {
+      return activeAgentName;
+    }
+    final model = resolvedAssistantModel;
+    return model.isEmpty ? appText('AI Gateway', 'AI Gateway') : model;
+  }
+
+  String get assistantConnectionStatusLabel => isAiGatewayOnlyMode
+      ? appText('仅 AI Gateway', 'AI Gateway Only')
+      : connection.status.label;
+
+  String get assistantConnectionTargetLabel {
+    if (!isAiGatewayOnlyMode) {
+      return connection.remoteAddress ?? appText('未连接目标', 'No target');
+    }
+    final model = resolvedAssistantModel;
+    final host = _aiGatewayHostLabel(settings.aiGateway.baseUrl);
+    if (model.isNotEmpty && host.isNotEmpty) {
+      return '$model · $host';
+    }
+    if (model.isNotEmpty) {
+      return model;
+    }
+    if (host.isNotEmpty) {
+      return host;
+    }
+    return appText('AI Gateway 未配置', 'AI Gateway not configured');
+  }
 
   Future<String> loadAiGatewayApiKey() async {
     return (await _store.loadAiGatewayApiKey())?.trim() ?? '';
@@ -403,13 +475,19 @@ class AppController extends ChangeNotifier {
       );
 
   List<GatewayChatMessage> get chatMessages {
-    final items = List<GatewayChatMessage>.from(_chatController.messages);
-    final localItems =
-        _localSessionMessages[_sessionsController.currentSessionKey];
+    final sessionKey = _sessionsController.currentSessionKey;
+    final items = List<GatewayChatMessage>.from(
+      isAiGatewayOnlyMode
+          ? (_gatewayHistoryCache[sessionKey] ?? const <GatewayChatMessage>[])
+          : _chatController.messages,
+    );
+    final localItems = _localSessionMessages[sessionKey];
     if (localItems != null && localItems.isNotEmpty) {
       items.addAll(localItems);
     }
-    final streaming = _chatController.streamingAssistantText?.trim() ?? '';
+    final streaming = isAiGatewayOnlyMode
+        ? ''
+        : (_chatController.streamingAssistantText?.trim() ?? '');
     if (streaming.isNotEmpty) {
       items.add(
         GatewayChatMessage(
@@ -725,6 +803,15 @@ class AppController extends ChangeNotifier {
     List<GatewayChatAttachmentPayload> attachments =
         const <GatewayChatAttachmentPayload>[],
   }) async {
+    if (isAiGatewayOnlyMode) {
+      await _sendAiGatewayMessage(
+        message,
+        thinking: thinking,
+        attachments: attachments,
+      );
+      _recomputeTasks();
+      return;
+    }
     final dispatch = _codeAgentNodeOrchestrator.buildGatewayDispatch(
       _buildCodeAgentNodeState(),
     );
@@ -750,6 +837,7 @@ class AppController extends ChangeNotifier {
       return;
     }
     if (target == AssistantExecutionTarget.aiGatewayOnly) {
+      _preserveGatewayHistoryForSession(_sessionsController.currentSessionKey);
       final nextGatewayProfile = settings.gateway.copyWith(
         mode: RuntimeConnectionMode.unconfigured,
         useSetupCode: false,
@@ -1259,6 +1347,202 @@ class AppController extends ChangeNotifier {
     return _multiAgentBrokerClient!;
   }
 
+  Future<void> _sendAiGatewayMessage(
+    String message, {
+    required String thinking,
+    required List<GatewayChatAttachmentPayload> attachments,
+  }) async {
+    final sessionKey = _sessionsController.currentSessionKey.trim().isEmpty
+        ? 'main'
+        : _sessionsController.currentSessionKey.trim();
+    final trimmed = message.trim();
+    if (trimmed.isEmpty && attachments.isEmpty) {
+      return;
+    }
+
+    final baseUrl = _normalizeAiGatewayBaseUrl(settings.aiGateway.baseUrl);
+    if (baseUrl == null) {
+      _appendLocalSessionMessage(
+        sessionKey,
+        _assistantErrorMessage(
+          appText(
+            'AI Gateway URL 未配置，无法发送对话。',
+            'AI Gateway URL is not configured, so the conversation could not be sent.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final apiKey = await loadAiGatewayApiKey();
+    if (apiKey.isEmpty) {
+      _appendLocalSessionMessage(
+        sessionKey,
+        _assistantErrorMessage(
+          appText(
+            'AI Gateway API Key 未配置，无法发送对话。',
+            'AI Gateway API key is not configured, so the conversation could not be sent.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final model = resolvedAssistantModel;
+    if (model.isEmpty) {
+      _appendLocalSessionMessage(
+        sessionKey,
+        _assistantErrorMessage(
+          appText(
+            '当前没有可用模型。请先在 AI Gateway 中同步或选择模型。',
+            'No model is available yet. Sync or select a model in AI Gateway first.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final userText = trimmed.isEmpty ? 'See attached.' : trimmed;
+    _appendLocalSessionMessage(
+      sessionKey,
+      GatewayChatMessage(
+        id: _nextLocalMessageId(),
+        role: 'user',
+        text: userText,
+        timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        toolCallId: null,
+        toolName: null,
+        stopReason: null,
+        pending: false,
+        error: false,
+      ),
+    );
+    _aiGatewayPendingSessionKeys.add(sessionKey);
+    _recomputeTasks();
+    _notifyIfActive();
+
+    try {
+      final assistantText = await _requestAiGatewayCompletion(
+        baseUrl: baseUrl,
+        apiKey: apiKey,
+        model: model,
+        thinking: thinking,
+        sessionKey: sessionKey,
+      );
+      _appendLocalSessionMessage(
+        sessionKey,
+        GatewayChatMessage(
+          id: _nextLocalMessageId(),
+          role: 'assistant',
+          text: assistantText,
+          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          toolCallId: null,
+          toolName: null,
+          stopReason: null,
+          pending: false,
+          error: false,
+        ),
+      );
+    } catch (error) {
+      _appendLocalSessionMessage(
+        sessionKey,
+        _assistantErrorMessage(_aiGatewayErrorLabel(error)),
+      );
+    } finally {
+      _aiGatewayPendingSessionKeys.remove(sessionKey);
+      _recomputeTasks();
+      _notifyIfActive();
+    }
+  }
+
+  Future<String> _requestAiGatewayCompletion({
+    required Uri baseUrl,
+    required String apiKey,
+    required String model,
+    required String thinking,
+    required String sessionKey,
+  }) async {
+    final uri = _aiGatewayChatUri(baseUrl);
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 20);
+    try {
+      final request = await client
+          .postUrl(uri)
+          .timeout(const Duration(seconds: 20));
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $apiKey');
+      request.headers.set('x-api-key', apiKey);
+      final payload = <String, dynamic>{
+        'model': model,
+        'stream': false,
+        'messages': _buildAiGatewayRequestMessages(sessionKey),
+      };
+      final normalizedThinking = thinking.trim().toLowerCase();
+      if (normalizedThinking.isNotEmpty && normalizedThinking != 'off') {
+        payload['reasoning_effort'] = normalizedThinking;
+      }
+      request.write(jsonEncode(payload));
+      final response = await request.close().timeout(
+        const Duration(seconds: 60),
+      );
+      final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw _AiGatewayChatException(
+          _formatAiGatewayHttpError(
+            response.statusCode,
+            _extractAiGatewayErrorDetail(body),
+          ),
+        );
+      }
+      final decoded = jsonDecode(_extractFirstJsonDocument(body));
+      final assistantText = _extractAiGatewayAssistantText(decoded);
+      if (assistantText.trim().isEmpty) {
+        throw const FormatException('Missing assistant content');
+      }
+      return assistantText.trim();
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  List<Map<String, String>> _buildAiGatewayRequestMessages(String sessionKey) {
+    final history = <GatewayChatMessage>[
+      ...(_gatewayHistoryCache[sessionKey] ?? const <GatewayChatMessage>[]),
+      ...(_localSessionMessages[sessionKey] ?? const <GatewayChatMessage>[]),
+    ];
+    return history
+        .where((message) {
+          final role = message.role.trim().toLowerCase();
+          return (role == 'user' || role == 'assistant') &&
+              (message.toolName ?? '').trim().isEmpty &&
+              message.text.trim().isNotEmpty;
+        })
+        .map(
+          (message) => <String, String>{
+            'role': message.role.trim().toLowerCase() == 'assistant'
+                ? 'assistant'
+                : 'user',
+            'content': message.text.trim(),
+          },
+        )
+        .toList(growable: false);
+  }
+
+  GatewayChatMessage _assistantErrorMessage(String text) {
+    return GatewayChatMessage(
+      id: _nextLocalMessageId(),
+      role: 'assistant',
+      text: text,
+      timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      toolCallId: null,
+      toolName: null,
+      stopReason: null,
+      pending: false,
+      error: true,
+    );
+  }
+
   void _appendLocalSessionMessage(
     String sessionKey,
     GatewayChatMessage message,
@@ -1271,9 +1555,241 @@ class AppController extends ChangeNotifier {
     _notifyIfActive();
   }
 
+  void _preserveGatewayHistoryForSession(String sessionKey) {
+    final key = sessionKey.trim().isEmpty ? 'main' : sessionKey.trim();
+    if (_chatController.messages.isEmpty) {
+      return;
+    }
+    _gatewayHistoryCache[key] = List<GatewayChatMessage>.from(
+      _chatController.messages,
+    );
+  }
+
   String _nextLocalMessageId() {
     _localMessageCounter += 1;
     return 'local-${DateTime.now().microsecondsSinceEpoch}-$_localMessageCounter';
+  }
+
+  Uri? _normalizeAiGatewayBaseUrl(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    final candidate = trimmed.contains('://') ? trimmed : 'https://$trimmed';
+    final uri = Uri.tryParse(candidate);
+    if (uri == null || uri.host.trim().isEmpty) {
+      return null;
+    }
+    final pathSegments = uri.pathSegments.where((item) => item.isNotEmpty);
+    return uri.replace(
+      pathSegments: pathSegments.isEmpty ? const <String>['v1'] : pathSegments,
+      query: null,
+      fragment: null,
+    );
+  }
+
+  Uri _aiGatewayChatUri(Uri baseUrl) {
+    final pathSegments = baseUrl.pathSegments
+        .where((item) => item.isNotEmpty)
+        .toList(growable: true);
+    if (pathSegments.isEmpty) {
+      pathSegments.add('v1');
+    }
+    if (pathSegments.length >= 2 &&
+        pathSegments[pathSegments.length - 2] == 'chat' &&
+        pathSegments.last == 'completions') {
+      return baseUrl.replace(query: null, fragment: null);
+    }
+    if (pathSegments.last == 'models') {
+      pathSegments.removeLast();
+    }
+    if (pathSegments.last != 'chat') {
+      pathSegments.add('chat');
+    }
+    pathSegments.add('completions');
+    return baseUrl.replace(
+      pathSegments: pathSegments,
+      query: null,
+      fragment: null,
+    );
+  }
+
+  String _aiGatewayHostLabel(String raw) {
+    final uri = _normalizeAiGatewayBaseUrl(raw);
+    if (uri == null) {
+      return '';
+    }
+    if (uri.hasPort) {
+      return '${uri.host}:${uri.port}';
+    }
+    return uri.host;
+  }
+
+  String _aiGatewayErrorLabel(Object error) {
+    if (error is _AiGatewayChatException) {
+      return error.message;
+    }
+    if (error is SocketException) {
+      return appText('无法连接到 AI Gateway。', 'Unable to reach the AI Gateway.');
+    }
+    if (error is HandshakeException) {
+      return appText(
+        'AI Gateway TLS 握手失败。',
+        'AI Gateway TLS handshake failed.',
+      );
+    }
+    if (error is TimeoutException) {
+      return appText('AI Gateway 请求超时。', 'AI Gateway request timed out.');
+    }
+    if (error is FormatException) {
+      return appText(
+        'AI Gateway 返回了无法解析的响应。',
+        'AI Gateway returned an invalid response.',
+      );
+    }
+    return error.toString();
+  }
+
+  String _formatAiGatewayHttpError(int statusCode, String detail) {
+    final base = switch (statusCode) {
+      400 => appText(
+        'AI Gateway 请求无效 (400)',
+        'AI Gateway rejected the request (400)',
+      ),
+      401 => appText(
+        'AI Gateway 鉴权失败 (401)',
+        'AI Gateway authentication failed (401)',
+      ),
+      403 => appText('AI Gateway 拒绝访问 (403)', 'AI Gateway denied access (403)'),
+      404 => appText(
+        'AI Gateway chat 接口不存在 (404)',
+        'AI Gateway chat endpoint was not found (404)',
+      ),
+      429 => appText(
+        'AI Gateway 限流 (429)',
+        'AI Gateway rate limited the request (429)',
+      ),
+      >= 500 => appText(
+        'AI Gateway 当前不可用 ($statusCode)',
+        'AI Gateway is unavailable right now ($statusCode)',
+      ),
+      _ => appText(
+        'AI Gateway 返回状态码 $statusCode',
+        'AI Gateway responded with status $statusCode',
+      ),
+    };
+    final trimmed = detail.trim();
+    return trimmed.isEmpty ? base : '$base · $trimmed';
+  }
+
+  String _extractAiGatewayErrorDetail(String body) {
+    if (body.trim().isEmpty) {
+      return '';
+    }
+    try {
+      final decoded = jsonDecode(_extractFirstJsonDocument(body));
+      final map = asMap(decoded);
+      final error = asMap(map['error']);
+      return (stringValue(error['message']) ??
+              stringValue(map['message']) ??
+              stringValue(map['detail']) ??
+              '')
+          .trim();
+    } on FormatException {
+      return '';
+    }
+  }
+
+  String _extractAiGatewayAssistantText(Object? decoded) {
+    final map = asMap(decoded);
+    final choices = asList(map['choices']);
+    if (choices.isNotEmpty) {
+      final firstChoice = asMap(choices.first);
+      final message = asMap(firstChoice['message']);
+      final content = _extractAiGatewayContent(message['content']);
+      if (content.isNotEmpty) {
+        return content;
+      }
+    }
+
+    final output = asList(map['output']);
+    for (final item in output) {
+      final entry = asMap(item);
+      final content = _extractAiGatewayContent(entry['content']);
+      if (content.isNotEmpty) {
+        return content;
+      }
+    }
+
+    final direct = _extractAiGatewayContent(map['content']);
+    if (direct.isNotEmpty) {
+      return direct;
+    }
+    return stringValue(map['output_text'])?.trim() ?? '';
+  }
+
+  String _extractAiGatewayContent(Object? content) {
+    if (content is String) {
+      return content.trim();
+    }
+    final parts = <String>[];
+    for (final item in asList(content)) {
+      final map = asMap(item);
+      final nestedText = stringValue(map['text']);
+      if (nestedText != null && nestedText.trim().isNotEmpty) {
+        parts.add(nestedText.trim());
+        continue;
+      }
+      final type = stringValue(map['type']) ?? '';
+      if (type == 'output_text') {
+        final text = stringValue(map['text']) ?? stringValue(map['value']);
+        if (text != null && text.trim().isNotEmpty) {
+          parts.add(text.trim());
+        }
+      }
+    }
+    return parts.join('\n').trim();
+  }
+
+  String _extractFirstJsonDocument(String body) {
+    final trimmed = body.trimLeft();
+    if (trimmed.isEmpty) {
+      throw const FormatException('Empty response body');
+    }
+    final start = trimmed.indexOf(RegExp(r'[\{\[]'));
+    if (start < 0) {
+      throw const FormatException('Missing JSON document');
+    }
+    var depth = 0;
+    var inString = false;
+    var escaped = false;
+    for (var index = start; index < trimmed.length; index++) {
+      final char = trimmed[index];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char == r'\') {
+        escaped = true;
+        continue;
+      }
+      if (char == '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) {
+        continue;
+      }
+      if (char == '{' || char == '[') {
+        depth += 1;
+      } else if (char == '}' || char == ']') {
+        depth -= 1;
+        if (depth == 0) {
+          return trimmed.substring(start, index + 1);
+        }
+      }
+    }
+    throw const FormatException('Unterminated JSON document');
   }
 
   SettingsSnapshot _sanitizeCodeAgentSettings(SettingsSnapshot snapshot) {
@@ -1438,7 +1954,7 @@ class AppController extends ChangeNotifier {
       sessions: _sessionsController.sessions,
       cronJobs: _cronJobsController.items,
       currentSessionKey: _sessionsController.currentSessionKey,
-      hasPendingRun: _chatController.hasPendingRun || _multiAgentRunPending,
+      hasPendingRun: hasAssistantPendingRun,
       activeAgentName: _agentsController.activeAgentName,
     );
   }
@@ -1554,4 +2070,13 @@ class AppController extends ChangeNotifier {
       tls: savedProfile.tls,
     );
   }
+}
+
+class _AiGatewayChatException implements Exception {
+  const _AiGatewayChatException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }

@@ -137,6 +137,12 @@ void main() {
       await _waitFor(() => !controller.initializing);
       await controller.saveSettings(
         controller.settings.copyWith(
+          aiGateway: controller.settings.aiGateway.copyWith(
+            baseUrl: 'http://127.0.0.1:11434/v1',
+            availableModels: const <String>['qwen2.5-coder:latest'],
+            selectedModels: const <String>['qwen2.5-coder:latest'],
+          ),
+          defaultModel: 'qwen2.5-coder:latest',
           gateway: controller.settings.gateway.copyWith(
             mode: RuntimeConnectionMode.remote,
             host: 'gateway.example.com',
@@ -222,6 +228,11 @@ void main() {
       expect(controller.settings.gateway.port, 9443);
       expect(controller.settings.gateway.tls, isTrue);
       expect(gateway.disconnectCount, 1);
+      expect(controller.assistantConnectionStatusLabel, '仅 AI Gateway');
+      expect(
+        controller.assistantConnectionTargetLabel,
+        'qwen2.5-coder:latest · 127.0.0.1:11434',
+      );
       expect(
         gateway.connectedProfiles,
         hasLength(2),
