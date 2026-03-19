@@ -21,14 +21,14 @@ class SimpleSpacing {
 class SimpleRadius {
   SimpleRadius._();
 
-  static const double card = 6.0;
-  static const double button = 8.0;
-  static const double input = 8.0;
-  static const double chip = 8.0;
+  static const double card = 16.0;
+  static const double button = 12.0;
+  static const double input = 14.0;
+  static const double chip = 12.0;
   static const double badge = 999.0;
-  static const double dialog = 5.0;
-  static const double sidebar = 8.0;
-  static const double icon = 8.0;
+  static const double dialog = 18.0;
+  static const double sidebar = 20.0;
+  static const double icon = 12.0;
 }
 
 class SimpleTypography {
@@ -66,18 +66,18 @@ class SimpleTypography {
 class SimpleSizes {
   SimpleSizes._();
 
-  static const double sidebarItemHeight = 32.0;
+  static const double sidebarItemHeight = 34.0;
   static const double sidebarIconSize = 18.0;
   static const double sidebarTextSize = 13.0;
-  static const double sidebarExpandedWidth = 176.0;
-  static const double sidebarCollapsedWidth = 52.0;
+  static const double sidebarExpandedWidth = 188.0;
+  static const double sidebarCollapsedWidth = 56.0;
 
   static const double textareaHeight = 36.0;
   static const double toolbarHeight = 40.0;
 
-  static const double inputHeight = 36.0;
-  static const double buttonHeightDesktop = 16.0;
-  static const double buttonHeightMobile = 16.0;
+  static const double inputHeight = 40.0;
+  static const double buttonHeightDesktop = 30.0;
+  static const double buttonHeightMobile = 36.0;
 }
 
 class AppSpacing {
@@ -244,37 +244,45 @@ class AppTheme {
         selectedColor: palette.surfacePrimary,
         secondarySelectedColor: palette.surfacePrimary,
         disabledColor: palette.surfaceSecondary,
-        side: BorderSide.none,
+        side: BorderSide(color: palette.strokeSoft),
         checkmarkColor: Colors.transparent,
         labelStyle: tunedTextTheme.labelMedium,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.chip),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       ),
       filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: palette.accent,
-          foregroundColor: Colors.white,
-          shadowColor: palette.shadow,
-          elevation: 0,
-          surfaceTintColor: Colors.transparent,
-          textStyle: tunedTextTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
+        style: ButtonStyle(
+          foregroundColor: const WidgetStatePropertyAll(Colors.white),
+          shadowColor: WidgetStatePropertyAll(palette.shadow),
+          elevation: const WidgetStatePropertyAll(0),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+          textStyle: WidgetStatePropertyAll(
+            tunedTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
           ),
-          minimumSize: Size(
-            0,
-            isDesktop
-                ? AppSizes.buttonHeightDesktop
-                : AppSizes.buttonHeightMobile,
+          minimumSize: WidgetStatePropertyAll(
+            Size(
+              0,
+              isDesktop
+                  ? AppSizes.buttonHeightDesktop
+                  : AppSizes.buttonHeightMobile,
+            ),
           ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: 0,
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: 12, vertical: 0),
           ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.button),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.button),
+            ),
           ),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) {
+              return palette.accentHover;
+            }
+            return palette.accent;
+          }),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -293,10 +301,7 @@ class AppTheme {
                 ? AppSizes.buttonHeightDesktop
                 : AppSizes.buttonHeightMobile,
           ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: 0,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button),
           ),
@@ -316,7 +321,7 @@ class AppTheme {
                 : AppSizes.buttonHeightMobile,
           ),
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xs,
+            horizontal: AppSpacing.sm,
             vertical: 0,
           ),
           shape: RoundedRectangleBorder(
@@ -327,10 +332,10 @@ class AppTheme {
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
           foregroundColor: palette.textSecondary,
-          backgroundColor: palette.surfaceSecondary,
+          backgroundColor: palette.surfaceSecondary.withValues(alpha: 0.88),
           surfaceTintColor: Colors.transparent,
-          minimumSize: const Size(40, 40),
-          padding: const EdgeInsets.all(10),
+          minimumSize: const Size(32, 32),
+          padding: const EdgeInsets.all(7),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.icon),
           ),
@@ -339,7 +344,7 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         isDense: true,
         filled: true,
-        fillColor: palette.surfacePrimary,
+        fillColor: palette.surfacePrimary.withValues(alpha: 0.92),
         hintStyle: tunedTextTheme.bodyMedium?.copyWith(
           color: palette.textMuted,
         ),
@@ -364,7 +369,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.input),
-          borderSide: BorderSide(color: palette.accent.withValues(alpha: 0.18)),
+          borderSide: BorderSide(color: palette.accent.withValues(alpha: 0.32)),
         ),
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
@@ -372,7 +377,7 @@ class AppTheme {
           side: const WidgetStatePropertyAll(BorderSide.none),
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
-              return palette.surfacePrimary;
+              return palette.surfacePrimary.withValues(alpha: 0.96);
             }
             return palette.surfaceSecondary;
           }),
@@ -400,14 +405,14 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: palette.surfacePrimary,
+        backgroundColor: palette.surfacePrimary.withValues(alpha: 0.96),
         contentTextStyle: TextStyle(color: palette.textPrimary),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.dialog),
         ),
       ),
       popupMenuTheme: PopupMenuThemeData(
-        color: palette.surfacePrimary,
+        color: palette.surfacePrimary.withValues(alpha: 0.98),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -449,7 +454,7 @@ class AppTheme {
         base.titleLarge?.copyWith(
           fontSize: AppTypography.sectionSize,
           fontWeight: FontWeight.w600,
-          letterSpacing: 0,
+          letterSpacing: 0.02,
           height: AppTypography.sectionHeight,
           color: palette.textPrimary,
         ),
@@ -506,7 +511,8 @@ class AppTheme {
       labelMedium: withUiFont(
         base.labelMedium?.copyWith(
           fontSize: AppTypography.captionSize,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
           height: AppTypography.captionHeight,
           color: palette.textSecondary,
         ),

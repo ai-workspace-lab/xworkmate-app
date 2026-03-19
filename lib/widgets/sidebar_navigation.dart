@@ -85,8 +85,8 @@ class SidebarNavigation extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            palette.chromeHighlight.withValues(alpha: 0.96),
-            palette.chromeSurface,
+            palette.chromeHighlight.withValues(alpha: 0.9),
+            palette.chromeSurface.withValues(alpha: 0.92),
           ],
         ),
         borderRadius: BorderRadius.circular(AppRadius.sidebar),
@@ -196,8 +196,8 @@ class SidebarHeader extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            palette.chromeHighlight.withValues(alpha: 0.94),
-            palette.chromeSurfacePressed,
+            palette.chromeHighlight.withValues(alpha: 0.88),
+            palette.chromeSurfacePressed.withValues(alpha: 0.92),
           ],
         ),
         border: Border.all(color: palette.chromeStroke),
@@ -261,6 +261,7 @@ class _SidebarSectionGroup extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: palette.textMuted,
                 fontWeight: FontWeight.w600,
+                letterSpacing: 0.28,
               ),
             ),
           ),
@@ -326,7 +327,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
     final theme = Theme.of(context);
     final isPrimary = widget.emphasis == _SidebarItemEmphasis.primary;
     final background = widget.selected
-        ? palette.chromeSurface
+        ? palette.surfacePrimary
         : _hovered
         ? palette.chromeSurfacePressed
         : Colors.transparent;
@@ -350,9 +351,11 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                     end: Alignment.bottomRight,
                     colors: [
                       palette.chromeHighlight.withValues(
-                        alpha: widget.selected ? 0.96 : 0.82,
+                        alpha: widget.selected ? 0.84 : 0.7,
                       ),
-                      background,
+                      background.withValues(
+                        alpha: widget.selected ? 0.96 : 0.9,
+                      ),
                     ],
                   )
                 : null,
@@ -372,7 +375,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
               onTap: widget.onTap,
               child: Container(
                 height: height,
-                padding: const EdgeInsets.symmetric(horizontal: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: widget.collapsed
                     ? Center(
                         child: Icon(
@@ -411,6 +414,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                                         fontWeight: isPrimary
                                             ? FontWeight.w600
                                             : FontWeight.w500,
+                                        letterSpacing: isPrimary ? 0.02 : 0,
                                       ),
                             ),
                           ),

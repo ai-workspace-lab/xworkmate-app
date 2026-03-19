@@ -280,6 +280,7 @@ class _AppShellState extends State<AppShell> {
                                       palette.chromeBackground,
                                       palette.canvas,
                                     ],
+                                    stops: const [0.0, 0.68],
                                   ),
                                 ),
                                 child: Stack(
@@ -300,8 +301,8 @@ class _AppShellState extends State<AppShell> {
                                                       alpha:
                                                           brightness ==
                                                               Brightness.dark
-                                                          ? 0.10
-                                                          : 0.58,
+                                                          ? 0.14
+                                                          : 0.42,
                                                     ),
                                                 palette.chromeHighlight
                                                     .withValues(alpha: 0),
@@ -326,8 +327,8 @@ class _AppShellState extends State<AppShell> {
                                                   alpha:
                                                       brightness ==
                                                           Brightness.dark
-                                                      ? 0.10
-                                                      : 0.36,
+                                                      ? 0.14
+                                                      : 0.24,
                                                 ),
                                                 palette.chromeInset.withValues(
                                                   alpha: 0,
