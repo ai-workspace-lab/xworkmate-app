@@ -200,6 +200,7 @@ class _AssistantPageState extends State<AssistantPage> {
                             _focusComposer();
                           },
                           onArchiveTask: _archiveTask,
+                          onRenameTask: _renameTask,
                         ),
                         navigationPanel: widget.navigationPanelBuilder!(
                           sidePanelContentWidth,
@@ -323,6 +324,7 @@ class _AssistantPageState extends State<AssistantPage> {
                         _focusComposer();
                       },
                       onArchiveTask: _archiveTask,
+                      onRenameTask: _renameTask,
                     ),
                   ),
                   SizedBox(
@@ -383,7 +385,7 @@ class _AssistantPageState extends State<AssistantPage> {
                 modelLabel: controller.resolvedAssistantModel.isEmpty
                     ? appText('未选择模型', 'No model selected')
                     : controller.resolvedAssistantModel,
-                modelOptions: controller.aiGatewayModelChoices,
+                modelOptions: controller.assistantModelChoices,
                 attachments: _attachments,
                 availableSkills: _availableSkillOptions(controller),
                 selectedSkillKeys: _selectedSkillKeys,
@@ -399,7 +401,7 @@ class _AssistantPageState extends State<AssistantPage> {
                 onThinkingChanged: (value) {
                   setState(() => _thinkingLabel = value);
                 },
-                onModelChanged: controller.selectDefaultModel,
+                onModelChanged: controller.selectAssistantModel,
                 onOpenGateway: _showConnectDialog,
                 onOpenAiGatewaySettings: _openAiGatewaySettings,
                 onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
@@ -889,7 +891,7 @@ class _AssistantPageState extends State<AssistantPage> {
     }
     return _AssistantTaskEntry(
       sessionKey: sessionKey,
-      title: _fallbackSessionTitle(sessionKey),
+      title: _resolvedTaskTitle(widget.controller, sessionKey),
       preview: '',
       status: 'queued',
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
@@ -907,7 +909,7 @@ class _AssistantPageState extends State<AssistantPage> {
       }
       _taskSeeds[session.key] = _AssistantTaskSeed(
         sessionKey: session.key,
-        title: _sessionDisplayTitle(session),
+        title: _resolvedTaskTitle(controller, session.key, session: session),
         preview:
             _sessionPreview(session) ??
             appText('等待继续执行这个任务', 'Waiting to continue this task'),
@@ -937,9 +939,11 @@ class _AssistantPageState extends State<AssistantPage> {
     }
     _taskSeeds[controller.currentSessionKey] = _AssistantTaskSeed(
       sessionKey: controller.currentSessionKey,
-      title:
-          currentSeed?.title ??
-          _fallbackSessionTitle(controller.currentSessionKey),
+      title: _resolvedTaskTitle(
+        controller,
+        controller.currentSessionKey,
+        fallbackTitle: currentSeed?.title,
+      ),
       preview:
           currentPreview ??
           currentSeed?.preview ??
@@ -953,6 +957,51 @@ class _AssistantPageState extends State<AssistantPage> {
       surface: currentSeed?.surface ?? 'Assistant',
       draft: controller.currentSessionKey.trim().startsWith('draft:'),
     );
+  }
+
+  GatewaySessionSummary? _sessionByKey(
+    AppController controller,
+    String sessionKey,
+  ) {
+    for (final session in controller.sessions) {
+      if (_sessionKeysMatch(session.key, sessionKey)) {
+        return session;
+      }
+    }
+    return null;
+  }
+
+  String _resolvedTaskTitle(
+    AppController controller,
+    String sessionKey, {
+    GatewaySessionSummary? session,
+    String? fallbackTitle,
+  }) {
+    final customTitle = controller.assistantCustomTaskTitle(sessionKey);
+    if (customTitle.isNotEmpty) {
+      return customTitle;
+    }
+    final resolvedSession = session ?? _sessionByKey(controller, sessionKey);
+    if (resolvedSession != null) {
+      return _sessionDisplayTitle(resolvedSession);
+    }
+    final fallback = fallbackTitle?.trim() ?? '';
+    if (fallback.isNotEmpty) {
+      return fallback;
+    }
+    return _fallbackSessionTitle(sessionKey);
+  }
+
+  String _defaultTaskTitle(
+    AppController controller,
+    String sessionKey, {
+    GatewaySessionSummary? session,
+  }) {
+    final resolvedSession = session ?? _sessionByKey(controller, sessionKey);
+    if (resolvedSession != null) {
+      return _sessionDisplayTitle(resolvedSession);
+    }
+    return _fallbackSessionTitle(sessionKey);
   }
 
   void _touchTaskSeed({
@@ -1010,6 +1059,66 @@ class _AssistantPageState extends State<AssistantPage> {
     }
 
     await _createNewThread();
+  }
+
+  Future<void> _renameTask(_AssistantTaskEntry entry) async {
+    final controller = widget.controller;
+    final input = TextEditingController(text: entry.title);
+    final renamed = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(appText('重命名任务', 'Rename task')),
+          content: TextField(
+            key: const Key('assistant-task-rename-input'),
+            controller: input,
+            autofocus: true,
+            maxLines: 1,
+            decoration: InputDecoration(
+              labelText: appText('任务名称', 'Task name'),
+              hintText: appText(
+                '留空后恢复默认名称',
+                'Leave empty to restore the default title',
+              ),
+            ),
+            onSubmitted: (value) => Navigator.of(context).pop(value),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(appText('取消', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(input.text),
+              child: Text(appText('保存', 'Save')),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted || renamed == null) {
+      return;
+    }
+    final normalized = renamed.trim();
+    final nextTitle = normalized.isNotEmpty
+        ? normalized
+        : _defaultTaskTitle(controller, entry.sessionKey);
+    setState(() {
+      final existing = _taskSeeds[entry.sessionKey];
+      if (existing != null) {
+        _taskSeeds[entry.sessionKey] = _AssistantTaskSeed(
+          sessionKey: existing.sessionKey,
+          title: nextTitle,
+          preview: existing.preview,
+          status: existing.status,
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          owner: existing.owner,
+          surface: existing.surface,
+          draft: existing.draft,
+        );
+      }
+    });
+    await controller.saveAssistantTaskTitle(entry.sessionKey, normalized);
   }
 
   String _buildDraftSessionKey(AppController controller) {
@@ -1613,6 +1722,7 @@ class _AssistantTaskRail extends StatelessWidget {
     required this.onCreateTask,
     required this.onSelectTask,
     required this.onArchiveTask,
+    required this.onRenameTask,
   });
 
   final AppController controller;
@@ -1625,6 +1735,7 @@ class _AssistantTaskRail extends StatelessWidget {
   final Future<void> Function() onCreateTask;
   final Future<void> Function(String sessionKey) onSelectTask;
   final Future<void> Function(String sessionKey) onArchiveTask;
+  final Future<void> Function(_AssistantTaskEntry entry) onRenameTask;
 
   @override
   Widget build(BuildContext context) {
@@ -1771,6 +1882,9 @@ class _AssistantTaskRail extends StatelessWidget {
                         onTap: () async {
                           await onSelectTask(task.sessionKey);
                         },
+                        onRename: () async {
+                          await onRenameTask(task);
+                        },
                         onArchive: () async {
                           await onArchiveTask(task.sessionKey);
                         },
@@ -1788,11 +1902,13 @@ class _AssistantTaskTile extends StatelessWidget {
   const _AssistantTaskTile({
     required this.entry,
     required this.onTap,
+    required this.onRename,
     required this.onArchive,
   });
 
   final _AssistantTaskEntry entry;
   final VoidCallback onTap;
+  final VoidCallback onRename;
   final VoidCallback onArchive;
 
   @override
@@ -1808,6 +1924,8 @@ class _AssistantTaskTile extends StatelessWidget {
         key: ValueKey<String>('assistant-task-item-${entry.sessionKey}'),
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
+        onLongPress: onRename,
+        onSecondaryTap: onRename,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
           decoration: BoxDecoration(

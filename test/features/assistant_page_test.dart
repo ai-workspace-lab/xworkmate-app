@@ -95,6 +95,50 @@ void main() {
     );
   });
 
+  testWidgets('AssistantPage lets users rename task titles', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+    );
+
+    await tester.longPress(
+      find.byKey(const ValueKey<String>('assistant-task-item-main')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('assistant-task-rename-input')),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('assistant-task-rename-input')),
+      '研发任务',
+    );
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('研发任务'), findsWidgets);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('assistant-conversation-title')))
+          .data,
+      '研发任务',
+    );
+    expect(controller.settings.assistantCustomTaskTitles['main'], '研发任务');
+
+    await pumpPage(
+      tester,
+      child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+    );
+
+    expect(find.text('研发任务'), findsWidgets);
+  });
+
   testWidgets('AssistantPage can switch unified side pane tabs and collapse', (
     WidgetTester tester,
   ) async {
