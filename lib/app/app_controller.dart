@@ -534,7 +534,12 @@ class AppController extends ChangeNotifier {
       mode: _modeFromHost(decoded?.host ?? settings.gateway.host),
     );
     await saveSettings(
-      settings.copyWith(gateway: nextProfile),
+      settings.copyWith(
+        gateway: nextProfile,
+        assistantExecutionTarget: _assistantExecutionTargetForMode(
+          nextProfile.mode,
+        ),
+      ),
       refreshAfterSave: false,
     );
     await _connectProfile(
@@ -572,7 +577,12 @@ class AppController extends ChangeNotifier {
       tls: mode == RuntimeConnectionMode.local ? false : tls,
     );
     await saveSettings(
-      settings.copyWith(gateway: nextProfile),
+      settings.copyWith(
+        gateway: nextProfile,
+        assistantExecutionTarget: _assistantExecutionTargetForMode(
+          nextProfile.mode,
+        ),
+      ),
       refreshAfterSave: false,
     );
     await _connectProfile(
@@ -739,6 +749,30 @@ class AppController extends ChangeNotifier {
     if (settings.assistantExecutionTarget == target) {
       return;
     }
+    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+      final nextGatewayProfile = settings.gateway.copyWith(
+        mode: RuntimeConnectionMode.unconfigured,
+        useSetupCode: false,
+        setupCode: '',
+      );
+      await saveSettings(
+        settings.copyWith(
+          assistantExecutionTarget: target,
+          gateway: nextGatewayProfile,
+        ),
+        refreshAfterSave: false,
+      );
+      if (_runtime.isConnected) {
+        try {
+          await disconnectGateway();
+        } catch (_) {
+          // Preserve the selected AI Gateway-only mode even if the active
+          // gateway session does not close cleanly on the first attempt.
+        }
+      }
+      return;
+    }
+
     await saveSettings(
       settings.copyWith(assistantExecutionTarget: target),
       refreshAfterSave: false,
@@ -1460,10 +1494,31 @@ class AppController extends ChangeNotifier {
     return RuntimeConnectionMode.remote;
   }
 
+  AssistantExecutionTarget _assistantExecutionTargetForMode(
+    RuntimeConnectionMode mode,
+  ) {
+    return switch (mode) {
+      RuntimeConnectionMode.unconfigured =>
+        AssistantExecutionTarget.aiGatewayOnly,
+      RuntimeConnectionMode.local => AssistantExecutionTarget.local,
+      RuntimeConnectionMode.remote => AssistantExecutionTarget.remote,
+    };
+  }
+
   GatewayConnectionProfile _gatewayProfileForAssistantExecutionTarget(
     AssistantExecutionTarget target,
   ) {
+    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+      return settings.gateway.copyWith(
+        mode: RuntimeConnectionMode.unconfigured,
+        useSetupCode: false,
+        setupCode: '',
+      );
+    }
+
     final desiredMode = switch (target) {
+      AssistantExecutionTarget.aiGatewayOnly =>
+        RuntimeConnectionMode.unconfigured,
       AssistantExecutionTarget.local => RuntimeConnectionMode.local,
       AssistantExecutionTarget.remote => RuntimeConnectionMode.remote,
     };
@@ -1484,13 +1539,19 @@ class AppController extends ChangeNotifier {
     }
 
     final defaults = GatewayConnectionProfile.defaults();
+    final savedHost = savedProfile.host.trim().isEmpty
+        ? defaults.host
+        : savedProfile.host.trim();
+    final savedPort = savedProfile.port <= 0
+        ? defaults.port
+        : savedProfile.port;
     return savedProfile.copyWith(
       mode: RuntimeConnectionMode.remote,
       useSetupCode: false,
       setupCode: '',
-      host: defaults.host,
-      port: defaults.port,
-      tls: defaults.tls,
+      host: savedHost,
+      port: savedPort,
+      tls: savedProfile.tls,
     );
   }
 }

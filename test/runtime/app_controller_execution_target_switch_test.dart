@@ -17,6 +17,7 @@ class _FakeGatewayRuntime extends GatewayRuntime {
 
   final List<GatewayConnectionProfile> connectedProfiles =
       <GatewayConnectionProfile>[];
+  int disconnectCount = 0;
   GatewayConnectionSnapshot _snapshot = GatewayConnectionSnapshot.initial();
 
   @override
@@ -35,18 +36,18 @@ class _FakeGatewayRuntime extends GatewayRuntime {
     String authPasswordOverride = '',
   }) async {
     connectedProfiles.add(profile);
-    _snapshot =
-        GatewayConnectionSnapshot.initial(mode: profile.mode).copyWith(
-          status: RuntimeConnectionStatus.connected,
-          statusText: 'Connected',
-          remoteAddress: '${profile.host}:${profile.port}',
-          connectAuthMode: 'none',
-        );
+    _snapshot = GatewayConnectionSnapshot.initial(mode: profile.mode).copyWith(
+      status: RuntimeConnectionStatus.connected,
+      statusText: 'Connected',
+      remoteAddress: '${profile.host}:${profile.port}',
+      connectAuthMode: 'none',
+    );
     notifyListeners();
   }
 
   @override
   Future<void> disconnect({bool clearDesiredProfile = true}) async {
+    disconnectCount += 1;
     _snapshot = _snapshot.copyWith(
       status: RuntimeConnectionStatus.offline,
       statusText: 'Offline',
@@ -65,10 +66,7 @@ class _FakeGatewayRuntime extends GatewayRuntime {
       case 'status':
         return <String, dynamic>{'ok': true};
       case 'agents.list':
-        return <String, dynamic>{
-          'agents': const <Object>[],
-          'mainKey': 'main',
-        };
+        return <String, dynamic>{'agents': const <Object>[], 'mainKey': 'main'};
       case 'sessions.list':
         return <String, dynamic>{'sessions': const <Object>[]};
       case 'chat.history':
@@ -200,6 +198,53 @@ void main() {
       );
       expect(controller.settings.gateway.port, 9443);
       expect(controller.settings.gateway.mode, RuntimeConnectionMode.remote);
+
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.aiGatewayOnly,
+      );
+
+      expect(
+        controller.settings.assistantExecutionTarget,
+        AssistantExecutionTarget.aiGatewayOnly,
+      );
+      expect(
+        controller.settings.gateway.mode,
+        RuntimeConnectionMode.unconfigured,
+      );
+      expect(controller.settings.gateway.useSetupCode, isFalse);
+      expect(controller.settings.gateway.setupCode, isEmpty);
+      expect(
+        controller.settings.gateway.host,
+        'gateway.example.com',
+        reason:
+            'AI Gateway-only mode should preserve the saved remote endpoint.',
+      );
+      expect(controller.settings.gateway.port, 9443);
+      expect(controller.settings.gateway.tls, isTrue);
+      expect(gateway.disconnectCount, 1);
+      expect(
+        gateway.connectedProfiles,
+        hasLength(2),
+        reason: 'AI Gateway-only mode should not open another gateway session.',
+      );
+
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.remote,
+      );
+
+      expect(
+        gateway.connectedProfiles.last,
+        isA<GatewayConnectionProfile>()
+            .having((item) => item.mode, 'mode', RuntimeConnectionMode.remote)
+            .having((item) => item.host, 'host', 'gateway.example.com')
+            .having((item) => item.port, 'port', 9443)
+            .having((item) => item.tls, 'tls', isTrue)
+            .having(
+              (item) => item.selectedAgentId,
+              'selectedAgentId',
+              'assistant-main',
+            ),
+      );
     },
   );
 }

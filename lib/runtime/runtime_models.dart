@@ -31,15 +31,26 @@ extension RuntimeConnectionStatusCopy on RuntimeConnectionStatus {
   };
 }
 
-enum AssistantExecutionTarget { local, remote }
+enum AssistantExecutionTarget { aiGatewayOnly, local, remote }
 
 extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   String get label => switch (this) {
-    AssistantExecutionTarget.local => appText('本地', 'Local'),
-    AssistantExecutionTarget.remote => appText('远程', 'Remote'),
+    AssistantExecutionTarget.aiGatewayOnly => appText(
+      '仅 AI Gateway',
+      'AI Gateway Only',
+    ),
+    AssistantExecutionTarget.local => appText(
+      '本地 OpenClaw Gateway',
+      'Local OpenClaw Gateway',
+    ),
+    AssistantExecutionTarget.remote => appText(
+      '远程 OpenClaw Gateway',
+      'Remote OpenClaw Gateway',
+    ),
   };
 
   String get promptValue => switch (this) {
+    AssistantExecutionTarget.aiGatewayOnly => 'ai-gateway-only',
     AssistantExecutionTarget.local => 'local',
     AssistantExecutionTarget.remote => 'remote',
   };
