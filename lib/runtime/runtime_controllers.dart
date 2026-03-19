@@ -1476,7 +1476,7 @@ class DerivedTasksController extends ChangeNotifier {
     if ((session.lastMessagePreview ?? '').isEmpty) {
       return 'Queued';
     }
-    return 'Completed';
+    return 'Open';
   }
 
   String _timeLabel(double? timestampMs) {

@@ -84,6 +84,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
+      controller.settings.assistantArchivedTaskKeys.any(
+        (item) => item.startsWith('draft:'),
+      ),
+      isTrue,
+    );
+    expect(
       find.byWidgetPredicate(
         (widget) =>
             widget.key is ValueKey<String> &&
@@ -93,6 +99,13 @@ void main() {
       ),
       findsOneWidget,
     );
+
+    await pumpPage(
+      tester,
+      child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+    );
+
+    expect(find.text('当前 0'), findsOneWidget);
   });
 
   testWidgets('AssistantPage lets users rename task titles', (

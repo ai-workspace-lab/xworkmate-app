@@ -96,11 +96,20 @@ class AppController extends ChangeNotifier {
   late final MultiAgentOrchestrator _multiAgentOrchestrator;
   MultiAgentBrokerServer? _multiAgentBrokerServer;
   MultiAgentBrokerClient? _multiAgentBrokerClient;
+  final Map<String, List<GatewayChatMessage>> _assistantThreadMessages =
+      <String, List<GatewayChatMessage>>{};
+  final Map<String, AssistantThreadRecord> _assistantThreadRecords =
+      <String, AssistantThreadRecord>{};
   final Map<String, List<GatewayChatMessage>> _localSessionMessages =
       <String, List<GatewayChatMessage>>{};
   final Map<String, List<GatewayChatMessage>> _gatewayHistoryCache =
       <String, List<GatewayChatMessage>>{};
+  final Map<String, String> _aiGatewayStreamingTextBySession =
+      <String, String>{};
+  final Map<String, HttpClient> _aiGatewayStreamingClients =
+      <String, HttpClient>{};
   final Set<String> _aiGatewayPendingSessionKeys = <String>{};
+  final Set<String> _aiGatewayAbortedSessionKeys = <String>{};
   bool _multiAgentRunPending = false;
   int _localMessageCounter = 0;
 
@@ -153,7 +162,9 @@ class AppController extends ChangeNotifier {
   GatewayConnectionSnapshot get connection => _runtime.snapshot;
   SettingsSnapshot get settings => _settingsController.snapshot;
   List<GatewayAgentSummary> get agents => _agentsController.agents;
-  List<GatewaySessionSummary> get sessions => _sessionsController.sessions;
+  List<GatewaySessionSummary> get sessions => isAiGatewayOnlyMode
+      ? _assistantSessionSummaries()
+      : _sessionsController.sessions;
   List<GatewayInstanceSummary> get instances => _instancesController.items;
   List<GatewaySkillSummary> get skills => _skillsController.items;
   List<GatewayConnectorSummary> get connectors => _connectorsController.items;
@@ -200,9 +211,7 @@ class AppController extends ChangeNotifier {
   bool _desktopPlatformBusy = false;
 
   bool get hasAssistantPendingRun =>
-      _chatController.hasPendingRun ||
-      _multiAgentRunPending ||
-      _aiGatewayPendingSessionKeys.contains(currentSessionKey);
+      assistantSessionHasPendingRun(currentSessionKey);
 
   bool get canUseAiGatewayConversation =>
       aiGatewayUrl.isNotEmpty &&
@@ -300,16 +309,25 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> refreshMultiAgentMounts({bool sync = false}) async {
+    if (_disposed) {
+      return;
+    }
     final resolved = _resolveMultiAgentConfig(settings);
     final reconciled = await _multiAgentMountManager.reconcile(
       config: sync ? resolved : resolved.copyWith(autoSync: false),
       aiGatewayUrl: aiGatewayUrl,
     );
+    if (_disposed) {
+      return;
+    }
     if (jsonEncode(reconciled.toJson()) !=
         jsonEncode(settings.multiAgent.toJson())) {
       await _settingsController.saveSnapshot(
         settings.copyWith(multiAgent: reconciled),
       );
+    }
+    if (_disposed) {
+      return;
     }
     _multiAgentOrchestrator.updateConfig(reconciled);
     _notifyIfActive();
@@ -527,12 +545,18 @@ class AppController extends ChangeNotifier {
           ? (_gatewayHistoryCache[sessionKey] ?? const <GatewayChatMessage>[])
           : _chatController.messages,
     );
+    final threadItems = isAiGatewayOnlyMode
+        ? _assistantThreadMessages[sessionKey]
+        : null;
+    if (threadItems != null && threadItems.isNotEmpty) {
+      items.addAll(threadItems);
+    }
     final localItems = _localSessionMessages[sessionKey];
     if (localItems != null && localItems.isNotEmpty) {
       items.addAll(localItems);
     }
     final streaming = isAiGatewayOnlyMode
-        ? ''
+        ? (_aiGatewayStreamingTextBySession[sessionKey]?.trim() ?? '')
         : (_chatController.streamingAssistantText?.trim() ?? '');
     if (streaming.isNotEmpty) {
       items.add(
@@ -555,6 +579,15 @@ class AppController extends ChangeNotifier {
   String _normalizedAssistantSessionKey(String sessionKey) {
     final trimmed = sessionKey.trim();
     return trimmed.isEmpty ? 'main' : trimmed;
+  }
+
+  bool assistantSessionHasPendingRun(String sessionKey) {
+    final normalized = _normalizedAssistantSessionKey(sessionKey);
+    if (isAiGatewayOnlyMode) {
+      return _aiGatewayPendingSessionKeys.contains(normalized);
+    }
+    return (_chatController.hasPendingRun || _multiAgentRunPending) &&
+        matchesSessionKey(normalized, _sessionsController.currentSessionKey);
   }
 
   void navigateTo(WorkspaceDestination destination) {
@@ -878,6 +911,10 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> abortRun() async {
+    if (isAiGatewayOnlyMode) {
+      await _abortAiGatewayRun(_sessionsController.currentSessionKey);
+      return;
+    }
     await _chatController.abortRun();
   }
 
@@ -901,6 +938,7 @@ class AppController extends ChangeNotifier {
         ),
         refreshAfterSave: false,
       );
+      await _ensureActiveAssistantThread();
       if (_runtime.isConnected) {
         try {
           await disconnectGateway();
@@ -961,11 +999,17 @@ class AppController extends ChangeNotifier {
   }
 
   String assistantCustomTaskTitle(String sessionKey) {
-    return settings.assistantCustomTaskTitles[sessionKey]?.trim() ?? '';
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final settingsTitle =
+        settings.assistantCustomTaskTitles[normalizedSessionKey]?.trim() ?? '';
+    if (settingsTitle.isNotEmpty) {
+      return settingsTitle;
+    }
+    return _assistantThreadRecords[normalizedSessionKey]?.title.trim() ?? '';
   }
 
   Future<void> saveAssistantTaskTitle(String sessionKey, String title) async {
-    final normalizedSessionKey = sessionKey.trim();
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
     if (normalizedSessionKey.isEmpty) {
       return;
     }
@@ -987,6 +1031,49 @@ class AppController extends ChangeNotifier {
       settings.copyWith(assistantCustomTaskTitles: next),
       refreshAfterSave: false,
     );
+    _upsertAssistantThreadRecord(
+      normalizedSessionKey,
+      title: normalizedTitle,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    _recomputeTasks();
+    _notifyIfActive();
+  }
+
+  bool isAssistantTaskArchived(String sessionKey) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    return settings.assistantArchivedTaskKeys.any(
+      (item) => _normalizedAssistantSessionKey(item) == normalizedSessionKey,
+    );
+  }
+
+  Future<void> saveAssistantTaskArchived(
+    String sessionKey,
+    bool archived,
+  ) async {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    if (normalizedSessionKey.isEmpty) {
+      return;
+    }
+    final next = <String>[
+      ...settings.assistantArchivedTaskKeys.where(
+        (item) => _normalizedAssistantSessionKey(item) != normalizedSessionKey,
+      ),
+    ];
+    if (archived) {
+      next.add(normalizedSessionKey);
+    }
+    await saveSettings(
+      settings.copyWith(assistantArchivedTaskKeys: next),
+      refreshAfterSave: false,
+    );
+    _upsertAssistantThreadRecord(
+      normalizedSessionKey,
+      archived: archived,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    _recomputeTasks();
+    _notifyIfActive();
   }
 
   Future<void> updateAiGatewaySelection(List<String> selectedModels) async {
@@ -1275,6 +1362,7 @@ class AppController extends ChangeNotifier {
   Future<void> _initialize() async {
     try {
       await _settingsController.initialize();
+      _restoreAssistantThreads(await _store.loadAssistantThreadRecords());
       if (_disposed) {
         return;
       }
@@ -1318,6 +1406,7 @@ class AppController extends ChangeNotifier {
         selectedAgentId: _agentsController.selectedAgentId,
         defaultAgentId: '',
       );
+      await _ensureActiveAssistantThread();
       _runtimeEventsSubscription = _runtimeCoordinator.gateway.events.listen(
         _handleRuntimeEvent,
       );
@@ -1371,6 +1460,39 @@ class AppController extends ChangeNotifier {
     await _settingsController.refreshDerivedState();
     await _ensureCodexGatewayRegistration();
     _recomputeTasks();
+  }
+
+  Future<void> _ensureActiveAssistantThread() async {
+    if (!isAiGatewayOnlyMode ||
+        !isAssistantTaskArchived(_sessionsController.currentSessionKey)) {
+      return;
+    }
+    final fallback = _assistantSessionSummaries().firstWhere(
+      (item) => !isAssistantTaskArchived(item.key),
+      orElse: () => GatewaySessionSummary(
+        key: 'draft:${DateTime.now().millisecondsSinceEpoch}',
+        kind: 'assistant',
+        displayName: appText('新对话', 'New conversation'),
+        surface: 'Assistant',
+        subject: null,
+        room: null,
+        space: null,
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        sessionId: null,
+        systemSent: false,
+        abortedLastRun: false,
+        thinkingLevel: null,
+        verboseLevel: null,
+        inputTokens: null,
+        outputTokens: null,
+        totalTokens: null,
+        model: null,
+        contextTokens: null,
+        derivedTitle: appText('新对话', 'New conversation'),
+        lastMessagePreview: null,
+      ),
+    );
+    await _sessionsController.switchSession(fallback.key);
   }
 
   void _handleRuntimeEvent(GatewayPushEvent event) {
@@ -1444,9 +1566,9 @@ class AppController extends ChangeNotifier {
     required String thinking,
     required List<GatewayChatAttachmentPayload> attachments,
   }) async {
-    final sessionKey = _sessionsController.currentSessionKey.trim().isEmpty
-        ? 'main'
-        : _sessionsController.currentSessionKey.trim();
+    final sessionKey = _normalizedAssistantSessionKey(
+      _sessionsController.currentSessionKey,
+    );
     final trimmed = message.trim();
     if (trimmed.isEmpty && attachments.isEmpty) {
       return;
@@ -1454,7 +1576,7 @@ class AppController extends ChangeNotifier {
 
     final baseUrl = _normalizeAiGatewayBaseUrl(settings.aiGateway.baseUrl);
     if (baseUrl == null) {
-      _appendLocalSessionMessage(
+      _appendAssistantThreadMessage(
         sessionKey,
         _assistantErrorMessage(
           appText(
@@ -1468,7 +1590,7 @@ class AppController extends ChangeNotifier {
 
     final apiKey = await loadAiGatewayApiKey();
     if (apiKey.isEmpty) {
-      _appendLocalSessionMessage(
+      _appendAssistantThreadMessage(
         sessionKey,
         _assistantErrorMessage(
           appText(
@@ -1482,7 +1604,7 @@ class AppController extends ChangeNotifier {
 
     final model = resolvedAiGatewayModel;
     if (model.isEmpty) {
-      _appendLocalSessionMessage(
+      _appendAssistantThreadMessage(
         sessionKey,
         _assistantErrorMessage(
           appText(
@@ -1495,7 +1617,7 @@ class AppController extends ChangeNotifier {
     }
 
     final userText = trimmed.isEmpty ? 'See attached.' : trimmed;
-    _appendLocalSessionMessage(
+    _appendAssistantThreadMessage(
       sessionKey,
       GatewayChatMessage(
         id: _nextLocalMessageId(),
@@ -1521,7 +1643,7 @@ class AppController extends ChangeNotifier {
         thinking: thinking,
         sessionKey: sessionKey,
       );
-      _appendLocalSessionMessage(
+      _appendAssistantThreadMessage(
         sessionKey,
         GatewayChatMessage(
           id: _nextLocalMessageId(),
@@ -1535,13 +1657,33 @@ class AppController extends ChangeNotifier {
           error: false,
         ),
       );
+    } on _AiGatewayAbortException catch (error) {
+      final partial = error.partialText.trim();
+      if (partial.isNotEmpty) {
+        _appendAssistantThreadMessage(
+          sessionKey,
+          GatewayChatMessage(
+            id: _nextLocalMessageId(),
+            role: 'assistant',
+            text: partial,
+            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            toolCallId: null,
+            toolName: null,
+            stopReason: 'aborted',
+            pending: false,
+            error: false,
+          ),
+        );
+      }
     } catch (error) {
-      _appendLocalSessionMessage(
+      _appendAssistantThreadMessage(
         sessionKey,
         _assistantErrorMessage(_aiGatewayErrorLabel(error)),
       );
     } finally {
       _aiGatewayPendingSessionKeys.remove(sessionKey);
+      _aiGatewayStreamingClients.remove(sessionKey);
+      _clearAiGatewayStreamingText(sessionKey);
       _recomputeTasks();
       _notifyIfActive();
     }
@@ -1557,11 +1699,15 @@ class AppController extends ChangeNotifier {
     final uri = _aiGatewayChatUri(baseUrl);
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 20);
+    _aiGatewayStreamingClients[sessionKey] = client;
     try {
       final request = await client
           .postUrl(uri)
           .timeout(const Duration(seconds: 20));
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.headers.set(
+        HttpHeaders.acceptHeader,
+        'text/event-stream, application/json',
+      );
       request.headers.set(
         HttpHeaders.contentTypeHeader,
         'application/json; charset=utf-8',
@@ -1570,7 +1716,7 @@ class AppController extends ChangeNotifier {
       request.headers.set('x-api-key', apiKey);
       final payload = <String, dynamic>{
         'model': model,
-        'stream': false,
+        'stream': true,
         'messages': _buildAiGatewayRequestMessages(sessionKey),
       };
       final normalizedThinking = thinking.trim().toLowerCase();
@@ -1581,8 +1727,8 @@ class AppController extends ChangeNotifier {
       final response = await request.close().timeout(
         const Duration(seconds: 60),
       );
-      final body = await response.transform(utf8.decoder).join();
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        final body = await response.transform(utf8.decoder).join();
         throw _AiGatewayChatException(
           _formatAiGatewayHttpError(
             response.statusCode,
@@ -1590,13 +1736,32 @@ class AppController extends ChangeNotifier {
           ),
         );
       }
-      final decoded = jsonDecode(_extractFirstJsonDocument(body));
-      final assistantText = _extractAiGatewayAssistantText(decoded);
-      if (assistantText.trim().isEmpty) {
-        throw const FormatException('Missing assistant content');
+      final contentType =
+          response.headers.contentType?.mimeType.toLowerCase() ??
+          response.headers
+              .value(HttpHeaders.contentTypeHeader)
+              ?.toLowerCase() ??
+          '';
+      if (contentType.contains('text/event-stream')) {
+        final streamed = await _readAiGatewayStreamingResponse(
+          response: response,
+          sessionKey: sessionKey,
+        );
+        if (streamed.trim().isEmpty) {
+          throw const FormatException('Missing assistant content');
+        }
+        return streamed.trim();
       }
-      return assistantText.trim();
+      return await _readAiGatewayJsonCompletion(response);
+    } catch (error) {
+      if (_consumeAiGatewayAbort(sessionKey)) {
+        throw _AiGatewayAbortException(
+          _aiGatewayStreamingTextBySession[sessionKey] ?? '',
+        );
+      }
+      rethrow;
     } finally {
+      _aiGatewayStreamingClients.remove(sessionKey);
       client.close(force: true);
     }
   }
@@ -1604,7 +1769,7 @@ class AppController extends ChangeNotifier {
   List<Map<String, String>> _buildAiGatewayRequestMessages(String sessionKey) {
     final history = <GatewayChatMessage>[
       ...(_gatewayHistoryCache[sessionKey] ?? const <GatewayChatMessage>[]),
-      ...(_localSessionMessages[sessionKey] ?? const <GatewayChatMessage>[]),
+      ...(_assistantThreadMessages[sessionKey] ?? const <GatewayChatMessage>[]),
     ];
     return history
         .where((message) {
@@ -1624,6 +1789,114 @@ class AppController extends ChangeNotifier {
         .toList(growable: false);
   }
 
+  Future<String> _readAiGatewayJsonCompletion(
+    HttpClientResponse response,
+  ) async {
+    final body = await response.transform(utf8.decoder).join();
+    final decoded = jsonDecode(_extractFirstJsonDocument(body));
+    final assistantText = _extractAiGatewayAssistantText(decoded);
+    if (assistantText.trim().isEmpty) {
+      throw const FormatException('Missing assistant content');
+    }
+    return assistantText.trim();
+  }
+
+  Future<String> _readAiGatewayStreamingResponse({
+    required HttpClientResponse response,
+    required String sessionKey,
+  }) async {
+    final buffer = StringBuffer();
+    final eventLines = <String>[];
+
+    void processEvent(String payload) {
+      final trimmed = payload.trim();
+      if (trimmed.isEmpty) {
+        return;
+      }
+      if (trimmed == '[DONE]') {
+        return;
+      }
+      final deltaText = _extractAiGatewayStreamText(trimmed);
+      if (deltaText.isEmpty) {
+        return;
+      }
+      final current = buffer.toString();
+      if (current.isEmpty || deltaText == current) {
+        buffer
+          ..clear()
+          ..write(deltaText);
+      } else if (deltaText.startsWith(current)) {
+        buffer
+          ..clear()
+          ..write(deltaText);
+      } else {
+        buffer.write(deltaText);
+      }
+      _setAiGatewayStreamingText(sessionKey, buffer.toString());
+    }
+
+    await for (final line
+        in response.transform(utf8.decoder).transform(const LineSplitter())) {
+      if (_consumeAiGatewayAbort(sessionKey)) {
+        throw _AiGatewayAbortException(buffer.toString());
+      }
+      if (line.isEmpty) {
+        if (eventLines.isNotEmpty) {
+          processEvent(eventLines.join('\n'));
+          eventLines.clear();
+        }
+        continue;
+      }
+      if (line.startsWith('data:')) {
+        eventLines.add(line.substring(5).trimLeft());
+      }
+    }
+
+    if (eventLines.isNotEmpty) {
+      processEvent(eventLines.join('\n'));
+    }
+
+    return buffer.toString();
+  }
+
+  String _extractAiGatewayStreamText(String payload) {
+    final decoded = jsonDecode(_extractFirstJsonDocument(payload));
+    final map = asMap(decoded);
+    final choices = asList(map['choices']);
+    if (choices.isNotEmpty) {
+      final firstChoice = asMap(choices.first);
+      final delta = asMap(firstChoice['delta']);
+      final deltaContent = _extractAiGatewayContent(delta['content']);
+      if (deltaContent.isNotEmpty) {
+        return deltaContent;
+      }
+    }
+    return _extractAiGatewayAssistantText(decoded);
+  }
+
+  Future<void> _abortAiGatewayRun(String sessionKey) async {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    _aiGatewayAbortedSessionKeys.add(normalizedSessionKey);
+    final client = _aiGatewayStreamingClients.remove(normalizedSessionKey);
+    if (client != null) {
+      try {
+        client.close(force: true);
+      } catch (_) {
+        // Best effort only.
+      }
+    }
+    _aiGatewayPendingSessionKeys.remove(normalizedSessionKey);
+    _clearAiGatewayStreamingText(normalizedSessionKey);
+    _recomputeTasks();
+    _notifyIfActive();
+  }
+
+  bool _consumeAiGatewayAbort(String sessionKey) {
+    return _aiGatewayAbortedSessionKeys.remove(
+      _normalizedAssistantSessionKey(sessionKey),
+    );
+  }
+
   GatewayChatMessage _assistantErrorMessage(String text) {
     return GatewayChatMessage(
       id: _nextLocalMessageId(),
@@ -1638,11 +1911,30 @@ class AppController extends ChangeNotifier {
     );
   }
 
+  void _appendAssistantThreadMessage(
+    String sessionKey,
+    GatewayChatMessage message,
+  ) {
+    final key = _normalizedAssistantSessionKey(sessionKey);
+    final next = List<GatewayChatMessage>.from(
+      _assistantThreadMessages[key] ?? const <GatewayChatMessage>[],
+    )..add(message);
+    _assistantThreadMessages[key] = next;
+    _upsertAssistantThreadRecord(
+      key,
+      messages: next,
+      updatedAtMs:
+          message.timestampMs ??
+          DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    _notifyIfActive();
+  }
+
   void _appendLocalSessionMessage(
     String sessionKey,
     GatewayChatMessage message,
   ) {
-    final key = sessionKey.trim().isEmpty ? 'main' : sessionKey.trim();
+    final key = _normalizedAssistantSessionKey(sessionKey);
     final next = List<GatewayChatMessage>.from(
       _localSessionMessages[key] ?? const <GatewayChatMessage>[],
     )..add(message);
@@ -1651,13 +1943,183 @@ class AppController extends ChangeNotifier {
   }
 
   void _preserveGatewayHistoryForSession(String sessionKey) {
-    final key = sessionKey.trim().isEmpty ? 'main' : sessionKey.trim();
+    final key = _normalizedAssistantSessionKey(sessionKey);
     if (_chatController.messages.isEmpty) {
       return;
     }
     _gatewayHistoryCache[key] = List<GatewayChatMessage>.from(
       _chatController.messages,
     );
+  }
+
+  List<GatewaySessionSummary> _assistantSessionSummaries() {
+    final archivedKeys = settings.assistantArchivedTaskKeys
+        .map(_normalizedAssistantSessionKey)
+        .toSet();
+    final items = <GatewaySessionSummary>[];
+
+    for (final record in _assistantThreadRecords.values) {
+      final sessionKey = _normalizedAssistantSessionKey(record.sessionKey);
+      if (archivedKeys.contains(sessionKey) || record.archived) {
+        continue;
+      }
+      items.add(_assistantSessionSummaryFor(sessionKey, record: record));
+    }
+
+    final currentSessionKey = _normalizedAssistantSessionKey(
+      _sessionsController.currentSessionKey,
+    );
+    final hasCurrent = items.any(
+      (item) => matchesSessionKey(item.key, currentSessionKey),
+    );
+    if (!hasCurrent && !archivedKeys.contains(currentSessionKey)) {
+      items.add(_assistantSessionSummaryFor(currentSessionKey));
+    }
+
+    items.sort((left, right) {
+      return (right.updatedAtMs ?? 0).compareTo(left.updatedAtMs ?? 0);
+    });
+    return items;
+  }
+
+  GatewaySessionSummary _assistantSessionSummaryFor(
+    String sessionKey, {
+    AssistantThreadRecord? record,
+  }) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final resolvedRecord =
+        record ?? _assistantThreadRecords[normalizedSessionKey];
+    final messages =
+        resolvedRecord?.messages ??
+        _assistantThreadMessages[normalizedSessionKey] ??
+        const <GatewayChatMessage>[];
+    final preview = _assistantThreadPreview(messages);
+    final title = assistantCustomTaskTitle(normalizedSessionKey);
+    final lastMessage = messages.isNotEmpty ? messages.last : null;
+    final updatedAtMs =
+        resolvedRecord?.updatedAtMs ??
+        lastMessage?.timestampMs ??
+        DateTime.now().millisecondsSinceEpoch.toDouble();
+    return GatewaySessionSummary(
+      key: normalizedSessionKey,
+      kind: 'assistant',
+      displayName: title.isEmpty ? null : title,
+      surface: 'Assistant',
+      subject: preview,
+      room: null,
+      space: null,
+      updatedAtMs: updatedAtMs,
+      sessionId: normalizedSessionKey,
+      systemSent: false,
+      abortedLastRun: lastMessage?.error == true,
+      thinkingLevel: null,
+      verboseLevel: null,
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
+      model: resolvedAssistantModel,
+      contextTokens: null,
+      derivedTitle: title.isEmpty ? null : title,
+      lastMessagePreview: preview,
+    );
+  }
+
+  String? _assistantThreadPreview(List<GatewayChatMessage> messages) {
+    for (final message in messages.reversed) {
+      final role = message.role.trim().toLowerCase();
+      if (role != 'user' && role != 'assistant') {
+        continue;
+      }
+      final text = message.text.trim();
+      if (text.isNotEmpty) {
+        return text;
+      }
+    }
+    return null;
+  }
+
+  void _restoreAssistantThreads(List<AssistantThreadRecord> records) {
+    _assistantThreadRecords.clear();
+    _assistantThreadMessages.clear();
+    final archivedKeys = settings.assistantArchivedTaskKeys
+        .map(_normalizedAssistantSessionKey)
+        .toSet();
+    for (final record in records) {
+      final sessionKey = _normalizedAssistantSessionKey(record.sessionKey);
+      if (sessionKey.isEmpty) {
+        continue;
+      }
+      final titleFromSettings = assistantCustomTaskTitle(sessionKey);
+      final normalizedRecord = record.copyWith(
+        sessionKey: sessionKey,
+        title: titleFromSettings.isEmpty
+            ? record.title.trim()
+            : titleFromSettings,
+        archived: record.archived || archivedKeys.contains(sessionKey),
+      );
+      _assistantThreadRecords[sessionKey] = normalizedRecord;
+      if (normalizedRecord.messages.isNotEmpty) {
+        _assistantThreadMessages[sessionKey] = List<GatewayChatMessage>.from(
+          normalizedRecord.messages,
+        );
+      }
+    }
+  }
+
+  void _upsertAssistantThreadRecord(
+    String sessionKey, {
+    List<GatewayChatMessage>? messages,
+    double? updatedAtMs,
+    String? title,
+    bool? archived,
+  }) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final existing = _assistantThreadRecords[normalizedSessionKey];
+    final nextMessages =
+        messages ??
+        existing?.messages ??
+        _assistantThreadMessages[normalizedSessionKey] ??
+        const <GatewayChatMessage>[];
+    final nextRecord = AssistantThreadRecord(
+      sessionKey: normalizedSessionKey,
+      messages: nextMessages,
+      updatedAtMs:
+          updatedAtMs ??
+          existing?.updatedAtMs ??
+          (nextMessages.isNotEmpty ? nextMessages.last.timestampMs : null),
+      title: title ?? existing?.title ?? '',
+      archived:
+          archived ??
+          existing?.archived ??
+          isAssistantTaskArchived(normalizedSessionKey),
+    );
+    _assistantThreadRecords[normalizedSessionKey] = nextRecord;
+    if (messages != null) {
+      _assistantThreadMessages[normalizedSessionKey] =
+          List<GatewayChatMessage>.from(messages);
+    }
+    unawaited(
+      _store.saveAssistantThreadRecords(
+        _assistantThreadRecords.values.toList(growable: false),
+      ),
+    );
+  }
+
+  void _setAiGatewayStreamingText(String sessionKey, String text) {
+    final key = _normalizedAssistantSessionKey(sessionKey);
+    if (text.trim().isEmpty) {
+      _aiGatewayStreamingTextBySession.remove(key);
+    } else {
+      _aiGatewayStreamingTextBySession[key] = text;
+    }
+    _notifyIfActive();
+  }
+
+  void _clearAiGatewayStreamingText(String sessionKey) {
+    final key = _normalizedAssistantSessionKey(sessionKey);
+    if (_aiGatewayStreamingTextBySession.remove(key) != null) {
+      _notifyIfActive();
+    }
   }
 
   String _nextLocalMessageId() {
@@ -2046,7 +2508,7 @@ class AppController extends ChangeNotifier {
 
   void _recomputeTasks() {
     _tasksController.recompute(
-      sessions: _sessionsController.sessions,
+      sessions: sessions,
       cronJobs: _cronJobsController.items,
       currentSessionKey: _sessionsController.currentSessionKey,
       hasPendingRun: hasAssistantPendingRun,
@@ -2174,4 +2636,10 @@ class _AiGatewayChatException implements Exception {
 
   @override
   String toString() => message;
+}
+
+class _AiGatewayAbortException implements Exception {
+  const _AiGatewayAbortException(this.partialText);
+
+  final String partialText;
 }

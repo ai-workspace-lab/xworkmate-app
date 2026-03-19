@@ -63,6 +63,7 @@ class _AssistantPageState extends State<AssistantPage> {
   List<_ComposerAttachment> _attachments = const <_ComposerAttachment>[];
   List<String> _selectedSkillKeys = const <String>[];
   String? _lastSubmittedPrompt;
+  String? _lastSubmittedSessionKey;
   String? _lastAutoAgentLabel;
   List<String> _lastSubmittedAttachments = const <String>[];
 
@@ -473,12 +474,16 @@ class _AssistantPageState extends State<AssistantPage> {
         controller.hasAssistantPendingRun || controller.activeRunId != null;
     final lastMessage = messages.isEmpty ? null : messages.last;
     final lastRole = lastMessage?.role.toLowerCase();
-    if (_lastSubmittedPrompt != null) {
+    if (_lastSubmittedPrompt != null &&
+        _sessionKeysMatch(
+          _lastSubmittedSessionKey ?? '',
+          controller.currentSessionKey,
+        )) {
       final status = hasPendingTask
           ? 'running'
           : (lastMessage?.error ?? false)
           ? 'failed'
-          : (lastRole == 'user' ? 'queued' : 'completed');
+          : (lastRole == 'user' ? 'queued' : 'open');
       items.add(
         _TimelineItem.taskCard(
           title: _lastSubmittedPrompt!,
@@ -494,8 +499,8 @@ class _AssistantPageState extends State<AssistantPage> {
               'This execution returned an error',
             ),
             _ => appText(
-              '本次会话中的执行已结束',
-              'Execution finished in this conversation',
+              '本轮已回复，可继续在当前线程处理',
+              'This turn finished. You can continue in the same thread.',
             ),
           },
           detail: _lastSubmittedAttachments.isEmpty
@@ -574,6 +579,7 @@ class _AssistantPageState extends State<AssistantPage> {
 
     setState(() {
       _lastSubmittedPrompt = rawPrompt;
+      _lastSubmittedSessionKey = controller.currentSessionKey;
       _lastAutoAgentLabel =
           autoAgent?.name ?? _conversationOwnerLabel(controller);
       _lastSubmittedAttachments = attachmentNames;
@@ -841,6 +847,9 @@ class _AssistantPageState extends State<AssistantPage> {
   }
 
   List<_AssistantTaskEntry> _buildTaskEntries(AppController controller) {
+    _archivedTaskKeys
+      ..clear()
+      ..addAll(controller.settings.assistantArchivedTaskKeys);
     _synchronizeTaskSeeds(controller);
     final entries =
         _taskSeeds.values
@@ -915,8 +924,7 @@ class _AssistantPageState extends State<AssistantPage> {
             appText('等待继续执行这个任务', 'Waiting to continue this task'),
         status: _sessionStatus(
           session,
-          currentSessionKey: controller.currentSessionKey,
-          hasPendingRun: controller.hasAssistantPendingRun,
+          sessionPending: controller.assistantSessionHasPendingRun(session.key),
         ),
         updatedAtMs:
             session.updatedAtMs ??
@@ -1039,10 +1047,14 @@ class _AssistantPageState extends State<AssistantPage> {
       sessionKey,
       widget.controller.currentSessionKey,
     );
+    if (widget.controller.assistantSessionHasPendingRun(sessionKey)) {
+      return;
+    }
     setState(() {
       _archivedTaskKeys.add(sessionKey);
       _taskSeeds.removeWhere((key, _) => _sessionKeysMatch(key, sessionKey));
     });
+    await widget.controller.saveAssistantTaskArchived(sessionKey, true);
 
     if (!isCurrent) {
       return;
@@ -1185,7 +1197,7 @@ class _AssistantPageState extends State<AssistantPage> {
     if (last.role.trim().toLowerCase() == 'user') {
       return 'queued';
     }
-    return 'completed';
+    return 'open';
   }
 }
 
@@ -1744,8 +1756,8 @@ class _AssistantTaskRail extends StatelessWidget {
     final runningCount = tasks
         .where((task) => _normalizedTaskStatus(task.status) == 'running')
         .length;
-    final completedCount = tasks
-        .where((task) => _normalizedTaskStatus(task.status) == 'completed')
+    final openCount = tasks
+        .where((task) => _normalizedTaskStatus(task.status) == 'open')
         .length;
 
     return SurfaceCard(
@@ -1822,8 +1834,8 @@ class _AssistantTaskRail extends StatelessWidget {
                       icon: Icons.play_circle_outline_rounded,
                     ),
                     _MetaPill(
-                      label: '${appText('已完成', 'Completed')} $completedCount',
-                      icon: Icons.check_circle_outline_rounded,
+                      label: '${appText('当前', 'Open')} $openCount',
+                      icon: Icons.forum_outlined,
                     ),
                     _MetaPill(
                       label:
@@ -1879,6 +1891,8 @@ class _AssistantTaskRail extends StatelessWidget {
                       final task = tasks[index];
                       return _AssistantTaskTile(
                         entry: task,
+                        archiveEnabled:
+                            _normalizedTaskStatus(task.status) != 'running',
                         onTap: () async {
                           await onSelectTask(task.sessionKey);
                         },
@@ -1901,12 +1915,14 @@ class _AssistantTaskRail extends StatelessWidget {
 class _AssistantTaskTile extends StatelessWidget {
   const _AssistantTaskTile({
     required this.entry,
+    required this.archiveEnabled,
     required this.onTap,
     required this.onRename,
     required this.onArchive,
   });
 
   final _AssistantTaskEntry entry;
+  final bool archiveEnabled;
   final VoidCallback onTap;
   final VoidCallback onRename;
   final VoidCallback onArchive;
@@ -1985,7 +2001,7 @@ class _AssistantTaskTile extends StatelessWidget {
                 tooltip: appText('归档任务', 'Archive task'),
                 visualDensity: VisualDensity.compact,
                 splashRadius: 12,
-                onPressed: onArchive,
+                onPressed: archiveEnabled ? onArchive : null,
                 icon: Icon(
                   Icons.archive_outlined,
                   size: 18,
@@ -3545,7 +3561,7 @@ StatusInfo _statusInfoForTask(String status) => switch (status) {
   'Failed' => StatusInfo(appText('失败', 'Failed'), StatusTone.danger),
   'queued' ||
   'Queued' => StatusInfo(appText('排队中', 'Queued'), StatusTone.neutral),
-  _ => StatusInfo(appText('已完成', 'Completed'), StatusTone.success),
+  _ => StatusInfo(appText('可继续', 'Open'), StatusTone.success),
 };
 
 String _normalizedTaskStatus(String status) {
@@ -3555,7 +3571,8 @@ String _normalizedTaskStatus(String status) {
     'queued' => 'queued',
     'failed' => 'failed',
     'error' => 'error',
-    _ => 'completed',
+    'open' => 'open',
+    _ => 'open',
   };
 }
 
@@ -3616,19 +3633,18 @@ String? _sessionPreview(GatewaySessionSummary session) {
 
 String _sessionStatus(
   GatewaySessionSummary session, {
-  required String currentSessionKey,
-  required bool hasPendingRun,
+  required bool sessionPending,
 }) {
   if (session.abortedLastRun == true) {
     return 'failed';
   }
-  if (hasPendingRun && _sessionKeysMatch(session.key, currentSessionKey)) {
+  if (sessionPending) {
     return 'running';
   }
   if ((session.lastMessagePreview ?? '').trim().isEmpty) {
     return 'queued';
   }
-  return 'completed';
+  return 'open';
 }
 
 String _sessionUpdatedAtLabel(double? updatedAtMs) {
