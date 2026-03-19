@@ -60,7 +60,15 @@ void main() {
         AssistantExecutionTarget.aiGatewayOnly,
       );
 
-      await controller.sendChatMessage('First question', thinking: 'low');
+      const firstQuestion =
+          'Execution context:\n'
+          '- target: ai-gateway-only\n'
+          '- workspace_root: /opt/data/workspace\n'
+          '- permission: full-access\n\n'
+          '今天聊点什么';
+      const secondQuestion = '继续刚才的话题';
+
+      await controller.sendChatMessage(firstQuestion, thinking: 'low');
 
       await _waitFor(
         () => controller.chatMessages.any(
@@ -69,7 +77,7 @@ void main() {
         ),
       );
 
-      await controller.sendChatMessage('Second question', thinking: 'low');
+      await controller.sendChatMessage(secondQuestion, thinking: 'low');
 
       await _waitFor(
         () => controller.chatMessages.any(
@@ -82,12 +90,12 @@ void main() {
       expect(server.lastAuthorization, 'Bearer live-key');
       expect(server.requests.first['model'], 'qwen2.5-coder:latest');
       expect(server.requests.first['messages'], <Map<String, dynamic>>[
-        <String, dynamic>{'role': 'user', 'content': 'First question'},
+        <String, dynamic>{'role': 'user', 'content': firstQuestion},
       ]);
       expect(server.requests.last['messages'], <Map<String, dynamic>>[
-        <String, dynamic>{'role': 'user', 'content': 'First question'},
+        <String, dynamic>{'role': 'user', 'content': firstQuestion},
         <String, dynamic>{'role': 'assistant', 'content': 'FIRST_REPLY'},
-        <String, dynamic>{'role': 'user', 'content': 'Second question'},
+        <String, dynamic>{'role': 'user', 'content': secondQuestion},
       ]);
       expect(controller.connection.status, RuntimeConnectionStatus.offline);
       expect(controller.assistantConnectionStatusLabel, '仅 AI Gateway');
