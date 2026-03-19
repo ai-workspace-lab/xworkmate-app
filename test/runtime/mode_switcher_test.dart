@@ -15,18 +15,17 @@ class MockGatewayRuntime extends GatewayRuntime {
   }
 
   MockGatewayRuntime._(SecureConfigStore store)
-    : _storeForTest = store,
-      super(
-        store: store,
-        identityStore: DeviceIdentityStore(store),
-      );
-
-  final SecureConfigStore _storeForTest;
+    : super(store: store, identityStore: DeviceIdentityStore(store));
   final StreamController<GatewayPushEvent> _eventsController =
       StreamController<GatewayPushEvent>.broadcast();
   GatewayConnectionSnapshot _snapshot = GatewayConnectionSnapshot.initial();
   bool _isConnected = false;
   final List<Map<String, dynamic>> _requests = [];
+  final Set<RuntimeConnectionMode> _failingModes = <RuntimeConnectionMode>{};
+
+  void failNextConnectFor(RuntimeConnectionMode mode) {
+    _failingModes.add(mode);
+  }
 
   void setConnected(bool connected) {
     _isConnected = connected;
@@ -37,14 +36,18 @@ class MockGatewayRuntime extends GatewayRuntime {
       statusText: connected ? 'Connected' : 'Offline',
     );
     notifyListeners();
-    
+
     // Emit connection event
     if (connected) {
-      _eventsController.add(
-        const GatewayPushEvent(
-          event: 'gateway/connected',
-          payload: <String, dynamic>{},
-        ),
+      unawaited(
+        Future<void>.delayed(Duration.zero, () {
+          _eventsController.add(
+            const GatewayPushEvent(
+              event: 'gateway/connected',
+              payload: <String, dynamic>{},
+            ),
+          );
+        }),
       );
     }
   }
@@ -77,26 +80,33 @@ class MockGatewayRuntime extends GatewayRuntime {
     String authTokenOverride = '',
     String authPasswordOverride = '',
   }) async {
+    if (_failingModes.remove(profile.mode)) {
+      throw StateError('Failed to connect ${profile.mode.name}');
+    }
     _isConnected = true;
     _snapshot = GatewayConnectionSnapshot.initial(mode: profile.mode).copyWith(
       status: RuntimeConnectionStatus.connected,
       statusText: 'Connected',
     );
     notifyListeners();
-    _eventsController.add(
-      const GatewayPushEvent(
-        event: 'gateway/connected',
-        payload: <String, dynamic>{},
-      ),
+    unawaited(
+      Future<void>.delayed(Duration.zero, () {
+        _eventsController.add(
+          const GatewayPushEvent(
+            event: 'gateway/connected',
+            payload: <String, dynamic>{},
+          ),
+        );
+      }),
     );
   }
 
   @override
   Future<void> disconnect({bool clearDesiredProfile = true}) async {
     _isConnected = false;
-    _snapshot = GatewayConnectionSnapshot.initial(mode: _snapshot.mode).copyWith(
-      statusText: 'Offline',
-    );
+    _snapshot = GatewayConnectionSnapshot.initial(
+      mode: _snapshot.mode,
+    ).copyWith(statusText: 'Offline');
     notifyListeners();
   }
 
@@ -120,10 +130,19 @@ void main() {
   group('ModeSwitcherState', () {
     test('has all expected states', () {
       expect(ModeSwitcherState.values, hasLength(6));
-      expect(ModeSwitcherState.values, contains(ModeSwitcherState.disconnected));
+      expect(
+        ModeSwitcherState.values,
+        contains(ModeSwitcherState.disconnected),
+      );
       expect(ModeSwitcherState.values, contains(ModeSwitcherState.connecting));
-      expect(ModeSwitcherState.values, contains(ModeSwitcherState.connectedLocal));
-      expect(ModeSwitcherState.values, contains(ModeSwitcherState.connectedRemote));
+      expect(
+        ModeSwitcherState.values,
+        contains(ModeSwitcherState.connectedLocal),
+      );
+      expect(
+        ModeSwitcherState.values,
+        contains(ModeSwitcherState.connectedRemote),
+      );
       expect(ModeSwitcherState.values, contains(ModeSwitcherState.offline));
       expect(ModeSwitcherState.values, contains(ModeSwitcherState.error));
     });
@@ -268,12 +287,28 @@ void main() {
     });
 
     test('autoSelect falls back to local when remote fails', () async {
-      // Don't set gateway as connected, remote will fail
+      mockGateway.failNextConnectFor(RuntimeConnectionMode.remote);
 
       final result = await modeSwitcher.autoSelect();
 
-      // Should fall back to offline since both remote and local fail
-      expect(result.mode, equals(GatewayMode.offline));
+      expect(result.success, isTrue);
+      expect(result.mode, equals(GatewayMode.local));
+      expect(modeSwitcher.currentMode, equals(GatewayMode.local));
     });
+
+    test(
+      'autoSelect falls back to offline when remote and local fail',
+      () async {
+        mockGateway
+          ..failNextConnectFor(RuntimeConnectionMode.remote)
+          ..failNextConnectFor(RuntimeConnectionMode.local);
+
+        final result = await modeSwitcher.autoSelect();
+
+        expect(result.success, isTrue);
+        expect(result.mode, equals(GatewayMode.offline));
+        expect(modeSwitcher.currentMode, equals(GatewayMode.offline));
+      },
+    );
   });
 }

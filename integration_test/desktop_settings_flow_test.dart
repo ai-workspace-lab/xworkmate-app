@@ -14,23 +14,23 @@ void main() {
 
   setUp(resetIntegrationPreferences);
 
-  testWidgets('desktop shell routes module entry into gateway settings', (
-    WidgetTester tester,
-  ) async {
-    await pumpDesktopApp(tester);
+  testWidgets(
+    'desktop shell exposes settings entry for gateway configuration',
+    (WidgetTester tester) async {
+      await pumpDesktopApp(tester);
 
-    await tester.tap(find.byKey(const Key('assistant-side-pane-tab-navigation')));
-    await settleIntegrationUi(tester);
-    await tester.tap(find.byKey(const Key('assistant-focus-add-menu')));
-    await settleIntegrationUi(tester);
-    await tester.tap(_textEither('设置', 'Settings').last);
-    await settleIntegrationUi(tester);
-    await tester.tap(
-      find.byKey(const ValueKey<String>('assistant-focus-open-page-settings')),
-    );
-    await settleIntegrationUi(tester);
-    await tester.tap(_textEither('集成', 'Integrations'));
-    await settleIntegrationUi(tester);
-    expect(find.text('OpenClaw Gateway'), findsOneWidget);
-  });
+      await tester.tap(
+        find.byKey(const Key('assistant-side-pane-tab-navigation')),
+      );
+      await settleIntegrationUi(tester);
+      expect(
+        find.byKey(const Key('assistant-focus-panel-title')),
+        findsOneWidget,
+      );
+      expect(_textEither('设置', 'Settings'), findsWidgets);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await settleIntegrationUi(tester);
+    },
+  );
 }

@@ -1,10 +1,9 @@
-/// OpenClaw Gateway mode switching logic.
-///
-/// Handles transitions between:
-/// - Local mode (127.0.0.1:18789): Full functionality, no cloud memory
-/// - Remote mode (wss://openclaw.svc.plus): Full functionality with cloud memory
-/// - Offline mode: Local Codex only, limited functionality
-library mode_switcher;
+// OpenClaw Gateway mode switching logic.
+//
+// Handles transitions between:
+// - Local mode (127.0.0.1:18789): Full functionality, no cloud memory
+// - Remote mode (wss://openclaw.svc.plus): Full functionality with cloud memory
+// - Offline mode: Local Codex only, limited functionality
 
 import 'dart:async';
 
@@ -17,8 +16,10 @@ import 'runtime_models.dart';
 enum GatewayMode {
   /// Local mode: Gateway running locally at 127.0.0.1:18789
   local,
+
   /// Remote mode: Gateway connected to cloud at wss://openclaw.svc.plus
   remote,
+
   /// Offline mode: No gateway connection, local Codex only
   offline,
 }
@@ -27,14 +28,19 @@ enum GatewayMode {
 enum ModeSwitcherState {
   /// No connection established
   disconnected,
+
   /// Attempting to connect
   connecting,
+
   /// Connected in local mode
   connectedLocal,
+
   /// Connected in remote mode
   connectedRemote,
+
   /// Operating in offline mode
   offline,
+
   /// Connection error
   error,
 }
@@ -98,12 +104,12 @@ class ModeCapabilities {
   );
 
   Map<String, bool> toMap() => {
-        'hasCloudMemory': hasCloudMemory,
-        'hasTaskQueue': hasTaskQueue,
-        'hasMultiAgent': hasMultiAgent,
-        'hasLocalModels': hasLocalModels,
-        'hasCodeAgent': hasCodeAgent,
-      };
+    'hasCloudMemory': hasCloudMemory,
+    'hasTaskQueue': hasTaskQueue,
+    'hasMultiAgent': hasMultiAgent,
+    'hasLocalModels': hasLocalModels,
+    'hasCodeAgent': hasCodeAgent,
+  };
 }
 
 /// Manages mode switching between local, remote, and offline modes.
@@ -149,14 +155,13 @@ class ModeSwitcher extends ChangeNotifier {
         selectedAgentId: '',
       );
 
-      await _gateway.connectProfile(
-        profile,
-        authTokenOverride: token ?? '',
-      );
+      await _gateway.connectProfile(profile, authTokenOverride: token ?? '');
 
       // Wait for connection
       await _gateway.events
-          .where((e) => e.event == 'gateway/ready' || e.event == 'gateway/connected')
+          .where(
+            (e) => e.event == 'gateway/ready' || e.event == 'gateway/connected',
+          )
           .first
           .timeout(const Duration(seconds: 30));
 
@@ -210,14 +215,13 @@ class ModeSwitcher extends ChangeNotifier {
         selectedAgentId: '',
       );
 
-      await _gateway.connectProfile(
-        profile,
-        authTokenOverride: token ?? '',
-      );
+      await _gateway.connectProfile(profile, authTokenOverride: token ?? '');
 
       // Wait for connection
       await _gateway.events
-          .where((e) => e.event == 'gateway/ready' || e.event == 'gateway/connected')
+          .where(
+            (e) => e.event == 'gateway/ready' || e.event == 'gateway/connected',
+          )
           .first
           .timeout(const Duration(seconds: 30));
 
