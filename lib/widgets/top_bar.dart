@@ -71,11 +71,7 @@ class TopBar extends StatelessWidget {
 }
 
 class AppBreadcrumbItem {
-  const AppBreadcrumbItem({
-    required this.label,
-    this.onTap,
-    this.icon,
-  });
+  const AppBreadcrumbItem({required this.label, this.onTap, this.icon});
 
   final String label;
   final VoidCallback? onTap;
@@ -149,10 +145,12 @@ class _BreadcrumbChip extends StatelessWidget {
     final body = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: item.onTap != null
-            ? palette.surfaceSecondary
-            : palette.surfacePrimary,
-        borderRadius: BorderRadius.circular(999),
+        color:
+            (item.onTap != null
+                    ? palette.surfaceSecondary
+                    : palette.surfacePrimary)
+                .withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: palette.strokeSoft),
       ),
       child: content,

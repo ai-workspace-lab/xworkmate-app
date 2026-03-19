@@ -47,17 +47,22 @@ class _SurfaceCardState extends State<SurfaceCard> {
     };
     final decoration = switch (widget.tone) {
       SurfaceCardTone.standard => BoxDecoration(
-        color: _hovered && widget.onTap != null ? hoveredColor : baseColor,
+        color: (_hovered && widget.onTap != null ? hoveredColor : baseColor)
+            .withValues(alpha: 0.94),
         border: Border.all(color: borderColor),
         borderRadius: BorderRadius.circular(widget.borderRadius),
+        boxShadow: widget.onTap != null && _hovered
+            ? [palette.chromeShadowLift]
+            : const [],
       ),
       SurfaceCardTone.chrome => BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            palette.chromeHighlight.withValues(alpha: 0.94),
-            _hovered && widget.onTap != null ? hoveredColor : baseColor,
+            palette.chromeHighlight.withValues(alpha: 0.92),
+            (_hovered && widget.onTap != null ? hoveredColor : baseColor)
+                .withValues(alpha: 0.9),
           ],
         ),
         border: Border.all(color: borderColor),
@@ -74,7 +79,7 @@ class _SurfaceCardState extends State<SurfaceCard> {
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        curve: Curves.easeInOut,
+        curve: Curves.easeOutCubic,
         decoration: decoration,
         child: Material(
           color: Colors.transparent,

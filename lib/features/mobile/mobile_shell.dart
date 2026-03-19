@@ -14,6 +14,7 @@ import '../../features/tasks/tasks_page.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
+import '../../theme/app_palette.dart';
 import '../../widgets/detail_drawer.dart';
 import '../../widgets/gateway_connect_dialog.dart';
 
@@ -37,21 +38,10 @@ extension on MobileShellTab {
   };
 }
 
-const _background = Color(0xFFF3EFF6);
-const _surface = Colors.white;
-const _surfaceSoft = Color(0xFFF7F4FB);
-const _stroke = Color(0xFFE3DDEE);
-const _textPrimary = Color(0xFF101113);
-const _textSecondary = Color(0xFF8A8694);
-const _accentStart = Color(0xFF7C88F8);
-const _accentEnd = Color(0xFF6757EF);
-const _accentSoft = Color(0xFFD9D5FA);
-const _blueSoft = Color(0xFFDCE4F1);
-const _blueLine = Color(0xFF6285A6);
-const _greenSoft = Color(0xFFDCEFE2);
-const _greenLine = Color(0xFF62C56A);
-const _orangeSoft = Color(0xFFF5E7D9);
-const _orangeLine = Color(0xFFE1913E);
+const _tealSoft = Color(0xFFDDF3EF);
+const _tealLine = Color(0xFF49A892);
+const _violetSoft = Color(0xFFECE2FF);
+const _violetLine = Color(0xFF7A61B6);
 
 class MobileShell extends StatefulWidget {
   const MobileShell({super.key, required this.controller});
@@ -242,20 +232,32 @@ class _MobileShellState extends State<MobileShell> {
                 'mobile-shell-${widget.controller.destination.name}',
               );
         final detailPanel = widget.controller.detailPanel;
+        final palette = context.palette;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
 
         return Scaffold(
-          backgroundColor: _background,
+          backgroundColor: palette.canvas,
           body: Stack(
             children: [
-              const Positioned(
+              Positioned(
                 top: 100,
                 left: -80,
-                child: _GlowOrb(size: 220, color: Color(0x1A8C89FF)),
+                child: _GlowOrb(
+                  size: 220,
+                  color: palette.accentMuted.withValues(
+                    alpha: isDark ? 0.36 : 0.6,
+                  ),
+                ),
               ),
-              const Positioned(
+              Positioned(
                 right: -90,
                 bottom: 220,
-                child: _GlowOrb(size: 260, color: Color(0x143AB08F)),
+                child: _GlowOrb(
+                  size: 260,
+                  color: palette.chromeHighlight.withValues(
+                    alpha: isDark ? 0.16 : 0.4,
+                  ),
+                ),
               ),
               SafeArea(
                 child: Padding(
@@ -264,11 +266,21 @@ class _MobileShellState extends State<MobileShell> {
                     children: [
                       Expanded(
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(32),
+                          borderRadius: BorderRadius.circular(28),
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              color: _surface.withValues(alpha: 0.94),
-                              border: Border.all(color: _stroke),
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  palette.chromeHighlight.withValues(
+                                    alpha: isDark ? 0.16 : 0.9,
+                                  ),
+                                  palette.chromeSurface.withValues(alpha: 0.94),
+                                ],
+                              ),
+                              border: Border.all(color: palette.chromeStroke),
+                              boxShadow: [palette.chromeShadowAmbient],
                             ),
                             child: AnimatedSwitcher(
                               duration: const Duration(milliseconds: 220),
@@ -298,7 +310,7 @@ class _MobileShellState extends State<MobileShell> {
                   child: GestureDetector(
                     onTap: widget.controller.closeDetail,
                     child: Container(
-                      color: Colors.black.withValues(alpha: 0.12),
+                      color: Colors.black.withValues(alpha: 0.14),
                     ),
                   ),
                 ),
@@ -335,48 +347,49 @@ class _MobileWorkspaceLauncher extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final connection = controller.connection;
+    final palette = context.palette;
     final entries = <_WorkspaceEntry>[
       _WorkspaceEntry(
         destination: WorkspaceDestination.skills,
         subtitle: appText('技能包与依赖状态', 'Packages and dependency status'),
-        iconColor: _blueLine,
-        iconBackground: _blueSoft,
+        iconColor: palette.accent,
+        iconBackground: palette.accentMuted,
       ),
       _WorkspaceEntry(
         destination: WorkspaceDestination.nodes,
         subtitle: appText('边缘节点与实例', 'Edge nodes and instances'),
-        iconColor: const Color(0xFF5CC9B7),
-        iconBackground: const Color(0xFFDDF3EF),
+        iconColor: _tealLine,
+        iconBackground: _tealSoft,
       ),
       _WorkspaceEntry(
         destination: WorkspaceDestination.agents,
         subtitle: appText('代理运行态与配置', 'Agent state and configuration'),
-        iconColor: _orangeLine,
-        iconBackground: _orangeSoft,
+        iconColor: palette.warning,
+        iconBackground: palette.warning.withValues(alpha: 0.12),
       ),
       _WorkspaceEntry(
         destination: WorkspaceDestination.mcpServer,
         subtitle: appText('MCP 连接与工具注册', 'MCP endpoints and tools'),
-        iconColor: const Color(0xFF5E7CE2),
-        iconBackground: const Color(0xFFE1E8FB),
+        iconColor: palette.accent,
+        iconBackground: palette.accentMuted,
       ),
       _WorkspaceEntry(
         destination: WorkspaceDestination.clawHub,
         subtitle: appText('技能与模板市场', 'Marketplace and templates'),
-        iconColor: const Color(0xFF845EC2),
-        iconBackground: const Color(0xFFECE2FF),
+        iconColor: _violetLine,
+        iconBackground: _violetSoft,
       ),
       _WorkspaceEntry(
         destination: WorkspaceDestination.aiGateway,
         subtitle: appText('模型与代理网关', 'Models and agent gateway'),
-        iconColor: const Color(0xFF6B5CF2),
-        iconBackground: _accentSoft,
+        iconColor: palette.accent,
+        iconBackground: palette.accentMuted,
       ),
       _WorkspaceEntry(
         destination: WorkspaceDestination.account,
         subtitle: appText('身份、工作区与会话', 'Identity, workspace and sessions'),
-        iconColor: _greenLine,
-        iconBackground: _greenSoft,
+        iconColor: palette.success,
+        iconBackground: palette.success.withValues(alpha: 0.12),
       ),
     ];
 
@@ -469,21 +482,24 @@ class _LauncherHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.palette;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 30,
-            fontWeight: FontWeight.w800,
-            color: _textPrimary,
+          style: theme.textTheme.displaySmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: palette.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
         Text(
           subtitle,
-          style: const TextStyle(fontSize: 16, color: _textSecondary),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: palette.textSecondary,
+          ),
         ),
         const SizedBox(height: 16),
         Wrap(
@@ -521,47 +537,54 @@ class _WorkspaceHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.palette;
     final statusLabel = connection.status == RuntimeConnectionStatus.connected
         ? appText('会话已就绪', 'Session Ready')
         : appText('等待接入', 'Awaiting Connection');
     final statusColor = connection.status == RuntimeConnectionStatus.connected
-        ? _greenLine
-        : _textSecondary;
+        ? palette.success
+        : palette.textSecondary;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: _stroke, width: 1.2),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            palette.chromeHighlight.withValues(alpha: 0.86),
+            palette.surfacePrimary.withValues(alpha: 0.94),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: palette.strokeSoft),
+        boxShadow: [palette.chromeShadowAmbient],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             statusLabel,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: statusColor,
-            ),
+            style: theme.textTheme.labelLarge?.copyWith(color: statusColor),
           ),
           const SizedBox(height: 10),
           Text(
             connection.remoteAddress ?? 'xworkmate.svc.plus',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: _textPrimary,
+            style: theme.textTheme.displaySmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: palette.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             activeAgentName,
-            style: const TextStyle(fontSize: 16, color: _textSecondary),
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: palette.textSecondary,
+            ),
           ),
           const SizedBox(height: 18),
           Wrap(
@@ -604,23 +627,24 @@ class _HeroMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.palette;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: _surfaceSoft,
-        borderRadius: BorderRadius.circular(18),
+        color: palette.surfaceSecondary.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.strokeSoft),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: _blueLine),
+          Icon(icon, size: 18, color: palette.accent),
           const SizedBox(width: 8),
           Text(
             '$label · $value',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: _textPrimary,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: palette.textPrimary,
             ),
           ),
         ],
@@ -637,17 +661,26 @@ class _WorkspaceShortcutCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.palette;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(24),
         child: Ink(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: _surface,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: _stroke, width: 1.2),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                palette.chromeHighlight.withValues(alpha: 0.84),
+                palette.surfacePrimary.withValues(alpha: 0.94),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: palette.strokeSoft),
           ),
           child: Row(
             children: [
@@ -671,10 +704,10 @@ class _WorkspaceShortcutCard extends StatelessWidget {
                   children: [
                     Text(
                       entry.destination.label,
-                      style: const TextStyle(
+                      style: theme.textTheme.headlineSmall?.copyWith(
                         fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: _textPrimary,
+                        fontWeight: FontWeight.w700,
+                        color: palette.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -682,16 +715,15 @@ class _WorkspaceShortcutCard extends StatelessWidget {
                       entry.subtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: _textSecondary,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: palette.textSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
-              const Icon(Icons.chevron_right_rounded, color: _textSecondary),
+              Icon(Icons.chevron_right_rounded, color: palette.textSecondary),
             ],
           ),
         ),
@@ -708,10 +740,15 @@ class _GradientActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [_accentStart, _accentEnd]),
-        borderRadius: BorderRadius.circular(999),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [palette.accent, palette.accentHover],
+        ),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: FilledButton(
         onPressed: onPressed,
@@ -719,6 +756,9 @@ class _GradientActionButton extends StatelessWidget {
           backgroundColor: Colors.transparent,
           foregroundColor: Colors.white,
           shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         ),
         child: Text(label),
@@ -735,12 +775,14 @@ class _BottomPillNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: const Color(0xF8FFFFFF),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: _stroke),
+        color: palette.surfacePrimary.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: palette.strokeSoft),
+        boxShadow: [palette.chromeShadowAmbient],
       ),
       child: Row(
         children: MobileShellTab.values
@@ -754,9 +796,9 @@ class _BottomPillNav extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
                       color: currentTab == tab
-                          ? _surfaceSoft
+                          ? palette.surfaceSecondary
                           : Colors.transparent,
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -764,7 +806,9 @@ class _BottomPillNav extends StatelessWidget {
                         Icon(
                           tab.icon,
                           size: 24,
-                          color: currentTab == tab ? _blueLine : _textPrimary,
+                          color: currentTab == tab
+                              ? palette.accent
+                              : palette.textPrimary,
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -774,7 +818,9 @@ class _BottomPillNav extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: currentTab == tab ? _blueLine : _textPrimary,
+                            color: currentTab == tab
+                                ? palette.accent
+                                : palette.textPrimary,
                           ),
                         ),
                       ],

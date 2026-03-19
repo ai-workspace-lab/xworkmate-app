@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 
 class DesktopWorkspaceScaffold extends StatelessWidget {
   const DesktopWorkspaceScaffold({
@@ -48,7 +49,7 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
                           style: Theme.of(context).textTheme.labelMedium
                               ?.copyWith(
                                 color: palette.textMuted,
-                                letterSpacing: 0.2,
+                                letterSpacing: 0.32,
                               ),
                         ),
                         const SizedBox(height: 6),
@@ -101,16 +102,16 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    palette.chromeHighlight.withValues(alpha: 0.96),
-                    palette.chromeSurface,
+                    palette.chromeHighlight.withValues(alpha: 0.9),
+                    palette.chromeSurface.withValues(alpha: 0.92),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.card),
                 border: Border.all(color: palette.chromeStroke),
                 boxShadow: [palette.chromeShadowAmbient],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.card),
                 child: child,
               ),
             ),
