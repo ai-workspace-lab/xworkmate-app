@@ -38,6 +38,32 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
   RuntimeConnectionMode _connectionMode = RuntimeConnectionMode.remote;
   bool _submitting = false;
 
+  bool get _isAiGatewayOnlyMode =>
+      _mode == 'manual' &&
+      _connectionMode == RuntimeConnectionMode.unconfigured;
+
+  bool get _manualGatewayFieldsEnabled => !_isAiGatewayOnlyMode;
+
+  bool get _credentialFieldsEnabled =>
+      _mode == 'setup' || _manualGatewayFieldsEnabled;
+
+  String _connectionModeLabel(RuntimeConnectionMode mode) {
+    return switch (mode) {
+      RuntimeConnectionMode.unconfigured => appText(
+        '仅 AI Gateway',
+        'AI Gateway Only',
+      ),
+      RuntimeConnectionMode.local => appText(
+        '本地 OpenClaw Gateway',
+        'Local OpenClaw Gateway',
+      ),
+      RuntimeConnectionMode.remote => appText(
+        '远程 OpenClaw Gateway',
+        'Remote OpenClaw Gateway',
+      ),
+    };
+  }
+
   @override
   void initState() {
     super.initState();
@@ -93,6 +119,9 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
     final typedGatewayToken = _tokenController.text.trim();
     final willUseStoredGatewayToken =
         typedGatewayToken.isEmpty && hasStoredGatewayToken;
+    final showSharedTokenStatusCard =
+        _credentialFieldsEnabled &&
+        (willUseStoredGatewayToken || typedGatewayToken.isNotEmpty);
     final body = Theme(
       data: theme.copyWith(
         inputDecorationTheme: theme.inputDecorationTheme.copyWith(
@@ -119,8 +148,8 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
             const SizedBox(height: AppSpacing.section),
             Text(
               appText(
-                '通过配置码或手动 Host / TLS 将 XWorkmate 连接到 OpenClaw Gateway。',
-                'Connect XWorkmate to an OpenClaw gateway with setup code or manual host / TLS.',
+                '通过配置码或手动 Host / TLS 将 XWorkmate 连接到 OpenClaw Gateway。也可切换到仅 AI Gateway 模式，仅使用模型路由而不建立 Gateway 会话。',
+                'Connect XWorkmate to an OpenClaw gateway with setup code or manual host / TLS. You can also switch to AI Gateway Only mode to use model routing without opening a gateway session.',
               ),
               style: supportingCopyStyle,
             ),
@@ -159,13 +188,13 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
               DropdownButtonFormField<RuntimeConnectionMode>(
                 initialValue: _connectionMode,
                 decoration: InputDecoration(
-                  labelText: appText('连接模式', 'Connection Mode'),
+                  labelText: appText('工作模式', 'Work Mode'),
                 ),
                 items: RuntimeConnectionMode.values
                     .map(
                       (mode) => DropdownMenuItem<RuntimeConnectionMode>(
                         value: mode,
-                        child: Text(mode.label),
+                        child: Text(_connectionModeLabel(mode)),
                       ),
                     )
                     .toList(),
@@ -183,9 +212,24 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                   });
                 },
               ),
+              if (_isAiGatewayOnlyMode) ...[
+                const SizedBox(height: 10),
+                Text(
+                  appText(
+                    '当前模式仅通过 AI Gateway 处理任务，不会建立 OpenClaw Gateway 会话。',
+                    'This mode routes tasks through AI Gateway only and does not establish an OpenClaw Gateway session.',
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 12,
+                    height: 16 / 12,
+                    color: palette.textSecondary,
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               TextField(
                 controller: _hostController,
+                enabled: _manualGatewayFieldsEnabled,
                 decoration: InputDecoration(labelText: appText('主机', 'Host')),
               ),
               const SizedBox(height: 12),
@@ -196,6 +240,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                     flex: 3,
                     child: TextField(
                       controller: _portController,
+                      enabled: _manualGatewayFieldsEnabled,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                         labelText: appText('端口', 'Port'),
@@ -208,8 +253,12 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                     child: _TlsToggleCard(
                       value: _tls,
                       label: appText('TLS', 'TLS'),
-                      enabled: _connectionMode != RuntimeConnectionMode.local,
-                      onChanged: _connectionMode == RuntimeConnectionMode.local
+                      enabled:
+                          _manualGatewayFieldsEnabled &&
+                          _connectionMode != RuntimeConnectionMode.local,
+                      onChanged:
+                          !_manualGatewayFieldsEnabled ||
+                              _connectionMode == RuntimeConnectionMode.local
                           ? null
                           : (value) => setState(() => _tls = value),
                     ),
@@ -222,6 +271,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
             const SizedBox(height: 8),
             TextField(
               controller: _tokenController,
+              enabled: _credentialFieldsEnabled,
               obscureText: _obscureSharedToken,
               enableSuggestions: false,
               autocorrect: false,
@@ -235,9 +285,11 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                   tooltip: _obscureSharedToken
                       ? appText('显示 Token', 'Show token')
                       : appText('隐藏 Token', 'Hide token'),
-                  onPressed: () => setState(
-                    () => _obscureSharedToken = !_obscureSharedToken,
-                  ),
+                  onPressed: !_credentialFieldsEnabled
+                      ? null
+                      : () => setState(
+                          () => _obscureSharedToken = !_obscureSharedToken,
+                        ),
                   icon: Icon(
                     _obscureSharedToken
                         ? Icons.visibility_off_rounded
@@ -247,7 +299,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
               ),
               onChanged: (_) => setState(() {}),
             ),
-            if (willUseStoredGatewayToken || typedGatewayToken.isNotEmpty) ...[
+            if (showSharedTokenStatusCard) ...[
               const SizedBox(height: 10),
               _SharedTokenStatusCard(
                 hasStoredGatewayToken: hasStoredGatewayToken,
@@ -268,6 +320,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
             const SizedBox(height: 12),
             TextField(
               controller: _passwordController,
+              enabled: _credentialFieldsEnabled,
               obscureText: true,
               decoration: InputDecoration(
                 labelText: appText('密码', 'Password'),
@@ -300,8 +353,12 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                     icon: const Icon(Icons.wifi_tethering_rounded),
                     label: Text(
                       _submitting
-                          ? appText('连接中…', 'Connecting…')
-                          : appText('连接', 'Connect'),
+                          ? (_isAiGatewayOnlyMode
+                                ? appText('应用中…', 'Applying…')
+                                : appText('连接中…', 'Connecting…'))
+                          : (_isAiGatewayOnlyMode
+                                ? appText('应用模式', 'Apply Mode')
+                                : appText('连接', 'Connect')),
                     ),
                   ),
                 ),
@@ -342,7 +399,9 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
         profile.port == defaults.port;
     setState(() {
       if (shouldPrefillEndpoint) {
-        _connectionMode = preferred.mode;
+        if (_connectionMode != RuntimeConnectionMode.unconfigured) {
+          _connectionMode = preferred.mode;
+        }
         _hostController.text = preferred.host;
         _portController.text = '${preferred.port}';
         _tls = preferred.tls;
@@ -368,6 +427,33 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
           token: resolvedToken,
           password: _passwordController.text,
         );
+      } else if (_connectionMode == RuntimeConnectionMode.unconfigured) {
+        final currentSettings = widget.controller.settings;
+        final currentProfile = currentSettings.gateway;
+        final resolvedHost = _hostController.text.trim().isEmpty
+            ? currentProfile.host
+            : _hostController.text.trim();
+        final resolvedPort =
+            int.tryParse(_portController.text.trim()) ?? currentProfile.port;
+        final nextProfile = currentProfile.copyWith(
+          mode: RuntimeConnectionMode.unconfigured,
+          useSetupCode: false,
+          setupCode: '',
+          host: resolvedHost,
+          port: resolvedPort <= 0 ? currentProfile.port : resolvedPort,
+          tls: _tls,
+        );
+        await widget.controller.saveSettings(
+          currentSettings.copyWith(
+            gateway: nextProfile,
+            assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
+          ),
+          refreshAfterSave: false,
+        );
+        if (widget.controller.connection.status ==
+            RuntimeConnectionStatus.connected) {
+          await widget.controller.disconnectGateway();
+        }
       } else {
         await widget.controller.connectManual(
           host: _hostController.text,

@@ -2073,7 +2073,7 @@ class _ComposerBar extends StatelessWidget {
               const SizedBox(width: 6),
               PopupMenuButton<AssistantExecutionTarget>(
                 key: const Key('assistant-execution-target-button'),
-                tooltip: appText('本地或远程', 'Local or remote'),
+                tooltip: appText('任务对话模式', 'Task Dialog Mode'),
                 onSelected: (value) {
                   controller.setAssistantExecutionTarget(value);
                 },
@@ -2608,6 +2608,7 @@ class _ComposerToolbarChipState extends State<_ComposerToolbarChip> {
 
 extension on AssistantExecutionTarget {
   IconData get icon => switch (this) {
+    AssistantExecutionTarget.aiGatewayOnly => Icons.hub_outlined,
     AssistantExecutionTarget.local => Icons.computer_outlined,
     AssistantExecutionTarget.remote => Icons.cloud_outlined,
   };

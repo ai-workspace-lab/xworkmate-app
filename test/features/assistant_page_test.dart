@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/features/assistant/assistant_page.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
 
 import '../test_support.dart';
 
@@ -174,16 +175,27 @@ void main() {
       child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
     );
 
-    expect(find.textContaining('Claw'), findsNothing);
     expect(find.text('幻灯片'), findsNothing);
     expect(find.text('视频生成'), findsNothing);
     expect(find.text('深度研究'), findsNothing);
     expect(find.text('自动化'), findsNothing);
     expect(find.textContaining('输入需求、补充上下文、继续追问'), findsOneWidget);
-    expect(find.byKey(const Key('assistant-attachment-menu-button')), findsOneWidget);
-    expect(find.byKey(const Key('assistant-execution-target-button')), findsOneWidget);
-    expect(find.byKey(const Key('assistant-skill-picker-button')), findsOneWidget);
-    expect(find.byKey(const Key('assistant-permission-button')), findsOneWidget);
+    expect(
+      find.byKey(const Key('assistant-attachment-menu-button')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('assistant-execution-target-button')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('assistant-skill-picker-button')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('assistant-permission-button')),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('assistant-model-button')), findsOneWidget);
     expect(find.byKey(const Key('assistant-thinking-button')), findsOneWidget);
     expect(find.byTooltip('模式'), findsNothing);
@@ -199,11 +211,22 @@ void main() {
     await tester.tapAt(const Offset(24, 24));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('assistant-execution-target-button')));
+    await tester.tap(
+      find.byKey(const Key('assistant-execution-target-button')),
+    );
     await tester.pumpAndSettle();
 
-    expect(find.text('本地'), findsWidgets);
-    expect(find.text('远程'), findsOneWidget);
+    expect(find.text('仅 AI Gateway'), findsOneWidget);
+    expect(find.text('本地 OpenClaw Gateway'), findsWidgets);
+    expect(find.text('远程 OpenClaw Gateway'), findsOneWidget);
+
+    await tester.tap(find.text('仅 AI Gateway').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.assistantExecutionTarget,
+      AssistantExecutionTarget.aiGatewayOnly,
+    );
 
     await tester.tapAt(const Offset(24, 24));
     await tester.pumpAndSettle();
@@ -214,8 +237,14 @@ void main() {
     await tester.tap(find.byKey(const Key('assistant-skill-picker-button')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('assistant-skill-picker-dialog')), findsOneWidget);
-    expect(find.byKey(const Key('assistant-skill-picker-search')), findsOneWidget);
+    expect(
+      find.byKey(const Key('assistant-skill-picker-dialog')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('assistant-skill-picker-search')),
+      findsOneWidget,
+    );
     expect(find.text('1password'), findsOneWidget);
     expect(find.text('xlsx'), findsOneWidget);
     expect(find.text('网页处理'), findsOneWidget);
