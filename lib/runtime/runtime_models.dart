@@ -909,6 +909,7 @@ class SettingsSnapshot {
     required this.assistantExecutionTarget,
     required this.assistantPermissionLevel,
     required this.assistantNavigationDestinations,
+    required this.assistantCustomTaskTitles,
   });
 
   final AppLanguage appLanguage;
@@ -939,6 +940,7 @@ class SettingsSnapshot {
   final AssistantExecutionTarget assistantExecutionTarget;
   final AssistantPermissionLevel assistantPermissionLevel;
   final List<WorkspaceDestination> assistantNavigationDestinations;
+  final Map<String, String> assistantCustomTaskTitles;
 
   factory SettingsSnapshot.defaults() {
     return SettingsSnapshot(
@@ -970,6 +972,7 @@ class SettingsSnapshot {
       assistantExecutionTarget: AssistantExecutionTarget.local,
       assistantPermissionLevel: AssistantPermissionLevel.defaultAccess,
       assistantNavigationDestinations: kAssistantNavigationDestinationDefaults,
+      assistantCustomTaskTitles: const <String, String>{},
     );
   }
 
@@ -1002,6 +1005,7 @@ class SettingsSnapshot {
     AssistantExecutionTarget? assistantExecutionTarget,
     AssistantPermissionLevel? assistantPermissionLevel,
     List<WorkspaceDestination>? assistantNavigationDestinations,
+    Map<String, String>? assistantCustomTaskTitles,
   }) {
     return SettingsSnapshot(
       appLanguage: appLanguage ?? this.appLanguage,
@@ -1036,6 +1040,8 @@ class SettingsSnapshot {
       assistantNavigationDestinations:
           assistantNavigationDestinations ??
           this.assistantNavigationDestinations,
+      assistantCustomTaskTitles:
+          assistantCustomTaskTitles ?? this.assistantCustomTaskTitles,
     );
   }
 
@@ -1071,10 +1077,27 @@ class SettingsSnapshot {
       'assistantNavigationDestinations': assistantNavigationDestinations
           .map((item) => item.name)
           .toList(growable: false),
+      'assistantCustomTaskTitles': assistantCustomTaskTitles,
     };
   }
 
   factory SettingsSnapshot.fromJson(Map<String, dynamic> json) {
+    Map<String, String> normalizeTaskTitles(Object? value) {
+      if (value is! Map) {
+        return const <String, String>{};
+      }
+      final normalized = <String, String>{};
+      value.forEach((key, title) {
+        final normalizedKey = key.toString().trim();
+        final normalizedTitle = title.toString().trim();
+        if (normalizedKey.isEmpty || normalizedTitle.isEmpty) {
+          return;
+        }
+        normalized[normalizedKey] = normalizedTitle;
+      });
+      return normalized;
+    }
+
     final rawAssistantNavigationDestinations =
         json['assistantNavigationDestinations'];
     final assistantNavigationDestinations =
@@ -1156,6 +1179,9 @@ class SettingsSnapshot {
         json['assistantPermissionLevel'] as String?,
       ),
       assistantNavigationDestinations: assistantNavigationDestinations,
+      assistantCustomTaskTitles: normalizeTaskTitles(
+        json['assistantCustomTaskTitles'],
+      ),
     );
   }
 

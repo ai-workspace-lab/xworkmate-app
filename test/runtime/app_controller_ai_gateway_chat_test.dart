@@ -52,7 +52,7 @@ void main() {
             availableModels: const <String>['qwen2.5-coder:latest'],
             selectedModels: const <String>['qwen2.5-coder:latest'],
           ),
-          defaultModel: 'qwen2.5-coder:latest',
+          defaultModel: 'gpt-5.4',
         ),
         refreshAfterSave: false,
       );

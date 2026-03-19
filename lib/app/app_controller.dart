@@ -207,28 +207,49 @@ class AppController extends ChangeNotifier {
   bool get canUseAiGatewayConversation =>
       aiGatewayUrl.isNotEmpty &&
       hasStoredAiGatewayApiKey &&
-      resolvedAssistantModel.isNotEmpty;
+      resolvedAiGatewayModel.isNotEmpty;
+
+  List<String> get aiGatewayConversationModelChoices {
+    final selected = settings.aiGateway.selectedModels
+        .map((item) => item.trim())
+        .where(
+          (item) =>
+              item.isNotEmpty &&
+              settings.aiGateway.availableModels.contains(item),
+        )
+        .toList(growable: false);
+    if (selected.isNotEmpty) {
+      return selected;
+    }
+    final available = settings.aiGateway.availableModels
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+    if (available.isNotEmpty) {
+      return available;
+    }
+    return const <String>[];
+  }
+
+  String get resolvedAiGatewayModel {
+    final current = settings.defaultModel.trim();
+    final choices = aiGatewayConversationModelChoices;
+    if (choices.contains(current)) {
+      return current;
+    }
+    if (choices.isNotEmpty) {
+      return choices.first;
+    }
+    return '';
+  }
 
   String get resolvedAssistantModel {
+    if (isAiGatewayOnlyMode) {
+      return resolvedAiGatewayModel;
+    }
     final resolved = resolvedDefaultModel.trim();
     if (resolved.isNotEmpty) {
       return resolved;
-    }
-    final localDefault = settings.ollamaLocal.defaultModel.trim();
-    if (localDefault.isNotEmpty) {
-      return localDefault;
-    }
-    final selected = settings.aiGateway.selectedModels
-        .where((item) => item.trim().isNotEmpty)
-        .toList(growable: false);
-    if (selected.isNotEmpty) {
-      return selected.first;
-    }
-    final available = settings.aiGateway.availableModels
-        .where((item) => item.trim().isNotEmpty)
-        .toList(growable: false);
-    if (available.isNotEmpty) {
-      return available.first;
     }
     return '';
   }
@@ -416,33 +437,56 @@ class AppController extends ChangeNotifier {
   }
 
   List<String> get aiGatewayModelChoices {
-    final selected = settings.aiGateway.selectedModels
-        .where(settings.aiGateway.availableModels.contains)
-        .toList(growable: false);
-    if (selected.isNotEmpty) {
-      return selected;
-    }
-    final available = settings.aiGateway.availableModels
-        .take(5)
-        .toList(growable: false);
-    if (available.isNotEmpty) {
-      return available;
+    return aiGatewayConversationModelChoices;
+  }
+
+  List<String> get connectedGatewayModelChoices {
+    if (connection.status != RuntimeConnectionStatus.connected) {
+      return const <String>[];
     }
     return _modelsController.items
-        .map((item) => item.id)
+        .map((item) => item.id.trim())
+        .where((item) => item.isNotEmpty)
         .toList(growable: false);
+  }
+
+  List<String> get assistantModelChoices {
+    if (isAiGatewayOnlyMode) {
+      return aiGatewayConversationModelChoices;
+    }
+    final runtimeModels = connectedGatewayModelChoices;
+    if (runtimeModels.isNotEmpty) {
+      return runtimeModels;
+    }
+    final resolved = resolvedDefaultModel.trim();
+    if (resolved.isNotEmpty) {
+      return <String>[resolved];
+    }
+    final localDefault = settings.ollamaLocal.defaultModel.trim();
+    if (localDefault.isNotEmpty) {
+      return <String>[localDefault];
+    }
+    return const <String>[];
   }
 
   String get resolvedDefaultModel {
     final current = settings.defaultModel.trim();
-    final choices = aiGatewayModelChoices;
-    if (choices.contains(current)) {
+    if (current.isNotEmpty) {
       return current;
     }
-    if (choices.isNotEmpty) {
-      return choices.first;
+    final localDefault = settings.ollamaLocal.defaultModel.trim();
+    if (localDefault.isNotEmpty) {
+      return localDefault;
     }
-    return current;
+    final runtimeModels = connectedGatewayModelChoices;
+    if (runtimeModels.isNotEmpty) {
+      return runtimeModels.first;
+    }
+    final aiGatewayChoices = aiGatewayConversationModelChoices;
+    if (aiGatewayChoices.isNotEmpty) {
+      return aiGatewayChoices.first;
+    }
+    return '';
   }
 
   bool get canQuickConnectGateway {
@@ -893,6 +937,47 @@ class AppController extends ChangeNotifier {
     }
     await saveSettings(
       settings.copyWith(defaultModel: trimmed),
+      refreshAfterSave: false,
+    );
+  }
+
+  Future<void> selectAssistantModel(String modelId) async {
+    final trimmed = modelId.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    final choices = assistantModelChoices;
+    if (choices.isNotEmpty && !choices.contains(trimmed)) {
+      return;
+    }
+    await selectDefaultModel(trimmed);
+  }
+
+  String assistantCustomTaskTitle(String sessionKey) {
+    return settings.assistantCustomTaskTitles[sessionKey]?.trim() ?? '';
+  }
+
+  Future<void> saveAssistantTaskTitle(String sessionKey, String title) async {
+    final normalizedSessionKey = sessionKey.trim();
+    if (normalizedSessionKey.isEmpty) {
+      return;
+    }
+    final normalizedTitle = title.trim();
+    final next = Map<String, String>.from(settings.assistantCustomTaskTitles);
+    final current = next[normalizedSessionKey]?.trim() ?? '';
+    if (normalizedTitle.isEmpty) {
+      if (current.isEmpty) {
+        return;
+      }
+      next.remove(normalizedSessionKey);
+    } else {
+      if (current == normalizedTitle) {
+        return;
+      }
+      next[normalizedSessionKey] = normalizedTitle;
+    }
+    await saveSettings(
+      settings.copyWith(assistantCustomTaskTitles: next),
       refreshAfterSave: false,
     );
   }
@@ -1388,14 +1473,14 @@ class AppController extends ChangeNotifier {
       return;
     }
 
-    final model = resolvedAssistantModel;
+    final model = resolvedAiGatewayModel;
     if (model.isEmpty) {
       _appendLocalSessionMessage(
         sessionKey,
         _assistantErrorMessage(
           appText(
-            '当前没有可用模型。请先在 AI Gateway 中同步或选择模型。',
-            'No model is available yet. Sync or select a model in AI Gateway first.',
+            '当前没有可用的 AI Gateway 对话模型。请先在 AI Gateway 页面同步并选择可用模型。',
+            'No AI Gateway chat model is available yet. Sync and select a supported model in AI Gateway first.',
           ),
         ),
       );
