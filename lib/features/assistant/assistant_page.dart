@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown/markdown.dart' as md;
 
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
@@ -368,12 +370,15 @@ class _AssistantPageState extends State<AssistantPage> {
                 controller: controller,
                 currentTask: currentTask,
                 items: timelineItems,
+                messageViewMode: controller.currentAssistantMessageViewMode,
                 scrollController: _conversationController,
                 onOpenDetail: widget.onOpenDetail,
                 onFocusComposer: _focusComposer,
                 onOpenGateway: _showConnectDialog,
                 onOpenAiGatewaySettings: _openAiGatewaySettings,
                 onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
+                onMessageViewModeChanged:
+                    controller.setAssistantMessageViewMode,
               ),
             ),
             const SizedBox(height: 2),
@@ -547,14 +552,14 @@ class _AssistantPageState extends State<AssistantPage> {
   Future<void> _submitPrompt() async {
     final controller = widget.controller;
     final settings = controller.settings;
+    final executionTarget = controller.assistantExecutionTarget;
     final rawPrompt = _inputController.text.trim();
     if (rawPrompt.isEmpty) {
       return;
     }
 
     final shouldUseGatewayAgent =
-        settings.assistantExecutionTarget !=
-        AssistantExecutionTarget.aiGatewayOnly;
+        executionTarget != AssistantExecutionTarget.aiGatewayOnly;
     final autoAgent = shouldUseGatewayAgent
         ? _pickAutoAgent(controller, rawPrompt)
         : null;
@@ -571,7 +576,7 @@ class _AssistantPageState extends State<AssistantPage> {
       prompt: rawPrompt,
       attachmentNames: attachmentNames,
       selectedSkillLabels: selectedSkillLabels,
-      executionTarget: settings.assistantExecutionTarget,
+      executionTarget: executionTarget,
       permissionLevel: settings.assistantPermissionLevel,
       workspacePath: settings.workspacePath,
       remoteProjectRoot: settings.remoteProjectRoot,
@@ -591,15 +596,14 @@ class _AssistantPageState extends State<AssistantPage> {
         preview: rawPrompt,
         status:
             controller.hasAssistantPendingRun ||
-                settings.assistantExecutionTarget ==
-                    AssistantExecutionTarget.aiGatewayOnly ||
+                executionTarget == AssistantExecutionTarget.aiGatewayOnly ||
                 controller.connection.status ==
                     RuntimeConnectionStatus.connected
             ? 'running'
             : 'queued',
         owner: autoAgent?.name ?? _conversationOwnerLabel(controller),
         surface: 'Assistant',
-        executionTarget: settings.assistantExecutionTarget,
+        executionTarget: executionTarget,
         draft: controller.currentSessionKey.trim().startsWith('draft:'),
       );
     });
@@ -824,6 +828,9 @@ class _AssistantPageState extends State<AssistantPage> {
 
   Future<void> _createNewThread() async {
     final sessionKey = _buildDraftSessionKey(widget.controller);
+    final inheritedTarget = widget.controller.currentAssistantExecutionTarget;
+    final inheritedViewMode =
+        widget.controller.currentAssistantMessageViewMode;
     setState(() {
       _archivedTaskKeys.removeWhere(
         (value) => _sessionKeysMatch(value, sessionKey),
@@ -839,11 +846,17 @@ class _AssistantPageState extends State<AssistantPage> {
         updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
         owner: _conversationOwnerLabel(widget.controller),
         surface: 'Assistant',
-        executionTarget: widget.controller.assistantExecutionTarget,
+        executionTarget: inheritedTarget,
         draft: true,
       );
       _selectedSkillKeys = const <String>[];
     });
+    widget.controller.initializeAssistantThreadContext(
+      sessionKey,
+      title: appText('新对话', 'New conversation'),
+      executionTarget: inheritedTarget,
+      messageViewMode: inheritedViewMode,
+    );
     await widget.controller.switchSession(sessionKey);
     _focusComposer();
   }
@@ -908,18 +921,17 @@ class _AssistantPageState extends State<AssistantPage> {
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       owner: _conversationOwnerLabel(widget.controller),
       surface: 'Assistant',
-      executionTarget: widget.controller.assistantExecutionTarget,
+      executionTarget: widget.controller.currentAssistantExecutionTarget,
       isCurrent: true,
       draft: true,
     );
   }
 
   void _synchronizeTaskSeeds(AppController controller) {
-    for (final session in controller.sessions) {
+    for (final session in controller.assistantSessions) {
       if (_isArchivedTask(session.key)) {
         continue;
       }
-      final existingSeed = _taskSeeds[session.key];
       _taskSeeds[session.key] = _AssistantTaskSeed(
         sessionKey: session.key,
         title: _resolvedTaskTitle(controller, session.key, session: session),
@@ -935,9 +947,9 @@ class _AssistantPageState extends State<AssistantPage> {
             DateTime.now().millisecondsSinceEpoch.toDouble(),
         owner: _conversationOwnerLabel(controller),
         surface: session.surface ?? session.kind ?? 'Assistant',
-        executionTarget:
-            existingSeed?.executionTarget ??
-            controller.assistantExecutionTarget,
+        executionTarget: controller.assistantExecutionTargetForSession(
+          session.key,
+        ),
         draft: session.key.trim().startsWith('draft:'),
       );
     }
@@ -970,8 +982,9 @@ class _AssistantPageState extends State<AssistantPage> {
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       owner: _conversationOwnerLabel(controller),
       surface: currentSeed?.surface ?? 'Assistant',
-      executionTarget:
-          currentSeed?.executionTarget ?? controller.assistantExecutionTarget,
+      executionTarget: controller.assistantExecutionTargetForSession(
+        controller.currentSessionKey,
+      ),
       draft: controller.currentSessionKey.trim().startsWith('draft:'),
     );
   }
@@ -980,7 +993,7 @@ class _AssistantPageState extends State<AssistantPage> {
     AppController controller,
     String sessionKey,
   ) {
-    for (final session in controller.sessions) {
+    for (final session in controller.assistantSessions) {
       if (_sessionKeysMatch(session.key, sessionKey)) {
         return session;
       }
@@ -1558,23 +1571,28 @@ class _ConversationArea extends StatelessWidget {
     required this.controller,
     required this.currentTask,
     required this.items,
+    required this.messageViewMode,
     required this.scrollController,
     required this.onOpenDetail,
     required this.onFocusComposer,
     required this.onOpenGateway,
     required this.onOpenAiGatewaySettings,
     required this.onReconnectGateway,
+    required this.onMessageViewModeChanged,
   });
 
   final AppController controller;
   final _AssistantTaskEntry currentTask;
   final List<_TimelineItem> items;
+  final AssistantMessageViewMode messageViewMode;
   final ScrollController scrollController;
   final ValueChanged<DetailPanelData> onOpenDetail;
   final VoidCallback onFocusComposer;
   final VoidCallback onOpenGateway;
   final VoidCallback onOpenAiGatewaySettings;
   final Future<void> Function() onReconnectGateway;
+  final Future<void> Function(AssistantMessageViewMode mode)
+      onMessageViewModeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1634,7 +1652,17 @@ class _ConversationArea extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                _ConnectionChip(controller: controller),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _MessageViewModeChip(
+                      value: messageViewMode,
+                      onSelected: onMessageViewModeChanged,
+                    ),
+                    const SizedBox(width: 6),
+                    _ConnectionChip(controller: controller),
+                  ],
+                ),
               ],
             ),
           ),
@@ -1664,18 +1692,21 @@ class _ConversationArea extends StatelessWidget {
                             text: item.text!,
                             alignRight: true,
                             tone: _BubbleTone.user,
+                            messageViewMode: messageViewMode,
                           ),
                           _TimelineItemKind.assistant => _MessageBubble(
                             label: item.label!,
                             text: item.text!,
                             alignRight: false,
                             tone: _BubbleTone.assistant,
+                            messageViewMode: messageViewMode,
                           ),
                           _TimelineItemKind.agent => _MessageBubble(
                             label: item.label!,
                             text: item.text!,
                             alignRight: false,
                             tone: _BubbleTone.agent,
+                            messageViewMode: messageViewMode,
                           ),
                           _TimelineItemKind.toolCall => _ToolCallTile(
                             toolName: item.title!,
@@ -2964,12 +2995,14 @@ class _MessageBubble extends StatelessWidget {
     required this.text,
     required this.alignRight,
     required this.tone,
+    required this.messageViewMode,
   });
 
   final String label;
   final String text;
   final bool alignRight;
   final _BubbleTone tone;
+  final AssistantMessageViewMode messageViewMode;
 
   @override
   Widget build(BuildContext context) {
@@ -3003,17 +3036,84 @@ class _MessageBubble extends StatelessWidget {
             children: [
               Text(label, style: theme.textTheme.labelLarge),
               const SizedBox(height: 4),
-              SelectableText(
-                text.isEmpty ? appText('暂无内容。', 'No content yet.') : text,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                  height: 1.45,
-                ),
+              _MessageBubbleBody(
+                text: text.isEmpty ? appText('暂无内容。', 'No content yet.') : text,
+                renderMarkdown:
+                    messageViewMode == AssistantMessageViewMode.rendered &&
+                    tone != _BubbleTone.user,
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _MessageBubbleBody extends StatelessWidget {
+  const _MessageBubbleBody({
+    required this.text,
+    required this.renderMarkdown,
+  });
+
+  final String text;
+  final bool renderMarkdown;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (!renderMarkdown) {
+      return SelectableText(
+        text,
+        style: theme.textTheme.bodyLarge?.copyWith(
+          color: theme.colorScheme.onSurface,
+          height: 1.45,
+        ),
+      );
+    }
+
+    final styleSheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
+      p: theme.textTheme.bodyLarge?.copyWith(
+        color: theme.colorScheme.onSurface,
+        height: 1.45,
+      ),
+      code: theme.textTheme.bodyMedium?.copyWith(
+        fontFamily: 'Menlo',
+        height: 1.4,
+      ),
+      codeblockDecoration: BoxDecoration(
+        color: context.palette.surfaceSecondary,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      blockquoteDecoration: BoxDecoration(
+        color: context.palette.surfaceSecondary.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      blockquotePadding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 8,
+      ),
+      tableBorder: TableBorder.all(color: context.palette.strokeSoft),
+      tableHead: theme.textTheme.labelLarge?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+    );
+
+    return MarkdownBody(
+      data: text,
+      selectable: true,
+      styleSheet: styleSheet,
+      extensionSet: md.ExtensionSet.gitHubWeb,
+      sizedImageBuilder: (config) => SelectableText(
+        config.alt?.trim().isNotEmpty == true
+            ? '![${config.alt!.trim()}](${config.uri.toString()})'
+            : config.uri.toString(),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: context.palette.textSecondary,
+          height: 1.4,
+        ),
+      ),
+      onTapLink: (text, href, title) {},
     );
   }
 }
@@ -3418,6 +3518,72 @@ class _ConnectionChip extends StatelessWidget {
       child: Text(
         '${controller.assistantConnectionStatusLabel} · ${controller.assistantConnectionTargetLabel}',
         style: theme.textTheme.labelMedium,
+      ),
+    );
+  }
+}
+
+class _MessageViewModeChip extends StatelessWidget {
+  const _MessageViewModeChip({
+    required this.value,
+    required this.onSelected,
+  });
+
+  final AssistantMessageViewMode value;
+  final Future<void> Function(AssistantMessageViewMode mode) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+
+    return PopupMenuButton<AssistantMessageViewMode>(
+      key: const Key('assistant-message-view-mode-button'),
+      tooltip: appText('消息视图', 'Message view'),
+      onSelected: (mode) => unawaited(onSelected(mode)),
+      itemBuilder: (context) => AssistantMessageViewMode.values
+          .map(
+            (mode) => PopupMenuItem<AssistantMessageViewMode>(
+              value: mode,
+              child: Row(
+                children: [
+                  Expanded(child: Text(mode.label)),
+                  if (mode == value) const Icon(Icons.check_rounded, size: 18),
+                ],
+              ),
+            ),
+          )
+          .toList(growable: false),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: 5,
+        ),
+        decoration: BoxDecoration(
+          color: palette.surfaceSecondary,
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+          boxShadow: [
+            BoxShadow(
+              color: palette.shadow.withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.notes_rounded, size: 14, color: palette.textMuted),
+            const SizedBox(width: 4),
+            Text(value.label, style: theme.textTheme.labelMedium),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 14,
+              color: palette.textMuted,
+            ),
+          ],
+        ),
       ),
     );
   }

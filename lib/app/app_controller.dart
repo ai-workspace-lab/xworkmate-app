@@ -177,6 +177,7 @@ class AppController extends ChangeNotifier {
   List<GatewaySessionSummary> get sessions => isAiGatewayOnlyMode
       ? _assistantSessionSummaries()
       : _sessionsController.sessions;
+  List<GatewaySessionSummary> get assistantSessions => _assistantSessions();
   List<GatewayInstanceSummary> get instances => _instancesController.items;
   List<GatewaySkillSummary> get skills => _skillsController.items;
   List<GatewayConnectorSummary> get connectors => _connectorsController.items;
@@ -189,7 +190,11 @@ class AppController extends ChangeNotifier {
   String? get activeRunId => _chatController.activeRunId;
   AppLanguage get appLanguage => settings.appLanguage;
   AssistantExecutionTarget get assistantExecutionTarget =>
-      settings.assistantExecutionTarget;
+      currentAssistantExecutionTarget;
+  AssistantExecutionTarget get currentAssistantExecutionTarget =>
+      assistantExecutionTargetForSession(currentSessionKey);
+  AssistantMessageViewMode get currentAssistantMessageViewMode =>
+      assistantMessageViewModeForSession(currentSessionKey);
   AssistantPermissionLevel get assistantPermissionLevel =>
       settings.assistantPermissionLevel;
   bool get hasStoredGatewayCredential =>
@@ -206,8 +211,7 @@ class AppController extends ChangeNotifier {
   bool get hasStoredAiGatewayApiKey =>
       _settingsController.secureRefs.containsKey('ai_gateway_api_key');
   bool get isAiGatewayOnlyMode =>
-      settings.assistantExecutionTarget ==
-      AssistantExecutionTarget.aiGatewayOnly;
+      currentAssistantExecutionTarget == AssistantExecutionTarget.aiGatewayOnly;
   bool get isCodexBridgeBusy => _isCodexBridgeBusy;
   String? get codexBridgeError => _codexBridgeError;
   String? get codexRuntimeWarning => _codexRuntimeWarning;
@@ -265,7 +269,11 @@ class AppController extends ChangeNotifier {
   }
 
   String get resolvedAssistantModel {
-    if (isAiGatewayOnlyMode) {
+    return _resolvedAssistantModelForTarget(currentAssistantExecutionTarget);
+  }
+
+  String _resolvedAssistantModelForTarget(AssistantExecutionTarget target) {
+    if (target == AssistantExecutionTarget.aiGatewayOnly) {
       return resolvedAiGatewayModel;
     }
     final resolved = resolvedDefaultModel.trim();
@@ -621,9 +629,71 @@ class AppController extends ChangeNotifier {
     return trimmed.isEmpty ? 'main' : trimmed;
   }
 
+  AssistantExecutionTarget assistantExecutionTargetForSession(
+    String sessionKey,
+  ) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    return _assistantThreadRecords[normalizedSessionKey]?.executionTarget ??
+        settings.assistantExecutionTarget;
+  }
+
+  AssistantMessageViewMode assistantMessageViewModeForSession(
+    String sessionKey,
+  ) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    return _assistantThreadRecords[normalizedSessionKey]?.messageViewMode ??
+        AssistantMessageViewMode.rendered;
+  }
+
+  List<GatewaySessionSummary> _assistantSessions() {
+    final archivedKeys = settings.assistantArchivedTaskKeys
+        .map(_normalizedAssistantSessionKey)
+        .toSet();
+    final byKey = <String, GatewaySessionSummary>{};
+
+    for (final session in _sessionsController.sessions) {
+      final normalizedSessionKey = _normalizedAssistantSessionKey(session.key);
+      if (archivedKeys.contains(normalizedSessionKey)) {
+        continue;
+      }
+      byKey[normalizedSessionKey] = session;
+    }
+
+    for (final record in _assistantThreadRecords.values) {
+      final normalizedSessionKey = _normalizedAssistantSessionKey(
+        record.sessionKey,
+      );
+      if (normalizedSessionKey.isEmpty ||
+          archivedKeys.contains(normalizedSessionKey) ||
+          record.archived) {
+        continue;
+      }
+      byKey.putIfAbsent(
+        normalizedSessionKey,
+        () => _assistantSessionSummaryFor(
+          normalizedSessionKey,
+          record: record,
+        ),
+      );
+    }
+
+    final currentKey = _normalizedAssistantSessionKey(currentSessionKey);
+    if (!archivedKeys.contains(currentKey) && !byKey.containsKey(currentKey)) {
+      byKey[currentKey] = _assistantSessionSummaryFor(currentKey);
+    }
+
+    final items = byKey.values.toList(growable: true)
+      ..sort(
+        (left, right) =>
+            (right.updatedAtMs ?? 0).compareTo(left.updatedAtMs ?? 0),
+      );
+    return items;
+  }
+
   bool assistantSessionHasPendingRun(String sessionKey) {
     final normalized = _normalizedAssistantSessionKey(sessionKey);
-    if (isAiGatewayOnlyMode) {
+    if (assistantExecutionTargetForSession(normalized) ==
+        AssistantExecutionTarget.aiGatewayOnly) {
       return _aiGatewayPendingSessionKeys.contains(normalized);
     }
     return (_chatController.hasPendingRun || _multiAgentRunPending) &&
@@ -735,20 +805,25 @@ class AppController extends ChangeNotifier {
       tls: decoded?.tls ?? settings.gateway.tls,
       mode: _modeFromHost(decoded?.host ?? settings.gateway.host),
     );
+    final nextTarget = _assistantExecutionTargetForMode(nextProfile.mode);
     await saveSettings(
       settings.copyWith(
         gateway: nextProfile,
-        assistantExecutionTarget: _assistantExecutionTargetForMode(
-          nextProfile.mode,
-        ),
+        assistantExecutionTarget: nextTarget,
       ),
       refreshAfterSave: false,
+    );
+    _upsertAssistantThreadRecord(
+      _sessionsController.currentSessionKey,
+      executionTarget: nextTarget,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     await _connectProfile(
       nextProfile,
       authTokenOverride: resolvedToken,
       authPasswordOverride: resolvedPassword,
     );
+    await _chatController.loadSession(_sessionsController.currentSessionKey);
   }
 
   Future<void> connectManual({
@@ -778,20 +853,25 @@ class AppController extends ChangeNotifier {
       port: resolvedPort <= 0 ? 443 : resolvedPort,
       tls: mode == RuntimeConnectionMode.local ? false : tls,
     );
+    final nextTarget = _assistantExecutionTargetForMode(nextProfile.mode);
     await saveSettings(
       settings.copyWith(
         gateway: nextProfile,
-        assistantExecutionTarget: _assistantExecutionTargetForMode(
-          nextProfile.mode,
-        ),
+        assistantExecutionTarget: nextTarget,
       ),
       refreshAfterSave: false,
+    );
+    _upsertAssistantThreadRecord(
+      _sessionsController.currentSessionKey,
+      executionTarget: nextTarget,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     await _connectProfile(
       nextProfile,
       authTokenOverride: token.trim(),
       authPasswordOverride: password.trim(),
     );
+    await _chatController.loadSession(_sessionsController.currentSessionKey);
   }
 
   Future<void> disconnectGateway() async {
@@ -916,8 +996,29 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> switchSession(String sessionKey) async {
-    await _sessionsController.switchSession(sessionKey);
-    await _chatController.loadSession(_sessionsController.currentSessionKey);
+    final previousSessionKey = _normalizedAssistantSessionKey(
+      _sessionsController.currentSessionKey,
+    );
+    final nextSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final nextTarget = assistantExecutionTargetForSession(nextSessionKey);
+    final nextViewMode = assistantMessageViewModeForSession(nextSessionKey);
+
+    if (!isAiGatewayOnlyMode) {
+      _preserveGatewayHistoryForSession(previousSessionKey);
+    }
+
+    await _sessionsController.switchSession(nextSessionKey);
+    _upsertAssistantThreadRecord(
+      nextSessionKey,
+      executionTarget: nextTarget,
+      messageViewMode: nextViewMode,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    await _applyAssistantExecutionTarget(
+      nextTarget,
+      sessionKey: nextSessionKey,
+      persistDefaultSelection: false,
+    );
     _recomputeTasks();
   }
 
@@ -974,46 +1075,43 @@ class AppController extends ChangeNotifier {
   Future<void> setAssistantExecutionTarget(
     AssistantExecutionTarget target,
   ) async {
-    if (settings.assistantExecutionTarget == target) {
-      return;
-    }
-    if (target == AssistantExecutionTarget.aiGatewayOnly) {
-      _preserveGatewayHistoryForSession(_sessionsController.currentSessionKey);
-      final nextGatewayProfile = settings.gateway.copyWith(
-        mode: RuntimeConnectionMode.unconfigured,
-        useSetupCode: false,
-        setupCode: '',
-      );
-      await saveSettings(
-        settings.copyWith(
-          assistantExecutionTarget: target,
-          gateway: nextGatewayProfile,
-        ),
-        refreshAfterSave: false,
-      );
-      await _ensureActiveAssistantThread();
-      if (_runtime.isConnected) {
-        try {
-          await disconnectGateway();
-        } catch (_) {
-          // Preserve the selected AI Gateway-only mode even if the active
-          // gateway session does not close cleanly on the first attempt.
-        }
-      }
-      return;
-    }
-
-    await saveSettings(
-      settings.copyWith(assistantExecutionTarget: target),
-      refreshAfterSave: false,
+    final currentTarget = assistantExecutionTargetForSession(
+      _sessionsController.currentSessionKey,
     );
-    final targetProfile = _gatewayProfileForAssistantExecutionTarget(target);
-    try {
-      await _connectProfile(targetProfile);
-    } catch (_) {
-      // Keep the selected execution target even when the immediate reconnect
-      // fails so the user can retry or adjust gateway settings manually.
+    if (currentTarget == target &&
+        settings.assistantExecutionTarget == target) {
+      return;
     }
+    _upsertAssistantThreadRecord(
+      _sessionsController.currentSessionKey,
+      executionTarget: target,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    await _applyAssistantExecutionTarget(
+      target,
+      sessionKey: _sessionsController.currentSessionKey,
+      persistDefaultSelection: true,
+    );
+    _recomputeTasks();
+    _notifyIfActive();
+  }
+
+  Future<void> setAssistantMessageViewMode(
+    AssistantMessageViewMode mode,
+  ) async {
+    final sessionKey = _normalizedAssistantSessionKey(
+      _sessionsController.currentSessionKey,
+    );
+    if (assistantMessageViewModeForSession(sessionKey) == mode) {
+      return;
+    }
+    _upsertAssistantThreadRecord(
+      sessionKey,
+      messageViewMode: mode,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    _recomputeTasks();
+    _notifyIfActive();
   }
 
   Future<void> setAssistantPermissionLevel(
@@ -1026,6 +1124,56 @@ class AppController extends ChangeNotifier {
       settings.copyWith(assistantPermissionLevel: level),
       refreshAfterSave: false,
     );
+  }
+
+  Future<void> _applyAssistantExecutionTarget(
+    AssistantExecutionTarget target, {
+    required String sessionKey,
+    required bool persistDefaultSelection,
+  }) async {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    if (!matchesSessionKey(
+      normalizedSessionKey,
+      _sessionsController.currentSessionKey,
+    )) {
+      await _sessionsController.switchSession(normalizedSessionKey);
+    }
+    if (persistDefaultSelection &&
+        settings.assistantExecutionTarget != target) {
+      await saveSettings(
+        settings.copyWith(assistantExecutionTarget: target),
+        refreshAfterSave: false,
+      );
+    }
+
+    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+      if (_runtime.isConnected) {
+        _preserveGatewayHistoryForSession(normalizedSessionKey);
+      }
+      await _ensureActiveAssistantThread();
+      if (_runtime.isConnected) {
+        try {
+          await disconnectGateway();
+        } catch (_) {
+          // Preserve the selected thread-bound target even when the active
+          // gateway session does not close cleanly on the first attempt.
+        }
+      } else {
+        _chatController.clear();
+      }
+      await _sessionsController.switchSession(normalizedSessionKey);
+      return;
+    }
+
+    final targetProfile = _gatewayProfileForAssistantExecutionTarget(target);
+    try {
+      await _connectProfile(targetProfile);
+    } catch (_) {
+      // Keep the selected execution target even when the immediate reconnect
+      // fails so the user can retry or adjust gateway settings manually.
+    }
+    await _sessionsController.switchSession(normalizedSessionKey);
+    await _chatController.loadSession(normalizedSessionKey);
   }
 
   Future<void> selectDefaultModel(String modelId) async {
@@ -1059,6 +1207,24 @@ class AppController extends ChangeNotifier {
       return settingsTitle;
     }
     return _assistantThreadRecords[normalizedSessionKey]?.title.trim() ?? '';
+  }
+
+  void initializeAssistantThreadContext(
+    String sessionKey, {
+    String title = '',
+    AssistantExecutionTarget? executionTarget,
+    AssistantMessageViewMode? messageViewMode,
+  }) {
+    _upsertAssistantThreadRecord(
+      sessionKey,
+      title: title.trim(),
+      executionTarget:
+          executionTarget ?? assistantExecutionTargetForSession(currentSessionKey),
+      messageViewMode:
+          messageViewMode ?? assistantMessageViewModeForSession(currentSessionKey),
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    _notifyIfActive();
   }
 
   Future<void> saveAssistantTaskTitle(String sessionKey, String title) async {
@@ -2110,7 +2276,9 @@ class AppController extends ChangeNotifier {
       inputTokens: null,
       outputTokens: null,
       totalTokens: null,
-      model: resolvedAssistantModel,
+      model: _resolvedAssistantModelForTarget(
+        assistantExecutionTargetForSession(normalizedSessionKey),
+      ),
       contextTokens: null,
       derivedTitle: title.isEmpty ? null : title,
       lastMessagePreview: preview,
@@ -2149,6 +2317,9 @@ class AppController extends ChangeNotifier {
             ? record.title.trim()
             : titleFromSettings,
         archived: record.archived || archivedKeys.contains(sessionKey),
+        executionTarget:
+            record.executionTarget ?? settings.assistantExecutionTarget,
+        messageViewMode: record.messageViewMode,
       );
       _assistantThreadRecords[sessionKey] = normalizedRecord;
       if (normalizedRecord.messages.isNotEmpty) {
@@ -2165,6 +2336,8 @@ class AppController extends ChangeNotifier {
     double? updatedAtMs,
     String? title,
     bool? archived,
+    AssistantExecutionTarget? executionTarget,
+    AssistantMessageViewMode? messageViewMode,
   }) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
     final existing = _assistantThreadRecords[normalizedSessionKey];
@@ -2185,6 +2358,14 @@ class AppController extends ChangeNotifier {
           archived ??
           existing?.archived ??
           isAssistantTaskArchived(normalizedSessionKey),
+      executionTarget:
+          executionTarget ??
+          existing?.executionTarget ??
+          settings.assistantExecutionTarget,
+      messageViewMode:
+          messageViewMode ??
+          existing?.messageViewMode ??
+          AssistantMessageViewMode.rendered,
     );
     _assistantThreadRecords[normalizedSessionKey] = nextRecord;
     if (messages != null) {
@@ -2504,7 +2685,7 @@ class AppController extends ChangeNotifier {
     return CodeAgentNodeState(
       selectedAgentId: _agentsController.selectedAgentId,
       gatewayConnected: _runtime.isConnected,
-      executionTarget: settings.assistantExecutionTarget,
+      executionTarget: currentAssistantExecutionTarget,
       runtimeMode: effectiveCodeAgentRuntimeMode,
       bridgeEnabled: _isCodexBridgeEnabled,
       bridgeState: _codexCooperationState.name,
