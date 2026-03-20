@@ -68,12 +68,20 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
   void initState() {
     super.initState();
     final profile = widget.controller.settings.gateway;
+    final executionTarget = widget.controller.currentAssistantExecutionTarget;
     _setupCodeController = TextEditingController(text: profile.setupCode);
     _hostController = TextEditingController(text: profile.host);
     _portController = TextEditingController(text: '${profile.port}');
     _tls = profile.tls;
-    _connectionMode = profile.mode;
-    _mode = profile.useSetupCode ? 'setup' : 'manual';
+    _connectionMode = switch (executionTarget) {
+      AssistantExecutionTarget.aiGatewayOnly =>
+        RuntimeConnectionMode.unconfigured,
+      AssistantExecutionTarget.local => RuntimeConnectionMode.local,
+      AssistantExecutionTarget.remote => RuntimeConnectionMode.remote,
+    };
+    _mode = executionTarget == AssistantExecutionTarget.aiGatewayOnly
+        ? 'manual'
+        : (profile.useSetupCode ? 'setup' : 'manual');
     _loadBootstrapPrefill();
   }
 
@@ -428,32 +436,9 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
           password: _passwordController.text,
         );
       } else if (_connectionMode == RuntimeConnectionMode.unconfigured) {
-        final currentSettings = widget.controller.settings;
-        final currentProfile = currentSettings.gateway;
-        final resolvedHost = _hostController.text.trim().isEmpty
-            ? currentProfile.host
-            : _hostController.text.trim();
-        final resolvedPort =
-            int.tryParse(_portController.text.trim()) ?? currentProfile.port;
-        final nextProfile = currentProfile.copyWith(
-          mode: RuntimeConnectionMode.unconfigured,
-          useSetupCode: false,
-          setupCode: '',
-          host: resolvedHost,
-          port: resolvedPort <= 0 ? currentProfile.port : resolvedPort,
-          tls: _tls,
+        await widget.controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.aiGatewayOnly,
         );
-        await widget.controller.saveSettings(
-          currentSettings.copyWith(
-            gateway: nextProfile,
-            assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
-          ),
-          refreshAfterSave: false,
-        );
-        if (widget.controller.connection.status ==
-            RuntimeConnectionStatus.connected) {
-          await widget.controller.disconnectGateway();
-        }
       } else {
         await widget.controller.connectManual(
           host: _hostController.text,

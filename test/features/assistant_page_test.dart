@@ -1,8 +1,18 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/features/assistant/assistant_page.dart';
+import 'package:xworkmate/runtime/codex_runtime.dart';
+import 'package:xworkmate/runtime/device_identity_store.dart';
+import 'package:xworkmate/runtime/gateway_runtime.dart';
+import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
 import '../test_support.dart';
@@ -154,7 +164,6 @@ void main() {
     expect(find.text('研发任务'), findsWidgets);
   });
 
-  // Known flutter_tester host-exit hang in this widget scenario.
   testWidgets('AssistantPage groups task rows by execution target', (
     WidgetTester tester,
   ) async {
@@ -165,31 +174,24 @@ void main() {
       child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
     );
 
-    await controller.saveSettings(
-      controller.settings.copyWith(
-        assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
-      ),
-      refreshAfterSave: false,
+    await tester.tap(find.byKey(const Key('assistant-new-task-button')));
+    await _pumpForUiSync(tester);
+
+    await controller.setAssistantExecutionTarget(
+      AssistantExecutionTarget.aiGatewayOnly,
     );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
+    await _pumpForUiSync(tester);
 
     await tester.tap(find.byKey(const Key('assistant-new-task-button')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
+    await _pumpForUiSync(tester);
 
-    await controller.saveSettings(
-      controller.settings.copyWith(
-        assistantExecutionTarget: AssistantExecutionTarget.remote,
-      ),
-      refreshAfterSave: false,
+    await controller.setAssistantExecutionTarget(
+      AssistantExecutionTarget.remote,
     );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
+    await _pumpForUiSync(tester);
 
     await tester.tap(find.byKey(const Key('assistant-new-task-button')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
+    await _pumpForUiSync(tester);
 
     final aiGroup = find.byKey(
       const ValueKey<String>('assistant-task-group-aiGatewayOnly'),
@@ -405,6 +407,143 @@ void main() {
 
   // Known flutter_tester host-exit hang in this widget scenario.
   testWidgets(
+    'AssistantPage syncs task selection with execution target menu and connection chip',
+    (WidgetTester tester) async {
+      final controller = await _createControllerWithThreadRecords(
+        records: const <AssistantThreadRecord>[],
+        useFakeGatewayRuntime: true,
+      );
+      addTearDown(controller.dispose);
+
+      await pumpPage(
+        tester,
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+      );
+
+      await tester.tap(find.byKey(const Key('assistant-new-task-button')));
+      await _pumpForUiSync(tester);
+
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.aiGatewayOnly,
+      );
+      await _pumpForUiSync(tester);
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('assistant-task-item-main')),
+      );
+      await _pumpForUiSync(tester);
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('assistant-execution-target-button')),
+          matching: find.text('本地 OpenClaw Gateway'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('离线 · 未连接目标'), findsOneWidget);
+
+      final aiThreadItem = find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key as ValueKey<String>).value.startsWith(
+              'assistant-task-item-draft:',
+            ),
+      );
+      expect(aiThreadItem, findsOneWidget);
+
+      await tester.tap(aiThreadItem);
+      await _pumpForUiSync(tester);
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('assistant-execution-target-button')),
+          matching: find.text('仅 AI Gateway'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('仅 AI Gateway'), findsWidgets);
+    },
+    skip: true,
+  );
+
+  testWidgets('AssistantPage shows thread-level message view chip', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+    );
+
+    expect(
+      find.byKey(const Key('assistant-message-view-mode-button')),
+      findsOneWidget,
+    );
+    expect(find.text('渲染'), findsOneWidget);
+  });
+
+  // Known flutter_tester host-exit hang in this widget scenario.
+  testWidgets('AssistantPage toggles Markdown Rendered and RAW per thread', (
+    WidgetTester tester,
+  ) async {
+    final controller = await _createControllerWithThreadRecords(
+      records: const <AssistantThreadRecord>[
+        AssistantThreadRecord(
+          sessionKey: 'main',
+          title: '研发任务',
+          archived: false,
+          executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          updatedAtMs: 1700000000000,
+          messages: <GatewayChatMessage>[
+            GatewayChatMessage(
+              id: 'user-1',
+              role: 'user',
+              text: '请看这个清单',
+              timestampMs: 1700000000000,
+              toolCallId: null,
+              toolName: null,
+              stopReason: null,
+              pending: false,
+              error: false,
+            ),
+            GatewayChatMessage(
+              id: 'assistant-1',
+              role: 'assistant',
+              text: '## 标题\\n\\n- 第一项\\n- 第二项',
+              timestampMs: 1700000001000,
+              toolCallId: null,
+              toolName: null,
+              stopReason: null,
+              pending: false,
+              error: false,
+            ),
+          ],
+        ),
+      ],
+      useFakeGatewayRuntime: true,
+    );
+    addTearDown(controller.dispose);
+
+    await pumpPage(
+      tester,
+      child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+    );
+
+    expect(find.byType(MarkdownBody), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('assistant-message-view-mode-button')));
+    await _pumpForUiSync(tester);
+    await tester.tap(find.text('RAW').last);
+    await _pumpForUiSync(tester);
+
+    expect(controller.currentAssistantMessageViewMode, AssistantMessageViewMode.raw);
+    expect(find.byType(MarkdownBody), findsNothing);
+  }, skip: true);
+
+  // Known flutter_tester host-exit hang in this widget scenario.
+  testWidgets(
     'AssistantPage shows AI Gateway-only chip and keeps task rows minimal',
     (WidgetTester tester) async {
       final controller = await createTestController(tester);
@@ -444,4 +583,147 @@ void main() {
     },
     skip: true,
   );
+}
+
+Future<AppController> _createControllerWithThreadRecords({
+  required List<AssistantThreadRecord> records,
+  bool useFakeGatewayRuntime = false,
+}) async {
+  SharedPreferences.setMockInitialValues(<String, Object>{});
+  final tempDirectory = await Directory.systemTemp.createTemp(
+    'xworkmate-assistant-page-tests-',
+  );
+  final store = SecureConfigStore(
+    enableSecureStorage: false,
+    databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+    fallbackDirectoryPathResolver: () async => tempDirectory.path,
+  );
+  await store.saveSettingsSnapshot(
+    SettingsSnapshot.defaults().copyWith(
+      aiGateway: SettingsSnapshot.defaults().aiGateway.copyWith(
+        baseUrl: 'http://127.0.0.1:11434/v1',
+        availableModels: const <String>['qwen2.5-coder:latest'],
+        selectedModels: const <String>['qwen2.5-coder:latest'],
+      ),
+      assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
+      defaultModel: 'qwen2.5-coder:latest',
+    ),
+  );
+  await store.saveAssistantThreadRecords(records);
+  final controller = AppController(
+    store: store,
+    runtimeCoordinator: useFakeGatewayRuntime
+        ? RuntimeCoordinator(
+            gateway: _FakeGatewayRuntime(store: store),
+            codex: _FakeCodexRuntime(),
+          )
+        : null,
+  );
+  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  while (controller.initializing) {
+    if (DateTime.now().isAfter(deadline)) {
+      fail('controller did not finish initializing before timeout');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
+  return controller;
+}
+
+Future<void> _pumpForUiSync(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 200));
+}
+
+class _FakeGatewayRuntime extends GatewayRuntime {
+  _FakeGatewayRuntime({required super.store})
+    : super(identityStore: DeviceIdentityStore(store));
+
+  GatewayConnectionSnapshot _snapshot = GatewayConnectionSnapshot.initial();
+
+  @override
+  bool get isConnected => _snapshot.status == RuntimeConnectionStatus.connected;
+
+  @override
+  GatewayConnectionSnapshot get snapshot => _snapshot;
+
+  @override
+  Stream<GatewayPushEvent> get events => const Stream<GatewayPushEvent>.empty();
+
+  @override
+  Future<void> connectProfile(
+    GatewayConnectionProfile profile, {
+    String authTokenOverride = '',
+    String authPasswordOverride = '',
+  }) async {
+    _snapshot = GatewayConnectionSnapshot.initial(mode: profile.mode).copyWith(
+      status: RuntimeConnectionStatus.connected,
+      statusText: 'Connected',
+      remoteAddress: '${profile.host}:${profile.port}',
+      connectAuthMode: 'none',
+    );
+    notifyListeners();
+  }
+
+  @override
+  Future<void> disconnect({bool clearDesiredProfile = true}) async {
+    _snapshot = _snapshot.copyWith(
+      status: RuntimeConnectionStatus.offline,
+      statusText: 'Offline',
+      remoteAddress: null,
+      clearLastError: true,
+      clearLastErrorCode: true,
+      clearLastErrorDetailCode: true,
+    );
+    notifyListeners();
+  }
+
+  @override
+  Future<dynamic> request(
+    String method, {
+    Map<String, dynamic>? params,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    switch (method) {
+      case 'health':
+      case 'status':
+        return <String, dynamic>{'ok': true};
+      case 'agents.list':
+        return <String, dynamic>{'agents': const <Object>[], 'mainKey': 'main'};
+      case 'sessions.list':
+        return <String, dynamic>{'sessions': const <Object>[]};
+      case 'chat.history':
+        return <String, dynamic>{'messages': const <Object>[]};
+      case 'skills.status':
+        return <String, dynamic>{'skills': const <Object>[]};
+      case 'channels.status':
+        return <String, dynamic>{
+          'channelMeta': const <Object>[],
+          'channelLabels': const <String, dynamic>{},
+          'channelDetailLabels': const <String, dynamic>{},
+          'channelAccounts': const <String, dynamic>{},
+          'channelOrder': const <Object>[],
+        };
+      case 'models.list':
+        return <String, dynamic>{'models': const <Object>[]};
+      case 'cron.list':
+        return <String, dynamic>{'jobs': const <Object>[]};
+      case 'device.pair.list':
+        return <String, dynamic>{
+          'pending': const <Object>[],
+          'paired': const <Object>[],
+        };
+      case 'system-presence':
+        return const <Object>[];
+      default:
+        return <String, dynamic>{};
+    }
+  }
+}
+
+class _FakeCodexRuntime extends CodexRuntime {
+  @override
+  Future<String?> findCodexBinary() async => null;
+
+  @override
+  Future<void> stop() async {}
 }

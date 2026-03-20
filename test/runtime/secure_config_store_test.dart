@@ -234,6 +234,8 @@ void main() {
           sessionKey: 'main',
           title: '研发任务',
           archived: true,
+          executionTarget: AssistantExecutionTarget.remote,
+          messageViewMode: AssistantMessageViewMode.raw,
           updatedAtMs: 1700000000000,
           messages: <GatewayChatMessage>[
             GatewayChatMessage(
@@ -276,6 +278,14 @@ void main() {
       expect(reloadedRecords.first.sessionKey, 'main');
       expect(reloadedRecords.first.archived, isTrue);
       expect(reloadedRecords.first.title, '研发任务');
+      expect(
+        reloadedRecords.first.executionTarget,
+        AssistantExecutionTarget.remote,
+      );
+      expect(
+        reloadedRecords.first.messageViewMode,
+        AssistantMessageViewMode.raw,
+      );
       expect(reloadedRecords.first.messages, hasLength(2));
       expect(reloadedRecords.first.messages.last.text, '第一条回复');
     },

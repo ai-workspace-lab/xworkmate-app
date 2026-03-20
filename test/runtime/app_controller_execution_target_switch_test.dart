@@ -214,12 +214,6 @@ void main() {
         AssistantExecutionTarget.aiGatewayOnly,
       );
       expect(
-        controller.settings.gateway.mode,
-        RuntimeConnectionMode.unconfigured,
-      );
-      expect(controller.settings.gateway.useSetupCode, isFalse);
-      expect(controller.settings.gateway.setupCode, isEmpty);
-      expect(
         controller.settings.gateway.host,
         'gateway.example.com',
         reason:
@@ -227,6 +221,7 @@ void main() {
       );
       expect(controller.settings.gateway.port, 9443);
       expect(controller.settings.gateway.tls, isTrue);
+      expect(controller.settings.gateway.mode, RuntimeConnectionMode.remote);
       expect(gateway.disconnectCount, 1);
       expect(controller.assistantConnectionStatusLabel, '仅 AI Gateway');
       expect(
@@ -256,6 +251,144 @@ void main() {
               'assistant-main',
             ),
       );
+    },
+  );
+
+  test(
+    'AppController switches runtime state when the selected thread changes',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-mode-switch-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final gateway = _FakeGatewayRuntime(store: store);
+      final controller = AppController(
+        store: store,
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: gateway,
+          codex: _FakeCodexRuntime(),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      await controller.saveSettings(
+        controller.settings.copyWith(
+          assistantExecutionTarget: AssistantExecutionTarget.local,
+          aiGateway: controller.settings.aiGateway.copyWith(
+            baseUrl: 'http://127.0.0.1:11434/v1',
+            availableModels: const <String>['qwen2.5-coder:latest'],
+            selectedModels: const <String>['qwen2.5-coder:latest'],
+          ),
+          gateway: controller.settings.gateway.copyWith(
+            mode: RuntimeConnectionMode.remote,
+            host: 'gateway.example.com',
+            port: 9443,
+            tls: true,
+          ),
+        ),
+        refreshAfterSave: false,
+      );
+
+      controller.initializeAssistantThreadContext(
+        'main',
+        executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+      );
+      controller.initializeAssistantThreadContext(
+        'remote-thread',
+        executionTarget: AssistantExecutionTarget.remote,
+      );
+
+      await controller.switchSession('remote-thread');
+
+      expect(
+        controller.assistantExecutionTarget,
+        AssistantExecutionTarget.remote,
+      );
+      expect(gateway.connectedProfiles.last.mode, RuntimeConnectionMode.remote);
+      expect(
+        controller.settings.assistantExecutionTarget,
+        AssistantExecutionTarget.local,
+        reason: 'Thread switching should not overwrite the new-thread default.',
+      );
+
+      await controller.switchSession('main');
+
+      expect(
+        controller.assistantExecutionTarget,
+        AssistantExecutionTarget.aiGatewayOnly,
+      );
+      expect(gateway.disconnectCount, 1);
+      expect(controller.assistantConnectionStatusLabel, '仅 AI Gateway');
+      expect(
+        controller.settings.assistantExecutionTarget,
+        AssistantExecutionTarget.local,
+      );
+    },
+  );
+
+  test(
+    'AppController persists markdown view mode per thread',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-view-mode-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final controller = AppController(
+        store: store,
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: _FakeGatewayRuntime(store: store),
+          codex: _FakeCodexRuntime(),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+
+      controller.initializeAssistantThreadContext(
+        'main',
+        messageViewMode: AssistantMessageViewMode.raw,
+      );
+      controller.initializeAssistantThreadContext(
+        'draft:secondary',
+        messageViewMode: AssistantMessageViewMode.rendered,
+      );
+
+      await controller.switchSession('main');
+      expect(controller.currentAssistantMessageViewMode, AssistantMessageViewMode.raw);
+
+      await controller.switchSession('draft:secondary');
+      expect(
+        controller.currentAssistantMessageViewMode,
+        AssistantMessageViewMode.rendered,
+      );
+
+      await controller.setAssistantMessageViewMode(AssistantMessageViewMode.raw);
+      expect(controller.currentAssistantMessageViewMode, AssistantMessageViewMode.raw);
+
+      final reloaded = await store.loadAssistantThreadRecords();
+      final secondary = reloaded.firstWhere((item) => item.sessionKey == 'draft:secondary');
+      expect(secondary.messageViewMode, AssistantMessageViewMode.raw);
     },
   );
 }

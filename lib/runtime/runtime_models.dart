@@ -63,6 +63,22 @@ extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   }
 }
 
+enum AssistantMessageViewMode { rendered, raw }
+
+extension AssistantMessageViewModeCopy on AssistantMessageViewMode {
+  String get label => switch (this) {
+    AssistantMessageViewMode.rendered => appText('渲染', 'Rendered'),
+    AssistantMessageViewMode.raw => 'RAW',
+  };
+
+  static AssistantMessageViewMode fromJsonValue(String? value) {
+    return AssistantMessageViewMode.values.firstWhere(
+      (item) => item.name == value,
+      orElse: () => AssistantMessageViewMode.rendered,
+    );
+  }
+}
+
 enum AssistantPermissionLevel { defaultAccess, fullAccess }
 
 extension AssistantPermissionLevelCopy on AssistantPermissionLevel {
@@ -1602,6 +1618,8 @@ class AssistantThreadRecord {
     required this.updatedAtMs,
     required this.title,
     required this.archived,
+    required this.executionTarget,
+    required this.messageViewMode,
   });
 
   final String sessionKey;
@@ -1609,6 +1627,8 @@ class AssistantThreadRecord {
   final double? updatedAtMs;
   final String title;
   final bool archived;
+  final AssistantExecutionTarget? executionTarget;
+  final AssistantMessageViewMode messageViewMode;
 
   AssistantThreadRecord copyWith({
     String? sessionKey,
@@ -1616,6 +1636,9 @@ class AssistantThreadRecord {
     double? updatedAtMs,
     String? title,
     bool? archived,
+    AssistantExecutionTarget? executionTarget,
+    bool clearExecutionTarget = false,
+    AssistantMessageViewMode? messageViewMode,
   }) {
     return AssistantThreadRecord(
       sessionKey: sessionKey ?? this.sessionKey,
@@ -1623,6 +1646,10 @@ class AssistantThreadRecord {
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
       title: title ?? this.title,
       archived: archived ?? this.archived,
+      executionTarget: clearExecutionTarget
+          ? null
+          : (executionTarget ?? this.executionTarget),
+      messageViewMode: messageViewMode ?? this.messageViewMode,
     );
   }
 
@@ -1633,6 +1660,8 @@ class AssistantThreadRecord {
       'updatedAtMs': updatedAtMs,
       'title': title,
       'archived': archived,
+      'executionTarget': executionTarget?.name,
+      'messageViewMode': messageViewMode.name,
     };
   }
 
@@ -1661,6 +1690,14 @@ class AssistantThreadRecord {
       updatedAtMs: asDouble(json['updatedAtMs']),
       title: json['title']?.toString() ?? '',
       archived: json['archived'] as bool? ?? false,
+      executionTarget: json['executionTarget'] == null
+          ? null
+          : AssistantExecutionTargetCopy.fromJsonValue(
+              json['executionTarget']?.toString(),
+            ),
+      messageViewMode: AssistantMessageViewModeCopy.fromJsonValue(
+        json['messageViewMode']?.toString(),
+      ),
     );
   }
 }
