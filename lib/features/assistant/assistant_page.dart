@@ -829,8 +829,7 @@ class _AssistantPageState extends State<AssistantPage> {
   Future<void> _createNewThread() async {
     final sessionKey = _buildDraftSessionKey(widget.controller);
     final inheritedTarget = widget.controller.currentAssistantExecutionTarget;
-    final inheritedViewMode =
-        widget.controller.currentAssistantMessageViewMode;
+    final inheritedViewMode = widget.controller.currentAssistantMessageViewMode;
     setState(() {
       _archivedTaskKeys.removeWhere(
         (value) => _sessionKeysMatch(value, sessionKey),
@@ -1592,7 +1591,7 @@ class _ConversationArea extends StatelessWidget {
   final VoidCallback onOpenAiGatewaySettings;
   final Future<void> Function() onReconnectGateway;
   final Future<void> Function(AssistantMessageViewMode mode)
-      onMessageViewModeChanged;
+  onMessageViewModeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -2312,7 +2311,7 @@ class _AssistantEmptyState extends StatelessWidget {
   }
 }
 
-class _ComposerBar extends StatelessWidget {
+class _ComposerBar extends StatefulWidget {
   const _ComposerBar({
     required this.controller,
     required this.inputController,
@@ -2354,8 +2353,39 @@ class _ComposerBar extends StatelessWidget {
   final Future<void> Function() onSend;
 
   @override
+  State<_ComposerBar> createState() => _ComposerBarState();
+}
+
+class _ComposerBarState extends State<_ComposerBar> {
+  static const double _minInputHeight = 68;
+  static const double _defaultInputHeight = 78;
+  static const double _maxInputHeight = 220;
+
+  late double _inputHeight;
+
+  @override
+  void initState() {
+    super.initState();
+    _inputHeight = _defaultInputHeight;
+  }
+
+  void _resizeInput(double delta) {
+    final nextHeight = (_inputHeight + delta).clamp(
+      _minInputHeight,
+      _maxInputHeight,
+    );
+    if (nextHeight == _inputHeight) {
+      return;
+    }
+    setState(() {
+      _inputHeight = nextHeight;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final controller = widget.controller;
     final aiGatewayOnly = controller.isAiGatewayOnlyMode;
     final connected = aiGatewayOnly
         ? controller.canUseAiGatewayConversation
@@ -2366,8 +2396,8 @@ class _ComposerBar extends StatelessWidget {
         controller.connection.status == RuntimeConnectionStatus.connecting;
     final executionTarget = controller.assistantExecutionTarget;
     final permissionLevel = controller.assistantPermissionLevel;
-    final selectedSkills = availableSkills
-        .where((skill) => selectedSkillKeys.contains(skill.key))
+    final selectedSkills = widget.availableSkills
+        .where((skill) => widget.selectedSkillKeys.contains(skill.key))
         .toList(growable: false);
     final submitLabel = connected
         ? appText('提交', 'Submit')
@@ -2394,7 +2424,7 @@ class _ComposerBar extends StatelessWidget {
                 onSelected: (value) {
                   switch (value) {
                     case 'attach':
-                      onPickAttachments();
+                      widget.onPickAttachments();
                       break;
                   }
                 },
@@ -2504,49 +2534,59 @@ class _ComposerBar extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          if (attachments.isNotEmpty) ...[
+          if (widget.attachments.isNotEmpty) ...[
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: attachments
+              children: widget.attachments
                   .map(
                     (attachment) => InputChip(
                       avatar: Icon(attachment.icon, size: 16),
                       label: Text(attachment.name),
-                      onDeleted: () => onRemoveAttachment(attachment),
+                      onDeleted: () => widget.onRemoveAttachment(attachment),
                     ),
                   )
                   .toList(),
             ),
             const SizedBox(height: 6),
           ],
-          TextField(
-            controller: inputController,
-            focusNode: focusNode,
-            autofocus: true,
-            minLines: 2,
-            maxLines: 4,
-            decoration: InputDecoration(
-              isCollapsed: true,
-              filled: true,
-              fillColor: palette.chromeSurface,
-              contentPadding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: palette.chromeStroke),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: palette.accent.withValues(alpha: 0.18),
+          SizedBox(
+            key: const Key('assistant-composer-input-area'),
+            height: _inputHeight,
+            child: TextField(
+              controller: widget.inputController,
+              focusNode: widget.focusNode,
+              autofocus: true,
+              expands: true,
+              minLines: null,
+              maxLines: null,
+              textAlignVertical: TextAlignVertical.top,
+              decoration: InputDecoration(
+                isCollapsed: true,
+                filled: true,
+                fillColor: palette.chromeSurface,
+                contentPadding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: palette.chromeStroke),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: palette.accent.withValues(alpha: 0.18),
+                  ),
+                ),
+                hintText: appText(
+                  '输入需求、补充上下文、继续追问，XWorkmate 会沿用当前任务上下文持续处理。',
+                  'Describe the task, add context, or continue the thread. XWorkmate keeps the current task context.',
                 ),
               ),
-              hintText: appText(
-                '输入需求、补充上下文、继续追问，XWorkmate 会沿用当前任务上下文持续处理。',
-                'Describe the task, add context, or continue the thread. XWorkmate keeps the current task context.',
-              ),
+              onSubmitted: (_) => widget.onSend(),
             ),
-            onSubmitted: (_) => onSend(),
+          ),
+          _ComposerResizeHandle(
+            key: const Key('assistant-composer-resize-handle'),
+            onDelta: _resizeInput,
           ),
           if (selectedSkills.isNotEmpty) ...[
             const SizedBox(height: 6),
@@ -2560,7 +2600,7 @@ class _ComposerBar extends StatelessWidget {
                         'assistant-selected-skill-${skill.key}',
                       ),
                       option: skill,
-                      onDeleted: () => onToggleSkill(skill.key),
+                      onDeleted: () => widget.onToggleSkill(skill.key),
                     ),
                   )
                   .toList(growable: false),
@@ -2627,26 +2667,26 @@ class _ComposerBar extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      modelOptions.isEmpty
+                      widget.modelOptions.isEmpty
                           ? _ComposerToolbarChip(
                               key: const Key('assistant-model-button'),
                               icon: Icons.bolt_rounded,
-                              label: modelLabel,
+                              label: widget.modelLabel,
                               showChevron: false,
                               maxLabelWidth: 140,
                             )
                           : PopupMenuButton<String>(
                               key: const Key('assistant-model-button'),
                               tooltip: appText('模型', 'Model'),
-                              onSelected: onModelChanged,
-                              itemBuilder: (context) => modelOptions
+                              onSelected: widget.onModelChanged,
+                              itemBuilder: (context) => widget.modelOptions
                                   .map(
                                     (value) => PopupMenuItem<String>(
                                       value: value,
                                       child: Row(
                                         children: [
                                           Expanded(child: Text(value)),
-                                          if (value == modelLabel)
+                                          if (value == widget.modelLabel)
                                             const Icon(
                                               Icons.check_rounded,
                                               size: 18,
@@ -2658,7 +2698,7 @@ class _ComposerBar extends StatelessWidget {
                                   .toList(),
                               child: _ComposerToolbarChip(
                                 icon: Icons.bolt_rounded,
-                                label: modelLabel,
+                                label: widget.modelLabel,
                                 showChevron: true,
                                 maxLabelWidth: 140,
                               ),
@@ -2667,7 +2707,7 @@ class _ComposerBar extends StatelessWidget {
                       PopupMenuButton<String>(
                         key: const Key('assistant-thinking-button'),
                         tooltip: appText('推理强度', 'Reasoning'),
-                        onSelected: onThinkingChanged,
+                        onSelected: widget.onThinkingChanged,
                         itemBuilder: (context) =>
                             const <String>['low', 'medium', 'high', 'max']
                                 .map(
@@ -2680,7 +2720,7 @@ class _ComposerBar extends StatelessWidget {
                                             _assistantThinkingLabel(value),
                                           ),
                                         ),
-                                        if (value == thinkingLabel)
+                                        if (value == widget.thinkingLabel)
                                           const Icon(
                                             Icons.check_rounded,
                                             size: 18,
@@ -2692,7 +2732,7 @@ class _ComposerBar extends StatelessWidget {
                                 .toList(),
                         child: _ComposerToolbarChip(
                           icon: Icons.psychology_alt_outlined,
-                          label: _assistantThinkingLabel(thinkingLabel),
+                          label: _assistantThinkingLabel(widget.thinkingLabel),
                           showChevron: true,
                           maxLabelWidth: 96,
                         ),
@@ -2708,14 +2748,14 @@ class _ComposerBar extends StatelessWidget {
                   onPressed: connecting
                       ? null
                       : connected
-                      ? onSend
+                      ? widget.onSend
                       : aiGatewayOnly
-                      ? onOpenAiGatewaySettings
+                      ? widget.onOpenAiGatewaySettings
                       : reconnectAvailable
                       ? () async {
-                          await onReconnectGateway();
+                          await widget.onReconnectGateway();
                         }
-                      : onOpenGateway,
+                      : widget.onOpenGateway,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -2760,7 +2800,7 @@ class _ComposerBar extends StatelessWidget {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final filteredSkills = availableSkills
+            final filteredSkills = widget.availableSkills
                 .where((skill) {
                   if (query.trim().isEmpty) {
                     return true;
@@ -2819,9 +2859,8 @@ class _ComposerBar extends StatelessWidget {
                                     const SizedBox(height: 8),
                                 itemBuilder: (context, index) {
                                   final skill = filteredSkills[index];
-                                  final selected = selectedSkillKeys.contains(
-                                    skill.key,
-                                  );
+                                  final selected = widget.selectedSkillKeys
+                                      .contains(skill.key);
                                   return _SkillPickerTile(
                                     key: ValueKey<String>(
                                       'assistant-skill-option-${skill.key}',
@@ -2829,7 +2868,7 @@ class _ComposerBar extends StatelessWidget {
                                     option: skill,
                                     selected: selected,
                                     onTap: () {
-                                      onToggleSkill(skill.key);
+                                      widget.onToggleSkill(skill.key);
                                       Navigator.of(dialogContext).pop();
                                     },
                                   );
@@ -2856,6 +2895,56 @@ class _ComposerIconButton extends StatefulWidget {
 
   @override
   State<_ComposerIconButton> createState() => _ComposerIconButtonState();
+}
+
+class _ComposerResizeHandle extends StatefulWidget {
+  const _ComposerResizeHandle({super.key, required this.onDelta});
+
+  final ValueChanged<double> onDelta;
+
+  @override
+  State<_ComposerResizeHandle> createState() => _ComposerResizeHandleState();
+}
+
+class _ComposerResizeHandleState extends State<_ComposerResizeHandle> {
+  bool _hovered = false;
+  bool _dragging = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final highlight = _hovered || _dragging;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeRow,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onVerticalDragStart: (_) => setState(() => _dragging = true),
+        onVerticalDragEnd: (_) => setState(() => _dragging = false),
+        onVerticalDragCancel: () => setState(() => _dragging = false),
+        onVerticalDragUpdate: (details) => widget.onDelta(details.delta.dy),
+        child: SizedBox(
+          height: 12,
+          width: double.infinity,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              width: 42,
+              height: 2,
+              decoration: BoxDecoration(
+                color: highlight
+                    ? palette.accent.withValues(alpha: 0.72)
+                    : palette.strokeSoft,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ComposerIconButtonState extends State<_ComposerIconButton> {
@@ -3051,10 +3140,7 @@ class _MessageBubble extends StatelessWidget {
 }
 
 class _MessageBubbleBody extends StatelessWidget {
-  const _MessageBubbleBody({
-    required this.text,
-    required this.renderMarkdown,
-  });
+  const _MessageBubbleBody({required this.text, required this.renderMarkdown});
 
   final String text;
   final bool renderMarkdown;
@@ -3524,10 +3610,7 @@ class _ConnectionChip extends StatelessWidget {
 }
 
 class _MessageViewModeChip extends StatelessWidget {
-  const _MessageViewModeChip({
-    required this.value,
-    required this.onSelected,
-  });
+  const _MessageViewModeChip({required this.value, required this.onSelected});
 
   final AssistantMessageViewMode value;
   final Future<void> Function(AssistantMessageViewMode mode) onSelected;
