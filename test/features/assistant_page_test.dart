@@ -405,6 +405,34 @@ void main() {
     expect(find.text('网页处理'), findsOneWidget);
   });
 
+  testWidgets('AssistantPage composer input area can be resized vertically', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+    );
+
+    final inputArea = find.byKey(const Key('assistant-composer-input-area'));
+    final resizeHandle = find.byKey(
+      const Key('assistant-composer-resize-handle'),
+    );
+
+    expect(inputArea, findsOneWidget);
+    expect(resizeHandle, findsOneWidget);
+
+    final initialHeight = tester.getSize(inputArea).height;
+
+    await tester.drag(resizeHandle, const Offset(0, 40));
+    await tester.pumpAndSettle();
+
+    final expandedHeight = tester.getSize(inputArea).height;
+
+    expect(expandedHeight, greaterThan(initialHeight));
+  });
+
   // Known flutter_tester host-exit hang in this widget scenario.
   testWidgets(
     'AssistantPage syncs task selection with execution target menu and connection chip',
@@ -533,12 +561,17 @@ void main() {
 
     expect(find.byType(MarkdownBody), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('assistant-message-view-mode-button')));
+    await tester.tap(
+      find.byKey(const Key('assistant-message-view-mode-button')),
+    );
     await _pumpForUiSync(tester);
     await tester.tap(find.text('RAW').last);
     await _pumpForUiSync(tester);
 
-    expect(controller.currentAssistantMessageViewMode, AssistantMessageViewMode.raw);
+    expect(
+      controller.currentAssistantMessageViewMode,
+      AssistantMessageViewMode.raw,
+    );
     expect(find.byType(MarkdownBody), findsNothing);
   }, skip: true);
 
