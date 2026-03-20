@@ -1366,10 +1366,49 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
             const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              key: ValueKey('multi-agent-framework-${config.framework.name}'),
+              initialValue: config.framework.name,
+              decoration: InputDecoration(
+                labelText: appText('协作框架', 'Framework'),
+              ),
+              items: MultiAgentFramework.values
+                  .map(
+                    (framework) => DropdownMenuItem<String>(
+                      value: framework.name,
+                      child: Text(framework.label),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+                final framework = MultiAgentFrameworkCopy.fromJsonValue(value);
+                _saveMultiAgentConfig(
+                  controller,
+                  config.copyWith(
+                    framework: framework,
+                    arisEnabled: framework == MultiAgentFramework.aris,
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
             _InfoRow(label: 'Ollama', value: config.ollamaEndpoint),
             _InfoRow(
               label: appText('超时时间', 'Timeout'),
               value: '${config.timeoutSeconds}s',
+            ),
+            _InfoRow(
+              label: 'ARIS',
+              value: config.usesAris
+                  ? [
+                      config.arisCompatStatus,
+                      if (config.arisBundleVersion.trim().isNotEmpty)
+                        config.arisBundleVersion.trim(),
+                    ].join(' · ')
+                  : appText('未启用', 'Disabled'),
             ),
             _InfoRow(
               label: appText('运行状态', 'Runtime'),
@@ -1634,6 +1673,16 @@ class _SettingsPageState extends State<SettingsPage> {
               label: appText('托管 MCP', 'Managed MCP'),
               value: '$managedMcpCount',
             ),
+            if (config.usesAris) ...[
+              const SizedBox(height: 4),
+              Text(
+                appText(
+                  'ARIS 模式会把内嵌 skills 与 Go bridge reviewer 作为本地 Ollama 协作增强层，不会覆盖你原有的 CLI 全局配置。',
+                  'ARIS mode injects embedded skills and the Go bridge reviewer for local Ollama collaboration without overwriting your existing CLI global config.',
+                ),
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
             const SizedBox(height: 16),
             ...mountTargets.map(
               (target) => Padding(

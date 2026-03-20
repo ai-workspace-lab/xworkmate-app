@@ -2446,6 +2446,30 @@ class _ComposerBar extends StatelessWidget {
                   },
                 ),
               ),
+              AnimatedBuilder(
+                animation: controller.multiAgentOrchestrator,
+                builder: (context, _) {
+                  final collab = controller.multiAgentOrchestrator;
+                  if (!collab.config.enabled) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: _ComposerToolbarChip(
+                      icon: Icons.hub_rounded,
+                      label: collab.config.usesAris
+                          ? appText('ARIS', 'ARIS')
+                          : appText('原生', 'Native'),
+                      showChevron: false,
+                      maxLabelWidth: 64,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                    ),
+                  );
+                },
+              ),
             ],
           ),
           const SizedBox(height: 8),

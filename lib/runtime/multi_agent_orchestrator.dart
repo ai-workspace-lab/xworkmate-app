@@ -4,7 +4,19 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'aris_bundle.dart';
+import 'aris_bridge.dart';
+import 'aris_llm_chat_client.dart';
+import 'multi_agent_frameworks.dart';
 import 'runtime_models.dart';
+
+typedef CliProcessStarter =
+    Future<Process> Function(
+      String executable,
+      List<String> arguments, {
+      Map<String, String>? environment,
+      String? workingDirectory,
+    });
 
 /// 多 Agent 协作编排器
 ///
@@ -16,11 +28,51 @@ import 'runtime_models.dart';
 /// - Engineer（工程师）：负责代码实现（Claude Code via Ollama）
 /// - Tester/Doc（评审）：负责测试、审阅、文档（Codex CLI via Ollama）
 class MultiAgentOrchestrator extends ChangeNotifier {
-  MultiAgentOrchestrator({required MultiAgentConfig config}) : _config = config;
+  MultiAgentOrchestrator({
+    required MultiAgentConfig config,
+    ArisBundleRepository? arisBundleRepository,
+    ArisBridgeLocator? arisBridgeLocator,
+    Future<bool> Function(String command)? binaryExistsResolver,
+    HttpClient Function()? httpClientFactory,
+    ArisLlmChatClient? arisLlmChatClient,
+    CliProcessStarter? processStarter,
+  }) : _config = config,
+       _arisBundleRepository = arisBundleRepository ?? ArisBundleRepository(),
+       _arisBridgeLocator =
+           arisBridgeLocator ??
+           ArisBridgeLocator(binaryExistsResolver: binaryExistsResolver),
+       _binaryExistsResolver = binaryExistsResolver,
+       _httpClientFactory = httpClientFactory ?? HttpClient.new,
+       _processStarter =
+           processStarter ??
+           ((executable, arguments, {environment, workingDirectory}) {
+             return Process.start(
+               executable,
+               arguments,
+               environment: environment,
+               workingDirectory: workingDirectory,
+             );
+           }),
+       _arisLlmChatClient =
+           arisLlmChatClient ??
+           ArisLlmChatClient(
+             bridgeLocator:
+                 arisBridgeLocator ??
+                 ArisBridgeLocator(binaryExistsResolver: binaryExistsResolver),
+           );
 
   /// 当前配置
   MultiAgentConfig _config;
   MultiAgentConfig get config => _config;
+  final ArisBundleRepository _arisBundleRepository;
+  final ArisBridgeLocator _arisBridgeLocator;
+  final Future<bool> Function(String command)? _binaryExistsResolver;
+  final HttpClient Function() _httpClientFactory;
+  final CliProcessStarter _processStarter;
+  final ArisLlmChatClient _arisLlmChatClient;
+  Process? _activeCliProcess;
+  HttpClient? _activeHttpClient;
+  bool _abortRequested = false;
 
   /// 协作模式是否启用
   bool _collaborationEnabled = false;
@@ -47,6 +99,28 @@ class MultiAgentOrchestrator extends ChangeNotifier {
     _config = config;
     _collaborationEnabled = config.enabled;
     notifyListeners();
+  }
+
+  Future<void> abort() async {
+    _abortRequested = true;
+    final process = _activeCliProcess;
+    _activeCliProcess = null;
+    if (process != null) {
+      try {
+        process.kill();
+      } catch (_) {
+        // Best effort only.
+      }
+    }
+    final client = _activeHttpClient;
+    _activeHttpClient = null;
+    if (client != null) {
+      try {
+        client.close(force: true);
+      } catch (_) {
+        // Best effort only.
+      }
+    }
   }
 
   /// 启用协作模式
@@ -91,15 +165,20 @@ class MultiAgentOrchestrator extends ChangeNotifier {
 
     _isRunning = true;
     _currentIteration = 0;
+    _abortRequested = false;
     _logEntries.clear();
     _lastError = null;
     notifyListeners();
 
     final startTime = DateTime.now();
     final steps = <CollaborationStep>[];
+    final preset = _config.usesAris
+        ? ArisFrameworkPreset(_arisBundleRepository)
+        : const NativeFrameworkPreset();
 
     try {
       // === Phase 1: Architect 分析任务 ===
+      _throwIfAborted();
       _log(CollaborationLogLevel.info, '🎨', 'Architect 开始分析任务...');
       _emitEvent(
         onEvent,
@@ -114,6 +193,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
       );
       final architectResult = await _runArchitect(
         taskPrompt,
+        preset: preset,
         selectedSkills: selectedSkills,
         aiGatewayBaseUrl: aiGatewayBaseUrl,
         aiGatewayApiKey: aiGatewayApiKey,
@@ -142,6 +222,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
       );
 
       // === Phase 2: Engineer 实现 ===
+      _throwIfAborted();
       _log(CollaborationLogLevel.info, '🔧', 'Engineer 开始实现...');
       _emitEvent(
         onEvent,
@@ -158,6 +239,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
         architectResult.decomposedTasks,
         workingDirectory,
         attachments,
+        preset: preset,
         selectedSkills: selectedSkills,
         aiGatewayBaseUrl: aiGatewayBaseUrl,
         aiGatewayApiKey: aiGatewayApiKey,
@@ -183,6 +265,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
       );
 
       // === Phase 3: Tester 审阅 ===
+      _throwIfAborted();
       _log(CollaborationLogLevel.info, '🔍', 'Tester 开始审阅...');
       _emitEvent(
         onEvent,
@@ -197,6 +280,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
       );
       final testerResult = await _runTester(
         engineerResult.codeOutput,
+        preset: preset,
         aiGatewayBaseUrl: aiGatewayBaseUrl,
         aiGatewayApiKey: aiGatewayApiKey,
       );
@@ -231,6 +315,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
         );
 
         for (var i = 0; i < _config.maxIterations; i++) {
+          _throwIfAborted();
           _currentIteration = i + 1;
           _log(
             CollaborationLogLevel.info,
@@ -244,6 +329,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
             engineerResult.codeOutput,
             testerResult.feedback,
             workingDirectory,
+            preset: preset,
             aiGatewayBaseUrl: aiGatewayBaseUrl,
             aiGatewayApiKey: aiGatewayApiKey,
           );
@@ -260,6 +346,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
           // Tester 重新审阅
           final reReview = await _runTester(
             fixedResult.codeOutput,
+            preset: preset,
             aiGatewayBaseUrl: aiGatewayBaseUrl,
             aiGatewayApiKey: aiGatewayApiKey,
           );
@@ -331,6 +418,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
   /// 运行 Architect（任务分析）
   Future<ArchitectResult> _runArchitect(
     String task, {
+    required FrameworkPreset preset,
     required List<String> selectedSkills,
     required String aiGatewayBaseUrl,
     required String aiGatewayApiKey,
@@ -340,10 +428,23 @@ class MultiAgentOrchestrator extends ChangeNotifier {
     try {
       // 根据配置选择 Architect 工具
       if (_config.architectEnabled) {
+        final tool = await _resolveToolForRole(
+          MultiAgentRole.architect,
+          _config.architectTool,
+        );
+        final instructionBlock = await preset.roleInstructionBlock(
+          role: MultiAgentRole.architect,
+          tool: tool,
+          selectedSkills: selectedSkills,
+        );
         final result = await _runCliPrompt(
-          tool: _config.architectTool,
-          model: _config.architectModel,
-          prompt: _buildArchitectPrompt(task, selectedSkills),
+          role: MultiAgentRole.architect,
+          tool: tool,
+          model: _resolvedModelForRole(
+            MultiAgentRole.architect,
+            configuredModel: _config.architectModel,
+          ),
+          prompt: _buildArchitectPrompt(task, selectedSkills, instructionBlock),
           cwd: '',
           aiGatewayBaseUrl: aiGatewayBaseUrl,
           aiGatewayApiKey: aiGatewayApiKey,
@@ -384,11 +485,21 @@ class MultiAgentOrchestrator extends ChangeNotifier {
     List<SubTask> tasks,
     String workingDirectory,
     List<CollaborationAttachment> attachments, {
+    required FrameworkPreset preset,
     required List<String> selectedSkills,
     required String aiGatewayBaseUrl,
     required String aiGatewayApiKey,
   }) async {
     final stopwatch = Stopwatch()..start();
+    final tool = await _resolveToolForRole(
+      MultiAgentRole.engineer,
+      _config.engineerTool,
+    );
+    final instructionBlock = await preset.roleInstructionBlock(
+      role: MultiAgentRole.engineer,
+      tool: tool,
+      selectedSkills: selectedSkills,
+    );
 
     final taskList = tasks
         .map((t) => '## ${t.order}. ${t.description}')
@@ -396,6 +507,8 @@ class MultiAgentOrchestrator extends ChangeNotifier {
 
     final prompt =
         '''
+$instructionBlock
+
 你是一个资深工程师，负责完成以下编码任务：
 
 ### 任务列表
@@ -414,8 +527,12 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
 ''';
 
     final result = await _runCliPrompt(
-      tool: _config.engineerTool,
-      model: _config.engineerModel,
+      role: MultiAgentRole.engineer,
+      tool: tool,
+      model: _resolvedModelForRole(
+        MultiAgentRole.engineer,
+        configuredModel: _config.engineerModel,
+      ),
       prompt: prompt,
       cwd: workingDirectory,
       aiGatewayBaseUrl: aiGatewayBaseUrl,
@@ -434,13 +551,25 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
   /// 运行 Tester（代码审阅）
   Future<TesterResult> _runTester(
     String codeOutput, {
+    required FrameworkPreset preset,
     required String aiGatewayBaseUrl,
     required String aiGatewayApiKey,
   }) async {
     final stopwatch = Stopwatch()..start();
+    final tool = await _resolveToolForRole(
+      MultiAgentRole.testerDoc,
+      _config.testerTool,
+    );
+    final instructionBlock = await preset.roleInstructionBlock(
+      role: MultiAgentRole.testerDoc,
+      tool: tool,
+      selectedSkills: const <String>[],
+    );
 
     final prompt =
         '''
+$instructionBlock
+
 请审阅以下代码，并按以下格式输出：
 
 ## 评分 (1-10)
@@ -464,14 +593,24 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
 ${codeOutput.length > 4000 ? '${codeOutput.substring(0, 4000)}\n...[代码已截断]' : codeOutput}
 ''';
 
-    final result = await _runCliPrompt(
-      tool: _config.testerTool,
-      model: _config.testerModel,
-      prompt: prompt,
-      cwd: '',
-      aiGatewayBaseUrl: aiGatewayBaseUrl,
-      aiGatewayApiKey: aiGatewayApiKey,
+    final testerModel = _resolvedModelForRole(
+      MultiAgentRole.testerDoc,
+      configuredModel: _config.testerModel,
     );
+    final result = _config.usesAris && tool == 'claude'
+        ? await _runArisTesterViaClaudeReview(
+            model: testerModel,
+            prompt: prompt,
+          )
+        : await _runCliPrompt(
+            role: MultiAgentRole.testerDoc,
+            tool: tool,
+            model: testerModel,
+            prompt: prompt,
+            cwd: '',
+            aiGatewayBaseUrl: aiGatewayBaseUrl,
+            aiGatewayApiKey: aiGatewayApiKey,
+          );
     stopwatch.stop();
 
     final score = _parseReviewScore(result.output);
@@ -490,13 +629,25 @@ ${codeOutput.length > 4000 ? '${codeOutput.substring(0, 4000)}\n...[代码已截
     String originalCode,
     String feedback,
     String workingDirectory, {
+    required FrameworkPreset preset,
     required String aiGatewayBaseUrl,
     required String aiGatewayApiKey,
   }) async {
     final stopwatch = Stopwatch()..start();
+    final tool = await _resolveToolForRole(
+      MultiAgentRole.engineer,
+      _config.engineerTool,
+    );
+    final instructionBlock = await preset.roleInstructionBlock(
+      role: MultiAgentRole.engineer,
+      tool: tool,
+      selectedSkills: const <String>[],
+    );
 
     final prompt =
         '''
+$instructionBlock
+
 你是一个资深工程师。请根据审阅反馈修复代码。
 
 ## 审阅反馈
@@ -509,8 +660,12 @@ $originalCode
 ''';
 
     final result = await _runCliPrompt(
-      tool: _config.engineerTool,
-      model: _config.engineerModel,
+      role: MultiAgentRole.engineer,
+      tool: tool,
+      model: _resolvedModelForRole(
+        MultiAgentRole.engineer,
+        configuredModel: _config.engineerModel,
+      ),
       prompt: prompt,
       cwd: workingDirectory,
       aiGatewayBaseUrl: aiGatewayBaseUrl,
@@ -528,6 +683,7 @@ $originalCode
 
   /// 通用的 CLI 进程执行方法
   Future<CliResult> _runCliPrompt({
+    required MultiAgentRole role,
     required String tool,
     required String model,
     required String prompt,
@@ -619,13 +775,25 @@ $originalCode
         throw ArgumentError('Unknown tool: $tool');
     }
 
+    final cliAvailable = await _binaryExists(command);
+    if (_config.usesAris && !cliAvailable) {
+      return _runArisFallback(
+        role: role,
+        model: model,
+        prompt: prompt,
+        aiGatewayBaseUrl: aiGatewayBaseUrl,
+        aiGatewayApiKey: aiGatewayApiKey,
+      );
+    }
+
     try {
-      final process = await Process.start(
+      final process = await _processStarter(
         command,
         args,
         environment: envVars,
         workingDirectory: cwd.isNotEmpty ? cwd : null,
       );
+      _activeCliProcess = process;
 
       await process.stdin.close();
 
@@ -653,20 +821,47 @@ $originalCode
         timeout,
         onTimeout: () => -1,
       );
+      _activeCliProcess = null;
 
-      return CliResult(
+      final cliResult = CliResult(
         output: results[0],
         error: results[1],
         exitCode: exitCode,
       );
+      if (_config.usesAris && !cliResult.success) {
+        return _runArisFallback(
+          role: role,
+          model: model,
+          prompt: prompt,
+          aiGatewayBaseUrl: aiGatewayBaseUrl,
+          aiGatewayApiKey: aiGatewayApiKey,
+        );
+      }
+      return cliResult;
     } catch (e) {
+      _activeCliProcess = null;
+      if (_config.usesAris) {
+        return _runArisFallback(
+          role: role,
+          model: model,
+          prompt: prompt,
+          aiGatewayBaseUrl: aiGatewayBaseUrl,
+          aiGatewayApiKey: aiGatewayApiKey,
+        );
+      }
       return CliResult(output: '', error: e.toString(), exitCode: -1);
     }
   }
 
   /// 构建 Architect 的 Prompt
-  String _buildArchitectPrompt(String task, List<String> selectedSkills) {
+  String _buildArchitectPrompt(
+    String task,
+    List<String> selectedSkills,
+    String instructionBlock,
+  ) {
     return '''
+$instructionBlock
+
 你是一个任务架构师（Architect）。请分析以下需求并分解为可执行的子任务。
 
 ## 用户需求
@@ -692,6 +887,293 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
 2. [任务描述] | 复杂度：[简单/中等/复杂] | 关键技术：[技术点]
 ...
 ''';
+  }
+
+  Future<String> _resolveToolForRole(
+    MultiAgentRole role,
+    String configuredTool,
+  ) async {
+    if (!_config.usesAris) {
+      return configuredTool;
+    }
+    final candidates = switch (role) {
+      MultiAgentRole.architect => <String>[
+        configuredTool,
+        'gemini',
+        'opencode',
+        'codex',
+        'claude',
+      ],
+      MultiAgentRole.engineer => <String>[
+        configuredTool,
+        'claude',
+        'codex',
+        'opencode',
+        'gemini',
+      ],
+      MultiAgentRole.testerDoc => <String>[
+        configuredTool,
+        'codex',
+        'claude',
+        'opencode',
+        'gemini',
+      ],
+    };
+    for (final candidate in candidates) {
+      final trimmed = candidate.trim();
+      if (trimmed.isEmpty) {
+        continue;
+      }
+      if (await _binaryExists(_resolveCliPath(trimmed))) {
+        return trimmed;
+      }
+    }
+    return configuredTool;
+  }
+
+  String _resolvedModelForRole(
+    MultiAgentRole role, {
+    required String configuredModel,
+  }) {
+    final trimmed = configuredModel.trim();
+    if (!_config.usesAris || trimmed.isEmpty) {
+      return trimmed;
+    }
+    if (!_looksRemoteOnlyModel(trimmed)) {
+      return trimmed;
+    }
+    switch (role) {
+      case MultiAgentRole.architect:
+        return _config.engineer.model.trim().isNotEmpty
+            ? _config.engineer.model.trim()
+            : 'qwen2.5-coder:latest';
+      case MultiAgentRole.engineer:
+        return trimmed;
+      case MultiAgentRole.testerDoc:
+        if (!_looksRemoteOnlyModel(_config.tester.model.trim())) {
+          return _config.tester.model.trim();
+        }
+        if (_config.engineer.model.trim().isNotEmpty) {
+          return _config.engineer.model.trim();
+        }
+        return 'gpt-oss:20b';
+    }
+  }
+
+  bool _looksRemoteOnlyModel(String model) {
+    final normalized = model.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return false;
+    }
+    return normalized.startsWith('gemini-') ||
+        normalized.startsWith('gpt-') ||
+        normalized.startsWith('moonshot') ||
+        normalized.startsWith('minimax') ||
+        normalized.startsWith('z-ai/') ||
+        normalized.contains('kimi');
+  }
+
+  Future<bool> _binaryExists(String command) async {
+    final resolver = _binaryExistsResolver;
+    if (resolver != null) {
+      return resolver(command);
+    }
+    final check = await Process.run(
+      Platform.isWindows ? 'where' : 'which',
+      <String>[command],
+      runInShell: true,
+    );
+    return check.exitCode == 0 && '${check.stdout}'.trim().isNotEmpty;
+  }
+
+  Future<CliResult> _runArisFallback({
+    required MultiAgentRole role,
+    required String model,
+    required String prompt,
+    required String aiGatewayBaseUrl,
+    required String aiGatewayApiKey,
+  }) async {
+    if (role == MultiAgentRole.testerDoc) {
+      final viaLlmChat = await _runArisTesterViaLlmChat(
+        model: model,
+        prompt: prompt,
+        aiGatewayBaseUrl: aiGatewayBaseUrl,
+        aiGatewayApiKey: aiGatewayApiKey,
+      );
+      if (viaLlmChat.success) {
+        return viaLlmChat;
+      }
+    }
+    return _runOpenAiCompatiblePrompt(
+      role: role,
+      model: model,
+      prompt: prompt,
+      aiGatewayBaseUrl: aiGatewayBaseUrl,
+      aiGatewayApiKey: aiGatewayApiKey,
+    );
+  }
+
+  Future<CliResult> _runArisTesterViaLlmChat({
+    required String model,
+    required String prompt,
+    required String aiGatewayBaseUrl,
+    required String aiGatewayApiKey,
+  }) async {
+    try {
+      if (!await _arisBridgeLocator.isAvailable()) {
+        return const CliResult(
+          output: '',
+          error: 'ARIS Go bridge is unavailable for llm-chat',
+          exitCode: -1,
+        );
+      }
+      final endpoint = _openAiCompatibleBaseUrl(
+        aiGatewayBaseUrl: aiGatewayBaseUrl,
+      );
+      final apiKey = _openAiCompatibleApiKey(aiGatewayApiKey: aiGatewayApiKey);
+      final output = await _arisLlmChatClient.chat(
+        endpoint: endpoint,
+        apiKey: apiKey,
+        model: model,
+        prompt: prompt,
+        systemPrompt:
+            'You are the ARIS reviewer. Review the provided implementation and return actionable feedback.',
+      );
+      return CliResult(output: output, error: '', exitCode: 0);
+    } catch (error) {
+      return CliResult(output: '', error: error.toString(), exitCode: -1);
+    }
+  }
+
+  Future<CliResult> _runArisTesterViaClaudeReview({
+    required String model,
+    required String prompt,
+  }) async {
+    try {
+      if (!await _arisBridgeLocator.isAvailable()) {
+        return const CliResult(
+          output: '',
+          error: 'ARIS Go bridge is unavailable for claude-review',
+          exitCode: -1,
+        );
+      }
+      if (!await _binaryExists(_resolveCliPath('claude'))) {
+        return const CliResult(
+          output: '',
+          error: 'Claude CLI is unavailable for claude-review',
+          exitCode: -1,
+        );
+      }
+      final output = await _arisLlmChatClient.claudeReview(
+        prompt: prompt,
+        model: model,
+        systemPrompt:
+            'You are the ARIS reviewer. Review the provided implementation and return actionable feedback.',
+      );
+      return CliResult(output: output, error: '', exitCode: 0);
+    } catch (error) {
+      return CliResult(output: '', error: error.toString(), exitCode: -1);
+    }
+  }
+
+  Future<CliResult> _runOpenAiCompatiblePrompt({
+    required MultiAgentRole role,
+    required String model,
+    required String prompt,
+    required String aiGatewayBaseUrl,
+    required String aiGatewayApiKey,
+  }) async {
+    final client = _httpClientFactory();
+    _activeHttpClient = client;
+    try {
+      final request = await client.postUrl(
+        Uri.parse(
+          '${_openAiCompatibleBaseUrl(aiGatewayBaseUrl: aiGatewayBaseUrl).replaceAll(RegExp(r'/$'), '')}/chat/completions',
+        ),
+      );
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer ${_openAiCompatibleApiKey(aiGatewayApiKey: aiGatewayApiKey)}',
+      );
+      request.add(
+        utf8.encode(
+          jsonEncode(<String, dynamic>{
+            'model': model,
+            'stream': false,
+            'messages': <Map<String, String>>[
+              <String, String>{
+                'role': 'system',
+                'content': _systemPromptForRole(role),
+              },
+              <String, String>{'role': 'user', 'content': prompt},
+            ],
+          }),
+        ),
+      );
+      final response = await request.close().timeout(
+        Duration(seconds: _config.timeoutSeconds),
+      );
+      final body = await utf8.decodeStream(response);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return CliResult(
+          output: '',
+          error: body,
+          exitCode: response.statusCode,
+        );
+      }
+      final decoded = jsonDecode(body) as Map<String, dynamic>;
+      final choices = decoded['choices'] as List? ?? const <Object>[];
+      final firstChoice = choices.isNotEmpty ? choices.first : null;
+      final output =
+          ((firstChoice as Map?)?['message'] as Map?)?['content']?.toString() ??
+          '';
+      return CliResult(output: output, error: '', exitCode: 0);
+    } catch (error) {
+      return CliResult(output: '', error: error.toString(), exitCode: -1);
+    } finally {
+      _activeHttpClient = null;
+      try {
+        client.close(force: true);
+      } catch (_) {
+        // Best effort only.
+      }
+    }
+  }
+
+  String _openAiCompatibleBaseUrl({required String aiGatewayBaseUrl}) {
+    if (_config.aiGatewayInjectionPolicy != AiGatewayInjectionPolicy.disabled &&
+        aiGatewayBaseUrl.trim().isNotEmpty) {
+      final normalized = aiGatewayBaseUrl.trim();
+      return normalized.endsWith('/v1') ? normalized : '$normalized/v1';
+    }
+    final normalized = _config.ollamaEndpoint.trim();
+    return normalized.endsWith('/v1') ? normalized : '$normalized/v1';
+  }
+
+  String _openAiCompatibleApiKey({required String aiGatewayApiKey}) {
+    if (_config.aiGatewayInjectionPolicy != AiGatewayInjectionPolicy.disabled &&
+        aiGatewayApiKey.trim().isNotEmpty) {
+      return aiGatewayApiKey.trim();
+    }
+    return 'ollama';
+  }
+
+  String _systemPromptForRole(MultiAgentRole role) {
+    return switch (role) {
+      MultiAgentRole.architect =>
+        'You are the Architect in a multi-agent coding workflow. Focus on decomposition, planning, and sequencing.',
+      MultiAgentRole.engineer =>
+        'You are the Engineer in a multi-agent coding workflow. Produce implementation-oriented output.',
+      MultiAgentRole.testerDoc =>
+        'You are the Tester/Reviewer in a multi-agent coding workflow. Review, score, and suggest follow-up fixes.',
+    };
+  }
+
+  void _throwIfAborted() {
+    if (_abortRequested) {
+      throw StateError('Multi-agent collaboration aborted.');
+    }
   }
 
   /// 解析 Architect 分解的任务
@@ -817,6 +1299,8 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
         aiGatewayApiKey.trim().isNotEmpty) {
       baseEnv['OPENAI_BASE_URL'] = aiGatewayBaseUrl.trim();
       baseEnv['OPENAI_API_KEY'] = aiGatewayApiKey.trim();
+      baseEnv['OLLAMA_BASE_URL'] = aiGatewayBaseUrl.trim();
+      baseEnv['OLLAMA_HOST'] = aiGatewayBaseUrl.trim();
       if (tool == 'claude') {
         baseEnv['ANTHROPIC_BASE_URL'] = aiGatewayBaseUrl.trim();
         baseEnv['ANTHROPIC_AUTH_TOKEN'] = aiGatewayApiKey.trim();
@@ -824,12 +1308,19 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
       }
       return baseEnv;
     }
+    final ollamaEndpoint = _config.ollamaEndpoint.trim();
+    if (ollamaEndpoint.isNotEmpty) {
+      baseEnv['OLLAMA_BASE_URL'] = ollamaEndpoint;
+      baseEnv['OLLAMA_HOST'] = ollamaEndpoint;
+      baseEnv['OPENAI_API_KEY'] = 'ollama';
+      baseEnv['OPENAI_BASE_URL'] = ollamaEndpoint.endsWith('/v1')
+          ? ollamaEndpoint
+          : '$ollamaEndpoint/v1';
+    }
     if (tool == 'claude' || tool == 'codex') {
       baseEnv['ANTHROPIC_AUTH_TOKEN'] = 'ollama';
       baseEnv['ANTHROPIC_API_KEY'] = '';
-      baseEnv['ANTHROPIC_BASE_URL'] = _config.ollamaEndpoint;
-      baseEnv['OPENAI_API_KEY'] = '';
-      baseEnv['OPENAI_BASE_URL'] = '${_config.ollamaEndpoint}/v1';
+      baseEnv['ANTHROPIC_BASE_URL'] = ollamaEndpoint;
     }
     return baseEnv;
   }

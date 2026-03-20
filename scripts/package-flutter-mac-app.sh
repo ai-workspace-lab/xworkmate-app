@@ -8,6 +8,8 @@ DIST_DIR="$ROOT_DIR/dist"
 APP_NAME="${APP_NAME:-XWorkmate}"
 BUILD_MODE="${BUILD_MODE:-release}"
 PRODUCTS_DIR_NAME="$(tr '[:lower:]' '[:upper:]' <<< "${BUILD_MODE:0:1}")${BUILD_MODE:1}"
+BRIDGE_BINARY_NAME="${BRIDGE_BINARY_NAME:-xworkmate-aris-bridge}"
+BRIDGE_BUILD_PATH="${ROOT_DIR}/build/bin/${BRIDGE_BINARY_NAME}"
 
 if [[ ! -f "$PUBSPEC_PATH" ]]; then
   echo "Missing pubspec: $PUBSPEC_PATH" >&2
@@ -29,8 +31,13 @@ fi
 BUILD_APP_PATH="$APP_DIR/build/macos/Build/Products/$PRODUCTS_DIR_NAME/$APP_NAME.app"
 DIST_APP_PATH="$DIST_DIR/$APP_NAME.app"
 DIST_DMG_PATH="$DIST_DIR/$APP_NAME-$APP_VERSION.dmg"
+HELPERS_DIR="$DIST_APP_PATH/Contents/Helpers"
+HELPER_PATH="$HELPERS_DIR/$BRIDGE_BINARY_NAME"
 
 mkdir -p "$DIST_DIR"
+
+echo "Building bundled ARIS bridge..."
+bash "$ROOT_DIR/scripts/build-aris-bridge.sh"
 
 echo "Building $APP_NAME $APP_VERSION ($APP_BUILD) for macOS..."
 BUILD_ARGS=(
@@ -58,6 +65,17 @@ fi
 
 rm -rf "$DIST_APP_PATH" "$DIST_DMG_PATH"
 ditto "$BUILD_APP_PATH" "$DIST_APP_PATH"
+mkdir -p "$HELPERS_DIR"
+ditto "$BRIDGE_BUILD_PATH" "$HELPER_PATH"
+chmod +x "$HELPER_PATH"
+
+echo "Re-signing bundled helper and app..."
+SIGN_IDENTITY="$(codesign -dv --verbose=2 "$DIST_APP_PATH" 2>&1 | sed -n 's/^Authority=//p' | head -n 1)"
+if [[ -z "$SIGN_IDENTITY" ]]; then
+  SIGN_IDENTITY="-"
+fi
+codesign --force --sign "$SIGN_IDENTITY" --timestamp=none "$HELPER_PATH"
+codesign --force --deep --sign "$SIGN_IDENTITY" --preserve-metadata=entitlements,requirements,flags,runtime --timestamp=none "$DIST_APP_PATH"
 
 echo "Packaging DMG..."
 DMG_VOLUME_NAME="$APP_NAME" "$ROOT_DIR/scripts/create-dmg.sh" "$DIST_APP_PATH" "$DIST_DMG_PATH"
