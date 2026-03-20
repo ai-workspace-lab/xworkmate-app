@@ -1,16 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
-import '../../features/account/account_page.dart';
-import '../../features/ai_gateway/ai_gateway_page.dart';
-import '../../features/assistant/assistant_page.dart';
-import '../../features/claw_hub/claw_hub_page.dart';
-import '../../features/mcp_server/mcp_server_page.dart';
-import '../../features/modules/modules_page.dart';
-import '../../features/secrets/secrets_page.dart';
-import '../../features/settings/settings_page.dart';
-import '../../features/skills/skills_page.dart';
-import '../../features/tasks/tasks_page.dart';
+import '../../app/workspace_page_registry.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
@@ -169,53 +160,12 @@ class _MobileShellState extends State<MobileShell> {
     }
 
     final destination = widget.controller.destination;
-    return switch (destination) {
-      WorkspaceDestination.assistant => AssistantPage(
-        controller: widget.controller,
-        onOpenDetail: _openDetailSheet,
-        showStandaloneTaskRail: false,
-      ),
-      WorkspaceDestination.tasks => TasksPage(
-        controller: widget.controller,
-        onOpenDetail: _openDetailSheet,
-      ),
-      WorkspaceDestination.skills => SkillsPage(
-        controller: widget.controller,
-        onOpenDetail: _openDetailSheet,
-      ),
-      WorkspaceDestination.nodes => ModulesPage(
-        controller: widget.controller,
-        onOpenDetail: _openDetailSheet,
-        initialTab: ModulesTab.nodes,
-      ),
-      WorkspaceDestination.agents => ModulesPage(
-        controller: widget.controller,
-        onOpenDetail: _openDetailSheet,
-        initialTab: ModulesTab.agents,
-      ),
-      WorkspaceDestination.mcpServer => McpServerPage(
-        controller: widget.controller,
-        onOpenDetail: _openDetailSheet,
-      ),
-      WorkspaceDestination.clawHub => ClawHubPage(
-        controller: widget.controller,
-        onOpenDetail: _openDetailSheet,
-      ),
-      WorkspaceDestination.secrets => SecretsPage(
-        controller: widget.controller,
-        onOpenDetail: _openDetailSheet,
-      ),
-      WorkspaceDestination.aiGateway => AiGatewayPage(
-        controller: widget.controller,
-        onOpenDetail: _openDetailSheet,
-      ),
-      WorkspaceDestination.settings => SettingsPage(
-        controller: widget.controller,
-      ),
-      WorkspaceDestination.account => AccountPage(
-        controller: widget.controller,
-      ),
-    };
+    return buildWorkspacePage(
+      destination: destination,
+      controller: widget.controller,
+      onOpenDetail: _openDetailSheet,
+      surface: WorkspacePageSurface.mobile,
+    );
   }
 
   @override

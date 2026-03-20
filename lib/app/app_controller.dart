@@ -128,6 +128,12 @@ class AppController extends ChangeNotifier {
   WorkspaceDestination _destination = WorkspaceDestination.assistant;
   ThemeMode _themeMode = ThemeMode.light;
   AppSidebarState _sidebarState = AppSidebarState.expanded;
+  ModulesTab _modulesTab = ModulesTab.gateway;
+  SecretsTab _secretsTab = SecretsTab.vault;
+  AiGatewayTab _aiGatewayTab = AiGatewayTab.models;
+  SettingsTab _settingsTab = SettingsTab.general;
+  SettingsDetailPage? _settingsDetail;
+  SettingsNavigationContext? _settingsNavigationContext;
   DetailPanelData? _detailPanel;
   bool _initializing = true;
   String? _bootstrapError;
@@ -137,6 +143,13 @@ class AppController extends ChangeNotifier {
   WorkspaceDestination get destination => _destination;
   ThemeMode get themeMode => _themeMode;
   AppSidebarState get sidebarState => _sidebarState;
+  ModulesTab get modulesTab => _modulesTab;
+  SecretsTab get secretsTab => _secretsTab;
+  AiGatewayTab get aiGatewayTab => _aiGatewayTab;
+  SettingsTab get settingsTab => _settingsTab;
+  SettingsDetailPage? get settingsDetail => _settingsDetail;
+  SettingsNavigationContext? get settingsNavigationContext =>
+      _settingsNavigationContext;
   DetailPanelData? get detailPanel => _detailPanel;
   bool get initializing => _initializing;
   String? get bootstrapError => _bootstrapError;
@@ -670,10 +683,7 @@ class AppController extends ChangeNotifier {
       }
       byKey.putIfAbsent(
         normalizedSessionKey,
-        () => _assistantSessionSummaryFor(
-          normalizedSessionKey,
-          record: record,
-        ),
+        () => _assistantSessionSummaryFor(normalizedSessionKey, record: record),
       );
     }
 
@@ -701,10 +711,25 @@ class AppController extends ChangeNotifier {
   }
 
   void navigateTo(WorkspaceDestination destination) {
-    if (_destination == destination) {
+    final nextModulesTab = switch (destination) {
+      WorkspaceDestination.nodes => ModulesTab.nodes,
+      WorkspaceDestination.agents => ModulesTab.agents,
+      _ => _modulesTab,
+    };
+    final shouldClearSettingsDrillIn =
+        _settingsDetail != null || _settingsNavigationContext != null;
+    final changed =
+        _destination != destination ||
+        _detailPanel != null ||
+        shouldClearSettingsDrillIn ||
+        nextModulesTab != _modulesTab;
+    if (!changed) {
       return;
     }
     _destination = destination;
+    _modulesTab = nextModulesTab;
+    _settingsDetail = null;
+    _settingsNavigationContext = null;
     _detailPanel = null;
     notifyListeners();
   }
@@ -716,14 +741,147 @@ class AppController extends ChangeNotifier {
         : 'main';
     final destinationChanged = _destination != WorkspaceDestination.assistant;
     final detailChanged = _detailPanel != null;
+    final settingsDrillInChanged =
+        _settingsDetail != null || _settingsNavigationContext != null;
     _destination = WorkspaceDestination.assistant;
+    _settingsDetail = null;
+    _settingsNavigationContext = null;
     _detailPanel = null;
-    if (destinationChanged || detailChanged) {
+    if (destinationChanged || detailChanged || settingsDrillInChanged) {
       notifyListeners();
     }
     if (_sessionsController.currentSessionKey != mainSessionKey) {
       unawaited(switchSession(mainSessionKey));
     }
+  }
+
+  void openModules({ModulesTab tab = ModulesTab.gateway}) {
+    final destination = tab == ModulesTab.agents
+        ? WorkspaceDestination.agents
+        : WorkspaceDestination.nodes;
+    final changed =
+        _destination != destination ||
+        _modulesTab != tab ||
+        _detailPanel != null ||
+        _settingsDetail != null ||
+        _settingsNavigationContext != null;
+    if (!changed) {
+      return;
+    }
+    _destination = destination;
+    _modulesTab = tab;
+    _detailPanel = null;
+    _settingsDetail = null;
+    _settingsNavigationContext = null;
+    notifyListeners();
+  }
+
+  void setModulesTab(ModulesTab tab) {
+    if (_modulesTab == tab) {
+      return;
+    }
+    _modulesTab = tab;
+    notifyListeners();
+  }
+
+  void openSecrets({SecretsTab tab = SecretsTab.vault}) {
+    final changed =
+        _destination != WorkspaceDestination.secrets ||
+        _secretsTab != tab ||
+        _detailPanel != null ||
+        _settingsDetail != null ||
+        _settingsNavigationContext != null;
+    if (!changed) {
+      return;
+    }
+    _destination = WorkspaceDestination.secrets;
+    _secretsTab = tab;
+    _detailPanel = null;
+    _settingsDetail = null;
+    _settingsNavigationContext = null;
+    notifyListeners();
+  }
+
+  void setSecretsTab(SecretsTab tab) {
+    if (_secretsTab == tab) {
+      return;
+    }
+    _secretsTab = tab;
+    notifyListeners();
+  }
+
+  void openAiGateway({AiGatewayTab tab = AiGatewayTab.models}) {
+    final changed =
+        _destination != WorkspaceDestination.aiGateway ||
+        _aiGatewayTab != tab ||
+        _detailPanel != null ||
+        _settingsDetail != null ||
+        _settingsNavigationContext != null;
+    if (!changed) {
+      return;
+    }
+    _destination = WorkspaceDestination.aiGateway;
+    _aiGatewayTab = tab;
+    _detailPanel = null;
+    _settingsDetail = null;
+    _settingsNavigationContext = null;
+    notifyListeners();
+  }
+
+  void setAiGatewayTab(AiGatewayTab tab) {
+    if (_aiGatewayTab == tab) {
+      return;
+    }
+    _aiGatewayTab = tab;
+    notifyListeners();
+  }
+
+  void openSettings({
+    SettingsTab tab = SettingsTab.general,
+    SettingsDetailPage? detail,
+    SettingsNavigationContext? navigationContext,
+  }) {
+    final resolvedTab = detail?.tab ?? tab;
+    final changed =
+        _destination != WorkspaceDestination.settings ||
+        _settingsTab != resolvedTab ||
+        _settingsDetail != detail ||
+        _settingsNavigationContext != navigationContext ||
+        _detailPanel != null;
+    if (!changed) {
+      return;
+    }
+    _destination = WorkspaceDestination.settings;
+    _settingsTab = resolvedTab;
+    _settingsDetail = detail;
+    _settingsNavigationContext = navigationContext;
+    _detailPanel = null;
+    notifyListeners();
+  }
+
+  void setSettingsTab(SettingsTab tab, {bool clearDetail = true}) {
+    final changed =
+        _settingsTab != tab ||
+        (clearDetail &&
+            (_settingsDetail != null || _settingsNavigationContext != null));
+    if (!changed) {
+      return;
+    }
+    _settingsTab = tab;
+    if (clearDetail) {
+      _settingsDetail = null;
+      _settingsNavigationContext = null;
+    }
+    notifyListeners();
+  }
+
+  void closeSettingsDetail() {
+    if (_settingsDetail == null && _settingsNavigationContext == null) {
+      return;
+    }
+    _settingsDetail = null;
+    _settingsNavigationContext = null;
+    notifyListeners();
   }
 
   void cycleSidebarState() {
@@ -1219,9 +1377,11 @@ class AppController extends ChangeNotifier {
       sessionKey,
       title: title.trim(),
       executionTarget:
-          executionTarget ?? assistantExecutionTargetForSession(currentSessionKey),
+          executionTarget ??
+          assistantExecutionTargetForSession(currentSessionKey),
       messageViewMode:
-          messageViewMode ?? assistantMessageViewModeForSession(currentSessionKey),
+          messageViewMode ??
+          assistantMessageViewModeForSession(currentSessionKey),
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     _notifyIfActive();

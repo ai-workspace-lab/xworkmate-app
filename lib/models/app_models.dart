@@ -215,6 +215,85 @@ extension SettingsTabCopy on SettingsTab {
   };
 }
 
+enum AiGatewayTab { models, agents, endpoints, tools }
+
+extension AiGatewayTabCopy on AiGatewayTab {
+  String get label => switch (this) {
+    AiGatewayTab.models => appText('模型', 'Models'),
+    AiGatewayTab.agents => appText('代理', 'Agents'),
+    AiGatewayTab.endpoints => appText('端点', 'Endpoints'),
+    AiGatewayTab.tools => appText('工具', 'Tools'),
+  };
+}
+
+enum SettingsDetailPage {
+  gatewayConnection,
+  aiGatewayIntegration,
+  vaultProvider,
+  ollamaProvider,
+  externalAgents,
+  diagnosticsAdvanced,
+}
+
+extension SettingsDetailPageCopy on SettingsDetailPage {
+  String get label => switch (this) {
+    SettingsDetailPage.gatewayConnection => appText(
+      'Gateway 连接参数',
+      'Gateway Connection',
+    ),
+    SettingsDetailPage.aiGatewayIntegration => appText(
+      'AI Gateway 集成参数',
+      'AI Gateway Integration',
+    ),
+    SettingsDetailPage.vaultProvider => appText(
+      'Vault 提供方参数',
+      'Vault Provider',
+    ),
+    SettingsDetailPage.ollamaProvider => appText(
+      'Ollama 提供方参数',
+      'Ollama Provider',
+    ),
+    SettingsDetailPage.externalAgents => appText(
+      '多 Agent 协作参数',
+      'External Agents',
+    ),
+    SettingsDetailPage.diagnosticsAdvanced => appText(
+      '高级诊断参数',
+      'Advanced Diagnostics',
+    ),
+  };
+
+  SettingsTab get tab => switch (this) {
+    SettingsDetailPage.gatewayConnection ||
+    SettingsDetailPage.aiGatewayIntegration ||
+    SettingsDetailPage.vaultProvider => SettingsTab.gateway,
+    SettingsDetailPage.ollamaProvider => SettingsTab.workspace,
+    SettingsDetailPage.externalAgents => SettingsTab.agents,
+    SettingsDetailPage.diagnosticsAdvanced => SettingsTab.diagnostics,
+  };
+}
+
+@immutable
+class SettingsNavigationContext {
+  const SettingsNavigationContext({
+    required this.rootLabel,
+    required this.destination,
+    this.sectionLabel,
+    this.modulesTab,
+    this.secretsTab,
+    this.aiGatewayTab,
+    this.settingsTab,
+  });
+
+  final String rootLabel;
+  final WorkspaceDestination destination;
+  final String? sectionLabel;
+  final ModulesTab? modulesTab;
+  final SecretsTab? secretsTab;
+  final AiGatewayTab? aiGatewayTab;
+  final SettingsTab? settingsTab;
+}
+
 enum AccountTab { profile, workspace, sessions }
 
 extension AccountTabCopy on AccountTab {

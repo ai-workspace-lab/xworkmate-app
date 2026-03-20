@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
+import '../../app/workspace_navigation.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
@@ -16,17 +17,34 @@ class SecretsPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onOpenDetail,
+    this.initialTab,
   });
 
   final AppController controller;
   final ValueChanged<DetailPanelData> onOpenDetail;
+  final SecretsTab? initialTab;
 
   @override
   State<SecretsPage> createState() => _SecretsPageState();
 }
 
 class _SecretsPageState extends State<SecretsPage> {
-  SecretsTab _tab = SecretsTab.vault;
+  late SecretsTab _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = widget.initialTab ?? widget.controller.secretsTab;
+  }
+
+  @override
+  void didUpdateWidget(covariant SecretsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextTab = widget.initialTab ?? widget.controller.secretsTab;
+    if (nextTab != _tab) {
+      setState(() => _tab = nextTab);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,15 +58,11 @@ class _SecretsPageState extends State<SecretsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
-                breadcrumbs: [
-                  AppBreadcrumbItem(
-                    label: appText('主页', 'Home'),
-                    icon: Icons.home_rounded,
-                    onTap: controller.navigateHome,
-                  ),
-                  AppBreadcrumbItem(label: appText('密钥', 'Secrets')),
-                  AppBreadcrumbItem(label: _tab.label),
-                ],
+                breadcrumbs: buildWorkspaceBreadcrumbs(
+                  controller: controller,
+                  rootLabel: appText('密钥', 'Secrets'),
+                  sectionLabel: _tab.label,
+                ),
                 title: appText('密钥', 'Secrets'),
                 subtitle: appText(
                   '管理密钥提供方、凭证和模块间的安全引用。',
@@ -76,7 +90,7 @@ class _SecretsPageState extends State<SecretsPage> {
                     ),
                     FilledButton.tonalIcon(
                       onPressed: () =>
-                          controller.navigateTo(WorkspaceDestination.settings),
+                          controller.openSettings(tab: SettingsTab.gateway),
                       icon: const Icon(Icons.add_rounded),
                       label: Text(appText('新增密钥', 'Add Secret')),
                     ),
@@ -87,11 +101,12 @@ class _SecretsPageState extends State<SecretsPage> {
               SectionTabs(
                 items: SecretsTab.values.map((item) => item.label).toList(),
                 value: _tab.label,
-                onChanged: (value) => setState(
-                  () => _tab = SecretsTab.values.firstWhere(
+                onChanged: (value) => setState(() {
+                  _tab = SecretsTab.values.firstWhere(
                     (item) => item.label == value,
-                  ),
-                ),
+                  );
+                  controller.openSecrets(tab: _tab);
+                }),
               ),
               const SizedBox(height: 24),
               switch (_tab) {
@@ -118,6 +133,24 @@ class _SecretsPageState extends State<SecretsPage> {
       },
     );
   }
+}
+
+SettingsNavigationContext _secretsNavigationContext(SecretsTab tab) {
+  return SettingsNavigationContext(
+    rootLabel: appText('密钥', 'Secrets'),
+    destination: WorkspaceDestination.secrets,
+    sectionLabel: tab.label,
+    secretsTab: tab,
+  );
+}
+
+SettingsDetailPage _secretsDetailForTab(SecretsTab tab) {
+  return switch (tab) {
+    SecretsTab.vault => SettingsDetailPage.vaultProvider,
+    SecretsTab.providers => SettingsDetailPage.ollamaProvider,
+    SecretsTab.audit => SettingsDetailPage.diagnosticsAdvanced,
+    SecretsTab.localStore => SettingsDetailPage.ollamaProvider,
+  };
 }
 
 class _VaultPanel extends StatelessWidget {
@@ -203,9 +236,13 @@ class _VaultPanel extends StatelessWidget {
                     child: Text(appText('连接测试', 'Test Connection')),
                   ),
                   OutlinedButton(
-                    onPressed: () =>
-                        controller.navigateTo(WorkspaceDestination.settings),
-                    child: Text(appText('配置', 'Configure')),
+                    onPressed: () => controller.openSettings(
+                      detail: _secretsDetailForTab(SecretsTab.vault),
+                      navigationContext: _secretsNavigationContext(
+                        SecretsTab.vault,
+                      ),
+                    ),
+                    child: Text(appText('编辑设置', 'Edit settings')),
                   ),
                 ],
               ),

@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/features/ai_gateway/ai_gateway_page.dart';
+import 'package:xworkmate/features/settings/settings_page.dart';
+import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
@@ -13,6 +15,8 @@ import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/theme/app_theme.dart';
+
+import '../test_support.dart';
 
 class _FakeGatewayRuntime extends GatewayRuntime {
   _FakeGatewayRuntime()
@@ -50,84 +54,123 @@ class _FakeCodexRuntime extends CodexRuntime {
 }
 
 void main() {
-  testWidgets('AiGatewayPage shows Codex bridge runtime states', (
+  testWidgets('AiGatewayPage edit settings opens detail context', (
     WidgetTester tester,
   ) async {
-    late AppController controller;
-    await tester.runAsync(() async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final store = SecureConfigStore();
-      controller = AppController(
-        store: store,
-        runtimeCoordinator: RuntimeCoordinator(
-          gateway: _FakeGatewayRuntime(),
-          codex: _FakeCodexRuntime(),
-        ),
-      );
-      await _waitFor(() => !controller.initializing);
-    });
-    addTearDown(() => controller.dispose());
+    final controller = await createTestController(tester);
 
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(1600, 1000);
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-    });
-
-    await tester.pumpWidget(
-      MaterialApp(
-        locale: const Locale('zh'),
-        supportedLocales: const [Locale('zh'), Locale('en')],
-        localizationsDelegates: GlobalMaterialLocalizations.delegates,
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
-        home: Scaffold(
-          body: AiGatewayPage(controller: controller, onOpenDetail: (_) {}),
-        ),
-      ),
+    await pumpPage(
+      tester,
+      child: AiGatewayPage(controller: controller, onOpenDetail: (_) {}),
     );
-    await tester.pump();
 
-    await tester.tap(find.text('工具'));
-    await tester.pump(const Duration(milliseconds: 200));
-
-    expect(find.text('External Codex CLI'), findsOneWidget);
-    expect(find.text('Built-in Codex (Experimental)'), findsOneWidget);
-    expect(find.text('未检测到'), findsOneWidget);
-
-    await tester.tap(
-      find.widgetWithText(ChoiceChip, 'Built-in Codex (Experimental)'),
-    );
+    await tester.tap(find.text('编辑设置'));
     await tester.pumpAndSettle();
-    expect(
-      controller.settings.codeAgentRuntimeMode,
-      CodeAgentRuntimeMode.builtIn,
-    );
 
-    late Directory tempDir;
-    late File codexBinary;
-    await tester.runAsync(() async {
-      tempDir = await Directory.systemTemp.createTemp('codex-ai-gateway-page-');
-      codexBinary = File('${tempDir.path}/codex');
-      await codexBinary.writeAsString('#!/bin/sh\nexit 0\n');
-      await controller.saveSettings(
-        controller.settings.copyWith(
-          codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
-          codexCliPath: codexBinary.path,
+    expect(controller.destination, WorkspaceDestination.settings);
+    expect(controller.settingsDetail, SettingsDetailPage.aiGatewayIntegration);
+    expect(
+      controller.settingsNavigationContext?.aiGatewayTab,
+      AiGatewayTab.models,
+    );
+  });
+
+  testWidgets(
+    'Settings external agents detail shows Codex bridge runtime states',
+    (WidgetTester tester) async {
+      late AppController controller;
+      await tester.runAsync(() async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        final store = SecureConfigStore();
+        controller = AppController(
+          store: store,
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: _FakeGatewayRuntime(),
+            codex: _FakeCodexRuntime(),
+          ),
+        );
+        await _waitFor(() => !controller.initializing);
+      });
+      addTearDown(() => controller.dispose());
+
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1600, 1000);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      controller.openSettings(
+        detail: SettingsDetailPage.externalAgents,
+        navigationContext: SettingsNavigationContext(
+          rootLabel: 'AI Gateway',
+          destination: WorkspaceDestination.aiGateway,
+          sectionLabel: AiGatewayTab.tools.label,
+          aiGatewayTab: AiGatewayTab.tools,
         ),
       );
-    });
-    addTearDown(() async {
-      if (await tempDir.exists()) {
-        await tempDir.delete(recursive: true);
-      }
-    });
-    await tester.pump(const Duration(milliseconds: 200));
 
-    expect(find.text('已就绪'), findsOneWidget);
-    expect(find.text(codexBinary.path), findsAtLeastNWidgets(1));
-  });
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('zh'),
+          supportedLocales: const [Locale('zh'), Locale('en')],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          home: Scaffold(
+            body: SettingsPage(
+              controller: controller,
+              initialTab: controller.settingsTab,
+              initialDetail: controller.settingsDetail,
+              navigationContext: controller.settingsNavigationContext,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('External Codex CLI'), findsOneWidget);
+      expect(find.text('Built-in Codex (Experimental)'), findsOneWidget);
+      expect(find.text('未检测到'), findsOneWidget);
+
+      final builtInChip = find.widgetWithText(
+        ChoiceChip,
+        'Built-in Codex (Experimental)',
+      );
+      await tester.ensureVisible(builtInChip);
+      await tester.tap(builtInChip);
+      await tester.pumpAndSettle();
+      expect(
+        controller.settings.codeAgentRuntimeMode,
+        CodeAgentRuntimeMode.builtIn,
+      );
+
+      late Directory tempDir;
+      late File codexBinary;
+      await tester.runAsync(() async {
+        tempDir = await Directory.systemTemp.createTemp(
+          'codex-ai-gateway-page-',
+        );
+        codexBinary = File('${tempDir.path}/codex');
+        await codexBinary.writeAsString('#!/bin/sh\nexit 0\n');
+        await controller.saveSettings(
+          controller.settings.copyWith(
+            codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
+            codexCliPath: codexBinary.path,
+          ),
+        );
+      });
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.text('已就绪'), findsOneWidget);
+      expect(find.text(codexBinary.path), findsAtLeastNWidgets(1));
+    },
+  );
 }
 
 Future<void> _waitFor(bool Function() predicate) async {

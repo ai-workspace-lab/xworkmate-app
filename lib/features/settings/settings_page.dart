@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
+import '../../app/workspace_navigation.dart';
+import '../ai_gateway/ai_gateway_page.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_controllers.dart';
@@ -18,10 +20,14 @@ class SettingsPage extends StatefulWidget {
     super.key,
     required this.controller,
     this.initialTab = SettingsTab.general,
+    this.initialDetail,
+    this.navigationContext,
   });
 
   final AppController controller;
   final SettingsTab initialTab;
+  final SettingsDetailPage? initialDetail;
+  final SettingsNavigationContext? navigationContext;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -31,6 +37,8 @@ class _SettingsPageState extends State<SettingsPage> {
   static const _storedSecretMask = '****';
 
   late SettingsTab _tab;
+  SettingsDetailPage? _detail;
+  SettingsNavigationContext? _navigationContext;
   late final TextEditingController _aiGatewayNameController;
   late final TextEditingController _aiGatewayUrlController;
   late final TextEditingController _aiGatewayApiKeyRefController;
@@ -55,6 +63,8 @@ class _SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     _tab = widget.initialTab;
+    _detail = widget.initialDetail;
+    _navigationContext = widget.navigationContext;
     _aiGatewayNameController = TextEditingController();
     _aiGatewayUrlController = TextEditingController();
     _aiGatewayApiKeyRefController = TextEditingController();
@@ -63,6 +73,20 @@ class _SettingsPageState extends State<SettingsPage> {
     _vaultTokenController = TextEditingController();
     _ollamaApiKeyController = TextEditingController();
     _runtimeLogFilterController = TextEditingController();
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTab != _tab) {
+      _tab = widget.initialTab;
+    }
+    if (widget.initialDetail != _detail) {
+      _detail = widget.initialDetail;
+    }
+    if (widget.navigationContext != _navigationContext) {
+      _navigationContext = widget.navigationContext;
+    }
   }
 
   @override
@@ -84,85 +108,204 @@ class _SettingsPageState extends State<SettingsPage> {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
+        _tab = controller.settingsTab;
+        _detail = controller.settingsDetail;
+        _navigationContext = controller.settingsNavigationContext;
         final settings = controller.settings;
+        final showingDetail = _detail != null;
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
-                breadcrumbs: [
-                  AppBreadcrumbItem(
-                    label: appText('主页', 'Home'),
-                    icon: Icons.home_rounded,
-                    onTap: controller.navigateHome,
-                  ),
-                  AppBreadcrumbItem(label: appText('设置', 'Settings')),
-                  AppBreadcrumbItem(label: _tab.label),
-                ],
+                breadcrumbs: buildSettingsBreadcrumbs(
+                  controller,
+                  tab: _tab,
+                  detail: _detail,
+                  navigationContext: _navigationContext,
+                ),
                 title: appText('设置', 'Settings'),
-                subtitle: appText(
-                  '配置 $kProductBrandName 工作区、网关默认项、界面与诊断选项',
-                  'Configure workspace, gateway defaults, appearance, and diagnostics for $kProductBrandName.',
-                ),
+                subtitle: showingDetail
+                    ? appText(
+                        '当前正在编辑详细设置参数，保存后会回写到对应状态页。',
+                        'You are editing detailed settings. Saved values flow back to the related status page.',
+                      )
+                    : appText(
+                        '配置 $kProductBrandName 工作区、网关默认项、界面与诊断选项',
+                        'Configure workspace, gateway defaults, appearance, and diagnostics for $kProductBrandName.',
+                      ),
                 trailing: SizedBox(
-                  width: 220,
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: appText('搜索设置', 'Search settings'),
-                      prefixIcon: Icon(Icons.search_rounded),
-                    ),
-                  ),
+                  width: showingDetail ? 168 : 220,
+                  child: showingDetail
+                      ? OutlinedButton.icon(
+                          onPressed: () {
+                            controller.closeSettingsDetail();
+                            setState(() {
+                              _detail = null;
+                              _navigationContext = null;
+                            });
+                          },
+                          icon: const Icon(Icons.arrow_back_rounded),
+                          label: Text(appText('返回概览', 'Back to overview')),
+                        )
+                      : TextField(
+                          decoration: InputDecoration(
+                            hintText: appText('搜索设置', 'Search settings'),
+                            prefixIcon: Icon(Icons.search_rounded),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 24),
-              SectionTabs(
-                items: SettingsTab.values.map((item) => item.label).toList(),
-                value: _tab.label,
-                onChanged: (value) => setState(
-                  () => _tab = SettingsTab.values.firstWhere(
-                    (item) => item.label == value,
-                  ),
+              if (!showingDetail) ...[
+                SectionTabs(
+                  items: SettingsTab.values.map((item) => item.label).toList(),
+                  value: _tab.label,
+                  onChanged: (value) => setState(() {
+                    _tab = SettingsTab.values.firstWhere(
+                      (item) => item.label == value,
+                    );
+                    _detail = null;
+                    _navigationContext = null;
+                    controller.setSettingsTab(_tab);
+                  }),
                 ),
-              ),
-              const SizedBox(height: 24),
-              ...switch (_tab) {
-                SettingsTab.general => _buildGeneral(
-                  context,
-                  controller,
-                  settings,
-                ),
-                SettingsTab.workspace => _buildWorkspace(
-                  context,
-                  controller,
-                  settings,
-                ),
-                SettingsTab.gateway => _buildGateway(
-                  context,
-                  controller,
-                  settings,
-                ),
-                SettingsTab.agents => _buildAgents(
-                  context,
-                  controller,
-                  settings,
-                ),
-                SettingsTab.appearance => _buildAppearance(context, controller),
-                SettingsTab.diagnostics => _buildDiagnostics(
-                  context,
-                  controller,
-                ),
-                SettingsTab.experimental => _buildExperimental(
-                  context,
-                  controller,
-                  settings,
-                ),
-                SettingsTab.about => _buildAbout(context, controller),
-              },
+                const SizedBox(height: 24),
+              ],
+              ..._buildContentForCurrentState(context, controller, settings),
             ],
           ),
         );
       },
+    );
+  }
+
+  List<Widget> _buildContentForCurrentState(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
+    if (_detail != null) {
+      return _buildDetailContent(context, controller, settings, _detail!);
+    }
+
+    return switch (_tab) {
+      SettingsTab.general => _buildGeneral(context, controller, settings),
+      SettingsTab.workspace => _buildWorkspace(context, controller, settings),
+      SettingsTab.gateway => _buildGateway(context, controller, settings),
+      SettingsTab.agents => _buildAgents(context, controller, settings),
+      SettingsTab.appearance => _buildAppearance(context, controller),
+      SettingsTab.diagnostics => _buildDiagnostics(context, controller),
+      SettingsTab.experimental => _buildExperimental(
+        context,
+        controller,
+        settings,
+      ),
+      SettingsTab.about => _buildAbout(context, controller),
+    };
+  }
+
+  List<Widget> _buildDetailContent(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+    SettingsDetailPage detail,
+  ) {
+    final gatewaySections = _buildGateway(context, controller, settings);
+    final workspaceSections = _buildWorkspace(context, controller, settings);
+    return switch (detail) {
+      SettingsDetailPage.gatewayConnection => <Widget>[
+        _buildDetailIntro(
+          context,
+          title: detail.label,
+          description: appText(
+            '集中编辑 Gateway 连接、设备配对和会话级连接入口。',
+            'Edit gateway connection, device pairing, and session-level connection entry points in one place.',
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...gatewaySections.take(3),
+      ],
+      SettingsDetailPage.aiGatewayIntegration => <Widget>[
+        _buildDetailIntro(
+          context,
+          title: detail.label,
+          description: appText(
+            '统一管理 AI Gateway 地址、API Key、模型目录同步和默认选择。',
+            'Manage AI Gateway endpoint, API key, model catalog sync, and default selections from one screen.',
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (gatewaySections.isNotEmpty) gatewaySections.last,
+      ],
+      SettingsDetailPage.vaultProvider => <Widget>[
+        _buildDetailIntro(
+          context,
+          title: detail.label,
+          description: appText(
+            '只在这里维护 Vault 地址、命名空间和安全 token 引用。',
+            'Maintain Vault endpoint, namespace, and secure token references here.',
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (gatewaySections.length > 4) gatewaySections[4],
+      ],
+      SettingsDetailPage.ollamaProvider => <Widget>[
+        _buildDetailIntro(
+          context,
+          title: detail.label,
+          description: appText(
+            '本地与云端 Ollama 提供方参数统一放在这个 detail 页面中维护。',
+            'Local and cloud Ollama provider settings live in this dedicated detail page.',
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...workspaceSections.skip(1),
+      ],
+      SettingsDetailPage.externalAgents => <Widget>[
+        _buildDetailIntro(
+          context,
+          title: detail.label,
+          description: appText(
+            '多 Agent 协作、角色编排和外部 CLI 工具的详细参数集中在这里。',
+            'Detailed multi-agent collaboration, role orchestration, and external CLI settings are edited here.',
+          ),
+        ),
+        const SizedBox(height: 16),
+        ..._buildAgents(context, controller, settings),
+        const SizedBox(height: 16),
+        CodexIntegrationCard(controller: controller),
+      ],
+      SettingsDetailPage.diagnosticsAdvanced => <Widget>[
+        _buildDetailIntro(
+          context,
+          title: detail.label,
+          description: appText(
+            '高级诊断集中展示网关诊断、运行日志和设备信息。',
+            'Advanced diagnostics centralize gateway diagnostics, runtime logs, and device information.',
+          ),
+        ),
+        const SizedBox(height: 16),
+        ..._buildDiagnostics(context, controller),
+      ],
+    };
+  }
+
+  Widget _buildDetailIntro(
+    BuildContext context, {
+    required String title,
+    required String description,
+  }) {
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 10),
+          Text(description, style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ),
     );
   }
 
