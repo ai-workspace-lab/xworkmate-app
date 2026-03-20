@@ -2020,6 +2020,22 @@ enum MultiAgentRole {
   testerDoc, // 测试/评审：测试生成、代码审阅
 }
 
+enum MultiAgentFramework { native, aris }
+
+extension MultiAgentFrameworkCopy on MultiAgentFramework {
+  String get label => switch (this) {
+    MultiAgentFramework.native => appText('原生多 Agent', 'Native Multi-Agent'),
+    MultiAgentFramework.aris => appText('ARIS 框架', 'ARIS Framework'),
+  };
+
+  static MultiAgentFramework fromJsonValue(String? value) {
+    return MultiAgentFramework.values.firstWhere(
+      (item) => item.name == value,
+      orElse: () => MultiAgentFramework.native,
+    );
+  }
+}
+
 extension MultiAgentRoleCopy on MultiAgentRole {
   String get label => switch (this) {
     MultiAgentRole.architect => 'Architect（调度者）',
@@ -2328,6 +2344,20 @@ class ManagedMountTargetState {
   static List<ManagedMountTargetState> defaults() {
     return const <ManagedMountTargetState>[
       ManagedMountTargetState(
+        targetId: 'aris',
+        label: 'ARIS',
+        available: false,
+        supportsSkills: true,
+        supportsMcp: true,
+        supportsAiGatewayInjection: false,
+        discoveryState: 'idle',
+        syncState: 'idle',
+        discoveredSkillCount: 0,
+        discoveredMcpCount: 0,
+        managedMcpCount: 0,
+        detail: '',
+      ),
+      ManagedMountTargetState(
         targetId: 'codex',
         label: 'Codex',
         available: false,
@@ -2406,6 +2436,11 @@ class MultiAgentConfig {
   const MultiAgentConfig({
     required this.enabled,
     required this.autoSync,
+    required this.framework,
+    required this.arisEnabled,
+    required this.arisMode,
+    required this.arisBundleVersion,
+    required this.arisCompatStatus,
     required this.architect,
     required this.engineer,
     required this.tester,
@@ -2421,6 +2456,11 @@ class MultiAgentConfig {
 
   final bool enabled;
   final bool autoSync;
+  final MultiAgentFramework framework;
+  final bool arisEnabled;
+  final String arisMode;
+  final String arisBundleVersion;
+  final String arisCompatStatus;
   final AgentWorkerConfig architect;
   final AgentWorkerConfig engineer;
   final AgentWorkerConfig tester;
@@ -2446,10 +2486,17 @@ class MultiAgentConfig {
   String get testerTool => tester.cliTool;
   String get testerModel => tester.model;
 
+  bool get usesAris => arisEnabled || framework == MultiAgentFramework.aris;
+
   factory MultiAgentConfig.defaults() {
     return MultiAgentConfig(
       enabled: false,
       autoSync: true,
+      framework: MultiAgentFramework.native,
+      arisEnabled: false,
+      arisMode: 'full',
+      arisBundleVersion: '',
+      arisCompatStatus: 'idle',
       architect: const AgentWorkerConfig(
         role: MultiAgentRole.architect,
         cliTool: 'gemini',
@@ -2476,6 +2523,20 @@ class MultiAgentConfig {
       managedSkills: const <ManagedSkillEntry>[],
       managedMcpServers: const <ManagedMcpServerEntry>[],
       mountTargets: const <ManagedMountTargetState>[
+        ManagedMountTargetState(
+          targetId: 'aris',
+          label: 'ARIS',
+          available: false,
+          supportsSkills: true,
+          supportsMcp: true,
+          supportsAiGatewayInjection: false,
+          discoveryState: 'idle',
+          syncState: 'idle',
+          discoveredSkillCount: 0,
+          discoveredMcpCount: 0,
+          managedMcpCount: 0,
+          detail: '',
+        ),
         ManagedMountTargetState(
           targetId: 'codex',
           label: 'Codex',
@@ -2553,6 +2614,11 @@ class MultiAgentConfig {
   MultiAgentConfig copyWith({
     bool? enabled,
     bool? autoSync,
+    MultiAgentFramework? framework,
+    bool? arisEnabled,
+    String? arisMode,
+    String? arisBundleVersion,
+    String? arisCompatStatus,
     AgentWorkerConfig? architect,
     AgentWorkerConfig? engineer,
     AgentWorkerConfig? tester,
@@ -2568,6 +2634,11 @@ class MultiAgentConfig {
     return MultiAgentConfig(
       enabled: enabled ?? this.enabled,
       autoSync: autoSync ?? this.autoSync,
+      framework: framework ?? this.framework,
+      arisEnabled: arisEnabled ?? this.arisEnabled,
+      arisMode: arisMode ?? this.arisMode,
+      arisBundleVersion: arisBundleVersion ?? this.arisBundleVersion,
+      arisCompatStatus: arisCompatStatus ?? this.arisCompatStatus,
       architect: architect ?? this.architect,
       engineer: engineer ?? this.engineer,
       tester: tester ?? this.tester,
@@ -2587,6 +2658,11 @@ class MultiAgentConfig {
     return {
       'enabled': enabled,
       'autoSync': autoSync,
+      'framework': framework.name,
+      'arisEnabled': arisEnabled,
+      'arisMode': arisMode,
+      'arisBundleVersion': arisBundleVersion,
+      'arisCompatStatus': arisCompatStatus,
       'architect': {
         'role': architect.role.name,
         'cliTool': architect.cliTool,
@@ -2647,6 +2723,15 @@ class MultiAgentConfig {
     return MultiAgentConfig(
       enabled: json['enabled'] as bool? ?? false,
       autoSync: json['autoSync'] as bool? ?? defaults.autoSync,
+      framework: MultiAgentFrameworkCopy.fromJsonValue(
+        json['framework'] as String?,
+      ),
+      arisEnabled: json['arisEnabled'] as bool? ?? defaults.arisEnabled,
+      arisMode: json['arisMode'] as String? ?? defaults.arisMode,
+      arisBundleVersion:
+          json['arisBundleVersion'] as String? ?? defaults.arisBundleVersion,
+      arisCompatStatus:
+          json['arisCompatStatus'] as String? ?? defaults.arisCompatStatus,
       architect: parseWorker(architectJson, MultiAgentRole.architect, 'gemini'),
       engineer: parseWorker(engineerJson, MultiAgentRole.engineer, 'claude'),
       tester: parseWorker(testerJson, MultiAgentRole.testerDoc, 'codex'),

@@ -143,6 +143,7 @@ void main() {
     expect(titleFinder, findsOneWidget);
     expect(tester.getSize(titleFinder).width, greaterThan(80));
     expect(find.text('启用协作模式'), findsOneWidget);
+    expect(find.text('协作框架'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

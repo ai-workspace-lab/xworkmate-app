@@ -7,7 +7,7 @@ PNPM ?= pnpm
 DART ?= dart
 DEVICE ?= macos
 
-.PHONY: help deps analyze test check format run build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean
+.PHONY: help deps analyze test check format run build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-aris-bridge
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -37,6 +37,9 @@ build-macos: ## Build the macOS app in release mode
 
 build-ios-sim: ## Build the iOS app for the simulator
 	$(FLUTTER) build ios --simulator
+
+build-aris-bridge: ## Build the ARIS Go bridge helper
+	bash scripts/build-aris-bridge.sh
 
 package-deb: ## Create the Linux .deb package
 	bash scripts/package-linux-deb.sh

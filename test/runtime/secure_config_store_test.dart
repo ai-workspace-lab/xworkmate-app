@@ -150,6 +150,10 @@ void main() {
         multiAgent: MultiAgentConfig.defaults().copyWith(
           enabled: true,
           autoSync: false,
+          framework: MultiAgentFramework.aris,
+          arisEnabled: true,
+          arisBundleVersion: '2026-03-19-dd663c1',
+          arisCompatStatus: 'ready',
           aiGatewayInjectionPolicy: AiGatewayInjectionPolicy.launchScoped,
           architect: const AgentWorkerConfig(
             role: MultiAgentRole.architect,
@@ -186,6 +190,10 @@ void main() {
 
       expect(loadedSnapshot.multiAgent.enabled, isTrue);
       expect(loadedSnapshot.multiAgent.autoSync, isFalse);
+      expect(loadedSnapshot.multiAgent.framework, MultiAgentFramework.aris);
+      expect(loadedSnapshot.multiAgent.arisEnabled, isTrue);
+      expect(loadedSnapshot.multiAgent.arisBundleVersion, '2026-03-19-dd663c1');
+      expect(loadedSnapshot.multiAgent.arisCompatStatus, 'ready');
       expect(
         loadedSnapshot.multiAgent.aiGatewayInjectionPolicy,
         AiGatewayInjectionPolicy.launchScoped,

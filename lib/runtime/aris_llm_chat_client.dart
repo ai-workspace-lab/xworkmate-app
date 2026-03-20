@@ -1,0 +1,178 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'aris_bridge.dart';
+
+typedef ArisProcessStarter =
+    Future<Process> Function(
+      String executable,
+      List<String> arguments, {
+      Map<String, String>? environment,
+      String? workingDirectory,
+    });
+
+class ArisLlmChatClient {
+  ArisLlmChatClient({
+    ArisProcessStarter? processStarter,
+    ArisBridgeLocator? bridgeLocator,
+  }) : _processStarter =
+           processStarter ??
+           ((executable, arguments, {environment, workingDirectory}) {
+             return Process.start(
+               executable,
+               arguments,
+               environment: environment,
+               workingDirectory: workingDirectory,
+             );
+           }),
+       _bridgeLocator = bridgeLocator ?? ArisBridgeLocator();
+
+  final ArisProcessStarter _processStarter;
+  final ArisBridgeLocator _bridgeLocator;
+
+  Future<String> chat({
+    required String endpoint,
+    required String apiKey,
+    required String model,
+    required String prompt,
+    String systemPrompt = '',
+  }) {
+    return _callTool(
+      toolName: 'chat',
+      environment: <String, String>{
+        ...Platform.environment,
+        'LLM_API_KEY': apiKey,
+        'LLM_BASE_URL': endpoint,
+        'LLM_MODEL': model,
+        'LLM_SERVER_NAME': 'xworkmate-aris-llm-chat',
+      },
+      arguments: <String, dynamic>{
+        'prompt': prompt,
+        'model': model,
+        if (systemPrompt.trim().isNotEmpty) 'system': systemPrompt.trim(),
+      },
+    );
+  }
+
+  Future<String> claudeReview({
+    required String prompt,
+    String model = '',
+    String systemPrompt = '',
+    String tools = '',
+  }) {
+    return _callTool(
+      toolName: 'claude_review',
+      environment: <String, String>{
+        ...Platform.environment,
+        if (model.trim().isNotEmpty) 'CLAUDE_REVIEW_MODEL': model.trim(),
+        if (systemPrompt.trim().isNotEmpty)
+          'CLAUDE_REVIEW_SYSTEM': systemPrompt.trim(),
+        if (tools.trim().isNotEmpty) 'CLAUDE_REVIEW_TOOLS': tools.trim(),
+      },
+      arguments: <String, dynamic>{
+        'prompt': prompt,
+        if (model.trim().isNotEmpty) 'model': model.trim(),
+        if (systemPrompt.trim().isNotEmpty) 'system': systemPrompt.trim(),
+        if (tools.trim().isNotEmpty) 'tools': tools.trim(),
+      },
+    );
+  }
+
+  Future<String> _callTool({
+    required String toolName,
+    required Map<String, String> environment,
+    required Map<String, dynamic> arguments,
+  }) async {
+    final launch = await _bridgeLocator.locate();
+    if (launch == null) {
+      throw StateError('ARIS Go bridge is unavailable.');
+    }
+
+    final process = await _processStarter(
+      launch.executable,
+      launch.arguments,
+      environment: environment,
+      workingDirectory: launch.workingDirectory,
+    );
+
+    final responseCompleter = Completer<String>();
+    final errorBuffer = StringBuffer();
+    late final StreamSubscription<String> stdoutSubscription;
+    late final StreamSubscription<String> stderrSubscription;
+
+    stdoutSubscription = process.stdout
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen((line) {
+          if (line.trim().isEmpty) {
+            return;
+          }
+          final message = jsonDecode(line) as Map<String, dynamic>;
+          if (message['id'] == 2) {
+            final result =
+                (message['result'] as Map?)?.cast<String, dynamic>() ??
+                const <String, dynamic>{};
+            final content =
+                (result['content'] as List?)
+                    ?.whereType<Map>()
+                    .map((item) => item['text']?.toString() ?? '')
+                    .join('\n')
+                    .trim() ??
+                '';
+            if (!responseCompleter.isCompleted) {
+              responseCompleter.complete(content);
+            }
+          } else if (message['error'] is Map &&
+              !responseCompleter.isCompleted) {
+            final error = (message['error'] as Map).cast<String, dynamic>();
+            responseCompleter.completeError(
+              StateError(error['message']?.toString() ?? 'ARIS bridge error'),
+            );
+          }
+        });
+
+    stderrSubscription = process.stderr
+        .transform(utf8.decoder)
+        .listen(errorBuffer.write);
+
+    void send(Object payload) {
+      process.stdin.writeln(jsonEncode(payload));
+    }
+
+    send(<String, dynamic>{
+      'jsonrpc': '2.0',
+      'id': 1,
+      'method': 'initialize',
+      'params': <String, dynamic>{},
+    });
+    send(<String, dynamic>{
+      'jsonrpc': '2.0',
+      'method': 'notifications/initialized',
+      'params': <String, dynamic>{},
+    });
+    send(<String, dynamic>{
+      'jsonrpc': '2.0',
+      'id': 2,
+      'method': 'tools/call',
+      'params': <String, dynamic>{'name': toolName, 'arguments': arguments},
+    });
+
+    try {
+      return await responseCompleter.future.timeout(const Duration(minutes: 2));
+    } finally {
+      await stdoutSubscription.cancel();
+      await stderrSubscription.cancel();
+      try {
+        process.kill();
+      } catch (_) {
+        // Best effort only.
+      }
+      await process.stdin.close();
+      final stderrText = errorBuffer.toString().trim();
+      if (stderrText.isNotEmpty && !responseCompleter.isCompleted) {
+        throw StateError(stderrText);
+      }
+    }
+  }
+}

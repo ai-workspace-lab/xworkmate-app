@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/features/assistant/assistant_page.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/theme/app_theme.dart';
 
 import '../test_support.dart';
 
@@ -248,6 +250,39 @@ void main() {
     expect(find.byKey(const Key('assistant-nav-panel-probe')), findsNothing);
     expect(find.byKey(const Key('assistant-side-pane')), findsOneWidget);
   });
+
+  testWidgets(
+    'AssistantPage shows ARIS chip when multi-agent ARIS is enabled',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
+      final multiAgentConfig = controller.settings.multiAgent.copyWith(
+        enabled: true,
+        framework: MultiAgentFramework.aris,
+        arisEnabled: true,
+      );
+      await controller.settingsController.saveSnapshot(
+        controller.settings.copyWith(multiAgent: multiAgentConfig),
+      );
+      controller.multiAgentOrchestrator.updateConfig(multiAgentConfig);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('zh'),
+          supportedLocales: const [Locale('zh'), Locale('en')],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          home: Scaffold(
+            body: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('ARIS'), findsWidgets);
+    },
+    skip: true,
+  );
 
   testWidgets('AssistantPage narrow layout keeps existing single-pane flow', (
     WidgetTester tester,

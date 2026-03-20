@@ -8,6 +8,8 @@ import 'app_metadata.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/device_identity_store.dart';
+import '../runtime/aris_bundle.dart';
+import '../runtime/aris_bridge.dart';
 import '../runtime/runtime_bootstrap.dart';
 import '../runtime/desktop_platform_service.dart';
 import '../runtime/gateway_runtime.dart';
@@ -66,9 +68,16 @@ class AppController extends ChangeNotifier {
     _tasksController = DerivedTasksController();
     _desktopPlatformService =
         desktopPlatformService ?? createDesktopPlatformService();
-    _multiAgentMountManager = MultiAgentMountManager();
+    _arisBundleRepository = ArisBundleRepository();
+    _arisBridgeLocator = ArisBridgeLocator();
+    _multiAgentMountManager = MultiAgentMountManager(
+      arisBundleRepository: _arisBundleRepository,
+      arisBridgeLocator: _arisBridgeLocator,
+    );
     _multiAgentOrchestrator = MultiAgentOrchestrator(
       config: _resolveMultiAgentConfig(_settingsController.snapshot),
+      arisBundleRepository: _arisBundleRepository,
+      arisBridgeLocator: _arisBridgeLocator,
     );
 
     _attachChildListeners();
@@ -92,6 +101,8 @@ class AppController extends ChangeNotifier {
   late final DevicesController _devicesController;
   late final DerivedTasksController _tasksController;
   late final DesktopPlatformService _desktopPlatformService;
+  late final ArisBundleRepository _arisBundleRepository;
+  late final ArisBridgeLocator _arisBridgeLocator;
   late final MultiAgentMountManager _multiAgentMountManager;
   late final MultiAgentOrchestrator _multiAgentOrchestrator;
   MultiAgentBrokerServer? _multiAgentBrokerServer;
@@ -110,6 +121,7 @@ class AppController extends ChangeNotifier {
       <String, HttpClient>{};
   final Set<String> _aiGatewayPendingSessionKeys = <String>{};
   final Set<String> _aiGatewayAbortedSessionKeys = <String>{};
+  final Set<String> _activeMultiAgentBrokerSessions = <String>{};
   bool _multiAgentRunPending = false;
   int _localMessageCounter = 0;
 
@@ -361,15 +373,43 @@ class AppController extends ChangeNotifier {
     );
     _recomputeTasks();
     try {
-      await for (final event in client.runTask(
-        taskPrompt: composedPrompt,
-        workingDirectory:
-            _resolveCodexWorkingDirectory() ?? Directory.current.path,
-        attachments: attachments,
-        selectedSkills: selectedSkillLabels,
-        aiGatewayBaseUrl: aiGatewayUrl,
-        aiGatewayApiKey: aiGatewayApiKey,
-      )) {
+      final taskStream = settings.multiAgent.usesAris
+          ? (_activeMultiAgentBrokerSessions.contains(sessionKey)
+                ? client.sendSessionMessage(
+                    sessionId: sessionKey,
+                    taskPrompt: composedPrompt,
+                    workingDirectory:
+                        _resolveCodexWorkingDirectory() ??
+                        Directory.current.path,
+                    attachments: attachments,
+                    selectedSkills: selectedSkillLabels,
+                    aiGatewayBaseUrl: aiGatewayUrl,
+                    aiGatewayApiKey: aiGatewayApiKey,
+                  )
+                : client.startSession(
+                    sessionId: sessionKey,
+                    taskPrompt: composedPrompt,
+                    workingDirectory:
+                        _resolveCodexWorkingDirectory() ??
+                        Directory.current.path,
+                    attachments: attachments,
+                    selectedSkills: selectedSkillLabels,
+                    aiGatewayBaseUrl: aiGatewayUrl,
+                    aiGatewayApiKey: aiGatewayApiKey,
+                  ))
+          : client.runTask(
+              taskPrompt: composedPrompt,
+              workingDirectory:
+                  _resolveCodexWorkingDirectory() ?? Directory.current.path,
+              attachments: attachments,
+              selectedSkills: selectedSkillLabels,
+              aiGatewayBaseUrl: aiGatewayUrl,
+              aiGatewayApiKey: aiGatewayApiKey,
+            );
+      if (settings.multiAgent.usesAris) {
+        _activeMultiAgentBrokerSessions.add(sessionKey);
+      }
+      await for (final event in taskStream) {
         if (event.type == 'result') {
           final success = event.data['success'] == true;
           final finalScore = event.data['finalScore'];
@@ -911,6 +951,19 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> abortRun() async {
+    if (_multiAgentRunPending) {
+      final sessionKey = _normalizedAssistantSessionKey(
+        _sessionsController.currentSessionKey,
+      );
+      if (_activeMultiAgentBrokerSessions.contains(sessionKey)) {
+        await _multiAgentBrokerClient?.cancelSession(sessionKey);
+      }
+      await _multiAgentOrchestrator.abort();
+      _multiAgentRunPending = false;
+      _recomputeTasks();
+      _notifyIfActive();
+      return;
+    }
     if (isAiGatewayOnlyMode) {
       await _abortAiGatewayRun(_sessionsController.currentSessionKey);
       return;
@@ -1067,6 +1120,10 @@ class AppController extends ChangeNotifier {
       settings.copyWith(assistantArchivedTaskKeys: next),
       refreshAfterSave: false,
     );
+    if (archived) {
+      _activeMultiAgentBrokerSessions.remove(normalizedSessionKey);
+      unawaited(_multiAgentBrokerClient?.closeSession(normalizedSessionKey));
+    }
     _upsertAssistantThreadRecord(
       normalizedSessionKey,
       archived: archived,
@@ -1540,6 +1597,11 @@ class AppController extends ChangeNotifier {
         ? current.tester.model.trim()
         : defaults.tester.model;
     return current.copyWith(
+      framework: current.arisEnabled
+          ? MultiAgentFramework.aris
+          : current.framework,
+      arisEnabled:
+          current.framework == MultiAgentFramework.aris || current.arisEnabled,
       ollamaEndpoint: ollamaEndpoint,
       architect: current.architect.copyWith(model: architectModel),
       engineer: current.engineer.copyWith(model: engineerModel),
@@ -1557,6 +1619,22 @@ class AppController extends ChangeNotifier {
     if (uri == null) {
       throw StateError('Multi-agent broker is unavailable');
     }
+    _runtimeCoordinator.registerExternalCodeAgent(
+      ExternalCodeAgentProvider(
+        id: 'aris-broker',
+        name: 'ARIS Broker',
+        command: 'xworkmate-multi-agent-broker',
+        transport: ExternalAgentTransport.websocketJsonRpc,
+        endpoint: uri.toString(),
+        capabilities: const <String>[
+          'architect',
+          'engineer',
+          'tester',
+          'multi-agent',
+          'session-stream',
+        ],
+      ),
+    );
     _multiAgentBrokerClient = MultiAgentBrokerClient(uri);
     return _multiAgentBrokerClient!;
   }
