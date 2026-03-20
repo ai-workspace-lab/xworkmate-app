@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
+import '../../app/workspace_navigation.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/platform_environment.dart';
@@ -16,17 +17,34 @@ class AiGatewayPage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onOpenDetail,
+    this.initialTab,
   });
 
   final AppController controller;
   final ValueChanged<DetailPanelData> onOpenDetail;
+  final AiGatewayTab? initialTab;
 
   @override
   State<AiGatewayPage> createState() => _AiGatewayPageState();
 }
 
 class _AiGatewayPageState extends State<AiGatewayPage> {
-  AiGatewayTab _tab = AiGatewayTab.models;
+  late AiGatewayTab _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = widget.initialTab ?? widget.controller.aiGatewayTab;
+  }
+
+  @override
+  void didUpdateWidget(covariant AiGatewayPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextTab = widget.initialTab ?? widget.controller.aiGatewayTab;
+    if (nextTab != _tab) {
+      setState(() => _tab = nextTab);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,19 +85,23 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
-                breadcrumbs: [
-                  AppBreadcrumbItem(
-                    label: appText('主页', 'Home'),
-                    icon: Icons.home_rounded,
-                    onTap: controller.navigateHome,
-                  ),
-                  const AppBreadcrumbItem(label: 'AI Gateway'),
-                  AppBreadcrumbItem(label: _tab.label),
-                ],
+                breadcrumbs: buildWorkspaceBreadcrumbs(
+                  controller: controller,
+                  rootLabel: 'AI Gateway',
+                  sectionLabel: _tab.label,
+                ),
                 title: 'AI Gateway',
                 subtitle: appText(
                   'AI 代理与模型网关配置管理中心。',
                   'AI proxy and model gateway configuration center.',
+                ),
+                trailing: FilledButton.tonalIcon(
+                  onPressed: () => controller.openSettings(
+                    detail: _aiGatewayDetailForTab(_tab),
+                    navigationContext: _aiGatewayNavigationContext(_tab),
+                  ),
+                  icon: const Icon(Icons.tune_rounded),
+                  label: Text(appText('编辑设置', 'Edit settings')),
                 ),
               ),
               const SizedBox(height: 24),
@@ -92,11 +114,12 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
               SectionTabs(
                 items: AiGatewayTab.values.map((t) => t.label).toList(),
                 value: _tab.label,
-                onChanged: (label) => setState(
-                  () => _tab = AiGatewayTab.values.firstWhere(
+                onChanged: (label) => setState(() {
+                  _tab = AiGatewayTab.values.firstWhere(
                     (t) => t.label == label,
-                  ),
-                ),
+                  );
+                  controller.openAiGateway(tab: _tab);
+                }),
               ),
               const SizedBox(height: 16),
               _buildTabContent(context, _tab, controller),
@@ -140,7 +163,12 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
                     ),
                     const Spacer(),
                     FilledButton.icon(
-                      onPressed: () {},
+                      onPressed: () => controller.openSettings(
+                        detail: SettingsDetailPage.aiGatewayIntegration,
+                        navigationContext: _aiGatewayNavigationContext(
+                          AiGatewayTab.models,
+                        ),
+                      ),
                       icon: const Icon(Icons.add_rounded, size: 18),
                       label: Text(appText('添加模型', 'Add Model')),
                     ),
@@ -188,7 +216,12 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
                     ),
                     const Spacer(),
                     FilledButton.icon(
-                      onPressed: () {},
+                      onPressed: () => controller.openSettings(
+                        detail: SettingsDetailPage.externalAgents,
+                        navigationContext: _aiGatewayNavigationContext(
+                          AiGatewayTab.agents,
+                        ),
+                      ),
                       icon: const Icon(Icons.add_rounded, size: 18),
                       label: Text(appText('添加代理', 'Add Agent')),
                     ),
@@ -279,7 +312,7 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                _CodexIntegrationCard(controller: controller),
+                _CodexIntegrationSummaryCard(controller: controller),
               ],
             ),
           ),
@@ -309,14 +342,20 @@ class _AiGatewayPageState extends State<AiGatewayPage> {
   }
 }
 
-enum AiGatewayTab { models, agents, endpoints, tools }
+SettingsNavigationContext _aiGatewayNavigationContext(AiGatewayTab tab) {
+  return SettingsNavigationContext(
+    rootLabel: 'AI Gateway',
+    destination: WorkspaceDestination.aiGateway,
+    sectionLabel: tab.label,
+    aiGatewayTab: tab,
+  );
+}
 
-extension AiGatewayTabCopy on AiGatewayTab {
-  String get label => switch (this) {
-    AiGatewayTab.models => appText('模型', 'Models'),
-    AiGatewayTab.agents => appText('代理', 'Agents'),
-    AiGatewayTab.endpoints => appText('端点', 'Endpoints'),
-    AiGatewayTab.tools => appText('工具', 'Tools'),
+SettingsDetailPage _aiGatewayDetailForTab(AiGatewayTab tab) {
+  return switch (tab) {
+    AiGatewayTab.agents ||
+    AiGatewayTab.tools => SettingsDetailPage.externalAgents,
+    _ => SettingsDetailPage.aiGatewayIntegration,
   };
 }
 
@@ -469,16 +508,100 @@ class _EndpointCard extends StatelessWidget {
 // Codex Integration Section
 // ============================================
 
-class _CodexIntegrationCard extends StatefulWidget {
-  const _CodexIntegrationCard({required this.controller});
+class _CodexIntegrationSummaryCard extends StatelessWidget {
+  const _CodexIntegrationSummaryCard({required this.controller});
 
   final AppController controller;
 
   @override
-  State<_CodexIntegrationCard> createState() => _CodexIntegrationCardState();
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final cooperationLabel = switch (controller.codexCooperationState) {
+      CodexCooperationState.notStarted => appText('未启动', 'Not started'),
+      CodexCooperationState.bridgeOnly => appText(
+        '已启动，但未注册到 Gateway',
+        'Started, not registered to the gateway',
+      ),
+      CodexCooperationState.registered => appText(
+        '已启动并已注册到 Gateway',
+        'Started and registered to the gateway',
+      ),
+    };
+
+    return Card(
+      color: palette.surfaceSecondary,
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              appText('Codex CLI 集成', 'Codex CLI Integration'),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: palette.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              appText(
+                '二级页只保留运行状态和快速入口，详细参数统一进入 Settings detail。',
+                'The status page keeps only runtime state and quick entry points. Detailed parameters live in Settings detail.',
+              ),
+              style: TextStyle(fontSize: 13, color: palette.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            _StatusRow(
+              label: appText('运行时模式', 'Runtime mode'),
+              value: controller.effectiveCodeAgentRuntimeMode.label,
+            ),
+            _StatusRow(
+              label: appText('Bridge 状态', 'Bridge status'),
+              value: controller.isCodexBridgeEnabled
+                  ? appText('运行中', 'Running')
+                  : appText('未启用', 'Disabled'),
+            ),
+            _StatusRow(
+              label: appText('Gateway 协同状态', 'Gateway cooperation'),
+              value: cooperationLabel,
+            ),
+            _StatusRow(
+              label: appText('Binary 状态', 'Binary status'),
+              value: controller.hasDetectedCodexCli
+                  ? appText('已就绪', 'Ready')
+                  : appText('未检测到', 'Not found'),
+              detail: controller.resolvedCodexCliPath,
+            ),
+            const SizedBox(height: 16),
+            FilledButton.tonalIcon(
+              onPressed: () => controller.openSettings(
+                detail: SettingsDetailPage.externalAgents,
+                navigationContext: _aiGatewayNavigationContext(
+                  AiGatewayTab.tools,
+                ),
+              ),
+              icon: const Icon(Icons.tune_rounded),
+              label: Text(appText('编辑详细设置', 'Edit detailed settings')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _CodexIntegrationCardState extends State<_CodexIntegrationCard> {
+class CodexIntegrationCard extends StatefulWidget {
+  const CodexIntegrationCard({super.key, required this.controller});
+
+  final AppController controller;
+
+  @override
+  State<CodexIntegrationCard> createState() => _CodexIntegrationCardState();
+}
+
+class _CodexIntegrationCardState extends State<CodexIntegrationCard> {
   bool _isExporting = false;
   String? _exportPath;
   String? _errorMessage;
@@ -493,7 +616,7 @@ class _CodexIntegrationCardState extends State<_CodexIntegrationCard> {
   }
 
   @override
-  void didUpdateWidget(covariant _CodexIntegrationCard oldWidget) {
+  void didUpdateWidget(covariant CodexIntegrationCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     final nextValue = widget.controller.configuredCodexCliPath;
     if (_pathController.text != nextValue) {

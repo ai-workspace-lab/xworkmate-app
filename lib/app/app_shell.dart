@@ -1,24 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../features/account/account_page.dart';
-import '../features/ai_gateway/ai_gateway_page.dart';
-import '../features/assistant/assistant_page.dart';
-import '../features/claw_hub/claw_hub_page.dart';
-import '../features/mcp_server/mcp_server_page.dart';
 import '../features/mobile/mobile_shell.dart';
-import '../features/modules/modules_page.dart';
-import '../features/secrets/secrets_page.dart';
-import '../features/settings/settings_page.dart';
-import '../features/skills/skills_page.dart';
-import '../features/tasks/tasks_page.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
-import '../widgets/assistant_focus_panel.dart';
 import '../widgets/detail_drawer.dart';
 import '../widgets/pane_resize_handle.dart';
 import '../widgets/sidebar_navigation.dart';
 import 'app_controller.dart';
+import 'workspace_page_registry.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.controller});
@@ -399,59 +390,12 @@ class _AppShellState extends State<AppShell> {
     WorkspaceDestination destination,
     ValueChanged<DetailPanelData> onOpenDetail,
   ) {
-    return switch (destination) {
-      WorkspaceDestination.assistant => AssistantPage(
-        controller: widget.controller,
-        onOpenDetail: onOpenDetail,
-        navigationPanelBuilder:
-            widget.controller.sidebarState == AppSidebarState.hidden
-            ? null
-            : (_) => AssistantFocusPanel(controller: widget.controller),
-        showStandaloneTaskRail: false,
-        unifiedPaneStartsCollapsed:
-            widget.controller.sidebarState == AppSidebarState.collapsed,
-      ),
-      WorkspaceDestination.tasks => TasksPage(
-        controller: widget.controller,
-        onOpenDetail: onOpenDetail,
-      ),
-      WorkspaceDestination.skills => SkillsPage(
-        controller: widget.controller,
-        onOpenDetail: onOpenDetail,
-      ),
-      WorkspaceDestination.nodes => ModulesPage(
-        controller: widget.controller,
-        onOpenDetail: onOpenDetail,
-        initialTab: ModulesTab.nodes,
-      ),
-      WorkspaceDestination.agents => ModulesPage(
-        controller: widget.controller,
-        onOpenDetail: onOpenDetail,
-        initialTab: ModulesTab.agents,
-      ),
-      WorkspaceDestination.mcpServer => McpServerPage(
-        controller: widget.controller,
-        onOpenDetail: onOpenDetail,
-      ),
-      WorkspaceDestination.clawHub => ClawHubPage(
-        controller: widget.controller,
-        onOpenDetail: onOpenDetail,
-      ),
-      WorkspaceDestination.secrets => SecretsPage(
-        controller: widget.controller,
-        onOpenDetail: onOpenDetail,
-      ),
-      WorkspaceDestination.aiGateway => AiGatewayPage(
-        controller: widget.controller,
-        onOpenDetail: onOpenDetail,
-      ),
-      WorkspaceDestination.settings => SettingsPage(
-        controller: widget.controller,
-      ),
-      WorkspaceDestination.account => AccountPage(
-        controller: widget.controller,
-      ),
-    };
+    return buildWorkspacePage(
+      destination: destination,
+      controller: widget.controller,
+      onOpenDetail: onOpenDetail,
+      surface: WorkspacePageSurface.desktop,
+    );
   }
 }
 

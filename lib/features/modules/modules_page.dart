@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
+import '../../app/workspace_navigation.dart';
 import '../../app/app_metadata.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
@@ -13,7 +14,7 @@ import '../../widgets/status_badge.dart';
 import '../../widgets/surface_card.dart';
 import '../../widgets/top_bar.dart';
 
- class ModulesPage extends StatefulWidget {
+class ModulesPage extends StatefulWidget {
   const ModulesPage({
     super.key,
     required this.controller,
@@ -29,14 +30,21 @@ import '../../widgets/top_bar.dart';
   State<ModulesPage> createState() => _ModulesPageState();
 }
 
- class _ModulesPageState extends State<ModulesPage> {
-  ModulesTab _tab = ModulesTab.gateway;
+class _ModulesPageState extends State<ModulesPage> {
+  late ModulesTab _tab;
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialTab != null) {
-      _tab = widget.initialTab!;
+    _tab = widget.initialTab ?? widget.controller.modulesTab;
+  }
+
+  @override
+  void didUpdateWidget(covariant ModulesPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextTab = widget.initialTab ?? widget.controller.modulesTab;
+    if (nextTab != _tab) {
+      setState(() => _tab = nextTab);
     }
   }
 
@@ -77,15 +85,11 @@ import '../../widgets/top_bar.dart';
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TopBar(
-                breadcrumbs: [
-                  AppBreadcrumbItem(
-                    label: appText('主页', 'Home'),
-                    icon: Icons.home_rounded,
-                    onTap: controller.navigateHome,
-                  ),
-                  AppBreadcrumbItem(label: appText('模块', 'Modules')),
-                  AppBreadcrumbItem(label: _tab.label),
-                ],
+                breadcrumbs: buildWorkspaceBreadcrumbs(
+                  controller: controller,
+                  rootLabel: appText('模块', 'Modules'),
+                  sectionLabel: _tab.label,
+                ),
                 title: appText('模块', 'Modules'),
                 subtitle: appText(
                   '管理 Gateway、代理、节点、技能和平台服务。',
@@ -123,7 +127,7 @@ import '../../widgets/top_bar.dart';
                     ),
                     FilledButton.tonalIcon(
                       onPressed: () =>
-                          controller.navigateTo(WorkspaceDestination.settings),
+                          controller.openSettings(tab: SettingsTab.gateway),
                       icon: const Icon(Icons.add_rounded),
                       label: Text(appText('接入模块', 'Add Module')),
                     ),
@@ -134,11 +138,12 @@ import '../../widgets/top_bar.dart';
               SectionTabs(
                 items: ModulesTab.values.map((item) => item.label).toList(),
                 value: _tab.label,
-                onChanged: (value) => setState(
-                  () => _tab = ModulesTab.values.firstWhere(
+                onChanged: (value) => setState(() {
+                  _tab = ModulesTab.values.firstWhere(
                     (item) => item.label == value,
-                  ),
-                ),
+                  );
+                  controller.openModules(tab: _tab);
+                }),
               ),
               const SizedBox(height: 24),
               LayoutBuilder(
@@ -195,6 +200,22 @@ import '../../widgets/top_bar.dart';
       },
     );
   }
+}
+
+SettingsNavigationContext _modulesNavigationContext(ModulesTab tab) {
+  return SettingsNavigationContext(
+    rootLabel: appText('模块', 'Modules'),
+    destination: WorkspaceDestination.nodes,
+    sectionLabel: tab.label,
+    modulesTab: tab,
+  );
+}
+
+SettingsDetailPage _modulesDetailForTab(ModulesTab tab) {
+  return switch (tab) {
+    ModulesTab.agents => SettingsDetailPage.externalAgents,
+    _ => SettingsDetailPage.gatewayConnection,
+  };
 }
 
 class _GatewayPanel extends StatelessWidget {
@@ -338,9 +359,13 @@ class _GatewayPanel extends StatelessWidget {
                     child: Text(appText('刷新会话', 'Refresh sessions')),
                   ),
                   OutlinedButton(
-                    onPressed: () =>
-                        controller.navigateTo(WorkspaceDestination.settings),
-                    child: Text(appText('配置', 'Configure')),
+                    onPressed: () => controller.openSettings(
+                      detail: _modulesDetailForTab(ModulesTab.gateway),
+                      navigationContext: _modulesNavigationContext(
+                        ModulesTab.gateway,
+                      ),
+                    ),
+                    child: Text(appText('编辑设置', 'Edit settings')),
                   ),
                 ],
               ),

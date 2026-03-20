@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
+import 'top_bar.dart';
 
 class DesktopWorkspaceScaffold extends StatelessWidget {
   const DesktopWorkspaceScaffold({
     super.key,
     required this.child,
+    this.breadcrumbs = const <AppBreadcrumbItem>[],
     this.eyebrow,
     this.title,
     this.subtitle,
@@ -15,6 +17,7 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
   });
 
   final Widget child;
+  final List<AppBreadcrumbItem> breadcrumbs;
   final String? eyebrow;
   final String? title;
   final String? subtitle;
@@ -25,6 +28,7 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final hasHeader =
+        breadcrumbs.isNotEmpty ||
         (title != null && title!.trim().isNotEmpty) ||
         (subtitle != null && subtitle!.trim().isNotEmpty) ||
         toolbar != null;
@@ -43,6 +47,10 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
                   final header = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (breadcrumbs.isNotEmpty) ...[
+                        AppBreadcrumbs(items: breadcrumbs),
+                        const SizedBox(height: 10),
+                      ],
                       if (eyebrow != null && eyebrow!.trim().isNotEmpty) ...[
                         Text(
                           eyebrow!,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/features/settings/settings_page.dart';
+import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
@@ -184,5 +185,39 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(controller.runtimeLogs, isEmpty);
+  });
+
+  testWidgets('SettingsPage detail mode returns to overview', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+    controller.openSettings(
+      detail: SettingsDetailPage.gatewayConnection,
+      navigationContext: SettingsNavigationContext(
+        rootLabel: '模块',
+        destination: WorkspaceDestination.nodes,
+        sectionLabel: ModulesTab.gateway.label,
+        modulesTab: ModulesTab.gateway,
+      ),
+    );
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(
+        controller: controller,
+        initialTab: controller.settingsTab,
+        initialDetail: controller.settingsDetail,
+        navigationContext: controller.settingsNavigationContext,
+      ),
+    );
+
+    expect(find.text('Gateway 连接参数'), findsWidgets);
+    expect(find.text('返回概览'), findsOneWidget);
+
+    await tester.tap(find.text('返回概览'));
+    await tester.pumpAndSettle();
+
+    expect(controller.settingsDetail, isNull);
+    expect(find.text('搜索设置'), findsOneWidget);
   });
 }

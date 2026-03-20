@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
+import '../../app/workspace_navigation.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
@@ -77,6 +78,10 @@ class _TasksPageState extends State<TasksPage> {
       builder: (context, _) {
         final palette = context.palette;
         return DesktopWorkspaceScaffold(
+          breadcrumbs: buildWorkspaceBreadcrumbs(
+            controller: controller,
+            rootLabel: WorkspaceDestination.tasks.label,
+          ),
           eyebrow: appText('任务与线程', 'Tasks and sessions'),
           title: appText('任务工作台', 'Task workspace'),
           subtitle: appText(

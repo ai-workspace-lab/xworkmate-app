@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
+import '../../app/workspace_navigation.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
@@ -45,6 +46,10 @@ class _SkillsPageState extends State<SkillsPage> {
             .toList(growable: false);
         final selected = _resolveSelectedSkill(skills);
         return DesktopWorkspaceScaffold(
+          breadcrumbs: buildWorkspaceBreadcrumbs(
+            controller: controller,
+            rootLabel: WorkspaceDestination.skills.label,
+          ),
           eyebrow: appText('技能与能力包', 'Skills and capabilities'),
           title: appText('技能工作台', 'Skills workspace'),
           subtitle: appText(
