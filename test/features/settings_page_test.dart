@@ -145,6 +145,8 @@ void main() {
     expect(tester.getSize(titleFinder).width, greaterThan(80));
     expect(find.text('启用协作模式'), findsOneWidget);
     expect(find.text('协作框架'), findsOneWidget);
+    expect(find.textContaining('Lead Engineer'), findsWidgets);
+    expect(find.textContaining('ollama launch codex'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

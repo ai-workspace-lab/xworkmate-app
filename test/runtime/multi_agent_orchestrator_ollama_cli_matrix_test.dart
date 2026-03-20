@@ -9,7 +9,7 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   test(
-    'MultiAgentOrchestrator injects local Ollama env into gemini, opencode, and codex CLI runs',
+    'MultiAgentOrchestrator launches first-batch external tools through ollama launch',
     () async {
       final recorder = _CliInvocationRecorder();
       final orchestrator = MultiAgentOrchestrator(
@@ -21,25 +21,24 @@ void main() {
           ollamaEndpoint: 'http://127.0.0.1:11434',
           architect: const AgentWorkerConfig(
             role: MultiAgentRole.architect,
-            cliTool: 'gemini',
-            model: 'qwen2.5-coder:latest',
+            cliTool: 'claude',
+            model: 'kimi-k2.5:cloud',
             enabled: true,
           ),
           engineer: const AgentWorkerConfig(
             role: MultiAgentRole.engineer,
-            cliTool: 'opencode',
-            model: 'qwen2.5-coder:latest',
+            cliTool: 'codex',
+            model: 'minimax-m2.7:cloud',
             enabled: true,
           ),
           tester: const AgentWorkerConfig(
             role: MultiAgentRole.testerDoc,
-            cliTool: 'codex',
-            model: 'gpt-oss:20b',
+            cliTool: 'opencode',
+            model: 'glm-5:cloud',
             enabled: true,
           ),
         ),
-        binaryExistsResolver: (command) async =>
-            command == 'gemini' || command == 'opencode' || command == 'codex',
+        binaryExistsResolver: (command) async => command == 'ollama',
         arisBundleRepository: _FakeArisBundleRepository(),
         processStarter: recorder.start,
       );
@@ -52,31 +51,78 @@ void main() {
       expect(result.success, isTrue);
       expect(result.finalScore, 8);
 
-      final geminiEnv = recorder.lastEnvironmentFor('gemini');
-      expect(geminiEnv['OPENAI_BASE_URL'], 'http://127.0.0.1:11434/v1');
-      expect(geminiEnv['OPENAI_API_KEY'], 'ollama');
-      expect(geminiEnv['OLLAMA_BASE_URL'], 'http://127.0.0.1:11434');
-      expect(geminiEnv['OLLAMA_HOST'], 'http://127.0.0.1:11434');
+      final architectInvocation = recorder.lastLaunchFor('claude');
+      expect(architectInvocation.executable, 'ollama');
+      expect(
+        architectInvocation.arguments,
+        containsAllInOrder(<String>[
+          'launch',
+          'claude',
+          '--model',
+          'kimi-k2.5:cloud',
+          '--yes',
+          '--',
+          '-p',
+        ]),
+      );
 
-      final opencodeEnv = recorder.lastEnvironmentFor('opencode');
-      expect(opencodeEnv['OPENAI_BASE_URL'], 'http://127.0.0.1:11434/v1');
-      expect(opencodeEnv['OPENAI_API_KEY'], 'ollama');
-      expect(opencodeEnv['OLLAMA_BASE_URL'], 'http://127.0.0.1:11434');
-      expect(opencodeEnv['OLLAMA_HOST'], 'http://127.0.0.1:11434');
+      final engineerInvocation = recorder.lastLaunchFor('codex');
+      expect(
+        engineerInvocation.arguments,
+        containsAllInOrder(<String>[
+          'launch',
+          'codex',
+          '--model',
+          'minimax-m2.7:cloud',
+          '--',
+          'exec',
+          '--skip-git-repo-check',
+          '--color',
+          'never',
+        ]),
+      );
 
-      final codexEnv = recorder.lastEnvironmentFor('codex');
-      expect(codexEnv['OPENAI_BASE_URL'], 'http://127.0.0.1:11434/v1');
-      expect(codexEnv['OPENAI_API_KEY'], 'ollama');
-      expect(codexEnv['OLLAMA_BASE_URL'], 'http://127.0.0.1:11434');
-      expect(codexEnv['OLLAMA_HOST'], 'http://127.0.0.1:11434');
-      expect(codexEnv['ANTHROPIC_BASE_URL'], 'http://127.0.0.1:11434');
-      expect(codexEnv['ANTHROPIC_AUTH_TOKEN'], 'ollama');
-      expect(codexEnv['ANTHROPIC_API_KEY'], isEmpty);
+      final workerInvocation = recorder.lastLaunchFor('opencode');
+      expect(
+        workerInvocation.arguments,
+        containsAllInOrder(<String>[
+          'launch',
+          'opencode',
+          '--model',
+          'glm-5:cloud',
+          '--',
+          'run',
+          '--format',
+          'default',
+        ]),
+      );
+
+      for (final invocation in <_Invocation>[
+        architectInvocation,
+        engineerInvocation,
+        workerInvocation,
+      ]) {
+        expect(
+          invocation.environment['OPENAI_BASE_URL'],
+          'http://127.0.0.1:11434/v1',
+        );
+        expect(invocation.environment['OPENAI_API_KEY'], 'ollama');
+        expect(
+          invocation.environment['OLLAMA_BASE_URL'],
+          'http://127.0.0.1:11434',
+        );
+        expect(invocation.environment['OLLAMA_HOST'], 'http://127.0.0.1:11434');
+      }
+      expect(
+        architectInvocation.environment['ANTHROPIC_BASE_URL'],
+        'http://127.0.0.1:11434',
+      );
+      expect(architectInvocation.environment['ANTHROPIC_AUTH_TOKEN'], 'ollama');
     },
   );
 
   test(
-    'MultiAgentOrchestrator injects local Ollama env into claude CLI runs',
+    'MultiAgentOrchestrator still injects Anthropic-compatible env for claude launches',
     () async {
       final recorder = _CliInvocationRecorder();
       final orchestrator = MultiAgentOrchestrator(
@@ -88,25 +134,24 @@ void main() {
           ollamaEndpoint: 'http://127.0.0.1:11434',
           architect: const AgentWorkerConfig(
             role: MultiAgentRole.architect,
-            cliTool: 'gemini',
-            model: 'qwen2.5-coder:latest',
+            cliTool: 'claude',
+            model: 'kimi-k2.5:cloud',
             enabled: true,
           ),
           engineer: const AgentWorkerConfig(
             role: MultiAgentRole.engineer,
             cliTool: 'claude',
-            model: 'qwen2.5-coder:latest',
+            model: 'qwen3.5:cloud',
             enabled: true,
           ),
           tester: const AgentWorkerConfig(
             role: MultiAgentRole.testerDoc,
             cliTool: 'codex',
-            model: 'gpt-oss:20b',
+            model: 'qwen3.5',
             enabled: true,
           ),
         ),
-        binaryExistsResolver: (command) async =>
-            command == 'gemini' || command == 'claude' || command == 'codex',
+        binaryExistsResolver: (command) async => command == 'ollama',
         arisBundleRepository: _FakeArisBundleRepository(),
         processStarter: recorder.start,
       );
@@ -119,7 +164,7 @@ void main() {
       expect(result.success, isTrue);
       expect(result.finalScore, 8);
 
-      final claudeEnv = recorder.lastEnvironmentFor('claude');
+      final claudeEnv = recorder.lastLaunchFor('claude').environment;
       expect(claudeEnv['OPENAI_BASE_URL'], 'http://127.0.0.1:11434/v1');
       expect(claudeEnv['OPENAI_API_KEY'], 'ollama');
       expect(claudeEnv['OLLAMA_BASE_URL'], 'http://127.0.0.1:11434');
@@ -151,7 +196,8 @@ class _CliInvocationRecorder {
       ),
     );
     final prompt = arguments.isEmpty ? '' : arguments.last;
-    final stdout = prompt.contains('任务架构师')
+    final stdout =
+        prompt.contains('任务架构师') || prompt.contains('多 Agent 协作调度者')
         ? '''
 ## 概述
 实现 hello world。
@@ -178,14 +224,20 @@ String helloWorld() => 'hello';
     return _FakeProcess(stdoutText: stdout);
   }
 
-  Map<String, String> lastEnvironmentFor(String executable) {
-    final matches = invocations.where((item) => item.executable == executable);
+  _Invocation lastLaunchFor(String tool) {
+    final matches = invocations.where(
+      (item) =>
+          item.executable == 'ollama' &&
+          item.arguments.length >= 2 &&
+          item.arguments.first == 'launch' &&
+          item.arguments[1] == tool,
+    );
     expect(
       matches,
       isNotEmpty,
-      reason: 'No invocation recorded for $executable',
+      reason: 'No ollama launch invocation recorded for $tool',
     );
-    return matches.last.environment;
+    return matches.last;
   }
 }
 
