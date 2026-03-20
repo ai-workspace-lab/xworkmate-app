@@ -16,19 +16,7 @@
 #include <string>
 #include <vector>
 
-namespace {
-
-constexpr char kChannelName[] = "plus.svc.xworkmate/desktop_platform";
-constexpr char kDesktopFileId[] = "plus.svc.xworkmate.desktop";
-
-struct CommandResult {
-  bool ok = false;
-  int exit_status = -1;
-  std::string stdout_text;
-  std::string stderr_text;
-};
-
-struct DesktopPlatformChannel {
+struct _DesktopPlatformChannel {
   MyApplication* application;
   GtkWindow* window;
   FlView* view;
@@ -45,6 +33,18 @@ struct DesktopPlatformChannel {
   bool network_manager_available = false;
   std::string desktop_environment = "unknown";
   std::string status_message;
+};
+
+namespace {
+
+constexpr char kChannelName[] = "plus.svc.xworkmate/desktop_platform";
+constexpr char kDesktopFileId[] = "plus.svc.xworkmate.desktop";
+
+struct CommandResult {
+  bool ok = false;
+  int exit_status = -1;
+  std::string stdout_text;
+  std::string stderr_text;
 };
 
 std::string json_escape(const std::string& input) {
