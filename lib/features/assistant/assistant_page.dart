@@ -2447,8 +2447,8 @@ class _ComposerBar extends StatelessWidget {
               const SizedBox(width: 4),
               Tooltip(
                 message: appText(
-                  '多 Agent 协作模式（Architect → Engineer → Tester）',
-                  'Multi-Agent Collaboration Mode (Architect → Engineer → Tester)',
+                  '多 Agent 协作模式（Architect 调度/文档 → Lead Engineer 主程 → Worker/Review）',
+                  'Multi-Agent Collaboration Mode (Architect docs/scheduler -> Lead Engineer -> Worker/Review)',
                 ),
                 child: AnimatedBuilder(
                   animation: controller.multiAgentOrchestrator,

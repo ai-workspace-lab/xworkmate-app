@@ -2052,9 +2052,9 @@ class LocalDeviceIdentity {
 
 /// 多 Agent 协作角色
 enum MultiAgentRole {
-  architect, // 调度者/架构师：任务分解、流程编排
-  engineer, // 工程师：代码实现
-  testerDoc, // 测试/评审：测试生成、代码审阅
+  architect, // 调度/文档：需求收口、接受标准、工作流设计
+  engineer, // 主程：关键实现、重构、集成
+  testerDoc, // worker/review：并行切片、复审、回归建议
 }
 
 enum MultiAgentFramework { native, aris }
@@ -2075,15 +2075,15 @@ extension MultiAgentFrameworkCopy on MultiAgentFramework {
 
 extension MultiAgentRoleCopy on MultiAgentRole {
   String get label => switch (this) {
-    MultiAgentRole.architect => 'Architect（调度者）',
-    MultiAgentRole.engineer => 'Engineer（工程师）',
-    MultiAgentRole.testerDoc => 'Tester/Doc（评审）',
+    MultiAgentRole.architect => 'Architect（调度/文档）',
+    MultiAgentRole.engineer => 'Lead Engineer（主程）',
+    MultiAgentRole.testerDoc => 'Worker/Review（Worker 池）',
   };
 
   String get description => switch (this) {
-    MultiAgentRole.architect => '负责任务分解、流程设计、宏观规划',
-    MultiAgentRole.engineer => '负责代码实现、重构、调试',
-    MultiAgentRole.testerDoc => '负责测试用例生成、代码审阅、文档撰写',
+    MultiAgentRole.architect => '负责需求收口、接受标准、文档与协作调度',
+    MultiAgentRole.engineer => '负责主实现、关键改动、集成收口',
+    MultiAgentRole.testerDoc => '负责并行 worker、复审、回归和补充说明',
   };
 }
 
@@ -2121,7 +2121,7 @@ class AgentWorkerConfig {
   });
 
   final MultiAgentRole role;
-  final String cliTool; // 'claude' | 'codex' | 'gemini'
+  final String cliTool; // e.g. 'claude' | 'codex' | 'opencode' | 'gemini'
   final String model;
   final bool enabled;
   final int maxRetries;
@@ -2536,20 +2536,20 @@ class MultiAgentConfig {
       arisCompatStatus: 'idle',
       architect: const AgentWorkerConfig(
         role: MultiAgentRole.architect,
-        cliTool: 'gemini',
-        model: 'gemini-2.0-flash',
+        cliTool: 'claude',
+        model: 'kimi-k2.5:cloud',
         enabled: true,
       ),
       engineer: const AgentWorkerConfig(
         role: MultiAgentRole.engineer,
-        cliTool: 'claude',
-        model: 'qwen2.5-coder:latest',
+        cliTool: 'codex',
+        model: 'minimax-m2.7:cloud',
         enabled: true,
       ),
       tester: const AgentWorkerConfig(
         role: MultiAgentRole.testerDoc,
-        cliTool: 'codex',
-        model: 'gpt-oss:20b',
+        cliTool: 'opencode',
+        model: 'glm-5:cloud',
         enabled: true,
       ),
       ollamaEndpoint: 'http://127.0.0.1:11434',
@@ -2769,9 +2769,21 @@ class MultiAgentConfig {
           json['arisBundleVersion'] as String? ?? defaults.arisBundleVersion,
       arisCompatStatus:
           json['arisCompatStatus'] as String? ?? defaults.arisCompatStatus,
-      architect: parseWorker(architectJson, MultiAgentRole.architect, 'gemini'),
-      engineer: parseWorker(engineerJson, MultiAgentRole.engineer, 'claude'),
-      tester: parseWorker(testerJson, MultiAgentRole.testerDoc, 'codex'),
+      architect: parseWorker(
+        architectJson,
+        MultiAgentRole.architect,
+        defaults.architect.cliTool,
+      ),
+      engineer: parseWorker(
+        engineerJson,
+        MultiAgentRole.engineer,
+        defaults.engineer.cliTool,
+      ),
+      tester: parseWorker(
+        testerJson,
+        MultiAgentRole.testerDoc,
+        defaults.tester.cliTool,
+      ),
       ollamaEndpoint:
           json['ollamaEndpoint'] as String? ?? defaults.ollamaEndpoint,
       maxIterations: json['maxIterations'] as int? ?? defaults.maxIterations,

@@ -40,6 +40,7 @@ void main() {
         'assets/aris/mcp-servers/llm-chat/requirements.txt': 'httpx\n',
         'assets/aris/skills/idea-discovery/SKILL.md': '# idea\n',
         'assets/aris/skills/skills-codex/idea-discovery/SKILL.md': '# codex\n',
+        'assets/aris/skills/research-pipeline/SKILL.md': '# unrelated\n',
       });
       final repository = ArisBundleRepository(
         assetBundle: bundle,
@@ -54,6 +55,12 @@ void main() {
       expect(await File(resolved.llmChatServerPath).exists(), isTrue);
       expect(resolved.skillPathsForRole(MultiAgentRole.architect), isNotEmpty);
       expect(await repository.countSkillFiles(), 2);
+      expect(
+        await File(
+          '${resolved.rootPath}/skills/research-pipeline/SKILL.md',
+        ).exists(),
+        isFalse,
+      );
     },
   );
 }

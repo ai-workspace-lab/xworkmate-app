@@ -20,13 +20,13 @@ typedef CliProcessStarter =
 
 /// 多 Agent 协作编排器
 ///
-/// 管理 Architect (Gemini) → Engineer (Claude Code) → Tester/Doc (Codex)
-/// 的工作流，通过 Ollama 驱动本地模型，在现有 UI 基础上补充协作能力。
+/// 管理 Architect（调度/文档）→ Lead Engineer（主程）→ Worker/Review（并行 worker + 复审）
+/// 的工作流，通过 Ollama 与外部 CLI 工具桥接首批云模型协作能力。
 ///
 /// 角色分工：
-/// - Architect（调度者）：负责任务分解、流程编排（Gemini CLI 或云端模型）
-/// - Engineer（工程师）：负责代码实现（Claude Code via Ollama）
-/// - Tester/Doc（评审）：负责测试、审阅、文档（Codex CLI via Ollama）
+/// - Architect（调度/文档）：负责任务分解、接受标准、工作流设计
+/// - Lead Engineer（主程）：负责关键实现、重构、集成收口
+/// - Worker/Review（并行 worker）：负责补充实现、复审、回归建议
 class MultiAgentOrchestrator extends ChangeNotifier {
   MultiAgentOrchestrator({
     required MultiAgentConfig config,
@@ -179,13 +179,17 @@ class MultiAgentOrchestrator extends ChangeNotifier {
     try {
       // === Phase 1: Architect 分析任务 ===
       _throwIfAborted();
-      _log(CollaborationLogLevel.info, '🎨', 'Architect 开始分析任务...');
+      _log(
+        CollaborationLogLevel.info,
+        '🎨',
+        '${_roleLabel(MultiAgentRole.architect)} 开始分析任务...',
+      );
       _emitEvent(
         onEvent,
         MultiAgentRunEvent(
           type: 'step',
-          title: 'Architect',
-          message: 'Architect 开始分析任务…',
+          title: _roleLabel(MultiAgentRole.architect),
+          message: '${_roleLabel(MultiAgentRole.architect)} 开始分析任务…',
           pending: true,
           error: false,
           role: 'architect',
@@ -210,7 +214,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
         onEvent,
         MultiAgentRunEvent(
           type: 'step',
-          title: 'Architect',
+          title: _roleLabel(MultiAgentRole.architect),
           message: '完成任务分析并生成执行分解。',
           pending: false,
           error: false,
@@ -223,13 +227,17 @@ class MultiAgentOrchestrator extends ChangeNotifier {
 
       // === Phase 2: Engineer 实现 ===
       _throwIfAborted();
-      _log(CollaborationLogLevel.info, '🔧', 'Engineer 开始实现...');
+      _log(
+        CollaborationLogLevel.info,
+        '🔧',
+        '${_roleLabel(MultiAgentRole.engineer)} 开始实现...',
+      );
       _emitEvent(
         onEvent,
         MultiAgentRunEvent(
           type: 'step',
-          title: 'Engineer',
-          message: 'Engineer 开始实现任务…',
+          title: _roleLabel(MultiAgentRole.engineer),
+          message: '${_roleLabel(MultiAgentRole.engineer)} 开始实现任务…',
           pending: true,
           error: false,
           role: 'engineer',
@@ -256,7 +264,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
         onEvent,
         MultiAgentRunEvent(
           type: 'step',
-          title: 'Engineer',
+          title: _roleLabel(MultiAgentRole.engineer),
           message: '完成首轮实现。',
           pending: false,
           error: false,
@@ -266,13 +274,17 @@ class MultiAgentOrchestrator extends ChangeNotifier {
 
       // === Phase 3: Tester 审阅 ===
       _throwIfAborted();
-      _log(CollaborationLogLevel.info, '🔍', 'Tester 开始审阅...');
+      _log(
+        CollaborationLogLevel.info,
+        '🔍',
+        '${_roleLabel(MultiAgentRole.testerDoc)} 开始审阅...',
+      );
       _emitEvent(
         onEvent,
         MultiAgentRunEvent(
           type: 'step',
-          title: 'Tester',
-          message: 'Tester 开始审阅实现…',
+          title: _roleLabel(MultiAgentRole.testerDoc),
+          message: '${_roleLabel(MultiAgentRole.testerDoc)} 开始审阅实现…',
           pending: true,
           error: false,
           role: 'tester',
@@ -297,7 +309,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
         onEvent,
         MultiAgentRunEvent(
           type: 'step',
-          title: 'Tester',
+          title: _roleLabel(MultiAgentRole.testerDoc),
           message: '完成代码审阅。',
           pending: false,
           error: false,
@@ -324,7 +336,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
           );
           notifyListeners();
 
-          // Engineer 接收反馈并修复
+          // Lead Engineer 接收反馈并修复
           final fixedResult = await _runFix(
             engineerResult.codeOutput,
             testerResult.feedback,
@@ -415,7 +427,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
     }
   }
 
-  /// 运行 Architect（任务分析）
+  /// 运行 Architect（调度/文档分析）
   Future<ArchitectResult> _runArchitect(
     String task, {
     required FrameworkPreset preset,
@@ -480,7 +492,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
     }
   }
 
-  /// 运行 Engineer（代码实现）
+  /// 运行 Lead Engineer（主实现）
   Future<EngineerResult> _runEngineer(
     List<SubTask> tasks,
     String workingDirectory,
@@ -548,7 +560,7 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
     );
   }
 
-  /// 运行 Tester（代码审阅）
+  /// 运行 Worker/Review（代码审阅）
   Future<TesterResult> _runTester(
     String codeOutput, {
     required FrameworkPreset preset,
@@ -694,16 +706,24 @@ $originalCode
     late final List<String> args;
     late final String command;
     late final Map<String, String> envVars;
+    final useOllamaLaunch = _prefersOllamaLaunch(tool: tool, model: model);
 
     switch (tool) {
       case 'claude':
-        command = _resolveCliPath('claude');
+        command = useOllamaLaunch ? 'ollama' : _resolveCliPath('claude');
         envVars = _buildCliEnvVars(
           tool: tool,
           aiGatewayBaseUrl: aiGatewayBaseUrl,
           aiGatewayApiKey: aiGatewayApiKey,
         );
-        if (model.isNotEmpty) {
+        if (useOllamaLaunch) {
+          args = _buildOllamaLaunchArgs(
+            tool: tool,
+            model: model,
+            prompt: prompt,
+            cwd: cwd,
+          );
+        } else if (model.isNotEmpty) {
           args = ['--model', model, '-p', prompt];
         } else {
           args = ['-p', prompt];
@@ -711,13 +731,20 @@ $originalCode
         break;
 
       case 'codex':
-        command = _resolveCliPath('codex');
+        command = useOllamaLaunch ? 'ollama' : _resolveCliPath('codex');
         envVars = _buildCliEnvVars(
           tool: tool,
           aiGatewayBaseUrl: aiGatewayBaseUrl,
           aiGatewayApiKey: aiGatewayApiKey,
         );
-        if (model.isNotEmpty) {
+        if (useOllamaLaunch) {
+          args = _buildOllamaLaunchArgs(
+            tool: tool,
+            model: model,
+            prompt: prompt,
+            cwd: cwd,
+          );
+        } else if (model.isNotEmpty) {
           args = [
             'exec',
             '--skip-git-repo-check',
@@ -755,20 +782,27 @@ $originalCode
         break;
 
       case 'opencode':
-        command = _resolveCliPath('opencode');
+        command = useOllamaLaunch ? 'ollama' : _resolveCliPath('opencode');
         envVars = _buildCliEnvVars(
           tool: tool,
           aiGatewayBaseUrl: aiGatewayBaseUrl,
           aiGatewayApiKey: aiGatewayApiKey,
         );
-        args = [
-          'run',
-          '--format',
-          'default',
-          if (cwd.isNotEmpty) ...['--dir', cwd],
-          if (model.isNotEmpty) ...['-m', model],
-          prompt,
-        ];
+        args = useOllamaLaunch
+            ? _buildOllamaLaunchArgs(
+                tool: tool,
+                model: model,
+                prompt: prompt,
+                cwd: cwd,
+              )
+            : [
+                'run',
+                '--format',
+                'default',
+                if (cwd.isNotEmpty) ...['--dir', cwd],
+                if (model.isNotEmpty) ...['-m', model],
+                prompt,
+              ];
         break;
 
       default:
@@ -862,7 +896,7 @@ $originalCode
     return '''
 $instructionBlock
 
-你是一个任务架构师（Architect）。请分析以下需求并分解为可执行的子任务。
+你是一个多 Agent 协作调度者。请先收敛 requirements -> acceptance evidence，再输出可执行的主程/worker分工。
 
 ## 用户需求
 $task
@@ -874,17 +908,18 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
 1. 任务概述（2-3 句话）
 2. 子任务列表（3-5 个），每个子任务包含：
    - 任务编号和描述
-   - 预计复杂度（简单/中等/复杂）
+   - 负责角色（文档/主程/worker）
+   - 接受标准
    - 关键技术点
-3. 推荐的执行顺序
+3. 推荐的执行顺序与关键里程碑
 
 请严格按以下格式输出：
 ## 概述
 [你的概述]
 
 ## 子任务
-1. [任务描述] | 复杂度：[简单/中等/复杂] | 关键技术：[技术点]
-2. [任务描述] | 复杂度：[简单/中等/复杂] | 关键技术：[技术点]
+1. [任务描述] | 角色：[文档/主程/worker] | 接受标准：[可验证结果] | 关键技术：[技术点]
+2. [任务描述] | 角色：[文档/主程/worker] | 接受标准：[可验证结果] | 关键技术：[技术点]
 ...
 ''';
   }
@@ -896,26 +931,30 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
     if (!_config.usesAris) {
       return configuredTool;
     }
+    final configuredModel = _resolvedModelForRole(
+      role,
+      configuredModel: _modelForRole(role).trim(),
+    );
     final candidates = switch (role) {
       MultiAgentRole.architect => <String>[
         configuredTool,
-        'gemini',
-        'opencode',
-        'codex',
         'claude',
+        'codex',
+        'opencode',
+        'gemini',
       ],
       MultiAgentRole.engineer => <String>[
         configuredTool,
-        'claude',
         'codex',
         'opencode',
+        'claude',
         'gemini',
       ],
       MultiAgentRole.testerDoc => <String>[
         configuredTool,
+        'opencode',
         'codex',
         'claude',
-        'opencode',
         'gemini',
       ],
     };
@@ -924,7 +963,11 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
       if (trimmed.isEmpty) {
         continue;
       }
-      if (await _binaryExists(_resolveCliPath(trimmed))) {
+      if (_prefersOllamaLaunch(tool: trimmed, model: configuredModel)) {
+        if (await _binaryExists('ollama')) {
+          return trimmed;
+        }
+      } else if (await _binaryExists(_resolveCliPath(trimmed))) {
         return trimmed;
       }
     }
@@ -936,41 +979,17 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
     required String configuredModel,
   }) {
     final trimmed = configuredModel.trim();
-    if (!_config.usesAris || trimmed.isEmpty) {
-      return trimmed;
-    }
-    if (!_looksRemoteOnlyModel(trimmed)) {
+    if (trimmed.isNotEmpty) {
       return trimmed;
     }
     switch (role) {
       case MultiAgentRole.architect:
-        return _config.engineer.model.trim().isNotEmpty
-            ? _config.engineer.model.trim()
-            : 'qwen2.5-coder:latest';
+        return 'kimi-k2.5:cloud';
       case MultiAgentRole.engineer:
-        return trimmed;
+        return 'minimax-m2.7:cloud';
       case MultiAgentRole.testerDoc:
-        if (!_looksRemoteOnlyModel(_config.tester.model.trim())) {
-          return _config.tester.model.trim();
-        }
-        if (_config.engineer.model.trim().isNotEmpty) {
-          return _config.engineer.model.trim();
-        }
-        return 'gpt-oss:20b';
+        return 'glm-5:cloud';
     }
-  }
-
-  bool _looksRemoteOnlyModel(String model) {
-    final normalized = model.trim().toLowerCase();
-    if (normalized.isEmpty) {
-      return false;
-    }
-    return normalized.startsWith('gemini-') ||
-        normalized.startsWith('gpt-') ||
-        normalized.startsWith('moonshot') ||
-        normalized.startsWith('minimax') ||
-        normalized.startsWith('z-ai/') ||
-        normalized.contains('kimi');
   }
 
   Future<bool> _binaryExists(String command) async {
@@ -1162,12 +1181,84 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
   String _systemPromptForRole(MultiAgentRole role) {
     return switch (role) {
       MultiAgentRole.architect =>
-        'You are the Architect in a multi-agent coding workflow. Focus on decomposition, planning, and sequencing.',
+        'You are the architecture and documentation lane in a multi-agent coding workflow. Focus on requirements, acceptance evidence, task slicing, and milestones.',
       MultiAgentRole.engineer =>
-        'You are the Engineer in a multi-agent coding workflow. Produce implementation-oriented output.',
+        'You are the lead engineer in a multi-agent coding workflow. Produce implementation-oriented output for the critical path.',
       MultiAgentRole.testerDoc =>
-        'You are the Tester/Reviewer in a multi-agent coding workflow. Review, score, and suggest follow-up fixes.',
+        'You are the worker-review lane in a multi-agent coding workflow. Review, score, and suggest follow-up fixes and worker follow-ups.',
     };
+  }
+
+  String _roleLabel(MultiAgentRole role) {
+    return switch (role) {
+      MultiAgentRole.architect => 'Architect',
+      MultiAgentRole.engineer => 'Lead Engineer',
+      MultiAgentRole.testerDoc => 'Worker/Review',
+    };
+  }
+
+  String _modelForRole(MultiAgentRole role) {
+    return switch (role) {
+      MultiAgentRole.architect => _config.architect.model,
+      MultiAgentRole.engineer => _config.engineer.model,
+      MultiAgentRole.testerDoc => _config.tester.model,
+    };
+  }
+
+  bool _prefersOllamaLaunch({
+    required String tool,
+    required String model,
+  }) {
+    final normalizedTool = tool.trim().toLowerCase();
+    final normalizedModel = model.trim();
+    if (normalizedModel.isEmpty) {
+      return false;
+    }
+    if (normalizedTool != 'claude' &&
+        normalizedTool != 'codex' &&
+        normalizedTool != 'opencode') {
+      return false;
+    }
+    return true;
+  }
+
+  List<String> _buildOllamaLaunchArgs({
+    required String tool,
+    required String model,
+    required String prompt,
+    required String cwd,
+  }) {
+    final args = <String>['launch', tool, '--model', model];
+    if (tool == 'claude') {
+      args.add('--yes');
+      args.addAll(<String>['--', '-p', prompt]);
+      return args;
+    }
+    if (tool == 'codex') {
+      args.addAll(<String>[
+        '--',
+        'exec',
+        '--skip-git-repo-check',
+        '--color',
+        'never',
+        if (cwd.isNotEmpty) ...<String>['-C', cwd],
+        prompt,
+      ]);
+      return args;
+    }
+    if (tool == 'opencode') {
+      args.addAll(<String>[
+        '--',
+        'run',
+        '--format',
+        'default',
+        if (cwd.isNotEmpty) ...<String>['--dir', cwd],
+        prompt,
+      ]);
+      return args;
+    }
+    args.addAll(<String>['--', '-p', prompt]);
+    return args;
   }
 
   void _throwIfAborted() {

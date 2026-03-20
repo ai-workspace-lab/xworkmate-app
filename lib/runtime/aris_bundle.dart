@@ -144,7 +144,7 @@ class ArisBundleRepository {
         (await markerFile.readAsString()).trim() != manifest.bundleVersion;
 
     if (needsExtract) {
-      await _extractBundle(rootPath, manifest.bundleVersion);
+      await _extractBundle(rootPath, manifest);
     }
 
     final bundle = ResolvedArisBundle(rootPath: rootPath, manifest: manifest);
@@ -187,7 +187,10 @@ class ArisBundleRepository {
     return '${supportDirectory.path}/xworkmate/aris-bundle';
   }
 
-  Future<void> _extractBundle(String rootPath, String version) async {
+  Future<void> _extractBundle(
+    String rootPath,
+    ArisBundleManifest manifest,
+  ) async {
     final directory = Directory(rootPath);
     if (await directory.exists()) {
       await directory.delete(recursive: true);
@@ -201,8 +204,12 @@ class ArisBundleRepository {
               .listAssets()
               .where((item) => item.startsWith(assetPrefix))
               .toList(growable: false);
+    final requiredAssets = _requiredAssetKeys(
+      manifest: manifest,
+      assetKeys: assetKeys,
+    );
 
-    for (final assetKey in assetKeys) {
+    for (final assetKey in requiredAssets) {
       final relativePath = assetKey.substring(assetPrefix.length);
       if (relativePath.isEmpty) {
         continue;
@@ -217,6 +224,51 @@ class ArisBundleRepository {
       await file.writeAsBytes(bytes, flush: true);
     }
 
-    await File('$rootPath/.bundle-version').writeAsString(version, flush: true);
+    await File(
+      '$rootPath/.bundle-version',
+    ).writeAsString(manifest.bundleVersion, flush: true);
+  }
+
+  List<String> _requiredAssetKeys({
+    required ArisBundleManifest manifest,
+    required List<String> assetKeys,
+  }) {
+    final required = <String>{manifestAssetPath};
+    final requiredPrefixes = <String>{
+      _parentAssetPrefix(manifest.llmChatServerPath),
+      _parentAssetPrefix(manifest.llmChatRequirementsPath),
+    }..removeWhere((item) => item.isEmpty);
+
+    for (final skillPath in <String>[
+      ...manifest.roleSkills.values.expand((items) => items),
+      ...manifest.codexRoleSkills.values.expand((items) => items),
+    ]) {
+      requiredPrefixes.add(_parentAssetPrefix(skillPath));
+    }
+
+    for (final assetKey in assetKeys) {
+      if (required.contains(assetKey)) {
+        continue;
+      }
+      if (requiredPrefixes.any((prefix) => assetKey.startsWith(prefix))) {
+        required.add(assetKey);
+      }
+    }
+    return required.toList(growable: false)..sort();
+  }
+
+  String _parentAssetPrefix(String relativePath) {
+    final trimmed = relativePath.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+    if (trimmed.endsWith('/')) {
+      return assetPrefix + trimmed;
+    }
+    final slashIndex = trimmed.lastIndexOf('/');
+    if (slashIndex < 0) {
+      return assetPrefix;
+    }
+    return '$assetPrefix${trimmed.substring(0, slashIndex + 1)}';
   }
 }

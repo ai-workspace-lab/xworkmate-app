@@ -1472,8 +1472,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(height: 4),
                     Text(
                       appText(
-                        '通过 Ollama 驱动多个 CLI 工具协同工作，实现 Architect → Engineer → Tester 的完整工作流。',
-                        'Orchestrate multiple CLI agents via Ollama for Architect → Engineer → Tester workflows.',
+                        '限定在多 Agent 协作：Architect 负责调度/文档，Lead Engineer 负责主程，Worker/Review 负责并行 worker 与复审；第一批外部桥接走 ollama launch。',
+                        'Multi-agent only: Architect handles orchestration/docs, Lead Engineer owns the critical path, Worker/Review handles parallel workers and review; first-batch external bridges run through ollama launch.',
                       ),
                       style: theme.textTheme.bodyMedium,
                     ),
@@ -1540,6 +1540,21 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 12),
             _InfoRow(label: 'Ollama', value: config.ollamaEndpoint),
             _InfoRow(
+              label: appText('文档 Lane', 'Doc Lane'),
+              value:
+                  '${config.architect.cliTool} · ${config.architect.model.isEmpty ? '—' : config.architect.model}',
+            ),
+            _InfoRow(
+              label: appText('主程 Lane', 'Lead Lane'),
+              value:
+                  '${config.engineer.cliTool} · ${config.engineer.model.isEmpty ? '—' : config.engineer.model}',
+            ),
+            _InfoRow(
+              label: appText('Worker Lane', 'Worker Lane'),
+              value:
+                  '${config.tester.cliTool} · ${config.tester.model.isEmpty ? '—' : config.tester.model}',
+            ),
+            _InfoRow(
               label: appText('超时时间', 'Timeout'),
               value: '${config.timeoutSeconds}s',
             ),
@@ -1574,16 +1589,19 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 16),
             _AgentRoleCard(
-              title: '🎨 ${appText('Architect（调度者）', 'Architect (Scheduler)')}',
+              title: '🧭 ${appText('Architect（调度/文档）', 'Architect (Docs / Scheduler)')}',
               description: appText(
-                '负责任务分解、流程编排、宏观设计',
-                'Task decomposition, workflow orchestration, macro design',
+                '负责 requirements -> acceptance evidence、架构选项排序、文档与调度。',
+                'Owns requirements -> acceptance evidence, option ranking, docs, and orchestration.',
               ),
               cliTool: config.architect.cliTool,
               model: config.architect.model,
               enabled: config.architect.enabled,
-              cliOptions: const ['gemini', 'claude', 'codex', 'opencode'],
-              modelOptions: const ['gemini-2.0-flash', 'gemini-2.5-pro'],
+              cliOptions: _mergeOptions(
+                config.architect.cliTool,
+                const ['claude', 'codex', 'opencode', 'gemini'],
+              ),
+              modelOptions: _getArchitectModelOptions(settings, config),
               onCliChanged: (tool) => _saveMultiAgentConfig(
                 controller,
                 config.copyWith(
@@ -1605,16 +1623,19 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 12),
             _AgentRoleCard(
-              title: '🔧 ${appText('Engineer（工程师）', 'Engineer (Developer)')}',
+              title: '🔧 ${appText('Lead Engineer（主程）', 'Lead Engineer')}',
               description: appText(
-                '负责代码实现、重构、调试',
-                'Code implementation, refactoring, debugging',
+                '负责关键实现、重构、集成收口，默认走 codex + minimax-m2.7:cloud。',
+                'Owns critical implementation, refactors, and integration. Defaults to codex + minimax-m2.7:cloud.',
               ),
               cliTool: config.engineer.cliTool,
               model: config.engineer.model,
               enabled: config.engineer.enabled,
-              cliOptions: const ['claude', 'codex', 'opencode'],
-              modelOptions: _getLocalModelOptions(settings),
+              cliOptions: _mergeOptions(
+                config.engineer.cliTool,
+                const ['codex', 'claude', 'opencode', 'gemini'],
+              ),
+              modelOptions: _getLeadModelOptions(settings, config),
               onCliChanged: (tool) => _saveMultiAgentConfig(
                 controller,
                 config.copyWith(
@@ -1636,20 +1657,19 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 12),
             _AgentRoleCard(
-              title: '🔍 ${appText('Tester/Doc（评审）', 'Tester/Doc (Reviewer)')}',
+              title: '🧪 ${appText('Worker/Review（Worker 池）', 'Worker/Review Pool')}',
               description: appText(
-                '负责测试用例生成、代码审阅、文档撰写',
-                'Test generation, code review, documentation',
+                '负责 glm/qwen worker lane、回归审阅和补充建议。',
+                'Owns glm/qwen worker lanes, review, regression checks, and follow-up notes.',
               ),
               cliTool: config.tester.cliTool,
               model: config.tester.model,
               enabled: config.tester.enabled,
-              cliOptions: const ['codex', 'claude', 'opencode'],
-              modelOptions: const [
-                'gpt-oss:20b',
-                'qwen2.5-coder:latest',
-                'glm-4.7-flash',
-              ],
+              cliOptions: _mergeOptions(
+                config.tester.cliTool,
+                const ['opencode', 'codex', 'claude', 'gemini'],
+              ),
+              modelOptions: _getWorkerModelOptions(settings, config),
               onCliChanged: (tool) => _saveMultiAgentConfig(
                 controller,
                 config.copyWith(tester: config.tester.copyWith(cliTool: tool)),
@@ -1715,8 +1735,8 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 8),
             Text(
               appText(
-                '当 Tester 评分低于最低分数时，将进入迭代审阅循环。最多迭代指定次数。',
-                'When Tester score is below minimum, iteration loop runs until max iterations or score达标.',
+                '当 Worker/Review 评分低于最低分数时，将进入迭代审阅循环。最多迭代指定次数。',
+                'When the Worker/Review score is below minimum, the iteration loop runs until max iterations or the score passes.',
               ),
               style: theme.textTheme.bodySmall,
             ),
@@ -1847,39 +1867,45 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 12),
             _WorkflowStep(
               label: '1',
-              emoji: '🎨',
-              title: 'Architect',
+              emoji: '🧭',
+              title: appText('Architect（调度/文档）', 'Architect (Docs / Scheduler)'),
               desc: appText(
-                '分析需求，分解任务',
-                'Analyze requirements, decompose tasks',
+                '收敛 requirements -> acceptance evidence，并冻结里程碑。',
+                'Freeze requirements -> acceptance evidence and milestones.',
               ),
             ),
             _WorkflowStep(
               label: '2',
               emoji: '🔧',
-              title: 'Engineer',
-              desc: appText('接收任务，实现代码', 'Receive tasks, implement code'),
+              title: appText('Lead Engineer（主程）', 'Lead Engineer'),
+              desc: appText(
+                '主程执行关键路径与集成收口。',
+                'Lead engineer executes the critical path and integration.',
+              ),
             ),
             _WorkflowStep(
               label: '3',
-              emoji: '🔍',
-              title: 'Tester',
-              desc: appText('审阅代码，生成测试', 'Review code, generate tests'),
+              emoji: '🧪',
+              title: appText('Worker/Review（Worker 池）', 'Worker/Review Pool'),
+              desc: appText(
+                '并行 worker 补切片，review lane 给出复审与回归建议。',
+                'Parallel workers handle bounded slices while the review lane returns critique and regression guidance.',
+              ),
             ),
             _WorkflowStep(
               label: '↻',
               emoji: '🔄',
               title: appText('迭代（如需要）', 'Iterate (if needed)'),
               desc: appText(
-                'Engineer 修复 → Tester 重新审阅',
-                'Engineer fixes → Tester re-reviews',
+                '主程修复 -> Worker/Review 重新审阅',
+                'Lead engineer fixes -> Worker/Review re-reviews',
               ),
             ),
             const SizedBox(height: 8),
             Text(
               appText(
-                '所有本地模型通过 Ollama（默认 http://127.0.0.1:11434）驱动，无需 API 密钥即可运行。',
-                'All local models powered by Ollama (default http://127.0.0.1:11434), no API key required.',
+                '首批支持的外部启动模式：`ollama launch claude --model kimi-k2.5:cloud --yes -- -p ...`、`ollama launch codex --model minimax-m2.7:cloud -- exec ...`、`ollama launch opencode --model glm-5:cloud -- run ...`。',
+                'First-batch launch bridges: `ollama launch claude --model kimi-k2.5:cloud --yes -- -p ...`, `ollama launch codex --model minimax-m2.7:cloud -- exec ...`, and `ollama launch opencode --model glm-5:cloud -- run ...`.',
               ),
               style: theme.textTheme.bodySmall,
             ),
@@ -1892,14 +1918,58 @@ class _SettingsPageState extends State<SettingsPage> {
   List<String> _getLocalModelOptions(SettingsSnapshot settings) {
     return <String>[
           settings.ollamaLocal.defaultModel,
-          'qwen2.5-coder:latest',
-          'gpt-oss:20b',
+          'qwen3.5',
           'glm-4.7-flash',
         ]
         .map((item) => item.trim())
         .where((item) => item.isNotEmpty)
         .toSet()
         .toList(growable: false);
+  }
+
+  List<String> _mergeOptions(String current, List<String> defaults) {
+    return <String>[current.trim(), ...defaults]
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+  }
+
+  List<String> _getArchitectModelOptions(
+    SettingsSnapshot settings,
+    MultiAgentConfig config,
+  ) {
+    return _mergeOptions(config.architect.model, <String>[
+      'kimi-k2.5:cloud',
+      'qwen3.5:cloud',
+      'glm-5:cloud',
+      ..._getLocalModelOptions(settings),
+    ]);
+  }
+
+  List<String> _getLeadModelOptions(
+    SettingsSnapshot settings,
+    MultiAgentConfig config,
+  ) {
+    return _mergeOptions(config.engineer.model, <String>[
+      'minimax-m2.7:cloud',
+      'qwen3.5:cloud',
+      'glm-5:cloud',
+      ..._getLocalModelOptions(settings),
+    ]);
+  }
+
+  List<String> _getWorkerModelOptions(
+    SettingsSnapshot settings,
+    MultiAgentConfig config,
+  ) {
+    return _mergeOptions(config.tester.model, <String>[
+      'glm-5:cloud',
+      'qwen3.5:cloud',
+      'glm-4.7-flash',
+      'qwen3.5',
+      ..._getLocalModelOptions(settings),
+    ]);
   }
 
   List<Widget> _buildExperimental(
