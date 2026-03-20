@@ -6,16 +6,61 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('MultiAgentBroker supports session start, message, cancel, and close', () async {
+  test(
+    'MultiAgentBroker supports session start, message, cancel, and close',
+    () async {
+      final orchestrator = _FakeOrchestrator();
+      final server = MultiAgentBrokerServer(orchestrator);
+      await server.start();
+      addTearDown(server.stop);
+
+      final client = MultiAgentBrokerClient(server.wsUri!);
+      final firstEvents = await client
+          .startSession(
+            sessionId: 'session-1',
+            taskPrompt: 'first turn',
+            workingDirectory: '/tmp',
+            attachments: const <CollaborationAttachment>[],
+            selectedSkills: const <String>['aris'],
+            aiGatewayBaseUrl: '',
+            aiGatewayApiKey: '',
+          )
+          .toList();
+      final secondEvents = await client
+          .sendSessionMessage(
+            sessionId: 'session-1',
+            taskPrompt: 'second turn',
+            workingDirectory: '/tmp',
+            attachments: const <CollaborationAttachment>[],
+            selectedSkills: const <String>['aris'],
+            aiGatewayBaseUrl: '',
+            aiGatewayApiKey: '',
+          )
+          .toList();
+
+      await client.cancelSession('session-1');
+      await client.closeSession('session-1');
+
+      expect(orchestrator.prompts, hasLength(2));
+      expect(orchestrator.prompts.first, contains('first turn'));
+      expect(orchestrator.prompts.last, contains('first turn'));
+      expect(orchestrator.prompts.last, contains('second turn'));
+      expect(firstEvents.last.type, 'result');
+      expect(secondEvents.last.type, 'result');
+      expect(orchestrator.abortCount, 1);
+    },
+  );
+
+  test('MultiAgentBroker clears session history after close', () async {
     final orchestrator = _FakeOrchestrator();
     final server = MultiAgentBrokerServer(orchestrator);
     await server.start();
     addTearDown(server.stop);
 
     final client = MultiAgentBrokerClient(server.wsUri!);
-    final firstEvents = await client
+    await client
         .startSession(
-          sessionId: 'session-1',
+          sessionId: 'session-2',
           taskPrompt: 'first turn',
           workingDirectory: '/tmp',
           attachments: const <CollaborationAttachment>[],
@@ -23,29 +68,24 @@ void main() {
           aiGatewayBaseUrl: '',
           aiGatewayApiKey: '',
         )
-        .toList();
-    final secondEvents = await client
+        .drain<void>();
+    await client.closeSession('session-2');
+    await client
         .sendSessionMessage(
-          sessionId: 'session-1',
-          taskPrompt: 'second turn',
+          sessionId: 'session-2',
+          taskPrompt: 'fresh turn',
           workingDirectory: '/tmp',
           attachments: const <CollaborationAttachment>[],
           selectedSkills: const <String>['aris'],
           aiGatewayBaseUrl: '',
           aiGatewayApiKey: '',
         )
-        .toList();
-
-    await client.cancelSession('session-1');
-    await client.closeSession('session-1');
+        .drain<void>();
 
     expect(orchestrator.prompts, hasLength(2));
     expect(orchestrator.prompts.first, contains('first turn'));
-    expect(orchestrator.prompts.last, contains('first turn'));
-    expect(orchestrator.prompts.last, contains('second turn'));
-    expect(firstEvents.last.type, 'result');
-    expect(secondEvents.last.type, 'result');
-    expect(orchestrator.abortCount, 1);
+    expect(orchestrator.prompts.last, contains('fresh turn'));
+    expect(orchestrator.prompts.last, isNot(contains('first turn')));
   });
 }
 

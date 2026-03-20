@@ -659,7 +659,7 @@ class OllamaCloudConfig {
 
   factory OllamaCloudConfig.defaults() {
     return const OllamaCloudConfig(
-      baseUrl: 'https://ollama.svc.plus',
+      baseUrl: 'https://ollama.com',
       organization: '',
       workspace: '',
       defaultModel: 'gpt-oss:120b',

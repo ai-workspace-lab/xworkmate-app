@@ -70,10 +70,7 @@ ditto "$BRIDGE_BUILD_PATH" "$HELPER_PATH"
 chmod +x "$HELPER_PATH"
 
 echo "Re-signing bundled helper and app..."
-SIGN_IDENTITY="$(codesign -dv --verbose=2 "$DIST_APP_PATH" 2>&1 | sed -n 's/^Authority=//p' | head -n 1)"
-if [[ -z "$SIGN_IDENTITY" ]]; then
-  SIGN_IDENTITY="-"
-fi
+SIGN_IDENTITY="${XWORKMATE_SIGN_IDENTITY:--}"
 codesign --force --sign "$SIGN_IDENTITY" --timestamp=none "$HELPER_PATH"
 codesign --force --deep --sign "$SIGN_IDENTITY" --preserve-metadata=entitlements,requirements,flags,runtime --timestamp=none "$DIST_APP_PATH"
 
