@@ -54,6 +54,42 @@ void main() {
   );
 
   test(
+    'SettingsController keeps AI Gateway api key in secure storage while retaining local selected models',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final server = await _FakeAiGatewayServer.start();
+      addTearDown(server.close);
+
+      final store = SecureConfigStore();
+      final controller = SettingsController(store);
+      await controller.initialize();
+      await controller.saveSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          aiGateway: AiGatewayProfile.defaults().copyWith(
+            baseUrl: server.baseUrl,
+            selectedModels: const <String>['gpt-5.4', 'claude-3.7'],
+          ),
+        ),
+      );
+
+      await controller.saveAiGatewayApiKey('stored-inline-key');
+
+      final result = await controller.syncAiGatewayCatalog(
+        controller.snapshot.aiGateway,
+      );
+
+      expect(server.lastAuthorization, 'Bearer stored-inline-key');
+      expect(result.selectedModels, const <String>['gpt-5.4', 'claude-3.7']);
+      expect(controller.snapshot.aiGateway.selectedModels, const <String>[
+        'gpt-5.4',
+        'claude-3.7',
+      ]);
+      expect(await store.loadAiGatewayApiKey(), 'stored-inline-key');
+      expect(controller.snapshot.toJsonString(), isNot(contains('stored-inline-key')));
+    },
+  );
+
+  test(
     'SettingsController tolerates OpenAI-compatible model payloads with a trailing JSON footer',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
