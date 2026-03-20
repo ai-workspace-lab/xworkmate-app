@@ -530,7 +530,7 @@ class _SettingsPageState extends State<SettingsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              appText('云端 Ollama', 'Ollama Cloud'),
+              appText('Ollama Cloud', 'Ollama Cloud'),
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),

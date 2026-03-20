@@ -1182,7 +1182,7 @@ class AppController extends ChangeNotifier {
   }) async {
     final current = settings;
     final sanitized = _sanitizeMultiAgentSettings(
-      _sanitizeCodeAgentSettings(snapshot),
+      _sanitizeOllamaCloudSettings(_sanitizeCodeAgentSettings(snapshot)),
     );
     setActiveAppLanguage(sanitized.appLanguage);
     await _settingsController.saveSnapshot(sanitized);
@@ -1438,7 +1438,9 @@ class AppController extends ChangeNotifier {
         }
       }
       final normalized = _sanitizeMultiAgentSettings(
-        _sanitizeCodeAgentSettings(_settingsController.snapshot),
+        _sanitizeOllamaCloudSettings(
+          _sanitizeCodeAgentSettings(_settingsController.snapshot),
+        ),
       );
       if (normalized.toJsonString() !=
           _settingsController.snapshot.toJsonString()) {
@@ -1577,6 +1579,19 @@ class AppController extends ChangeNotifier {
       return snapshot;
     }
     return snapshot.copyWith(multiAgent: resolved);
+  }
+
+  SettingsSnapshot _sanitizeOllamaCloudSettings(SettingsSnapshot snapshot) {
+    final rawBaseUrl = snapshot.ollamaCloud.baseUrl.trim();
+    final normalized = rawBaseUrl.endsWith('/')
+        ? rawBaseUrl.substring(0, rawBaseUrl.length - 1)
+        : rawBaseUrl;
+    if (normalized != 'https://ollama.svc.plus') {
+      return snapshot;
+    }
+    return snapshot.copyWith(
+      ollamaCloud: snapshot.ollamaCloud.copyWith(baseUrl: 'https://ollama.com'),
+    );
   }
 
   MultiAgentConfig _resolveMultiAgentConfig(SettingsSnapshot snapshot) {

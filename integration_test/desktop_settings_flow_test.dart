@@ -9,28 +9,59 @@ Finder _textEither(String zh, String en) {
   );
 }
 
+Future<void> _ensureSettingsFocused(WidgetTester tester) async {
+  final activeSettings = find.byKey(
+    const ValueKey<String>('assistant-focus-active-title-settings'),
+  );
+  if (activeSettings.evaluate().isNotEmpty) {
+    return;
+  }
+  final addSettingsChip = find.byKey(
+    const ValueKey<String>('assistant-focus-add-settings'),
+  );
+  if (addSettingsChip.evaluate().isNotEmpty) {
+    await tester.tap(addSettingsChip);
+    await settleIntegrationUi(tester);
+    return;
+  }
+  final addMenu = find.byKey(const Key('assistant-focus-add-menu'));
+  expect(addMenu, findsOneWidget);
+  await tester.tap(addMenu);
+  await settleIntegrationUi(tester);
+  final settingsItem = _textEither('设置', 'Settings');
+  expect(settingsItem, findsWidgets);
+  await tester.tap(settingsItem.last);
+  await settleIntegrationUi(tester);
+}
+
 void main() {
   initializeIntegrationHarness();
 
-  setUp(resetIntegrationPreferences);
+  setUp(() async {
+    await resetIntegrationPreferences();
+  });
 
   testWidgets(
     'desktop shell exposes settings entry for gateway configuration',
     (WidgetTester tester) async {
       await pumpDesktopApp(tester);
 
-      await tester.tap(
-        find.byKey(const Key('assistant-side-pane-tab-navigation')),
-      );
-      await settleIntegrationUi(tester);
-      expect(
-        find.byKey(const Key('assistant-focus-panel-title')),
-        findsOneWidget,
-      );
-      expect(_textEither('设置', 'Settings'), findsWidgets);
+    await tester.tap(
+      find.byKey(const Key('assistant-side-pane-tab-navigation')),
+    );
+    await settleIntegrationUi(tester);
+    expect(
+      find.byKey(const Key('assistant-focus-panel-title')),
+      findsOneWidget,
+    );
+    await _ensureSettingsFocused(tester);
+    expect(
+      find.byKey(const ValueKey<String>('assistant-focus-active-title-settings')),
+      findsOneWidget,
+    );
 
-      await tester.pumpWidget(const SizedBox.shrink());
-      await settleIntegrationUi(tester);
-    },
+    await tester.pumpWidget(const SizedBox.shrink());
+    await settleIntegrationUi(tester);
+  },
   );
 }

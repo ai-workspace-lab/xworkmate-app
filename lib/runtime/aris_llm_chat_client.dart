@@ -16,6 +16,7 @@ class ArisLlmChatClient {
   ArisLlmChatClient({
     ArisProcessStarter? processStarter,
     ArisBridgeLocator? bridgeLocator,
+    Duration rpcTimeout = const Duration(minutes: 2),
   }) : _processStarter =
            processStarter ??
            ((executable, arguments, {environment, workingDirectory}) {
@@ -26,10 +27,12 @@ class ArisLlmChatClient {
                workingDirectory: workingDirectory,
              );
            }),
-       _bridgeLocator = bridgeLocator ?? ArisBridgeLocator();
+       _bridgeLocator = bridgeLocator ?? ArisBridgeLocator(),
+       _rpcTimeout = rpcTimeout;
 
   final ArisProcessStarter _processStarter;
   final ArisBridgeLocator _bridgeLocator;
+  final Duration _rpcTimeout;
 
   Future<String> chat({
     required String endpoint,
@@ -100,6 +103,7 @@ class ArisLlmChatClient {
     final errorBuffer = StringBuffer();
     late final StreamSubscription<String> stdoutSubscription;
     late final StreamSubscription<String> stderrSubscription;
+    late final StreamSubscription<int> exitSubscription;
 
     stdoutSubscription = process.stdout
         .transform(utf8.decoder)
@@ -108,7 +112,17 @@ class ArisLlmChatClient {
           if (line.trim().isEmpty) {
             return;
           }
-          final message = jsonDecode(line) as Map<String, dynamic>;
+          late final Map<String, dynamic> message;
+          try {
+            message = jsonDecode(line) as Map<String, dynamic>;
+          } catch (error) {
+            if (!responseCompleter.isCompleted) {
+              responseCompleter.completeError(
+                StateError('ARIS bridge returned invalid JSON: $error'),
+              );
+            }
+            return;
+          }
           if (message['id'] == 2) {
             final result =
                 (message['result'] as Map?)?.cast<String, dynamic>() ??
@@ -135,6 +149,31 @@ class ArisLlmChatClient {
     stderrSubscription = process.stderr
         .transform(utf8.decoder)
         .listen(errorBuffer.write);
+    exitSubscription = process.exitCode.asStream().listen((exitCode) {
+      scheduleMicrotask(() {
+        if (responseCompleter.isCompleted) {
+          return;
+        }
+        final stderrText = errorBuffer.toString().trim();
+        if (exitCode != 0) {
+          responseCompleter.completeError(
+            StateError(
+              stderrText.isNotEmpty
+                  ? stderrText
+                  : 'ARIS bridge exited with code $exitCode',
+            ),
+          );
+          return;
+        }
+        responseCompleter.completeError(
+          StateError(
+            stderrText.isNotEmpty
+                ? stderrText
+                : 'ARIS bridge closed without returning a tool result.',
+          ),
+        );
+      });
+    });
 
     void send(Object payload) {
       process.stdin.writeln(jsonEncode(payload));
@@ -159,10 +198,17 @@ class ArisLlmChatClient {
     });
 
     try {
-      return await responseCompleter.future.timeout(const Duration(minutes: 2));
+      return await responseCompleter.future.timeout(
+        _rpcTimeout,
+        onTimeout: () => throw TimeoutException(
+          'ARIS bridge timed out after ${_rpcTimeout.inSeconds}s',
+          _rpcTimeout,
+        ),
+      );
     } finally {
       await stdoutSubscription.cancel();
       await stderrSubscription.cancel();
+      await exitSubscription.cancel();
       try {
         process.kill();
       } catch (_) {
