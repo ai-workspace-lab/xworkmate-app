@@ -265,12 +265,11 @@ packages:
     source: hosted
     version: "1.2.1"
   flutter_secure_storage_windows:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
-      name: flutter_secure_storage_windows
-      sha256: b20b07cb5ed4ed74fc567b78a72936203f587eba460af1df11281c9326cd3709
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/flutter_secure_storage_windows"
+      relative: true
+    source: path
     version: "3.1.2"
   flutter_test:
     dependency: "direct dev"
