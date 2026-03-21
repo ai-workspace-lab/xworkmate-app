@@ -1,7 +1,7 @@
 # XWorkmate
 
-XWorkmate is a desktop-first AI workspace shell built with Flutter.  
-`v0.5` ships persistent assistant task threads, optional ARIS-powered multi-agent collaboration, and a bundled Go bridge runtime that travels with the app.
+XWorkmate is an AI workspace shell built with Flutter.
+`v0.5` ships persistent assistant task threads, optional ARIS-powered multi-agent collaboration, and a bundled Go bridge runtime that travels with the macOS app.
 
 ## v0.5 Highlights
 
@@ -19,6 +19,7 @@ XWorkmate is a desktop-first AI workspace shell built with Flutter.
 - Multi-Agent orchestration with optional ARIS preset
 - Bundled ARIS skills, Go bridge helper, `llm-chat` reviewer, and `claude-review`
 - Ollama Cloud settings, task grouping, and macOS packaged delivery
+- Flutter Web shell with `Assistant` + `Settings` only, supporting `Direct AI Gateway` and `Relay OpenClaw Gateway`
 
 ### Not Yet Implemented
 - Built-in Codex runtime through Rust FFI
@@ -38,8 +39,28 @@ XWorkmate is a desktop-first AI workspace shell built with Flutter.
 ```bash
 flutter analyze
 flutter test
+flutter test --platform chrome test/widget_test.dart test/web
 flutter run -d macos
 ```
+
+## Flutter Web
+
+Web keeps the Assistant-first entry flow, but only exposes:
+
+- `Assistant`
+- `Settings`
+- `Direct AI Gateway`
+- `Relay OpenClaw Gateway`
+
+Web does not expose local CLI, workspace file access, native runtime orchestration, or desktop-only diagnostics.
+
+Build the root-site bundle with:
+
+```bash
+flutter build web --release --base-href /
+```
+
+Deployment notes for `https://xworkmate.svc.plus/` are in [docs/web-deployment.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/web-deployment.md).
 
 ## macOS Packaging
 
