@@ -72,7 +72,9 @@ class SidebarNavigation extends StatelessWidget {
     final isCollapsed = sidebarState == AppSidebarState.collapsed;
     final expandedWidth =
         expandedWidthOverride ??
-        (appLanguage == AppLanguage.zh ? AppSizes.sidebarExpandedWidth : 220.0);
+        (appLanguage == AppLanguage.zh
+            ? AppSizes.sidebarExpandedWidthZh
+            : AppSizes.sidebarExpandedWidthEn);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),

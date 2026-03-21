@@ -69,7 +69,9 @@ class SimpleSizes {
   static const double sidebarItemHeight = 34.0;
   static const double sidebarIconSize = 18.0;
   static const double sidebarTextSize = 13.0;
-  static const double sidebarExpandedWidth = 188.0;
+  static const double sidebarExpandedWidthZh = 152.0;
+  static const double sidebarExpandedWidthEn = 188.0;
+  static const double sidebarExpandedWidth = sidebarExpandedWidthZh;
   static const double sidebarCollapsedWidth = 56.0;
 
   static const double textareaHeight = 36.0;
@@ -148,6 +150,10 @@ class AppSizes {
   static const double sidebarItemHeight = SimpleSizes.sidebarItemHeight;
   static const double sidebarIconSize = SimpleSizes.sidebarIconSize;
   static const double sidebarTextSize = SimpleSizes.sidebarTextSize;
+  static const double sidebarExpandedWidthZh =
+      SimpleSizes.sidebarExpandedWidthZh;
+  static const double sidebarExpandedWidthEn =
+      SimpleSizes.sidebarExpandedWidthEn;
   static const double sidebarExpandedWidth = SimpleSizes.sidebarExpandedWidth;
   static const double sidebarCollapsedWidth = SimpleSizes.sidebarCollapsedWidth;
 

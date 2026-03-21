@@ -5,6 +5,7 @@ import '../features/mobile/mobile_shell.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 import '../widgets/detail_drawer.dart';
 import '../widgets/pane_resize_handle.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -43,7 +44,9 @@ class _AppShellState extends State<AppShell> {
   }
 
   double _defaultSidebarWidth(AppLanguage language, double viewportWidth) {
-    final baseWidth = language == AppLanguage.zh ? 176.0 : 188.0;
+    final baseWidth = language == AppLanguage.zh
+        ? AppSizes.sidebarExpandedWidthZh
+        : AppSizes.sidebarExpandedWidthEn;
     return _clampSidebarWidth(baseWidth, viewportWidth);
   }
 
