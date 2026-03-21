@@ -6,6 +6,38 @@ import 'package:xworkmate/theme/app_theme.dart';
 import 'package:xworkmate/widgets/sidebar_navigation.dart';
 
 void main() {
+  testWidgets('SidebarNavigation uses the compact zh default width', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: SidebarNavigation(
+            currentSection: WorkspaceDestination.assistant,
+            sidebarState: AppSidebarState.expanded,
+            appLanguage: AppLanguage.zh,
+            themeMode: ThemeMode.light,
+            onSectionChanged: (_) {},
+            onToggleLanguage: () {},
+            onCycleSidebarState: () {},
+            onExpandFromCollapsed: () {},
+            onOpenAccount: () {},
+            onOpenThemeToggle: () {},
+            accountName: 'Tester',
+            accountSubtitle: 'Workspace',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getSize(find.byType(SidebarNavigation)).width,
+      AppSizes.sidebarExpandedWidthZh + 8,
+    );
+  });
+
   testWidgets('SidebarNavigation routes footer and section actions', (
     WidgetTester tester,
   ) async {
