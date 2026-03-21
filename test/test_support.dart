@@ -47,10 +47,10 @@ Future<void> pumpPage(
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: platform == null
           ? AppTheme.light()
-          : AppTheme.light().copyWith(platform: platform),
+          : AppTheme.light(platform: platform),
       darkTheme: platform == null
           ? AppTheme.dark()
-          : AppTheme.dark().copyWith(platform: platform),
+          : AppTheme.dark(platform: platform),
       home: Scaffold(body: child),
     ),
   );

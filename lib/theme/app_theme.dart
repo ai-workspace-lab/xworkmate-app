@@ -166,21 +166,31 @@ class AppSizes {
 }
 
 class AppTheme {
-  static ThemeData light() =>
-      _theme(brightness: Brightness.light, palette: AppPalette.light);
+  static ThemeData light({TargetPlatform? platform}) => _theme(
+    brightness: Brightness.light,
+    palette: AppPalette.light,
+    platform: platform,
+  );
 
-  static ThemeData dark() =>
-      _theme(brightness: Brightness.dark, palette: AppPalette.dark);
+  static ThemeData dark({TargetPlatform? platform}) => _theme(
+    brightness: Brightness.dark,
+    palette: AppPalette.dark,
+    platform: platform,
+  );
 
   static ThemeData _theme({
     required Brightness brightness,
     required AppPalette palette,
+    TargetPlatform? platform,
   }) {
-    final platform = defaultTargetPlatform;
+    final resolvedPlatform = platform ?? defaultTargetPlatform;
     final isDesktop =
-        platform == TargetPlatform.macOS ||
-        platform == TargetPlatform.windows ||
-        platform == TargetPlatform.linux;
+        resolvedPlatform == TargetPlatform.macOS ||
+        resolvedPlatform == TargetPlatform.windows ||
+        resolvedPlatform == TargetPlatform.linux;
+    final isMobile =
+        resolvedPlatform == TargetPlatform.iOS ||
+        resolvedPlatform == TargetPlatform.android;
     final colorScheme =
         ColorScheme.fromSeed(
           seedColor: palette.accent,
@@ -211,12 +221,16 @@ class AppTheme {
     final base = ThemeData(
       useMaterial3: true,
       brightness: brightness,
-      typography: Typography.material2021(platform: platform),
+      typography: Typography.material2021(platform: resolvedPlatform),
       colorScheme: colorScheme,
       scaffoldBackgroundColor: palette.canvas,
       extensions: [palette],
     );
-    final tunedTextTheme = _textTheme(base.textTheme, palette: palette);
+    final tunedTextTheme = _textTheme(
+      base.textTheme,
+      palette: palette,
+      isMobile: isMobile,
+    );
 
     return base.copyWith(
       splashFactory: NoSplash.splashFactory,
@@ -428,7 +442,11 @@ class AppTheme {
     );
   }
 
-  static TextTheme _textTheme(TextTheme base, {required AppPalette palette}) {
+  static TextTheme _textTheme(
+    TextTheme base, {
+    required AppPalette palette,
+    required bool isMobile,
+  }) {
     TextStyle withUiFont(TextStyle? style) {
       return (style ?? const TextStyle()).copyWith(
         fontFamily: null,
@@ -440,10 +458,10 @@ class AppTheme {
     return base.copyWith(
       displaySmall: withUiFont(
         base.displaySmall?.copyWith(
-          fontSize: AppTypography.displaySize,
+          fontSize: isMobile ? 24 : AppTypography.displaySize,
           fontWeight: AppTypography.displayWeight,
-          letterSpacing: -0.32,
-          height: AppTypography.displayHeight,
+          letterSpacing: isMobile ? -0.24 : -0.32,
+          height: isMobile ? 28 / 24 : AppTypography.displayHeight,
           color: palette.textPrimary,
         ),
       ),
