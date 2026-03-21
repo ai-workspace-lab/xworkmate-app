@@ -1,0 +1,194 @@
+name: Build and Release XWorkmate Packages
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+    paths-ignore:
+      - "README.md"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "lib/**"
+      - "assets/**"
+      - "android/**"
+      - "ios/**"
+      - "macos/**"
+      - "linux/**"
+      - "windows/**"
+      - "rust/**"
+      - "scripts/**"
+      - "pubspec.*"
+      - "Makefile"
+      - ".github/actions/setup-flutter-sdk/action.yml"
+      - ".github/workflows/build-and-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-and-release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.41.4
+
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    outputs:
+      should_release: ${{ steps.flags.outputs.should_release }}
+      release_tag: ${{ steps.meta.outputs.release_tag }}
+      release_title: ${{ steps.meta.outputs.release_title }}
+      release_notes: ${{ steps.meta.outputs.release_notes }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine release mode
+        id: flags
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* || "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" ]]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute release metadata
+        id: meta
+        shell: bash
+        run: bash ./scripts/ci/compute_release_metadata.sh
+
+  verify:
+    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter SDK
+        uses: ./.github/actions/setup-flutter-sdk
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Install Linux dependencies
+        shell: bash
+        run: bash ./scripts/ci/setup_platform_deps.sh linux
+
+      - name: Run analysis and tests
+        shell: bash
+        run: bash ./scripts/ci/run_code_analysis.sh
+
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            arch: amd64
+            runs_on: ubuntu-22.04
+          - platform: windows
+            arch: amd64
+            runs_on: windows-2022
+          - platform: macos
+            arch: arm64
+            runs_on: macos-14
+          - platform: ios
+            arch: arm64
+            runs_on: macos-14
+          - platform: android
+            arch: arm64
+            runs_on: ubuntu-22.04
+    runs-on: ${{ matrix.runs_on }}
+    needs:
+      - prepare
+      - verify
+    env:
+      PLATFORM: ${{ matrix.platform }}
+      ARCH: ${{ matrix.arch }}
+      SHOULD_RELEASE: ${{ needs.prepare.outputs.should_release }}
+      XWORKMATE_SIGN_IDENTITY: ${{ secrets.XWORKMATE_SIGN_IDENTITY }}
+      WINDOWS_PFX_BASE64: ${{ secrets.WINDOWS_PFX_BASE64 }}
+      WINDOWS_PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
+      WINDOWS_CODESIGN_SUBJECT: ${{ secrets.WINDOWS_CODESIGN_SUBJECT }}
+      APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+      APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+      APPLE_PROVISION_PROFILE_BASE64: ${{ secrets.APPLE_PROVISION_PROFILE_BASE64 }}
+      APPLE_KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+      APPLE_EXPORT_METHOD: ${{ secrets.APPLE_EXPORT_METHOD }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter SDK
+        uses: ./.github/actions/setup-flutter-sdk
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Install Go
+        if: ${{ matrix.platform == 'macos' }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.1"
+
+      - name: Install platform dependencies
+        shell: bash
+        run: bash ./scripts/ci/setup_platform_deps.sh "$PLATFORM"
+
+      - name: Build platform artifacts
+        shell: bash
+        run: bash ./scripts/ci/build_matrix_artifacts.sh "$PLATFORM" "$ARCH" "$SHOULD_RELEASE"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            dist/linux/*.deb
+            dist/linux/*.rpm
+            dist/macos/*.dmg
+            dist/windows/*.msi
+            dist/windows/*.zip
+            dist/ios/*.ipa
+            dist/ios/*.zip
+            dist/android/*.apk
+          if-no-files-found: error
+
+  release:
+    if: ${{ needs.prepare.outputs.should_release == 'true' }}
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    needs:
+      - prepare
+      - build
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Upload assets to GitHub Release
+        shell: bash
+        run: bash ./scripts/ci/github_release_upload.sh release-artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+          RELEASE_TITLE: ${{ needs.prepare.outputs.release_title }}
+          RELEASE_NOTES: ${{ needs.prepare.outputs.release_notes }}
