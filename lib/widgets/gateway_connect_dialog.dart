@@ -102,10 +102,10 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
     final horizontalPadding = widget.compact ? 20.0 : 24.0;
     final verticalPadding = widget.compact ? 18.0 : 22.0;
     final dialogTitleStyle = theme.textTheme.headlineSmall?.copyWith(
-      fontSize: widget.compact ? 24 : 22,
-      height: widget.compact ? 28 / 24 : 26 / 22,
-      letterSpacing: -0.28,
-      fontWeight: FontWeight.w700,
+      fontSize: AppTypography.titleSize,
+      height: AppTypography.titleHeight,
+      letterSpacing: -0.18,
+      fontWeight: AppTypography.titleWeight,
     );
     final supportingCopyStyle = theme.textTheme.bodyMedium?.copyWith(
       fontSize: 12,
@@ -156,8 +156,8 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
             const SizedBox(height: AppSpacing.section),
             Text(
               appText(
-                '通过配置码或手动 Host / TLS 将 XWorkmate 连接到 OpenClaw Gateway。也可切换到仅 AI Gateway 模式，仅使用模型路由而不建立 Gateway 会话。',
-                'Connect XWorkmate to an OpenClaw gateway with setup code or manual host / TLS. You can also switch to AI Gateway Only mode to use model routing without opening a gateway session.',
+                '通过配置码或手动 Host / TLS 将 XWorkmate 连接到 OpenClaw Gateway。远程模式保持显式 TLS 直连；也可切换到仅 AI Gateway 模式，仅使用模型路由而不建立 Gateway 会话。',
+                'Connect XWorkmate to an OpenClaw gateway with setup code or manual host / TLS. Remote mode keeps TLS explicit for direct access. You can also switch to AI Gateway Only mode to use model routing without opening a gateway session.',
               ),
               style: supportingCopyStyle,
             ),

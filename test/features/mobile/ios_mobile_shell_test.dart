@@ -27,8 +27,8 @@ void main() {
         locale: const Locale('zh'),
         supportedLocales: const [Locale('zh'), Locale('en')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
-        theme: AppTheme.light().copyWith(platform: platform),
-        darkTheme: AppTheme.dark().copyWith(platform: platform),
+        theme: AppTheme.light(platform: platform),
+        darkTheme: AppTheme.dark(platform: platform),
         home: child,
       ),
     );
@@ -168,13 +168,32 @@ void main() {
         locale: const Locale('zh'),
         supportedLocales: const [Locale('zh'), Locale('en')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
-        theme: AppTheme.light().copyWith(platform: TargetPlatform.android),
-        darkTheme: AppTheme.dark().copyWith(platform: TargetPlatform.android),
+        theme: AppTheme.light(platform: TargetPlatform.android),
+        darkTheme: AppTheme.dark(platform: TargetPlatform.android),
         home: AppShell(controller: desktopAndroidController),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.byType(MobileShell), findsNothing);
+  });
+
+  testWidgets('MobileShell exposes mobile-safe pairing shortcuts', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpMobileShell(
+      tester,
+      child: MobileShell(controller: controller),
+      platform: TargetPlatform.iOS,
+    );
+
+    expect(find.byKey(const ValueKey('mobile-safe-strip')), findsOneWidget);
+    expect(find.byKey(const ValueKey('mobile-safe-open-button')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('mobile-safe-connect-button')),
+      findsOneWidget,
+    );
   });
 }
