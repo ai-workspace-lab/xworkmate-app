@@ -46,6 +46,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/key.properties
+/*.p12
+/*.mobileprovision
+/*.keystore
 
 # Rust / FFI artifacts
 /rust/target/
