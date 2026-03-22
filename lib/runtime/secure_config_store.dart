@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import '../app/app_metadata.dart';
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,9 +16,13 @@ class SecureConfigStore {
   SecureConfigStore({
     Future<String?> Function()? fallbackDirectoryPathResolver,
     Future<String?> Function()? databasePathResolver,
+    SecureConfigDatabaseOpener? databaseOpener,
+    SecureStorageClient? secureStorage,
     bool enableSecureStorage = true,
   }) : _fallbackDirectoryPathResolver = fallbackDirectoryPathResolver,
        _databasePathResolver = databasePathResolver,
+       _databaseOpener = databaseOpener,
+       _secureStorageOverride = secureStorage,
        _enableSecureStorage = enableSecureStorage;
 
   static const _settingsKey = 'xworkmate.settings.snapshot';
@@ -24,8 +31,12 @@ class SecureConfigStore {
   static const _databaseFileName = 'config-store.sqlite3';
   static const _databaseTableName = 'config_entries';
   static const _stateBackupFileName = 'assistant-state-backup.json';
-  static const _backupSchemaVersion = 1;
-  static const _secureStorageTimeout = Duration(milliseconds: 400);
+  static const _backupSchemaVersion = 2;
+  static const _secureStorageTimeout = Duration(seconds: 5);
+  static const _localStateKeyKey = 'xworkmate.local_state.key';
+  static const _sealedStateFormat = 'xworkmate.sealed.local-state.v1';
+  static const _assistantStateBackupStorageKey =
+      'xworkmate.assistant.state.backup';
 
   static const _gatewayTokenKey = 'xworkmate.gateway.token';
   static const _gatewayPasswordKey = 'xworkmate.gateway.password';
@@ -41,13 +52,31 @@ class SecureConfigStore {
 
   SharedPreferences? _prefs;
   sqlite.Database? _database;
-  FlutterSecureStorage? _secureStorage;
+  SecureStorageClient? _secureStorage;
   final Map<String, String> _memoryStore = <String, String>{};
   final Map<String, String> _memorySecure = <String, String>{};
   final Future<String?> Function()? _fallbackDirectoryPathResolver;
   final Future<String?> Function()? _databasePathResolver;
+  final SecureConfigDatabaseOpener? _databaseOpener;
+  final SecureStorageClient? _secureStorageOverride;
   final bool _enableSecureStorage;
   bool _initialized = false;
+  final Cipher _localStateCipher = AesGcm.with256bits();
+  final Random _random = Random.secure();
+  Future<void> _localStateWriteQueue = Future<void>.value();
+
+  static const Map<String, String> _durableStateFileNames = <String, String>{
+    _settingsKey: 'settings-snapshot.json',
+    _assistantThreadsKey: 'assistant-threads.json',
+  };
+
+  static const Map<String, String> _secureFallbackFileNames = <String, String>{
+    _gatewayTokenKey: 'gateway-token.txt',
+    _gatewayPasswordKey: 'gateway-password.txt',
+    _ollamaCloudApiKeyKey: 'ollama-cloud-api-key.txt',
+    _vaultTokenKey: 'vault-token.txt',
+    _aiGatewayApiKeyKey: 'ai-gateway-api-key.txt',
+  };
 
   Future<void> initialize() async {
     if (_initialized) {
@@ -58,14 +87,22 @@ class SecureConfigStore {
     } catch (_) {
       _prefs = null;
     }
-    await _initializeDatabase();
     if (_enableSecureStorage) {
-      try {
-        _secureStorage = const FlutterSecureStorage();
-      } catch (_) {
-        _secureStorage = null;
+      if (_secureStorageOverride != null) {
+        _secureStorage = _secureStorageOverride;
+      } else if (_useDebugSecureStorageFallback()) {
+        _secureStorage = _buildDebugSecureStorageClient();
+      } else {
+        try {
+          _secureStorage = FlutterSecureStorageClient(
+            const FlutterSecureStorage(),
+          );
+        } catch (_) {
+          _secureStorage = null;
+        }
       }
     }
+    await _initializeDatabase();
     _initialized = true;
   }
 
@@ -76,9 +113,13 @@ class SecureConfigStore {
   }
 
   Future<void> saveSettingsSnapshot(SettingsSnapshot snapshot) async {
-    await initialize();
-    await _writeStoredString(_settingsKey, snapshot.toJsonString());
-    await _persistAssistantStateBackup(settings: snapshot);
+    await _enqueueLocalStateWrite(() async {
+      await initialize();
+      final encoded = snapshot.toJsonString();
+      await _writeStoredString(_settingsKey, encoded);
+      await _writeDurableStateFile(_settingsKey, encoded);
+      await _persistAssistantStateBackup(settings: snapshot);
+    });
   }
 
   Future<List<AssistantThreadRecord>> loadAssistantThreadRecords() async {
@@ -90,19 +131,26 @@ class SecureConfigStore {
   Future<void> saveAssistantThreadRecords(
     List<AssistantThreadRecord> records,
   ) async {
-    await initialize();
-    await _writeStoredString(
-      _assistantThreadsKey,
-      jsonEncode(records.map((item) => item.toJson()).toList(growable: false)),
-    );
-    await _persistAssistantStateBackup(assistantThreads: records);
+    await _enqueueLocalStateWrite(() async {
+      await initialize();
+      final encoded = jsonEncode(
+        records.map((item) => item.toJson()).toList(growable: false),
+      );
+      await _writeStoredString(_assistantThreadsKey, encoded);
+      await _writeDurableStateFile(_assistantThreadsKey, encoded);
+      await _persistAssistantStateBackup(assistantThreads: records);
+    });
   }
 
   Future<void> clearAssistantLocalState() async {
-    await initialize();
-    await _deleteStoredString(_settingsKey);
-    await _deleteStoredString(_assistantThreadsKey);
-    await _deleteAssistantStateBackup();
+    await _enqueueLocalStateWrite(() async {
+      await initialize();
+      await _deleteStoredString(_settingsKey);
+      await _deleteStoredString(_assistantThreadsKey);
+      await _deleteDurableStateFile(_settingsKey);
+      await _deleteDurableStateFile(_assistantThreadsKey);
+      await _deleteAssistantStateBackup();
+    });
   }
 
   Future<List<SecretAuditEntry>> loadAuditTrail() async {
@@ -286,11 +334,7 @@ class SecureConfigStore {
     final resolvedPath = await _resolveDatabasePath();
     if (resolvedPath != null && resolvedPath.trim().isNotEmpty) {
       try {
-        final file = File(resolvedPath);
-        await file.parent.create(recursive: true);
-        final database = sqlite.sqlite3.open(file.path);
-        _configureDatabase(database);
-        _database = database;
+        _database = await _openDatabase(resolvedPath);
       } catch (_) {
         _database = null;
       }
@@ -305,6 +349,21 @@ class SecureConfigStore {
       }
     }
     await _migrateLegacyPrefs();
+  }
+
+  Future<sqlite.Database?> _openDatabase(String resolvedPath) async {
+    if (_databaseOpener != null) {
+      final database = await _databaseOpener(resolvedPath);
+      if (database != null) {
+        _configureDatabase(database);
+      }
+      return database;
+    }
+    final file = File(resolvedPath);
+    await file.parent.create(recursive: true);
+    final database = sqlite.sqlite3.open(file.path);
+    _configureDatabase(database);
+    return database;
   }
 
   void _configureDatabase(sqlite.Database database) {
@@ -331,18 +390,21 @@ class SecureConfigStore {
       return;
     }
     try {
-      final existing = _database!.select(
-        'SELECT value FROM $_databaseTableName WHERE storage_key = ? LIMIT 1',
-        <Object?>[key],
-      );
-      if (existing.isNotEmpty) {
-        return;
-      }
       final legacyValue = _prefs!.getString(key);
       if (legacyValue == null || legacyValue.trim().isEmpty) {
         return;
       }
-      _writeStoredStringInternal(key, legacyValue);
+      final existing = _database!.select(
+        'SELECT value FROM $_databaseTableName WHERE storage_key = ? LIMIT 1',
+        <Object?>[key],
+      );
+      if (existing.isEmpty) {
+        await _writeStoredString(key, legacyValue);
+        if (_durableStateFileNames.containsKey(key)) {
+          await _writeDurableStateFile(key, legacyValue);
+        }
+      }
+      await _prefs!.remove(key);
     } catch (_) {
       return;
     }
@@ -372,6 +434,13 @@ class SecureConfigStore {
   }
 
   Future<String?> _readStoredString(String key) async {
+    final memoryValue = _memoryStore[key];
+    if (memoryValue != null) {
+      final restored = await _restorePersistedValue(key, memoryValue);
+      if (restored != null) {
+        return restored;
+      }
+    }
     if (_database != null) {
       try {
         final result = _database!.select(
@@ -381,14 +450,21 @@ class SecureConfigStore {
         if (result.isNotEmpty) {
           final value = result.first['value'];
           if (value is String) {
-            return value;
+            final restored = await _restorePersistedValue(key, value);
+            if (restored != null) {
+              return restored;
+            }
           }
         }
       } catch (_) {
-        // Fall through to the in-memory fallback.
+        // Fall through to durable and in-memory fallback.
       }
     }
-    return _memoryStore[key];
+    final durableValue = await _readDurableStateFile(key);
+    if (durableValue != null) {
+      return durableValue;
+    }
+    return null;
   }
 
   Future<void> _deleteStoredString(String key) async {
@@ -403,6 +479,7 @@ class SecureConfigStore {
       }
     }
     _memoryStore.remove(key);
+    await _deleteDurableStateFile(key);
     try {
       await _prefs?.remove(key);
     } catch (_) {
@@ -411,53 +488,87 @@ class SecureConfigStore {
   }
 
   Future<void> _writeStoredString(String key, String value) async {
+    final persistedValue = await _preparePersistedValue(key, value);
+    if (persistedValue == null) {
+      return;
+    }
+    _memoryStore[key] = persistedValue;
     if (_database != null) {
       try {
-        _writeStoredStringInternal(key, value);
+        _writeStoredStringInternal(key, persistedValue);
         return;
       } catch (_) {
-        // Fall through to the in-memory fallback.
+        // Fall through to durable and in-memory fallback.
       }
     }
-    _memoryStore[key] = value;
+    await _writeDurableStateFile(key, value);
   }
 
   Future<_AssistantStateSnapshot?>
   _loadAssistantStateFromPrimaryOrBackup() async {
     final rawSettings = await _readStoredString(_settingsKey);
     final rawThreads = await _readStoredString(_assistantThreadsKey);
+    final rawSettingsSealed = _isSealedLocalState(rawSettings);
+    final rawThreadsSealed = _isSealedLocalState(rawThreads);
     final decodedSettings = _decodeSettingsSnapshot(rawSettings);
     final decodedThreads = _decodeAssistantThreadRecords(rawThreads);
-    final primaryHasSettings = rawSettings != null;
-    final primaryHasThreads = rawThreads != null;
-    final primaryValid =
-        decodedSettings != null &&
-        decodedThreads != null &&
-        primaryHasSettings &&
-        primaryHasThreads;
-    if (primaryValid) {
-      return _AssistantStateSnapshot(
-        settings: decodedSettings,
-        assistantThreads: decodedThreads,
-      );
-    }
-    final backup = await _readAssistantStateBackup();
-    if (backup == null) {
-      return _AssistantStateSnapshot(
-        settings: decodedSettings ?? SettingsSnapshot.defaults(),
-        assistantThreads: decodedThreads ?? const <AssistantThreadRecord>[],
-      );
-    }
-    await _writeStoredString(_settingsKey, backup.settings.toJsonString());
-    await _writeStoredString(
-      _assistantThreadsKey,
-      jsonEncode(
-        backup.assistantThreads
-            .map((item) => item.toJson())
-            .toList(growable: false),
-      ),
+    final backupRead = await _readAssistantStateBackup();
+    final backup = backupRead?.snapshot;
+    final backupWasSealed = backupRead?.sealed ?? false;
+    final resolvedSettings =
+        decodedSettings ?? backup?.settings ?? SettingsSnapshot.defaults();
+    final resolvedThreads =
+        decodedThreads ??
+        backup?.assistantThreads ??
+        const <AssistantThreadRecord>[];
+    final defaultSettings = SettingsSnapshot.defaults();
+    final encodedSettings = resolvedSettings.toJsonString();
+    final defaultEncodedSettings = defaultSettings.toJsonString();
+    final encodedThreads = jsonEncode(
+      resolvedThreads.map((item) => item.toJson()).toList(growable: false),
     );
-    return backup;
+    final hasMeaningfulState =
+        rawSettings != null ||
+        rawThreads != null ||
+        backup != null ||
+        encodedSettings != defaultEncodedSettings ||
+        resolvedThreads.isNotEmpty;
+
+    if (hasMeaningfulState &&
+        (rawSettings == null ||
+            !rawSettingsSealed ||
+            decodedSettings == null)) {
+      await _writeStoredString(_settingsKey, encodedSettings);
+    }
+    if (hasMeaningfulState &&
+        (rawThreads == null || !rawThreadsSealed || decodedThreads == null)) {
+      await _writeStoredString(_assistantThreadsKey, encodedThreads);
+    }
+    if (hasMeaningfulState) {
+      await _writeDurableStateFile(_settingsKey, encodedSettings);
+      await _writeDurableStateFile(_assistantThreadsKey, encodedThreads);
+    }
+
+    if (hasMeaningfulState &&
+        (backup == null ||
+            !backupWasSealed ||
+            jsonEncode(backup.settings.toJson()) !=
+                jsonEncode(resolvedSettings.toJson()) ||
+            jsonEncode(
+                  backup.assistantThreads
+                      .map((item) => item.toJson())
+                      .toList(growable: false),
+                ) !=
+                encodedThreads)) {
+      await _persistAssistantStateBackup(
+        settings: resolvedSettings,
+        assistantThreads: resolvedThreads,
+      );
+    }
+    return _AssistantStateSnapshot(
+      settings: resolvedSettings,
+      assistantThreads: resolvedThreads,
+    );
   }
 
   SettingsSnapshot? _decodeSettingsSnapshot(String? raw) {
@@ -506,15 +617,22 @@ class SecureConfigStore {
       if (file == null) {
         return;
       }
+      final plaintext = jsonEncode(<String, dynamic>{
+        'settings': payload.settings.toJson(),
+        'assistantThreads': payload.assistantThreads
+            .map((item) => item.toJson())
+            .toList(growable: false),
+      });
+      final sealedPayload = await _sealLocalState(
+        _assistantStateBackupStorageKey,
+        plaintext,
+      );
       await file.writeAsString(
         jsonEncode(<String, dynamic>{
           'schemaVersion': _backupSchemaVersion,
           'appVersion': kAppVersion,
           'backupCreatedAtMs': DateTime.now().millisecondsSinceEpoch,
-          'settings': payload.settings.toJson(),
-          'assistantThreads': payload.assistantThreads
-              .map((item) => item.toJson())
-              .toList(growable: false),
+          'sealedState': sealedPayload,
         }),
         flush: true,
       );
@@ -523,7 +641,7 @@ class SecureConfigStore {
     }
   }
 
-  Future<_AssistantStateSnapshot?> _readAssistantStateBackup() async {
+  Future<_AssistantStateBackupReadResult?> _readAssistantStateBackup() async {
     try {
       final file = await _assistantStateBackupFile();
       if (file == null || !await file.exists()) {
@@ -531,6 +649,34 @@ class SecureConfigStore {
       }
       final decoded =
           jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final sealedState = decoded['sealedState'];
+      if (sealedState is String && sealedState.trim().isNotEmpty) {
+        final plaintext = await _restoreLocalState(
+          _assistantStateBackupStorageKey,
+          sealedState,
+        );
+        if (plaintext == null || plaintext.trim().isEmpty) {
+          return null;
+        }
+        final payload = jsonDecode(plaintext) as Map<String, dynamic>;
+        final settings = SettingsSnapshot.fromJson(
+          (payload['settings'] as Map?)?.cast<String, dynamic>() ?? const {},
+        );
+        final threads = ((payload['assistantThreads'] as List?) ?? const [])
+            .whereType<Map>()
+            .map(
+              (item) =>
+                  AssistantThreadRecord.fromJson(item.cast<String, dynamic>()),
+            )
+            .toList(growable: false);
+        return _AssistantStateBackupReadResult(
+          snapshot: _AssistantStateSnapshot(
+            settings: settings,
+            assistantThreads: threads,
+          ),
+          sealed: true,
+        );
+      }
       final settings = SettingsSnapshot.fromJson(
         (decoded['settings'] as Map?)?.cast<String, dynamic>() ?? const {},
       );
@@ -541,9 +687,12 @@ class SecureConfigStore {
                 AssistantThreadRecord.fromJson(item.cast<String, dynamic>()),
           )
           .toList(growable: false);
-      return _AssistantStateSnapshot(
-        settings: settings,
-        assistantThreads: threads,
+      return _AssistantStateBackupReadResult(
+        snapshot: _AssistantStateSnapshot(
+          settings: settings,
+          assistantThreads: threads,
+        ),
+        sealed: false,
       );
     } catch (_) {
       return null;
@@ -566,6 +715,70 @@ class SecureConfigStore {
     }
   }
 
+  Future<File?> _durableStateFile(String key) async {
+    final fileName = _durableStateFileNames[key];
+    if (fileName == null) {
+      return null;
+    }
+    try {
+      final resolvedPath = await _resolveDatabasePath();
+      if (resolvedPath == null || resolvedPath.trim().isEmpty) {
+        return null;
+      }
+      final directory = File(resolvedPath).parent;
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+      return File('${directory.path}/$fileName');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _readDurableStateFile(String key) async {
+    try {
+      final file = await _durableStateFile(key);
+      if (file == null || !await file.exists()) {
+        return null;
+      }
+      final value = await file.readAsString();
+      if (value.trim().isEmpty) {
+        return null;
+      }
+      return _restorePersistedValue(key, value);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _writeDurableStateFile(String key, String value) async {
+    try {
+      final file = await _durableStateFile(key);
+      if (file == null) {
+        return;
+      }
+      final persistedValue = await _preparePersistedValue(key, value);
+      if (persistedValue == null) {
+        return;
+      }
+      await file.writeAsString(persistedValue, flush: true);
+    } catch (_) {
+      return;
+    }
+  }
+
+  Future<void> _deleteDurableStateFile(String key) async {
+    try {
+      final file = await _durableStateFile(key);
+      if (file == null || !await file.exists()) {
+        return;
+      }
+      await file.delete();
+    } catch (_) {
+      return;
+    }
+  }
+
   Future<void> _deleteAssistantStateBackup() async {
     try {
       final file = await _assistantStateBackupFile();
@@ -576,6 +789,132 @@ class SecureConfigStore {
     } catch (_) {
       return;
     }
+  }
+
+  bool _shouldSealLocalState(String key) {
+    return key == _settingsKey || key == _assistantThreadsKey;
+  }
+
+  bool _isSealedLocalState(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return false;
+    }
+    try {
+      final decoded = jsonDecode(trimmed);
+      return decoded is Map<String, dynamic> &&
+          decoded['storageFormat'] == _sealedStateFormat;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<String?> _preparePersistedValue(String key, String value) async {
+    if (!_shouldSealLocalState(key)) {
+      return value;
+    }
+    return _sealLocalState(key, value);
+  }
+
+  Future<String?> _restorePersistedValue(String key, String value) async {
+    if (!_shouldSealLocalState(key)) {
+      return value;
+    }
+    return _restoreLocalState(key, value);
+  }
+
+  Future<String> _sealLocalState(String key, String plaintext) async {
+    final keyBytes = await _loadOrCreateLocalStateKey();
+    final secretBox = await _localStateCipher.encrypt(
+      utf8.encode(plaintext),
+      secretKey: SecretKey(keyBytes),
+      nonce: _randomBytes(12),
+      aad: utf8.encode(key),
+    );
+    return jsonEncode(<String, dynamic>{
+      'storageFormat': _sealedStateFormat,
+      'nonce': _base64UrlEncode(secretBox.nonce),
+      'cipherText': _base64UrlEncode(secretBox.cipherText),
+      'mac': _base64UrlEncode(secretBox.mac.bytes),
+    });
+  }
+
+  Future<String?> _restoreLocalState(String key, String persisted) async {
+    final trimmed = persisted.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    Map<String, dynamic>? envelope;
+    try {
+      final decoded = jsonDecode(trimmed);
+      if (decoded is Map<String, dynamic> &&
+          decoded['storageFormat'] == _sealedStateFormat) {
+        envelope = decoded;
+      }
+    } catch (_) {
+      return trimmed;
+    }
+    if (envelope == null) {
+      return trimmed;
+    }
+    final keyBytes = await _loadLocalStateKey(createIfMissing: false);
+    if (keyBytes == null) {
+      return null;
+    }
+    try {
+      final secretBox = SecretBox(
+        _base64UrlDecode(envelope['cipherText'] as String? ?? ''),
+        nonce: _base64UrlDecode(envelope['nonce'] as String? ?? ''),
+        mac: Mac(_base64UrlDecode(envelope['mac'] as String? ?? '')),
+      );
+      final clearText = await _localStateCipher.decrypt(
+        secretBox,
+        secretKey: SecretKey(keyBytes),
+        aad: utf8.encode(key),
+      );
+      return utf8.decode(clearText);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<int>> _loadOrCreateLocalStateKey() async {
+    final existing = await _loadLocalStateKey(createIfMissing: false);
+    if (existing != null && existing.isNotEmpty) {
+      return existing;
+    }
+    final generated = _randomBytes(32);
+    await _writeSecure(_localStateKeyKey, _base64UrlEncode(generated));
+    final persisted = await _loadLocalStateKey(createIfMissing: false);
+    if (persisted != null && persisted.isNotEmpty) {
+      return persisted;
+    }
+    throw StateError('Local state encryption key unavailable');
+  }
+
+  Future<List<int>?> _loadLocalStateKey({required bool createIfMissing}) async {
+    final encoded = (await _readSecure(_localStateKeyKey))?.trim() ?? '';
+    if (encoded.isNotEmpty) {
+      return _base64UrlDecode(encoded);
+    }
+    if (!createIfMissing) {
+      return null;
+    }
+    return _loadOrCreateLocalStateKey();
+  }
+
+  List<int> _randomBytes(int length) {
+    return List<int>.generate(length, (_) => _random.nextInt(256));
+  }
+
+  String _base64UrlEncode(List<int> bytes) {
+    return base64Url.encode(bytes).replaceAll('=', '');
+  }
+
+  List<int> _base64UrlDecode(String value) {
+    final normalized = value.replaceAll('-', '+').replaceAll('_', '/');
+    final padded = normalized + '=' * ((4 - normalized.length % 4) % 4);
+    return base64.decode(padded);
   }
 
   void _writeStoredStringInternal(String key, String value) {
@@ -598,42 +937,94 @@ class SecureConfigStore {
   Future<String?> _readSecure(String key) async {
     if (_secureStorage != null) {
       try {
-        return await _secureStorage!
-            .read(key: key)
-            .timeout(_secureStorageTimeout);
+        final value = await _readSecureValue(_secureStorage!, key);
+        if (value != null && value.trim().isNotEmpty) {
+          await _deleteGenericSecureFallback(key);
+          return value;
+        }
       } catch (_) {
-        _secureStorage = null;
-        // Fall back to in-memory storage for tests and unsupported runners.
+        // Keep the primary secure store available for future retries and use
+        // the persistent fallback only for this operation.
       }
     }
+    if (await _promoteToFileSecureStorageForTests()) {
+      try {
+        final value = await _readSecureValue(_secureStorage!, key);
+        if (value != null && value.trim().isNotEmpty) {
+          return value;
+        }
+      } catch (_) {
+        // Fall through to the standard fallback handling below.
+      }
+    }
+    if (_requiresPrimarySecureStorage(key)) {
+      final migratedValue = await _migrateLegacyPrimarySecureFallback(key);
+      if (migratedValue != null && migratedValue.trim().isNotEmpty) {
+        return migratedValue;
+      }
+      return _memorySecure[key];
+    }
+    final persistedFallback = await _loadGenericSecureFallback(key);
+    if (persistedFallback != null && persistedFallback.trim().isNotEmpty) {
+      return persistedFallback;
+    }
     return _memorySecure[key];
+  }
+
+  Future<void> _enqueueLocalStateWrite(Future<void> Function() action) {
+    final next = _localStateWriteQueue.catchError((_) {}).then((_) => action());
+    _localStateWriteQueue = next.catchError((_) {});
+    return next;
   }
 
   Future<void> _writeSecure(String key, String value) async {
     if (_secureStorage != null) {
       try {
-        await _secureStorage!
-            .write(key: key, value: value)
-            .timeout(_secureStorageTimeout);
+        await _writeSecureValue(_secureStorage!, key, value);
+        await _deleteGenericSecureFallback(key);
+        if (_requiresPrimarySecureStorage(key)) {
+          await _deleteLegacyPrimarySecureFallback(key);
+        }
+        _memorySecure[key] = value;
         return;
       } catch (_) {
-        _secureStorage = null;
-        // Fall back to in-memory storage for tests and unsupported runners.
+        if (await _promoteToFileSecureStorageForTests()) {
+          try {
+            await _writeSecureValue(_secureStorage!, key, value);
+            await _deleteGenericSecureFallback(key);
+            if (_requiresPrimarySecureStorage(key)) {
+              await _deleteLegacyPrimarySecureFallback(key);
+            }
+            _memorySecure[key] = value;
+            return;
+          } catch (_) {
+            // Fall through to the normal handling below.
+          }
+        }
+        // Keep the primary secure store available for future retries and fall
+        // back to a durable local file instead of session-only memory.
       }
     }
+    if (_requiresPrimarySecureStorage(key)) {
+      throw StateError('Primary secure storage unavailable for $key');
+    }
     _memorySecure[key] = value;
+    await _saveGenericSecureFallback(key, value);
   }
 
   Future<void> _deleteSecure(String key) async {
     if (_secureStorage != null) {
       try {
-        await _secureStorage!.delete(key: key).timeout(_secureStorageTimeout);
+        await _deleteSecureValue(_secureStorage!, key);
       } catch (_) {
-        _secureStorage = null;
-        // Keep the in-memory fallback in sync.
+        // Best effort. Still clear fallback copies below.
       }
     }
     _memorySecure.remove(key);
+    await _deleteGenericSecureFallback(key);
+    if (_requiresPrimarySecureStorage(key)) {
+      await _deleteLegacyPrimarySecureFallback(key);
+    }
   }
 
   void dispose() {
@@ -721,6 +1112,156 @@ class SecureConfigStore {
     return File(
       '${directory.path}/${_deviceTokenFallbackFileName(deviceId, role)}',
     );
+  }
+
+  Future<File?> _genericSecureFallbackFile(String key) async {
+    final fileName = _secureFallbackFileNames[key];
+    if (fileName == null) {
+      return null;
+    }
+    final directory = await _resolveFallbackDirectory();
+    if (directory == null) {
+      return null;
+    }
+    return File('${directory.path}/$fileName');
+  }
+
+  Future<String?> _loadGenericSecureFallback(String key) async {
+    try {
+      final file = await _genericSecureFallbackFile(key);
+      if (file == null || !await file.exists()) {
+        return null;
+      }
+      final value = (await file.readAsString()).trim();
+      return value.isEmpty ? null : value;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _saveGenericSecureFallback(String key, String value) async {
+    try {
+      final file = await _genericSecureFallbackFile(key);
+      if (file == null) {
+        return;
+      }
+      await file.writeAsString(value, flush: true);
+    } catch (_) {
+      return;
+    }
+  }
+
+  Future<void> _deleteGenericSecureFallback(String key) async {
+    try {
+      final file = await _genericSecureFallbackFile(key);
+      if (file == null || !await file.exists()) {
+        return;
+      }
+      await file.delete();
+    } catch (_) {
+      return;
+    }
+  }
+
+  bool _requiresPrimarySecureStorage(String key) {
+    return key == _localStateKeyKey;
+  }
+
+  Future<File?> _legacyPrimarySecureFallbackFile(String key) async {
+    if (key != _localStateKeyKey) {
+      return null;
+    }
+    final directory = await _resolveFallbackDirectory();
+    if (directory == null) {
+      return null;
+    }
+    return File('${directory.path}/local-state-key.txt');
+  }
+
+  Future<String?> _migrateLegacyPrimarySecureFallback(String key) async {
+    try {
+      final file = await _legacyPrimarySecureFallbackFile(key);
+      if (file == null || !await file.exists()) {
+        return null;
+      }
+      final value = (await file.readAsString()).trim();
+      if (value.isEmpty || _secureStorage == null) {
+        return null;
+      }
+      await _writeSecureValue(_secureStorage!, key, value);
+      _memorySecure[key] = value;
+      await file.delete();
+      return value;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _deleteLegacyPrimarySecureFallback(String key) async {
+    try {
+      final file = await _legacyPrimarySecureFallbackFile(key);
+      if (file == null || !await file.exists()) {
+        return;
+      }
+      await file.delete();
+    } catch (_) {
+      return;
+    }
+  }
+
+  Future<bool> _promoteToFileSecureStorageForTests() async {
+    if (_secureStorageOverride != null ||
+        (_databasePathResolver == null &&
+            _fallbackDirectoryPathResolver == null)) {
+      return false;
+    }
+    _secureStorage = FileSecureStorageClient(() => _resolveFallbackDirectory());
+    return true;
+  }
+
+  Future<String?> _readSecureValue(SecureStorageClient client, String key) {
+    final future = client.read(key: key);
+    if (client is FlutterSecureStorageClient) {
+      return future.timeout(_secureStorageTimeout);
+    }
+    return future;
+  }
+
+  Future<void> _writeSecureValue(
+    SecureStorageClient client,
+    String key,
+    String value,
+  ) {
+    final future = client.write(key: key, value: value);
+    if (client is FlutterSecureStorageClient) {
+      return future.timeout(_secureStorageTimeout);
+    }
+    return future;
+  }
+
+  Future<void> _deleteSecureValue(SecureStorageClient client, String key) {
+    final future = client.delete(key: key);
+    if (client is FlutterSecureStorageClient) {
+      return future.timeout(_secureStorageTimeout);
+    }
+    return future;
+  }
+
+  bool _useDebugSecureStorageFallback() {
+    var enabled = false;
+    assert(() {
+      enabled = true;
+      return true;
+    }());
+    return enabled;
+  }
+
+  SecureStorageClient _buildDebugSecureStorageClient() {
+    if (_databasePathResolver != null ||
+        _fallbackDirectoryPathResolver != null) {
+      return FileSecureStorageClient(() => _resolveFallbackDirectory());
+    }
+    return MemorySecureStorageClient();
   }
 
   Future<LocalDeviceIdentity?> _loadDeviceIdentityFallback() async {
@@ -820,4 +1361,112 @@ class _AssistantStateSnapshot {
 
   final SettingsSnapshot settings;
   final List<AssistantThreadRecord> assistantThreads;
+}
+
+class _AssistantStateBackupReadResult {
+  const _AssistantStateBackupReadResult({
+    required this.snapshot,
+    required this.sealed,
+  });
+
+  final _AssistantStateSnapshot snapshot;
+  final bool sealed;
+}
+
+abstract class SecureStorageClient {
+  Future<String?> read({required String key});
+
+  Future<void> write({required String key, required String value});
+
+  Future<void> delete({required String key});
+}
+
+typedef SecureConfigDatabaseOpener =
+    FutureOr<sqlite.Database?> Function(String resolvedPath);
+
+class FlutterSecureStorageClient implements SecureStorageClient {
+  const FlutterSecureStorageClient(this._storage);
+
+  final FlutterSecureStorage _storage;
+
+  @override
+  Future<String?> read({required String key}) {
+    return _storage.read(key: key);
+  }
+
+  @override
+  Future<void> write({required String key, required String value}) {
+    return _storage.write(key: key, value: value);
+  }
+
+  @override
+  Future<void> delete({required String key}) {
+    return _storage.delete(key: key);
+  }
+}
+
+class FileSecureStorageClient implements SecureStorageClient {
+  FileSecureStorageClient(this._directoryResolver);
+
+  final Future<Directory?> Function() _directoryResolver;
+
+  @override
+  Future<void> delete({required String key}) async {
+    final file = await _fileForKey(key);
+    if (file == null || !await file.exists()) {
+      return;
+    }
+    await file.delete();
+  }
+
+  @override
+  Future<String?> read({required String key}) async {
+    final file = await _fileForKey(key);
+    if (file == null || !await file.exists()) {
+      return null;
+    }
+    final value = (await file.readAsString()).trim();
+    return value.isEmpty ? null : value;
+  }
+
+  @override
+  Future<void> write({required String key, required String value}) async {
+    final file = await _fileForKey(key);
+    if (file == null) {
+      throw StateError('Secure storage directory unavailable for $key');
+    }
+    await file.writeAsString(value, flush: true);
+  }
+
+  Future<File?> _fileForKey(String key) async {
+    final directory = await _directoryResolver();
+    if (directory == null) {
+      return null;
+    }
+    final secureDirectory = Directory('${directory.path}/secure-storage');
+    if (!await secureDirectory.exists()) {
+      await secureDirectory.create(recursive: true);
+    }
+    final safeKey = base64Url.encode(utf8.encode(key)).replaceAll('=', '');
+    return File('${secureDirectory.path}/$safeKey.txt');
+  }
+}
+
+class MemorySecureStorageClient implements SecureStorageClient {
+  final Map<String, String> _values = <String, String>{};
+
+  @override
+  Future<void> delete({required String key}) async {
+    _values.remove(key);
+  }
+
+  @override
+  Future<String?> read({required String key}) async {
+    return _values[key];
+  }
+
+  @override
+  Future<void> write({required String key, required String value}) async {
+    _values[key] = value;
+  }
 }
