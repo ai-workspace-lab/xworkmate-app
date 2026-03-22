@@ -461,16 +461,6 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
               spacing: 10,
               runSpacing: 10,
               children: [
-                FilledButton(
-                  onPressed: () => controller.saveAiGatewayConfiguration(
-                    name: _directNameController.text,
-                    baseUrl: _directBaseUrlController.text,
-                    provider: _directProviderController.text,
-                    apiKey: _directApiKeyController.text,
-                    defaultModel: controller.resolvedAiGatewayModel,
-                  ),
-                  child: Text(appText('保存', 'Save')),
-                ),
                 OutlinedButton(
                   onPressed: controller.aiGatewayBusy
                       ? null
@@ -487,10 +477,17 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
                         },
                   child: Text(appText('测试连接', 'Test connection')),
                 ),
-                OutlinedButton.icon(
+                FilledButton.icon(
                   onPressed: controller.aiGatewayBusy
                       ? null
                       : () async {
+                          await controller.saveAiGatewayConfiguration(
+                            name: _directNameController.text,
+                            baseUrl: _directBaseUrlController.text,
+                            provider: _directProviderController.text,
+                            apiKey: _directApiKeyController.text,
+                            defaultModel: controller.resolvedAiGatewayModel,
+                          );
                           try {
                             await controller.syncAiGatewayModels(
                               name: _directNameController.text,
@@ -518,8 +515,8 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
                           height: 14,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.sync_rounded),
-                  label: Text(appText('同步模型', 'Sync models')),
+                      : const Icon(Icons.check_circle_outline_rounded),
+                  label: Text(appText('保存/应用', 'Save / Apply')),
                 ),
               ],
             ),

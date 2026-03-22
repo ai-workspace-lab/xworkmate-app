@@ -1005,12 +1005,12 @@ class _SettingsPageState extends State<SettingsPage> {
               loadValue: controller.settingsController.loadAiGatewayApiKey,
               onSubmitted: controller.settingsController.saveAiGatewayApiKey,
               storedHelperText: appText(
-                '已安全保存，默认以 **** 显示；可直接测试/同步，也可点击查看。',
-                'Stored securely. Test or sync directly, or reveal it on demand.',
+                '已安全保存，默认以 **** 显示；可直接测试或保存/应用，也可点击查看。',
+                'Stored securely. Test or save/apply directly, or reveal it on demand.',
               ),
               emptyHelperText: appText(
-                '输入后点击保存或同步模型。',
-                'Save or sync to persist securely.',
+                '输入后点击测试连接或保存/应用。',
+                'Test or save/apply to persist securely.',
               ),
             ),
             const SizedBox(height: 12),
@@ -1018,13 +1018,6 @@ class _SettingsPageState extends State<SettingsPage> {
               spacing: 10,
               runSpacing: 10,
               children: [
-                FilledButton.tonal(
-                  key: const ValueKey('ai-gateway-save-button'),
-                  onPressed: _aiGatewayTesting || _aiGatewaySyncing
-                      ? null
-                      : () => _saveAiGatewayDraft(controller, settings),
-                  child: Text(appText('保存草稿', 'Save Draft')),
-                ),
                 OutlinedButton(
                   key: const ValueKey('ai-gateway-test-button'),
                   onPressed: _aiGatewayTesting || _aiGatewaySyncing
@@ -1036,59 +1029,15 @@ class _SettingsPageState extends State<SettingsPage> {
                         : appText('测试连接', 'Test Connection'),
                   ),
                 ),
-                OutlinedButton(
-                  key: const ValueKey('ai-gateway-sync-button'),
-                  onPressed: () async {
-                    if (_aiGatewayTesting || _aiGatewaySyncing) {
-                      return;
-                    }
-                    final messenger = ScaffoldMessenger.of(context);
-                    final draft = _buildAiGatewayDraft(settings);
-                    final apiKey = _secretOverride(
-                      _aiGatewayApiKeyController,
-                      _aiGatewayApiKeyState,
-                    );
-                    setState(() => _aiGatewaySyncing = true);
-                    try {
-                      await _saveSettings(
-                        controller,
-                        settings.copyWith(aiGateway: draft),
-                      );
-                      unawaited(
-                        _persistAiGatewayApiKeyIfNeeded(
-                          controller,
-                          hasStoredValue: hasStoredAiGatewayApiKey,
-                        ).catchError((_) {}),
-                      );
-                      final result = await controller.syncAiGatewayCatalog(
-                        draft,
-                        apiKeyOverride: apiKey,
-                      );
-                      if (!mounted) {
-                        return;
-                      }
-                      setState(() {
-                        _aiGatewayTestState = result.syncState;
-                        _aiGatewayTestMessage = result.syncState == 'ready'
-                            ? 'Catalog synced · ${result.availableModels.length} model(s) ready'
-                            : result.syncMessage;
-                        _aiGatewayTestEndpoint = result.syncState == 'ready'
-                            ? _previewAiGatewayEndpoint(draft.baseUrl)
-                            : '';
-                      });
-                      messenger.showSnackBar(
-                        SnackBar(content: Text(result.syncMessage)),
-                      );
-                    } finally {
-                      if (mounted) {
-                        setState(() => _aiGatewaySyncing = false);
-                      }
-                    }
-                  },
+                FilledButton.tonal(
+                  key: const ValueKey('ai-gateway-apply-button'),
+                  onPressed: _aiGatewayTesting || _aiGatewaySyncing
+                      ? null
+                      : () => _applyAiGatewaySettings(controller, settings),
                   child: Text(
                     _aiGatewaySyncing
-                        ? appText('同步中...', 'Syncing...')
-                        : '${appText('同步模型', 'Sync Models')} · ${settings.aiGateway.syncState}',
+                        ? appText('应用中...', 'Applying...')
+                        : appText('保存/应用', 'Save / Apply'),
                   ),
                 ),
               ],
@@ -2188,6 +2137,68 @@ class _SettingsPageState extends State<SettingsPage> {
       _aiGatewayTestMessage = '';
       _aiGatewayTestEndpoint = '';
     });
+  }
+
+  Future<void> _applyAiGatewaySettings(
+    AppController controller,
+    SettingsSnapshot settings,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final draft = _buildAiGatewayDraft(settings);
+    final apiKey = _secretOverride(
+      _aiGatewayApiKeyController,
+      _aiGatewayApiKeyState,
+    );
+    final hasStoredAiGatewayApiKey =
+        controller.settingsController.secureRefs['ai_gateway_api_key'] != null;
+    setState(() => _aiGatewaySyncing = true);
+    try {
+      await _saveSettings(controller, settings.copyWith(aiGateway: draft));
+      await _persistAiGatewayApiKeyIfNeeded(
+        controller,
+        hasStoredValue: hasStoredAiGatewayApiKey,
+      );
+      if (!mounted) {
+        return;
+      }
+      _aiGatewayNameSyncedValue = draft.name;
+      _aiGatewayUrlSyncedValue = draft.baseUrl;
+      _aiGatewayApiKeyRefSyncedValue = draft.apiKeyRef;
+      if (_aiGatewayTestState != 'ready') {
+        setState(() {
+          _aiGatewayTestState = draft.syncState;
+          _aiGatewayTestMessage = '';
+          _aiGatewayTestEndpoint = '';
+        });
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(appText('AI Gateway 已保存', 'AI Gateway saved')),
+          ),
+        );
+        return;
+      }
+      final result = await controller.syncAiGatewayCatalog(
+        draft,
+        apiKeyOverride: apiKey,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _aiGatewayTestState = result.syncState;
+        _aiGatewayTestMessage = result.syncState == 'ready'
+            ? 'Catalog synced · ${result.availableModels.length} model(s) ready'
+            : result.syncMessage;
+        _aiGatewayTestEndpoint = result.syncState == 'ready'
+            ? _previewAiGatewayEndpoint(draft.baseUrl)
+            : '';
+      });
+      messenger.showSnackBar(SnackBar(content: Text(result.syncMessage)));
+    } finally {
+      if (mounted) {
+        setState(() => _aiGatewaySyncing = false);
+      }
+    }
   }
 
   Future<void> _testAiGatewayConnection(
