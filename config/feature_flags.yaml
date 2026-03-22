@@ -73,7 +73,7 @@ mobile:
       description: Mobile workspace AI Gateway launcher
       ui_surface: mobile_workspace_hub
     account:
-      enabled: true
+      enabled: false
       release_tier: experimental
       build_modes: [debug, profile, release]
       description: Mobile workspace account launcher
@@ -246,8 +246,8 @@ desktop:
       description: Desktop settings destination
       ui_surface: sidebar_navigation
     account:
-      enabled: true
-      release_tier: stable
+      enabled: false
+      release_tier: experimental
       build_modes: [debug, profile, release]
       description: Desktop account destination
       ui_surface: sidebar_navigation

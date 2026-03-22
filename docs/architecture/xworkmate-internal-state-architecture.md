@@ -41,6 +41,13 @@ Platform runtime matrix
   - Platform: standard browser runtime
   - Fixed work modes: AI Gateway, Remote OpenClaw Gateway
 
+Persistence guardrails (v0.6.1)
+
+- Desktop persistence path is stable at `~/Library/Application Support/plus.svc.xworkmate/xworkmate`.
+- `SettingsStore` and `SecretStore` initialize durable directories/files on first install.
+- Path/DB resolution failure defaults to fail-fast instead of silent in-memory persistence.
+- In explicit test fallback mode, temporary in-memory state will attempt best-effort sync back to durable storage when possible.
+
 These work-mode arrays come from feature-manifest capabilities. They are not
 derived from gateway profile data.
 
