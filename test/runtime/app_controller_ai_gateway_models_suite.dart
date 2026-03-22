@@ -2,19 +2,27 @@
 library;
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   test(
     'AppController exposes selected AI Gateway models to the assistant',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final controller = AppController();
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-app-controller-models-',
+      );
+      addTearDown(() => tempDirectory.delete(recursive: true));
+      final store = _createIsolatedStore(tempDirectory.path);
+      final controller = AppController(store: store);
       addTearDown(controller.dispose);
+      addTearDown(store.dispose);
 
       await _waitFor(() => !controller.initializing);
 
@@ -40,8 +48,14 @@ void main() {
     'AppController switches assistant model source with the execution mode',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final controller = AppController();
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-app-controller-models-',
+      );
+      addTearDown(() => tempDirectory.delete(recursive: true));
+      final store = _createIsolatedStore(tempDirectory.path);
+      final controller = AppController(store: store);
       addTearDown(controller.dispose);
+      addTearDown(store.dispose);
 
       await _waitFor(() => !controller.initializing);
 
@@ -71,6 +85,15 @@ void main() {
       expect(controller.resolvedAssistantModel, 'gpt-5.4');
       expect(controller.assistantModelChoices, const <String>['gpt-5.4']);
     },
+  );
+}
+
+SecureConfigStore _createIsolatedStore(String rootPath) {
+  return SecureConfigStore(
+    enableSecureStorage: false,
+    databasePathResolver: () async => '$rootPath/config-store.sqlite3',
+    fallbackDirectoryPathResolver: () async => rootPath,
+    defaultSupportDirectoryPathResolver: () async => rootPath,
   );
 }
 

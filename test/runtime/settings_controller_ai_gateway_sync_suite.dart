@@ -19,7 +19,12 @@ void main() {
       final server = await _FakeAiGatewayServer.start();
       addTearDown(server.close);
 
-      final store = SecureConfigStore();
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-settings-ai-gateway-sync-',
+      );
+      addTearDown(() async => _deleteDirectoryBestEffort(tempDirectory));
+      final store = _createIsolatedStore(tempDirectory.path);
+      addTearDown(store.dispose);
       final controller = SettingsController(store);
       await controller.initialize();
       await controller.saveSnapshot(
@@ -63,7 +68,12 @@ void main() {
       final server = await _FakeAiGatewayServer.start();
       addTearDown(server.close);
 
-      final store = SecureConfigStore();
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-settings-ai-gateway-sync-',
+      );
+      addTearDown(() async => _deleteDirectoryBestEffort(tempDirectory));
+      final store = _createIsolatedStore(tempDirectory.path);
+      addTearDown(store.dispose);
       final controller = SettingsController(store);
       await controller.initialize();
       await controller.saveSnapshot(
@@ -88,7 +98,10 @@ void main() {
         'claude-3.7',
       ]);
       expect(await store.loadAiGatewayApiKey(), 'stored-inline-key');
-      expect(controller.snapshot.toJsonString(), isNot(contains('stored-inline-key')));
+      expect(
+        controller.snapshot.toJsonString(),
+        isNot(contains('stored-inline-key')),
+      );
     },
   );
 
@@ -99,7 +112,12 @@ void main() {
       final server = await _FakeAiGatewayServer.start(appendFooterJson: true);
       addTearDown(server.close);
 
-      final store = SecureConfigStore();
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-settings-ai-gateway-sync-',
+      );
+      addTearDown(() async => _deleteDirectoryBestEffort(tempDirectory));
+      final store = _createIsolatedStore(tempDirectory.path);
+      addTearDown(store.dispose);
       final controller = SettingsController(store);
       await controller.initialize();
       await controller.saveSnapshot(
@@ -131,7 +149,12 @@ void main() {
       );
       addTearDown(server.close);
 
-      final store = SecureConfigStore();
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-settings-ai-gateway-sync-',
+      );
+      addTearDown(() async => _deleteDirectoryBestEffort(tempDirectory));
+      final store = _createIsolatedStore(tempDirectory.path);
+      addTearDown(store.dispose);
       final controller = SettingsController(store);
       await controller.initialize();
 
@@ -157,7 +180,12 @@ void main() {
       );
       addTearDown(server.close);
 
-      final store = SecureConfigStore();
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-settings-ai-gateway-sync-',
+      );
+      addTearDown(() async => _deleteDirectoryBestEffort(tempDirectory));
+      final store = _createIsolatedStore(tempDirectory.path);
+      addTearDown(store.dispose);
       final controller = SettingsController(store);
       await controller.initialize();
 
@@ -171,6 +199,32 @@ void main() {
       expect(await store.loadAiGatewayApiKey(), isNull);
     },
   );
+}
+
+SecureConfigStore _createIsolatedStore(String rootPath) {
+  return SecureConfigStore(
+    enableSecureStorage: false,
+    databasePathResolver: () async => '$rootPath/config-store.sqlite3',
+    fallbackDirectoryPathResolver: () async => rootPath,
+    defaultSupportDirectoryPathResolver: () async => rootPath,
+  );
+}
+
+Future<void> _deleteDirectoryBestEffort(Directory directory) async {
+  for (var attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (!await directory.exists()) {
+        return;
+      }
+      await directory.delete(recursive: true);
+      return;
+    } on FileSystemException {
+      if (attempt == 2) {
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+    }
+  }
 }
 
 class _FakeAiGatewayServer {

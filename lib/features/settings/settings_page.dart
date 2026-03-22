@@ -61,6 +61,8 @@ class _SettingsPageState extends State<SettingsPage> {
   String _gatewaySetupCodeSyncedValue = '';
   String _gatewayHostSyncedValue = '';
   String _gatewayPortSyncedValue = '';
+  _SecretFieldUiState _gatewayTokenState = const _SecretFieldUiState();
+  _SecretFieldUiState _gatewayPasswordState = const _SecretFieldUiState();
   bool _aiGatewayTesting = false;
   String _aiGatewayTestState = 'idle';
   String _aiGatewayTestMessage = '';
@@ -139,6 +141,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _navigationContext = controller.settingsNavigationContext;
         final settings = controller.settingsDraft;
         final showingDetail = _detail != null;
+        final showGlobalApplyBar = _tab != SettingsTab.gateway;
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
           child: Column(
@@ -184,8 +187,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              _buildGlobalApplyBar(context, controller),
-              const SizedBox(height: 16),
+              if (showGlobalApplyBar) ...[
+                _buildGlobalApplyBar(context, controller),
+                const SizedBox(height: 16),
+              ],
               if (!showingDetail) ...[
                 SectionTabs(
                   items: availableTabs.map((item) => item.label).toList(),
@@ -912,21 +917,19 @@ class _SettingsPageState extends State<SettingsPage> {
       selectedProfileIndex,
       gatewayProfile,
     );
+    final uiFeatures = controller.featuresFor(
+      resolveUiFeaturePlatformFromContext(context),
+    );
+    final setupCodeFeatureEnabled = uiFeatures.supportsGatewaySetupCode;
     final useSetupCode = selectedProfileIndex == kGatewayLocalProfileIndex
         ? false
-        : gatewayProfile.useSetupCode;
+        : setupCodeFeatureEnabled && gatewayProfile.useSetupCode;
     final gatewayTls = gatewayMode == RuntimeConnectionMode.local
         ? false
         : gatewayProfile.tls;
     final hasStoredGatewayToken = controller.hasStoredGatewayToken;
     final hasStoredGatewayPassword =
         controller.settingsController.secureRefs['gateway_password'] != null;
-    final typedGatewayToken = _gatewayTokenController.text.trim();
-    final willUseStoredGatewayToken =
-        typedGatewayToken.isEmpty && hasStoredGatewayToken;
-    final showSharedTokenStatusCard =
-        gatewayMode != RuntimeConnectionMode.unconfigured &&
-        (willUseStoredGatewayToken || typedGatewayToken.isNotEmpty);
 
     return SurfaceCard(
       child: Column(
@@ -983,7 +986,8 @@ class _SettingsPageState extends State<SettingsPage> {
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 12),
-          if (selectedProfileIndex != kGatewayLocalProfileIndex) ...[
+          if (selectedProfileIndex != kGatewayLocalProfileIndex &&
+              setupCodeFeatureEnabled) ...[
             SectionTabs(
               items: [appText('配置码', 'Setup Code'), appText('手动配置', 'Manual')],
               value: useSetupCode
@@ -1083,65 +1087,45 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ],
           const SizedBox(height: 16),
-          TextField(
-            key: const ValueKey('gateway-shared-token-field'),
+          _buildSecureField(
+            fieldKey: const ValueKey('gateway-shared-token-field'),
             controller: _gatewayTokenController,
-            obscureText: true,
-            enableSuggestions: false,
-            autocorrect: false,
-            decoration: InputDecoration(
-              labelText: appText('共享 Token', 'Shared Token'),
-              hintText: appText(
-                '可选：覆盖默认 Gateway Token',
-                'Optional override for gateway token',
-              ),
+            label: appText('共享 Token', 'Shared Token'),
+            hasStoredValue: hasStoredGatewayToken,
+            fieldState: _gatewayTokenState,
+            onStateChanged: (value) =>
+                setState(() => _gatewayTokenState = value),
+            loadValue: controller.settingsController.loadGatewayToken,
+            onSubmitted: (value) async =>
+                controller.saveGatewayTokenDraft(value),
+            storedHelperText: appText(
+              '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存/应用提交。',
+              'Stored securely. Test directly or submit with local Save / Apply actions.',
             ),
-            onChanged: (_) =>
-                controller.saveGatewayTokenDraft(_gatewayTokenController.text),
+            emptyHelperText: appText(
+              '输入后先进入草稿；通过本区保存/应用提交。',
+              'Values stage into draft first; submit with local Save / Apply actions.',
+            ),
           ),
-          if (showSharedTokenStatusCard) ...[
-            const SizedBox(height: 10),
-            _GatewaySecretStatusCard(
-              message: willUseStoredGatewayToken
-                  ? appText(
-                      '已安全保存 shared token（${controller.storedGatewayTokenMask}）。留空时会直接使用它连接。',
-                      'A shared token is already stored securely (${controller.storedGatewayTokenMask}). Leave the field empty to connect with it.',
-                    )
-                  : appText(
-                      '本次输入会覆盖已安全保存的 shared token。',
-                      'This entry will overwrite the stored shared token.',
-                    ),
-              locked: hasStoredGatewayToken,
-              onClear: hasStoredGatewayToken
-                  ? () async {
-                      await controller.clearStoredGatewayToken();
-                      if (mounted) {
-                        setState(() {});
-                      }
-                    }
-                  : null,
-            ),
-          ],
           const SizedBox(height: 12),
-          TextField(
-            key: const ValueKey('gateway-password-field'),
+          _buildSecureField(
+            fieldKey: const ValueKey('gateway-password-field'),
             controller: _gatewayPasswordController,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: appText('密码', 'Password'),
-              hintText: appText('可选：共享密码', 'Optional shared password'),
-              helperText: hasStoredGatewayPassword
-                  ? appText(
-                      '已存在安全保存的密码；输入新值后会在保存时覆盖。',
-                      'A password is already stored securely; entering a new value replaces it on Save.',
-                    )
-                  : appText(
-                      '输入后先进入草稿；保存后才会写入安全存储。',
-                      'Values stage into draft first and only persist after Save.',
-                    ),
+            label: appText('密码', 'Password'),
+            hasStoredValue: hasStoredGatewayPassword,
+            fieldState: _gatewayPasswordState,
+            onStateChanged: (value) =>
+                setState(() => _gatewayPasswordState = value),
+            loadValue: controller.settingsController.loadGatewayPassword,
+            onSubmitted: (value) async =>
+                controller.saveGatewayPasswordDraft(value),
+            storedHelperText: appText(
+              '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存/应用提交。',
+              'Stored securely. Test directly or submit with local Save / Apply actions.',
             ),
-            onChanged: (_) => controller.saveGatewayPasswordDraft(
-              _gatewayPasswordController.text,
+            emptyHelperText: appText(
+              '输入后先进入草稿；通过本区保存/应用提交。',
+              'Values stage into draft first; submit with local Save / Apply actions.',
             ),
           ),
           const SizedBox(height: 16),
@@ -1360,8 +1344,8 @@ class _SettingsPageState extends State<SettingsPage> {
               'Stored securely. Test directly or submit it with the local Save / Apply actions.',
             ),
             emptyHelperText: appText(
-              '输入后可直接测试，也可通过本区或顶部按钮统一保存/应用。',
-              'Test it now, or use the local or top-level Save / Apply actions.',
+              '输入后可直接测试，也可通过本区保存/应用提交。',
+              'Test it now, or submit it with the local Save / Apply actions.',
             ),
           ),
           const SizedBox(height: 12),
@@ -2434,11 +2418,17 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _captureVisibleSecretDrafts(AppController controller) async {
-    final gatewayToken = _gatewayTokenController.text.trim();
+    final gatewayToken = _secretOverride(
+      _gatewayTokenController,
+      _gatewayTokenState,
+    );
     if (gatewayToken.isNotEmpty) {
       controller.saveGatewayTokenDraft(gatewayToken);
     }
-    final gatewayPassword = _gatewayPasswordController.text.trim();
+    final gatewayPassword = _secretOverride(
+      _gatewayPasswordController,
+      _gatewayPasswordState,
+    );
     if (gatewayPassword.isNotEmpty) {
       controller.saveGatewayPasswordDraft(gatewayPassword);
     }
@@ -2463,6 +2453,10 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _resetSecureFieldUiAfterPersist(AppController controller) {
+    final hasStoredGatewayToken =
+        controller.settingsController.secureRefs['gateway_token'] != null;
+    final hasStoredGatewayPassword =
+        controller.settingsController.secureRefs['gateway_password'] != null;
     final hasStoredAiGatewayApiKey =
         controller.settingsController.secureRefs['ai_gateway_api_key'] != null;
     final hasStoredVaultToken =
@@ -2470,11 +2464,21 @@ class _SettingsPageState extends State<SettingsPage> {
     final hasStoredOllamaApiKey =
         controller.settingsController.secureRefs['ollama_cloud_api_key'] !=
         null;
+    _gatewayTokenState = const _SecretFieldUiState();
+    _gatewayPasswordState = const _SecretFieldUiState();
     _aiGatewayApiKeyState = const _SecretFieldUiState();
     _vaultTokenState = const _SecretFieldUiState();
     _ollamaApiKeyState = const _SecretFieldUiState();
-    _gatewayTokenController.clear();
-    _gatewayPasswordController.clear();
+    _primeSecureFieldController(
+      _gatewayTokenController,
+      hasStoredValue: hasStoredGatewayToken,
+      fieldState: _gatewayTokenState,
+    );
+    _primeSecureFieldController(
+      _gatewayPasswordController,
+      hasStoredValue: hasStoredGatewayPassword,
+      fieldState: _gatewayPasswordState,
+    );
     _primeSecureFieldController(
       _aiGatewayApiKeyController,
       hasStoredValue: hasStoredAiGatewayApiKey,
@@ -2782,8 +2786,17 @@ class _SettingsPageState extends State<SettingsPage> {
       RuntimeConnectionMode.remote => AssistantExecutionTarget.remote,
       RuntimeConnectionMode.unconfigured => AssistantExecutionTarget.remote,
     };
-    final token = _gatewayTokenController.text.trim();
-    final password = _gatewayPasswordController.text.trim();
+    var token = _secretOverride(_gatewayTokenController, _gatewayTokenState);
+    var password = _secretOverride(
+      _gatewayPasswordController,
+      _gatewayPasswordState,
+    );
+    if (token.isEmpty) {
+      token = await controller.settingsController.loadGatewayToken();
+    }
+    if (password.isEmpty) {
+      password = await controller.settingsController.loadGatewayPassword();
+    }
     setState(() => _gatewayTesting = true);
     try {
       final result = await controller.testGatewayConnectionDraft(
@@ -3848,47 +3861,6 @@ class _InlineSwitchField extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _GatewaySecretStatusCard extends StatelessWidget {
-  const _GatewaySecretStatusCard({
-    required this.message,
-    required this.locked,
-    this.onClear,
-  });
-
-  final String message;
-  final bool locked;
-  final Future<void> Function()? onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            locked ? Icons.lock_rounded : Icons.info_outline_rounded,
-            size: 18,
-          ),
-          const SizedBox(width: 10),
-          Expanded(child: Text(message, style: theme.textTheme.bodySmall)),
-          if (onClear != null)
-            TextButton(
-              onPressed: () => onClear!.call(),
-              child: Text(appText('清除', 'Clear')),
-            ),
-        ],
       ),
     );
   }

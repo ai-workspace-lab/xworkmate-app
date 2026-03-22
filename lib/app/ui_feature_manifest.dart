@@ -65,6 +65,7 @@ abstract final class UiFeatureKeys {
   static const settingsGeneral = 'settings.general';
   static const settingsWorkspace = 'settings.workspace';
   static const settingsGateway = 'settings.gateway';
+  static const settingsGatewaySetupCode = 'settings.gateway_setup_code';
   static const settingsAgents = 'settings.agents';
   static const settingsAppearance = 'settings.appearance';
   static const settingsDiagnostics = 'settings.diagnostics';
@@ -254,9 +255,15 @@ mobile:
       build_modes: [debug, profile, release]
       description: Mobile settings gateway tab
       ui_surface: settings_page
+    gateway_setup_code:
+      enabled: false
+      release_tier: experimental
+      build_modes: [debug, profile, release]
+      description: Mobile gateway setup code editor
+      ui_surface: settings_page
     agents:
-      enabled: true
-      release_tier: stable
+      enabled: false
+      release_tier: experimental
       build_modes: [debug, profile, release]
       description: Mobile settings multi-agent tab
       ui_surface: settings_page
@@ -427,9 +434,15 @@ desktop:
       build_modes: [debug, profile, release]
       description: Desktop settings gateway tab
       ui_surface: settings_page
+    gateway_setup_code:
+      enabled: false
+      release_tier: experimental
+      build_modes: [debug, profile, release]
+      description: Desktop gateway setup code editor
+      ui_surface: settings_page
     agents:
-      enabled: true
-      release_tier: stable
+      enabled: false
+      release_tier: experimental
       build_modes: [debug, profile, release]
       description: Desktop settings multi-agent tab
       ui_surface: settings_page
@@ -539,6 +552,12 @@ web:
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Web settings gateway tab
+      ui_surface: web_settings_page
+    gateway_setup_code:
+      enabled: false
+      release_tier: experimental
+      build_modes: []
+      description: Web does not expose gateway setup code editor
       ui_surface: web_settings_page
     appearance:
       enabled: true
@@ -909,6 +928,9 @@ class UiFeatureAccess {
 
   bool get supportsDiagnostics =>
       isEnabledPath(UiFeatureKeys.settingsDiagnostics);
+
+  bool get supportsGatewaySetupCode =>
+      isEnabledPath(UiFeatureKeys.settingsGatewaySetupCode);
 
   List<SettingsTab> get availableSettingsTabs {
     return SettingsTab.values
