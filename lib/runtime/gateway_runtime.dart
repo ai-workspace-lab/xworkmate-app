@@ -199,6 +199,8 @@ class GatewayRuntime extends ChangeNotifier {
       fields: connectAuthFields,
       sources: connectAuthSources,
     );
+    final usedStoredDeviceTokenOnly =
+        sharedToken.isEmpty && deviceToken.isNotEmpty;
 
     if (endpoint == null) {
       _appendLog(
@@ -338,6 +340,20 @@ class GatewayRuntime extends ChangeNotifier {
         await _store.clearDeviceToken(
           deviceId: identity.deviceId,
           role: 'operator',
+        );
+      } else if (usedStoredDeviceTokenOnly &&
+          _isPairingRequiredError(
+            runtimeError?.code,
+            runtimeError?.detailCode,
+          )) {
+        await _store.clearDeviceToken(
+          deviceId: identity.deviceId,
+          role: 'operator',
+        );
+        _appendLog(
+          'warn',
+          'auth',
+          'cleared stale device token after pairing-required response',
         );
       }
       if (!_shouldAutoReconnect(runtimeError)) {
@@ -1255,6 +1271,13 @@ class GatewayRuntime extends ChangeNotifier {
       return false;
     }
     return true;
+  }
+
+  bool _isPairingRequiredError(String? code, String? detailCode) {
+    final resolvedCode = code?.trim().toUpperCase();
+    final resolvedDetailCode = detailCode?.trim().toUpperCase();
+    return resolvedCode == 'NOT_PAIRED' ||
+        resolvedDetailCode == 'PAIRING_REQUIRED';
   }
 
   Future<void> _closeSocket() async {

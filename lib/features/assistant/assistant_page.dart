@@ -1855,7 +1855,7 @@ class _ConversationArea extends StatelessWidget {
   }
 }
 
-class _AssistantTaskRail extends StatelessWidget {
+class _AssistantTaskRail extends StatefulWidget {
   const _AssistantTaskRail({
     super.key,
     required this.controller,
@@ -1884,9 +1884,18 @@ class _AssistantTaskRail extends StatelessWidget {
   final Future<void> Function(_AssistantTaskEntry entry) onRenameTask;
 
   @override
+  State<_AssistantTaskRail> createState() => _AssistantTaskRailState();
+}
+
+class _AssistantTaskRailState extends State<_AssistantTaskRail> {
+  final Set<AssistantExecutionTarget> _expandedGroups =
+      <AssistantExecutionTarget>{};
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = context.palette;
+    final tasks = widget.tasks;
     final groupedTasks = _groupTasksForRail(tasks);
     final runningCount = tasks
         .where((task) => _normalizedTaskStatus(task.status) == 'running')
@@ -1911,16 +1920,16 @@ class _AssistantTaskRail extends StatelessWidget {
                     Expanded(
                       child: TextField(
                         key: const Key('assistant-task-search'),
-                        controller: searchController,
-                        onChanged: onQueryChanged,
+                        controller: widget.searchController,
+                        onChanged: widget.onQueryChanged,
                         decoration: InputDecoration(
                           hintText: appText('搜索任务', 'Search tasks'),
                           prefixIcon: const Icon(Icons.search_rounded),
-                          suffixIcon: query.isEmpty
+                          suffixIcon: widget.query.isEmpty
                               ? null
                               : IconButton(
                                   tooltip: appText('清除搜索', 'Clear search'),
-                                  onPressed: onClearQuery,
+                                  onPressed: widget.onClearQuery,
                                   icon: const Icon(Icons.close_rounded),
                                 ),
                         ),
@@ -1931,7 +1940,7 @@ class _AssistantTaskRail extends StatelessWidget {
                       key: const Key('assistant-task-refresh'),
                       tooltip: appText('刷新任务', 'Refresh tasks'),
                       onPressed: () async {
-                        await onRefreshTasks();
+                        await widget.onRefreshTasks();
                       },
                       icon: const Icon(Icons.refresh_rounded),
                     ),
@@ -1943,7 +1952,7 @@ class _AssistantTaskRail extends StatelessWidget {
                   child: FilledButton.tonalIcon(
                     key: const Key('assistant-new-task-button'),
                     onPressed: () async {
-                      await onCreateTask();
+                      await widget.onCreateTask();
                     },
                     icon: const Icon(Icons.edit_note_rounded),
                     label: Text(appText('新对话', 'New conversation')),
@@ -1974,7 +1983,7 @@ class _AssistantTaskRail extends StatelessWidget {
                     ),
                     _MetaPill(
                       label:
-                          '${appText('技能', 'Skills')} ${controller.skills.length}',
+                          '${appText('技能', 'Skills')} ${widget.controller.skills.length}',
                       icon: Icons.auto_awesome_rounded,
                     ),
                   ],
@@ -2002,68 +2011,75 @@ class _AssistantTaskRail extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: tasks.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(
-                        appText(
-                          '没有匹配的任务，试试新建一个。',
-                          'No matching tasks. Start a new one.',
-                        ),
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: palette.textSecondary,
-                        ),
-                      ),
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+              itemCount: groupedTasks.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final group = groupedTasks[index];
+                final expanded = _expandedGroups.contains(group.executionTarget);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _AssistantTaskGroupHeader(
+                      executionTarget: group.executionTarget,
+                      count: group.items.length,
+                      expanded: expanded,
+                      onTap: () {
+                        setState(() {
+                          if (expanded) {
+                            _expandedGroups.remove(group.executionTarget);
+                          } else {
+                            _expandedGroups.add(group.executionTarget);
+                          }
+                        });
+                      },
                     ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
-                    itemCount: groupedTasks.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final group = groupedTasks[index];
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _AssistantTaskGroupHeader(
-                            executionTarget: group.executionTarget,
-                            count: group.items.length,
-                          ),
-                          const SizedBox(height: 4),
-                          for (
-                            var itemIndex = 0;
-                            itemIndex < group.items.length;
-                            itemIndex++
-                          ) ...[
-                            if (itemIndex > 0) const SizedBox(height: 4),
-                            _AssistantTaskTile(
-                              entry: group.items[itemIndex],
-                              archiveEnabled:
-                                  _normalizedTaskStatus(
-                                    group.items[itemIndex].status,
-                                  ) !=
-                                  'running',
-                              onTap: () async {
-                                await onSelectTask(
-                                  group.items[itemIndex].sessionKey,
-                                );
-                              },
-                              onRename: () async {
-                                await onRenameTask(group.items[itemIndex]);
-                              },
-                              onArchive: () async {
-                                await onArchiveTask(
-                                  group.items[itemIndex].sessionKey,
-                                );
-                              },
+                    if (expanded) ...[
+                      const SizedBox(height: 4),
+                      if (group.items.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(28, 0, 8, 4),
+                          child: Text(
+                            appText('当前分组没有任务。', 'No tasks in this group.'),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: palette.textMuted,
                             ),
-                          ],
-                        ],
-                      );
-                    },
-                  ),
+                          ),
+                        ),
+                      for (
+                        var itemIndex = 0;
+                        itemIndex < group.items.length;
+                        itemIndex++
+                      ) ...[
+                        if (itemIndex > 0) const SizedBox(height: 4),
+                        _AssistantTaskTile(
+                          entry: group.items[itemIndex],
+                          archiveEnabled:
+                              _normalizedTaskStatus(
+                                group.items[itemIndex].status,
+                              ) !=
+                              'running',
+                          onTap: () async {
+                            await widget.onSelectTask(
+                              group.items[itemIndex].sessionKey,
+                            );
+                          },
+                          onRename: () async {
+                            await widget.onRenameTask(group.items[itemIndex]);
+                          },
+                          onArchive: () async {
+                            await widget.onArchiveTask(
+                              group.items[itemIndex].sessionKey,
+                            );
+                          },
+                        ),
+                      ],
+                    ],
+                  ],
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -2086,7 +2102,6 @@ List<_AssistantTaskGroup> _groupTasksForRail(List<_AssistantTaskEntry> tasks) {
           items: grouped[target]!,
         ),
       )
-      .where((group) => group.items.isNotEmpty)
       .toList(growable: false);
 }
 
@@ -2198,41 +2213,60 @@ class _AssistantTaskGroupHeader extends StatelessWidget {
   const _AssistantTaskGroupHeader({
     required this.executionTarget,
     required this.count,
+    required this.expanded,
+    required this.onTap,
   });
 
   final AssistantExecutionTarget executionTarget;
   final int count;
+  final bool expanded;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final theme = Theme.of(context);
-    return Padding(
-      key: ValueKey<String>('assistant-task-group-${executionTarget.name}'),
-      padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
-      child: Row(
-        children: [
-          Icon(executionTarget.icon, size: 14, color: palette.textMuted),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              executionTarget.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: palette.textSecondary,
-                fontWeight: FontWeight.w600,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: ValueKey<String>('assistant-task-group-${executionTarget.name}'),
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 2),
+          child: Row(
+            children: [
+              Icon(
+                expanded
+                    ? Icons.keyboard_arrow_down_rounded
+                    : Icons.keyboard_arrow_right_rounded,
+                size: 16,
+                color: palette.textMuted,
               ),
-            ),
+              const SizedBox(width: 4),
+              Icon(executionTarget.icon, size: 14, color: palette.textMuted),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  executionTarget.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: palette.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '$count',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: palette.textMuted,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 6),
-          Text(
-            '$count',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: palette.textMuted,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

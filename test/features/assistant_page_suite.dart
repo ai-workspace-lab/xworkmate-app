@@ -62,6 +62,11 @@ void main() {
       platform: TargetPlatform.macOS,
     );
 
+    await tester.tap(
+      find.byKey(const ValueKey<String>('assistant-task-group-local')),
+    );
+    await tester.pumpAndSettle();
+
     expect(
       find.byWidgetPredicate(
         (widget) =>
@@ -137,6 +142,11 @@ void main() {
       tester,
       child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
     );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('assistant-task-group-local')),
+    );
+    await tester.pumpAndSettle();
 
     await tester.longPress(
       find.byKey(const ValueKey<String>('assistant-task-item-main')),
@@ -224,6 +234,44 @@ void main() {
       lessThan(tester.getTopLeft(remoteGroup).dy),
     );
   }, skip: true);
+
+  testWidgets('AssistantPage shows three collapsed task groups by default', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+    );
+
+    expect(
+      find.byKey(const ValueKey<String>('assistant-task-group-aiGatewayOnly')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('assistant-task-group-local')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('assistant-task-group-remote')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('assistant-task-item-main')),
+      findsNothing,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('assistant-task-group-local')),
+    );
+    await _pumpForUiSync(tester);
+
+    expect(
+      find.byKey(const ValueKey<String>('assistant-task-item-main')),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('AssistantPage can switch unified side pane tabs and collapse', (
     WidgetTester tester,
@@ -402,9 +450,9 @@ void main() {
     );
     await _pumpForUiSync(tester);
 
-    expect(find.text('仅 AI Gateway'), findsOneWidget);
+    expect(find.text('仅 AI Gateway'), findsWidgets);
     expect(find.text('本地 OpenClaw Gateway'), findsWidgets);
-    expect(find.text('远程 OpenClaw Gateway'), findsOneWidget);
+    expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
 
     await tester.tap(find.text('仅 AI Gateway').last);
     await _pumpForUiSync(tester);
