@@ -1412,6 +1412,8 @@ class AppController extends ChangeNotifier {
       executionTarget: resolvedTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
+    _recomputeTasks();
+    _notifyIfActive();
     await _applyAssistantExecutionTarget(
       resolvedTarget,
       sessionKey: _sessionsController.currentSessionKey,
