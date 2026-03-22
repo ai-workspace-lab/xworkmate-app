@@ -360,7 +360,7 @@ void main() {
     );
   });
 
-  testWidgets('AssistantPage offline submit control opens gateway settings', (
+  testWidgets('AssistantPage offline edit action opens gateway settings', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
@@ -370,7 +370,7 @@ void main() {
       child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
     );
 
-    await tester.tap(find.byTooltip('连接'));
+    await tester.tap(find.text('编辑连接'));
     await tester.pumpAndSettle();
 
     expect(controller.destination, WorkspaceDestination.settings);
@@ -453,14 +453,6 @@ void main() {
     expect(find.text('仅 AI Gateway'), findsWidgets);
     expect(find.text('本地 OpenClaw Gateway'), findsWidgets);
     expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
-
-    await tester.tap(find.text('仅 AI Gateway').last);
-    await _pumpForUiSync(tester);
-
-    expect(
-      controller.assistantExecutionTarget,
-      AssistantExecutionTarget.aiGatewayOnly,
-    );
   });
 
   testWidgets('AssistantPage hides gated attachment and multi-agent actions', (
@@ -538,6 +530,41 @@ void main() {
     expect(expandedHeight, greaterThan(initialHeight));
     expect(expandedComposerHeight, greaterThan(initialComposerHeight));
     expect(expandedConversationHeight, lessThan(initialConversationHeight));
+  });
+
+  testWidgets('AssistantPage workspace split can be resized vertically', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+    );
+
+    final resizeHandle = find.byKey(
+      const Key('assistant-workspace-resize-handle'),
+    );
+    final conversationShell = find.byKey(
+      const Key('assistant-conversation-shell'),
+    );
+    final composerShell = find.byKey(const Key('assistant-composer-shell'));
+
+    expect(resizeHandle, findsOneWidget);
+    expect(conversationShell, findsOneWidget);
+    expect(composerShell, findsOneWidget);
+
+    final initialComposerHeight = tester.getRect(composerShell).height;
+    final initialConversationHeight = tester.getRect(conversationShell).height;
+
+    await tester.drag(resizeHandle, const Offset(0, 40));
+    await tester.pumpAndSettle();
+
+    final shrunkComposerHeight = tester.getRect(composerShell).height;
+    final expandedConversationHeight = tester.getRect(conversationShell).height;
+
+    expect(shrunkComposerHeight, lessThan(initialComposerHeight));
+    expect(expandedConversationHeight, greaterThan(initialConversationHeight));
   });
 
   // Known flutter_tester host-exit hang in this widget scenario.

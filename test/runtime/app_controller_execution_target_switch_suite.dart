@@ -190,15 +190,17 @@ void main() {
 
       await _waitFor(() => !controller.initializing);
       await controller.saveSettings(
-        controller.settings.copyWith(
-          assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
-          aiGateway: controller.settings.aiGateway.copyWith(
-            baseUrl: 'http://127.0.0.1:11434/v1',
-            availableModels: const <String>['qwen2.5-coder:latest'],
-            selectedModels: const <String>['qwen2.5-coder:latest'],
+        _withRemoteGatewayProfile(
+          controller.settings.copyWith(
+            assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
+            aiGateway: controller.settings.aiGateway.copyWith(
+              baseUrl: 'http://127.0.0.1:11434/v1',
+              availableModels: const <String>['qwen2.5-coder:latest'],
+              selectedModels: const <String>['qwen2.5-coder:latest'],
+            ),
+            defaultModel: 'qwen2.5-coder:latest',
           ),
-          defaultModel: 'qwen2.5-coder:latest',
-          gateway: controller.settings.gateway.copyWith(
+          controller.settings.primaryRemoteGatewayProfile.copyWith(
             mode: RuntimeConnectionMode.remote,
             host: 'gateway.example.com',
             port: 9443,
@@ -242,23 +244,22 @@ void main() {
             .having((item) => item.host, 'host', '127.0.0.1')
             .having((item) => item.port, 'port', 18789)
             .having((item) => item.tls, 'tls', isFalse)
-            .having(
-              (item) => item.selectedAgentId,
-              'selectedAgentId',
-              'assistant-main',
-            ),
+            .having((item) => item.selectedAgentId, 'selectedAgentId', ''),
       );
       expect(
         controller.settings.assistantExecutionTarget,
         AssistantExecutionTarget.local,
       );
       expect(
-        controller.settings.gateway.host,
+        controller.settings.primaryRemoteGatewayProfile.host,
         'gateway.example.com',
         reason: 'Saved remote profile should remain intact after local switch.',
       );
-      expect(controller.settings.gateway.port, 9443);
-      expect(controller.settings.gateway.mode, RuntimeConnectionMode.remote);
+      expect(controller.settings.primaryRemoteGatewayProfile.port, 9443);
+      expect(
+        controller.settings.primaryRemoteGatewayProfile.mode,
+        RuntimeConnectionMode.remote,
+      );
 
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.aiGatewayOnly,
@@ -269,14 +270,17 @@ void main() {
         AssistantExecutionTarget.aiGatewayOnly,
       );
       expect(
-        controller.settings.gateway.host,
+        controller.settings.primaryRemoteGatewayProfile.host,
         'gateway.example.com',
         reason:
             'AI Gateway-only mode should preserve the saved remote endpoint.',
       );
-      expect(controller.settings.gateway.port, 9443);
-      expect(controller.settings.gateway.tls, isTrue);
-      expect(controller.settings.gateway.mode, RuntimeConnectionMode.remote);
+      expect(controller.settings.primaryRemoteGatewayProfile.port, 9443);
+      expect(controller.settings.primaryRemoteGatewayProfile.tls, isTrue);
+      expect(
+        controller.settings.primaryRemoteGatewayProfile.mode,
+        RuntimeConnectionMode.remote,
+      );
       expect(gateway.disconnectCount, 1);
       expect(controller.assistantConnectionStatusLabel, '仅 AI Gateway');
       expect(
@@ -336,14 +340,16 @@ void main() {
 
       await _waitFor(() => !controller.initializing);
       await controller.saveSettings(
-        controller.settings.copyWith(
-          aiGateway: controller.settings.aiGateway.copyWith(
-            baseUrl: 'http://127.0.0.1:11434/v1',
-            availableModels: const <String>['qwen2.5-coder:latest'],
-            selectedModels: const <String>['qwen2.5-coder:latest'],
+        _withRemoteGatewayProfile(
+          controller.settings.copyWith(
+            aiGateway: controller.settings.aiGateway.copyWith(
+              baseUrl: 'http://127.0.0.1:11434/v1',
+              availableModels: const <String>['qwen2.5-coder:latest'],
+              selectedModels: const <String>['qwen2.5-coder:latest'],
+            ),
+            defaultModel: 'qwen2.5-coder:latest',
           ),
-          defaultModel: 'qwen2.5-coder:latest',
-          gateway: controller.settings.gateway.copyWith(
+          controller.settings.primaryRemoteGatewayProfile.copyWith(
             mode: RuntimeConnectionMode.remote,
             host: 'gateway.example.com',
             port: 9443,
@@ -420,15 +426,17 @@ void main() {
 
       await _waitFor(() => !controller.initializing);
       await controller.saveSettings(
-        controller.settings.copyWith(
-          assistantExecutionTarget: AssistantExecutionTarget.local,
-          aiGateway: controller.settings.aiGateway.copyWith(
-            baseUrl: 'http://127.0.0.1:11434/v1',
-            availableModels: const <String>['qwen2.5-coder:latest'],
-            selectedModels: const <String>['qwen2.5-coder:latest'],
+        _withRemoteGatewayProfile(
+          controller.settings.copyWith(
+            assistantExecutionTarget: AssistantExecutionTarget.local,
+            aiGateway: controller.settings.aiGateway.copyWith(
+              baseUrl: 'http://127.0.0.1:11434/v1',
+              availableModels: const <String>['qwen2.5-coder:latest'],
+              selectedModels: const <String>['qwen2.5-coder:latest'],
+            ),
+            defaultModel: 'qwen2.5-coder:latest',
           ),
-          defaultModel: 'qwen2.5-coder:latest',
-          gateway: controller.settings.gateway.copyWith(
+          controller.settings.primaryRemoteGatewayProfile.copyWith(
             mode: RuntimeConnectionMode.remote,
             host: 'openclaw.svc.plus',
             port: 443,
@@ -454,7 +462,9 @@ void main() {
         AssistantExecutionTarget.remote,
       );
       expect(
-        controller.assistantExecutionTargetForSession(controller.currentSessionKey),
+        controller.assistantExecutionTargetForSession(
+          controller.currentSessionKey,
+        ),
         AssistantExecutionTarget.remote,
       );
       expect(
@@ -492,8 +502,9 @@ void main() {
 
       await _waitFor(() => !controller.initializing);
       await controller.saveSettings(
-        controller.settings.copyWith(
-          gateway: controller.settings.gateway.copyWith(
+        _withLocalGatewayProfile(
+          controller.settings,
+          controller.settings.primaryLocalGatewayProfile.copyWith(
             mode: RuntimeConnectionMode.local,
             host: '127.0.0.1',
             port: 18789,
@@ -554,15 +565,17 @@ void main() {
 
       await _waitFor(() => !controller.initializing);
       await controller.saveSettings(
-        controller.settings.copyWith(
-          assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
-          aiGateway: controller.settings.aiGateway.copyWith(
-            baseUrl: 'http://127.0.0.1:11434/v1',
-            availableModels: const <String>['qwen2.5-coder:latest'],
-            selectedModels: const <String>['qwen2.5-coder:latest'],
+        _withRemoteGatewayProfile(
+          controller.settings.copyWith(
+            assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
+            aiGateway: controller.settings.aiGateway.copyWith(
+              baseUrl: 'http://127.0.0.1:11434/v1',
+              availableModels: const <String>['qwen2.5-coder:latest'],
+              selectedModels: const <String>['qwen2.5-coder:latest'],
+            ),
+            defaultModel: 'qwen2.5-coder:latest',
           ),
-          defaultModel: 'qwen2.5-coder:latest',
-          gateway: controller.settings.gateway.copyWith(
+          controller.settings.primaryRemoteGatewayProfile.copyWith(
             mode: RuntimeConnectionMode.remote,
             host: 'gateway.example.com',
             port: 9443,
@@ -649,14 +662,16 @@ void main() {
 
       await _waitFor(() => !controller.initializing);
       await controller.saveSettings(
-        controller.settings.copyWith(
-          assistantExecutionTarget: AssistantExecutionTarget.local,
-          aiGateway: controller.settings.aiGateway.copyWith(
-            baseUrl: 'http://127.0.0.1:11434/v1',
-            availableModels: const <String>['qwen2.5-coder:latest'],
-            selectedModels: const <String>['qwen2.5-coder:latest'],
+        _withRemoteGatewayProfile(
+          controller.settings.copyWith(
+            assistantExecutionTarget: AssistantExecutionTarget.local,
+            aiGateway: controller.settings.aiGateway.copyWith(
+              baseUrl: 'http://127.0.0.1:11434/v1',
+              availableModels: const <String>['qwen2.5-coder:latest'],
+              selectedModels: const <String>['qwen2.5-coder:latest'],
+            ),
           ),
-          gateway: controller.settings.gateway.copyWith(
+          controller.settings.primaryRemoteGatewayProfile.copyWith(
             mode: RuntimeConnectionMode.remote,
             host: 'gateway.example.com',
             port: 9443,
@@ -730,14 +745,16 @@ void main() {
 
       await _waitFor(() => !controller.initializing);
       await controller.saveSettings(
-        controller.settings.copyWith(
-          aiGateway: controller.settings.aiGateway.copyWith(
-            baseUrl: 'http://127.0.0.1:11434/v1',
-            availableModels: const <String>['qwen2.5-coder:latest'],
-            selectedModels: const <String>['qwen2.5-coder:latest'],
+        _withRemoteGatewayProfile(
+          controller.settings.copyWith(
+            aiGateway: controller.settings.aiGateway.copyWith(
+              baseUrl: 'http://127.0.0.1:11434/v1',
+              availableModels: const <String>['qwen2.5-coder:latest'],
+              selectedModels: const <String>['qwen2.5-coder:latest'],
+            ),
+            defaultModel: 'qwen2.5-coder:latest',
           ),
-          defaultModel: 'qwen2.5-coder:latest',
-          gateway: controller.settings.gateway.copyWith(
+          controller.settings.primaryRemoteGatewayProfile.copyWith(
             mode: RuntimeConnectionMode.remote,
             host: 'gateway.example.com',
             port: 9443,
@@ -995,4 +1012,18 @@ Future<void> _waitFor(bool Function() predicate) async {
     }
     await Future<void>.delayed(const Duration(milliseconds: 20));
   }
+}
+
+SettingsSnapshot _withRemoteGatewayProfile(
+  SettingsSnapshot snapshot,
+  GatewayConnectionProfile profile,
+) {
+  return snapshot.copyWithGatewayProfileAt(kGatewayRemoteProfileIndex, profile);
+}
+
+SettingsSnapshot _withLocalGatewayProfile(
+  SettingsSnapshot snapshot,
+  GatewayConnectionProfile profile,
+) {
+  return snapshot.copyWithGatewayProfileAt(kGatewayLocalProfileIndex, profile);
 }

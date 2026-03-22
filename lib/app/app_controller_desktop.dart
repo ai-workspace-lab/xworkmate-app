@@ -713,7 +713,11 @@ class AppController extends ChangeNotifier {
   }
 
   bool get canQuickConnectGateway {
-    final profile = settings.gateway;
+    final target = currentAssistantExecutionTarget;
+    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+      return false;
+    }
+    final profile = _gatewayProfileForAssistantExecutionTarget(target);
     if (profile.useSetupCode && profile.setupCode.trim().isNotEmpty) {
       return true;
     }
@@ -724,7 +728,14 @@ class AppController extends ChangeNotifier {
     if (profile.mode == RuntimeConnectionMode.local) {
       return true;
     }
-    final defaults = GatewayConnectionProfile.defaults();
+    final defaults = switch (target) {
+      AssistantExecutionTarget.aiGatewayOnly =>
+        GatewayConnectionProfile.emptySlot(index: kGatewayRemoteProfileIndex),
+      AssistantExecutionTarget.local =>
+        GatewayConnectionProfile.defaultsLocal(),
+      AssistantExecutionTarget.remote =>
+        GatewayConnectionProfile.defaultsRemote(),
+    };
     return hasStoredGatewayCredential ||
         host != defaults.host ||
         profile.port != defaults.port ||
@@ -1128,25 +1139,34 @@ class AppController extends ChangeNotifier {
       token: resolvedToken,
       password: resolvedPassword,
     );
-    final nextProfile = settings.gateway.copyWith(
+    final resolvedTarget = _assistantExecutionTargetForMode(
+      _modeFromHost(decoded?.host ?? settings.primaryRemoteGatewayProfile.host),
+    );
+    final currentProfile = _gatewayProfileForAssistantExecutionTarget(
+      resolvedTarget,
+    );
+    final nextProfile = currentProfile.copyWith(
       useSetupCode: true,
       setupCode: setupCode.trim(),
-      host: decoded?.host ?? settings.gateway.host,
-      port: decoded?.port ?? settings.gateway.port,
-      tls: decoded?.tls ?? settings.gateway.tls,
-      mode: _modeFromHost(decoded?.host ?? settings.gateway.host),
+      host: decoded?.host ?? currentProfile.host,
+      port: decoded?.port ?? currentProfile.port,
+      tls: decoded?.tls ?? currentProfile.tls,
+      mode: resolvedTarget == AssistantExecutionTarget.local
+          ? RuntimeConnectionMode.local
+          : RuntimeConnectionMode.remote,
     );
-    final nextTarget = _assistantExecutionTargetForMode(nextProfile.mode);
     await saveSettings(
-      settings.copyWith(
-        gateway: nextProfile,
-        assistantExecutionTarget: nextTarget,
-      ),
+      settings
+          .copyWithGatewayProfileAt(
+            _gatewayProfileIndexForExecutionTarget(resolvedTarget),
+            nextProfile,
+          )
+          .copyWith(assistantExecutionTarget: resolvedTarget),
       refreshAfterSave: false,
     );
     _upsertAssistantThreadRecord(
       _sessionsController.currentSessionKey,
-      executionTarget: nextTarget,
+      executionTarget: resolvedTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     await _connectProfile(
@@ -1176,20 +1196,23 @@ class AppController extends ChangeNotifier {
     final resolvedPort = mode == RuntimeConnectionMode.local && port <= 0
         ? 18789
         : port;
-    final nextProfile = settings.gateway.copyWith(
-      mode: mode,
-      useSetupCode: false,
-      setupCode: '',
-      host: resolvedHost,
-      port: resolvedPort <= 0 ? 443 : resolvedPort,
-      tls: mode == RuntimeConnectionMode.local ? false : tls,
-    );
-    final nextTarget = _assistantExecutionTargetForMode(nextProfile.mode);
+    final nextTarget = _assistantExecutionTargetForMode(mode);
+    final nextProfile = _gatewayProfileForAssistantExecutionTarget(nextTarget)
+        .copyWith(
+          mode: mode,
+          useSetupCode: false,
+          setupCode: '',
+          host: resolvedHost,
+          port: resolvedPort <= 0 ? 443 : resolvedPort,
+          tls: mode == RuntimeConnectionMode.local ? false : tls,
+        );
     await saveSettings(
-      settings.copyWith(
-        gateway: nextProfile,
-        assistantExecutionTarget: nextTarget,
-      ),
+      settings
+          .copyWithGatewayProfileAt(
+            _gatewayProfileIndexForExecutionTarget(nextTarget),
+            nextProfile,
+          )
+          .copyWith(assistantExecutionTarget: nextTarget),
       refreshAfterSave: false,
     );
     _upsertAssistantThreadRecord(
@@ -1222,7 +1245,11 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> connectSavedGateway() async {
-    await _connectProfile(settings.gateway);
+    final target = currentAssistantExecutionTarget;
+    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+      return;
+    }
+    await _connectProfile(_gatewayProfileForAssistantExecutionTarget(target));
   }
 
   Future<void> clearStoredGatewayToken() async {
@@ -1294,13 +1321,20 @@ class AppController extends ChangeNotifier {
 
   Future<void> selectAgent(String? agentId) async {
     _agentsController.selectAgent(agentId);
-    final nextProfile = settings.gateway.copyWith(
-      selectedAgentId: _agentsController.selectedAgentId,
-    );
-    await saveSettings(
-      settings.copyWith(gateway: nextProfile),
-      refreshAfterSave: false,
-    );
+    if (currentAssistantExecutionTarget !=
+        AssistantExecutionTarget.aiGatewayOnly) {
+      final target = currentAssistantExecutionTarget;
+      final nextProfile = _gatewayProfileForAssistantExecutionTarget(
+        target,
+      ).copyWith(selectedAgentId: _agentsController.selectedAgentId);
+      await saveSettings(
+        settings.copyWithGatewayProfileAt(
+          _gatewayProfileIndexForExecutionTarget(target),
+          nextProfile,
+        ),
+        refreshAfterSave: false,
+      );
+    }
     _sessionsController.configure(
       mainSessionKey: _runtime.snapshot.mainSessionKey ?? 'main',
       selectedAgentId: _agentsController.selectedAgentId,
@@ -1976,7 +2010,9 @@ class AppController extends ChangeNotifier {
     setActiveAppLanguage(defaults.appLanguage);
     await _settingsController.resetSnapshot(defaults);
     _multiAgentOrchestrator.updateConfig(defaults.multiAgent);
-    _agentsController.restoreSelection(defaults.gateway.selectedAgentId);
+    _agentsController.restoreSelection(
+      defaults.primaryRemoteGatewayProfile.selectedAgentId,
+    );
     _modelsController.restoreFromSettings(defaults.aiGateway);
     await _setCurrentAssistantSessionKey('main', persistSelection: false);
     _chatController.clear();
@@ -2119,7 +2155,8 @@ class AppController extends ChangeNotifier {
     );
     final temporaryStore = SecureConfigStore(
       enableSecureStorage: false,
-      databasePathResolver: () async => '${temporaryRoot.path}/settings.sqlite3',
+      databasePathResolver: () async =>
+          '${temporaryRoot.path}/settings.sqlite3',
       fallbackDirectoryPathResolver: () async => temporaryRoot.path,
     );
     final runtime = GatewayRuntime(
@@ -2138,8 +2175,8 @@ class AppController extends ChangeNotifier {
       } catch (_) {
         // Connectivity succeeded; health is best-effort for the test path.
       }
-      final endpoint = runtime.snapshot.remoteAddress ??
-          '${profile.host}:${profile.port}';
+      final endpoint =
+          runtime.snapshot.remoteAddress ?? '${profile.host}:${profile.port}';
       return (
         state: 'success',
         message: appText('连接成功。', 'Connection succeeded.'),
@@ -2336,7 +2373,15 @@ class AppController extends ChangeNotifier {
       if (_disposed) {
         return;
       }
-      _agentsController.restoreSelection(settings.gateway.selectedAgentId);
+      final startupTarget = _sanitizeExecutionTarget(
+        settings.assistantExecutionTarget,
+      );
+      _agentsController.restoreSelection(
+        settings
+                .gatewayProfileForExecutionTarget(startupTarget)
+                ?.selectedAgentId ??
+            '',
+      );
       _sessionsController.configure(
         mainSessionKey: _runtime.snapshot.mainSessionKey ?? 'main',
         selectedAgentId: _agentsController.selectedAgentId,
@@ -2350,12 +2395,17 @@ class AppController extends ChangeNotifier {
       _runtimeEventsSubscription = _runtimeCoordinator.gateway.events.listen(
         _handleRuntimeEvent,
       );
+      final startupProfile = settings.gatewayProfileForExecutionTarget(
+        startupTarget,
+      );
       final shouldAutoConnect =
-          settings.gateway.useSetupCode &&
-          settings.gateway.setupCode.trim().isNotEmpty;
+          startupTarget != AssistantExecutionTarget.aiGatewayOnly &&
+          startupProfile != null &&
+          startupProfile.useSetupCode &&
+          startupProfile.setupCode.trim().isNotEmpty;
       if (shouldAutoConnect) {
         try {
-          await _connectProfile(settings.gateway);
+          await _connectProfile(startupProfile);
         } catch (_) {
           // Keep the shell usable when auto-connect fails.
         }
@@ -2433,7 +2483,12 @@ class AppController extends ChangeNotifier {
     SettingsSnapshot next,
   ) {
     final gatewayChanged =
-        previous.gateway.toJson().toString() != next.gateway.toJson().toString() ||
+        jsonEncode(
+              previous.gatewayProfiles.map((item) => item.toJson()).toList(),
+            ) !=
+            jsonEncode(
+              next.gatewayProfiles.map((item) => item.toJson()).toList(),
+            ) ||
         previous.assistantExecutionTarget != next.assistantExecutionTarget ||
         _draftSecretValues.containsKey(_draftGatewayTokenKey) ||
         _draftSecretValues.containsKey(_draftGatewayPasswordKey);
@@ -2488,7 +2543,14 @@ class AppController extends ChangeNotifier {
   }) async {
     setActiveAppLanguage(current.appLanguage);
     _multiAgentOrchestrator.updateConfig(current.multiAgent);
-    _agentsController.restoreSelection(current.gateway.selectedAgentId);
+    _agentsController.restoreSelection(
+      current
+              .gatewayProfileForExecutionTarget(
+                _sanitizeExecutionTarget(current.assistantExecutionTarget),
+              )
+              ?.selectedAgentId ??
+          '',
+    );
     _modelsController.restoreFromSettings(current.aiGateway);
     if (_disposed) {
       return;
@@ -3791,10 +3853,13 @@ class AppController extends ChangeNotifier {
   }
 
   GatewayMode _bridgeGatewayMode() {
-    return switch (settings.gateway.mode) {
-      RuntimeConnectionMode.local => GatewayMode.local,
-      RuntimeConnectionMode.remote => GatewayMode.remote,
-      RuntimeConnectionMode.unconfigured => GatewayMode.offline,
+    if (!_runtime.isConnected) {
+      return GatewayMode.offline;
+    }
+    return switch (currentAssistantExecutionTarget) {
+      AssistantExecutionTarget.aiGatewayOnly => GatewayMode.offline,
+      AssistantExecutionTarget.local => GatewayMode.local,
+      AssistantExecutionTarget.remote => GatewayMode.remote,
     };
   }
 
@@ -3955,55 +4020,23 @@ class AppController extends ChangeNotifier {
   GatewayConnectionProfile _gatewayProfileForAssistantExecutionTarget(
     AssistantExecutionTarget target,
   ) {
-    if (target == AssistantExecutionTarget.aiGatewayOnly) {
-      return settings.gateway.copyWith(
-        mode: RuntimeConnectionMode.unconfigured,
-        useSetupCode: false,
-        setupCode: '',
-      );
-    }
-
-    final desiredMode = switch (target) {
-      AssistantExecutionTarget.aiGatewayOnly =>
-        RuntimeConnectionMode.unconfigured,
-      AssistantExecutionTarget.local => RuntimeConnectionMode.local,
-      AssistantExecutionTarget.remote => RuntimeConnectionMode.remote,
+    return switch (target) {
+      AssistantExecutionTarget.local => settings.primaryLocalGatewayProfile,
+      AssistantExecutionTarget.remote => settings.primaryRemoteGatewayProfile,
+      AssistantExecutionTarget.aiGatewayOnly => throw StateError(
+        'AI Gateway only target has no OpenClaw gateway profile.',
+      ),
     };
-    final savedProfile = settings.gateway;
-    if (savedProfile.mode == desiredMode) {
-      return savedProfile;
-    }
+  }
 
-    if (desiredMode == RuntimeConnectionMode.local) {
-      return savedProfile.copyWith(
-        mode: RuntimeConnectionMode.local,
-        useSetupCode: false,
-        setupCode: '',
-        host: '127.0.0.1',
-        port: 18789,
-        tls: false,
-      );
-    }
-
-    final defaults = GatewayConnectionProfile.defaults();
-    final useDefaultRemoteEndpoint =
-        savedProfile.host.trim().isEmpty ||
-        _isLoopbackHost(savedProfile.host) ||
-        savedProfile.port <= 0;
-    final savedHost = useDefaultRemoteEndpoint
-        ? defaults.host
-        : savedProfile.host.trim();
-    final savedPort = useDefaultRemoteEndpoint
-        ? defaults.port
-        : savedProfile.port;
-    return savedProfile.copyWith(
-      mode: RuntimeConnectionMode.remote,
-      useSetupCode: false,
-      setupCode: '',
-      host: savedHost,
-      port: savedPort,
-      tls: useDefaultRemoteEndpoint ? defaults.tls : savedProfile.tls,
-    );
+  int _gatewayProfileIndexForExecutionTarget(AssistantExecutionTarget target) {
+    return switch (target) {
+      AssistantExecutionTarget.local => kGatewayLocalProfileIndex,
+      AssistantExecutionTarget.remote => kGatewayRemoteProfileIndex,
+      AssistantExecutionTarget.aiGatewayOnly => throw StateError(
+        'AI Gateway only target has no OpenClaw gateway profile index.',
+      ),
+    };
   }
 }
 

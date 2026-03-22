@@ -108,9 +108,31 @@ void main() {
     expect(find.text('OpenClaw Gateway'), findsOneWidget);
     expect(find.text('Vault Server'), findsOneWidget);
     expect(find.byKey(const ValueKey('ai-gateway-url-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('gateway-mode-field')), findsNothing);
+    expect(find.text('认证诊断'), findsNothing);
     expect(find.byKey(const ValueKey('gateway-test-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('gateway-save-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('gateway-apply-button')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('gateway-profile-chip-0')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('gateway-profile-chip-1')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('gateway-profile-chip-2')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('gateway-profile-chip-3')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('gateway-profile-chip-4')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('gateway-device-security-card')),
       findsOneWidget,

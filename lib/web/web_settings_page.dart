@@ -78,6 +78,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
 
   void _syncControllers() {
     final settings = widget.controller.settings;
+    final relayProfile = settings.primaryRemoteGatewayProfile;
     _setIfDifferent(_directNameController, settings.aiGateway.name);
     _setIfDifferent(_directBaseUrlController, settings.aiGateway.baseUrl);
     _setIfDifferent(_directProviderController, settings.defaultProvider);
@@ -87,8 +88,8 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           ? ''
           : _directApiKeyController.text,
     );
-    _setIfDifferent(_relayHostController, settings.gateway.host);
-    _setIfDifferent(_relayPortController, '${settings.gateway.port}');
+    _setIfDifferent(_relayHostController, relayProfile.host);
+    _setIfDifferent(_relayPortController, '${relayProfile.port}');
     _setIfDifferent(
       _relayTokenController,
       widget.controller.storedRelayTokenMask == null
@@ -270,6 +271,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     SettingsSnapshot settings,
   ) {
     final palette = context.palette;
+    final relayProfile = settings.primaryRemoteGatewayProfile;
     return [
       SurfaceCard(
         child: Row(
@@ -585,7 +587,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
                   ),
                 ),
                 Switch(
-                  value: settings.gateway.tls,
+                  value: relayProfile.tls,
                   onChanged: (value) => controller.saveRelayConfiguration(
                     host: _relayHostController.text,
                     port: int.tryParse(_relayPortController.text.trim()) ?? 443,
@@ -606,7 +608,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
                   onPressed: () => controller.saveRelayConfiguration(
                     host: _relayHostController.text,
                     port: int.tryParse(_relayPortController.text.trim()) ?? 443,
-                    tls: settings.gateway.tls,
+                    tls: relayProfile.tls,
                     token: _relayTokenController.text,
                     password: _relayPasswordController.text,
                   ),
@@ -624,7 +626,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
                                     _relayPortController.text.trim(),
                                   ) ??
                                   443,
-                              tls: settings.gateway.tls,
+                              tls: relayProfile.tls,
                               token: _relayTokenController.text,
                               password: _relayPasswordController.text,
                             );
