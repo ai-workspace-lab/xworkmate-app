@@ -153,7 +153,7 @@ class AppController extends ChangeNotifier {
   WorkspaceDestination _destination = WorkspaceDestination.assistant;
   ThemeMode _themeMode = ThemeMode.light;
   AppSidebarState _sidebarState = AppSidebarState.expanded;
-  ModulesTab _modulesTab = ModulesTab.gateway;
+  ModulesTab _modulesTab = ModulesTab.nodes;
   SecretsTab _secretsTab = SecretsTab.vault;
   AiGatewayTab _aiGatewayTab = AiGatewayTab.models;
   SettingsTab _settingsTab = SettingsTab.general;
@@ -876,6 +876,11 @@ class AppController extends ChangeNotifier {
     if (!capabilities.supportsDestination(destination)) {
       return;
     }
+    if (destination == WorkspaceDestination.aiGateway ||
+        destination == WorkspaceDestination.secrets) {
+      openSettings(tab: SettingsTab.gateway);
+      return;
+    }
     final nextModulesTab = switch (destination) {
       WorkspaceDestination.nodes => ModulesTab.nodes,
       WorkspaceDestination.agents => ModulesTab.agents,
@@ -926,7 +931,11 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  void openModules({ModulesTab tab = ModulesTab.gateway}) {
+  void openModules({ModulesTab tab = ModulesTab.nodes}) {
+    if (tab == ModulesTab.gateway) {
+      openSettings(tab: SettingsTab.gateway);
+      return;
+    }
     final destination = tab == ModulesTab.agents
         ? WorkspaceDestination.agents
         : WorkspaceDestination.nodes;
@@ -959,24 +968,11 @@ class AppController extends ChangeNotifier {
   }
 
   void openSecrets({SecretsTab tab = SecretsTab.vault}) {
-    if (!capabilities.supportsDestination(WorkspaceDestination.secrets)) {
+    if (!capabilities.supportsDestination(WorkspaceDestination.settings)) {
       return;
     }
-    final changed =
-        _destination != WorkspaceDestination.secrets ||
-        _secretsTab != tab ||
-        _detailPanel != null ||
-        _settingsDetail != null ||
-        _settingsNavigationContext != null;
-    if (!changed) {
-      return;
-    }
-    _destination = WorkspaceDestination.secrets;
     _secretsTab = tab;
-    _detailPanel = null;
-    _settingsDetail = null;
-    _settingsNavigationContext = null;
-    notifyListeners();
+    openSettings(tab: SettingsTab.gateway);
   }
 
   void setSecretsTab(SecretsTab tab) {
@@ -988,24 +984,11 @@ class AppController extends ChangeNotifier {
   }
 
   void openAiGateway({AiGatewayTab tab = AiGatewayTab.models}) {
-    if (!capabilities.supportsDestination(WorkspaceDestination.aiGateway)) {
+    if (!capabilities.supportsDestination(WorkspaceDestination.settings)) {
       return;
     }
-    final changed =
-        _destination != WorkspaceDestination.aiGateway ||
-        _aiGatewayTab != tab ||
-        _detailPanel != null ||
-        _settingsDetail != null ||
-        _settingsNavigationContext != null;
-    if (!changed) {
-      return;
-    }
-    _destination = WorkspaceDestination.aiGateway;
     _aiGatewayTab = tab;
-    _detailPanel = null;
-    _settingsDetail = null;
-    _settingsNavigationContext = null;
-    notifyListeners();
+    openSettings(tab: SettingsTab.gateway);
   }
 
   void setAiGatewayTab(AiGatewayTab tab) {
@@ -2129,9 +2112,17 @@ class AppController extends ChangeNotifier {
       );
     }
 
+    final temporaryRoot = await Directory.systemTemp.createTemp(
+      'xworkmate-gateway-test-',
+    );
+    final temporaryStore = SecureConfigStore(
+      enableSecureStorage: false,
+      databasePathResolver: () async => '${temporaryRoot.path}/settings.sqlite3',
+      fallbackDirectoryPathResolver: () async => temporaryRoot.path,
+    );
     final runtime = GatewayRuntime(
-      store: _store,
-      identityStore: DeviceIdentityStore(_store),
+      store: temporaryStore,
+      identityStore: DeviceIdentityStore(temporaryStore),
     );
     await runtime.initialize();
     try {
@@ -2165,6 +2156,12 @@ class AppController extends ChangeNotifier {
         // Ignore teardown noise from temporary connectivity checks.
       }
       runtime.dispose();
+      temporaryStore.dispose();
+      try {
+        await temporaryRoot.delete(recursive: true);
+      } catch (_) {
+        // Ignore cleanup noise for temporary connectivity checks.
+      }
     }
   }
 
@@ -2794,8 +2791,8 @@ class AppController extends ChangeNotifier {
         sessionKey,
         _assistantErrorMessage(
           appText(
-            '当前没有可用的 AI Gateway 对话模型。请先在 AI Gateway 页面同步并选择可用模型。',
-            'No AI Gateway chat model is available yet. Sync and select a supported model in AI Gateway first.',
+            '当前没有可用的 AI Gateway 对话模型。请先在 设置 -> 集成 中同步并选择可用模型。',
+            'No AI Gateway chat model is available yet. Sync and select a supported model in Settings -> Integrations first.',
           ),
         ),
       );

@@ -8,7 +8,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
-import 'package:xworkmate/features/ai_gateway/ai_gateway_page.dart';
 import 'package:xworkmate/features/settings/settings_page.dart';
 import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
@@ -56,8 +55,8 @@ class _FakeCodexRuntime extends CodexRuntime {
   Future<void> stop() async {}
 }
 
-class _AiGatewayPageTestController extends AppController {
-  _AiGatewayPageTestController({
+class _AiGatewaySettingsShortcutTestController extends AppController {
+  _AiGatewaySettingsShortcutTestController({
     required super.store,
     required super.runtimeCoordinator,
   });
@@ -67,43 +66,46 @@ class _AiGatewayPageTestController extends AppController {
 }
 
 void main() {
-  testWidgets('AiGatewayPage edit settings opens detail context', (
+  testWidgets('AI Gateway shortcut routes to Settings center', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
 
-    await pumpPage(
-      tester,
-      child: AiGatewayPage(controller: controller, onOpenDetail: (_) {}),
-    );
-
-    await tester.tap(find.text('编辑设置'));
-    await tester.pumpAndSettle();
+    controller.navigateTo(WorkspaceDestination.aiGateway);
 
     expect(controller.destination, WorkspaceDestination.settings);
-    expect(controller.settingsDetail, SettingsDetailPage.aiGatewayIntegration);
-    expect(
-      controller.settingsNavigationContext?.aiGatewayTab,
-      AiGatewayTab.models,
+    expect(controller.settingsTab, SettingsTab.gateway);
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(
+        controller: controller,
+        initialTab: controller.settingsTab,
+        initialDetail: controller.settingsDetail,
+        navigationContext: controller.settingsNavigationContext,
+      ),
     );
+
+    expect(find.text('OpenClaw Gateway'), findsOneWidget);
+    expect(find.text('AI Gateway'), findsWidgets);
   });
 
   testWidgets(
-    'Settings external agents detail shows Codex bridge runtime states',
+    'Settings external agents detail keeps Codex bridge runtime states',
     (WidgetTester tester) async {
       late AppController controller;
       late Directory testRoot;
       await tester.runAsync(() async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
         testRoot = await Directory.systemTemp.createTemp(
-          'xworkmate-ai-gateway-page-',
+          'xworkmate-ai-gateway-shortcut-',
         );
         final store = SecureConfigStore(
           enableSecureStorage: false,
           databasePathResolver: () async => '${testRoot.path}/settings.sqlite3',
           fallbackDirectoryPathResolver: () async => testRoot.path,
         );
-        controller = _AiGatewayPageTestController(
+        controller = _AiGatewaySettingsShortcutTestController(
           store: store,
           runtimeCoordinator: RuntimeCoordinator(
             gateway: _FakeGatewayRuntime(),
@@ -129,10 +131,10 @@ void main() {
       controller.openSettings(
         detail: SettingsDetailPage.externalAgents,
         navigationContext: SettingsNavigationContext(
-          rootLabel: 'AI Gateway',
-          destination: WorkspaceDestination.aiGateway,
-          sectionLabel: AiGatewayTab.tools.label,
-          aiGatewayTab: AiGatewayTab.tools,
+          rootLabel: '设置',
+          destination: WorkspaceDestination.settings,
+          sectionLabel: SettingsTab.agents.label,
+          settingsTab: SettingsTab.agents,
         ),
       );
 
@@ -175,7 +177,7 @@ void main() {
       late File codexBinary;
       await tester.runAsync(() async {
         tempDir = await Directory.systemTemp.createTemp(
-          'codex-ai-gateway-page-',
+          'codex-ai-gateway-shortcut-',
         );
         codexBinary = File('${tempDir.path}/codex');
         await codexBinary.writeAsString('#!/bin/sh\nexit 0\n');

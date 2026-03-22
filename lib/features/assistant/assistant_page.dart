@@ -897,7 +897,7 @@ class _AssistantPageState extends State<AssistantPage> {
   }
 
   void _openAiGatewaySettings() {
-    widget.controller.navigateTo(WorkspaceDestination.aiGateway);
+    widget.controller.openSettings(tab: SettingsTab.gateway);
   }
 
   void _focusComposer() {
@@ -2276,8 +2276,8 @@ class _AssistantEmptyState extends StatelessWidget {
                   'This mode handles the current task through AI Gateway only and does not open an OpenClaw Gateway session.',
                 )
               : appText(
-                  '请先在 Settings -> AI Gateway 中配置地址、API Key 和默认模型，然后继续当前任务。',
-                  'Set the AI Gateway URL, API key, and default model in Settings -> AI Gateway, then continue this task.',
+                  '请先在 设置 -> 集成 中配置 AI Gateway 地址、API Key 和默认模型，然后继续当前任务。',
+                  'Set the AI Gateway URL, API key, and default model in Settings -> Integrations, then continue this task.',
                 )
         : connected
         ? appText(
@@ -2301,12 +2301,14 @@ class _AssistantEmptyState extends StatelessWidget {
                   'After connecting, you can chat, create tasks, and read results in this session.',
                 ));
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(8),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
           child: Container(
+            key: const Key('assistant-empty-state-card'),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: context.palette.surfacePrimary.withValues(alpha: 0.92),
@@ -2348,7 +2350,7 @@ class _AssistantEmptyState extends StatelessWidget {
                         connected
                             ? appText('开始输入', 'Start typing')
                             : aiGatewayOnly
-                            ? appText('配置 AI Gateway', 'Configure AI Gateway')
+                            ? appText('打开配置中心', 'Open settings')
                             : reconnectAvailable
                             ? appText('重新连接', 'Reconnect')
                             : appText('连接 Gateway', 'Connect gateway'),
@@ -2376,7 +2378,7 @@ class _AssistantEmptyState extends StatelessWidget {
                         ),
                         label: Text(
                           aiGatewayOnly
-                              ? appText('打开 AI Gateway', 'Open AI Gateway')
+                              ? appText('打开设置中心', 'Open settings')
                               : appText('编辑连接', 'Edit connection'),
                         ),
                         style: OutlinedButton.styleFrom(
