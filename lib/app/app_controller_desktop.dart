@@ -1352,6 +1352,8 @@ class AppController extends ChangeNotifier {
     );
     if (nextTarget == AssistantExecutionTarget.aiGatewayOnly) {
       await discoverGatewayOnlySkillsForSession(nextSessionKey);
+    } else {
+      await dismissDiscoveredSkillsForSession(nextSessionKey);
     }
     _recomputeTasks();
   }
@@ -1883,8 +1885,8 @@ class AppController extends ChangeNotifier {
     _settingsDraftInitialized = true;
     _pendingSettingsApply = true;
     _settingsDraftStatusMessage = appText(
-      '已保存设置，等待应用。',
-      'Settings saved. Apply to activate runtime changes.',
+      '已保存配置，不立即生效。',
+      'Settings saved. They do not take effect until Apply.',
     );
     notifyListeners();
   }
@@ -1923,8 +1925,8 @@ class AppController extends ChangeNotifier {
     _settingsDraft = settings;
     _settingsDraftInitialized = true;
     _settingsDraftStatusMessage = appText(
-      '已应用全部设置。',
-      'All saved settings have been applied.',
+      '已按当前配置生效。',
+      'The current configuration is now in effect.',
     );
     notifyListeners();
   }
@@ -2516,22 +2518,29 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> _applyPersistedGatewaySettings(SettingsSnapshot snapshot) async {
-    if (snapshot.assistantExecutionTarget == AssistantExecutionTarget.aiGatewayOnly) {
-      if (_runtime.isConnected) {
-        try {
-          await disconnectGateway();
-        } catch (_) {
-          // Keep saved settings even when runtime teardown is noisy.
-        }
-      }
-      return;
+    final target = _sanitizeExecutionTarget(snapshot.assistantExecutionTarget);
+    final sessionKey = _normalizedAssistantSessionKey(
+      _sessionsController.currentSessionKey,
+    );
+    _upsertAssistantThreadRecord(
+      sessionKey,
+      executionTarget: target,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    _recomputeTasks();
+    _notifyIfActive();
+    await _applyAssistantExecutionTarget(
+      target,
+      sessionKey: sessionKey,
+      persistDefaultSelection: false,
+    );
+    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+      await discoverGatewayOnlySkillsForSession(sessionKey);
+    } else {
+      await dismissDiscoveredSkillsForSession(sessionKey);
     }
-    try {
-      await _connectProfile(snapshot.gateway);
-    } catch (_) {
-      // Save/apply should keep persisted config even if the immediate
-      // connection attempt fails.
-    }
+    _recomputeTasks();
+    _notifyIfActive();
   }
 
   Future<void> _applyPersistedAiGatewaySettings(

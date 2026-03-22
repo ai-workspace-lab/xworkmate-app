@@ -394,6 +394,78 @@ void main() {
   );
 
   test(
+    'AppController applySettingsDraft syncs the active session execution target',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-apply-settings-sync-',
+      );
+      addTearDown(() async {
+        await _deleteDirectoryWithRetry(tempDirectory);
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final gateway = _FakeGatewayRuntime(store: store);
+      final controller = AppController(
+        store: store,
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: gateway,
+          codex: _FakeCodexRuntime(),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      await controller.saveSettings(
+        controller.settings.copyWith(
+          assistantExecutionTarget: AssistantExecutionTarget.local,
+          aiGateway: controller.settings.aiGateway.copyWith(
+            baseUrl: 'http://127.0.0.1:11434/v1',
+            availableModels: const <String>['qwen2.5-coder:latest'],
+            selectedModels: const <String>['qwen2.5-coder:latest'],
+          ),
+          defaultModel: 'qwen2.5-coder:latest',
+          gateway: controller.settings.gateway.copyWith(
+            mode: RuntimeConnectionMode.remote,
+            host: 'openclaw.svc.plus',
+            port: 443,
+            tls: true,
+          ),
+        ),
+        refreshAfterSave: false,
+      );
+
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.local,
+      );
+
+      await controller.saveSettingsDraft(
+        controller.settingsDraft.copyWith(
+          assistantExecutionTarget: AssistantExecutionTarget.remote,
+        ),
+      );
+      await controller.applySettingsDraft();
+
+      expect(
+        controller.currentAssistantExecutionTarget,
+        AssistantExecutionTarget.remote,
+      );
+      expect(
+        controller.assistantExecutionTargetForSession(controller.currentSessionKey),
+        AssistantExecutionTarget.remote,
+      );
+      expect(
+        controller.assistantConnectionTargetLabel,
+        'openclaw.svc.plus:443',
+      );
+      expect(gateway.connectedProfiles.last.mode, RuntimeConnectionMode.remote);
+    },
+  );
+
+  test(
     'AppController does not leak the local endpoint into remote thread status while reconnecting',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});

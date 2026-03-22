@@ -378,13 +378,13 @@ class _SettingsPageState extends State<SettingsPage> {
                       ? message
                       : hasDraft
                       ? appText(
-                          '当前存在未保存草稿。保存会持久化配置，但不会触发连接或模型同步。',
-                          'There are unsaved drafts. Save persists settings without connecting or syncing models.',
+                          '当前存在未保存草稿。保存：仅保存配置，不立即生效。',
+                          'There are unsaved drafts. Save persists configuration only and does not apply it immediately.',
                         )
                       : hasPendingApply
                       ? appText(
-                          '当前存在已保存但未应用的更改。点击应用会触发连接和模型同步。',
-                          'There are saved changes waiting to be applied. Apply will trigger connection and model sync.',
+                          '当前存在已保存但未应用的更改。应用：立即按当前配置生效。',
+                          'There are saved changes waiting to be applied. Apply makes the current configuration take effect immediately.',
                         )
                       : (message.isEmpty
                             ? appText(
@@ -933,8 +933,8 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 8),
           Text(
             appText(
-              '统一编辑本地 / 远程 OpenClaw Gateway 的连接参数。保存只持久化，应用才会按当前模式发起连接或切换为仅 AI Gateway。',
-              'Edit local and remote OpenClaw gateway settings in one place. Save persists only; Apply connects or switches to AI Gateway-only mode.',
+              '统一编辑本地 / 远程 OpenClaw Gateway 的连接参数。保存：仅保存配置，不立即生效。应用：立即按当前配置生效。',
+              'Edit local and remote OpenClaw gateway settings in one place. Save persists configuration only and does not apply it immediately. Apply makes the current configuration take effect immediately.',
             ),
             style: theme.textTheme.bodyMedium,
           ),
@@ -2602,7 +2602,6 @@ class _SettingsPageState extends State<SettingsPage> {
     final profile = _buildGatewayDraftProfile(settings);
     final nextSettings = settings.copyWith(
       gateway: profile,
-      assistantExecutionTarget: _assistantExecutionTargetForMode(profile.mode),
     );
     await _saveSettings(controller, nextSettings);
     if (!mounted) {
