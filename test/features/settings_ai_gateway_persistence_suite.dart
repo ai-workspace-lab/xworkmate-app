@@ -14,7 +14,7 @@ import '../test_support.dart';
 
 void main() {
   testWidgets(
-    'SettingsPage AI Gateway draft/save/apply flow persists edited fields through the global actions',
+    'SettingsPage AI Gateway draft/save/apply flow persists edited fields through local actions',
     (WidgetTester tester) async {
       late _AiGatewaySettingsTestController controller;
       await tester.runAsync(() async {
@@ -53,10 +53,7 @@ void main() {
         );
       });
 
-      await pumpPage(
-        tester,
-        child: SettingsPage(controller: controller),
-      );
+      await pumpPage(tester, child: SettingsPage(controller: controller));
 
       await tester.tap(find.text('集成'));
       await tester.pump(const Duration(milliseconds: 300));
@@ -83,18 +80,27 @@ void main() {
             .text,
         'https://api.svc.plus/v1',
       );
-      expect(find.byKey(const ValueKey('ai-gateway-save-button')), findsOneWidget);
-      expect(find.byKey(const ValueKey('ai-gateway-apply-button')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('ai-gateway-save-button')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('ai-gateway-apply-button')),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const ValueKey('settings-global-save-button')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const ValueKey('settings-global-apply-button')),
-        findsOneWidget,
+        findsNothing,
       );
 
-      expect(controller.settingsDraft.aiGateway.baseUrl, 'https://api.svc.plus/v1');
+      expect(
+        controller.settingsDraft.aiGateway.baseUrl,
+        'https://api.svc.plus/v1',
+      );
       expect(controller.settings.aiGateway.baseUrl, isEmpty);
 
       final saveButton = tester.widget<OutlinedButton>(

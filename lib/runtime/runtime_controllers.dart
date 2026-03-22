@@ -136,6 +136,14 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<String> loadGatewayToken() async {
+    return (await _store.loadGatewayToken())?.trim() ?? '';
+  }
+
+  Future<String> loadGatewayPassword() async {
+    return (await _store.loadGatewayPassword())?.trim() ?? '';
+  }
+
   Future<void> saveOllamaCloudApiKey(String value) async {
     final trimmed = value.trim();
     if (trimmed.isEmpty) {

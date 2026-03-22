@@ -161,6 +161,19 @@ XWorkmate 统一维护两类状态：
 - 远程 Gateway 不允许静默降级为非 TLS
 - 协作事件与 metadata 不上传本地 secret 或本机绝对路径
 
+## 8. 设置页统一动作语义（Gateway 家族）
+
+`OpenClaw Gateway`、`Vault`、`AI Gateway`（以及后续外部扩展）统一遵循同一操作语义：
+
+- `Test`：只使用当前草稿（含当前输入的临时 secret 覆盖）做连通性校验，不写入持久层。
+- `Save`：把草稿同步到本地持久存储（`SettingsStore` + `SecretStore`），不立即改变运行时会话行为。
+- `Apply`：在 `Save` 的基础上，立即让当前运行时按新配置生效。
+
+实现约束：
+
+- Gateway 集成页不再重复显示顶层全局 `Save / Apply`，避免与卡片内动作语义冲突。
+- `settings.gateway_setup_code` 与 `settings.agents` 当前均按 `experimental + enabled: false` 发布策略控制。
+
 ## 相关代码
 
 - `lib/app/app_controller.dart`

@@ -579,7 +579,20 @@ switchSession(sessionKey) must synchronize:
 - gatewayProfiles changes must not silently overwrite the current thread mode
 - platform capability filtering must not invent unsupported work modes
 
-6.4 What task list must never do
+6.5 Integration cards share one action contract
+
+Gateway-family cards (`OpenClaw Gateway` / `Vault` / `AI Gateway`) and future
+extensions must keep the same contract:
+
+- Test = validate current draft only (including temporary secret overrides), no
+  persistence side effects
+- Save = persist draft + secure secrets only
+- Apply = make saved draft effective in runtime/session state
+
+To avoid semantic duplication, the Gateway settings tab uses local card actions
+and does not render another global Save/Apply action row.
+
+6.6 What task list must never do
 
 Task list must never:
 - own executionTarget
