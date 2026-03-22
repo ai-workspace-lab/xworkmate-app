@@ -106,10 +106,15 @@ class SecretStore {
   SecretStore({
     Future<String?> Function()? fallbackDirectoryPathResolver,
     Future<String?> Function()? databasePathResolver,
+    Future<String?> Function()? defaultSupportDirectoryPathResolver,
+    bool allowInMemoryFallback = false,
     SecureStorageClient? secureStorage,
     bool enableSecureStorage = true,
   }) : _fallbackDirectoryPathResolver = fallbackDirectoryPathResolver,
        _databasePathResolver = databasePathResolver,
+       _defaultSupportDirectoryPathResolver =
+           defaultSupportDirectoryPathResolver,
+       _allowInMemoryFallback = allowInMemoryFallback,
        _secureStorageOverride = secureStorage,
        _enableSecureStorage = enableSecureStorage;
 
@@ -137,6 +142,8 @@ class SecretStore {
   final Map<String, String> _memorySecure = <String, String>{};
   final Future<String?> Function()? _fallbackDirectoryPathResolver;
   final Future<String?> Function()? _databasePathResolver;
+  final Future<String?> Function()? _defaultSupportDirectoryPathResolver;
+  final bool _allowInMemoryFallback;
   final SecureStorageClient? _secureStorageOverride;
   final bool _enableSecureStorage;
   SecureStorageClient? _secureStorage;
@@ -146,6 +153,7 @@ class SecretStore {
     if (_initialized) {
       return;
     }
+    await _ensureDurableStorageLayout();
     if (_enableSecureStorage) {
       if (_secureStorageOverride != null) {
         _secureStorage = _secureStorageOverride;
@@ -162,6 +170,24 @@ class SecretStore {
       }
     }
     _initialized = true;
+  }
+
+  Future<void> _ensureDurableStorageLayout() async {
+    final fallbackDirectory = await _resolveFallbackDirectory();
+    if (fallbackDirectory == null) {
+      if (_allowInMemoryFallback) {
+        return;
+      }
+      throw StateError(
+        'Durable secret storage layout unavailable: cannot resolve fallback directory.',
+      );
+    }
+    final secureStorageDirectory = Directory(
+      '${fallbackDirectory.path}/secure-storage',
+    );
+    if (!await secureStorageDirectory.exists()) {
+      await secureStorageDirectory.create(recursive: true);
+    }
   }
 
   Future<String?> loadGatewayToken() => _readSecure(_gatewayTokenKey);
@@ -308,6 +334,9 @@ class SecretStore {
   }
 
   Future<void> dispose() async {
+    if (_allowInMemoryFallback && _memorySecure.isNotEmpty) {
+      await _syncMemorySecretsToDurableStore();
+    }
     _secureStorage = null;
     _initialized = false;
     _memorySecure.clear();
@@ -346,7 +375,7 @@ class SecretStore {
           return value.trim();
         }
       } catch (_) {
-        if (await _promoteToFileSecureStorageForTests()) {
+        if (await _promoteToFileSecureStorageFallback()) {
           try {
             final value = await _readSecureValue(_secureStorage!, key);
             if (value != null && value.trim().isNotEmpty) {
@@ -369,17 +398,49 @@ class SecretStore {
       return;
     }
     if (_secureStorage == null &&
-        !await _promoteToFileSecureStorageForTests()) {
-      _memorySecure[key] = trimmed;
+        !await _promoteToFileSecureStorageFallback()) {
+      if (_allowInMemoryFallback) {
+        _memorySecure[key] = trimmed;
+        unawaited(_syncMemorySecretsToDurableStore());
+        return;
+      }
+      throw StateError(
+        'Durable secret storage unavailable for $key: secure storage and file fallback both failed.',
+      );
+    }
+    if (_secureStorage == null) {
       return;
     }
-    if (_secureStorage != null) {
+    try {
       await _writeSecureValue(_secureStorage!, key, trimmed);
       _memorySecure[key] = trimmed;
       final file = await _legacyFallbackFile(key);
       if (file != null && await file.exists()) {
         await file.delete();
       }
+    } catch (_) {
+      final promoted = await _promoteToFileSecureStorageFallback();
+      if (promoted && _secureStorage != null) {
+        try {
+          await _writeSecureValue(_secureStorage!, key, trimmed);
+          _memorySecure[key] = trimmed;
+          final file = await _legacyFallbackFile(key);
+          if (file != null && await file.exists()) {
+            await file.delete();
+          }
+          return;
+        } catch (_) {
+          // Fall through to strict fallback handling below.
+        }
+      }
+      if (_allowInMemoryFallback) {
+        _memorySecure[key] = trimmed;
+        unawaited(_syncMemorySecretsToDurableStore());
+        return;
+      }
+      throw StateError(
+        'Durable secret storage unavailable for $key: failed to write secure value.',
+      );
     }
   }
 
@@ -441,15 +502,23 @@ class SecretStore {
   }
 
   Future<Directory?> _resolveFallbackDirectory() async {
-    final explicit = await _fallbackDirectoryPathResolver?.call();
-    final explicitTrimmed = explicit?.trim() ?? '';
-    if (explicitTrimmed.isNotEmpty) {
-      return _ensureDirectory(explicitTrimmed);
+    try {
+      final explicit = await _fallbackDirectoryPathResolver?.call();
+      final explicitTrimmed = explicit?.trim() ?? '';
+      if (explicitTrimmed.isNotEmpty) {
+        return _ensureDirectory(explicitTrimmed);
+      }
+    } catch (_) {
+      // Continue to next fallback candidate.
     }
-    final databasePath = await _databasePathResolver?.call();
-    final databaseTrimmed = databasePath?.trim() ?? '';
-    if (databaseTrimmed.isNotEmpty) {
-      return _ensureDirectory(File(databaseTrimmed).parent.path);
+    try {
+      final databasePath = await _databasePathResolver?.call();
+      final databaseTrimmed = databasePath?.trim() ?? '';
+      if (databaseTrimmed.isNotEmpty) {
+        return _ensureDirectory(File(databaseTrimmed).parent.path);
+      }
+    } catch (_) {
+      // Continue to next fallback candidate.
     }
     try {
       final supportDirectory = await getApplicationSupportDirectory();
@@ -457,7 +526,38 @@ class SecretStore {
         '${supportDirectory.path}/xworkmate/gateway-auth',
       );
     } catch (_) {
-      return null;
+      // Continue below to deterministic fallback.
+    }
+    try {
+      final defaultSupportRoot = await _defaultSupportDirectoryPathResolver
+          ?.call();
+      final trimmed = defaultSupportRoot?.trim() ?? '';
+      if (trimmed.isNotEmpty) {
+        return _ensureDirectory('$trimmed/gateway-auth');
+      }
+    } catch (_) {
+      // Ignore and fall through.
+    }
+    return null;
+  }
+
+  Future<void> _syncMemorySecretsToDurableStore() async {
+    if (_memorySecure.isEmpty) {
+      return;
+    }
+    if (_secureStorage == null || _secureStorage is MemorySecureStorageClient) {
+      final promoted = await _promoteToFileSecureStorageFallback();
+      if (!promoted || _secureStorage == null) {
+        return;
+      }
+    }
+    final snapshot = Map<String, String>.from(_memorySecure);
+    for (final entry in snapshot.entries) {
+      try {
+        await _writeSecureValue(_secureStorage!, entry.key, entry.value);
+      } catch (_) {
+        // Best-effort sync for fallback memory mode.
+      }
     }
   }
 
@@ -469,13 +569,18 @@ class SecretStore {
     return directory;
   }
 
-  Future<bool> _promoteToFileSecureStorageForTests() async {
+  Future<bool> _promoteToFileSecureStorageFallback() async {
     if (_secureStorageOverride != null ||
         (_databasePathResolver == null &&
-            _fallbackDirectoryPathResolver == null)) {
+            _fallbackDirectoryPathResolver == null &&
+            _defaultSupportDirectoryPathResolver == null)) {
       return false;
     }
-    _secureStorage = FileSecureStorageClient(() => _resolveFallbackDirectory());
+    final directory = await _resolveFallbackDirectory();
+    if (directory == null) {
+      return false;
+    }
+    _secureStorage = FileSecureStorageClient(() async => directory);
     return true;
   }
 
@@ -518,7 +623,8 @@ class SecretStore {
 
   SecureStorageClient _buildDebugSecureStorageClient() {
     if (_databasePathResolver != null ||
-        _fallbackDirectoryPathResolver != null) {
+        _fallbackDirectoryPathResolver != null ||
+        _defaultSupportDirectoryPathResolver != null) {
       return FileSecureStorageClient(() => _resolveFallbackDirectory());
     }
     return MemorySecureStorageClient();

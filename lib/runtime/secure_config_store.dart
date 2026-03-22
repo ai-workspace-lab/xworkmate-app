@@ -1,3 +1,5 @@
+import 'dart:io';
+
 export 'legacy_settings_recovery.dart';
 export 'secret_store.dart';
 export 'settings_store.dart';
@@ -11,19 +13,32 @@ class SecureConfigStore {
   SecureConfigStore({
     Future<String?> Function()? fallbackDirectoryPathResolver,
     Future<String?> Function()? databasePathResolver,
+    Future<String?> Function()? defaultSupportDirectoryPathResolver,
+    bool? allowInMemoryFallback,
     SecureConfigDatabaseOpener? databaseOpener,
     SecureStorageClient? secureStorage,
     bool enableSecureStorage = true,
   }) {
+    final resolvedDefaultSupportDirectoryPathResolver =
+        defaultSupportDirectoryPathResolver ??
+        _resolveDefaultSupportDirectoryPath;
+    final resolvedAllowInMemoryFallback =
+        allowInMemoryFallback ?? _isFlutterTestEnvironment();
     _secretStore = SecretStore(
       fallbackDirectoryPathResolver: fallbackDirectoryPathResolver,
       databasePathResolver: databasePathResolver,
+      defaultSupportDirectoryPathResolver:
+          resolvedDefaultSupportDirectoryPathResolver,
+      allowInMemoryFallback: resolvedAllowInMemoryFallback,
       secureStorage: secureStorage,
       enableSecureStorage: enableSecureStorage,
     );
     _settingsStore = SettingsStore(
       fallbackDirectoryPathResolver: fallbackDirectoryPathResolver,
       databasePathResolver: databasePathResolver,
+      defaultSupportDirectoryPathResolver:
+          resolvedDefaultSupportDirectoryPathResolver,
+      allowInMemoryFallback: resolvedAllowInMemoryFallback,
       databaseOpener: databaseOpener,
       legacyLocalStateKeyLoader: _secretStore.loadLegacyLocalStateKeyBytes,
     );
@@ -146,4 +161,38 @@ class SecureConfigStore {
   static String maskValue(String value) {
     return SecretStore.maskValue(value);
   }
+}
+
+bool _isFlutterTestEnvironment() =>
+    Platform.environment.containsKey('FLUTTER_TEST');
+
+const String _defaultBundleIdentifier = 'plus.svc.xworkmate';
+
+Future<String?> _resolveDefaultSupportDirectoryPath() async {
+  final home = Platform.environment['HOME']?.trim() ?? '';
+  if (home.isNotEmpty) {
+    if (Platform.isMacOS) {
+      return '$home/Library/Application Support/$_defaultBundleIdentifier/xworkmate';
+    }
+    if (Platform.isLinux) {
+      final xdgStateHome = Platform.environment['XDG_STATE_HOME']?.trim() ?? '';
+      if (xdgStateHome.isNotEmpty) {
+        return '$xdgStateHome/$_defaultBundleIdentifier/xworkmate';
+      }
+      return '$home/.local/state/$_defaultBundleIdentifier/xworkmate';
+    }
+  }
+
+  if (Platform.isWindows) {
+    final appData = Platform.environment['APPDATA']?.trim() ?? '';
+    if (appData.isNotEmpty) {
+      return '$appData\\$_defaultBundleIdentifier\\xworkmate';
+    }
+    final localAppData = Platform.environment['LOCALAPPDATA']?.trim() ?? '';
+    if (localAppData.isNotEmpty) {
+      return '$localAppData\\$_defaultBundleIdentifier\\xworkmate';
+    }
+  }
+
+  return null;
 }

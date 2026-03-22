@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.1 — 2026-03-22
+
+### Highlights
+- 修复本地配置持久化链路：`SecureConfigStore` 增加标准目录 fallback，`SettingsStore`/`SecretStore` 首次启动自动准备耐久目录结构。
+- 持久化策略改为默认 fail-fast：当耐久路径不可解析或数据库不可打开时直接报错，避免静默内存化导致重启丢配置。
+- 在显式内存回退模式下补齐“尽力回写”机制：后续写入和退出阶段会尝试同步到标准耐久目录。
+- 关闭未完备账号入口：`mobile.workspace.account` 与 `desktop.navigation.account` 标记为 `experimental` 且 `enabled: false`。
+- 补充回归测试覆盖“路径失败报错”和“默认支持目录 fallback 跨实例持久化”。
+
+### Dev
+- `pubspec.yaml`: 当前版本更新为 `0.6.1+1`
+- 本次按用户要求直接在 `main` 分支提交，预期 tag 为 `v0.6.1`
+
 ## 0.6.0 — 2026-03-22
 
 ### Highlights
