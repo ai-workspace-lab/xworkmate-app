@@ -236,6 +236,44 @@ void main() {
     expect(find.text('实验特性'), findsNothing);
   });
 
+  testWidgets(
+    'SettingsPage clears local assistant state with double confirmation',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
+
+      await pumpPage(tester, child: SettingsPage(controller: controller));
+
+      await tester.tap(find.text('诊断'));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        find.byKey(const ValueKey('assistant-local-state-card')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('assistant-local-state-clear-button')),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final confirmButtonFinder = find.widgetWithText(FilledButton, '确认清理');
+      final confirmButtonBefore = tester.widget<FilledButton>(
+        confirmButtonFinder,
+      );
+      expect(confirmButtonBefore.onPressed, isNull);
+
+      await tester.tap(
+        find.byKey(const ValueKey('assistant-local-state-clear-confirm')),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final confirmButtonAfter = tester.widget<FilledButton>(
+        confirmButtonFinder,
+      );
+      expect(confirmButtonAfter.onPressed, isNotNull);
+    },
+  );
+
   testWidgets('SettingsPage detail mode returns to overview', (
     WidgetTester tester,
   ) async {

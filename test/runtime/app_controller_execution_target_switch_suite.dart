@@ -109,6 +109,23 @@ class _FakeCodexRuntime extends CodexRuntime {
   Future<void> stop() async {}
 }
 
+Future<void> _deleteDirectoryWithRetry(Directory directory) async {
+  if (!await directory.exists()) {
+    return;
+  }
+  for (var attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await directory.delete(recursive: true);
+      return;
+    } on FileSystemException {
+      if (attempt == 2) {
+        rethrow;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+  }
+}
+
 void main() {
   test(
     'AppController switches gateway connection when assistant execution target changes',
@@ -118,9 +135,7 @@ void main() {
         'xworkmate-execution-target-switch-',
       );
       addTearDown(() async {
-        if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
-        }
+        await _deleteDirectoryWithRetry(tempDirectory);
       });
       final store = SecureConfigStore(
         enableSecureStorage: false,
@@ -265,9 +280,7 @@ void main() {
         'xworkmate-thread-mode-switch-',
       );
       addTearDown(() async {
-        if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
-        }
+        await _deleteDirectoryWithRetry(tempDirectory);
       });
       final store = SecureConfigStore(
         enableSecureStorage: false,
@@ -340,21 +353,150 @@ void main() {
     },
   );
 
+  test('AppController persists markdown view mode per thread', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final tempDirectory = await Directory.systemTemp.createTemp(
+      'xworkmate-thread-view-mode-',
+    );
+    addTearDown(() async {
+      await _deleteDirectoryWithRetry(tempDirectory);
+    });
+    final store = SecureConfigStore(
+      enableSecureStorage: false,
+      databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+      fallbackDirectoryPathResolver: () async => tempDirectory.path,
+    );
+    final controller = AppController(
+      store: store,
+      runtimeCoordinator: RuntimeCoordinator(
+        gateway: _FakeGatewayRuntime(store: store),
+        codex: _FakeCodexRuntime(),
+      ),
+    );
+    addTearDown(controller.dispose);
+
+    await _waitFor(() => !controller.initializing);
+
+    controller.initializeAssistantThreadContext(
+      'main',
+      messageViewMode: AssistantMessageViewMode.raw,
+    );
+    controller.initializeAssistantThreadContext(
+      'draft:secondary',
+      messageViewMode: AssistantMessageViewMode.rendered,
+    );
+
+    await controller.switchSession('main');
+    expect(
+      controller.currentAssistantMessageViewMode,
+      AssistantMessageViewMode.raw,
+    );
+
+    await controller.switchSession('draft:secondary');
+    expect(
+      controller.currentAssistantMessageViewMode,
+      AssistantMessageViewMode.rendered,
+    );
+
+    await controller.setAssistantMessageViewMode(AssistantMessageViewMode.raw);
+    expect(
+      controller.currentAssistantMessageViewMode,
+      AssistantMessageViewMode.raw,
+    );
+
+    final reloaded = await store.loadAssistantThreadRecords();
+    final secondary = reloaded.firstWhere(
+      (item) => item.sessionKey == 'draft:secondary',
+    );
+    expect(secondary.messageViewMode, AssistantMessageViewMode.raw);
+  });
+
   test(
-    'AppController persists markdown view mode per thread',
+    'AppController restores the last active assistant thread across restart',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-thread-view-mode-',
+        'xworkmate-thread-restart-',
       );
       addTearDown(() async {
-        if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
-        }
+        await _deleteDirectoryWithRetry(tempDirectory);
       });
+      final databasePath = '${tempDirectory.path}/settings.db';
+      final firstStore = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final firstController = AppController(
+        store: firstStore,
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: _FakeGatewayRuntime(store: firstStore),
+          codex: _FakeCodexRuntime(),
+        ),
+      );
+      addTearDown(firstController.dispose);
+
+      await _waitFor(() => !firstController.initializing);
+      firstController.initializeAssistantThreadContext(
+        'draft:alpha',
+        title: 'Alpha',
+        executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+      );
+      firstController.initializeAssistantThreadContext(
+        'draft:beta',
+        title: 'Beta',
+        executionTarget: AssistantExecutionTarget.local,
+      );
+      await firstController.saveAssistantTaskTitle('draft:beta', 'Beta Task');
+      await firstController.saveAssistantTaskArchived('draft:alpha', true);
+      await firstController.switchSession('draft:beta');
+
+      await _waitFor(
+        () => firstController.settings.assistantLastSessionKey == 'draft:beta',
+      );
+
+      firstController.dispose();
+
+      final secondStore = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final secondController = AppController(
+        store: secondStore,
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: _FakeGatewayRuntime(store: secondStore),
+          codex: _FakeCodexRuntime(),
+        ),
+      );
+      addTearDown(secondController.dispose);
+
+      await _waitFor(() => !secondController.initializing);
+
+      expect(secondController.currentSessionKey, 'draft:beta');
+      expect(secondController.settings.assistantLastSessionKey, 'draft:beta');
+      expect(
+        secondController.assistantCustomTaskTitle('draft:beta'),
+        'Beta Task',
+      );
+      expect(secondController.isAssistantTaskArchived('draft:alpha'), isTrue);
+    },
+  );
+
+  test(
+    'AppController clears local assistant state and resets persisted defaults',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-clear-local-',
+      );
+      addTearDown(() async {
+        await _deleteDirectoryWithRetry(tempDirectory);
+      });
+      final databasePath = '${tempDirectory.path}/settings.db';
       final store = SecureConfigStore(
         enableSecureStorage: false,
-        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        databasePathResolver: () async => databasePath,
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
       );
       final controller = AppController(
@@ -367,31 +509,40 @@ void main() {
       addTearDown(controller.dispose);
 
       await _waitFor(() => !controller.initializing);
-
-      controller.initializeAssistantThreadContext(
-        'main',
-        messageViewMode: AssistantMessageViewMode.raw,
+      await controller.saveSettings(
+        controller.settings.copyWith(accountUsername: 'local-user'),
+        refreshAfterSave: false,
       );
       controller.initializeAssistantThreadContext(
-        'draft:secondary',
-        messageViewMode: AssistantMessageViewMode.rendered,
+        'draft:clear-me',
+        title: 'Clear Me',
       );
+      await controller.switchSession('draft:clear-me');
 
-      await controller.switchSession('main');
-      expect(controller.currentAssistantMessageViewMode, AssistantMessageViewMode.raw);
+      await controller.clearAssistantLocalState();
 
-      await controller.switchSession('draft:secondary');
+      expect(controller.currentSessionKey, 'main');
       expect(
-        controller.currentAssistantMessageViewMode,
-        AssistantMessageViewMode.rendered,
+        controller.settings.accountUsername,
+        SettingsSnapshot.defaults().accountUsername,
       );
+      expect(controller.settings.assistantLastSessionKey, isEmpty);
+      expect(controller.assistantCustomTaskTitle('draft:clear-me'), isEmpty);
 
-      await controller.setAssistantMessageViewMode(AssistantMessageViewMode.raw);
-      expect(controller.currentAssistantMessageViewMode, AssistantMessageViewMode.raw);
+      final reloadedStore = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final reloadedSnapshot = await reloadedStore.loadSettingsSnapshot();
+      final reloadedThreads = await reloadedStore.loadAssistantThreadRecords();
 
-      final reloaded = await store.loadAssistantThreadRecords();
-      final secondary = reloaded.firstWhere((item) => item.sessionKey == 'draft:secondary');
-      expect(secondary.messageViewMode, AssistantMessageViewMode.raw);
+      expect(
+        reloadedSnapshot.accountUsername,
+        SettingsSnapshot.defaults().accountUsername,
+      );
+      expect(reloadedSnapshot.assistantLastSessionKey, isEmpty);
+      expect(reloadedThreads, isEmpty);
     },
   );
 }

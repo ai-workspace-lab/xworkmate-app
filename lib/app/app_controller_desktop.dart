@@ -31,11 +31,21 @@ import '../runtime/multi_agent_orchestrator.dart';
 enum CodexCooperationState { notStarted, bridgeOnly, registered }
 
 class AppController extends ChangeNotifier {
+  static const List<String> _defaultGatewayOnlySkillScanRoots = <String>[
+    '.codex/skills',
+    '.workbuddy/skills',
+    '.claude/skills',
+    '.gemini/skills',
+    '.opencode/skills',
+    '.openclaw/skills',
+  ];
+
   AppController({
     SecureConfigStore? store,
     RuntimeCoordinator? runtimeCoordinator,
     DesktopPlatformService? desktopPlatformService,
     UiFeatureManifest? uiFeatureManifest,
+    List<String>? gatewayOnlySkillScanRoots,
   }) {
     _store = store ?? SecureConfigStore();
     _uiFeatureManifest = uiFeatureManifest ?? UiFeatureManifest.fallback();
@@ -75,6 +85,8 @@ class AppController extends ChangeNotifier {
     _tasksController = DerivedTasksController();
     _desktopPlatformService =
         desktopPlatformService ?? createDesktopPlatformService();
+    _gatewayOnlySkillScanRoots =
+        gatewayOnlySkillScanRoots ?? _defaultGatewayOnlySkillScanRoots;
     _arisBundleRepository = ArisBundleRepository();
     _arisBridgeLocator = ArisBridgeLocator();
     _multiAgentMountManager = MultiAgentMountManager(
@@ -110,6 +122,7 @@ class AppController extends ChangeNotifier {
   late final DevicesController _devicesController;
   late final DerivedTasksController _tasksController;
   late final DesktopPlatformService _desktopPlatformService;
+  late final List<String> _gatewayOnlySkillScanRoots;
   late final ArisBundleRepository _arisBundleRepository;
   late final ArisBridgeLocator _arisBridgeLocator;
   late final MultiAgentMountManager _multiAgentMountManager;
@@ -298,7 +311,7 @@ class AppController extends ChangeNotifier {
   }
 
   String get resolvedAssistantModel {
-    return _resolvedAssistantModelForTarget(currentAssistantExecutionTarget);
+    return assistantModelForSession(currentSessionKey);
   }
 
   String _resolvedAssistantModelForTarget(AssistantExecutionTarget target) {
@@ -310,6 +323,48 @@ class AppController extends ChangeNotifier {
       return resolved;
     }
     return '';
+  }
+
+  List<AssistantThreadSkillEntry> assistantDiscoveredSkillsForSession(
+    String sessionKey,
+  ) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    return _assistantThreadRecords[normalizedSessionKey]?.discoveredSkills ??
+        const <AssistantThreadSkillEntry>[];
+  }
+
+  List<AssistantThreadSkillEntry> assistantImportedSkillsForSession(
+    String sessionKey,
+  ) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    return _assistantThreadRecords[normalizedSessionKey]?.importedSkills ??
+        const <AssistantThreadSkillEntry>[];
+  }
+
+  List<String> assistantSelectedSkillKeysForSession(String sessionKey) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final importedKeys = assistantImportedSkillsForSession(
+      normalizedSessionKey,
+    ).map((item) => item.key).toSet();
+    final selected =
+        _assistantThreadRecords[normalizedSessionKey]?.selectedSkillKeys ??
+        const <String>[];
+    return selected
+        .where((item) => importedKeys.contains(item))
+        .toList(growable: false);
+  }
+
+  String assistantModelForSession(String sessionKey) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final target = assistantExecutionTargetForSession(normalizedSessionKey);
+    final recordModel =
+        _assistantThreadRecords[normalizedSessionKey]?.assistantModelId
+            .trim() ??
+        '';
+    if (recordModel.isNotEmpty) {
+      return recordModel;
+    }
+    return _resolvedAssistantModelForTarget(target);
   }
 
   String get assistantConversationOwnerLabel {
@@ -546,7 +601,12 @@ class AppController extends ChangeNotifier {
   }
 
   List<String> get assistantModelChoices {
-    if (isAiGatewayOnlyMode) {
+    return _assistantModelChoicesForSession(currentSessionKey);
+  }
+
+  List<String> _assistantModelChoicesForSession(String sessionKey) {
+    final target = assistantExecutionTargetForSession(sessionKey);
+    if (target == AssistantExecutionTarget.aiGatewayOnly) {
       return aiGatewayConversationModelChoices;
     }
     final runtimeModels = connectedGatewayModelChoices;
@@ -1211,7 +1271,7 @@ class AppController extends ChangeNotifier {
       _preserveGatewayHistoryForSession(previousSessionKey);
     }
 
-    await _sessionsController.switchSession(nextSessionKey);
+    await _setCurrentAssistantSessionKey(nextSessionKey);
     _upsertAssistantThreadRecord(
       nextSessionKey,
       executionTarget: nextTarget,
@@ -1223,6 +1283,9 @@ class AppController extends ChangeNotifier {
       sessionKey: nextSessionKey,
       persistDefaultSelection: false,
     );
+    if (nextTarget == AssistantExecutionTarget.aiGatewayOnly) {
+      await discoverGatewayOnlySkillsForSession(nextSessionKey);
+    }
     _recomputeTasks();
   }
 
@@ -1297,6 +1360,15 @@ class AppController extends ChangeNotifier {
       sessionKey: _sessionsController.currentSessionKey,
       persistDefaultSelection: true,
     );
+    if (resolvedTarget == AssistantExecutionTarget.aiGatewayOnly) {
+      await discoverGatewayOnlySkillsForSession(
+        _sessionsController.currentSessionKey,
+      );
+    } else {
+      await dismissDiscoveredSkillsForSession(
+        _sessionsController.currentSessionKey,
+      );
+    }
     _recomputeTasks();
     _notifyIfActive();
   }
@@ -1342,7 +1414,7 @@ class AppController extends ChangeNotifier {
       normalizedSessionKey,
       _sessionsController.currentSessionKey,
     )) {
-      await _sessionsController.switchSession(normalizedSessionKey);
+      await _setCurrentAssistantSessionKey(normalizedSessionKey);
     }
     if (persistDefaultSelection &&
         settings.assistantExecutionTarget != resolvedTarget) {
@@ -1367,7 +1439,7 @@ class AppController extends ChangeNotifier {
       } else {
         _chatController.clear();
       }
-      await _sessionsController.switchSession(normalizedSessionKey);
+      await _setCurrentAssistantSessionKey(normalizedSessionKey);
       return;
     }
 
@@ -1380,7 +1452,7 @@ class AppController extends ChangeNotifier {
       // Keep the selected execution target even when the immediate reconnect
       // fails so the user can retry or adjust gateway settings manually.
     }
-    await _sessionsController.switchSession(normalizedSessionKey);
+    await _setCurrentAssistantSessionKey(normalizedSessionKey);
     await _chatController.loadSession(normalizedSessionKey);
   }
 
@@ -1396,15 +1468,35 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> selectAssistantModel(String modelId) async {
+    await selectAssistantModelForSession(currentSessionKey, modelId);
+  }
+
+  Future<void> selectAssistantModelForSession(
+    String sessionKey,
+    String modelId,
+  ) async {
     final trimmed = modelId.trim();
     if (trimmed.isEmpty) {
       return;
     }
-    final choices = assistantModelChoices;
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final choices = matchesSessionKey(normalizedSessionKey, currentSessionKey)
+        ? assistantModelChoices
+        : _assistantModelChoicesForSession(normalizedSessionKey);
     if (choices.isNotEmpty && !choices.contains(trimmed)) {
       return;
     }
-    await selectDefaultModel(trimmed);
+    if (_assistantThreadRecords[normalizedSessionKey]?.assistantModelId ==
+        trimmed) {
+      return;
+    }
+    _upsertAssistantThreadRecord(
+      normalizedSessionKey,
+      assistantModelId: trimmed,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    _recomputeTasks();
+    _notifyIfActive();
   }
 
   String assistantCustomTaskTitle(String sessionKey) {
@@ -1423,8 +1515,9 @@ class AppController extends ChangeNotifier {
     AssistantExecutionTarget? executionTarget,
     AssistantMessageViewMode? messageViewMode,
   }) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
     _upsertAssistantThreadRecord(
-      sessionKey,
+      normalizedSessionKey,
       title: title.trim(),
       executionTarget:
           executionTarget ??
@@ -1432,6 +1525,118 @@ class AppController extends ChangeNotifier {
       messageViewMode:
           messageViewMode ??
           assistantMessageViewModeForSession(currentSessionKey),
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    unawaited(_persistAssistantLastSessionKey(normalizedSessionKey));
+    _notifyIfActive();
+  }
+
+  Future<void> discoverGatewayOnlySkillsForSession(String sessionKey) async {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    if (assistantExecutionTargetForSession(normalizedSessionKey) !=
+        AssistantExecutionTarget.aiGatewayOnly) {
+      _upsertAssistantThreadRecord(
+        normalizedSessionKey,
+        discoveredSkills: const <AssistantThreadSkillEntry>[],
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
+      return;
+    }
+
+    final discovered = await _scanGatewayOnlySkillCandidates();
+    final importedKeys = assistantImportedSkillsForSession(
+      normalizedSessionKey,
+    ).map((item) => item.key).toSet();
+    _upsertAssistantThreadRecord(
+      normalizedSessionKey,
+      discoveredSkills: discovered
+          .where((item) => !importedKeys.contains(item.key))
+          .toList(growable: false),
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    _notifyIfActive();
+  }
+
+  Future<void> confirmImportedSkillsForSession(
+    String sessionKey,
+    List<String> skillKeys,
+  ) async {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final requestedKeys = skillKeys
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet();
+    if (requestedKeys.isEmpty) {
+      return;
+    }
+    final discovered = assistantDiscoveredSkillsForSession(
+      normalizedSessionKey,
+    );
+    final existingImported = assistantImportedSkillsForSession(
+      normalizedSessionKey,
+    );
+    final importByKey = <String, AssistantThreadSkillEntry>{
+      for (final item in existingImported) item.key: item,
+      for (final item in discovered)
+        if (requestedKeys.contains(item.key)) item.key: item,
+    };
+    final nextImported = importByKey.values.toList(growable: false);
+    final nextDiscovered = discovered
+        .where((item) => !requestedKeys.contains(item.key))
+        .toList(growable: false);
+    final nextSelected = <String>{
+      ...assistantSelectedSkillKeysForSession(normalizedSessionKey),
+      ...requestedKeys.where(importByKey.containsKey),
+    }.toList(growable: false);
+    _upsertAssistantThreadRecord(
+      normalizedSessionKey,
+      discoveredSkills: nextDiscovered,
+      importedSkills: nextImported,
+      selectedSkillKeys: nextSelected,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    _notifyIfActive();
+  }
+
+  Future<void> dismissDiscoveredSkillsForSession(String sessionKey) async {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    if (assistantDiscoveredSkillsForSession(normalizedSessionKey).isEmpty) {
+      return;
+    }
+    _upsertAssistantThreadRecord(
+      normalizedSessionKey,
+      discoveredSkills: const <AssistantThreadSkillEntry>[],
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    _notifyIfActive();
+  }
+
+  Future<void> toggleAssistantSkillForSession(
+    String sessionKey,
+    String skillKey,
+  ) async {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final normalizedSkillKey = skillKey.trim();
+    if (normalizedSkillKey.isEmpty) {
+      return;
+    }
+    final importedKeys = assistantImportedSkillsForSession(
+      normalizedSessionKey,
+    ).map((item) => item.key).toSet();
+    if (!importedKeys.contains(normalizedSkillKey)) {
+      return;
+    }
+    final nextSelected = List<String>.from(
+      assistantSelectedSkillKeysForSession(normalizedSessionKey),
+    );
+    if (nextSelected.contains(normalizedSkillKey)) {
+      nextSelected.remove(normalizedSkillKey);
+    } else {
+      nextSelected.add(normalizedSkillKey);
+    }
+    _upsertAssistantThreadRecord(
+      normalizedSessionKey,
+      selectedSkillKeys: nextSelected,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     _notifyIfActive();
@@ -1582,6 +1787,30 @@ class AppController extends ChangeNotifier {
       _recomputeTasks();
     }
     unawaited(refreshMultiAgentMounts(sync: sanitized.multiAgent.autoSync));
+    notifyListeners();
+  }
+
+  Future<void> clearAssistantLocalState() async {
+    await _store.clearAssistantLocalState();
+    final defaults = SettingsSnapshot.defaults();
+    _assistantThreadRecords.clear();
+    _assistantThreadMessages.clear();
+    _localSessionMessages.clear();
+    _gatewayHistoryCache.clear();
+    _aiGatewayStreamingTextBySession.clear();
+    _aiGatewayStreamingClients.clear();
+    _aiGatewayPendingSessionKeys.clear();
+    _aiGatewayAbortedSessionKeys.clear();
+    _activeMultiAgentBrokerSessions.clear();
+    _multiAgentRunPending = false;
+    setActiveAppLanguage(defaults.appLanguage);
+    await _settingsController.resetSnapshot(defaults);
+    _multiAgentOrchestrator.updateConfig(defaults.multiAgent);
+    _agentsController.restoreSelection(defaults.gateway.selectedAgentId);
+    _modelsController.restoreFromSettings(defaults.aiGateway);
+    await _setCurrentAssistantSessionKey('main', persistSelection: false);
+    _chatController.clear();
+    _recomputeTasks();
     notifyListeners();
   }
 
@@ -1848,7 +2077,11 @@ class AppController extends ChangeNotifier {
         selectedAgentId: _agentsController.selectedAgentId,
         defaultAgentId: '',
       );
+      await _restoreInitialAssistantSessionSelection();
       await _ensureActiveAssistantThread();
+      if (isAiGatewayOnlyMode) {
+        await discoverGatewayOnlySkillsForSession(currentSessionKey);
+      }
       _runtimeEventsSubscription = _runtimeCoordinator.gateway.events.listen(
         _handleRuntimeEvent,
       );
@@ -1934,7 +2167,21 @@ class AppController extends ChangeNotifier {
         lastMessagePreview: null,
       ),
     );
-    await _sessionsController.switchSession(fallback.key);
+    await _setCurrentAssistantSessionKey(fallback.key);
+  }
+
+  Future<void> _restoreInitialAssistantSessionSelection() async {
+    final normalized = _normalizedAssistantSessionKey(
+      settings.assistantLastSessionKey,
+    );
+    final known =
+        normalized == 'main' ||
+        _assistantThreadRecords.containsKey(normalized) ||
+        _assistantThreadMessages.containsKey(normalized);
+    if (normalized.isEmpty || !known || isAssistantTaskArchived(normalized)) {
+      return;
+    }
+    await _setCurrentAssistantSessionKey(normalized, persistSelection: false);
   }
 
   void _handleRuntimeEvent(GatewayPushEvent event) {
@@ -2542,9 +2789,7 @@ class AppController extends ChangeNotifier {
       inputTokens: null,
       outputTokens: null,
       totalTokens: null,
-      model: _resolvedAssistantModelForTarget(
-        assistantExecutionTargetForSession(normalizedSessionKey),
-      ),
+      model: assistantModelForSession(normalizedSessionKey),
       contextTokens: null,
       derivedTitle: title.isEmpty ? null : title,
       lastMessagePreview: preview,
@@ -2563,6 +2808,81 @@ class AppController extends ChangeNotifier {
       }
     }
     return null;
+  }
+
+  String _gatewayEntryStateForTarget(AssistantExecutionTarget target) {
+    return target.promptValue;
+  }
+
+  Future<List<AssistantThreadSkillEntry>>
+  _scanGatewayOnlySkillCandidates() async {
+    final home = Platform.environment['HOME']?.trim() ?? '';
+    if (home.isEmpty &&
+        _gatewayOnlySkillScanRoots.every((item) => !item.startsWith('/'))) {
+      return const <AssistantThreadSkillEntry>[];
+    }
+    final entries = <AssistantThreadSkillEntry>[];
+    final seen = <String>{};
+    for (final relativeRoot in _gatewayOnlySkillScanRoots) {
+      final root = Directory(
+        relativeRoot.startsWith('/') ? relativeRoot : '$home/$relativeRoot',
+      );
+      if (!await root.exists()) {
+        continue;
+      }
+      await for (final entity in root.list(
+        recursive: true,
+        followLinks: false,
+      )) {
+        if (entity is! File || entity.uri.pathSegments.last != 'SKILL.md') {
+          continue;
+        }
+        final directory = entity.parent.path;
+        final normalizedKey = directory.trim();
+        if (normalizedKey.isEmpty || !seen.add(normalizedKey)) {
+          continue;
+        }
+        entries.add(await _skillEntryFromFile(entity, root.path));
+      }
+    }
+    entries.sort((left, right) => left.label.compareTo(right.label));
+    return entries;
+  }
+
+  Future<AssistantThreadSkillEntry> _skillEntryFromFile(
+    File file,
+    String rootPath,
+  ) async {
+    final content = await file.readAsString();
+    final nameMatch = RegExp(
+      "^name:\\s*[\"']?(.+?)[\"']?\\s*\$",
+      multiLine: true,
+    ).firstMatch(content);
+    final descriptionMatch = RegExp(
+      "^description:\\s*[\"']?(.+?)[\"']?\\s*\$",
+      multiLine: true,
+    ).firstMatch(content);
+    final directory = file.parent;
+    final label =
+        (nameMatch?.group(1) ??
+                directory.uri.pathSegments
+                    .where((item) => item.isNotEmpty)
+                    .last)
+            .trim();
+    final relativeSource = directory.path.startsWith(rootPath)
+        ? directory.path
+              .substring(rootPath.length)
+              .replaceFirst(RegExp(r'^/'), '')
+        : directory.path;
+    return AssistantThreadSkillEntry(
+      key: directory.path,
+      label: label,
+      description: (descriptionMatch?.group(1) ?? '').trim(),
+      sourcePath: directory.path,
+      sourceLabel: relativeSource.isEmpty
+          ? directory.path.split('/').where((item) => item.isNotEmpty).last
+          : relativeSource,
+    );
   }
 
   void _restoreAssistantThreads(List<AssistantThreadRecord> records) {
@@ -2586,6 +2906,21 @@ class AppController extends ChangeNotifier {
         executionTarget:
             record.executionTarget ?? settings.assistantExecutionTarget,
         messageViewMode: record.messageViewMode,
+        selectedSkillKeys: record.selectedSkillKeys
+            .where(
+              (item) => record.importedSkills.any((skill) => skill.key == item),
+            )
+            .toList(growable: false),
+        assistantModelId: record.assistantModelId.trim().isEmpty
+            ? _resolvedAssistantModelForTarget(
+                record.executionTarget ?? settings.assistantExecutionTarget,
+              )
+            : record.assistantModelId.trim(),
+        gatewayEntryState: (record.gatewayEntryState ?? '').trim().isEmpty
+            ? _gatewayEntryStateForTarget(
+                record.executionTarget ?? settings.assistantExecutionTarget,
+              )
+            : record.gatewayEntryState,
       );
       _assistantThreadRecords[sessionKey] = normalizedRecord;
       if (normalizedRecord.messages.isNotEmpty) {
@@ -2604,9 +2939,27 @@ class AppController extends ChangeNotifier {
     bool? archived,
     AssistantExecutionTarget? executionTarget,
     AssistantMessageViewMode? messageViewMode,
+    List<AssistantThreadSkillEntry>? discoveredSkills,
+    List<AssistantThreadSkillEntry>? importedSkills,
+    List<String>? selectedSkillKeys,
+    String? assistantModelId,
+    String? gatewayEntryState,
   }) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
     final existing = _assistantThreadRecords[normalizedSessionKey];
+    final nextExecutionTarget =
+        executionTarget ??
+        existing?.executionTarget ??
+        settings.assistantExecutionTarget;
+    final nextImportedSkills =
+        importedSkills ??
+        existing?.importedSkills ??
+        const <AssistantThreadSkillEntry>[];
+    final importedKeys = nextImportedSkills.map((item) => item.key).toSet();
+    final nextSelectedSkillKeys =
+        (selectedSkillKeys ?? existing?.selectedSkillKeys ?? const <String>[])
+            .where(importedKeys.contains)
+            .toList(growable: false);
     final nextMessages =
         messages ??
         existing?.messages ??
@@ -2624,14 +2977,25 @@ class AppController extends ChangeNotifier {
           archived ??
           existing?.archived ??
           isAssistantTaskArchived(normalizedSessionKey),
-      executionTarget:
-          executionTarget ??
-          existing?.executionTarget ??
-          settings.assistantExecutionTarget,
+      executionTarget: nextExecutionTarget,
       messageViewMode:
           messageViewMode ??
           existing?.messageViewMode ??
           AssistantMessageViewMode.rendered,
+      discoveredSkills:
+          discoveredSkills ??
+          existing?.discoveredSkills ??
+          const <AssistantThreadSkillEntry>[],
+      importedSkills: nextImportedSkills,
+      selectedSkillKeys: nextSelectedSkillKeys,
+      assistantModelId:
+          assistantModelId ??
+          existing?.assistantModelId ??
+          _resolvedAssistantModelForTarget(nextExecutionTarget),
+      gatewayEntryState:
+          gatewayEntryState ??
+          existing?.gatewayEntryState ??
+          _gatewayEntryStateForTarget(nextExecutionTarget),
     );
     _assistantThreadRecords[normalizedSessionKey] = nextRecord;
     if (messages != null) {
@@ -2642,6 +3006,32 @@ class AppController extends ChangeNotifier {
       _store.saveAssistantThreadRecords(
         _assistantThreadRecords.values.toList(growable: false),
       ),
+    );
+  }
+
+  Future<void> _setCurrentAssistantSessionKey(
+    String sessionKey, {
+    bool persistSelection = true,
+  }) async {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    if (normalizedSessionKey.isEmpty) {
+      return;
+    }
+    await _sessionsController.switchSession(normalizedSessionKey);
+    if (persistSelection) {
+      await _persistAssistantLastSessionKey(normalizedSessionKey);
+    }
+  }
+
+  Future<void> _persistAssistantLastSessionKey(String sessionKey) async {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    if (normalizedSessionKey.isEmpty ||
+        settings.assistantLastSessionKey == normalizedSessionKey) {
+      return;
+    }
+    await saveSettings(
+      settings.copyWith(assistantLastSessionKey: normalizedSessionKey),
+      refreshAfterSave: false,
     );
   }
 
