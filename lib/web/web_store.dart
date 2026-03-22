@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +13,7 @@ class WebStore {
   static const relayTokenKey = 'xworkmate.web.relay.token';
   static const relayPasswordKey = 'xworkmate.web.relay.password';
   static const relayDeviceIdentityKey = 'xworkmate.web.relay.device_identity';
+  static const sessionClientIdKey = 'xworkmate.web.session.client_id';
   static const themeModeKey = 'xworkmate.web.theme_mode';
 
   SharedPreferences? _prefs;
@@ -90,6 +92,17 @@ class WebStore {
     await _prefs!.setString(relayPasswordKey, value.trim());
   }
 
+  Future<String> loadOrCreateWebSessionClientId() async {
+    await initialize();
+    final existing = (_prefs!.getString(sessionClientIdKey) ?? '').trim();
+    if (existing.isNotEmpty) {
+      return existing;
+    }
+    final next = _generateClientId();
+    await _prefs!.setString(sessionClientIdKey, next);
+    return next;
+  }
+
   Future<LocalDeviceIdentity?> loadRelayDeviceIdentity() async {
     await initialize();
     final raw = _prefs!.getString(relayDeviceIdentityKey);
@@ -136,5 +149,16 @@ class WebStore {
       return '*' * trimmed.length;
     }
     return '${trimmed.substring(0, 2)}${'*' * (trimmed.length - 4)}${trimmed.substring(trimmed.length - 2)}';
+  }
+
+  static String _generateClientId() {
+    final random = Random();
+    final timestamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    final suffix = List<String>.generate(
+      4,
+      (_) => random.nextInt(1 << 16).toRadixString(16).padLeft(4, '0'),
+      growable: false,
+    ).join();
+    return 'web-$timestamp-$suffix';
   }
 }

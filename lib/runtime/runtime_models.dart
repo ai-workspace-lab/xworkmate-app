@@ -895,6 +895,70 @@ class AiGatewayConnectionCheck {
   bool get success => state == 'ready' || state == 'empty';
 }
 
+enum WebSessionPersistenceMode { browser, remote }
+
+extension WebSessionPersistenceModeCopy on WebSessionPersistenceMode {
+  String get label => switch (this) {
+    WebSessionPersistenceMode.browser => appText('浏览器本地缓存', 'Browser cache'),
+    WebSessionPersistenceMode.remote => appText(
+      '远端 Session API',
+      'Remote session API',
+    ),
+  };
+
+  static WebSessionPersistenceMode fromJsonValue(String? value) {
+    return WebSessionPersistenceMode.values.firstWhere(
+      (item) => item.name == value,
+      orElse: () => WebSessionPersistenceMode.browser,
+    );
+  }
+}
+
+class WebSessionPersistenceConfig {
+  const WebSessionPersistenceConfig({
+    required this.mode,
+    required this.remoteBaseUrl,
+  });
+
+  final WebSessionPersistenceMode mode;
+  final String remoteBaseUrl;
+
+  factory WebSessionPersistenceConfig.defaults() {
+    return const WebSessionPersistenceConfig(
+      mode: WebSessionPersistenceMode.browser,
+      remoteBaseUrl: '',
+    );
+  }
+
+  bool get usesRemoteApi =>
+      mode == WebSessionPersistenceMode.remote &&
+      remoteBaseUrl.trim().isNotEmpty;
+
+  WebSessionPersistenceConfig copyWith({
+    WebSessionPersistenceMode? mode,
+    String? remoteBaseUrl,
+  }) {
+    return WebSessionPersistenceConfig(
+      mode: mode ?? this.mode,
+      remoteBaseUrl: remoteBaseUrl ?? this.remoteBaseUrl,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'mode': mode.name, 'remoteBaseUrl': remoteBaseUrl};
+  }
+
+  factory WebSessionPersistenceConfig.fromJson(Map<String, dynamic> json) {
+    final defaults = WebSessionPersistenceConfig.defaults();
+    return WebSessionPersistenceConfig(
+      mode: WebSessionPersistenceModeCopy.fromJsonValue(
+        json['mode'] as String?,
+      ),
+      remoteBaseUrl: json['remoteBaseUrl'] as String? ?? defaults.remoteBaseUrl,
+    );
+  }
+}
+
 class SettingsSnapshot {
   const SettingsSnapshot({
     required this.appLanguage,
@@ -913,6 +977,7 @@ class SettingsSnapshot {
     required this.ollamaCloud,
     required this.vault,
     required this.aiGateway,
+    required this.webSessionPersistence,
     required this.multiAgent,
     required this.experimentalCanvas,
     required this.experimentalBridge,
@@ -945,6 +1010,7 @@ class SettingsSnapshot {
   final OllamaCloudConfig ollamaCloud;
   final VaultConfig vault;
   final AiGatewayProfile aiGateway;
+  final WebSessionPersistenceConfig webSessionPersistence;
   final MultiAgentConfig multiAgent;
   final bool experimentalCanvas;
   final bool experimentalBridge;
@@ -978,6 +1044,7 @@ class SettingsSnapshot {
       ollamaCloud: OllamaCloudConfig.defaults(),
       vault: VaultConfig.defaults(),
       aiGateway: AiGatewayProfile.defaults(),
+      webSessionPersistence: WebSessionPersistenceConfig.defaults(),
       multiAgent: MultiAgentConfig.defaults(),
       experimentalCanvas: false,
       experimentalBridge: false,
@@ -1012,6 +1079,7 @@ class SettingsSnapshot {
     OllamaCloudConfig? ollamaCloud,
     VaultConfig? vault,
     AiGatewayProfile? aiGateway,
+    WebSessionPersistenceConfig? webSessionPersistence,
     MultiAgentConfig? multiAgent,
     bool? experimentalCanvas,
     bool? experimentalBridge,
@@ -1044,6 +1112,8 @@ class SettingsSnapshot {
       ollamaCloud: ollamaCloud ?? this.ollamaCloud,
       vault: vault ?? this.vault,
       aiGateway: aiGateway ?? this.aiGateway,
+      webSessionPersistence:
+          webSessionPersistence ?? this.webSessionPersistence,
       multiAgent: multiAgent ?? this.multiAgent,
       experimentalCanvas: experimentalCanvas ?? this.experimentalCanvas,
       experimentalBridge: experimentalBridge ?? this.experimentalBridge,
@@ -1085,6 +1155,7 @@ class SettingsSnapshot {
       'ollamaCloud': ollamaCloud.toJson(),
       'vault': vault.toJson(),
       'aiGateway': aiGateway.toJson(),
+      'webSessionPersistence': webSessionPersistence.toJson(),
       'multiAgent': multiAgent.toJson(),
       'experimentalCanvas': experimentalCanvas,
       'experimentalBridge': experimentalBridge,
@@ -1192,6 +1263,10 @@ class SettingsSnapshot {
       aiGateway: AiGatewayProfile.fromJson(
         (json['aiGateway'] as Map?)?.cast<String, dynamic>() ??
             (json['apisix'] as Map?)?.cast<String, dynamic>() ??
+            const {},
+      ),
+      webSessionPersistence: WebSessionPersistenceConfig.fromJson(
+        (json['webSessionPersistence'] as Map?)?.cast<String, dynamic>() ??
             const {},
       ),
       multiAgent: MultiAgentConfig.fromJson(

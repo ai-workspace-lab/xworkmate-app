@@ -30,9 +30,13 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
   late final TextEditingController _relayPortController;
   late final TextEditingController _relayTokenController;
   late final TextEditingController _relayPasswordController;
+  late final TextEditingController _sessionRemoteBaseUrlController;
+  late final TextEditingController _sessionApiTokenController;
+  late WebSessionPersistenceMode _sessionPersistenceMode;
 
   String _directMessage = '';
   String _relayMessage = '';
+  String _sessionPersistenceMessage = '';
 
   @override
   void initState() {
@@ -45,6 +49,9 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     _relayPortController = TextEditingController();
     _relayTokenController = TextEditingController();
     _relayPasswordController = TextEditingController();
+    _sessionRemoteBaseUrlController = TextEditingController();
+    _sessionApiTokenController = TextEditingController();
+    _sessionPersistenceMode = widget.controller.webSessionPersistence.mode;
     _syncControllers();
   }
 
@@ -64,6 +71,8 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     _relayPortController.dispose();
     _relayTokenController.dispose();
     _relayPasswordController.dispose();
+    _sessionRemoteBaseUrlController.dispose();
+    _sessionApiTokenController.dispose();
     super.dispose();
   }
 
@@ -91,6 +100,17 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
       widget.controller.storedRelayPasswordMask == null
           ? ''
           : _relayPasswordController.text,
+    );
+    _sessionPersistenceMode = settings.webSessionPersistence.mode;
+    _setIfDifferent(
+      _sessionRemoteBaseUrlController,
+      settings.webSessionPersistence.remoteBaseUrl,
+    );
+    _setIfDifferent(
+      _sessionApiTokenController,
+      widget.controller.storedWebSessionApiTokenMask == null
+          ? ''
+          : _sessionApiTokenController.text,
     );
   }
 
@@ -237,12 +257,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
               },
             ),
             const SizedBox(height: 12),
-            Text(
-              appText(
-                '当前会话列表会在浏览器本地保存，刷新后仍可恢复 Direct AI / Relay 的历史入口。',
-                'Conversation history is stored in this browser so Direct AI and Relay entries remain available after reload.',
-              ),
-            ),
+            Text(controller.conversationPersistenceSummary),
           ],
         ),
       ),
@@ -269,6 +284,112 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 12),
+      SurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              appText('会话持久化', 'Session persistence'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              appText(
+                '默认使用浏览器本地缓存保存 Assistant 会话。若要做 durable store，请配置一个 HTTPS Session API；该 API 可以由 PostgreSQL 等后端数据库承接，但浏览器不会直接连接数据库。',
+                'Assistant sessions default to browser-local cache. For durable storage, configure an HTTPS session API. That API can be backed by PostgreSQL, but the browser never connects to the database directly.',
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<WebSessionPersistenceMode>(
+              initialValue: _sessionPersistenceMode,
+              items: WebSessionPersistenceMode.values
+                  .map(
+                    (mode) => DropdownMenuItem<WebSessionPersistenceMode>(
+                      value: mode,
+                      child: Text(mode.label),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+                setState(() {
+                  _sessionPersistenceMode = value;
+                });
+              },
+              decoration: InputDecoration(
+                labelText: appText('保存位置', 'Persistence target'),
+              ),
+            ),
+            if (_sessionPersistenceMode ==
+                WebSessionPersistenceMode.remote) ...[
+              const SizedBox(height: 10),
+              TextField(
+                controller: _sessionRemoteBaseUrlController,
+                decoration: InputDecoration(
+                  labelText: appText(
+                    'Session API Base URL',
+                    'Session API Base URL',
+                  ),
+                  hintText: 'https://xworkmate.svc.plus/api/web-sessions',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _sessionApiTokenController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: appText('Session API Token', 'Session API token'),
+                  helperText: controller.storedWebSessionApiTokenMask == null
+                      ? appText(
+                          '只保留在当前浏览器会话内存中；刷新页面后需要重新输入。',
+                          'Kept only in the current browser session memory; re-enter it after reload.',
+                        )
+                      : '${appText('当前会话', 'This session')}: ${controller.storedWebSessionApiTokenMask} · ${appText('刷新后需重新输入', 'Re-enter after reload')}',
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                FilledButton(
+                  onPressed: () async {
+                    await controller.saveWebSessionPersistenceConfiguration(
+                      mode: _sessionPersistenceMode,
+                      remoteBaseUrl: _sessionRemoteBaseUrlController.text,
+                      apiToken: _sessionApiTokenController.text,
+                    );
+                    if (!mounted) {
+                      return;
+                    }
+                    setState(() {
+                      _sessionPersistenceMessage =
+                          controller.sessionPersistenceStatusMessage;
+                    });
+                  },
+                  child: Text(appText('保存会话存储', 'Save session store')),
+                ),
+              ],
+            ),
+            if (_sessionPersistenceMessage.trim().isNotEmpty ||
+                controller.sessionPersistenceStatusMessage
+                    .trim()
+                    .isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                (_sessionPersistenceMessage.trim().isNotEmpty
+                        ? _sessionPersistenceMessage
+                        : controller.sessionPersistenceStatusMessage)
+                    .trim(),
+              ),
+            ],
           ],
         ),
       ),

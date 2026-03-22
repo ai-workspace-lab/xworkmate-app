@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:xworkmate/app/app_controller_web.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/web/web_session_repository.dart';
 import 'package:xworkmate/web/web_store.dart';
 
 void main() {
@@ -13,8 +14,13 @@ void main() {
 
   test('web controller persists direct and relay configuration', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
+    final remoteRecords = <AssistantThreadRecord>[];
 
-    final controller = AppController(store: WebStore());
+    final controller = AppController(
+      store: WebStore(),
+      remoteSessionRepositoryBuilder: (config, clientId, accessToken) =>
+          _MemoryRemoteSessionRepository(remoteRecords),
+    );
     await _waitForReady(controller);
 
     await controller.saveAiGatewayConfiguration(
@@ -31,6 +37,11 @@ void main() {
       token: 'relay-token',
       password: 'relay-password',
     );
+    await controller.saveWebSessionPersistenceConfiguration(
+      mode: WebSessionPersistenceMode.remote,
+      remoteBaseUrl: 'https://xworkmate.svc.plus/api/web-sessions',
+      apiToken: 'session-token',
+    );
     await controller.setAssistantExecutionTarget(
       AssistantExecutionTarget.remote,
     );
@@ -38,7 +49,11 @@ void main() {
       target: AssistantExecutionTarget.aiGatewayOnly,
     );
 
-    final reloaded = AppController(store: WebStore());
+    final reloaded = AppController(
+      store: WebStore(),
+      remoteSessionRepositoryBuilder: (config, clientId, accessToken) =>
+          _MemoryRemoteSessionRepository(remoteRecords),
+    );
     await _waitForReady(reloaded);
 
     expect(reloaded.settings.aiGateway.baseUrl, 'https://api.example.com/v1');
@@ -46,16 +61,121 @@ void main() {
     expect(reloaded.settings.gateway.host, 'relay.example.com');
     expect(reloaded.settings.gateway.port, 443);
     expect(
+      reloaded.settings.webSessionPersistence.mode,
+      WebSessionPersistenceMode.remote,
+    );
+    expect(
+      reloaded.settings.webSessionPersistence.remoteBaseUrl,
+      'https://xworkmate.svc.plus/api/web-sessions',
+    );
+    expect(
       reloaded.settings.assistantExecutionTarget,
       AssistantExecutionTarget.remote,
     );
     expect(reloaded.storedAiGatewayApiKeyMask, isNotNull);
     expect(reloaded.storedRelayTokenMask, isNotNull);
+    expect(controller.storedWebSessionApiTokenMask, isNotNull);
+    expect(reloaded.storedWebSessionApiTokenMask, isNull);
+    expect(remoteRecords, isNotEmpty);
     expect(reloaded.conversations, isNotEmpty);
 
     controller.dispose();
     reloaded.dispose();
   });
+
+  test('web controller rejects insecure remote session api urls', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
+    final controller = AppController(store: WebStore());
+    await _waitForReady(controller);
+
+    await controller.saveWebSessionPersistenceConfiguration(
+      mode: WebSessionPersistenceMode.remote,
+      remoteBaseUrl: 'http://xworkmate.svc.plus/api/web-sessions',
+      apiToken: 'session-token',
+    );
+
+    expect(controller.usesRemoteSessionPersistence, isFalse);
+    expect(controller.sessionPersistenceStatusMessage, contains('HTTPS'));
+    expect(
+      controller.settings.webSessionPersistence.mode,
+      WebSessionPersistenceMode.browser,
+    );
+    expect(controller.settings.webSessionPersistence.remoteBaseUrl, isEmpty);
+    expect(controller.storedWebSessionApiTokenMask, isNull);
+
+    controller.dispose();
+  });
+
+  test(
+    'empty remote session api does not import stale browser cache',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final store = WebStore();
+      final remoteRecords = <AssistantThreadRecord>[];
+
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          webSessionPersistence: const WebSessionPersistenceConfig(
+            mode: WebSessionPersistenceMode.remote,
+            remoteBaseUrl: 'https://xworkmate.svc.plus/api/web-sessions',
+          ),
+        ),
+      );
+      await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
+        AssistantThreadRecord(
+          sessionKey: 'direct:stale-browser-cache',
+          messages: const <GatewayChatMessage>[],
+          updatedAtMs: 1,
+          title: 'stale browser cache',
+          archived: false,
+          executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+          messageViewMode: AssistantMessageViewMode.rendered,
+        ),
+      ]);
+
+      final controller = AppController(
+        store: store,
+        remoteSessionRepositoryBuilder: (config, clientId, accessToken) =>
+            _MemoryRemoteSessionRepository(remoteRecords),
+      );
+      await _waitForReady(controller);
+
+      expect(remoteRecords, isEmpty);
+      expect(
+        controller.sessionPersistenceStatusMessage,
+        anyOf(
+          contains('不会自动导入远端'),
+          contains('will not be imported automatically'),
+        ),
+      );
+      expect(
+        controller.conversations.single.title,
+        isNot('stale browser cache'),
+      );
+
+      controller.dispose();
+    },
+  );
+}
+
+class _MemoryRemoteSessionRepository implements WebSessionRepository {
+  _MemoryRemoteSessionRepository(this._records);
+
+  final List<AssistantThreadRecord> _records;
+
+  @override
+  Future<List<AssistantThreadRecord>> loadThreadRecords() async {
+    return List<AssistantThreadRecord>.from(_records, growable: false);
+  }
+
+  @override
+  Future<void> saveThreadRecords(List<AssistantThreadRecord> records) async {
+    _records
+      ..clear()
+      ..addAll(records);
+  }
 }
 
 Future<void> _waitForReady(
