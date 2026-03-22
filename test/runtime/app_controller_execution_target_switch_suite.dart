@@ -376,6 +376,10 @@ void main() {
         controller.assistantExecutionTarget,
         AssistantExecutionTarget.remote,
       );
+      expect(
+        controller.assistantConnectionTargetLabel,
+        'gateway.example.com:9443',
+      );
       expect(completed, isFalse);
 
       connectGate.complete();
@@ -386,6 +390,68 @@ void main() {
         AssistantExecutionTarget.remote,
       );
       expect(gateway.connectedProfiles.last.mode, RuntimeConnectionMode.remote);
+    },
+  );
+
+  test(
+    'AppController does not leak the local endpoint into remote thread status while reconnecting',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-execution-target-remote-fallback-',
+      );
+      addTearDown(() async {
+        await _deleteDirectoryWithRetry(tempDirectory);
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final gateway = _FakeGatewayRuntime(store: store);
+      final controller = AppController(
+        store: store,
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: gateway,
+          codex: _FakeCodexRuntime(),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      await controller.saveSettings(
+        controller.settings.copyWith(
+          gateway: controller.settings.gateway.copyWith(
+            mode: RuntimeConnectionMode.local,
+            host: '127.0.0.1',
+            port: 18789,
+            tls: false,
+          ),
+        ),
+        refreshAfterSave: false,
+      );
+
+      final connectGate = Completer<void>();
+      gateway.holdNextConnect(connectGate);
+
+      final switchFuture = controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.remote,
+      );
+
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.assistantExecutionTarget,
+        AssistantExecutionTarget.remote,
+      );
+      expect(controller.assistantConnectionStatusLabel, '离线');
+      expect(
+        controller.assistantConnectionTargetLabel,
+        'openclaw.svc.plus:443',
+      );
+
+      connectGate.complete();
+      await switchFuture;
     },
   );
 

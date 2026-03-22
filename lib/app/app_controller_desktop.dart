@@ -3577,10 +3577,15 @@ class AppController extends ChangeNotifier {
 
   RuntimeConnectionMode _modeFromHost(String host) {
     final trimmed = host.trim().toLowerCase();
-    if (trimmed == '127.0.0.1' || trimmed == 'localhost') {
+    if (_isLoopbackHost(trimmed)) {
       return RuntimeConnectionMode.local;
     }
     return RuntimeConnectionMode.remote;
+  }
+
+  bool _isLoopbackHost(String host) {
+    final trimmed = host.trim().toLowerCase();
+    return trimmed == '127.0.0.1' || trimmed == 'localhost';
   }
 
   AssistantExecutionTarget _assistantExecutionTargetForMode(
@@ -3628,10 +3633,14 @@ class AppController extends ChangeNotifier {
     }
 
     final defaults = GatewayConnectionProfile.defaults();
-    final savedHost = savedProfile.host.trim().isEmpty
+    final useDefaultRemoteEndpoint =
+        savedProfile.host.trim().isEmpty ||
+        _isLoopbackHost(savedProfile.host) ||
+        savedProfile.port <= 0;
+    final savedHost = useDefaultRemoteEndpoint
         ? defaults.host
         : savedProfile.host.trim();
-    final savedPort = savedProfile.port <= 0
+    final savedPort = useDefaultRemoteEndpoint
         ? defaults.port
         : savedProfile.port;
     return savedProfile.copyWith(
@@ -3640,7 +3649,7 @@ class AppController extends ChangeNotifier {
       setupCode: '',
       host: savedHost,
       port: savedPort,
-      tls: savedProfile.tls,
+      tls: useDefaultRemoteEndpoint ? defaults.tls : savedProfile.tls,
     );
   }
 }
