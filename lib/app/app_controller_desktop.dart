@@ -157,6 +157,14 @@ class AppController extends ChangeNotifier {
   SettingsDetailPage? _settingsDetail;
   SettingsNavigationContext? _settingsNavigationContext;
   DetailPanelData? _detailPanel;
+  SettingsSnapshot _settingsDraft = SettingsSnapshot.defaults();
+  SettingsSnapshot _lastAppliedSettings = SettingsSnapshot.defaults();
+  final Map<String, String> _draftSecretValues = <String, String>{};
+  bool _settingsDraftInitialized = false;
+  bool _pendingSettingsApply = false;
+  bool _pendingGatewayApply = false;
+  bool _pendingAiGatewayApply = false;
+  String _settingsDraftStatusMessage = '';
   bool _initializing = true;
   String? _bootstrapError;
   StreamSubscription<GatewayPushEvent>? _runtimeEventsSubscription;
@@ -216,6 +224,14 @@ class AppController extends ChangeNotifier {
 
   GatewayConnectionSnapshot get connection => _runtime.snapshot;
   SettingsSnapshot get settings => _settingsController.snapshot;
+  SettingsSnapshot get settingsDraft =>
+      _settingsDraftInitialized ? _settingsDraft : settings;
+  bool get hasSettingsDraftChanges =>
+      settingsDraft.toJsonString() != settings.toJsonString() ||
+      _draftSecretValues.isNotEmpty;
+  bool get hasPendingSettingsApply => _pendingSettingsApply;
+  String get settingsDraftStatusMessage => _settingsDraftStatusMessage;
+  LegacyRecoveryReport get legacyRecoveryReport => _store.lastRecoveryReport;
   List<GatewayAgentSummary> get agents => _agentsController.agents;
   List<GatewaySessionSummary> get sessions => isAiGatewayOnlyMode
       ? _assistantSessionSummaries()
@@ -268,6 +284,12 @@ class AppController extends ChangeNotifier {
   CodexCooperationState get codexCooperationState => _codexCooperationState;
   bool get isMultiAgentRunPending => _multiAgentRunPending;
   bool _desktopPlatformBusy = false;
+
+  static const String _draftGatewayTokenKey = 'gateway_token';
+  static const String _draftGatewayPasswordKey = 'gateway_password';
+  static const String _draftAiGatewayApiKeyKey = 'ai_gateway_api_key';
+  static const String _draftVaultTokenKey = 'vault_token';
+  static const String _draftOllamaApiKeyKey = 'ollama_cloud_api_key';
 
   bool get hasAssistantPendingRun =>
       assistantSessionHasPendingRun(currentSessionKey);
@@ -1813,6 +1835,111 @@ class AppController extends ChangeNotifier {
     return synced;
   }
 
+  Future<void> saveSettingsDraft(SettingsSnapshot snapshot) async {
+    if (_disposed) {
+      return;
+    }
+    _settingsDraft = _sanitizeFeatureFlagSettings(
+      _sanitizeMultiAgentSettings(
+        _sanitizeOllamaCloudSettings(_sanitizeCodeAgentSettings(snapshot)),
+      ),
+    );
+    _settingsDraftInitialized = true;
+    _settingsDraftStatusMessage = appText(
+      '草稿已更新，点击顶部保存持久化。',
+      'Draft updated. Use the top Save button to persist it.',
+    );
+    notifyListeners();
+  }
+
+  void saveGatewayTokenDraft(String value) {
+    _saveSecretDraft(_draftGatewayTokenKey, value);
+  }
+
+  void saveGatewayPasswordDraft(String value) {
+    _saveSecretDraft(_draftGatewayPasswordKey, value);
+  }
+
+  void saveAiGatewayApiKeyDraft(String value) {
+    _saveSecretDraft(_draftAiGatewayApiKeyKey, value);
+  }
+
+  void saveVaultTokenDraft(String value) {
+    _saveSecretDraft(_draftVaultTokenKey, value);
+  }
+
+  void saveOllamaCloudApiKeyDraft(String value) {
+    _saveSecretDraft(_draftOllamaApiKeyKey, value);
+  }
+
+  Future<void> persistSettingsDraft() async {
+    if (_disposed) {
+      return;
+    }
+    if (!hasSettingsDraftChanges) {
+      _settingsDraftStatusMessage = appText(
+        '没有需要保存的更改。',
+        'There are no changes to save.',
+      );
+      notifyListeners();
+      return;
+    }
+    final nextSettings = settingsDraft;
+    _markPendingApplyDomains(settings, nextSettings);
+    await _persistDraftSecrets();
+    if (nextSettings.toJsonString() != settings.toJsonString()) {
+      await _persistSettingsSnapshot(nextSettings);
+    }
+    _settingsDraft = settings;
+    _settingsDraftInitialized = true;
+    _pendingSettingsApply = true;
+    _settingsDraftStatusMessage = appText(
+      '已保存设置，等待应用。',
+      'Settings saved. Apply to activate runtime changes.',
+    );
+    notifyListeners();
+  }
+
+  Future<void> applySettingsDraft() async {
+    if (_disposed) {
+      return;
+    }
+    if (hasSettingsDraftChanges) {
+      await persistSettingsDraft();
+    }
+    if (!_pendingSettingsApply) {
+      _settingsDraftStatusMessage = appText(
+        '没有需要应用的更改。',
+        'There are no saved changes to apply.',
+      );
+      notifyListeners();
+      return;
+    }
+    final currentSettings = settings;
+    await _applyPersistedSettingsSideEffects(
+      previous: _lastAppliedSettings,
+      current: currentSettings,
+      refreshAfterSave: true,
+    );
+    if (_pendingGatewayApply) {
+      await _applyPersistedGatewaySettings(currentSettings);
+    }
+    if (_pendingAiGatewayApply) {
+      await _applyPersistedAiGatewaySettings(currentSettings);
+    }
+    _lastAppliedSettings = settings;
+    _pendingSettingsApply = false;
+    _pendingGatewayApply = false;
+    _pendingAiGatewayApply = false;
+    _settingsDraft = settings;
+    _settingsDraftInitialized = true;
+    _settingsDraftStatusMessage = appText(
+      '已应用全部设置。',
+      'All saved settings have been applied.',
+    );
+    notifyListeners();
+  }
+
   Future<void> saveSettings(
     SettingsSnapshot snapshot, {
     bool refreshAfterSave = true,
@@ -1820,45 +1947,24 @@ class AppController extends ChangeNotifier {
     if (_disposed) {
       return;
     }
-    final current = settings;
-    final sanitized = _sanitizeFeatureFlagSettings(
-      _sanitizeMultiAgentSettings(
-        _sanitizeOllamaCloudSettings(_sanitizeCodeAgentSettings(snapshot)),
-      ),
+    final previous = settings;
+    await _persistSettingsSnapshot(snapshot);
+    if (_disposed) {
+      return;
+    }
+    await _applyPersistedSettingsSideEffects(
+      previous: previous,
+      current: settings,
+      refreshAfterSave: refreshAfterSave,
     );
-    setActiveAppLanguage(sanitized.appLanguage);
-    await _settingsController.saveSnapshot(sanitized);
-    if (_disposed) {
-      return;
-    }
-    _multiAgentOrchestrator.updateConfig(sanitized.multiAgent);
-    _agentsController.restoreSelection(sanitized.gateway.selectedAgentId);
-    _modelsController.restoreFromSettings(sanitized.aiGateway);
-    if (_disposed) {
-      return;
-    }
-    if (current.codexCliPath != sanitized.codexCliPath ||
-        current.codeAgentRuntimeMode != sanitized.codeAgentRuntimeMode) {
-      _registerCodexExternalProvider(codexPath: sanitized.codexCliPath);
-      await _refreshCodexCliAvailability();
-      if (_disposed) {
-        return;
-      }
-    }
-    if (current.linuxDesktop.toJson().toString() !=
-            sanitized.linuxDesktop.toJson().toString() ||
-        current.launchAtLogin != sanitized.launchAtLogin) {
-      await _desktopPlatformService.syncConfig(sanitized.linuxDesktop);
-      await _desktopPlatformService.setLaunchAtLogin(sanitized.launchAtLogin);
-      if (_disposed) {
-        return;
-      }
-    }
-    if (refreshAfterSave) {
-      _recomputeTasks();
-    }
-    unawaited(refreshMultiAgentMounts(sync: sanitized.multiAgent.autoSync));
-    notifyListeners();
+    _lastAppliedSettings = settings;
+    _settingsDraft = settings;
+    _settingsDraftInitialized = true;
+    _pendingSettingsApply = false;
+    _pendingGatewayApply = false;
+    _pendingAiGatewayApply = false;
+    _draftSecretValues.clear();
+    _settingsDraftStatusMessage = '';
   }
 
   Future<void> clearAssistantLocalState() async {
@@ -2169,6 +2275,15 @@ class AppController extends ChangeNotifier {
         }
       }
       await refreshMultiAgentMounts(sync: settings.multiAgent.autoSync);
+      _settingsDraft = settings;
+      _lastAppliedSettings = settings;
+      _settingsDraftInitialized = true;
+      _settingsDraftStatusMessage = legacyRecoveryReport.hasIssue
+          ? appText(
+              '检测到旧版本配置，但当前版本无法解锁旧加密状态。',
+              'Detected legacy settings, but this build could not unlock the old encrypted state.',
+            )
+          : '';
     } catch (error) {
       if (_disposed) {
         return;
@@ -2208,6 +2323,142 @@ class AppController extends ChangeNotifier {
     await _settingsController.refreshDerivedState();
     await _ensureCodexGatewayRegistration();
     _recomputeTasks();
+  }
+
+  void _saveSecretDraft(String key, String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      _draftSecretValues.remove(key);
+    } else {
+      _draftSecretValues[key] = trimmed;
+    }
+    _settingsDraftStatusMessage = appText(
+      '草稿已更新，点击顶部保存持久化。',
+      'Draft updated. Use the top Save button to persist it.',
+    );
+    notifyListeners();
+  }
+
+  void _markPendingApplyDomains(
+    SettingsSnapshot previous,
+    SettingsSnapshot next,
+  ) {
+    final gatewayChanged =
+        previous.gateway.toJson().toString() != next.gateway.toJson().toString() ||
+        previous.assistantExecutionTarget != next.assistantExecutionTarget ||
+        _draftSecretValues.containsKey(_draftGatewayTokenKey) ||
+        _draftSecretValues.containsKey(_draftGatewayPasswordKey);
+    final aiGatewayChanged =
+        previous.aiGateway.toJson().toString() !=
+            next.aiGateway.toJson().toString() ||
+        previous.defaultModel != next.defaultModel ||
+        _draftSecretValues.containsKey(_draftAiGatewayApiKeyKey);
+    _pendingGatewayApply = _pendingGatewayApply || gatewayChanged;
+    _pendingAiGatewayApply = _pendingAiGatewayApply || aiGatewayChanged;
+  }
+
+  Future<void> _persistDraftSecrets() async {
+    final gatewayToken = _draftSecretValues[_draftGatewayTokenKey];
+    final gatewayPassword = _draftSecretValues[_draftGatewayPasswordKey];
+    if ((gatewayToken ?? '').isNotEmpty || (gatewayPassword ?? '').isNotEmpty) {
+      await _settingsController.saveGatewaySecrets(
+        token: gatewayToken ?? '',
+        password: gatewayPassword ?? '',
+      );
+    }
+    final aiGatewayApiKey = _draftSecretValues[_draftAiGatewayApiKeyKey];
+    if ((aiGatewayApiKey ?? '').isNotEmpty) {
+      await _settingsController.saveAiGatewayApiKey(aiGatewayApiKey!);
+    }
+    final vaultToken = _draftSecretValues[_draftVaultTokenKey];
+    if ((vaultToken ?? '').isNotEmpty) {
+      await _settingsController.saveVaultToken(vaultToken!);
+    }
+    final ollamaApiKey = _draftSecretValues[_draftOllamaApiKeyKey];
+    if ((ollamaApiKey ?? '').isNotEmpty) {
+      await _settingsController.saveOllamaCloudApiKey(ollamaApiKey!);
+    }
+    _draftSecretValues.clear();
+  }
+
+  Future<void> _persistSettingsSnapshot(SettingsSnapshot snapshot) async {
+    final sanitized = _sanitizeFeatureFlagSettings(
+      _sanitizeMultiAgentSettings(
+        _sanitizeOllamaCloudSettings(_sanitizeCodeAgentSettings(snapshot)),
+      ),
+    );
+    await _settingsController.saveSnapshot(sanitized);
+    _settingsDraft = sanitized;
+    _settingsDraftInitialized = true;
+  }
+
+  Future<void> _applyPersistedSettingsSideEffects({
+    required SettingsSnapshot previous,
+    required SettingsSnapshot current,
+    required bool refreshAfterSave,
+  }) async {
+    setActiveAppLanguage(current.appLanguage);
+    _multiAgentOrchestrator.updateConfig(current.multiAgent);
+    _agentsController.restoreSelection(current.gateway.selectedAgentId);
+    _modelsController.restoreFromSettings(current.aiGateway);
+    if (_disposed) {
+      return;
+    }
+    if (previous.codexCliPath != current.codexCliPath ||
+        previous.codeAgentRuntimeMode != current.codeAgentRuntimeMode) {
+      _registerCodexExternalProvider(codexPath: current.codexCliPath);
+      await _refreshCodexCliAvailability();
+      if (_disposed) {
+        return;
+      }
+    }
+    if (previous.linuxDesktop.toJson().toString() !=
+            current.linuxDesktop.toJson().toString() ||
+        previous.launchAtLogin != current.launchAtLogin) {
+      await _desktopPlatformService.syncConfig(current.linuxDesktop);
+      await _desktopPlatformService.setLaunchAtLogin(current.launchAtLogin);
+      if (_disposed) {
+        return;
+      }
+    }
+    if (refreshAfterSave) {
+      _recomputeTasks();
+    }
+    unawaited(refreshMultiAgentMounts(sync: current.multiAgent.autoSync));
+    notifyListeners();
+  }
+
+  Future<void> _applyPersistedGatewaySettings(SettingsSnapshot snapshot) async {
+    if (snapshot.assistantExecutionTarget == AssistantExecutionTarget.aiGatewayOnly) {
+      if (_runtime.isConnected) {
+        try {
+          await disconnectGateway();
+        } catch (_) {
+          // Keep saved settings even when runtime teardown is noisy.
+        }
+      }
+      return;
+    }
+    try {
+      await _connectProfile(snapshot.gateway);
+    } catch (_) {
+      // Save/apply should keep persisted config even if the immediate
+      // connection attempt fails.
+    }
+  }
+
+  Future<void> _applyPersistedAiGatewaySettings(
+    SettingsSnapshot snapshot,
+  ) async {
+    final apiKey = await _settingsController.loadAiGatewayApiKey();
+    if (snapshot.aiGateway.baseUrl.trim().isEmpty || apiKey.trim().isEmpty) {
+      return;
+    }
+    try {
+      await syncAiGatewayCatalog(snapshot.aiGateway, apiKeyOverride: apiKey);
+    } catch (_) {
+      // Keep the saved draft applied even if model sync fails immediately.
+    }
   }
 
   Future<void> _ensureActiveAssistantThread() async {
