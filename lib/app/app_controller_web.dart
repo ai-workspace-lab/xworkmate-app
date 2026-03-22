@@ -7,19 +7,30 @@ import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
 import '../web/web_ai_gateway_client.dart';
 import '../web/web_relay_gateway_client.dart';
+import '../web/web_session_repository.dart';
 import '../web/web_store.dart';
 import 'app_capabilities.dart';
 import 'ui_feature_manifest.dart';
+
+typedef RemoteWebSessionRepositoryBuilder =
+    WebSessionRepository Function(
+      WebSessionPersistenceConfig config,
+      String clientId,
+      String accessToken,
+    );
 
 class AppController extends ChangeNotifier {
   AppController({
     WebStore? store,
     WebAiGatewayClient? aiGatewayClient,
     WebRelayGatewayClient? relayClient,
+    RemoteWebSessionRepositoryBuilder? remoteSessionRepositoryBuilder,
     UiFeatureManifest? uiFeatureManifest,
   }) : _store = store ?? WebStore(),
        _uiFeatureManifest = uiFeatureManifest ?? UiFeatureManifest.fallback(),
-       _aiGatewayClient = aiGatewayClient ?? const WebAiGatewayClient() {
+       _aiGatewayClient = aiGatewayClient ?? const WebAiGatewayClient(),
+       _remoteSessionRepositoryBuilder =
+           remoteSessionRepositoryBuilder ?? _defaultRemoteSessionRepository {
     _relayClient = relayClient ?? WebRelayGatewayClient(_store);
     _relayEventsSubscription = _relayClient.events.listen(_handleRelayEvent);
     unawaited(_initialize());
@@ -28,7 +39,10 @@ class AppController extends ChangeNotifier {
   final WebStore _store;
   final UiFeatureManifest _uiFeatureManifest;
   final WebAiGatewayClient _aiGatewayClient;
+  final RemoteWebSessionRepositoryBuilder _remoteSessionRepositoryBuilder;
   late final WebRelayGatewayClient _relayClient;
+  late final BrowserWebSessionRepository _browserSessionRepository =
+      BrowserWebSessionRepository(_store);
 
   late final StreamSubscription<GatewayPushEvent> _relayEventsSubscription;
 
@@ -46,6 +60,9 @@ class AppController extends ChangeNotifier {
   final Map<String, String> _streamingTextBySession = <String, String>{};
   String _currentSessionKey = '';
   String? _lastAssistantError;
+  String _webSessionApiTokenCache = '';
+  String _webSessionClientId = '';
+  String _sessionPersistenceStatusMessage = '';
 
   UiFeatureManifest get uiFeatureManifest => _uiFeatureManifest;
   AppCapabilities get capabilities =>
@@ -62,6 +79,10 @@ class AppController extends ChangeNotifier {
   bool get aiGatewayBusy => _aiGatewayBusy;
   String? get lastAssistantError => _lastAssistantError;
   String get currentSessionKey => _currentSessionKey;
+  WebSessionPersistenceConfig get webSessionPersistence =>
+      _settings.webSessionPersistence;
+  String get sessionPersistenceStatusMessage =>
+      _sessionPersistenceStatusMessage;
   bool get supportsDesktopIntegration => false;
   bool get hasStoredGatewayToken => storedRelayTokenMask != null;
   bool get hasStoredAiGatewayApiKey => storedAiGatewayApiKeyMask != null;
@@ -75,6 +96,15 @@ class AppController extends ChangeNotifier {
   String? get storedAiGatewayApiKeyMask => WebStore.maskValue(
     _aiGatewayApiKeyCache.trim().isEmpty ? '' : _aiGatewayApiKeyCache,
   );
+  String? get storedWebSessionApiTokenMask => WebStore.maskValue(
+    _webSessionApiTokenCache.trim().isEmpty ? '' : _webSessionApiTokenCache,
+  );
+  bool get usesRemoteSessionPersistence =>
+      webSessionPersistence.mode == WebSessionPersistenceMode.remote &&
+      RemoteWebSessionRepository.normalizeBaseUrl(
+            webSessionPersistence.remoteBaseUrl,
+          ) !=
+          null;
 
   String _relayTokenCache = '';
   String _relayPasswordCache = '';
@@ -122,7 +152,9 @@ class AppController extends ChangeNotifier {
                 updatedAtMs:
                     record.updatedAtMs ??
                     DateTime.now().millisecondsSinceEpoch.toDouble(),
-                executionTarget: _sanitizeTarget(record.executionTarget),
+                executionTarget:
+                    _sanitizeTarget(record.executionTarget) ??
+                    AssistantExecutionTarget.aiGatewayOnly,
                 pending: _pendingSessionKeys.contains(record.sessionKey),
                 current: record.sessionKey == _currentSessionKey,
               ),
@@ -202,6 +234,19 @@ class AppController extends ChangeNotifier {
     return host.isNotEmpty ? host : model;
   }
 
+  String get conversationPersistenceSummary {
+    if (usesRemoteSessionPersistence) {
+      return appText(
+        '当前会话会同步到远端 Session API，并在浏览器中保留一份本地缓存用于恢复。',
+        'Conversation history syncs to the remote session API and keeps a browser cache for local recovery.',
+      );
+    }
+    return appText(
+      '当前会话列表会在浏览器本地保存，刷新后仍可恢复 Direct AI / Relay 的历史入口。',
+      'Conversation history is stored in this browser so Direct AI and Relay entries remain available after reload.',
+    );
+  }
+
   String get currentConversationTitle => _titleForRecord(_currentRecord);
 
   AssistantThreadRecord get _currentRecord {
@@ -209,7 +254,9 @@ class AppController extends ChangeNotifier {
     if (existing != null) {
       return existing;
     }
-    final target = _sanitizeTarget(_settings.assistantExecutionTarget);
+    final target =
+        _sanitizeTarget(_settings.assistantExecutionTarget) ??
+        AssistantExecutionTarget.aiGatewayOnly;
     final record = _newRecord(target: target);
     _threadRecords[record.sessionKey] = record;
     _currentSessionKey = record.sessionKey;
@@ -224,7 +271,8 @@ class AppController extends ChangeNotifier {
       _aiGatewayApiKeyCache = await _store.loadAiGatewayApiKey();
       _relayTokenCache = await _store.loadRelayToken();
       _relayPasswordCache = await _store.loadRelayPassword();
-      final records = await _store.loadAssistantThreadRecords();
+      _webSessionClientId = await _store.loadOrCreateWebSessionClientId();
+      final records = await _loadThreadRecords();
       for (final record in records) {
         final sanitized = _sanitizeRecord(record);
         _threadRecords[sanitized.sessionKey] = sanitized;
@@ -253,20 +301,43 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> saveWebSessionPersistenceConfiguration({
+    required WebSessionPersistenceMode mode,
+    required String remoteBaseUrl,
+    required String apiToken,
+  }) async {
+    final trimmedRemoteBaseUrl = remoteBaseUrl.trim();
+    final normalizedRemoteBaseUrl = RemoteWebSessionRepository.normalizeBaseUrl(
+      trimmedRemoteBaseUrl,
+    );
+    if (mode == WebSessionPersistenceMode.remote &&
+        trimmedRemoteBaseUrl.isNotEmpty &&
+        normalizedRemoteBaseUrl == null) {
+      _sessionPersistenceStatusMessage = appText(
+        'Session API URL 必须使用 HTTPS；仅 localhost / 127.0.0.1 允许 HTTP 作为开发回路。',
+        'Session API URLs must use HTTPS. HTTP is allowed only for localhost or 127.0.0.1 during development.',
+      );
+      notifyListeners();
+      return;
+    }
+    _settings = _settings.copyWith(
+      webSessionPersistence: _settings.webSessionPersistence.copyWith(
+        mode: mode,
+        remoteBaseUrl:
+            normalizedRemoteBaseUrl?.toString() ?? trimmedRemoteBaseUrl,
+      ),
+    );
+    _webSessionApiTokenCache = apiToken.trim();
+    await _persistSettings();
+    await _persistThreads();
+    notifyListeners();
+  }
+
   void navigateHome() {
-    final homeDestination =
-        capabilities.supportsDestination(WorkspaceDestination.assistant)
-        ? WorkspaceDestination.assistant
-        : (capabilities.allowedDestinations.isEmpty
-              ? WorkspaceDestination.assistant
-              : capabilities.allowedDestinations.first);
-    navigateTo(homeDestination);
+    navigateTo(WorkspaceDestination.assistant);
   }
 
   void openSettings({SettingsTab tab = SettingsTab.general}) {
-    if (!capabilities.supportsDestination(WorkspaceDestination.settings)) {
-      return;
-    }
     _destination = WorkspaceDestination.settings;
     _settingsTab = _sanitizeSettingsTab(tab);
     notifyListeners();
@@ -296,7 +367,8 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> createConversation({AssistantExecutionTarget? target}) async {
-    final resolvedTarget = _sanitizeTarget(target);
+    final resolvedTarget =
+        _sanitizeTarget(target) ?? _settings.assistantExecutionTarget;
     final record = _newRecord(target: resolvedTarget);
     _threadRecords[record.sessionKey] = record;
     _currentSessionKey = record.sessionKey;
@@ -323,7 +395,8 @@ class AppController extends ChangeNotifier {
   Future<void> setAssistantExecutionTarget(
     AssistantExecutionTarget target,
   ) async {
-    final resolvedTarget = _sanitizeTarget(target);
+    final resolvedTarget =
+        _sanitizeTarget(target) ?? AssistantExecutionTarget.aiGatewayOnly;
     _settings = _settings.copyWith(assistantExecutionTarget: resolvedTarget);
     _replaceCurrentRecord(
       _currentRecord.copyWith(executionTarget: resolvedTarget),
@@ -670,11 +743,24 @@ class AppController extends ChangeNotifier {
   }
 
   SettingsTab _sanitizeSettingsTab(SettingsTab tab) {
-    return featuresFor(UiFeaturePlatform.web).sanitizeSettingsTab(tab);
+    return switch (tab) {
+      SettingsTab.workspace ||
+      SettingsTab.agents ||
+      SettingsTab.diagnostics ||
+      SettingsTab.experimental => SettingsTab.gateway,
+      _ => tab,
+    };
   }
 
   SettingsSnapshot _sanitizeSettings(SettingsSnapshot snapshot) {
-    final target = _sanitizeTarget(snapshot.assistantExecutionTarget);
+    final target =
+        _sanitizeTarget(snapshot.assistantExecutionTarget) ??
+        AssistantExecutionTarget.aiGatewayOnly;
+    final normalizedSessionBaseUrl =
+        RemoteWebSessionRepository.normalizeBaseUrl(
+          snapshot.webSessionPersistence.remoteBaseUrl,
+        )?.toString() ??
+        '';
     return snapshot.copyWith(
       assistantExecutionTarget: target,
       gateway: snapshot.gateway.copyWith(
@@ -683,12 +769,17 @@ class AppController extends ChangeNotifier {
             : RuntimeConnectionMode.unconfigured,
         useSetupCode: false,
       ),
+      webSessionPersistence: snapshot.webSessionPersistence.copyWith(
+        remoteBaseUrl: normalizedSessionBaseUrl,
+      ),
       assistantNavigationDestinations: const <WorkspaceDestination>[],
     );
   }
 
   AssistantThreadRecord _sanitizeRecord(AssistantThreadRecord record) {
-    final target = _sanitizeTarget(record.executionTarget);
+    final target =
+        _sanitizeTarget(record.executionTarget) ??
+        AssistantExecutionTarget.aiGatewayOnly;
     return record.copyWith(
       executionTarget: target,
       title: record.title.trim().isEmpty
@@ -697,8 +788,13 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  AssistantExecutionTarget _sanitizeTarget(AssistantExecutionTarget? target) {
-    return featuresFor(UiFeaturePlatform.web).sanitizeExecutionTarget(target);
+  AssistantExecutionTarget? _sanitizeTarget(AssistantExecutionTarget? target) {
+    return switch (target) {
+      AssistantExecutionTarget.remote => AssistantExecutionTarget.remote,
+      AssistantExecutionTarget.aiGatewayOnly =>
+        AssistantExecutionTarget.aiGatewayOnly,
+      _ => AssistantExecutionTarget.aiGatewayOnly,
+    };
   }
 
   AssistantThreadRecord _newRecord({
@@ -784,8 +880,112 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> _persistThreads() async {
-    await _store.saveAssistantThreadRecords(
-      _threadRecords.values.toList(growable: false),
+    final records = _threadRecords.values.toList(growable: false);
+    await _browserSessionRepository.saveThreadRecords(records);
+    final invalidRemoteConfigMessage = _invalidRemoteSessionConfigMessage();
+    if (invalidRemoteConfigMessage != null) {
+      _sessionPersistenceStatusMessage = invalidRemoteConfigMessage;
+      return;
+    }
+    final remoteRepository = _resolveRemoteSessionRepository();
+    if (remoteRepository == null) {
+      _sessionPersistenceStatusMessage = '';
+      return;
+    }
+    try {
+      await remoteRepository.saveThreadRecords(records);
+      _sessionPersistenceStatusMessage = appText(
+        '远端 Session API 已同步，浏览器缓存仍保留一份本地副本。',
+        'Remote session API synced successfully; the browser cache remains as a local fallback.',
+      );
+    } catch (error) {
+      _sessionPersistenceStatusMessage = _sessionPersistenceErrorLabel(error);
+    }
+  }
+
+  Future<List<AssistantThreadRecord>> _loadThreadRecords() async {
+    final browserRecords = await _browserSessionRepository.loadThreadRecords();
+    final invalidRemoteConfigMessage = _invalidRemoteSessionConfigMessage();
+    if (invalidRemoteConfigMessage != null) {
+      _sessionPersistenceStatusMessage = invalidRemoteConfigMessage;
+      return browserRecords;
+    }
+    final remoteRepository = _resolveRemoteSessionRepository();
+    if (remoteRepository == null) {
+      _sessionPersistenceStatusMessage = '';
+      return browserRecords;
+    }
+    try {
+      final remoteRecords = await remoteRepository.loadThreadRecords();
+      if (remoteRecords.isNotEmpty) {
+        _sessionPersistenceStatusMessage = appText(
+          '远端 Session API 已启用，并覆盖浏览器中的本地缓存。',
+          'Remote session API is active and overrides the browser cache.',
+        );
+        await _browserSessionRepository.saveThreadRecords(remoteRecords);
+        return remoteRecords;
+      }
+      _sessionPersistenceStatusMessage = appText(
+        '远端 Session API 已启用，但当前为空；浏览器缓存不会自动导入远端。',
+        'The remote session API is active but empty, and the browser cache will not be imported automatically.',
+      );
+      return const <AssistantThreadRecord>[];
+    } catch (error) {
+      _sessionPersistenceStatusMessage = _sessionPersistenceErrorLabel(error);
+      return browserRecords;
+    }
+  }
+
+  WebSessionRepository? _resolveRemoteSessionRepository() {
+    final config = _settings.webSessionPersistence;
+    if (config.mode != WebSessionPersistenceMode.remote) {
+      return null;
+    }
+    final normalizedBaseUrl = RemoteWebSessionRepository.normalizeBaseUrl(
+      config.remoteBaseUrl,
+    );
+    if (normalizedBaseUrl == null) {
+      return null;
+    }
+    return _remoteSessionRepositoryBuilder(
+      config.copyWith(remoteBaseUrl: normalizedBaseUrl.toString()),
+      _webSessionClientId,
+      _webSessionApiTokenCache,
+    );
+  }
+
+  String? _invalidRemoteSessionConfigMessage() {
+    final config = _settings.webSessionPersistence;
+    if (config.mode != WebSessionPersistenceMode.remote ||
+        config.remoteBaseUrl.trim().isEmpty) {
+      return null;
+    }
+    if (RemoteWebSessionRepository.normalizeBaseUrl(config.remoteBaseUrl) !=
+        null) {
+      return null;
+    }
+    return appText(
+      'Session API URL 无效。请使用 HTTPS，或仅在 localhost / 127.0.0.1 开发环境中使用 HTTP。',
+      'The Session API URL is invalid. Use HTTPS, or HTTP only for localhost / 127.0.0.1 during development.',
+    );
+  }
+
+  String _sessionPersistenceErrorLabel(Object error) {
+    return appText(
+      '远端 Session API 当前不可用，已回退到浏览器缓存。${error.toString()}',
+      'The remote session API is unavailable, so XWorkmate fell back to the browser cache. ${error.toString()}',
+    );
+  }
+
+  static WebSessionRepository _defaultRemoteSessionRepository(
+    WebSessionPersistenceConfig config,
+    String clientId,
+    String accessToken,
+  ) {
+    return RemoteWebSessionRepository(
+      baseUrl: config.remoteBaseUrl,
+      clientId: clientId,
+      accessToken: accessToken,
     );
   }
 
