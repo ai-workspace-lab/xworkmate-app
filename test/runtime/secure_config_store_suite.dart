@@ -1,8 +1,11 @@
 @TestOn('vm')
 library;
 
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -129,6 +132,298 @@ void main() {
       expect(loadedAudit, hasLength(1));
       expect(loadedAudit.first.provider, 'Vault');
       expect(loadedAudit.first.target, 'vault_token');
+    },
+  );
+
+  test(
+    'SecureConfigStore persists secure values across instances when secure storage times out',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-secure-fallback-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final databasePath = '${tempDirectory.path}/settings.sqlite3';
+
+      final firstStore = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+        secureStorage: _TimeoutSecureStorageClient(),
+      );
+      await firstStore.saveGatewayToken('token-secret');
+      await firstStore.saveGatewayPassword('password-secret');
+      await firstStore.saveAiGatewayApiKey('ai-gateway-secret');
+
+      final secondStore = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+        secureStorage: _TimeoutSecureStorageClient(),
+      );
+      final secureRefs = await secondStore.loadSecureRefs();
+
+      expect(secureRefs['gateway_token'], 'token-secret');
+      expect(secureRefs['gateway_password'], 'password-secret');
+      expect(secureRefs['ai_gateway_api_key'], 'ai-gateway-secret');
+    },
+  );
+
+  test(
+    'SecureConfigStore persists encrypted local settings and assistant threads when sqlite is unavailable',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-encrypted-local-state-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final databasePath = '${tempDirectory.path}/settings.sqlite3';
+      final secureStorage = _MapSecureStorageClient();
+      final snapshot = SettingsSnapshot.defaults().copyWith(
+        accountUsername: 'encrypted-user',
+        assistantLastSessionKey: 'draft:encrypted-1',
+      );
+      const records = <AssistantThreadRecord>[
+        AssistantThreadRecord(
+          sessionKey: 'draft:encrypted-1',
+          title: '加密线程',
+          archived: false,
+          executionTarget: AssistantExecutionTarget.local,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          updatedAtMs: 1700000000000,
+          messages: <GatewayChatMessage>[
+            GatewayChatMessage(
+              id: 'assistant-1',
+              role: 'assistant',
+              text: 'encrypted message',
+              timestampMs: 1700000001000,
+              toolCallId: null,
+              toolName: null,
+              stopReason: null,
+              pending: false,
+              error: false,
+            ),
+          ],
+        ),
+      ];
+
+      final firstStore = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+        databaseOpener: (_) => throw StateError('sqlite unavailable'),
+        secureStorage: secureStorage,
+      );
+      await firstStore.saveSettingsSnapshot(snapshot);
+      await firstStore.saveAssistantThreadRecords(records);
+
+      final settingsFile = File('${tempDirectory.path}/settings-snapshot.json');
+      final threadsFile = File('${tempDirectory.path}/assistant-threads.json');
+      expect(await settingsFile.exists(), isTrue);
+      expect(await threadsFile.exists(), isTrue);
+      expect(
+        await settingsFile.readAsString(),
+        isNot(contains('encrypted-user')),
+      );
+      expect(
+        await threadsFile.readAsString(),
+        isNot(contains('encrypted message')),
+      );
+
+      final secondStore = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+        databaseOpener: (_) => throw StateError('sqlite unavailable'),
+        secureStorage: secureStorage,
+      );
+      final loadedSnapshot = await secondStore.loadSettingsSnapshot();
+      final loadedThreads = await secondStore.loadAssistantThreadRecords();
+
+      expect(loadedSnapshot.accountUsername, 'encrypted-user');
+      expect(loadedSnapshot.assistantLastSessionKey, 'draft:encrypted-1');
+      expect(loadedThreads, hasLength(1));
+      expect(loadedThreads.single.messages.single.text, 'encrypted message');
+    },
+  );
+
+  test(
+    'SecureConfigStore migrates plaintext local state into sealed storage and clears legacy prefs',
+    () async {
+      final legacySnapshot = SettingsSnapshot.defaults().copyWith(
+        accountUsername: 'legacy-user',
+        assistantLastSessionKey: 'draft:legacy-1',
+      );
+      const legacyRecords = <AssistantThreadRecord>[
+        AssistantThreadRecord(
+          sessionKey: 'draft:legacy-1',
+          title: 'Legacy thread',
+          archived: false,
+          executionTarget: AssistantExecutionTarget.local,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          updatedAtMs: 1700000000000,
+          messages: <GatewayChatMessage>[
+            GatewayChatMessage(
+              id: 'assistant-1',
+              role: 'assistant',
+              text: 'legacy message',
+              timestampMs: 1700000001000,
+              toolCallId: null,
+              toolName: null,
+              stopReason: null,
+              pending: false,
+              error: false,
+            ),
+          ],
+        ),
+      ];
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'xworkmate.settings.snapshot': legacySnapshot.toJsonString(),
+        'xworkmate.assistant.threads': jsonEncode(
+          legacyRecords.map((item) => item.toJson()).toList(growable: false),
+        ),
+      });
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-legacy-migrate-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final databasePath = '${tempDirectory.path}/settings.sqlite3';
+      final secureStorage = _MapSecureStorageClient();
+
+      final store = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+        secureStorage: secureStorage,
+      );
+      final loadedSnapshot = await store.loadSettingsSnapshot();
+      final loadedThreads = await store.loadAssistantThreadRecords();
+
+      expect(loadedSnapshot.accountUsername, 'legacy-user');
+      expect(loadedSnapshot.assistantLastSessionKey, 'draft:legacy-1');
+      expect(loadedThreads.single.messages.single.text, 'legacy message');
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('xworkmate.settings.snapshot'), isNull);
+      expect(prefs.getString('xworkmate.assistant.threads'), isNull);
+
+      final database = sqlite.sqlite3.open(databasePath);
+      addTearDown(database.dispose);
+      final settingsValue =
+          database
+                  .select(
+                    "SELECT value FROM config_entries WHERE storage_key = 'xworkmate.settings.snapshot' LIMIT 1",
+                  )
+                  .single['value']
+              as String;
+      final threadsValue =
+          database
+                  .select(
+                    "SELECT value FROM config_entries WHERE storage_key = 'xworkmate.assistant.threads' LIMIT 1",
+                  )
+                  .single['value']
+              as String;
+      expect(settingsValue, contains('xworkmate.sealed.local-state.v1'));
+      expect(threadsValue, contains('xworkmate.sealed.local-state.v1'));
+      expect(settingsValue, isNot(contains('legacy-user')));
+      expect(threadsValue, isNot(contains('legacy message')));
+
+      final backupFile = File(
+        '${tempDirectory.path}/assistant-state-backup.json',
+      );
+      expect(await backupFile.exists(), isTrue);
+      final backupContents = await backupFile.readAsString();
+      expect(backupContents, contains('sealedState'));
+      expect(backupContents, isNot(contains('legacy-user')));
+      expect(backupContents, isNot(contains('legacy message')));
+    },
+  );
+
+  test(
+    'SecureConfigStore migrates legacy local-state key fallback into primary secure storage',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-local-state-key-migrate-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final databasePath = '${tempDirectory.path}/settings.sqlite3';
+      final secureStorage = _MapSecureStorageClient();
+      final localStateKey = List<int>.generate(32, (index) => index + 1);
+      final encodedKey = _base64UrlNoPadding(localStateKey);
+      final keyFallbackFile = File('${tempDirectory.path}/local-state-key.txt');
+      await keyFallbackFile.writeAsString(encodedKey, flush: true);
+
+      final snapshot = SettingsSnapshot.defaults().copyWith(
+        accountUsername: 'migrated-user',
+        assistantLastSessionKey: 'draft:migrated-1',
+      );
+      const records = <AssistantThreadRecord>[
+        AssistantThreadRecord(
+          sessionKey: 'draft:migrated-1',
+          title: 'Migrated thread',
+          archived: false,
+          executionTarget: AssistantExecutionTarget.local,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          updatedAtMs: 1700000000000,
+          messages: <GatewayChatMessage>[
+            GatewayChatMessage(
+              id: 'assistant-1',
+              role: 'assistant',
+              text: 'migrated message',
+              timestampMs: 1700000001000,
+              toolCallId: null,
+              toolName: null,
+              stopReason: null,
+              pending: false,
+              error: false,
+            ),
+          ],
+        ),
+      ];
+
+      await File('${tempDirectory.path}/settings-snapshot.json').writeAsString(
+        await _sealLocalStateForTest(
+          key: 'xworkmate.settings.snapshot',
+          plaintext: snapshot.toJsonString(),
+          keyBytes: localStateKey,
+        ),
+        flush: true,
+      );
+      await File('${tempDirectory.path}/assistant-threads.json').writeAsString(
+        await _sealLocalStateForTest(
+          key: 'xworkmate.assistant.threads',
+          plaintext: jsonEncode(
+            records.map((item) => item.toJson()).toList(growable: false),
+          ),
+          keyBytes: localStateKey,
+        ),
+        flush: true,
+      );
+
+      final store = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+        secureStorage: secureStorage,
+      );
+      final loadedSnapshot = await store.loadSettingsSnapshot();
+      final loadedThreads = await store.loadAssistantThreadRecords();
+
+      expect(loadedSnapshot.accountUsername, 'migrated-user');
+      expect(loadedThreads.single.messages.single.text, 'migrated message');
+      expect(secureStorage._values['xworkmate.local_state.key'], encodedKey);
+      expect(await keyFallbackFile.exists(), isFalse);
     },
   );
 
@@ -403,6 +698,13 @@ void main() {
 
       await store.saveSettingsSnapshot(snapshot);
       await store.saveAssistantThreadRecords(records);
+      final backupFile = File(
+        '${tempDirectory.path}/assistant-state-backup.json',
+      );
+      expect(await backupFile.exists(), isTrue);
+      final backupContents = await backupFile.readAsString();
+      expect(backupContents, isNot(contains('backup-user')));
+      expect(backupContents, isNot(contains('backup message')));
 
       final database = sqlite.sqlite3.open(databasePath);
       addTearDown(database.dispose);
@@ -477,6 +779,14 @@ void main() {
         await File(
           '${tempDirectory.path}/assistant-state-backup.json',
         ).exists(),
+        isFalse,
+      );
+      expect(
+        await File('${tempDirectory.path}/settings-snapshot.json').exists(),
+        isFalse,
+      );
+      expect(
+        await File('${tempDirectory.path}/assistant-threads.json').exists(),
         isFalse,
       );
     },
@@ -583,4 +893,65 @@ void main() {
       expect(reloadedToken, 'device-token');
     },
   );
+}
+
+class _TimeoutSecureStorageClient implements SecureStorageClient {
+  @override
+  Future<String?> read({required String key}) async {
+    throw TimeoutException('secure read timed out');
+  }
+
+  @override
+  Future<void> write({required String key, required String value}) async {
+    throw TimeoutException('secure write timed out');
+  }
+
+  @override
+  Future<void> delete({required String key}) async {
+    throw TimeoutException('secure delete timed out');
+  }
+}
+
+class _MapSecureStorageClient implements SecureStorageClient {
+  final Map<String, String> _values = <String, String>{};
+
+  @override
+  Future<void> delete({required String key}) async {
+    _values.remove(key);
+  }
+
+  @override
+  Future<String?> read({required String key}) async {
+    return _values[key];
+  }
+
+  @override
+  Future<void> write({required String key, required String value}) async {
+    _values[key] = value;
+  }
+}
+
+Future<String> _sealLocalStateForTest({
+  required String key,
+  required String plaintext,
+  required List<int> keyBytes,
+}) async {
+  const nonce = <int>[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  final cipher = AesGcm.with256bits();
+  final secretBox = await cipher.encrypt(
+    utf8.encode(plaintext),
+    secretKey: SecretKey(keyBytes),
+    nonce: nonce,
+    aad: utf8.encode(key),
+  );
+  return jsonEncode(<String, dynamic>{
+    'storageFormat': 'xworkmate.sealed.local-state.v1',
+    'nonce': _base64UrlNoPadding(secretBox.nonce),
+    'cipherText': _base64UrlNoPadding(secretBox.cipherText),
+    'mac': _base64UrlNoPadding(secretBox.mac.bytes),
+  });
+}
+
+String _base64UrlNoPadding(List<int> bytes) {
+  return base64Url.encode(bytes).replaceAll('=', '');
 }

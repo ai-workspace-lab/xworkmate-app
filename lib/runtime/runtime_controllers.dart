@@ -12,6 +12,7 @@ class SettingsController extends ChangeNotifier {
   SettingsController(this._store);
 
   final SecureConfigStore _store;
+  bool _disposed = false;
 
   SettingsSnapshot _snapshot = SettingsSnapshot.defaults();
   Map<String, String> _secureRefs = const <String, String>{};
@@ -26,6 +27,20 @@ class SettingsController extends ChangeNotifier {
   String get ollamaStatus => _ollamaStatus;
   String get vaultStatus => _vaultStatus;
   String get aiGatewayStatus => _aiGatewayStatus;
+
+  @override
+  void notifyListeners() {
+    if (_disposed) {
+      return;
+    }
+    super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 
   Future<void> initialize() async {
     _snapshot = await _store.loadSettingsSnapshot();

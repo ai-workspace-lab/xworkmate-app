@@ -161,6 +161,7 @@ class AppController extends ChangeNotifier {
   String? _bootstrapError;
   StreamSubscription<GatewayPushEvent>? _runtimeEventsSubscription;
   bool _disposed = false;
+  Future<void> _assistantThreadPersistQueue = Future<void>.value();
 
   WorkspaceDestination get destination => _destination;
   UiFeatureManifest get uiFeatureManifest => _uiFeatureManifest;
@@ -1356,6 +1357,7 @@ class AppController extends ChangeNotifier {
         thinking: thinking,
         attachments: attachments,
       );
+      await _flushAssistantThreadPersistence();
       _recomputeTasks();
       return;
     }
@@ -1442,6 +1444,7 @@ class AppController extends ChangeNotifier {
       messageViewMode: mode,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
+    await _flushAssistantThreadPersistence();
     _recomputeTasks();
     _notifyIfActive();
   }
@@ -1812,6 +1815,9 @@ class AppController extends ChangeNotifier {
     SettingsSnapshot snapshot, {
     bool refreshAfterSave = true,
   }) async {
+    if (_disposed) {
+      return;
+    }
     final current = settings;
     final sanitized = _sanitizeFeatureFlagSettings(
       _sanitizeMultiAgentSettings(
@@ -1820,19 +1826,31 @@ class AppController extends ChangeNotifier {
     );
     setActiveAppLanguage(sanitized.appLanguage);
     await _settingsController.saveSnapshot(sanitized);
+    if (_disposed) {
+      return;
+    }
     _multiAgentOrchestrator.updateConfig(sanitized.multiAgent);
     _agentsController.restoreSelection(sanitized.gateway.selectedAgentId);
     _modelsController.restoreFromSettings(sanitized.aiGateway);
+    if (_disposed) {
+      return;
+    }
     if (current.codexCliPath != sanitized.codexCliPath ||
         current.codeAgentRuntimeMode != sanitized.codeAgentRuntimeMode) {
       _registerCodexExternalProvider(codexPath: sanitized.codexCliPath);
       await _refreshCodexCliAvailability();
+      if (_disposed) {
+        return;
+      }
     }
     if (current.linuxDesktop.toJson().toString() !=
             sanitized.linuxDesktop.toJson().toString() ||
         current.launchAtLogin != sanitized.launchAtLogin) {
       await _desktopPlatformService.syncConfig(sanitized.linuxDesktop);
       await _desktopPlatformService.setLaunchAtLogin(sanitized.launchAtLogin);
+      if (_disposed) {
+        return;
+      }
     }
     if (refreshAfterSave) {
       _recomputeTasks();
@@ -1842,7 +1860,9 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> clearAssistantLocalState() async {
+    await _flushAssistantThreadPersistence();
     await _store.clearAssistantLocalState();
+    _assistantThreadPersistQueue = Future<void>.value();
     final defaults = SettingsSnapshot.defaults();
     _assistantThreadRecords.clear();
     _assistantThreadMessages.clear();
@@ -2753,6 +2773,10 @@ class AppController extends ChangeNotifier {
     _notifyIfActive();
   }
 
+  Future<void> _flushAssistantThreadPersistence() async {
+    await _assistantThreadPersistQueue.catchError((_) {});
+  }
+
   void _appendLocalSessionMessage(
     String sessionKey,
     GatewayChatMessage message,
@@ -3053,11 +3077,17 @@ class AppController extends ChangeNotifier {
       _assistantThreadMessages[normalizedSessionKey] =
           List<GatewayChatMessage>.from(messages);
     }
-    unawaited(
-      _store.saveAssistantThreadRecords(
-        _assistantThreadRecords.values.toList(growable: false),
-      ),
-    );
+    final snapshot = _assistantThreadRecords.values.toList(growable: false);
+    final nextPersist = _assistantThreadPersistQueue.catchError((_) {}).then((
+      _,
+    ) async {
+      if (_disposed) {
+        return;
+      }
+      await _store.saveAssistantThreadRecords(snapshot);
+    });
+    _assistantThreadPersistQueue = nextPersist;
+    unawaited(nextPersist);
   }
 
   Future<void> _setCurrentAssistantSessionKey(
@@ -3075,6 +3105,9 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> _persistAssistantLastSessionKey(String sessionKey) async {
+    if (_disposed) {
+      return;
+    }
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
     if (normalizedSessionKey.isEmpty ||
         settings.assistantLastSessionKey == normalizedSessionKey) {
