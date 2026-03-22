@@ -9,13 +9,16 @@ import '../web/web_ai_gateway_client.dart';
 import '../web/web_relay_gateway_client.dart';
 import '../web/web_store.dart';
 import 'app_capabilities.dart';
+import 'ui_feature_manifest.dart';
 
 class AppController extends ChangeNotifier {
   AppController({
     WebStore? store,
     WebAiGatewayClient? aiGatewayClient,
     WebRelayGatewayClient? relayClient,
+    UiFeatureManifest? uiFeatureManifest,
   }) : _store = store ?? WebStore(),
+       _uiFeatureManifest = uiFeatureManifest ?? UiFeatureManifest.fallback(),
        _aiGatewayClient = aiGatewayClient ?? const WebAiGatewayClient() {
     _relayClient = relayClient ?? WebRelayGatewayClient(_store);
     _relayEventsSubscription = _relayClient.events.listen(_handleRelayEvent);
@@ -23,6 +26,7 @@ class AppController extends ChangeNotifier {
   }
 
   final WebStore _store;
+  final UiFeatureManifest _uiFeatureManifest;
   final WebAiGatewayClient _aiGatewayClient;
   late final WebRelayGatewayClient _relayClient;
 
@@ -43,7 +47,9 @@ class AppController extends ChangeNotifier {
   String _currentSessionKey = '';
   String? _lastAssistantError;
 
-  AppCapabilities get capabilities => AppCapabilities.web;
+  UiFeatureManifest get uiFeatureManifest => _uiFeatureManifest;
+  AppCapabilities get capabilities =>
+      AppCapabilities.fromFeatureAccess(featuresFor(UiFeaturePlatform.web));
   WorkspaceDestination get destination => _destination;
   SettingsTab get settingsTab => _settingsTab;
   ThemeMode get themeMode => _themeMode;
@@ -73,6 +79,10 @@ class AppController extends ChangeNotifier {
   String _relayTokenCache = '';
   String _relayPasswordCache = '';
   String _aiGatewayApiKeyCache = '';
+
+  UiFeatureAccess featuresFor(UiFeaturePlatform platform) {
+    return _uiFeatureManifest.forPlatform(platform);
+  }
 
   AssistantExecutionTarget get assistantExecutionTarget =>
       _currentRecord.executionTarget ?? _settings.assistantExecutionTarget;
@@ -112,9 +122,7 @@ class AppController extends ChangeNotifier {
                 updatedAtMs:
                     record.updatedAtMs ??
                     DateTime.now().millisecondsSinceEpoch.toDouble(),
-                executionTarget:
-                    _sanitizeTarget(record.executionTarget) ??
-                    AssistantExecutionTarget.aiGatewayOnly,
+                executionTarget: _sanitizeTarget(record.executionTarget),
                 pending: _pendingSessionKeys.contains(record.sessionKey),
                 current: record.sessionKey == _currentSessionKey,
               ),
@@ -201,9 +209,7 @@ class AppController extends ChangeNotifier {
     if (existing != null) {
       return existing;
     }
-    final target =
-        _sanitizeTarget(_settings.assistantExecutionTarget) ??
-        AssistantExecutionTarget.aiGatewayOnly;
+    final target = _sanitizeTarget(_settings.assistantExecutionTarget);
     final record = _newRecord(target: target);
     _threadRecords[record.sessionKey] = record;
     _currentSessionKey = record.sessionKey;
@@ -248,10 +254,19 @@ class AppController extends ChangeNotifier {
   }
 
   void navigateHome() {
-    navigateTo(WorkspaceDestination.assistant);
+    final homeDestination =
+        capabilities.supportsDestination(WorkspaceDestination.assistant)
+        ? WorkspaceDestination.assistant
+        : (capabilities.allowedDestinations.isEmpty
+              ? WorkspaceDestination.assistant
+              : capabilities.allowedDestinations.first);
+    navigateTo(homeDestination);
   }
 
   void openSettings({SettingsTab tab = SettingsTab.general}) {
+    if (!capabilities.supportsDestination(WorkspaceDestination.settings)) {
+      return;
+    }
     _destination = WorkspaceDestination.settings;
     _settingsTab = _sanitizeSettingsTab(tab);
     notifyListeners();
@@ -281,8 +296,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> createConversation({AssistantExecutionTarget? target}) async {
-    final resolvedTarget =
-        _sanitizeTarget(target) ?? _settings.assistantExecutionTarget;
+    final resolvedTarget = _sanitizeTarget(target);
     final record = _newRecord(target: resolvedTarget);
     _threadRecords[record.sessionKey] = record;
     _currentSessionKey = record.sessionKey;
@@ -309,8 +323,7 @@ class AppController extends ChangeNotifier {
   Future<void> setAssistantExecutionTarget(
     AssistantExecutionTarget target,
   ) async {
-    final resolvedTarget =
-        _sanitizeTarget(target) ?? AssistantExecutionTarget.aiGatewayOnly;
+    final resolvedTarget = _sanitizeTarget(target);
     _settings = _settings.copyWith(assistantExecutionTarget: resolvedTarget);
     _replaceCurrentRecord(
       _currentRecord.copyWith(executionTarget: resolvedTarget),
@@ -657,19 +670,11 @@ class AppController extends ChangeNotifier {
   }
 
   SettingsTab _sanitizeSettingsTab(SettingsTab tab) {
-    return switch (tab) {
-      SettingsTab.workspace ||
-      SettingsTab.agents ||
-      SettingsTab.diagnostics ||
-      SettingsTab.experimental => SettingsTab.gateway,
-      _ => tab,
-    };
+    return featuresFor(UiFeaturePlatform.web).sanitizeSettingsTab(tab);
   }
 
   SettingsSnapshot _sanitizeSettings(SettingsSnapshot snapshot) {
-    final target =
-        _sanitizeTarget(snapshot.assistantExecutionTarget) ??
-        AssistantExecutionTarget.aiGatewayOnly;
+    final target = _sanitizeTarget(snapshot.assistantExecutionTarget);
     return snapshot.copyWith(
       assistantExecutionTarget: target,
       gateway: snapshot.gateway.copyWith(
@@ -683,9 +688,7 @@ class AppController extends ChangeNotifier {
   }
 
   AssistantThreadRecord _sanitizeRecord(AssistantThreadRecord record) {
-    final target =
-        _sanitizeTarget(record.executionTarget) ??
-        AssistantExecutionTarget.aiGatewayOnly;
+    final target = _sanitizeTarget(record.executionTarget);
     return record.copyWith(
       executionTarget: target,
       title: record.title.trim().isEmpty
@@ -694,13 +697,8 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  AssistantExecutionTarget? _sanitizeTarget(AssistantExecutionTarget? target) {
-    return switch (target) {
-      AssistantExecutionTarget.remote => AssistantExecutionTarget.remote,
-      AssistantExecutionTarget.aiGatewayOnly =>
-        AssistantExecutionTarget.aiGatewayOnly,
-      _ => AssistantExecutionTarget.aiGatewayOnly,
-    };
+  AssistantExecutionTarget _sanitizeTarget(AssistantExecutionTarget? target) {
+    return featuresFor(UiFeaturePlatform.web).sanitizeExecutionTarget(target);
   }
 
   AssistantThreadRecord _newRecord({

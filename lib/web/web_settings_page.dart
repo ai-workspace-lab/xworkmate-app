@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app/app_controller_web.dart';
 import '../app/app_metadata.dart';
+import '../app/ui_feature_manifest.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
@@ -100,7 +101,11 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
       animation: controller,
       builder: (context, _) {
         final settings = controller.settings;
-        final currentTab = controller.settingsTab;
+        final uiFeatures = controller.featuresFor(UiFeaturePlatform.web);
+        final availableTabs = uiFeatures.availableSettingsTabs;
+        final currentTab = uiFeatures.sanitizeSettingsTab(
+          controller.settingsTab,
+        );
         return DesktopWorkspaceScaffold(
           breadcrumbs: <AppBreadcrumbItem>[
             AppBreadcrumbItem(
@@ -159,15 +164,10 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           child: Column(
             children: [
               SectionTabs(
-                items: const <SettingsTab>[
-                  SettingsTab.general,
-                  SettingsTab.gateway,
-                  SettingsTab.appearance,
-                  SettingsTab.about,
-                ].map((item) => item.label).toList(),
+                items: availableTabs.map((item) => item.label).toList(),
                 value: currentTab.label,
                 onChanged: (label) {
-                  final tab = SettingsTab.values.firstWhere(
+                  final tab = availableTabs.firstWhere(
                     (item) => item.label == label,
                   );
                   controller.setSettingsTab(tab);
@@ -201,6 +201,15 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
   }
 
   List<Widget> _buildGeneral(BuildContext context, AppController controller) {
+    final targets = controller
+        .featuresFor(UiFeaturePlatform.web)
+        .availableExecutionTargets
+        .where(
+          (target) =>
+              target == AssistantExecutionTarget.aiGatewayOnly ||
+              target == AssistantExecutionTarget.remote,
+        )
+        .toList(growable: false);
     return [
       SurfaceCard(
         child: Column(
@@ -213,18 +222,14 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
             const SizedBox(height: 10),
             DropdownButtonFormField<AssistantExecutionTarget>(
               initialValue: controller.assistantExecutionTarget,
-              items:
-                  const <AssistantExecutionTarget>[
-                        AssistantExecutionTarget.aiGatewayOnly,
-                        AssistantExecutionTarget.remote,
-                      ]
-                      .map((target) {
-                        return DropdownMenuItem<AssistantExecutionTarget>(
-                          value: target,
-                          child: Text(_targetLabel(target)),
-                        );
-                      })
-                      .toList(growable: false),
+              items: targets
+                  .map((target) {
+                    return DropdownMenuItem<AssistantExecutionTarget>(
+                      value: target,
+                      child: Text(_targetLabel(target)),
+                    );
+                  })
+                  .toList(growable: false),
               onChanged: (value) {
                 if (value != null) {
                   controller.setAssistantExecutionTarget(value);

@@ -7,7 +7,7 @@ PNPM ?= pnpm
 DART ?= dart
 DEVICE ?= macos
 
-.PHONY: help deps analyze test check format run build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-aris-bridge
+.PHONY: help deps analyze test check format run build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-aris-bridge render-release-docs
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -25,6 +25,9 @@ check: analyze test ## Run the standard validation suite
 
 format: ## Format Dart sources
 	$(DART) format lib test
+
+render-release-docs: ## Render feature matrix, roadmap, release notes, and changelog docs
+	$(DART) run tool/render_release_docs.dart
 
 run: ## Run the app on a device or desktop target (DEVICE=macos by default)
 	$(FLUTTER) run -d $(DEVICE)

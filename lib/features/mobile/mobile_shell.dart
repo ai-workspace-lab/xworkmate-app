@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
+import '../../app/ui_feature_manifest.dart';
 import '../../app/workspace_page_registry.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
@@ -189,7 +190,8 @@ class _MobileShellState extends State<MobileShell> {
   }
 
   Widget _buildCurrentPage() {
-    if (_showWorkspaceHub) {
+    final features = widget.controller.featuresFor(UiFeaturePlatform.mobile);
+    if (_showWorkspaceHub && features.showsWorkspaceHub) {
       return _MobileWorkspaceLauncher(
         controller: widget.controller,
         onOpenGatewayConnect: _showConnectSheet,
@@ -211,9 +213,26 @@ class _MobileShellState extends State<MobileShell> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
+        final features = widget.controller.featuresFor(
+          UiFeaturePlatform.mobile,
+        );
+        final availableTabs = <MobileShellTab>[
+          if (features.isEnabledPath(UiFeatureKeys.navigationAssistant))
+            MobileShellTab.assistant,
+          if (features.isEnabledPath(UiFeatureKeys.navigationTasks))
+            MobileShellTab.tasks,
+          if (features.showsWorkspaceHub) MobileShellTab.workspace,
+          if (features.isEnabledPath(UiFeatureKeys.navigationSecrets))
+            MobileShellTab.secrets,
+          if (features.isEnabledPath(UiFeatureKeys.navigationSettings))
+            MobileShellTab.settings,
+        ];
         final currentTab = _showWorkspaceHub
             ? MobileShellTab.workspace
             : _tabForDestination(widget.controller.destination);
+        final resolvedCurrentTab = availableTabs.contains(currentTab)
+            ? currentTab
+            : (availableTabs.isEmpty ? currentTab : availableTabs.first);
         final destinationKey = _showWorkspaceHub
             ? const ValueKey<String>('mobile-shell-workspace')
             : ValueKey<String>(
@@ -260,7 +279,9 @@ class _MobileShellState extends State<MobileShell> {
                       const SizedBox(height: 10),
                       Expanded(
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(AppRadius.sidebar),
+                          borderRadius: BorderRadius.circular(
+                            AppRadius.sidebar,
+                          ),
                           child: DecoratedBox(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
@@ -291,7 +312,8 @@ class _MobileShellState extends State<MobileShell> {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(6, 12, 6, 18),
                         child: _BottomPillNav(
-                          currentTab: currentTab,
+                          currentTab: resolvedCurrentTab,
+                          tabs: availableTabs,
                           onChanged: _selectTab,
                         ),
                       ),
@@ -408,8 +430,8 @@ class _MobileSafeStrip extends StatelessWidget {
                 color: connection.status == RuntimeConnectionStatus.connected
                     ? palette.success
                     : palette.textSecondary,
-                background: connection.status ==
-                        RuntimeConnectionStatus.connected
+                background:
+                    connection.status == RuntimeConnectionStatus.connected
                     ? palette.success.withValues(alpha: 0.14)
                     : palette.surfaceSecondary,
               ),
@@ -611,11 +633,13 @@ class _MobileSafeSheet extends StatelessWidget {
                               _MobileFactChip(
                                 icon: Icons.monitor_heart_outlined,
                                 label: connection.status.label,
-                                color: connection.status ==
+                                color:
+                                    connection.status ==
                                         RuntimeConnectionStatus.connected
                                     ? palette.success
                                     : palette.textSecondary,
-                                background: connection.status ==
+                                background:
+                                    connection.status ==
                                         RuntimeConnectionStatus.connected
                                     ? palette.success.withValues(alpha: 0.14)
                                     : palette.surfaceSecondary,
@@ -665,18 +689,13 @@ class _MobileSafeSheet extends StatelessWidget {
                                   child: Text(
                                     controller.canQuickConnectGateway
                                         ? appText('快速连接', 'Quick Connect')
-                                        : appText(
-                                            '打开连接面板',
-                                            'Open Connection',
-                                          ),
+                                        : appText('打开连接面板', 'Open Connection'),
                                   ),
                                 ),
                               if (hasPendingRun)
                                 FilledButton.tonal(
                                   onPressed: controller.abortRun,
-                                  child: Text(
-                                    appText('停止运行', 'Stop Run'),
-                                  ),
+                                  child: Text(appText('停止运行', 'Stop Run')),
                                 ),
                             ],
                           ),
@@ -968,7 +987,8 @@ class _MobilePendingApprovalCard extends StatelessWidget {
             runSpacing: 8,
             children: [
               FilledButton.tonal(
-                onPressed: () => controller.approveDevicePairing(item.requestId),
+                onPressed: () =>
+                    controller.approveDevicePairing(item.requestId),
                 child: Text(appText('批准配对', 'Approve Pairing')),
               ),
               OutlinedButton(
@@ -996,10 +1016,7 @@ class _MobilePendingApprovalCard extends StatelessWidget {
 }
 
 class _MobilePairedDeviceCard extends StatelessWidget {
-  const _MobilePairedDeviceCard({
-    required this.controller,
-    required this.item,
-  });
+  const _MobilePairedDeviceCard({required this.controller, required this.item});
 
   final AppController controller;
   final GatewayPairedDevice item;
@@ -1121,13 +1138,14 @@ String _mobileSecurePathLabel({
       : connection.mode;
   return switch (mode) {
     RuntimeConnectionMode.local => appText('Loopback WS', 'Loopback WS'),
-    RuntimeConnectionMode.remote => profile.tls
-        ? appText('Secure Direct TLS', 'Secure Direct TLS')
-        : appText('Remote Non-TLS', 'Remote Non-TLS'),
+    RuntimeConnectionMode.remote =>
+      profile.tls
+          ? appText('Secure Direct TLS', 'Secure Direct TLS')
+          : appText('Remote Non-TLS', 'Remote Non-TLS'),
     RuntimeConnectionMode.unconfigured => appText(
-        'Gateway 未配置',
-        'Gateway Not Configured',
-      ),
+      'Gateway 未配置',
+      'Gateway Not Configured',
+    ),
   };
 }
 
@@ -1178,50 +1196,60 @@ class _MobileWorkspaceLauncher extends StatelessWidget {
   Widget build(BuildContext context) {
     final connection = controller.connection;
     final palette = context.palette;
-    final entries = <_WorkspaceEntry>[
-      _WorkspaceEntry(
-        destination: WorkspaceDestination.skills,
-        subtitle: appText('技能包与依赖状态', 'Packages and dependency status'),
-        iconColor: palette.accent,
-        iconBackground: palette.accentMuted,
-      ),
-      _WorkspaceEntry(
-        destination: WorkspaceDestination.nodes,
-        subtitle: appText('边缘节点与实例', 'Edge nodes and instances'),
-        iconColor: _tealLine,
-        iconBackground: _tealSoft,
-      ),
-      _WorkspaceEntry(
-        destination: WorkspaceDestination.agents,
-        subtitle: appText('代理运行态与配置', 'Agent state and configuration'),
-        iconColor: palette.warning,
-        iconBackground: palette.warning.withValues(alpha: 0.12),
-      ),
-      _WorkspaceEntry(
-        destination: WorkspaceDestination.mcpServer,
-        subtitle: appText('MCP 连接与工具注册', 'MCP endpoints and tools'),
-        iconColor: palette.accent,
-        iconBackground: palette.accentMuted,
-      ),
-      _WorkspaceEntry(
-        destination: WorkspaceDestination.clawHub,
-        subtitle: appText('技能与模板市场', 'Marketplace and templates'),
-        iconColor: _violetLine,
-        iconBackground: _violetSoft,
-      ),
-      _WorkspaceEntry(
-        destination: WorkspaceDestination.aiGateway,
-        subtitle: appText('模型与代理网关', 'Models and agent gateway'),
-        iconColor: palette.accent,
-        iconBackground: palette.accentMuted,
-      ),
-      _WorkspaceEntry(
-        destination: WorkspaceDestination.account,
-        subtitle: appText('身份、工作区与会话', 'Identity, workspace and sessions'),
-        iconColor: palette.success,
-        iconBackground: palette.success.withValues(alpha: 0.12),
-      ),
-    ];
+    final features = controller.featuresFor(UiFeaturePlatform.mobile);
+    final entries =
+        <_WorkspaceEntry>[
+              _WorkspaceEntry(
+                destination: WorkspaceDestination.skills,
+                subtitle: appText('技能包与依赖状态', 'Packages and dependency status'),
+                iconColor: palette.accent,
+                iconBackground: palette.accentMuted,
+              ),
+              _WorkspaceEntry(
+                destination: WorkspaceDestination.nodes,
+                subtitle: appText('边缘节点与实例', 'Edge nodes and instances'),
+                iconColor: _tealLine,
+                iconBackground: _tealSoft,
+              ),
+              _WorkspaceEntry(
+                destination: WorkspaceDestination.agents,
+                subtitle: appText('代理运行态与配置', 'Agent state and configuration'),
+                iconColor: palette.warning,
+                iconBackground: palette.warning.withValues(alpha: 0.12),
+              ),
+              _WorkspaceEntry(
+                destination: WorkspaceDestination.mcpServer,
+                subtitle: appText('MCP 连接与工具注册', 'MCP endpoints and tools'),
+                iconColor: palette.accent,
+                iconBackground: palette.accentMuted,
+              ),
+              _WorkspaceEntry(
+                destination: WorkspaceDestination.clawHub,
+                subtitle: appText('技能与模板市场', 'Marketplace and templates'),
+                iconColor: _violetLine,
+                iconBackground: _violetSoft,
+              ),
+              _WorkspaceEntry(
+                destination: WorkspaceDestination.aiGateway,
+                subtitle: appText('模型与代理网关', 'Models and agent gateway'),
+                iconColor: palette.accent,
+                iconBackground: palette.accentMuted,
+              ),
+              _WorkspaceEntry(
+                destination: WorkspaceDestination.account,
+                subtitle: appText(
+                  '身份、工作区与会话',
+                  'Identity, workspace and sessions',
+                ),
+                iconColor: palette.success,
+                iconBackground: palette.success.withValues(alpha: 0.12),
+              ),
+            ]
+            .where(
+              (entry) =>
+                  features.allowedDestinations.contains(entry.destination),
+            )
+            .toList(growable: false);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
@@ -1598,9 +1626,14 @@ class _GradientActionButton extends StatelessWidget {
 }
 
 class _BottomPillNav extends StatelessWidget {
-  const _BottomPillNav({required this.currentTab, required this.onChanged});
+  const _BottomPillNav({
+    required this.currentTab,
+    required this.tabs,
+    required this.onChanged,
+  });
 
   final MobileShellTab currentTab;
+  final List<MobileShellTab> tabs;
   final ValueChanged<MobileShellTab> onChanged;
 
   @override
@@ -1615,7 +1648,7 @@ class _BottomPillNav extends StatelessWidget {
         boxShadow: [palette.chromeShadowAmbient],
       ),
       child: Row(
-        children: MobileShellTab.values
+        children: tabs
             .map(
               (tab) => Expanded(
                 child: GestureDetector(
@@ -1645,12 +1678,13 @@ class _BottomPillNav extends StatelessWidget {
                           tab.label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: currentTab == tab
-                                ? palette.accent
-                                : palette.textPrimary,
-                          ),
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: currentTab == tab
+                                    ? palette.accent
+                                    : palette.textPrimary,
+                              ),
                         ),
                       ],
                     ),

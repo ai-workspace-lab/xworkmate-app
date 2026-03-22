@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/features/settings/settings_page.dart';
 import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
@@ -69,7 +70,11 @@ void main() {
   ) async {
     final controller = await createTestController(tester);
 
-    await pumpPage(tester, child: SettingsPage(controller: controller));
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
 
     await tester.tap(find.text('外观'));
     await tester.pumpAndSettle();
@@ -88,7 +93,11 @@ void main() {
   ) async {
     final controller = await createTestController(tester);
 
-    await pumpPage(tester, child: SettingsPage(controller: controller));
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
 
     await tester.tap(find.text('集成'));
     await tester.pumpAndSettle();
@@ -108,7 +117,11 @@ void main() {
       desktopPlatformService: _DesktopServiceStub(),
     );
 
-    await pumpPage(tester, child: SettingsPage(controller: controller));
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
 
     expect(
       find.byKey(const ValueKey('linux-desktop-integration-card')),
@@ -187,6 +200,37 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(controller.runtimeLogs, isEmpty);
+  });
+
+  testWidgets('SettingsPage hides tabs disabled by feature manifest', (
+    WidgetTester tester,
+  ) async {
+    final manifest = UiFeatureManifest.fallback()
+        .copyWithFeature(
+          platform: UiFeaturePlatform.desktop,
+          module: 'settings',
+          feature: 'diagnostics',
+          enabled: false,
+        )
+        .copyWithFeature(
+          platform: UiFeaturePlatform.desktop,
+          module: 'settings',
+          feature: 'experimental',
+          enabled: false,
+        );
+    final controller = await createTestController(
+      tester,
+      uiFeatureManifest: manifest,
+    );
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
+
+    expect(find.text('诊断'), findsNothing);
+    expect(find.text('实验特性'), findsNothing);
   });
 
   testWidgets('SettingsPage detail mode returns to overview', (

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'app_metadata.dart';
 import 'app_capabilities.dart';
+import 'ui_feature_manifest.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/device_identity_store.dart';
@@ -34,8 +35,13 @@ class AppController extends ChangeNotifier {
     SecureConfigStore? store,
     RuntimeCoordinator? runtimeCoordinator,
     DesktopPlatformService? desktopPlatformService,
+    UiFeatureManifest? uiFeatureManifest,
   }) {
     _store = store ?? SecureConfigStore();
+    _uiFeatureManifest = uiFeatureManifest ?? UiFeatureManifest.fallback();
+    _hostUiFeaturePlatform = Platform.isIOS || Platform.isAndroid
+        ? UiFeaturePlatform.mobile
+        : UiFeaturePlatform.desktop;
 
     final resolvedRuntimeCoordinator =
         runtimeCoordinator ??
@@ -86,6 +92,8 @@ class AppController extends ChangeNotifier {
   }
 
   late final SecureConfigStore _store;
+  late final UiFeatureManifest _uiFeatureManifest;
+  late final UiFeaturePlatform _hostUiFeaturePlatform;
 
   late final RuntimeCoordinator _runtimeCoordinator;
   late final CodeAgentNodeOrchestrator _codeAgentNodeOrchestrator;
@@ -142,7 +150,9 @@ class AppController extends ChangeNotifier {
   bool _disposed = false;
 
   WorkspaceDestination get destination => _destination;
-  AppCapabilities get capabilities => AppCapabilities.desktop;
+  UiFeatureManifest get uiFeatureManifest => _uiFeatureManifest;
+  AppCapabilities get capabilities =>
+      AppCapabilities.fromFeatureAccess(featuresFor(_hostUiFeaturePlatform));
   ThemeMode get themeMode => _themeMode;
   AppSidebarState get sidebarState => _sidebarState;
   ModulesTab get modulesTab => _modulesTab;
@@ -155,6 +165,10 @@ class AppController extends ChangeNotifier {
   DetailPanelData? get detailPanel => _detailPanel;
   bool get initializing => _initializing;
   String? get bootstrapError => _bootstrapError;
+
+  UiFeatureAccess featuresFor(UiFeaturePlatform platform) {
+    return _uiFeatureManifest.forPlatform(platform);
+  }
 
   RuntimeCoordinator get runtimeCoordinator => _runtimeCoordinator;
   GatewayRuntime get _runtime => _runtimeCoordinator.gateway;
@@ -597,7 +611,7 @@ class AppController extends ChangeNotifier {
   List<WorkspaceDestination> get assistantNavigationDestinations =>
       normalizeAssistantNavigationDestinations(
         settings.assistantNavigationDestinations,
-      );
+      ).where(capabilities.supportsDestination).toList(growable: false);
 
   List<GatewayChatMessage> get chatMessages {
     final sessionKey = _normalizedAssistantSessionKey(
@@ -648,8 +662,10 @@ class AppController extends ChangeNotifier {
     String sessionKey,
   ) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    return _assistantThreadRecords[normalizedSessionKey]?.executionTarget ??
-        settings.assistantExecutionTarget;
+    return _sanitizeExecutionTarget(
+      _assistantThreadRecords[normalizedSessionKey]?.executionTarget ??
+          settings.assistantExecutionTarget,
+    );
   }
 
   AssistantMessageViewMode assistantMessageViewModeForSession(
@@ -713,6 +729,9 @@ class AppController extends ChangeNotifier {
   }
 
   void navigateTo(WorkspaceDestination destination) {
+    if (!capabilities.supportsDestination(destination)) {
+      return;
+    }
     final nextModulesTab = switch (destination) {
       WorkspaceDestination.nodes => ModulesTab.nodes,
       WorkspaceDestination.agents => ModulesTab.agents,
@@ -741,11 +760,17 @@ class AppController extends ChangeNotifier {
         _runtime.snapshot.mainSessionKey?.trim().isNotEmpty == true
         ? _runtime.snapshot.mainSessionKey!.trim()
         : 'main';
-    final destinationChanged = _destination != WorkspaceDestination.assistant;
+    final homeDestination =
+        capabilities.supportsDestination(WorkspaceDestination.assistant)
+        ? WorkspaceDestination.assistant
+        : (capabilities.allowedDestinations.isEmpty
+              ? WorkspaceDestination.assistant
+              : capabilities.allowedDestinations.first);
+    final destinationChanged = _destination != homeDestination;
     final detailChanged = _detailPanel != null;
     final settingsDrillInChanged =
         _settingsDetail != null || _settingsNavigationContext != null;
-    _destination = WorkspaceDestination.assistant;
+    _destination = homeDestination;
     _settingsDetail = null;
     _settingsNavigationContext = null;
     _detailPanel = null;
@@ -761,6 +786,9 @@ class AppController extends ChangeNotifier {
     final destination = tab == ModulesTab.agents
         ? WorkspaceDestination.agents
         : WorkspaceDestination.nodes;
+    if (!capabilities.supportsDestination(destination)) {
+      return;
+    }
     final changed =
         _destination != destination ||
         _modulesTab != tab ||
@@ -787,6 +815,9 @@ class AppController extends ChangeNotifier {
   }
 
   void openSecrets({SecretsTab tab = SecretsTab.vault}) {
+    if (!capabilities.supportsDestination(WorkspaceDestination.secrets)) {
+      return;
+    }
     final changed =
         _destination != WorkspaceDestination.secrets ||
         _secretsTab != tab ||
@@ -813,6 +844,9 @@ class AppController extends ChangeNotifier {
   }
 
   void openAiGateway({AiGatewayTab tab = AiGatewayTab.models}) {
+    if (!capabilities.supportsDestination(WorkspaceDestination.aiGateway)) {
+      return;
+    }
     final changed =
         _destination != WorkspaceDestination.aiGateway ||
         _aiGatewayTab != tab ||
@@ -843,11 +877,18 @@ class AppController extends ChangeNotifier {
     SettingsDetailPage? detail,
     SettingsNavigationContext? navigationContext,
   }) {
-    final resolvedTab = detail?.tab ?? tab;
+    if (!capabilities.supportsDestination(WorkspaceDestination.settings)) {
+      return;
+    }
+    final requestedTab = detail?.tab ?? tab;
+    final resolvedTab = _sanitizeSettingsTab(requestedTab);
+    final resolvedDetail = detail != null && resolvedTab == detail.tab
+        ? detail
+        : null;
     final changed =
         _destination != WorkspaceDestination.settings ||
         _settingsTab != resolvedTab ||
-        _settingsDetail != detail ||
+        _settingsDetail != resolvedDetail ||
         _settingsNavigationContext != navigationContext ||
         _detailPanel != null;
     if (!changed) {
@@ -855,21 +896,24 @@ class AppController extends ChangeNotifier {
     }
     _destination = WorkspaceDestination.settings;
     _settingsTab = resolvedTab;
-    _settingsDetail = detail;
-    _settingsNavigationContext = navigationContext;
+    _settingsDetail = resolvedDetail;
+    _settingsNavigationContext = resolvedDetail == null
+        ? null
+        : navigationContext;
     _detailPanel = null;
     notifyListeners();
   }
 
   void setSettingsTab(SettingsTab tab, {bool clearDetail = true}) {
+    final resolvedTab = _sanitizeSettingsTab(tab);
     final changed =
-        _settingsTab != tab ||
+        _settingsTab != resolvedTab ||
         (clearDetail &&
             (_settingsDetail != null || _settingsNavigationContext != null));
     if (!changed) {
       return;
     }
-    _settingsTab = tab;
+    _settingsTab = resolvedTab;
     if (clearDetail) {
       _settingsDetail = null;
       _settingsNavigationContext = null;
@@ -1235,20 +1279,21 @@ class AppController extends ChangeNotifier {
   Future<void> setAssistantExecutionTarget(
     AssistantExecutionTarget target,
   ) async {
+    final resolvedTarget = _sanitizeExecutionTarget(target);
     final currentTarget = assistantExecutionTargetForSession(
       _sessionsController.currentSessionKey,
     );
-    if (currentTarget == target &&
-        settings.assistantExecutionTarget == target) {
+    if (currentTarget == resolvedTarget &&
+        settings.assistantExecutionTarget == resolvedTarget) {
       return;
     }
     _upsertAssistantThreadRecord(
       _sessionsController.currentSessionKey,
-      executionTarget: target,
+      executionTarget: resolvedTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     await _applyAssistantExecutionTarget(
-      target,
+      resolvedTarget,
       sessionKey: _sessionsController.currentSessionKey,
       persistDefaultSelection: true,
     );
@@ -1291,6 +1336,7 @@ class AppController extends ChangeNotifier {
     required String sessionKey,
     required bool persistDefaultSelection,
   }) async {
+    final resolvedTarget = _sanitizeExecutionTarget(target);
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
     if (!matchesSessionKey(
       normalizedSessionKey,
@@ -1299,14 +1345,14 @@ class AppController extends ChangeNotifier {
       await _sessionsController.switchSession(normalizedSessionKey);
     }
     if (persistDefaultSelection &&
-        settings.assistantExecutionTarget != target) {
+        settings.assistantExecutionTarget != resolvedTarget) {
       await saveSettings(
-        settings.copyWith(assistantExecutionTarget: target),
+        settings.copyWith(assistantExecutionTarget: resolvedTarget),
         refreshAfterSave: false,
       );
     }
 
-    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+    if (resolvedTarget == AssistantExecutionTarget.aiGatewayOnly) {
       if (_runtime.isConnected) {
         _preserveGatewayHistoryForSession(normalizedSessionKey);
       }
@@ -1325,7 +1371,9 @@ class AppController extends ChangeNotifier {
       return;
     }
 
-    final targetProfile = _gatewayProfileForAssistantExecutionTarget(target);
+    final targetProfile = _gatewayProfileForAssistantExecutionTarget(
+      resolvedTarget,
+    );
     try {
       await _connectProfile(targetProfile);
     } catch (_) {
@@ -1509,8 +1557,10 @@ class AppController extends ChangeNotifier {
     bool refreshAfterSave = true,
   }) async {
     final current = settings;
-    final sanitized = _sanitizeMultiAgentSettings(
-      _sanitizeOllamaCloudSettings(_sanitizeCodeAgentSettings(snapshot)),
+    final sanitized = _sanitizeFeatureFlagSettings(
+      _sanitizeMultiAgentSettings(
+        _sanitizeOllamaCloudSettings(_sanitizeCodeAgentSettings(snapshot)),
+      ),
     );
     setActiveAppLanguage(sanitized.appLanguage);
     await _settingsController.saveSnapshot(sanitized);
@@ -1600,6 +1650,9 @@ class AppController extends ChangeNotifier {
     WorkspaceDestination destination,
   ) async {
     if (!kAssistantNavigationDestinationCandidates.contains(destination)) {
+      return;
+    }
+    if (!capabilities.supportsDestination(destination)) {
       return;
     }
     final current = assistantNavigationDestinations;
@@ -1765,9 +1818,11 @@ class AppController extends ChangeNotifier {
           return;
         }
       }
-      final normalized = _sanitizeMultiAgentSettings(
-        _sanitizeOllamaCloudSettings(
-          _sanitizeCodeAgentSettings(_settingsController.snapshot),
+      final normalized = _sanitizeFeatureFlagSettings(
+        _sanitizeMultiAgentSettings(
+          _sanitizeOllamaCloudSettings(
+            _sanitizeCodeAgentSettings(_settingsController.snapshot),
+          ),
         ),
       );
       if (normalized.toJsonString() !=
@@ -1909,6 +1964,45 @@ class AppController extends ChangeNotifier {
     return snapshot.copyWith(multiAgent: resolved);
   }
 
+  SettingsSnapshot _sanitizeFeatureFlagSettings(SettingsSnapshot snapshot) {
+    final features = featuresFor(_hostUiFeaturePlatform);
+    final allowedNavigation = normalizeAssistantNavigationDestinations(
+      snapshot.assistantNavigationDestinations,
+    ).where(features.allowedDestinations.contains).toList(growable: false);
+    final sanitizedExecutionTarget = features.sanitizeExecutionTarget(
+      snapshot.assistantExecutionTarget,
+    );
+    final multiAgentConfig = features.supportsMultiAgent
+        ? snapshot.multiAgent
+        : snapshot.multiAgent.copyWith(enabled: false);
+    final experimentalCanvas =
+        features.allowsExperimentalSetting(
+          UiFeatureKeys.settingsExperimentalCanvas,
+        )
+        ? snapshot.experimentalCanvas
+        : false;
+    final experimentalBridge =
+        features.allowsExperimentalSetting(
+          UiFeatureKeys.settingsExperimentalBridge,
+        )
+        ? snapshot.experimentalBridge
+        : false;
+    final experimentalDebug =
+        features.allowsExperimentalSetting(
+          UiFeatureKeys.settingsExperimentalDebug,
+        )
+        ? snapshot.experimentalDebug
+        : false;
+    return snapshot.copyWith(
+      assistantExecutionTarget: sanitizedExecutionTarget,
+      assistantNavigationDestinations: allowedNavigation,
+      multiAgent: multiAgentConfig,
+      experimentalCanvas: experimentalCanvas,
+      experimentalBridge: experimentalBridge,
+      experimentalDebug: experimentalDebug,
+    );
+  }
+
   SettingsSnapshot _sanitizeOllamaCloudSettings(SettingsSnapshot snapshot) {
     final rawBaseUrl = snapshot.ollamaCloud.baseUrl.trim();
     final normalized = rawBaseUrl.endsWith('/')
@@ -1920,6 +2014,16 @@ class AppController extends ChangeNotifier {
     return snapshot.copyWith(
       ollamaCloud: snapshot.ollamaCloud.copyWith(baseUrl: 'https://ollama.com'),
     );
+  }
+
+  SettingsTab _sanitizeSettingsTab(SettingsTab tab) {
+    return featuresFor(_hostUiFeaturePlatform).sanitizeSettingsTab(tab);
+  }
+
+  AssistantExecutionTarget _sanitizeExecutionTarget(
+    AssistantExecutionTarget? target,
+  ) {
+    return featuresFor(_hostUiFeaturePlatform).sanitizeExecutionTarget(target);
   }
 
   MultiAgentConfig _resolveMultiAgentConfig(SettingsSnapshot snapshot) {

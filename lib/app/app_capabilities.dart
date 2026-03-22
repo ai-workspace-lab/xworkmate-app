@@ -1,4 +1,5 @@
 import '../models/app_models.dart';
+import 'ui_feature_manifest.dart';
 
 class AppCapabilities {
   const AppCapabilities({
@@ -21,36 +22,14 @@ class AppCapabilities {
     return allowedDestinations.contains(destination);
   }
 
-  static const desktop = AppCapabilities(
-    allowedDestinations: <WorkspaceDestination>{
-      WorkspaceDestination.assistant,
-      WorkspaceDestination.tasks,
-      WorkspaceDestination.skills,
-      WorkspaceDestination.nodes,
-      WorkspaceDestination.agents,
-      WorkspaceDestination.mcpServer,
-      WorkspaceDestination.clawHub,
-      WorkspaceDestination.secrets,
-      WorkspaceDestination.aiGateway,
-      WorkspaceDestination.settings,
-      WorkspaceDestination.account,
-    },
-    supportsFileAttachments: true,
-    supportsLocalGateway: true,
-    supportsRelayGateway: true,
-    supportsDesktopRuntime: true,
-    supportsDiagnostics: true,
-  );
-
-  static const web = AppCapabilities(
-    allowedDestinations: <WorkspaceDestination>{
-      WorkspaceDestination.assistant,
-      WorkspaceDestination.settings,
-    },
-    supportsFileAttachments: false,
-    supportsLocalGateway: false,
-    supportsRelayGateway: true,
-    supportsDesktopRuntime: false,
-    supportsDiagnostics: false,
-  );
+  factory AppCapabilities.fromFeatureAccess(UiFeatureAccess access) {
+    return AppCapabilities(
+      allowedDestinations: access.allowedDestinations,
+      supportsFileAttachments: access.supportsFileAttachments,
+      supportsLocalGateway: access.supportsLocalGateway,
+      supportsRelayGateway: access.supportsRelayGateway,
+      supportsDesktopRuntime: access.supportsDesktopRuntime,
+      supportsDiagnostics: access.supportsDiagnostics,
+    );
+  }
 }

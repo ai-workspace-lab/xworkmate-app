@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_shell.dart';
+import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/features/mobile/mobile_shell.dart';
 import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/widgets/detail_drawer.dart';
@@ -106,6 +107,33 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('MobileShell workspace launcher filters disabled entries', (
+    WidgetTester tester,
+  ) async {
+    final manifest = UiFeatureManifest.fallback().copyWithFeature(
+      platform: UiFeaturePlatform.mobile,
+      module: 'workspace',
+      feature: 'mcp_server',
+      enabled: false,
+    );
+    final controller = await createTestController(
+      tester,
+      uiFeatureManifest: manifest,
+    );
+
+    await pumpMobileShell(
+      tester,
+      child: MobileShell(controller: controller),
+      platform: TargetPlatform.android,
+    );
+
+    await tester.tap(find.text('工作区'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('MCP Hub'), findsNothing);
+    expect(find.text('节点'), findsOneWidget);
+  });
+
   testWidgets('MobileShell renders detail panels as bottom sheets', (
     WidgetTester tester,
   ) async {
@@ -190,7 +218,10 @@ void main() {
     );
 
     expect(find.byKey(const ValueKey('mobile-safe-strip')), findsOneWidget);
-    expect(find.byKey(const ValueKey('mobile-safe-open-button')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('mobile-safe-open-button')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('mobile-safe-connect-button')),
       findsOneWidget,

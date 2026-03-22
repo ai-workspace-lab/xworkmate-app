@@ -2,6 +2,7 @@ const kSystemAppName = 'XWorkmate';
 const kProductBrandName = 'XWorkmate';
 const kProductSubtitle = 'Actionable AI Workspace';
 const kProductTagline = 'Turn Ideas Into Action';
+const kProductLogoAsset = 'assets/branding/xmate_desktop_logo.png';
 const kAppVersion = String.fromEnvironment(
   'XWORKMATE_DISPLAY_VERSION',
   defaultValue: '2026.3.11',

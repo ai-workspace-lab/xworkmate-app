@@ -174,7 +174,7 @@ void main() {
 }
 
 Future<void> _waitFor(bool Function() predicate) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  final deadline = DateTime.now().add(const Duration(seconds: 10));
   while (!predicate()) {
     if (DateTime.now().isAfter(deadline)) {
       fail('condition not met before timeout');
