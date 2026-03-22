@@ -10,7 +10,7 @@ import 'package:xworkmate/models/app_models.dart';
 
 void main() {
   test(
-    'AppController omits fixed task entry from focused destinations',
+    'AppController keeps tasks destination in focused destinations',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final controller = AppController();
@@ -23,6 +23,7 @@ void main() {
           assistantNavigationDestinations: const <WorkspaceDestination>[
             WorkspaceDestination.tasks,
             WorkspaceDestination.skills,
+            WorkspaceDestination.tasks,
             WorkspaceDestination.aiGateway,
           ],
         ),
@@ -32,6 +33,7 @@ void main() {
       expect(
         controller.assistantNavigationDestinations,
         const <WorkspaceDestination>[
+          WorkspaceDestination.tasks,
           WorkspaceDestination.skills,
           WorkspaceDestination.aiGateway,
         ],

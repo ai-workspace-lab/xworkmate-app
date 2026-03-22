@@ -110,6 +110,7 @@ const List<WorkspaceDestination> kAssistantNavigationDestinationDefaults =
 
 const List<WorkspaceDestination> kAssistantNavigationDestinationCandidates =
     <WorkspaceDestination>[
+      WorkspaceDestination.tasks,
       WorkspaceDestination.skills,
       WorkspaceDestination.nodes,
       WorkspaceDestination.agents,

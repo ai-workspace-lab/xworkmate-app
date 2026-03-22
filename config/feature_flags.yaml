@@ -134,9 +134,15 @@ mobile:
       build_modes: [debug, profile, release]
       description: Mobile settings gateway tab
       ui_surface: settings_page
+    gateway_setup_code:
+      enabled: false
+      release_tier: experimental
+      build_modes: [debug, profile, release]
+      description: Mobile gateway setup code editor
+      ui_surface: settings_page
     agents:
-      enabled: true
-      release_tier: stable
+      enabled: false
+      release_tier: experimental
       build_modes: [debug, profile, release]
       description: Mobile settings multi-agent tab
       ui_surface: settings_page
@@ -307,9 +313,15 @@ desktop:
       build_modes: [debug, profile, release]
       description: Desktop settings gateway tab
       ui_surface: settings_page
+    gateway_setup_code:
+      enabled: false
+      release_tier: experimental
+      build_modes: [debug, profile, release]
+      description: Desktop gateway setup code editor
+      ui_surface: settings_page
     agents:
-      enabled: true
-      release_tier: stable
+      enabled: false
+      release_tier: experimental
       build_modes: [debug, profile, release]
       description: Desktop settings multi-agent tab
       ui_surface: settings_page
@@ -419,6 +431,12 @@ web:
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Web settings gateway tab
+      ui_surface: web_settings_page
+    gateway_setup_code:
+      enabled: false
+      release_tier: experimental
+      build_modes: []
+      description: Web does not expose gateway setup code editor
       ui_surface: web_settings_page
     appearance:
       enabled: true

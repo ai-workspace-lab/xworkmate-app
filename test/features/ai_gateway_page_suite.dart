@@ -8,6 +8,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/features/settings/settings_page.dart';
 import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
@@ -59,6 +60,7 @@ class _AiGatewaySettingsShortcutTestController extends AppController {
   _AiGatewaySettingsShortcutTestController({
     required super.store,
     required super.runtimeCoordinator,
+    super.uiFeatureManifest,
   });
 
   @override
@@ -105,12 +107,20 @@ void main() {
           databasePathResolver: () async => '${testRoot.path}/settings.sqlite3',
           fallbackDirectoryPathResolver: () async => testRoot.path,
         );
+        final manifest = UiFeatureManifest.fallback().copyWithFeature(
+          platform: UiFeaturePlatform.desktop,
+          module: 'settings',
+          feature: 'agents',
+          enabled: true,
+          releaseTier: UiFeatureReleaseTier.stable,
+        );
         controller = _AiGatewaySettingsShortcutTestController(
           store: store,
           runtimeCoordinator: RuntimeCoordinator(
             gateway: _FakeGatewayRuntime(),
             codex: _FakeCodexRuntime(),
           ),
+          uiFeatureManifest: manifest,
         );
         await _waitFor(() => !controller.initializing);
       });

@@ -165,11 +165,22 @@ void main() {
   testWidgets('SettingsPage multi-agent tab keeps header readable', (
     WidgetTester tester,
   ) async {
-    final controller = await createTestController(tester);
+    final manifest = UiFeatureManifest.fallback().copyWithFeature(
+      platform: UiFeaturePlatform.desktop,
+      module: 'settings',
+      feature: 'agents',
+      enabled: true,
+      releaseTier: UiFeatureReleaseTier.stable,
+    );
+    final controller = await createTestController(
+      tester,
+      uiFeatureManifest: manifest,
+    );
 
     await pumpPage(
       tester,
       child: const SizedBox(width: 1100, height: 900, child: Placeholder()),
+      platform: TargetPlatform.macOS,
     );
     await pumpPage(
       tester,
@@ -178,6 +189,7 @@ void main() {
         height: 900,
         child: SettingsPage(controller: controller),
       ),
+      platform: TargetPlatform.macOS,
     );
 
     await tester.tap(find.text('多 Agent'));
@@ -191,6 +203,30 @@ void main() {
     expect(find.textContaining('Lead Engineer'), findsWidgets);
     expect(find.textContaining('ollama launch codex'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('SettingsPage hides gateway setup code editor by default', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
+
+    await tester.tap(find.text('集成'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('gateway-profile-chip-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('配置码'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('gateway-setup-code-field')),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('gateway-host-field')), findsOneWidget);
   });
 
   testWidgets('SettingsPage diagnostics tab filters and clears runtime logs', (
