@@ -63,6 +63,36 @@ extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   }
 }
 
+class AssistantThreadConnectionState {
+  const AssistantThreadConnectionState({
+    required this.executionTarget,
+    required this.status,
+    required this.primaryLabel,
+    required this.detailLabel,
+    required this.ready,
+    required this.pairingRequired,
+    required this.gatewayTokenMissing,
+    required this.lastError,
+  });
+
+  final AssistantExecutionTarget executionTarget;
+  final RuntimeConnectionStatus status;
+  final String primaryLabel;
+  final String detailLabel;
+  final bool ready;
+  final bool pairingRequired;
+  final bool gatewayTokenMissing;
+  final String? lastError;
+
+  bool get isAiGatewayOnly =>
+      executionTarget == AssistantExecutionTarget.aiGatewayOnly;
+
+  bool get connected => ready;
+
+  bool get connecting =>
+      !isAiGatewayOnly && status == RuntimeConnectionStatus.connecting;
+}
+
 enum AssistantMessageViewMode { rendered, raw }
 
 extension AssistantMessageViewModeCopy on AssistantMessageViewMode {
