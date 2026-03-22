@@ -215,15 +215,31 @@ class SettingsController extends ChangeNotifier {
   }
 
   Future<String> testOllamaConnection({required bool cloud}) async {
+    return testOllamaConnectionDraft(
+      cloud: cloud,
+      localConfig: _snapshot.ollamaLocal,
+      cloudConfig: _snapshot.ollamaCloud,
+    );
+  }
+
+  Future<String> testOllamaConnectionDraft({
+    required bool cloud,
+    required OllamaLocalConfig localConfig,
+    required OllamaCloudConfig cloudConfig,
+    String apiKeyOverride = '',
+  }) async {
     final base = cloud
-        ? _snapshot.ollamaCloud.baseUrl.trim()
-        : _snapshot.ollamaLocal.endpoint.trim();
+        ? cloudConfig.baseUrl.trim()
+        : localConfig.endpoint.trim();
     if (base.isEmpty) {
       final message = 'Missing endpoint';
       _ollamaStatus = message;
       notifyListeners();
       return message;
     }
+    final cloudApiKey = apiKeyOverride.trim().isNotEmpty
+        ? apiKeyOverride.trim()
+        : (await _store.loadOllamaCloudApiKey())?.trim() ?? '';
     try {
       final uri = Uri.parse(
         cloud ? base : '$base${base.endsWith('/') ? '' : '/'}api/tags',
@@ -232,7 +248,7 @@ class SettingsController extends ChangeNotifier {
         uri,
         headers: cloud
             ? <String, String>{
-                if (_secureRefs[_snapshot.ollamaCloud.apiKeyRef] != null)
+                if (cloudApiKey.isNotEmpty)
                   'Authorization': 'Bearer live-secret',
               }
             : const <String, String>{},
@@ -252,7 +268,14 @@ class SettingsController extends ChangeNotifier {
   }
 
   Future<String> testVaultConnection() async {
-    final address = _snapshot.vault.address.trim();
+    return testVaultConnectionDraft(_snapshot.vault);
+  }
+
+  Future<String> testVaultConnectionDraft(
+    VaultConfig profile, {
+    String tokenOverride = '',
+  }) async {
+    final address = profile.address.trim();
     if (address.isEmpty) {
       const message = 'Missing address';
       _vaultStatus = message;
@@ -264,11 +287,13 @@ class SettingsController extends ChangeNotifier {
         '$address${address.endsWith('/') ? '' : '/'}v1/sys/health',
       );
       final headers = <String, String>{
-        if (_snapshot.vault.namespace.trim().isNotEmpty)
-          'X-Vault-Namespace': _snapshot.vault.namespace.trim(),
+        if (profile.namespace.trim().isNotEmpty)
+          'X-Vault-Namespace': profile.namespace.trim(),
       };
-      final token = await _store.loadVaultToken();
-      if (token != null && token.trim().isNotEmpty) {
+      final token = tokenOverride.trim().isNotEmpty
+          ? tokenOverride.trim()
+          : (await _store.loadVaultToken())?.trim() ?? '';
+      if (token.trim().isNotEmpty) {
         headers['X-Vault-Token'] = token.trim();
       }
       final response = await _simpleGet(uri, headers: headers);

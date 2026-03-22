@@ -11,7 +11,6 @@ import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/detail_drawer.dart';
-import '../../widgets/gateway_connect_dialog.dart';
 
 enum MobileShellTab { assistant, tasks, workspace, secrets, settings }
 
@@ -147,19 +146,13 @@ class _MobileShellState extends State<MobileShell> {
   }
 
   void _showConnectSheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return FractionallySizedBox(
-          heightFactor: 0.94,
-          child: GatewayConnectDialog(
-            controller: widget.controller,
-            onDone: () => Navigator.of(sheetContext).pop(),
-          ),
-        );
-      },
+    widget.controller.openSettings(
+      detail: SettingsDetailPage.gatewayConnection,
+      navigationContext: SettingsNavigationContext(
+        rootLabel: appText('移动端', 'Mobile'),
+        destination: WorkspaceDestination.settings,
+        sectionLabel: appText('集成', 'Integrations'),
+      ),
     );
   }
 
@@ -689,7 +682,7 @@ class _MobileSafeSheet extends StatelessWidget {
                                   child: Text(
                                     controller.canQuickConnectGateway
                                         ? appText('快速连接', 'Quick Connect')
-                                        : appText('打开连接面板', 'Open Connection'),
+                                        : appText('打开集成设置', 'Open Integrations'),
                                   ),
                                 ),
                               if (hasPendingRun)

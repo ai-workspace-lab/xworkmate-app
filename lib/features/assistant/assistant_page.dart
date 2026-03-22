@@ -18,7 +18,6 @@ import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/assistant_focus_panel.dart';
-import '../../widgets/gateway_connect_dialog.dart';
 import '../../widgets/desktop_workspace_scaffold.dart';
 import '../../widgets/pane_resize_handle.dart';
 import '../../widgets/surface_card.dart';
@@ -401,7 +400,7 @@ class _AssistantPageState extends State<AssistantPage> {
                   scrollController: _conversationController,
                   onOpenDetail: widget.onOpenDetail,
                   onFocusComposer: _focusComposer,
-                  onOpenGateway: _showConnectDialog,
+                  onOpenGateway: _openGatewaySettings,
                   onOpenAiGatewaySettings: _openAiGatewaySettings,
                   onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
                   onMessageViewModeChanged:
@@ -463,7 +462,7 @@ class _AssistantPageState extends State<AssistantPage> {
                       controller.currentSessionKey,
                       modelId,
                     ),
-                onOpenGateway: _showConnectDialog,
+                onOpenGateway: _openGatewaySettings,
                 onOpenAiGatewaySettings: _openAiGatewaySettings,
                 onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
                 onPickAttachments: _pickAttachments,
@@ -878,19 +877,20 @@ class _AssistantPageState extends State<AssistantPage> {
     };
   }
 
-  void _showConnectDialog() {
-    showDialog<void>(
-      context: context,
-      builder: (context) => GatewayConnectDialog(
-        controller: widget.controller,
-        onDone: () => Navigator.of(context).pop(),
+  void _openGatewaySettings() {
+    widget.controller.openSettings(
+      detail: SettingsDetailPage.gatewayConnection,
+      navigationContext: SettingsNavigationContext(
+        rootLabel: appText('助手', 'Assistant'),
+        destination: WorkspaceDestination.assistant,
+        sectionLabel: appText('集成', 'Integrations'),
       ),
     );
   }
 
   Future<void> _connectFromSavedSettingsOrShowDialog() async {
     if (!widget.controller.canQuickConnectGateway) {
-      _showConnectDialog();
+      _openGatewaySettings();
       return;
     }
     await widget.controller.connectSavedGateway();

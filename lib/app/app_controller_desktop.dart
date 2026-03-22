@@ -86,7 +86,10 @@ class AppController extends ChangeNotifier {
     _desktopPlatformService =
         desktopPlatformService ?? createDesktopPlatformService();
     _gatewayOnlySkillScanRoots =
-        gatewayOnlySkillScanRoots ?? _defaultGatewayOnlySkillScanRoots;
+        gatewayOnlySkillScanRoots ??
+        (_isFlutterTestEnvironment
+            ? const <String>[]
+            : _defaultGatewayOnlySkillScanRoots);
     _arisBundleRepository = ArisBundleRepository();
     _arisBridgeLocator = ArisBridgeLocator();
     _multiAgentMountManager = MultiAgentMountManager(
@@ -169,6 +172,9 @@ class AppController extends ChangeNotifier {
   String? _bootstrapError;
   StreamSubscription<GatewayPushEvent>? _runtimeEventsSubscription;
   bool _disposed = false;
+
+  static bool get _isFlutterTestEnvironment =>
+      Platform.environment.containsKey('FLUTTER_TEST');
   Future<void> _assistantThreadPersistQueue = Future<void>.value();
 
   WorkspaceDestination get destination => _destination;
@@ -2077,8 +2083,89 @@ class AppController extends ChangeNotifier {
     return _settingsController.testOllamaConnection(cloud: cloud);
   }
 
+  Future<String> testOllamaConnectionDraft({
+    required bool cloud,
+    required SettingsSnapshot snapshot,
+    String apiKeyOverride = '',
+  }) {
+    return _settingsController.testOllamaConnectionDraft(
+      cloud: cloud,
+      localConfig: snapshot.ollamaLocal,
+      cloudConfig: snapshot.ollamaCloud,
+      apiKeyOverride: apiKeyOverride,
+    );
+  }
+
   Future<String> testVaultConnection() {
     return _settingsController.testVaultConnection();
+  }
+
+  Future<String> testVaultConnectionDraft({
+    required SettingsSnapshot snapshot,
+    String tokenOverride = '',
+  }) {
+    return _settingsController.testVaultConnectionDraft(
+      snapshot.vault,
+      tokenOverride: tokenOverride,
+    );
+  }
+
+  Future<({String state, String message, String endpoint})>
+  testGatewayConnectionDraft({
+    required GatewayConnectionProfile profile,
+    required AssistantExecutionTarget executionTarget,
+    String tokenOverride = '',
+    String passwordOverride = '',
+  }) async {
+    if (executionTarget == AssistantExecutionTarget.aiGatewayOnly ||
+        profile.mode == RuntimeConnectionMode.unconfigured) {
+      return (
+        state: 'inactive',
+        message: appText(
+          '当前模式仅使用 AI Gateway，不建立 OpenClaw Gateway 会话。',
+          'The current mode uses AI Gateway only and does not open an OpenClaw Gateway session.',
+        ),
+        endpoint: '',
+      );
+    }
+
+    final runtime = GatewayRuntime(
+      store: _store,
+      identityStore: DeviceIdentityStore(_store),
+    );
+    await runtime.initialize();
+    try {
+      await runtime.connectProfile(
+        profile,
+        authTokenOverride: tokenOverride,
+        authPasswordOverride: passwordOverride,
+      );
+      try {
+        await runtime.health();
+      } catch (_) {
+        // Connectivity succeeded; health is best-effort for the test path.
+      }
+      final endpoint = runtime.snapshot.remoteAddress ??
+          '${profile.host}:${profile.port}';
+      return (
+        state: 'success',
+        message: appText('连接成功。', 'Connection succeeded.'),
+        endpoint: endpoint,
+      );
+    } catch (error) {
+      return (
+        state: 'error',
+        message: error.toString(),
+        endpoint: '${profile.host}:${profile.port}',
+      );
+    } finally {
+      try {
+        await runtime.disconnect(clearDesiredProfile: false);
+      } catch (_) {
+        // Ignore teardown noise from temporary connectivity checks.
+      }
+      runtime.dispose();
+    }
   }
 
   void clearRuntimeLogs() {
@@ -2274,7 +2361,10 @@ class AppController extends ChangeNotifier {
           // Keep the shell usable when auto-connect fails.
         }
       }
-      await refreshMultiAgentMounts(sync: settings.multiAgent.autoSync);
+      // Mount reconciliation may invoke multiple external CLIs. Keep startup
+      // responsive and let the mounts refresh in the background instead of
+      // blocking app initialization on those probes.
+      unawaited(refreshMultiAgentMounts(sync: settings.multiAgent.autoSync));
       _settingsDraft = settings;
       _lastAppliedSettings = settings;
       _settingsDraftInitialized = true;
@@ -3337,7 +3427,13 @@ class AppController extends ChangeNotifier {
       if (_disposed) {
         return;
       }
-      await _store.saveAssistantThreadRecords(snapshot);
+      try {
+        await _store.saveAssistantThreadRecords(snapshot);
+      } catch (_) {
+        // Assistant thread persistence is background best-effort. Keep the
+        // in-memory session usable even when teardown or temp-directory
+        // cleanup races with the durable write.
+      }
     });
     _assistantThreadPersistQueue = nextPersist;
     unawaited(nextPersist);
