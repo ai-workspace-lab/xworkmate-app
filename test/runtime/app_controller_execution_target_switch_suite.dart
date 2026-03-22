@@ -21,6 +21,8 @@ class _FakeGatewayRuntime extends GatewayRuntime {
   final List<GatewayConnectionProfile> connectedProfiles =
       <GatewayConnectionProfile>[];
   final Set<RuntimeConnectionMode> _failingModes = <RuntimeConnectionMode>{};
+  Completer<void>? _connectGate;
+  Completer<void>? _disconnectGate;
   int disconnectCount = 0;
   GatewayConnectionSnapshot _snapshot = GatewayConnectionSnapshot.initial();
 
@@ -40,6 +42,11 @@ class _FakeGatewayRuntime extends GatewayRuntime {
     String authPasswordOverride = '',
   }) async {
     connectedProfiles.add(profile);
+    final connectGate = _connectGate;
+    _connectGate = null;
+    if (connectGate != null && !connectGate.isCompleted) {
+      await connectGate.future;
+    }
     if (_failingModes.remove(profile.mode)) {
       _snapshot = GatewayConnectionSnapshot.initial(mode: profile.mode)
           .copyWith(
@@ -63,6 +70,11 @@ class _FakeGatewayRuntime extends GatewayRuntime {
   @override
   Future<void> disconnect({bool clearDesiredProfile = true}) async {
     disconnectCount += 1;
+    final disconnectGate = _disconnectGate;
+    _disconnectGate = null;
+    if (disconnectGate != null && !disconnectGate.isCompleted) {
+      await disconnectGate.future;
+    }
     _snapshot = _snapshot.copyWith(
       status: RuntimeConnectionStatus.offline,
       statusText: 'Offline',
@@ -114,6 +126,14 @@ class _FakeGatewayRuntime extends GatewayRuntime {
 
   void failNextConnect(RuntimeConnectionMode mode) {
     _failingModes.add(mode);
+  }
+
+  void holdNextConnect(Completer<void> gate) {
+    _connectGate = gate;
+  }
+
+  void holdNextDisconnect(Completer<void> gate) {
+    _disconnectGate = gate;
   }
 }
 
@@ -171,6 +191,7 @@ void main() {
       await _waitFor(() => !controller.initializing);
       await controller.saveSettings(
         controller.settings.copyWith(
+          assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
           aiGateway: controller.settings.aiGateway.copyWith(
             baseUrl: 'http://127.0.0.1:11434/v1',
             availableModels: const <String>['qwen2.5-coder:latest'],
@@ -285,6 +306,181 @@ void main() {
               'assistant-main',
             ),
       );
+    },
+  );
+
+  test(
+    'AppController notifies execution target changes before connect completes',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-execution-target-notify-',
+      );
+      addTearDown(() async {
+        await _deleteDirectoryWithRetry(tempDirectory);
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final gateway = _FakeGatewayRuntime(store: store);
+      final controller = AppController(
+        store: store,
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: gateway,
+          codex: _FakeCodexRuntime(),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      await controller.saveSettings(
+        controller.settings.copyWith(
+          aiGateway: controller.settings.aiGateway.copyWith(
+            baseUrl: 'http://127.0.0.1:11434/v1',
+            availableModels: const <String>['qwen2.5-coder:latest'],
+            selectedModels: const <String>['qwen2.5-coder:latest'],
+          ),
+          defaultModel: 'qwen2.5-coder:latest',
+          gateway: controller.settings.gateway.copyWith(
+            mode: RuntimeConnectionMode.remote,
+            host: 'gateway.example.com',
+            port: 9443,
+            tls: true,
+          ),
+        ),
+        refreshAfterSave: false,
+      );
+
+      int notificationCount = 0;
+      controller.addListener(() {
+        notificationCount += 1;
+      });
+
+      final connectGate = Completer<void>();
+      gateway.holdNextConnect(connectGate);
+
+      final switchFuture = controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.remote,
+      );
+      var completed = false;
+      switchFuture.then((_) {
+        completed = true;
+      });
+
+      await Future<void>.delayed(Duration.zero);
+
+      expect(notificationCount, greaterThan(0));
+      expect(
+        controller.assistantExecutionTarget,
+        AssistantExecutionTarget.remote,
+      );
+      expect(completed, isFalse);
+
+      connectGate.complete();
+      await switchFuture;
+
+      expect(
+        controller.settings.assistantExecutionTarget,
+        AssistantExecutionTarget.remote,
+      );
+      expect(gateway.connectedProfiles.last.mode, RuntimeConnectionMode.remote);
+    },
+  );
+
+  test(
+    'AppController notifies aiGatewayOnly target changes before disconnect completes',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-execution-target-disconnect-notify-',
+      );
+      addTearDown(() async {
+        await _deleteDirectoryWithRetry(tempDirectory);
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final gateway = _FakeGatewayRuntime(store: store);
+      final controller = AppController(
+        store: store,
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: gateway,
+          codex: _FakeCodexRuntime(),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      await controller.saveSettings(
+        controller.settings.copyWith(
+          assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
+          aiGateway: controller.settings.aiGateway.copyWith(
+            baseUrl: 'http://127.0.0.1:11434/v1',
+            availableModels: const <String>['qwen2.5-coder:latest'],
+            selectedModels: const <String>['qwen2.5-coder:latest'],
+          ),
+          defaultModel: 'qwen2.5-coder:latest',
+          gateway: controller.settings.gateway.copyWith(
+            mode: RuntimeConnectionMode.remote,
+            host: 'gateway.example.com',
+            port: 9443,
+            tls: true,
+          ),
+        ),
+        refreshAfterSave: false,
+      );
+
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.remote,
+      );
+
+      int notificationCount = 0;
+      controller.addListener(() {
+        notificationCount += 1;
+      });
+
+      final disconnectGate = Completer<void>();
+      gateway.holdNextDisconnect(disconnectGate);
+
+      final switchFuture = controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.aiGatewayOnly,
+      );
+      var completed = false;
+      switchFuture.then((_) {
+        completed = true;
+      });
+
+      try {
+        await _waitFor(() => gateway.disconnectCount == 1);
+
+        expect(notificationCount, greaterThan(0));
+        expect(
+          controller.assistantExecutionTarget,
+          AssistantExecutionTarget.aiGatewayOnly,
+        );
+        expect(controller.assistantConnectionStatusLabel, '仅 AI Gateway');
+        expect(completed, isFalse);
+      } finally {
+        if (!disconnectGate.isCompleted) {
+          disconnectGate.complete();
+        }
+      }
+
+      await switchFuture;
+
+      expect(
+        controller.settings.assistantExecutionTarget,
+        AssistantExecutionTarget.aiGatewayOnly,
+      );
+      expect(
+        controller.assistantExecutionTarget,
+        AssistantExecutionTarget.aiGatewayOnly,
+      );
+      expect(controller.assistantConnectionStatusLabel, '仅 AI Gateway');
     },
   );
 
