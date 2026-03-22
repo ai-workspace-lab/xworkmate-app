@@ -13,7 +13,6 @@ class WebStore {
   static const relayTokenKey = 'xworkmate.web.relay.token';
   static const relayPasswordKey = 'xworkmate.web.relay.password';
   static const relayDeviceIdentityKey = 'xworkmate.web.relay.device_identity';
-  static const sessionApiTokenKey = 'xworkmate.web.session.api_token';
   static const sessionClientIdKey = 'xworkmate.web.session.client_id';
   static const themeModeKey = 'xworkmate.web.theme_mode';
 
@@ -91,16 +90,6 @@ class WebStore {
   Future<void> saveRelayPassword(String value) async {
     await initialize();
     await _prefs!.setString(relayPasswordKey, value.trim());
-  }
-
-  Future<String> loadWebSessionApiToken() async {
-    await initialize();
-    return (_prefs!.getString(sessionApiTokenKey) ?? '').trim();
-  }
-
-  Future<void> saveWebSessionApiToken(String value) async {
-    await initialize();
-    await _prefs!.setString(sessionApiTokenKey, value.trim());
   }
 
   Future<String> loadOrCreateWebSessionClientId() async {
