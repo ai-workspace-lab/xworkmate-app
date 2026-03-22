@@ -13,7 +13,7 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
 void main() {
-  testWidgets('SettingsPage AI Gateway draft persists edited fields', (
+  testWidgets('SettingsPage AI Gateway apply button persists edited fields', (
     WidgetTester tester,
   ) async {
     late AppController controller;
@@ -94,7 +94,7 @@ void main() {
     );
     tester
         .widget<FilledButton>(
-          find.byKey(const ValueKey('ai-gateway-save-button')),
+          find.byKey(const ValueKey('ai-gateway-apply-button')),
         )
         .onPressed!();
     await tester.pump();
