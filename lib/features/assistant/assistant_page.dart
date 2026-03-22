@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +22,8 @@ import '../../widgets/gateway_connect_dialog.dart';
 import '../../widgets/desktop_workspace_scaffold.dart';
 import '../../widgets/pane_resize_handle.dart';
 import '../../widgets/surface_card.dart';
+
+const double _assistantComposerDefaultInputHeight = 78;
 
 class AssistantPage extends StatefulWidget {
   const AssistantPage({
@@ -68,6 +71,7 @@ class _AssistantPageState extends State<AssistantPage> {
   String? _lastSubmittedSessionKey;
   String? _lastAutoAgentLabel;
   List<String> _lastSubmittedAttachments = const <String>[];
+  double _composerContentHeight = 0;
 
   @override
   void initState() {
@@ -361,28 +365,36 @@ class _AssistantPageState extends State<AssistantPage> {
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final composerHeight = constraints.maxHeight >= 900 ? 180.0 : 152.0;
+        final baseComposerHeight = constraints.maxHeight >= 900 ? 180.0 : 152.0;
+        final composerHeight = math.min(
+          math.max(0.0, constraints.maxHeight - 2),
+          math.max(baseComposerHeight, _composerContentHeight),
+        );
 
         return Column(
           children: [
             Expanded(
-              child: _ConversationArea(
-                controller: controller,
-                currentTask: currentTask,
-                items: timelineItems,
-                messageViewMode: controller.currentAssistantMessageViewMode,
-                scrollController: _conversationController,
-                onOpenDetail: widget.onOpenDetail,
-                onFocusComposer: _focusComposer,
-                onOpenGateway: _showConnectDialog,
-                onOpenAiGatewaySettings: _openAiGatewaySettings,
-                onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
-                onMessageViewModeChanged:
-                    controller.setAssistantMessageViewMode,
+              child: KeyedSubtree(
+                key: const Key('assistant-conversation-shell'),
+                child: _ConversationArea(
+                  controller: controller,
+                  currentTask: currentTask,
+                  items: timelineItems,
+                  messageViewMode: controller.currentAssistantMessageViewMode,
+                  scrollController: _conversationController,
+                  onOpenDetail: widget.onOpenDetail,
+                  onFocusComposer: _focusComposer,
+                  onOpenGateway: _showConnectDialog,
+                  onOpenAiGatewaySettings: _openAiGatewaySettings,
+                  onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
+                  onMessageViewModeChanged:
+                      controller.setAssistantMessageViewMode,
+                ),
               ),
             ),
             const SizedBox(height: 2),
             SizedBox(
+              key: const Key('assistant-composer-shell'),
               height: composerHeight,
               child: _AssistantLowerPane(
                 inputController: _inputController,
@@ -438,6 +450,8 @@ class _AssistantPageState extends State<AssistantPage> {
                 onOpenAiGatewaySettings: _openAiGatewaySettings,
                 onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
                 onPickAttachments: _pickAttachments,
+                onComposerContentHeightChanged:
+                    _handleComposerContentHeightChanged,
                 onSend: _submitPrompt,
               ),
             ),
@@ -445,6 +459,15 @@ class _AssistantPageState extends State<AssistantPage> {
         );
       },
     );
+  }
+
+  void _handleComposerContentHeightChanged(double value) {
+    if (!mounted || value == _composerContentHeight) {
+      return;
+    }
+    setState(() {
+      _composerContentHeight = value;
+    });
   }
 
   List<_TimelineItem> _buildTimelineItems(
@@ -1556,6 +1579,7 @@ class _AssistantLowerPane extends StatelessWidget {
     required this.onOpenAiGatewaySettings,
     required this.onReconnectGateway,
     required this.onPickAttachments,
+    required this.onComposerContentHeightChanged,
     required this.onSend,
   });
 
@@ -1579,6 +1603,7 @@ class _AssistantLowerPane extends StatelessWidget {
   final VoidCallback onOpenAiGatewaySettings;
   final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
+  final ValueChanged<double> onComposerContentHeightChanged;
   final Future<void> Function() onSend;
 
   @override
@@ -1608,6 +1633,7 @@ class _AssistantLowerPane extends StatelessWidget {
           onOpenAiGatewaySettings: onOpenAiGatewaySettings,
           onReconnectGateway: onReconnectGateway,
           onPickAttachments: onPickAttachments,
+          onContentHeightChanged: onComposerContentHeightChanged,
           onSend: onSend,
         ),
       ),
@@ -2381,6 +2407,7 @@ class _ComposerBar extends StatefulWidget {
     required this.onOpenAiGatewaySettings,
     required this.onReconnectGateway,
     required this.onPickAttachments,
+    required this.onContentHeightChanged,
     required this.onSend,
   });
 
@@ -2404,6 +2431,7 @@ class _ComposerBar extends StatefulWidget {
   final VoidCallback onOpenAiGatewaySettings;
   final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
+  final ValueChanged<double> onContentHeightChanged;
   final Future<void> Function() onSend;
 
   @override
@@ -2412,10 +2440,12 @@ class _ComposerBar extends StatefulWidget {
 
 class _ComposerBarState extends State<_ComposerBar> {
   static const double _minInputHeight = 68;
-  static const double _defaultInputHeight = 78;
+  static const double _defaultInputHeight =
+      _assistantComposerDefaultInputHeight;
   static const double _maxInputHeight = 220;
 
   late double _inputHeight;
+  double? _reportedContentHeight;
 
   @override
   void initState() {
@@ -2436,8 +2466,23 @@ class _ComposerBarState extends State<_ComposerBar> {
     });
   }
 
+  void _reportContentHeight() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final height = context.size?.height;
+      if (height == null || height == _reportedContentHeight) {
+        return;
+      }
+      _reportedContentHeight = height;
+      widget.onContentHeightChanged(height);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    _reportContentHeight();
     final palette = context.palette;
     final controller = widget.controller;
     final uiFeatures = controller.featuresFor(
