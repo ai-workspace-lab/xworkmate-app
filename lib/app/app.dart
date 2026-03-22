@@ -6,9 +6,12 @@ import '../theme/app_theme.dart';
 import 'app_controller.dart';
 import 'app_metadata.dart';
 import 'app_shell.dart';
+import 'ui_feature_manifest.dart';
 
 class XWorkmateApp extends StatefulWidget {
-  const XWorkmateApp({super.key});
+  const XWorkmateApp({super.key, this.featureManifest});
+
+  final UiFeatureManifest? featureManifest;
 
   @override
   State<XWorkmateApp> createState() => _XWorkmateAppState();
@@ -20,7 +23,9 @@ class _XWorkmateAppState extends State<XWorkmateApp> {
   @override
   void initState() {
     super.initState();
-    _controller = AppController();
+    _controller = AppController(
+      uiFeatureManifest: widget.featureManifest ?? UiFeatureManifest.fallback(),
+    );
   }
 
   @override

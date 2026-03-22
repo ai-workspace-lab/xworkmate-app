@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/app_controller_web.dart';
+import '../app/ui_feature_manifest.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
@@ -39,6 +40,7 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
+        final uiFeatures = controller.featuresFor(UiFeaturePlatform.web);
         final allDirect = controller.conversationsForTarget(
           AssistantExecutionTarget.aiGatewayOnly,
         );
@@ -48,6 +50,13 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
         final direct = _filterConversations(allDirect);
         final relay = _filterConversations(allRelay);
         final currentTarget = controller.assistantExecutionTarget;
+        final availableTargets = uiFeatures.availableExecutionTargets
+            .where(
+              (target) =>
+                  target == AssistantExecutionTarget.aiGatewayOnly ||
+                  target == AssistantExecutionTarget.remote,
+            )
+            .toList(growable: false);
         final connected =
             currentTarget == AssistantExecutionTarget.aiGatewayOnly
             ? controller.canUseAiGatewayConversation
@@ -95,6 +104,7 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
                 label: Text(appText('连接设置', 'Connection settings')),
               ),
               _TargetChip(
+                targets: availableTargets,
                 value: currentTarget,
                 onChanged: (value) {
                   if (value != null) {
@@ -118,6 +128,8 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
                   _searchController.clear();
                   setState(() => _query = '');
                 },
+                showDirect: uiFeatures.supportsDirectAi,
+                showRelay: uiFeatures.supportsRelayGateway,
                 direct: direct,
                 relay: relay,
               );
@@ -175,6 +187,8 @@ class _ConversationRail extends StatelessWidget {
     required this.searchController,
     required this.onQueryChanged,
     required this.onClearQuery,
+    required this.showDirect,
+    required this.showRelay,
     required this.direct,
     required this.relay,
   });
@@ -184,6 +198,8 @@ class _ConversationRail extends StatelessWidget {
   final TextEditingController searchController;
   final ValueChanged<String> onQueryChanged;
   final VoidCallback onClearQuery;
+  final bool showDirect;
+  final bool showRelay;
   final List<WebConversationSummary> direct;
   final List<WebConversationSummary> relay;
 
@@ -214,30 +230,32 @@ class _ConversationRail extends StatelessWidget {
           Expanded(
             child: ListView(
               children: [
-                _ConversationGroup(
-                  title: appText('Direct AI Gateway', 'Direct AI Gateway'),
-                  icon: Icons.hub_rounded,
-                  items: direct,
-                  emptyLabel: appText(
-                    '还没有 Direct AI 对话',
-                    'No Direct AI conversations yet',
+                if (showDirect)
+                  _ConversationGroup(
+                    title: appText('Direct AI Gateway', 'Direct AI Gateway'),
+                    icon: Icons.hub_rounded,
+                    items: direct,
+                    emptyLabel: appText(
+                      '还没有 Direct AI 对话',
+                      'No Direct AI conversations yet',
+                    ),
+                    onSelect: controller.switchConversation,
                   ),
-                  onSelect: controller.switchConversation,
-                ),
-                const SizedBox(height: 12),
-                _ConversationGroup(
-                  title: appText(
-                    'Relay OpenClaw Gateway',
-                    'Relay OpenClaw Gateway',
+                if (showDirect && showRelay) const SizedBox(height: 12),
+                if (showRelay)
+                  _ConversationGroup(
+                    title: appText(
+                      'Relay OpenClaw Gateway',
+                      'Relay OpenClaw Gateway',
+                    ),
+                    icon: Icons.cloud_outlined,
+                    items: relay,
+                    emptyLabel: appText(
+                      '还没有 Relay 对话',
+                      'No Relay conversations yet',
+                    ),
+                    onSelect: controller.switchConversation,
                   ),
-                  icon: Icons.cloud_outlined,
-                  items: relay,
-                  emptyLabel: appText(
-                    '还没有 Relay 对话',
-                    'No Relay conversations yet',
-                  ),
-                  onSelect: controller.switchConversation,
-                ),
               ],
             ),
           ),
@@ -588,8 +606,13 @@ class _MessageBubble extends StatelessWidget {
 }
 
 class _TargetChip extends StatelessWidget {
-  const _TargetChip({required this.value, required this.onChanged});
+  const _TargetChip({
+    required this.targets,
+    required this.value,
+    required this.onChanged,
+  });
 
+  final List<AssistantExecutionTarget> targets;
   final AssistantExecutionTarget value;
   final ValueChanged<AssistantExecutionTarget?> onChanged;
 
@@ -599,18 +622,14 @@ class _TargetChip extends StatelessWidget {
       child: DropdownButton<AssistantExecutionTarget>(
         value: value,
         onChanged: onChanged,
-        items:
-            const <AssistantExecutionTarget>[
-                  AssistantExecutionTarget.aiGatewayOnly,
-                  AssistantExecutionTarget.remote,
-                ]
-                .map((target) {
-                  return DropdownMenuItem<AssistantExecutionTarget>(
-                    value: target,
-                    child: Text(_targetLabel(target)),
-                  );
-                })
-                .toList(growable: false),
+        items: targets
+            .map((target) {
+              return DropdownMenuItem<AssistantExecutionTarget>(
+                value: target,
+                child: Text(_targetLabel(target)),
+              );
+            })
+            .toList(growable: false),
       ),
     );
   }

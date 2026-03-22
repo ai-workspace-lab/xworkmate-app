@@ -89,6 +89,15 @@ class _AppShellState extends State<AppShell> {
                     controller.destination == WorkspaceDestination.account
                     ? WorkspaceDestination.assistant
                     : controller.destination;
+                final availableMobileDestinations = _mobileDestinations
+                    .where(controller.capabilities.supportsDestination)
+                    .toList(growable: false);
+                final resolvedMobileDestination =
+                    availableMobileDestinations.contains(mobileDestination)
+                    ? mobileDestination
+                    : (availableMobileDestinations.isEmpty
+                          ? mobileDestination
+                          : availableMobileDestinations.first);
 
                 void openMobileDetail(DetailPanelData detail) {
                   showModalBottomSheet<void>(
@@ -151,7 +160,7 @@ class _AppShellState extends State<AppShell> {
                                 child: Container(
                                   color: palette.canvas.withValues(alpha: 0.18),
                                   child: _pageForDestination(
-                                    mobileDestination,
+                                    resolvedMobileDestination,
                                     openMobileDetail,
                                   ),
                                 ),
@@ -163,15 +172,18 @@ class _AppShellState extends State<AppShell> {
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(24),
                               child: NavigationBar(
-                                selectedIndex: _mobileDestinations.indexOf(
-                                  mobileDestination,
-                                ),
+                                selectedIndex:
+                                    availableMobileDestinations.isEmpty
+                                    ? 0
+                                    : availableMobileDestinations.indexOf(
+                                        resolvedMobileDestination,
+                                      ),
                                 onDestinationSelected: (index) {
                                   controller.navigateTo(
-                                    _mobileDestinations[index],
+                                    availableMobileDestinations[index],
                                   );
                                 },
-                                destinations: _mobileDestinations
+                                destinations: availableMobileDestinations
                                     .map(
                                       (destination) => NavigationDestination(
                                         icon: Icon(destination.icon),
@@ -187,10 +199,15 @@ class _AppShellState extends State<AppShell> {
                       Positioned(
                         right: 24,
                         bottom: 96,
-                        child: FloatingActionButton.small(
-                          onPressed: openAccountSheet,
-                          child: const Icon(Icons.account_circle_rounded),
-                        ),
+                        child:
+                            controller.capabilities.supportsDestination(
+                              WorkspaceDestination.account,
+                            )
+                            ? FloatingActionButton.small(
+                                onPressed: openAccountSheet,
+                                child: const Icon(Icons.account_circle_rounded),
+                              )
+                            : const SizedBox.shrink(),
                       ),
                     ],
                   );
@@ -242,6 +259,8 @@ class _AppShellState extends State<AppShell> {
                                 .toSet(),
                             onToggleFavorite:
                                 controller.toggleAssistantNavigationDestination,
+                            availableDestinations:
+                                controller.capabilities.allowedDestinations,
                           ),
                         if (sidebarState == AppSidebarState.expanded &&
                             !embedSidebarIntoAssistant)

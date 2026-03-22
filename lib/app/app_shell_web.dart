@@ -6,6 +6,7 @@ import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
 import '../web/web_assistant_page.dart';
 import '../web/web_settings_page.dart';
+import '../widgets/app_brand_logo.dart';
 import 'app_controller_web.dart';
 
 class AppShell extends StatelessWidget {
@@ -18,6 +19,19 @@ class AppShell extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
+        final availableDestinations =
+            <WorkspaceDestination>[
+                  WorkspaceDestination.assistant,
+                  WorkspaceDestination.settings,
+                ]
+                .where(controller.capabilities.supportsDestination)
+                .toList(growable: false);
+        final currentDestination =
+            availableDestinations.contains(controller.destination)
+            ? controller.destination
+            : (availableDestinations.isEmpty
+                  ? WorkspaceDestination.assistant
+                  : availableDestinations.first);
         return Scaffold(
           body: SafeArea(
             bottom: false,
@@ -27,34 +41,33 @@ class AppShell extends StatelessWidget {
                 if (mobile) {
                   return Column(
                     children: [
-                      Expanded(child: _buildPage(controller)),
+                      Expanded(
+                        child: _buildPage(
+                          controller,
+                          destination: currentDestination,
+                        ),
+                      ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(24),
                           child: NavigationBar(
-                            selectedIndex:
-                                controller.destination ==
-                                    WorkspaceDestination.settings
-                                ? 1
-                                : 0,
+                            selectedIndex: availableDestinations.indexOf(
+                              currentDestination,
+                            ),
                             onDestinationSelected: (index) {
                               controller.navigateTo(
-                                index == 0
-                                    ? WorkspaceDestination.assistant
-                                    : WorkspaceDestination.settings,
+                                availableDestinations[index],
                               );
                             },
-                            destinations: const [
-                              NavigationDestination(
-                                icon: Icon(Icons.chat_bubble_outline_rounded),
-                                label: 'Assistant',
-                              ),
-                              NavigationDestination(
-                                icon: Icon(Icons.tune_rounded),
-                                label: 'Settings',
-                              ),
-                            ],
+                            destinations: availableDestinations
+                                .map(
+                                  (destination) => NavigationDestination(
+                                    icon: Icon(destination.icon),
+                                    label: destination.label,
+                                  ),
+                                )
+                                .toList(growable: false),
                           ),
                         ),
                       ),
@@ -66,9 +79,7 @@ class AppShell extends StatelessWidget {
                 return Row(
                   children: [
                     Container(
-                      width:
-                          controller.destination ==
-                              WorkspaceDestination.settings
+                      width: currentDestination == WorkspaceDestination.settings
                           ? 248
                           : 236,
                       margin: const EdgeInsets.fromLTRB(4, 4, 4, 0),
@@ -92,18 +103,7 @@ class AppShell extends StatelessWidget {
                           children: [
                             Row(
                               children: [
-                                Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10),
-                                    color: palette.accentMuted,
-                                  ),
-                                  child: Icon(
-                                    Icons.crop_square_rounded,
-                                    color: palette.accent,
-                                  ),
-                                ),
+                                const AppBrandLogo(size: 32, borderRadius: 10),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
@@ -137,23 +137,15 @@ class AppShell extends StatelessWidget {
                               ],
                             ),
                             const SizedBox(height: 18),
-                            _WebNavItem(
-                              destination: WorkspaceDestination.assistant,
-                              selected:
-                                  controller.destination ==
-                                  WorkspaceDestination.assistant,
-                              onTap: () => controller.navigateTo(
-                                WorkspaceDestination.assistant,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            _WebNavItem(
-                              destination: WorkspaceDestination.settings,
-                              selected:
-                                  controller.destination ==
-                                  WorkspaceDestination.settings,
-                              onTap: () => controller.navigateTo(
-                                WorkspaceDestination.settings,
+                            ...availableDestinations.map(
+                              (destination) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: _WebNavItem(
+                                  destination: destination,
+                                  selected: currentDestination == destination,
+                                  onTap: () =>
+                                      controller.navigateTo(destination),
+                                ),
                               ),
                             ),
                             const Spacer(),
@@ -191,7 +183,12 @@ class AppShell extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Expanded(child: _buildPage(controller)),
+                    Expanded(
+                      child: _buildPage(
+                        controller,
+                        destination: currentDestination,
+                      ),
+                    ),
                   ],
                 );
               },
@@ -202,8 +199,11 @@ class AppShell extends StatelessWidget {
     );
   }
 
-  Widget _buildPage(AppController controller) {
-    return switch (controller.destination) {
+  Widget _buildPage(
+    AppController controller, {
+    required WorkspaceDestination destination,
+  }) {
+    return switch (destination) {
       WorkspaceDestination.settings => WebSettingsPage(controller: controller),
       _ => WebAssistantPage(controller: controller),
     };

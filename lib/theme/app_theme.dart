@@ -233,6 +233,7 @@ class AppTheme {
     );
 
     return base.copyWith(
+      platform: resolvedPlatform,
       splashFactory: NoSplash.splashFactory,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       visualDensity: isDesktop

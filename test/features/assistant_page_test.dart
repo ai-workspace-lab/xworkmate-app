@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/features/assistant/assistant_page.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
@@ -53,6 +54,7 @@ void main() {
     await pumpPage(
       tester,
       child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+      platform: TargetPlatform.macOS,
     );
 
     expect(
@@ -115,6 +117,7 @@ void main() {
     await pumpPage(
       tester,
       child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+      platform: TargetPlatform.macOS,
     );
 
     expect(find.text('当前 0'), findsOneWidget);
@@ -128,6 +131,7 @@ void main() {
     await pumpPage(
       tester,
       child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+      platform: TargetPlatform.macOS,
     );
 
     await tester.longPress(
@@ -403,6 +407,43 @@ void main() {
     expect(find.text('1password'), findsOneWidget);
     expect(find.text('xlsx'), findsOneWidget);
     expect(find.text('网页处理'), findsOneWidget);
+  });
+
+  testWidgets('AssistantPage hides gated attachment and multi-agent actions', (
+    WidgetTester tester,
+  ) async {
+    final manifest = UiFeatureManifest.fallback()
+        .copyWithFeature(
+          platform: UiFeaturePlatform.desktop,
+          module: 'assistant',
+          feature: 'file_attachments',
+          enabled: false,
+        )
+        .copyWithFeature(
+          platform: UiFeaturePlatform.desktop,
+          module: 'assistant',
+          feature: 'multi_agent',
+          enabled: false,
+        );
+    final controller = await createTestController(
+      tester,
+      uiFeatureManifest: manifest,
+    );
+
+    await pumpPage(
+      tester,
+      child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+      platform: TargetPlatform.macOS,
+    );
+
+    expect(
+      find.byKey(const Key('assistant-attachment-menu-button')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('assistant-collaboration-toggle')),
+      findsNothing,
+    );
   });
 
   testWidgets('AssistantPage composer input area can be resized vertically', (

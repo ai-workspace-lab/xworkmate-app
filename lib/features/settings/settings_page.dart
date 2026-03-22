@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
+import '../../app/ui_feature_manifest.dart';
 import '../../app/workspace_navigation.dart';
 import '../ai_gateway/ai_gateway_page.dart';
 import '../../i18n/app_language.dart';
@@ -108,7 +109,10 @@ class _SettingsPageState extends State<SettingsPage> {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        _tab = controller.settingsTab;
+        final featurePlatform = resolveUiFeaturePlatformFromContext(context);
+        final uiFeatures = controller.featuresFor(featurePlatform);
+        final availableTabs = uiFeatures.availableSettingsTabs;
+        _tab = uiFeatures.sanitizeSettingsTab(controller.settingsTab);
         _detail = controller.settingsDetail;
         _navigationContext = controller.settingsNavigationContext;
         final settings = controller.settings;
@@ -160,10 +164,10 @@ class _SettingsPageState extends State<SettingsPage> {
               const SizedBox(height: 24),
               if (!showingDetail) ...[
                 SectionTabs(
-                  items: SettingsTab.values.map((item) => item.label).toList(),
+                  items: availableTabs.map((item) => item.label).toList(),
                   value: _tab.label,
                   onChanged: (value) => setState(() {
-                    _tab = SettingsTab.values.firstWhere(
+                    _tab = availableTabs.firstWhere(
                       (item) => item.label == value,
                     );
                     _detail = null;
@@ -173,7 +177,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 24),
               ],
-              ..._buildContentForCurrentState(context, controller, settings),
+              ..._buildContentForCurrentState(
+                context,
+                controller,
+                settings,
+                uiFeatures,
+              ),
             ],
           ),
         );
@@ -185,6 +194,7 @@ class _SettingsPageState extends State<SettingsPage> {
     BuildContext context,
     AppController controller,
     SettingsSnapshot settings,
+    UiFeatureAccess uiFeatures,
   ) {
     if (_detail != null) {
       return _buildDetailContent(context, controller, settings, _detail!);
@@ -201,6 +211,7 @@ class _SettingsPageState extends State<SettingsPage> {
         context,
         controller,
         settings,
+        uiFeatures,
       ),
       SettingsTab.about => _buildAbout(context, controller),
     };
@@ -1589,7 +1600,8 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 16),
             _AgentRoleCard(
-              title: '🧭 ${appText('Architect（调度/文档）', 'Architect (Docs / Scheduler)')}',
+              title:
+                  '🧭 ${appText('Architect（调度/文档）', 'Architect (Docs / Scheduler)')}',
               description: appText(
                 '负责 requirements -> acceptance evidence、架构选项排序、文档与调度。',
                 'Owns requirements -> acceptance evidence, option ranking, docs, and orchestration.',
@@ -1597,10 +1609,12 @@ class _SettingsPageState extends State<SettingsPage> {
               cliTool: config.architect.cliTool,
               model: config.architect.model,
               enabled: config.architect.enabled,
-              cliOptions: _mergeOptions(
-                config.architect.cliTool,
-                const ['claude', 'codex', 'opencode', 'gemini'],
-              ),
+              cliOptions: _mergeOptions(config.architect.cliTool, const [
+                'claude',
+                'codex',
+                'opencode',
+                'gemini',
+              ]),
               modelOptions: _getArchitectModelOptions(settings, config),
               onCliChanged: (tool) => _saveMultiAgentConfig(
                 controller,
@@ -1631,10 +1645,12 @@ class _SettingsPageState extends State<SettingsPage> {
               cliTool: config.engineer.cliTool,
               model: config.engineer.model,
               enabled: config.engineer.enabled,
-              cliOptions: _mergeOptions(
-                config.engineer.cliTool,
-                const ['codex', 'claude', 'opencode', 'gemini'],
-              ),
+              cliOptions: _mergeOptions(config.engineer.cliTool, const [
+                'codex',
+                'claude',
+                'opencode',
+                'gemini',
+              ]),
               modelOptions: _getLeadModelOptions(settings, config),
               onCliChanged: (tool) => _saveMultiAgentConfig(
                 controller,
@@ -1657,7 +1673,8 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 12),
             _AgentRoleCard(
-              title: '🧪 ${appText('Worker/Review（Worker 池）', 'Worker/Review Pool')}',
+              title:
+                  '🧪 ${appText('Worker/Review（Worker 池）', 'Worker/Review Pool')}',
               description: appText(
                 '负责 glm/qwen worker lane、回归审阅和补充建议。',
                 'Owns glm/qwen worker lanes, review, regression checks, and follow-up notes.',
@@ -1665,10 +1682,12 @@ class _SettingsPageState extends State<SettingsPage> {
               cliTool: config.tester.cliTool,
               model: config.tester.model,
               enabled: config.tester.enabled,
-              cliOptions: _mergeOptions(
-                config.tester.cliTool,
-                const ['opencode', 'codex', 'claude', 'gemini'],
-              ),
+              cliOptions: _mergeOptions(config.tester.cliTool, const [
+                'opencode',
+                'codex',
+                'claude',
+                'gemini',
+              ]),
               modelOptions: _getWorkerModelOptions(settings, config),
               onCliChanged: (tool) => _saveMultiAgentConfig(
                 controller,
@@ -1868,7 +1887,10 @@ class _SettingsPageState extends State<SettingsPage> {
             _WorkflowStep(
               label: '1',
               emoji: '🧭',
-              title: appText('Architect（调度/文档）', 'Architect (Docs / Scheduler)'),
+              title: appText(
+                'Architect（调度/文档）',
+                'Architect (Docs / Scheduler)',
+              ),
               desc: appText(
                 '收敛 requirements -> acceptance evidence，并冻结里程碑。',
                 'Freeze requirements -> acceptance evidence and milestones.',
@@ -1976,7 +1998,44 @@ class _SettingsPageState extends State<SettingsPage> {
     BuildContext context,
     AppController controller,
     SettingsSnapshot settings,
+    UiFeatureAccess uiFeatures,
   ) {
+    final toggles = <Widget>[
+      if (uiFeatures.allowsExperimentalSetting(
+        UiFeatureKeys.settingsExperimentalCanvas,
+      ))
+        _SwitchRow(
+          label: appText('Canvas 宿主', 'Canvas host'),
+          value: settings.experimentalCanvas,
+          onChanged: (value) => _saveSettings(
+            controller,
+            settings.copyWith(experimentalCanvas: value),
+          ),
+        ),
+      if (uiFeatures.allowsExperimentalSetting(
+        UiFeatureKeys.settingsExperimentalBridge,
+      ))
+        _SwitchRow(
+          label: appText('桥接模式', 'Bridge mode'),
+          value: settings.experimentalBridge,
+          onChanged: (value) => _saveSettings(
+            controller,
+            settings.copyWith(experimentalBridge: value),
+          ),
+        ),
+      if (uiFeatures.allowsExperimentalSetting(
+        UiFeatureKeys.settingsExperimentalDebug,
+      ))
+        _SwitchRow(
+          label: appText('调试运行时', 'Debug runtime'),
+          value: settings.experimentalDebug,
+          onChanged: (value) => _saveSettings(
+            controller,
+            settings.copyWith(experimentalDebug: value),
+          ),
+        ),
+    ];
+
     return [
       SurfaceCard(
         child: Column(
@@ -1987,30 +2046,14 @@ class _SettingsPageState extends State<SettingsPage> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
-            _SwitchRow(
-              label: appText('Canvas 宿主', 'Canvas host'),
-              value: settings.experimentalCanvas,
-              onChanged: (value) => _saveSettings(
-                controller,
-                settings.copyWith(experimentalCanvas: value),
+            if (toggles.isEmpty)
+              Text(
+                appText(
+                  '当前发布配置未开放额外实验开关。',
+                  'This build does not expose additional experimental toggles.',
+                ),
               ),
-            ),
-            _SwitchRow(
-              label: appText('桥接模式', 'Bridge mode'),
-              value: settings.experimentalBridge,
-              onChanged: (value) => _saveSettings(
-                controller,
-                settings.copyWith(experimentalBridge: value),
-              ),
-            ),
-            _SwitchRow(
-              label: appText('调试运行时', 'Debug runtime'),
-              value: settings.experimentalDebug,
-              onChanged: (value) => _saveSettings(
-                controller,
-                settings.copyWith(experimentalDebug: value),
-              ),
-            ),
+            ...toggles,
           ],
         ),
       ),

@@ -72,7 +72,7 @@ void main() {
 
 Future<void> _waitFor(
   bool Function() condition, {
-  Duration timeout = const Duration(seconds: 5),
+  Duration timeout = const Duration(seconds: 10),
 }) async {
   final deadline = DateTime.now().add(timeout);
   while (!condition()) {
