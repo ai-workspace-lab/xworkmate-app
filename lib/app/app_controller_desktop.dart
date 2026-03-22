@@ -1544,14 +1544,10 @@ class AppController extends ChangeNotifier {
     }
 
     final discovered = await _scanGatewayOnlySkillCandidates();
-    final importedKeys = assistantImportedSkillsForSession(
-      normalizedSessionKey,
-    ).map((item) => item.key).toSet();
     _upsertAssistantThreadRecord(
       normalizedSessionKey,
-      discoveredSkills: discovered
-          .where((item) => !importedKeys.contains(item.key))
-          .toList(growable: false),
+      discoveredSkills: const <AssistantThreadSkillEntry>[],
+      importedSkills: discovered,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     _notifyIfActive();
