@@ -329,6 +329,28 @@ void main() {
     expect(controller.settingsDetail, SettingsDetailPage.gatewayConnection);
   });
 
+  testWidgets(
+    'AssistantPage empty state stays above the composer instead of centering over the workspace',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
+
+      await pumpPage(
+        tester,
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+      );
+
+      final emptyState = find.byKey(const Key('assistant-empty-state-card'));
+      final composerShell = find.byKey(const Key('assistant-composer-shell'));
+
+      expect(emptyState, findsOneWidget);
+      expect(composerShell, findsOneWidget);
+      expect(
+        tester.getRect(emptyState).bottom,
+        lessThan(tester.getRect(composerShell).top),
+      );
+    },
+  );
+
   testWidgets('AssistantPage keeps a minimal composer action menu', (
     WidgetTester tester,
   ) async {

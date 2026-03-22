@@ -59,15 +59,19 @@ void openSettingsNavigationContext(
   SettingsNavigationContext context,
 ) {
   if (context.modulesTab != null) {
+    if (context.modulesTab == ModulesTab.gateway) {
+      controller.openSettings(tab: SettingsTab.gateway);
+      return;
+    }
     controller.openModules(tab: context.modulesTab!);
     return;
   }
   if (context.secretsTab != null) {
-    controller.openSecrets(tab: context.secretsTab!);
+    controller.openSettings(tab: SettingsTab.gateway);
     return;
   }
   if (context.aiGatewayTab != null) {
-    controller.openAiGateway(tab: context.aiGatewayTab!);
+    controller.openSettings(tab: SettingsTab.gateway);
     return;
   }
   if (context.settingsTab != null ||

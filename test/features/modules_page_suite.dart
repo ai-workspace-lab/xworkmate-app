@@ -3,29 +3,38 @@ library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/features/modules/modules_page.dart';
+import 'package:xworkmate/features/settings/settings_page.dart';
 import 'package:xworkmate/models/app_models.dart';
 
 import '../test_support.dart';
 
 void main() {
   testWidgets(
-    'ModulesPage switches connectors tab and routes module actions to settings',
+    'Modules gateway shortcut routes to Settings center and modules page excludes the old gateway tab',
     (WidgetTester tester) async {
       final controller = await createTestController(tester);
-      controller.navigateTo(WorkspaceDestination.skills);
+      controller.openModules(tab: ModulesTab.gateway);
+
+      expect(controller.destination, WorkspaceDestination.settings);
+      expect(controller.settingsTab, SettingsTab.gateway);
 
       await pumpPage(
         tester,
-        child: ModulesPage(controller: controller, onOpenDetail: (_) {}),
+        child: SettingsPage(
+          controller: controller,
+          initialTab: controller.settingsTab,
+          initialDetail: controller.settingsDetail,
+          navigationContext: controller.settingsNavigationContext,
+        ),
       );
 
-      await tester.tap(find.text('编辑设置').first);
-      await tester.pumpAndSettle();
-      expect(controller.destination, WorkspaceDestination.settings);
-      expect(controller.settingsDetail, SettingsDetailPage.gatewayConnection);
-      expect(
-        controller.settingsNavigationContext?.modulesTab,
-        ModulesTab.gateway,
+      expect(find.text('OpenClaw Gateway'), findsOneWidget);
+      expect(find.text('AI Gateway'), findsWidgets);
+
+      controller.navigateTo(WorkspaceDestination.nodes);
+      await pumpPage(
+        tester,
+        child: ModulesPage(controller: controller, onOpenDetail: (_) {}),
       );
 
       await tester.tap(find.text('连接器'));
@@ -35,7 +44,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.text('接入模块'));
+      await tester.tap(find.text('打开设置中心'));
       await tester.pumpAndSettle();
       expect(controller.destination, WorkspaceDestination.settings);
       expect(controller.settingsTab, SettingsTab.gateway);

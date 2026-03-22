@@ -1,11 +1,16 @@
 @TestOn('vm')
 library;
 
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/runtime/secure_config_store.dart';
 
 class _FakeDesktopPlatformService implements DesktopPlatformService {
   _FakeDesktopPlatformService()
@@ -98,6 +103,130 @@ class _FakeDesktopPlatformService implements DesktopPlatformService {
   void dispose() {}
 }
 
+class _ThrowingSecureConfigStore extends SecureConfigStore {
+  _ThrowingSecureConfigStore()
+    : super(enableSecureStorage: false);
+
+  @override
+  Future<String?> loadGatewayToken() async {
+    throw StateError('main store gateway token should not be used');
+  }
+
+  @override
+  Future<String?> loadGatewayPassword() async {
+    throw StateError('main store gateway password should not be used');
+  }
+
+  @override
+  Future<LocalDeviceIdentity?> loadDeviceIdentity() async {
+    throw StateError('main store identity should not be used');
+  }
+
+  @override
+  Future<void> saveDeviceIdentity(LocalDeviceIdentity identity) async {
+    throw StateError('main store identity save should not be used');
+  }
+
+  @override
+  Future<String?> loadDeviceToken({
+    required String deviceId,
+    required String role,
+  }) async {
+    throw StateError('main store device token should not be used');
+  }
+
+  @override
+  Future<void> saveDeviceToken({
+    required String deviceId,
+    required String role,
+    required String token,
+  }) async {
+    throw StateError('main store device token save should not be used');
+  }
+}
+
+class _FakeGatewayTestServer {
+  _FakeGatewayTestServer._(this._server);
+
+  final HttpServer _server;
+
+  int get port => _server.port;
+
+  static Future<_FakeGatewayTestServer> start() async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final fake = _FakeGatewayTestServer._(server);
+    unawaited(fake._serve());
+    return fake;
+  }
+
+  Future<void> close() async {
+    await _server.close(force: true);
+  }
+
+  Future<void> _serve() async {
+    await for (final request in _server) {
+      final socket = await WebSocketTransformer.upgrade(request);
+      socket.add(
+        jsonEncode(<String, dynamic>{
+          'type': 'event',
+          'event': 'connect.challenge',
+          'payload': <String, dynamic>{'nonce': 'nonce-1'},
+        }),
+      );
+      await for (final raw in socket) {
+        final frame = jsonDecode(raw as String) as Map<String, dynamic>;
+        if (frame['type'] != 'req') {
+          continue;
+        }
+        final id = frame['id'] as String? ?? 'req-id';
+        final method = frame['method'] as String? ?? '';
+        switch (method) {
+          case 'connect':
+            socket.add(
+              jsonEncode(<String, dynamic>{
+                'type': 'res',
+                'id': id,
+                'ok': true,
+                'payload': <String, dynamic>{
+                  'server': <String, dynamic>{'host': '127.0.0.1'},
+                  'snapshot': <String, dynamic>{
+                    'sessionDefaults': <String, dynamic>{
+                      'mainSessionKey': 'main',
+                    },
+                  },
+                  'auth': <String, dynamic>{
+                    'role': 'operator',
+                    'scopes': const <String>['operator.admin'],
+                  },
+                },
+              }),
+            );
+            break;
+          case 'health':
+            socket.add(
+              jsonEncode(<String, dynamic>{
+                'type': 'res',
+                'id': id,
+                'ok': true,
+                'payload': <String, dynamic>{'status': 'ok'},
+              }),
+            );
+            break;
+          default:
+            socket.add(
+              jsonEncode(<String, dynamic>{
+                'type': 'res',
+                'id': id,
+                'ok': true,
+                'payload': const <String, dynamic>{},
+              }),
+            );
+        }
+      }
+    }
+  }
+}
+
 void main() {
   test(
     'AppController syncs Linux desktop settings into platform service',
@@ -135,6 +264,35 @@ void main() {
 
       await controller.setLaunchAtLogin(true);
       expect(service.autostartEnabled, isTrue);
+    },
+  );
+
+  test(
+    'AppController tests gateway connectivity without touching the main secure store',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final server = await _FakeGatewayTestServer.start();
+      final controller = AppController(store: _ThrowingSecureConfigStore());
+      addTearDown(server.close);
+      addTearDown(controller.dispose);
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final result = await controller.testGatewayConnectionDraft(
+        profile: GatewayConnectionProfile.defaults().copyWith(
+          mode: RuntimeConnectionMode.local,
+          host: '127.0.0.1',
+          port: server.port,
+          tls: false,
+          useSetupCode: false,
+        ),
+        executionTarget: AssistantExecutionTarget.local,
+        tokenOverride: 'draft-token',
+      );
+
+      expect(result.state, 'success');
+      expect(result.endpoint, '127.0.0.1:${server.port}');
+      expect(result.message, isNot(contains('main store')));
     },
   );
 }

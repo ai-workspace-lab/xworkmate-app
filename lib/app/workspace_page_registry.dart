@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../features/account/account_page.dart';
-import '../features/ai_gateway/ai_gateway_page.dart';
 import '../features/assistant/assistant_page.dart';
 import '../features/claw_hub/claw_hub_page.dart';
 import '../features/mcp_server/mcp_server_page.dart';
 import '../features/modules/modules_page.dart';
-import '../features/secrets/secrets_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/skills/skills_page.dart';
 import '../features/tasks/tasks_page.dart';
@@ -111,28 +109,24 @@ final Map<WorkspaceDestination, WorkspacePageSpec> _workspacePageSpecs =
       ),
       WorkspaceDestination.secrets: WorkspacePageSpec(
         destination: WorkspaceDestination.secrets,
-        desktopBuilder: (controller, onOpenDetail) => SecretsPage(
+        desktopBuilder: (controller, onOpenDetail) => SettingsPage(
           controller: controller,
-          onOpenDetail: onOpenDetail,
-          initialTab: controller.secretsTab,
+          initialTab: SettingsTab.gateway,
         ),
-        mobileBuilder: (controller, onOpenDetail) => SecretsPage(
+        mobileBuilder: (controller, onOpenDetail) => SettingsPage(
           controller: controller,
-          onOpenDetail: onOpenDetail,
-          initialTab: controller.secretsTab,
+          initialTab: SettingsTab.gateway,
         ),
       ),
       WorkspaceDestination.aiGateway: WorkspacePageSpec(
         destination: WorkspaceDestination.aiGateway,
-        desktopBuilder: (controller, onOpenDetail) => AiGatewayPage(
+        desktopBuilder: (controller, onOpenDetail) => SettingsPage(
           controller: controller,
-          onOpenDetail: onOpenDetail,
-          initialTab: controller.aiGatewayTab,
+          initialTab: SettingsTab.gateway,
         ),
-        mobileBuilder: (controller, onOpenDetail) => AiGatewayPage(
+        mobileBuilder: (controller, onOpenDetail) => SettingsPage(
           controller: controller,
-          onOpenDetail: onOpenDetail,
-          initialTab: controller.aiGatewayTab,
+          initialTab: SettingsTab.gateway,
         ),
       ),
       WorkspaceDestination.settings: WorkspacePageSpec(

@@ -2,35 +2,32 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xworkmate/features/secrets/secrets_page.dart';
+import 'package:xworkmate/features/settings/settings_page.dart';
 import 'package:xworkmate/models/app_models.dart';
 
 import '../test_support.dart';
 
 void main() {
-  testWidgets(
-    'SecretsPage switches to audit and routes add secret to settings',
-    (WidgetTester tester) async {
-      final controller = await createTestController(tester);
-      controller.navigateTo(WorkspaceDestination.secrets);
-      DetailPanelData? openedDetail;
+  testWidgets('Secrets shortcut routes to Settings center integrations', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+    controller.navigateTo(WorkspaceDestination.secrets);
 
-      await pumpPage(
-        tester,
-        child: SecretsPage(
-          controller: controller,
-          onOpenDetail: (detail) => openedDetail = detail,
-        ),
-      );
+    expect(controller.destination, WorkspaceDestination.settings);
+    expect(controller.settingsTab, SettingsTab.gateway);
 
-      await tester.tap(find.text('审计'));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('还没有安全审计条目'), findsOneWidget);
-      expect(openedDetail, isNull);
+    await pumpPage(
+      tester,
+      child: SettingsPage(
+        controller: controller,
+        initialTab: controller.settingsTab,
+        initialDetail: controller.settingsDetail,
+        navigationContext: controller.settingsNavigationContext,
+      ),
+    );
 
-      await tester.tap(find.text('新增密钥'));
-      await tester.pumpAndSettle();
-      expect(controller.destination, WorkspaceDestination.settings);
-    },
-  );
+    expect(find.text('OpenClaw Gateway'), findsOneWidget);
+    expect(find.text('Vault Server'), findsOneWidget);
+  });
 }
