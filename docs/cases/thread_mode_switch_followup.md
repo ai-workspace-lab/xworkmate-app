@@ -4,6 +4,10 @@
 
 验证三种模式切换后，线程归属正确、模型随模式变化，并且现有线程还能继续追问。
 
+相关设计说明：
+
+- [Assistant 任务线程信息架构](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate.svc.plus/docs/architecture/assistant-thread-information-architecture.md)
+
 ## 需要覆盖的三种模式
 
 - `仅 AI Gateway`
@@ -63,3 +67,4 @@
 - `仅 AI Gateway` 不会错误显示 OpenClaw 已连接
 - 三种模式下线程都能继续追问
 - 任务列表分组归属与实际提交模式一致
+- 右上角状态只反映当前线程，不沿用别的线程连接结果

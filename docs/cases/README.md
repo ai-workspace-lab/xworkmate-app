@@ -17,6 +17,10 @@
 3. [外部 Agent CLI Bridge 会话](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/cases/external_agent_bridge_session.md)
 4. [模式切换与线程连续追问](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/cases/thread_mode_switch_followup.md)
 
+## 相关设计文档
+
+- [Assistant 任务线程信息架构](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate.svc.plus/docs/architecture/assistant-thread-information-architecture.md)
+
 ## 你应该重点观察的点
 
 - Assistant 仍复用现有输入框、附件、技能和当前线程
