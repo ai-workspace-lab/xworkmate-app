@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
+import '../runtime/legacy_settings_recovery.dart';
 import '../runtime/runtime_models.dart';
 import '../web/web_ai_gateway_client.dart';
 import '../web/web_relay_gateway_client.dart';
@@ -47,9 +48,14 @@ class AppController extends ChangeNotifier {
   late final StreamSubscription<GatewayPushEvent> _relayEventsSubscription;
 
   SettingsSnapshot _settings = SettingsSnapshot.defaults();
+  SettingsSnapshot _settingsDraft = SettingsSnapshot.defaults();
   ThemeMode _themeMode = ThemeMode.light;
   WorkspaceDestination _destination = WorkspaceDestination.assistant;
   SettingsTab _settingsTab = SettingsTab.general;
+  bool _settingsDraftInitialized = false;
+  bool _pendingSettingsApply = false;
+  String _settingsDraftStatusMessage = '';
+  final Map<String, String> _draftSecretValues = <String, String>{};
   bool _initializing = true;
   String? _bootstrapError;
   bool _relayBusy = false;
@@ -73,6 +79,14 @@ class AppController extends ChangeNotifier {
   bool get initializing => _initializing;
   String? get bootstrapError => _bootstrapError;
   SettingsSnapshot get settings => _settings;
+  SettingsSnapshot get settingsDraft =>
+      _settingsDraftInitialized ? _settingsDraft : _settings;
+  bool get hasSettingsDraftChanges =>
+      settingsDraft.toJsonString() != _settings.toJsonString() ||
+      _draftSecretValues.isNotEmpty;
+  bool get hasPendingSettingsApply => _pendingSettingsApply;
+  String get settingsDraftStatusMessage => _settingsDraftStatusMessage;
+  LegacyRecoveryReport get legacyRecoveryReport => const LegacyRecoveryReport();
   AppLanguage get appLanguage => _settings.appLanguage;
   GatewayConnectionSnapshot get connection => _relayClient.snapshot;
   bool get relayBusy => _relayBusy;
@@ -109,6 +123,10 @@ class AppController extends ChangeNotifier {
   String _relayTokenCache = '';
   String _relayPasswordCache = '';
   String _aiGatewayApiKeyCache = '';
+
+  static const String _draftAiGatewayApiKeyKey = 'ai_gateway_api_key';
+  static const String _draftVaultTokenKey = 'vault_token';
+  static const String _draftOllamaApiKeyKey = 'ollama_cloud_api_key';
 
   UiFeatureAccess featuresFor(UiFeaturePlatform platform) {
     return _uiFeatureManifest.forPlatform(platform);
@@ -312,6 +330,8 @@ class AppController extends ChangeNotifier {
         _threadRecords[record.sessionKey] = record;
       }
       _currentSessionKey = conversations.first.sessionKey;
+      _settingsDraft = _settings;
+      _settingsDraftInitialized = true;
     } catch (error) {
       _bootstrapError = '$error';
     } finally {
@@ -381,6 +401,72 @@ class AppController extends ChangeNotifier {
     }
     _themeMode = mode;
     await _store.saveThemeMode(mode);
+    notifyListeners();
+  }
+
+  Future<void> saveSettingsDraft(SettingsSnapshot snapshot) async {
+    _settingsDraft = snapshot;
+    _settingsDraftInitialized = true;
+    _settingsDraftStatusMessage = appText(
+      '草稿已更新，点击顶部保存持久化。',
+      'Draft updated. Use the top Save button to persist it.',
+    );
+    notifyListeners();
+  }
+
+  void saveAiGatewayApiKeyDraft(String value) {
+    _saveSecretDraft(_draftAiGatewayApiKeyKey, value);
+  }
+
+  void saveVaultTokenDraft(String value) {
+    _saveSecretDraft(_draftVaultTokenKey, value);
+  }
+
+  void saveOllamaCloudApiKeyDraft(String value) {
+    _saveSecretDraft(_draftOllamaApiKeyKey, value);
+  }
+
+  Future<void> persistSettingsDraft() async {
+    if (!hasSettingsDraftChanges) {
+      _settingsDraftStatusMessage = appText(
+        '没有需要保存的更改。',
+        'There are no changes to save.',
+      );
+      notifyListeners();
+      return;
+    }
+    _settings = settingsDraft;
+    await _persistDraftSecrets();
+    await _persistSettings();
+    _settingsDraft = _settings;
+    _settingsDraftInitialized = true;
+    _pendingSettingsApply = true;
+    _settingsDraftStatusMessage = appText(
+      '已保存设置，等待应用。',
+      'Settings saved. Apply to activate runtime changes.',
+    );
+    notifyListeners();
+  }
+
+  Future<void> applySettingsDraft() async {
+    if (hasSettingsDraftChanges) {
+      await persistSettingsDraft();
+    }
+    if (!_pendingSettingsApply) {
+      _settingsDraftStatusMessage = appText(
+        '没有需要应用的更改。',
+        'There are no saved changes to apply.',
+      );
+      notifyListeners();
+      return;
+    }
+    _settingsDraft = _settings;
+    _settingsDraftInitialized = true;
+    _pendingSettingsApply = false;
+    _settingsDraftStatusMessage = appText(
+      '已应用全部设置。',
+      'All saved settings have been applied.',
+    );
     notifyListeners();
   }
 
@@ -904,6 +990,29 @@ class AppController extends ChangeNotifier {
 
   Future<void> _persistSettings() async {
     await _store.saveSettingsSnapshot(_settings);
+  }
+
+  void _saveSecretDraft(String key, String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      _draftSecretValues.remove(key);
+    } else {
+      _draftSecretValues[key] = trimmed;
+    }
+    _settingsDraftStatusMessage = appText(
+      '草稿已更新，点击顶部保存持久化。',
+      'Draft updated. Use the top Save button to persist it.',
+    );
+    notifyListeners();
+  }
+
+  Future<void> _persistDraftSecrets() async {
+    final aiGatewayApiKey = _draftSecretValues[_draftAiGatewayApiKeyKey];
+    if ((aiGatewayApiKey ?? '').isNotEmpty) {
+      _aiGatewayApiKeyCache = aiGatewayApiKey!;
+      await _store.saveAiGatewayApiKey(_aiGatewayApiKeyCache);
+    }
+    _draftSecretValues.clear();
   }
 
   Future<void> _persistThreads() async {

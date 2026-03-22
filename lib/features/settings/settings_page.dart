@@ -49,7 +49,6 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _ollamaApiKeyController;
   late final TextEditingController _runtimeLogFilterController;
   bool _aiGatewayTesting = false;
-  bool _aiGatewaySyncing = false;
   String _aiGatewayTestState = 'idle';
   String _aiGatewayTestMessage = '';
   String _aiGatewayTestEndpoint = '';
@@ -115,7 +114,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _tab = uiFeatures.sanitizeSettingsTab(controller.settingsTab);
         _detail = controller.settingsDetail;
         _navigationContext = controller.settingsNavigationContext;
-        final settings = controller.settings;
+        final settings = controller.settingsDraft;
         final showingDetail = _detail != null;
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
@@ -162,6 +161,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
               const SizedBox(height: 24),
+              _buildGlobalApplyBar(context, controller),
+              const SizedBox(height: 16),
               if (!showingDetail) ...[
                 SectionTabs(
                   items: availableTabs.map((item) => item.label).toList(),
@@ -320,6 +321,80 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Widget _buildGlobalApplyBar(BuildContext context, AppController controller) {
+    final theme = Theme.of(context);
+    final hasDraft = controller.hasSettingsDraftChanges;
+    final hasPendingApply = controller.hasPendingSettingsApply;
+    final recoveryIssue = controller.legacyRecoveryReport.hasIssue;
+    final message = recoveryIssue
+        ? appText(
+            '检测到旧版本配置，但当前版本无法解锁旧加密状态。',
+            'Detected legacy settings, but this build could not unlock the old encrypted state.',
+          )
+        : controller.settingsDraftStatusMessage;
+    return SurfaceCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  appText('设置提交流程', 'Settings Submission'),
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  recoveryIssue
+                      ? message
+                      : hasDraft
+                      ? appText(
+                          '当前存在未保存草稿。保存会持久化配置，但不会触发连接或模型同步。',
+                          'There are unsaved drafts. Save persists settings without connecting or syncing models.',
+                        )
+                      : hasPendingApply
+                      ? appText(
+                          '当前存在已保存但未应用的更改。点击应用会触发连接和模型同步。',
+                          'There are saved changes waiting to be applied. Apply will trigger connection and model sync.',
+                        )
+                      : (message.isEmpty
+                            ? appText(
+                                '当前没有待提交更改。',
+                                'There are no pending settings changes.',
+                              )
+                            : message),
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              OutlinedButton(
+                key: const ValueKey('settings-global-save-button'),
+                onPressed: (!hasDraft && !recoveryIssue)
+                    ? null
+                    : () => _handleTopLevelSave(controller),
+                child: Text(appText('保存', 'Save')),
+              ),
+              FilledButton.tonal(
+                key: const ValueKey('settings-global-apply-button'),
+                onPressed: (!hasDraft && !hasPendingApply && !recoveryIssue)
+                    ? null
+                    : () => _handleTopLevelApply(controller),
+                child: Text(appText('应用', 'Apply')),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   List<Widget> _buildGeneral(
     BuildContext context,
     AppController controller,
@@ -467,20 +542,29 @@ class _SettingsPageState extends State<SettingsPage> {
           _SwitchRow(
             label: appText('开机启动', 'Launch at login'),
             value: settings.launchAtLogin,
-            onChanged: (value) => controller.setLaunchAtLogin(value),
+            onChanged: (value) => _saveSettings(
+              controller,
+              settings.copyWith(launchAtLogin: value),
+            ),
           ),
           _SwitchRow(
             label: appText('托盘菜单', 'Tray menu'),
             value: config.trayEnabled,
-            onChanged: (value) => controller.saveLinuxDesktopConfig(
-              config.copyWith(trayEnabled: value),
+            onChanged: (value) => _saveSettings(
+              controller,
+              settings.copyWith(
+                linuxDesktop: config.copyWith(trayEnabled: value),
+              ),
             ),
           ),
           _EditableField(
             label: appText('隧道连接名称', 'Tunnel Connection Name'),
             value: config.vpnConnectionName,
-            onSubmitted: (value) => controller.saveLinuxDesktopConfig(
-              config.copyWith(vpnConnectionName: value.trim()),
+            onSubmitted: (value) => _saveSettings(
+              controller,
+              settings.copyWith(
+                linuxDesktop: config.copyWith(vpnConnectionName: value.trim()),
+              ),
             ),
           ),
           Row(
@@ -489,8 +573,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: _EditableField(
                   label: appText('代理主机', 'Proxy Host'),
                   value: config.proxyHost,
-                  onSubmitted: (value) => controller.saveLinuxDesktopConfig(
-                    config.copyWith(proxyHost: value.trim()),
+                  onSubmitted: (value) => _saveSettings(
+                    controller,
+                    settings.copyWith(
+                      linuxDesktop: config.copyWith(proxyHost: value.trim()),
+                    ),
                   ),
                 ),
               ),
@@ -504,8 +591,11 @@ class _SettingsPageState extends State<SettingsPage> {
                     if (parsed == null || parsed <= 0) {
                       return;
                     }
-                    controller.saveLinuxDesktopConfig(
-                      config.copyWith(proxyPort: parsed),
+                    _saveSettings(
+                      controller,
+                      settings.copyWith(
+                        linuxDesktop: config.copyWith(proxyPort: parsed),
+                      ),
                     );
                   },
                 ),
@@ -736,27 +826,22 @@ class _SettingsPageState extends State<SettingsPage> {
               onStateChanged: (value) =>
                   setState(() => _ollamaApiKeyState = value),
               loadValue: controller.settingsController.loadOllamaCloudApiKey,
-              onSubmitted: controller.settingsController.saveOllamaCloudApiKey,
+              onSubmitted: (value) async =>
+                  controller.saveOllamaCloudApiKeyDraft(value),
               storedHelperText: appText(
                 '已安全保存，默认以 **** 显示，点击查看后读取真实值。',
                 'Stored securely. Shows as **** until you reveal it.',
               ),
               emptyHelperText: appText(
-                '输入后会安全保存到本机密钥存储。',
-                'Saving writes to secure local key storage.',
+                '输入后先进入草稿；顶部保存后才会写入安全存储。',
+                'Values stage into draft first and only persist to secure storage after Save.',
               ),
             ),
             const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerLeft,
               child: OutlinedButton(
-                onPressed: () async {
-                  await _persistOllamaApiKeyIfNeeded(
-                    controller,
-                    hasStoredValue: hasStoredOllamaApiKey,
-                  );
-                  await controller.testOllamaConnection(cloud: true);
-                },
+                onPressed: () => controller.testOllamaConnection(cloud: true),
                 child: Text(
                   '${appText('测试云端', 'Test Cloud')} · ${controller.settingsController.ollamaStatus}',
                 ),
@@ -928,27 +1013,22 @@ class _SettingsPageState extends State<SettingsPage> {
               onStateChanged: (value) =>
                   setState(() => _vaultTokenState = value),
               loadValue: controller.settingsController.loadVaultToken,
-              onSubmitted: controller.settingsController.saveVaultToken,
+              onSubmitted: (value) async =>
+                  controller.saveVaultTokenDraft(value),
               storedHelperText: appText(
                 '已安全保存，默认以 **** 显示，点击查看后读取真实值。',
                 'Stored securely. Shows as **** until you reveal it.',
               ),
               emptyHelperText: appText(
-                '输入后会安全保存到本机密钥存储。',
-                'Saving writes to secure local key storage.',
+                '输入后先进入草稿；顶部保存后才会写入安全存储。',
+                'Values stage into draft first and only persist to secure storage after Save.',
               ),
             ),
             const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerLeft,
               child: OutlinedButton(
-                onPressed: () async {
-                  await _persistVaultTokenIfNeeded(
-                    controller,
-                    hasStoredValue: hasStoredVaultToken,
-                  );
-                  await controller.testVaultConnection();
-                },
+                onPressed: () => controller.testVaultConnection(),
                 child: Text(
                   '${appText('测试 Vault', 'Test Vault')} · ${controller.settingsController.vaultStatus}',
                 ),
@@ -973,6 +1053,9 @@ class _SettingsPageState extends State<SettingsPage> {
               decoration: InputDecoration(
                 labelText: appText('配置名称', 'Profile Name'),
               ),
+              onChanged: (_) => unawaited(
+                _saveAiGatewayDraft(controller, settings).catchError((_) {}),
+              ),
               onSubmitted: (_) => _saveAiGatewayDraft(controller, settings),
             ),
             const SizedBox(height: 14),
@@ -982,6 +1065,9 @@ class _SettingsPageState extends State<SettingsPage> {
               decoration: InputDecoration(
                 labelText: appText('Gateway URL', 'Gateway URL'),
               ),
+              onChanged: (_) => unawaited(
+                _saveAiGatewayDraft(controller, settings).catchError((_) {}),
+              ),
               onSubmitted: (_) => _saveAiGatewayDraft(controller, settings),
             ),
             const SizedBox(height: 14),
@@ -990,6 +1076,9 @@ class _SettingsPageState extends State<SettingsPage> {
               controller: _aiGatewayApiKeyRefController,
               decoration: InputDecoration(
                 labelText: appText('API Key 引用', 'API Key Ref'),
+              ),
+              onChanged: (_) => unawaited(
+                _saveAiGatewayDraft(controller, settings).catchError((_) {}),
               ),
               onSubmitted: (_) => _saveAiGatewayDraft(controller, settings),
             ),
@@ -1003,14 +1092,15 @@ class _SettingsPageState extends State<SettingsPage> {
               onStateChanged: (value) =>
                   setState(() => _aiGatewayApiKeyState = value),
               loadValue: controller.settingsController.loadAiGatewayApiKey,
-              onSubmitted: controller.settingsController.saveAiGatewayApiKey,
+              onSubmitted: (value) async =>
+                  controller.saveAiGatewayApiKeyDraft(value),
               storedHelperText: appText(
-                '已安全保存，默认以 **** 显示；可直接测试或保存/应用，也可点击查看。',
-                'Stored securely. Test or save/apply directly, or reveal it on demand.',
+                '已安全保存，默认以 **** 显示；可直接测试，也可保存草稿后再统一提交。',
+                'Stored securely. Test directly or save to draft before the global submit.',
               ),
               emptyHelperText: appText(
-                '输入后点击测试连接或保存/应用。',
-                'Test or save/apply to persist securely.',
+                '输入后可测试连接，或先保存到草稿，顶部再统一保存/应用。',
+                'Test the connection now, or stage it for the top-level Save / Apply flow.',
               ),
             ),
             const SizedBox(height: 12),
@@ -1020,7 +1110,7 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 OutlinedButton(
                   key: const ValueKey('ai-gateway-test-button'),
-                  onPressed: _aiGatewayTesting || _aiGatewaySyncing
+                  onPressed: _aiGatewayTesting
                       ? null
                       : () => _testAiGatewayConnection(controller, settings),
                   child: Text(
@@ -1030,15 +1120,11 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
                 FilledButton.tonal(
-                  key: const ValueKey('ai-gateway-apply-button'),
-                  onPressed: _aiGatewayTesting || _aiGatewaySyncing
+                  key: const ValueKey('ai-gateway-save-draft-button'),
+                  onPressed: _aiGatewayTesting
                       ? null
-                      : () => _applyAiGatewaySettings(controller, settings),
-                  child: Text(
-                    _aiGatewaySyncing
-                        ? appText('应用中...', 'Applying...')
-                        : appText('保存/应用', 'Save / Apply'),
-                  ),
+                      : () => _saveAiGatewayDraft(controller, settings),
+                  child: Text(appText('保存草稿', 'Save Draft')),
                 ),
               ],
             ),
@@ -2077,14 +2163,87 @@ class _SettingsPageState extends State<SettingsPage> {
     AppController controller,
     SettingsSnapshot snapshot,
   ) {
-    return controller.saveSettings(snapshot);
+    return controller.saveSettingsDraft(snapshot);
+  }
+
+  Future<void> _handleTopLevelSave(AppController controller) async {
+    await _captureVisibleSecretDrafts(controller);
+    await controller.persistSettingsDraft();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _resetSecureFieldUiAfterPersist(controller);
+    });
+  }
+
+  Future<void> _handleTopLevelApply(AppController controller) async {
+    await _captureVisibleSecretDrafts(controller);
+    await controller.applySettingsDraft();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _resetSecureFieldUiAfterPersist(controller);
+    });
+  }
+
+  Future<void> _captureVisibleSecretDrafts(AppController controller) async {
+    final aiGatewayApiKey = _secretOverride(
+      _aiGatewayApiKeyController,
+      _aiGatewayApiKeyState,
+    );
+    if (aiGatewayApiKey.isNotEmpty) {
+      controller.saveAiGatewayApiKeyDraft(aiGatewayApiKey);
+    }
+    final vaultToken = _secretOverride(_vaultTokenController, _vaultTokenState);
+    if (vaultToken.isNotEmpty) {
+      controller.saveVaultTokenDraft(vaultToken);
+    }
+    final ollamaApiKey = _secretOverride(
+      _ollamaApiKeyController,
+      _ollamaApiKeyState,
+    );
+    if (ollamaApiKey.isNotEmpty) {
+      controller.saveOllamaCloudApiKeyDraft(ollamaApiKey);
+    }
+  }
+
+  void _resetSecureFieldUiAfterPersist(AppController controller) {
+    final hasStoredAiGatewayApiKey =
+        controller.settingsController.secureRefs['ai_gateway_api_key'] != null;
+    final hasStoredVaultToken =
+        controller.settingsController.secureRefs['vault_token'] != null;
+    final hasStoredOllamaApiKey =
+        controller.settingsController.secureRefs['ollama_cloud_api_key'] !=
+        null;
+    _aiGatewayApiKeyState = const _SecretFieldUiState();
+    _vaultTokenState = const _SecretFieldUiState();
+    _ollamaApiKeyState = const _SecretFieldUiState();
+    _primeSecureFieldController(
+      _aiGatewayApiKeyController,
+      hasStoredValue: hasStoredAiGatewayApiKey,
+      fieldState: _aiGatewayApiKeyState,
+    );
+    _primeSecureFieldController(
+      _vaultTokenController,
+      hasStoredValue: hasStoredVaultToken,
+      fieldState: _vaultTokenState,
+    );
+    _primeSecureFieldController(
+      _ollamaApiKeyController,
+      hasStoredValue: hasStoredOllamaApiKey,
+      fieldState: _ollamaApiKeyState,
+    );
   }
 
   Future<void> _saveMultiAgentConfig(
     AppController controller,
     MultiAgentConfig config,
   ) {
-    return controller.saveMultiAgentConfig(config);
+    return controller.saveSettingsDraft(
+      controller.settingsDraft.copyWith(multiAgent: config),
+    );
   }
 
   AiGatewayProfile _buildAiGatewayDraft(SettingsSnapshot settings) {
@@ -2117,15 +2276,7 @@ class _SettingsPageState extends State<SettingsPage> {
     SettingsSnapshot settings,
   ) async {
     final draft = _buildAiGatewayDraft(settings);
-    final hasStoredAiGatewayApiKey =
-        controller.settingsController.secureRefs['ai_gateway_api_key'] != null;
     await _saveSettings(controller, settings.copyWith(aiGateway: draft));
-    unawaited(
-      _persistAiGatewayApiKeyIfNeeded(
-        controller,
-        hasStoredValue: hasStoredAiGatewayApiKey,
-      ).catchError((_) {}),
-    );
     if (!mounted) {
       return;
     }
@@ -2137,68 +2288,6 @@ class _SettingsPageState extends State<SettingsPage> {
       _aiGatewayTestMessage = '';
       _aiGatewayTestEndpoint = '';
     });
-  }
-
-  Future<void> _applyAiGatewaySettings(
-    AppController controller,
-    SettingsSnapshot settings,
-  ) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final draft = _buildAiGatewayDraft(settings);
-    final apiKey = _secretOverride(
-      _aiGatewayApiKeyController,
-      _aiGatewayApiKeyState,
-    );
-    final hasStoredAiGatewayApiKey =
-        controller.settingsController.secureRefs['ai_gateway_api_key'] != null;
-    setState(() => _aiGatewaySyncing = true);
-    try {
-      await _saveSettings(controller, settings.copyWith(aiGateway: draft));
-      await _persistAiGatewayApiKeyIfNeeded(
-        controller,
-        hasStoredValue: hasStoredAiGatewayApiKey,
-      );
-      if (!mounted) {
-        return;
-      }
-      _aiGatewayNameSyncedValue = draft.name;
-      _aiGatewayUrlSyncedValue = draft.baseUrl;
-      _aiGatewayApiKeyRefSyncedValue = draft.apiKeyRef;
-      if (_aiGatewayTestState != 'ready') {
-        setState(() {
-          _aiGatewayTestState = draft.syncState;
-          _aiGatewayTestMessage = '';
-          _aiGatewayTestEndpoint = '';
-        });
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(appText('AI Gateway 已保存', 'AI Gateway saved')),
-          ),
-        );
-        return;
-      }
-      final result = await controller.syncAiGatewayCatalog(
-        draft,
-        apiKeyOverride: apiKey,
-      );
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _aiGatewayTestState = result.syncState;
-        _aiGatewayTestMessage = result.syncState == 'ready'
-            ? 'Catalog synced · ${result.availableModels.length} model(s) ready'
-            : result.syncMessage;
-        _aiGatewayTestEndpoint = result.syncState == 'ready'
-            ? _previewAiGatewayEndpoint(draft.baseUrl)
-            : '';
-      });
-      messenger.showSnackBar(SnackBar(content: Text(result.syncMessage)));
-    } finally {
-      if (mounted) {
-        setState(() => _aiGatewaySyncing = false);
-      }
-    }
   }
 
   Future<void> _testAiGatewayConnection(
@@ -2239,30 +2328,6 @@ class _SettingsPageState extends State<SettingsPage> {
     return models
         .where((modelId) => modelId.toLowerCase().contains(query))
         .toList(growable: false);
-  }
-
-  String _previewAiGatewayEndpoint(String rawUrl) {
-    final trimmed = rawUrl.trim();
-    if (trimmed.isEmpty) {
-      return '';
-    }
-    final candidate = trimmed.contains('://') ? trimmed : 'https://$trimmed';
-    final uri = Uri.tryParse(candidate);
-    if (uri == null || uri.host.trim().isEmpty) {
-      return '';
-    }
-    final pathSegments = uri.pathSegments
-        .where((item) => item.isNotEmpty)
-        .toList(growable: true);
-    if (pathSegments.isEmpty) {
-      pathSegments.add('v1');
-    }
-    if (pathSegments.last != 'models') {
-      pathSegments.add('models');
-    }
-    return uri
-        .replace(pathSegments: pathSegments, query: null, fragment: null)
-        .toString();
   }
 
   Widget _buildSecureField({
@@ -2405,45 +2470,6 @@ class _SettingsPageState extends State<SettingsPage> {
     }
     _syncControllerValue(controller, _storedSecretMask);
     onStateChanged(const _SecretFieldUiState());
-  }
-
-  Future<void> _persistAiGatewayApiKeyIfNeeded(
-    AppController controller, {
-    required bool hasStoredValue,
-  }) {
-    return _persistSecureFieldIfNeeded(
-      controller: _aiGatewayApiKeyController,
-      hasStoredValue: hasStoredValue,
-      fieldState: _aiGatewayApiKeyState,
-      onStateChanged: (value) => setState(() => _aiGatewayApiKeyState = value),
-      onSubmitted: controller.settingsController.saveAiGatewayApiKey,
-    );
-  }
-
-  Future<void> _persistVaultTokenIfNeeded(
-    AppController controller, {
-    required bool hasStoredValue,
-  }) {
-    return _persistSecureFieldIfNeeded(
-      controller: _vaultTokenController,
-      hasStoredValue: hasStoredValue,
-      fieldState: _vaultTokenState,
-      onStateChanged: (value) => setState(() => _vaultTokenState = value),
-      onSubmitted: controller.settingsController.saveVaultToken,
-    );
-  }
-
-  Future<void> _persistOllamaApiKeyIfNeeded(
-    AppController controller, {
-    required bool hasStoredValue,
-  }) {
-    return _persistSecureFieldIfNeeded(
-      controller: _ollamaApiKeyController,
-      hasStoredValue: hasStoredValue,
-      fieldState: _ollamaApiKeyState,
-      onStateChanged: (value) => setState(() => _ollamaApiKeyState = value),
-      onSubmitted: controller.settingsController.saveOllamaCloudApiKey,
-    );
   }
 
   void _primeSecureFieldController(
@@ -3111,7 +3137,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-class _EditableField extends StatelessWidget {
+class _EditableField extends StatefulWidget {
   const _EditableField({
     required this.label,
     required this.value,
@@ -3123,14 +3149,47 @@ class _EditableField extends StatelessWidget {
   final ValueChanged<String> onSubmitted;
 
   @override
+  State<_EditableField> createState() => _EditableFieldState();
+}
+
+class _EditableFieldState extends State<_EditableField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value);
+  }
+
+  @override
+  void didUpdateWidget(covariant _EditableField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value == _controller.text) {
+      return;
+    }
+    _controller.value = _controller.value.copyWith(
+      text: widget.value,
+      selection: TextSelection.collapsed(offset: widget.value.length),
+      composing: TextRange.empty,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: TextFormField(
-        key: ValueKey('$label:$value'),
-        initialValue: value,
-        decoration: InputDecoration(labelText: label),
-        onFieldSubmitted: onSubmitted,
+        key: ValueKey('${widget.label}:${widget.value}'),
+        controller: _controller,
+        decoration: InputDecoration(labelText: widget.label),
+        onChanged: widget.onSubmitted,
+        onFieldSubmitted: widget.onSubmitted,
       ),
     );
   }
