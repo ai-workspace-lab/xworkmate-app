@@ -64,7 +64,6 @@ class _AssistantPageState extends State<AssistantPage> {
       <String, _AssistantTaskSeed>{};
   final Set<String> _archivedTaskKeys = <String>{};
   List<_ComposerAttachment> _attachments = const <_ComposerAttachment>[];
-  List<String> _selectedSkillKeys = const <String>[];
   String? _lastSubmittedPrompt;
   String? _lastSubmittedSessionKey;
   String? _lastAutoAgentLabel;
@@ -395,7 +394,8 @@ class _AssistantPageState extends State<AssistantPage> {
                 modelOptions: controller.assistantModelChoices,
                 attachments: _attachments,
                 availableSkills: _availableSkillOptions(controller),
-                selectedSkillKeys: _selectedSkillKeys,
+                discoveredSkills: _discoveredSkillOptions(controller),
+                selectedSkillKeys: _selectedSkillKeysFor(controller),
                 controller: controller,
                 onRemoveAttachment: (attachment) {
                   setState(() {
@@ -404,11 +404,36 @@ class _AssistantPageState extends State<AssistantPage> {
                         .toList(growable: false);
                   });
                 },
-                onToggleSkill: _toggleSelectedSkill,
+                onToggleSkill: (key) {
+                  unawaited(
+                    controller.toggleAssistantSkillForSession(
+                      controller.currentSessionKey,
+                      key,
+                    ),
+                  );
+                  _focusComposer();
+                },
+                onConfirmImportedSkills: (skillKeys) {
+                  unawaited(
+                    controller.confirmImportedSkillsForSession(
+                      controller.currentSessionKey,
+                      skillKeys,
+                    ),
+                  );
+                },
+                onDismissDiscoveredSkills: () {
+                  return controller.dismissDiscoveredSkillsForSession(
+                    controller.currentSessionKey,
+                  );
+                },
                 onThinkingChanged: (value) {
                   setState(() => _thinkingLabel = value);
                 },
-                onModelChanged: controller.selectAssistantModel,
+                onModelChanged: (modelId) =>
+                    controller.selectAssistantModelForSession(
+                      controller.currentSessionKey,
+                      modelId,
+                    ),
                 onOpenGateway: _showConnectDialog,
                 onOpenAiGatewaySettings: _openAiGatewaySettings,
                 onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
@@ -727,6 +752,12 @@ class _AssistantPageState extends State<AssistantPage> {
   }
 
   List<_ComposerSkillOption> _availableSkillOptions(AppController controller) {
+    if (controller.isAiGatewayOnlyMode) {
+      return controller
+          .assistantImportedSkillsForSession(controller.currentSessionKey)
+          .map(_skillOptionFromThreadSkill)
+          .toList(growable: false);
+    }
     final options = <_ComposerSkillOption>[];
     final seenKeys = <String>{};
 
@@ -748,28 +779,28 @@ class _AssistantPageState extends State<AssistantPage> {
     return options;
   }
 
+  List<_ComposerSkillOption> _discoveredSkillOptions(AppController controller) {
+    return controller
+        .assistantDiscoveredSkillsForSession(controller.currentSessionKey)
+        .map(_skillOptionFromThreadSkill)
+        .toList(growable: false);
+  }
+
+  List<String> _selectedSkillKeysFor(AppController controller) {
+    return controller.assistantSelectedSkillKeysForSession(
+      controller.currentSessionKey,
+    );
+  }
+
   List<String> _resolveSelectedSkillLabels(AppController controller) {
     final optionsByKey = <String, _ComposerSkillOption>{
       for (final option in _availableSkillOptions(controller))
         option.key: option,
     };
-    return _selectedSkillKeys
+    return _selectedSkillKeysFor(controller)
         .map((key) => optionsByKey[key]?.label)
         .whereType<String>()
         .toList(growable: false);
-  }
-
-  void _toggleSelectedSkill(String key) {
-    setState(() {
-      final selected = List<String>.from(_selectedSkillKeys);
-      if (selected.contains(key)) {
-        selected.remove(key);
-      } else {
-        selected.add(key);
-      }
-      _selectedSkillKeys = selected;
-    });
-    _focusComposer();
   }
 
   String _composePrompt({
@@ -859,7 +890,6 @@ class _AssistantPageState extends State<AssistantPage> {
         executionTarget: inheritedTarget,
         draft: true,
       );
-      _selectedSkillKeys = const <String>[];
     });
     widget.controller.initializeAssistantThreadContext(
       sessionKey,
@@ -1514,9 +1544,12 @@ class _AssistantLowerPane extends StatelessWidget {
     required this.modelOptions,
     required this.attachments,
     required this.availableSkills,
+    required this.discoveredSkills,
     required this.selectedSkillKeys,
     required this.onRemoveAttachment,
     required this.onToggleSkill,
+    required this.onConfirmImportedSkills,
+    required this.onDismissDiscoveredSkills,
     required this.onThinkingChanged,
     required this.onModelChanged,
     required this.onOpenGateway,
@@ -1534,9 +1567,12 @@ class _AssistantLowerPane extends StatelessWidget {
   final List<String> modelOptions;
   final List<_ComposerAttachment> attachments;
   final List<_ComposerSkillOption> availableSkills;
+  final List<_ComposerSkillOption> discoveredSkills;
   final List<String> selectedSkillKeys;
   final ValueChanged<_ComposerAttachment> onRemoveAttachment;
   final ValueChanged<String> onToggleSkill;
+  final ValueChanged<List<String>> onConfirmImportedSkills;
+  final Future<void> Function() onDismissDiscoveredSkills;
   final ValueChanged<String> onThinkingChanged;
   final Future<void> Function(String modelId) onModelChanged;
   final VoidCallback onOpenGateway;
@@ -1560,9 +1596,12 @@ class _AssistantLowerPane extends StatelessWidget {
           modelOptions: modelOptions,
           attachments: attachments,
           availableSkills: availableSkills,
+          discoveredSkills: discoveredSkills,
           selectedSkillKeys: selectedSkillKeys,
           onRemoveAttachment: onRemoveAttachment,
           onToggleSkill: onToggleSkill,
+          onConfirmImportedSkills: onConfirmImportedSkills,
+          onDismissDiscoveredSkills: onDismissDiscoveredSkills,
           onThinkingChanged: onThinkingChanged,
           onModelChanged: onModelChanged,
           onOpenGateway: onOpenGateway,
@@ -2332,9 +2371,12 @@ class _ComposerBar extends StatefulWidget {
     required this.modelOptions,
     required this.attachments,
     required this.availableSkills,
+    required this.discoveredSkills,
     required this.selectedSkillKeys,
     required this.onRemoveAttachment,
     required this.onToggleSkill,
+    required this.onConfirmImportedSkills,
+    required this.onDismissDiscoveredSkills,
     required this.onThinkingChanged,
     required this.onModelChanged,
     required this.onOpenGateway,
@@ -2352,9 +2394,12 @@ class _ComposerBar extends StatefulWidget {
   final List<String> modelOptions;
   final List<_ComposerAttachment> attachments;
   final List<_ComposerSkillOption> availableSkills;
+  final List<_ComposerSkillOption> discoveredSkills;
   final List<String> selectedSkillKeys;
   final ValueChanged<_ComposerAttachment> onRemoveAttachment;
   final ValueChanged<String> onToggleSkill;
+  final ValueChanged<List<String>> onConfirmImportedSkills;
+  final Future<void> Function() onDismissDiscoveredSkills;
   final ValueChanged<String> onThinkingChanged;
   final Future<void> Function(String modelId) onModelChanged;
   final VoidCallback onOpenGateway;
@@ -2413,6 +2458,7 @@ class _ComposerBarState extends State<_ComposerBar> {
     final selectedSkills = widget.availableSkills
         .where((skill) => widget.selectedSkillKeys.contains(skill.key))
         .toList(growable: false);
+    final discoveredCount = widget.discoveredSkills.length;
     final submitLabel = connected
         ? appText('提交', 'Submit')
         : aiGatewayOnly
@@ -2634,6 +2680,23 @@ class _ComposerBarState extends State<_ComposerBar> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (aiGatewayOnly && discoveredCount > 0) ...[
+                        InkWell(
+                          key: const Key('assistant-discovered-skills-button'),
+                          borderRadius: BorderRadius.circular(AppRadius.chip),
+                          onTap: () => _showDiscoveredSkillsDialog(context),
+                          child: _ComposerToolbarChip(
+                            icon: Icons.download_done_rounded,
+                            label: appText(
+                              '候选技能 $discoveredCount',
+                              'Candidates $discoveredCount',
+                            ),
+                            showChevron: true,
+                            maxLabelWidth: 148,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
                       InkWell(
                         key: const Key('assistant-skill-picker-button'),
                         borderRadius: BorderRadius.circular(AppRadius.chip),
@@ -2893,6 +2956,164 @@ class _ComposerBarState extends State<_ComposerBar> {
                                   );
                                 },
                               ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    searchController.dispose();
+  }
+
+  Future<void> _showDiscoveredSkillsDialog(BuildContext context) async {
+    final searchController = TextEditingController();
+    final selectedKeys = <String>{};
+    String query = '';
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final filteredSkills = widget.discoveredSkills
+                .where((skill) {
+                  if (query.trim().isEmpty) {
+                    return true;
+                  }
+                  final haystack =
+                      '${skill.label}\n${skill.description}\n${skill.sourceLabel}'
+                          .toLowerCase();
+                  return haystack.contains(query.trim().toLowerCase());
+                })
+                .toList(growable: false);
+            return Dialog(
+              key: const Key('assistant-discovered-skills-dialog'),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 32,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 620,
+                  maxHeight: 560,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        appText('确认导入技能', 'Confirm Skill Import'),
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        key: const Key('assistant-discovered-skills-search'),
+                        controller: searchController,
+                        autofocus: true,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            query = value;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          hintText: appText(
+                            '搜索候选技能',
+                            'Search discovered skills',
+                          ),
+                          prefixIcon: const Icon(Icons.search_rounded),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: filteredSkills.isEmpty
+                            ? Center(
+                                child: Text(
+                                  appText(
+                                    '没有匹配的候选技能。',
+                                    'No matching discovered skills.',
+                                  ),
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: context.palette.textSecondary,
+                                      ),
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: filteredSkills.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(height: 8),
+                                itemBuilder: (context, index) {
+                                  final skill = filteredSkills[index];
+                                  final selected = selectedKeys.contains(
+                                    skill.key,
+                                  );
+                                  return CheckboxListTile(
+                                    key: ValueKey<String>(
+                                      'assistant-discovered-skill-${skill.key}',
+                                    ),
+                                    value: selected,
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
+                                    title: Text(skill.label),
+                                    subtitle: Text(
+                                      skill.description.trim().isEmpty
+                                          ? skill.sourceLabel
+                                          : '${skill.description}\n${skill.sourceLabel}',
+                                    ),
+                                    onChanged: (_) {
+                                      setDialogState(() {
+                                        if (selected) {
+                                          selectedKeys.remove(skill.key);
+                                        } else {
+                                          selectedKeys.add(skill.key);
+                                        }
+                                      });
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            key: const Key(
+                              'assistant-discovered-skills-dismiss',
+                            ),
+                            onPressed: () async {
+                              await widget.onDismissDiscoveredSkills();
+                              if (dialogContext.mounted) {
+                                Navigator.of(dialogContext).pop();
+                              }
+                            },
+                            child: Text(appText('忽略本次', 'Dismiss')),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton(
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            child: Text(appText('取消', 'Cancel')),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton(
+                            key: const Key(
+                              'assistant-discovered-skills-confirm',
+                            ),
+                            onPressed: selectedKeys.isEmpty
+                                ? null
+                                : () {
+                                    widget.onConfirmImportedSkills(
+                                      selectedKeys.toList(growable: false),
+                                    );
+                                    Navigator.of(dialogContext).pop();
+                                  },
+                            child: Text(appText('导入所选', 'Import Selected')),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -4145,6 +4366,22 @@ _ComposerSkillOption _skillOptionFromGateway(GatewaySkillSummary skill) {
     description: description,
     sourceLabel: sourceLabel,
     icon: isWebSkill ? Icons.language_rounded : Icons.auto_awesome_rounded,
+  );
+}
+
+_ComposerSkillOption _skillOptionFromThreadSkill(
+  AssistantThreadSkillEntry skill,
+) {
+  return _ComposerSkillOption(
+    key: skill.key,
+    label: skill.label.trim().isEmpty ? skill.key : skill.label.trim(),
+    description: skill.description.trim().isEmpty
+        ? appText('已导入到当前线程的技能。', 'Skill imported into this thread.')
+        : skill.description.trim(),
+    sourceLabel: skill.sourceLabel.trim().isEmpty
+        ? skill.sourcePath
+        : skill.sourceLabel.trim(),
+    icon: Icons.auto_awesome_rounded,
   );
 }
 

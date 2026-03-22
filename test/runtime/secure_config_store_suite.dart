@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
@@ -231,6 +232,7 @@ void main() {
       final snapshot = SettingsSnapshot.defaults().copyWith(
         assistantArchivedTaskKeys: const <String>['main'],
         assistantCustomTaskTitles: const <String, String>{'main': '研发任务'},
+        assistantLastSessionKey: 'main',
       );
       const records = <AssistantThreadRecord>[
         AssistantThreadRecord(
@@ -239,6 +241,27 @@ void main() {
           archived: true,
           executionTarget: AssistantExecutionTarget.remote,
           messageViewMode: AssistantMessageViewMode.raw,
+          discoveredSkills: <AssistantThreadSkillEntry>[
+            AssistantThreadSkillEntry(
+              key: '/tmp/discovered-skill',
+              label: 'Discovered Skill',
+              description: 'candidate only',
+              sourcePath: '/tmp/discovered-skill',
+              sourceLabel: 'codex/discovered',
+            ),
+          ],
+          importedSkills: <AssistantThreadSkillEntry>[
+            AssistantThreadSkillEntry(
+              key: '/tmp/imported-skill',
+              label: 'Imported Skill',
+              description: 'confirmed import',
+              sourcePath: '/tmp/imported-skill',
+              sourceLabel: 'workbuddy/imported',
+            ),
+          ],
+          selectedSkillKeys: <String>['/tmp/imported-skill'],
+          assistantModelId: 'gpt-5.4-mini',
+          gatewayEntryState: 'ai-gateway-only',
           updatedAtMs: 1700000000000,
           messages: <GatewayChatMessage>[
             GatewayChatMessage(
@@ -276,6 +299,7 @@ void main() {
       expect(reloadedSnapshot.assistantArchivedTaskKeys, const <String>[
         'main',
       ]);
+      expect(reloadedSnapshot.assistantLastSessionKey, 'main');
       expect(reloadedSnapshot.assistantCustomTaskTitles['main'], '研发任务');
       expect(reloadedRecords, hasLength(1));
       expect(reloadedRecords.first.sessionKey, 'main');
@@ -289,8 +313,172 @@ void main() {
         reloadedRecords.first.messageViewMode,
         AssistantMessageViewMode.raw,
       );
+      expect(reloadedRecords.first.discoveredSkills, hasLength(1));
+      expect(reloadedRecords.first.importedSkills, hasLength(1));
+      expect(reloadedRecords.first.selectedSkillKeys, const <String>[
+        '/tmp/imported-skill',
+      ]);
+      expect(reloadedRecords.first.assistantModelId, 'gpt-5.4-mini');
+      expect(reloadedRecords.first.gatewayEntryState, 'ai-gateway-only');
       expect(reloadedRecords.first.messages, hasLength(2));
       expect(reloadedRecords.first.messages.last.text, '第一条回复');
+    },
+  );
+
+  test('SettingsSnapshot encodes and decodes assistantLastSessionKey', () {
+    final snapshot = SettingsSnapshot.defaults().copyWith(
+      assistantLastSessionKey: 'draft:session-1',
+    );
+
+    final decoded = SettingsSnapshot.fromJsonString(snapshot.toJsonString());
+
+    expect(decoded.assistantLastSessionKey, 'draft:session-1');
+  });
+
+  test(
+    'AssistantThreadRecord keeps compatibility with legacy json payloads',
+    () {
+      final decoded = AssistantThreadRecord.fromJson(<String, dynamic>{
+        'sessionKey': 'legacy-thread',
+        'messages': const <Object>[],
+        'updatedAtMs': 1700000000000,
+        'title': 'Legacy',
+        'archived': false,
+        'executionTarget': 'local',
+        'messageViewMode': 'rendered',
+      });
+
+      expect(decoded.discoveredSkills, isEmpty);
+      expect(decoded.importedSkills, isEmpty);
+      expect(decoded.selectedSkillKeys, isEmpty);
+      expect(decoded.assistantModelId, isEmpty);
+      expect(decoded.gatewayEntryState, isNull);
+    },
+  );
+
+  test(
+    'SecureConfigStore restores assistant state from backup when primary storage is missing',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-backup-restore-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final databasePath = '${tempDirectory.path}/settings.sqlite3';
+      final store = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final snapshot = SettingsSnapshot.defaults().copyWith(
+        accountUsername: 'backup-user',
+        assistantLastSessionKey: 'draft:backup-1',
+      );
+      const records = <AssistantThreadRecord>[
+        AssistantThreadRecord(
+          sessionKey: 'draft:backup-1',
+          title: '备份线程',
+          archived: false,
+          executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          updatedAtMs: 1700000000000,
+          messages: <GatewayChatMessage>[
+            GatewayChatMessage(
+              id: 'assistant-1',
+              role: 'assistant',
+              text: 'backup message',
+              timestampMs: 1700000001000,
+              toolCallId: null,
+              toolName: null,
+              stopReason: null,
+              pending: false,
+              error: false,
+            ),
+          ],
+        ),
+      ];
+
+      await store.saveSettingsSnapshot(snapshot);
+      await store.saveAssistantThreadRecords(records);
+
+      final database = sqlite.sqlite3.open(databasePath);
+      addTearDown(database.dispose);
+      database.execute('DELETE FROM config_entries');
+
+      final recoveredStore = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final recoveredSnapshot = await recoveredStore.loadSettingsSnapshot();
+      final recoveredRecords = await recoveredStore
+          .loadAssistantThreadRecords();
+
+      expect(recoveredSnapshot.accountUsername, 'backup-user');
+      expect(recoveredSnapshot.assistantLastSessionKey, 'draft:backup-1');
+      expect(recoveredRecords, hasLength(1));
+      expect(recoveredRecords.first.sessionKey, 'draft:backup-1');
+      expect(recoveredRecords.first.messages.single.text, 'backup message');
+    },
+  );
+
+  test(
+    'SecureConfigStore clears assistant local state without deleting secure refs',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-clear-local-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final databasePath = '${tempDirectory.path}/settings.sqlite3';
+      final store = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final snapshot = SettingsSnapshot.defaults().copyWith(
+        accountUsername: 'clear-me',
+        assistantLastSessionKey: 'draft:clear-1',
+      );
+      const records = <AssistantThreadRecord>[
+        AssistantThreadRecord(
+          sessionKey: 'draft:clear-1',
+          title: '清理线程',
+          archived: false,
+          executionTarget: AssistantExecutionTarget.local,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          updatedAtMs: 1700000000000,
+          messages: <GatewayChatMessage>[],
+        ),
+      ];
+
+      await store.saveSettingsSnapshot(snapshot);
+      await store.saveAssistantThreadRecords(records);
+      await store.saveGatewayToken('token-secret');
+
+      await store.clearAssistantLocalState();
+
+      final clearedSnapshot = await store.loadSettingsSnapshot();
+      final clearedRecords = await store.loadAssistantThreadRecords();
+
+      expect(
+        clearedSnapshot.accountUsername,
+        SettingsSnapshot.defaults().accountUsername,
+      );
+      expect(clearedSnapshot.assistantLastSessionKey, isEmpty);
+      expect(clearedRecords, isEmpty);
+      expect(await store.loadGatewayToken(), 'token-secret');
+      expect(
+        await File(
+          '${tempDirectory.path}/assistant-state-backup.json',
+        ).exists(),
+        isFalse,
+      );
     },
   );
 

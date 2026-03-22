@@ -14,16 +14,20 @@ Future<AppController> createTestController(
   WidgetTester tester, {
   DesktopPlatformService? desktopPlatformService,
   UiFeatureManifest? uiFeatureManifest,
+  List<String>? gatewayOnlySkillScanRoots,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
+  final testRoot =
+      '${Directory.systemTemp.path}/xworkmate-widget-tests-${DateTime.now().microsecondsSinceEpoch}';
   final controller = AppController(
     store: SecureConfigStore(
       enableSecureStorage: false,
-      fallbackDirectoryPathResolver: () async =>
-          '${Directory.systemTemp.path}/xworkmate-widget-tests',
+      databasePathResolver: () async => '$testRoot/settings.sqlite3',
+      fallbackDirectoryPathResolver: () async => testRoot,
     ),
     desktopPlatformService: desktopPlatformService,
     uiFeatureManifest: uiFeatureManifest,
+    gatewayOnlySkillScanRoots: gatewayOnlySkillScanRoots,
   );
   addTearDown(controller.dispose);
   await tester.pump(const Duration(milliseconds: 100));

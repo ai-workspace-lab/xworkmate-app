@@ -1419,6 +1419,40 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       const SizedBox(height: 16),
       SurfaceCard(
+        key: const ValueKey('assistant-local-state-card'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              appText('本地数据清理', 'Local Data Cleanup'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              appText(
+                '删除本机保存的 Assistant 任务线程会话、本地设置快照和恢复备份，不会删除已保存密钥，也不会触碰外部 Codex 全局目录。',
+                'Deletes locally saved Assistant threads, settings snapshots, and recovery backups. Stored secrets and the external Codex home stay untouched.',
+              ),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.tonalIcon(
+                key: const ValueKey('assistant-local-state-clear-button'),
+                onPressed: () =>
+                    _showClearAssistantLocalStateDialog(context, controller),
+                icon: const Icon(Icons.delete_forever_rounded),
+                label: Text(
+                  appText('清理任务线程与本地配置', 'Clear threads and local config'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
+      SurfaceCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2945,6 +2979,69 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Text(appText('确认', 'Confirm')),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showClearAssistantLocalStateDialog(
+    BuildContext context,
+    AppController controller,
+  ) {
+    var confirmed = false;
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(appText('清理本地数据', 'Clear Local Data')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                appText(
+                  '该操作会删除本机保存的 Assistant 任务线程会话、本地设置快照和恢复备份，且无法撤销。',
+                  'This deletes locally stored Assistant threads, settings snapshots, and recovery backups. This cannot be undone.',
+                ),
+              ),
+              const SizedBox(height: 12),
+              CheckboxListTile(
+                key: const ValueKey('assistant-local-state-clear-confirm'),
+                contentPadding: EdgeInsets.zero,
+                value: confirmed,
+                onChanged: (value) {
+                  setDialogState(() {
+                    confirmed = value ?? false;
+                  });
+                },
+                title: Text(
+                  appText(
+                    '我确认删除本机任务线程会话和本地配置',
+                    'I confirm deleting local threads and settings',
+                  ),
+                ),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(appText('取消', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: !confirmed
+                  ? null
+                  : () async {
+                      await controller.clearAssistantLocalState();
+                      if (!dialogContext.mounted) {
+                        return;
+                      }
+                      Navigator.of(dialogContext).pop();
+                    },
+              child: Text(appText('确认清理', 'Confirm Clear')),
+            ),
+          ],
+        ),
       ),
     );
   }

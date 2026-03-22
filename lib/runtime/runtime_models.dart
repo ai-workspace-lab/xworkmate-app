@@ -992,6 +992,7 @@ class SettingsSnapshot {
     required this.assistantNavigationDestinations,
     required this.assistantCustomTaskTitles,
     required this.assistantArchivedTaskKeys,
+    required this.assistantLastSessionKey,
   });
 
   final AppLanguage appLanguage;
@@ -1025,6 +1026,7 @@ class SettingsSnapshot {
   final List<WorkspaceDestination> assistantNavigationDestinations;
   final Map<String, String> assistantCustomTaskTitles;
   final List<String> assistantArchivedTaskKeys;
+  final String assistantLastSessionKey;
 
   factory SettingsSnapshot.defaults() {
     return SettingsSnapshot(
@@ -1059,6 +1061,7 @@ class SettingsSnapshot {
       assistantNavigationDestinations: kAssistantNavigationDestinationDefaults,
       assistantCustomTaskTitles: const <String, String>{},
       assistantArchivedTaskKeys: const <String>[],
+      assistantLastSessionKey: '',
     );
   }
 
@@ -1094,6 +1097,7 @@ class SettingsSnapshot {
     List<WorkspaceDestination>? assistantNavigationDestinations,
     Map<String, String>? assistantCustomTaskTitles,
     List<String>? assistantArchivedTaskKeys,
+    String? assistantLastSessionKey,
   }) {
     return SettingsSnapshot(
       appLanguage: appLanguage ?? this.appLanguage,
@@ -1134,6 +1138,8 @@ class SettingsSnapshot {
           assistantCustomTaskTitles ?? this.assistantCustomTaskTitles,
       assistantArchivedTaskKeys:
           assistantArchivedTaskKeys ?? this.assistantArchivedTaskKeys,
+      assistantLastSessionKey:
+          assistantLastSessionKey ?? this.assistantLastSessionKey,
     );
   }
 
@@ -1172,6 +1178,7 @@ class SettingsSnapshot {
           .toList(growable: false),
       'assistantCustomTaskTitles': assistantCustomTaskTitles,
       'assistantArchivedTaskKeys': assistantArchivedTaskKeys,
+      'assistantLastSessionKey': assistantLastSessionKey,
     };
   }
 
@@ -1299,6 +1306,7 @@ class SettingsSnapshot {
       assistantArchivedTaskKeys: normalizeTaskKeys(
         json['assistantArchivedTaskKeys'],
       ),
+      assistantLastSessionKey: json['assistantLastSessionKey'] as String? ?? '',
     );
   }
 
@@ -1686,6 +1694,58 @@ class GatewayChatMessage {
   }
 }
 
+class AssistantThreadSkillEntry {
+  const AssistantThreadSkillEntry({
+    required this.key,
+    required this.label,
+    required this.description,
+    required this.sourcePath,
+    required this.sourceLabel,
+  });
+
+  final String key;
+  final String label;
+  final String description;
+  final String sourcePath;
+  final String sourceLabel;
+
+  AssistantThreadSkillEntry copyWith({
+    String? key,
+    String? label,
+    String? description,
+    String? sourcePath,
+    String? sourceLabel,
+  }) {
+    return AssistantThreadSkillEntry(
+      key: key ?? this.key,
+      label: label ?? this.label,
+      description: description ?? this.description,
+      sourcePath: sourcePath ?? this.sourcePath,
+      sourceLabel: sourceLabel ?? this.sourceLabel,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'key': key,
+      'label': label,
+      'description': description,
+      'sourcePath': sourcePath,
+      'sourceLabel': sourceLabel,
+    };
+  }
+
+  factory AssistantThreadSkillEntry.fromJson(Map<String, dynamic> json) {
+    return AssistantThreadSkillEntry(
+      key: json['key']?.toString() ?? '',
+      label: json['label']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      sourcePath: json['sourcePath']?.toString() ?? '',
+      sourceLabel: json['sourceLabel']?.toString() ?? '',
+    );
+  }
+}
+
 class AssistantThreadRecord {
   const AssistantThreadRecord({
     required this.sessionKey,
@@ -1695,6 +1755,11 @@ class AssistantThreadRecord {
     required this.archived,
     required this.executionTarget,
     required this.messageViewMode,
+    this.discoveredSkills = const <AssistantThreadSkillEntry>[],
+    this.importedSkills = const <AssistantThreadSkillEntry>[],
+    this.selectedSkillKeys = const <String>[],
+    this.assistantModelId = '',
+    this.gatewayEntryState,
   });
 
   final String sessionKey;
@@ -1704,6 +1769,11 @@ class AssistantThreadRecord {
   final bool archived;
   final AssistantExecutionTarget? executionTarget;
   final AssistantMessageViewMode messageViewMode;
+  final List<AssistantThreadSkillEntry> discoveredSkills;
+  final List<AssistantThreadSkillEntry> importedSkills;
+  final List<String> selectedSkillKeys;
+  final String assistantModelId;
+  final String? gatewayEntryState;
 
   AssistantThreadRecord copyWith({
     String? sessionKey,
@@ -1714,6 +1784,12 @@ class AssistantThreadRecord {
     AssistantExecutionTarget? executionTarget,
     bool clearExecutionTarget = false,
     AssistantMessageViewMode? messageViewMode,
+    List<AssistantThreadSkillEntry>? discoveredSkills,
+    List<AssistantThreadSkillEntry>? importedSkills,
+    List<String>? selectedSkillKeys,
+    String? assistantModelId,
+    String? gatewayEntryState,
+    bool clearGatewayEntryState = false,
   }) {
     return AssistantThreadRecord(
       sessionKey: sessionKey ?? this.sessionKey,
@@ -1725,6 +1801,13 @@ class AssistantThreadRecord {
           ? null
           : (executionTarget ?? this.executionTarget),
       messageViewMode: messageViewMode ?? this.messageViewMode,
+      discoveredSkills: discoveredSkills ?? this.discoveredSkills,
+      importedSkills: importedSkills ?? this.importedSkills,
+      selectedSkillKeys: selectedSkillKeys ?? this.selectedSkillKeys,
+      assistantModelId: assistantModelId ?? this.assistantModelId,
+      gatewayEntryState: clearGatewayEntryState
+          ? null
+          : (gatewayEntryState ?? this.gatewayEntryState),
     );
   }
 
@@ -1737,6 +1820,15 @@ class AssistantThreadRecord {
       'archived': archived,
       'executionTarget': executionTarget?.name,
       'messageViewMode': messageViewMode.name,
+      'discoveredSkills': discoveredSkills
+          .map((item) => item.toJson())
+          .toList(growable: false),
+      'importedSkills': importedSkills
+          .map((item) => item.toJson())
+          .toList(growable: false),
+      'selectedSkillKeys': selectedSkillKeys,
+      'assistantModelId': assistantModelId,
+      'gatewayEntryState': gatewayEntryState,
     };
   }
 
@@ -1758,6 +1850,40 @@ class AssistantThreadRecord {
               )
               .toList(growable: false)
         : const <GatewayChatMessage>[];
+    List<AssistantThreadSkillEntry> normalizeSkillEntries(Object? value) {
+      if (value is! List) {
+        return const <AssistantThreadSkillEntry>[];
+      }
+      final entries = <AssistantThreadSkillEntry>[];
+      final seen = <String>{};
+      for (final item in value.whereType<Map>()) {
+        final entry = AssistantThreadSkillEntry.fromJson(
+          item.cast<String, dynamic>(),
+        );
+        final normalizedKey = entry.key.trim();
+        if (normalizedKey.isEmpty || !seen.add(normalizedKey)) {
+          continue;
+        }
+        entries.add(entry);
+      }
+      return entries;
+    }
+
+    List<String> normalizeSkillKeys(Object? value) {
+      if (value is! List) {
+        return const <String>[];
+      }
+      final keys = <String>[];
+      final seen = <String>{};
+      for (final item in value) {
+        final normalized = item?.toString().trim() ?? '';
+        if (normalized.isEmpty || !seen.add(normalized)) {
+          continue;
+        }
+        keys.add(normalized);
+      }
+      return keys;
+    }
 
     return AssistantThreadRecord(
       sessionKey: json['sessionKey']?.toString() ?? '',
@@ -1773,6 +1899,11 @@ class AssistantThreadRecord {
       messageViewMode: AssistantMessageViewModeCopy.fromJsonValue(
         json['messageViewMode']?.toString(),
       ),
+      discoveredSkills: normalizeSkillEntries(json['discoveredSkills']),
+      importedSkills: normalizeSkillEntries(json['importedSkills']),
+      selectedSkillKeys: normalizeSkillKeys(json['selectedSkillKeys']),
+      assistantModelId: json['assistantModelId']?.toString() ?? '',
+      gatewayEntryState: json['gatewayEntryState']?.toString(),
     );
   }
 }

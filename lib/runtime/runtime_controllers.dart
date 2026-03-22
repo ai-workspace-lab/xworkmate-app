@@ -45,6 +45,12 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> resetSnapshot(SettingsSnapshot snapshot) async {
+    _snapshot = snapshot;
+    await _reloadDerivedState();
+    notifyListeners();
+  }
+
   Future<void> saveGatewaySecrets({
     required String token,
     required String password,
