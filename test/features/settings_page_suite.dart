@@ -91,7 +91,7 @@ void main() {
     expect(controller.themeMode, ThemeMode.light);
   });
 
-  testWidgets('SettingsPage gateway tab exposes device pairing controls', (
+  testWidgets('SettingsPage integration tab exposes unified gateway controls', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
@@ -105,7 +105,12 @@ void main() {
     await tester.tap(find.text('集成'));
     await tester.pumpAndSettle();
 
-    expect(find.text('打开连接面板'), findsOneWidget);
+    expect(find.text('OpenClaw Gateway'), findsOneWidget);
+    expect(find.text('Vault Server'), findsOneWidget);
+    expect(find.byKey(const ValueKey('ai-gateway-url-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('gateway-test-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('gateway-save-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('gateway-apply-button')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('gateway-device-security-card')),
       findsOneWidget,

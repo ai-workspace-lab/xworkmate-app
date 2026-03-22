@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/features/assistant/assistant_page.dart';
+import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
@@ -311,7 +312,7 @@ void main() {
     );
   });
 
-  testWidgets('AssistantPage offline submit control opens gateway dialog', (
+  testWidgets('AssistantPage offline submit control opens gateway settings', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
@@ -324,7 +325,8 @@ void main() {
     await tester.tap(find.byTooltip('连接'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Gateway 访问'), findsOneWidget);
+    expect(controller.destination, WorkspaceDestination.settings);
+    expect(controller.settingsDetail, SettingsDetailPage.gatewayConnection);
   });
 
   testWidgets('AssistantPage keeps a minimal composer action menu', (
