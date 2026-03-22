@@ -261,7 +261,6 @@ class AppController extends ChangeNotifier {
       _aiGatewayApiKeyCache = await _store.loadAiGatewayApiKey();
       _relayTokenCache = await _store.loadRelayToken();
       _relayPasswordCache = await _store.loadRelayPassword();
-      _webSessionApiTokenCache = await _store.loadWebSessionApiToken();
       _webSessionClientId = await _store.loadOrCreateWebSessionClientId();
       final records = await _loadThreadRecords();
       for (final record in records) {
@@ -301,16 +300,6 @@ class AppController extends ChangeNotifier {
     final normalizedRemoteBaseUrl = RemoteWebSessionRepository.normalizeBaseUrl(
       trimmedRemoteBaseUrl,
     );
-    _settings = _settings.copyWith(
-      webSessionPersistence: _settings.webSessionPersistence.copyWith(
-        mode: mode,
-        remoteBaseUrl:
-            normalizedRemoteBaseUrl?.toString() ?? trimmedRemoteBaseUrl,
-      ),
-    );
-    _webSessionApiTokenCache = apiToken.trim();
-    await _store.saveWebSessionApiToken(_webSessionApiTokenCache);
-    await _persistSettings();
     if (mode == WebSessionPersistenceMode.remote &&
         trimmedRemoteBaseUrl.isNotEmpty &&
         normalizedRemoteBaseUrl == null) {
@@ -321,6 +310,15 @@ class AppController extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    _settings = _settings.copyWith(
+      webSessionPersistence: _settings.webSessionPersistence.copyWith(
+        mode: mode,
+        remoteBaseUrl:
+            normalizedRemoteBaseUrl?.toString() ?? trimmedRemoteBaseUrl,
+      ),
+    );
+    _webSessionApiTokenCache = apiToken.trim();
+    await _persistSettings();
     await _persistThreads();
     notifyListeners();
   }
@@ -752,7 +750,7 @@ class AppController extends ChangeNotifier {
         RemoteWebSessionRepository.normalizeBaseUrl(
           snapshot.webSessionPersistence.remoteBaseUrl,
         )?.toString() ??
-        snapshot.webSessionPersistence.remoteBaseUrl.trim();
+        '';
     return snapshot.copyWith(
       assistantExecutionTarget: target,
       gateway: snapshot.gateway.copyWith(
@@ -917,19 +915,11 @@ class AppController extends ChangeNotifier {
         await _browserSessionRepository.saveThreadRecords(remoteRecords);
         return remoteRecords;
       }
-      if (browserRecords.isNotEmpty) {
-        await remoteRepository.saveThreadRecords(browserRecords);
-        _sessionPersistenceStatusMessage = appText(
-          '远端 Session API 为空，已使用当前浏览器缓存完成初始化。',
-          'The remote session API was empty, so the current browser cache was used to seed it.',
-        );
-      } else {
-        _sessionPersistenceStatusMessage = appText(
-          '远端 Session API 已启用，当前还没有可恢复的会话。',
-          'The remote session API is active and there are no saved conversations yet.',
-        );
-      }
-      return browserRecords;
+      _sessionPersistenceStatusMessage = appText(
+        '远端 Session API 已启用，但当前为空；浏览器缓存不会自动导入远端。',
+        'The remote session API is active but empty, and the browser cache will not be imported automatically.',
+      );
+      return const <AssistantThreadRecord>[];
     } catch (error) {
       _sessionPersistenceStatusMessage = _sessionPersistenceErrorLabel(error);
       return browserRecords;

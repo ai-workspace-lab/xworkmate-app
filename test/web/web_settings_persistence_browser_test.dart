@@ -74,7 +74,8 @@ void main() {
     );
     expect(reloaded.storedAiGatewayApiKeyMask, isNotNull);
     expect(reloaded.storedRelayTokenMask, isNotNull);
-    expect(reloaded.storedWebSessionApiTokenMask, isNotNull);
+    expect(controller.storedWebSessionApiTokenMask, isNotNull);
+    expect(reloaded.storedWebSessionApiTokenMask, isNull);
     expect(remoteRecords, isNotEmpty);
     expect(reloaded.conversations, isNotEmpty);
 
@@ -97,12 +98,66 @@ void main() {
     expect(controller.usesRemoteSessionPersistence, isFalse);
     expect(controller.sessionPersistenceStatusMessage, contains('HTTPS'));
     expect(
-      controller.settings.webSessionPersistence.remoteBaseUrl,
-      'http://xworkmate.svc.plus/api/web-sessions',
+      controller.settings.webSessionPersistence.mode,
+      WebSessionPersistenceMode.browser,
     );
+    expect(controller.settings.webSessionPersistence.remoteBaseUrl, isEmpty);
+    expect(controller.storedWebSessionApiTokenMask, isNull);
 
     controller.dispose();
   });
+
+  test(
+    'empty remote session api does not import stale browser cache',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final store = WebStore();
+      final remoteRecords = <AssistantThreadRecord>[];
+
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          webSessionPersistence: const WebSessionPersistenceConfig(
+            mode: WebSessionPersistenceMode.remote,
+            remoteBaseUrl: 'https://xworkmate.svc.plus/api/web-sessions',
+          ),
+        ),
+      );
+      await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
+        AssistantThreadRecord(
+          sessionKey: 'direct:stale-browser-cache',
+          messages: const <GatewayChatMessage>[],
+          updatedAtMs: 1,
+          title: 'stale browser cache',
+          archived: false,
+          executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+          messageViewMode: AssistantMessageViewMode.rendered,
+        ),
+      ]);
+
+      final controller = AppController(
+        store: store,
+        remoteSessionRepositoryBuilder: (config, clientId, accessToken) =>
+            _MemoryRemoteSessionRepository(remoteRecords),
+      );
+      await _waitForReady(controller);
+
+      expect(remoteRecords, isEmpty);
+      expect(
+        controller.sessionPersistenceStatusMessage,
+        anyOf(
+          contains('不会自动导入远端'),
+          contains('will not be imported automatically'),
+        ),
+      );
+      expect(
+        controller.conversations.single.title,
+        isNot('stale browser cache'),
+      );
+
+      controller.dispose();
+    },
+  );
 }
 
 class _MemoryRemoteSessionRepository implements WebSessionRepository {
