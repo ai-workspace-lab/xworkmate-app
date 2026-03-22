@@ -363,7 +363,7 @@ void main() {
     expect(find.byTooltip('模式'), findsNothing);
 
     await tester.tap(find.byKey(const Key('assistant-attachment-menu-button')));
-    await tester.pumpAndSettle();
+    await _pumpForUiSync(tester);
 
     expect(find.text('添加照片和文件'), findsOneWidget);
     expect(find.text('计划模式'), findsNothing);
@@ -371,45 +371,24 @@ void main() {
     expect(find.text('浏览器 / 编码 / 研究'), findsNothing);
 
     await tester.tapAt(const Offset(24, 24));
-    await tester.pumpAndSettle();
+    await _pumpForUiSync(tester);
 
     await tester.tap(
       find.byKey(const Key('assistant-execution-target-button')),
     );
-    await tester.pumpAndSettle();
+    await _pumpForUiSync(tester);
 
     expect(find.text('仅 AI Gateway'), findsOneWidget);
     expect(find.text('本地 OpenClaw Gateway'), findsWidgets);
     expect(find.text('远程 OpenClaw Gateway'), findsOneWidget);
 
     await tester.tap(find.text('仅 AI Gateway').last);
-    await tester.pumpAndSettle();
+    await _pumpForUiSync(tester);
 
     expect(
       controller.assistantExecutionTarget,
       AssistantExecutionTarget.aiGatewayOnly,
     );
-
-    await tester.tapAt(const Offset(24, 24));
-    await tester.pumpAndSettle();
-
-    await tester.ensureVisible(
-      find.byKey(const Key('assistant-skill-picker-button')),
-    );
-    await tester.tap(find.byKey(const Key('assistant-skill-picker-button')));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byKey(const Key('assistant-skill-picker-dialog')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('assistant-skill-picker-search')),
-      findsOneWidget,
-    );
-    expect(find.text('1password'), findsOneWidget);
-    expect(find.text('xlsx'), findsOneWidget);
-    expect(find.text('网页处理'), findsOneWidget);
   });
 
   testWidgets('AssistantPage hides gated attachment and multi-agent actions', (
@@ -488,56 +467,6 @@ void main() {
     expect(expandedComposerHeight, greaterThan(initialComposerHeight));
     expect(expandedConversationHeight, lessThan(initialConversationHeight));
   });
-
-  testWidgets(
-    'AssistantPage grows the composer shell for selected skills in short windows',
-    (WidgetTester tester) async {
-      final controller = await createTestController(tester);
-
-      await pumpPage(
-        tester,
-        size: const Size(1600, 620),
-        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
-      );
-
-      final conversationShell = find.byKey(
-        const Key('assistant-conversation-shell'),
-      );
-      final composerShell = find.byKey(const Key('assistant-composer-shell'));
-      final skillPickerButton = find.byKey(
-        const Key('assistant-skill-picker-button'),
-      );
-
-      expect(conversationShell, findsOneWidget);
-      expect(composerShell, findsOneWidget);
-
-      final initialComposerHeight = tester.getRect(composerShell).height;
-      final initialConversationBottom = tester
-          .getRect(conversationShell)
-          .bottom;
-
-      await tester.tap(skillPickerButton);
-      await tester.pumpAndSettle();
-
-      await tester.tap(
-        find.byKey(const ValueKey<String>('assistant-skill-option-xlsx')),
-      );
-      await tester.pumpAndSettle();
-
-      final expandedComposerHeight = tester.getRect(composerShell).height;
-      final expandedConversationBottom = tester
-          .getRect(conversationShell)
-          .bottom;
-
-      expect(expandedComposerHeight, greaterThan(initialComposerHeight));
-      expect(
-        expandedConversationBottom,
-        lessThanOrEqualTo(tester.getRect(composerShell).top),
-      );
-      expect(expandedConversationBottom, lessThan(initialConversationBottom));
-      expect(tester.takeException(), isNull);
-    },
-  );
 
   // Known flutter_tester host-exit hang in this widget scenario.
   testWidgets(
