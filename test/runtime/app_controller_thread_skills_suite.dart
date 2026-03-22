@@ -11,7 +11,7 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   test(
-    'AppController keeps gateway-only discovered skills as candidates until confirmed',
+    'AppController auto-discovers gateway-only skills into the available list without selecting them',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -59,22 +59,6 @@ void main() {
         AssistantExecutionTarget.aiGatewayOnly,
       );
 
-      final discoveredBefore = controller.assistantDiscoveredSkillsForSession(
-        controller.currentSessionKey,
-      );
-      expect(discoveredBefore, hasLength(2));
-      expect(
-        controller.assistantImportedSkillsForSession(
-          controller.currentSessionKey,
-        ),
-        isEmpty,
-      );
-
-      await controller.confirmImportedSkillsForSession(
-        controller.currentSessionKey,
-        discoveredBefore.map((item) => item.key).toList(growable: false),
-      );
-
       expect(
         controller.assistantDiscoveredSkillsForSession(
           controller.currentSessionKey,
@@ -87,11 +71,12 @@ void main() {
         ),
         hasLength(2),
       );
+
       expect(
         controller.assistantSelectedSkillKeysForSession(
           controller.currentSessionKey,
         ),
-        hasLength(2),
+        isEmpty,
       );
     },
   );
@@ -134,12 +119,16 @@ void main() {
         AssistantExecutionTarget.aiGatewayOnly,
       );
       final firstSessionKey = controller.currentSessionKey;
-      final discovered = controller.assistantDiscoveredSkillsForSession(
-        firstSessionKey,
+      expect(
+        controller.assistantImportedSkillsForSession(firstSessionKey),
+        hasLength(1),
       );
-      await controller.confirmImportedSkillsForSession(
+      await controller.toggleAssistantSkillForSession(
         firstSessionKey,
-        <String>[discovered.single.key],
+        controller
+            .assistantImportedSkillsForSession(firstSessionKey)
+            .single
+            .key,
       );
       await controller.selectAssistantModelForSession(
         firstSessionKey,
@@ -162,7 +151,7 @@ void main() {
         controller.assistantImportedSkillsForSession(
           controller.currentSessionKey,
         ),
-        isEmpty,
+        hasLength(1),
       );
       expect(
         controller.assistantSelectedSkillKeysForSession(
