@@ -75,12 +75,12 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
       'Browse and install skill packages, agent templates and connectors.',
     ),
     WorkspaceDestination.secrets => appText(
-      'Vault 密码保险箱，安全存储密钥、凭证与审计信息。',
-      'Vault password safe for secure storage of keys, credentials and audit data.',
+      '密钥与 Vault 配置统一收口到设置中心。',
+      'Secrets and Vault configuration now live in the Settings center.',
     ),
     WorkspaceDestination.aiGateway => appText(
-      'AI Gateway 代理与模型网关配置管理。',
-      'AI Gateway proxy and model gateway configuration.',
+      'AI Gateway 配置统一收口到设置中心。',
+      'AI Gateway configuration now lives in the Settings center.',
     ),
     WorkspaceDestination.settings => appText(
       '全局配置中心，只负责系统设置与诊断，不承担业务模块入口。',

@@ -286,10 +286,10 @@ void main() {
     controller.openSettings(
       detail: SettingsDetailPage.gatewayConnection,
       navigationContext: SettingsNavigationContext(
-        rootLabel: '模块',
-        destination: WorkspaceDestination.nodes,
-        sectionLabel: ModulesTab.gateway.label,
-        modulesTab: ModulesTab.gateway,
+        rootLabel: '设置',
+        destination: WorkspaceDestination.settings,
+        sectionLabel: SettingsTab.gateway.label,
+        settingsTab: SettingsTab.gateway,
       ),
     );
 

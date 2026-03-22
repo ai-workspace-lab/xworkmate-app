@@ -5,7 +5,6 @@ import '../../app/workspace_navigation.dart';
 import '../../app/app_metadata.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
-import '../../runtime/runtime_controllers.dart';
 import '../../runtime/runtime_models.dart';
 import '../../widgets/metric_card.dart';
 import '../../widgets/section_header.dart';
@@ -33,16 +32,22 @@ class ModulesPage extends StatefulWidget {
 class _ModulesPageState extends State<ModulesPage> {
   late ModulesTab _tab;
 
+  ModulesTab _normalizeTab(ModulesTab tab) {
+    return tab == ModulesTab.gateway ? ModulesTab.nodes : tab;
+  }
+
   @override
   void initState() {
     super.initState();
-    _tab = widget.initialTab ?? widget.controller.modulesTab;
+    _tab = _normalizeTab(widget.initialTab ?? widget.controller.modulesTab);
   }
 
   @override
   void didUpdateWidget(covariant ModulesPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final nextTab = widget.initialTab ?? widget.controller.modulesTab;
+    final nextTab = _normalizeTab(
+      widget.initialTab ?? widget.controller.modulesTab,
+    );
     if (nextTab != _tab) {
       setState(() => _tab = nextTab);
     }
@@ -92,8 +97,8 @@ class _ModulesPageState extends State<ModulesPage> {
                 ),
                 title: appText('模块', 'Modules'),
                 subtitle: appText(
-                  '管理 Gateway、代理、节点、技能和平台服务。',
-                  'Manage gateway, agents, nodes, skills, and platform services.',
+                  '管理代理、节点、技能和平台服务。',
+                  'Manage agents, nodes, skills, and platform services.',
                 ),
                 trailing: Wrap(
                   spacing: 12,
@@ -126,17 +131,21 @@ class _ModulesPageState extends State<ModulesPage> {
                       icon: const Icon(Icons.refresh_rounded),
                     ),
                     FilledButton.tonalIcon(
-                      onPressed: () =>
-                          controller.openSettings(tab: SettingsTab.gateway),
+                      onPressed: () => controller.openSettings(
+                        tab: SettingsTab.gateway,
+                      ),
                       icon: const Icon(Icons.add_rounded),
-                      label: Text(appText('接入模块', 'Add Module')),
+                      label: Text(appText('打开设置中心', 'Open Settings')),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
               SectionTabs(
-                items: ModulesTab.values.map((item) => item.label).toList(),
+                items: ModulesTab.values
+                    .where((item) => item != ModulesTab.gateway)
+                    .map((item) => item.label)
+                    .toList(),
                 value: _tab.label,
                 onChanged: (value) => setState(() {
                   _tab = ModulesTab.values.firstWhere(
@@ -169,10 +178,6 @@ class _ModulesPageState extends State<ModulesPage> {
               ),
               const SizedBox(height: 28),
               switch (_tab) {
-                ModulesTab.gateway => _GatewayPanel(
-                  controller: controller,
-                  onOpenDetail: widget.onOpenDetail,
-                ),
                 ModulesTab.nodes => _NodesPanel(
                   controller: controller,
                   onOpenDetail: widget.onOpenDetail,
@@ -193,212 +198,15 @@ class _ModulesPageState extends State<ModulesPage> {
                   controller: controller,
                   onOpenDetail: widget.onOpenDetail,
                 ),
+                ModulesTab.gateway => _NodesPanel(
+                  controller: controller,
+                  onOpenDetail: widget.onOpenDetail,
+                ),
               },
             ],
           ),
         );
       },
-    );
-  }
-}
-
-SettingsNavigationContext _modulesNavigationContext(ModulesTab tab) {
-  return SettingsNavigationContext(
-    rootLabel: appText('模块', 'Modules'),
-    destination: WorkspaceDestination.nodes,
-    sectionLabel: tab.label,
-    modulesTab: tab,
-  );
-}
-
-SettingsDetailPage _modulesDetailForTab(ModulesTab tab) {
-  return switch (tab) {
-    ModulesTab.agents => SettingsDetailPage.externalAgents,
-    _ => SettingsDetailPage.gatewayConnection,
-  };
-}
-
-class _GatewayPanel extends StatelessWidget {
-  const _GatewayPanel({required this.controller, required this.onOpenDetail});
-
-  final AppController controller;
-  final ValueChanged<DetailPanelData> onOpenDetail;
-
-  @override
-  Widget build(BuildContext context) {
-    final connection = controller.connection;
-    final metrics = [
-      MetricSummary(
-        label: appText('模式', 'Mode'),
-        value: controller.settings.gateway.mode.label,
-        caption: controller.settings.gateway.useSetupCode
-            ? appText('配置码', 'Setup code')
-            : appText('手动配置', 'Manual profile'),
-        icon: Icons.link_rounded,
-      ),
-      MetricSummary(
-        label: appText('活跃会话', 'Active Sessions'),
-        value: '${controller.sessions.length}',
-        caption: appText(
-          '当前 Key ${controller.currentSessionKey}',
-          'Current key ${controller.currentSessionKey}',
-        ),
-        icon: Icons.chat_bubble_outline_rounded,
-      ),
-      MetricSummary(
-        label: appText('今日运行', 'Today Runs'),
-        value:
-            '${controller.tasksController.running.length + controller.tasksController.history.length}',
-        caption: appText('根据实时会话活动计算', 'Derived from live session activity'),
-        icon: Icons.bolt_rounded,
-      ),
-      MetricSummary(
-        label: appText('技能', 'Skills'),
-        value: '${controller.skills.length}',
-        caption: appText('来自网关加载', 'Loaded from gateway'),
-        icon: Icons.extension_rounded,
-      ),
-    ];
-
-    final statusPayload = connection.statusPayload ?? const <String, dynamic>{};
-    final healthPayload = connection.healthPayload ?? const <String, dynamic>{};
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth > 1180
-                ? (constraints.maxWidth - 48) / 4
-                : constraints.maxWidth > 860
-                ? (constraints.maxWidth - 16) / 2
-                : constraints.maxWidth;
-            return Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              children: metrics
-                  .map(
-                    (metric) => SizedBox(
-                      width: width,
-                      child: MetricCard(metric: metric),
-                    ),
-                  )
-                  .toList(),
-            );
-          },
-        ),
-        const SizedBox(height: 20),
-        SurfaceCard(
-          onTap: () => onOpenDetail(
-            DetailPanelData(
-              title: appText('网关概览', 'Gateway Overview'),
-              subtitle: appText('运行时', 'Runtime'),
-              icon: Icons.wifi_tethering_rounded,
-              status: _connectionStatus(connection.status),
-              description: appText(
-                '与 macOS 工作台保持一致的实时 Gateway 控制面摘要。',
-                'Live gateway control plane summary aligned with the macOS workspace shell.',
-              ),
-              meta: [
-                connection.remoteAddress ?? appText('未连接目标', 'No target'),
-                controller.activeAgentName,
-              ],
-              actions: [
-                appText('刷新', 'Refresh'),
-                appText('打开设置', 'Open Settings'),
-              ],
-              sections: [
-                DetailSection(
-                  title: appText('连接', 'Connection'),
-                  items: [
-                    DetailItem(
-                      label: appText('状态', 'Status'),
-                      value: connection.status.label,
-                    ),
-                    DetailItem(
-                      label: appText('地址', 'Address'),
-                      value:
-                          connection.remoteAddress ?? appText('离线', 'Offline'),
-                    ),
-                    DetailItem(
-                      label: appText('模式', 'Mode'),
-                      value: controller.settings.gateway.mode.label,
-                    ),
-                    DetailItem(
-                      label: appText('代理', 'Agent'),
-                      value: controller.activeAgentName,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                appText('网关', 'Gateway'),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '${connection.status.label} · ${connection.remoteAddress ?? appText('未连接目标', 'No target')} · ${controller.activeAgentName}',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  OutlinedButton(
-                    onPressed: controller.refreshGatewayHealth,
-                    child: Text(appText('刷新状态', 'Refresh status')),
-                  ),
-                  OutlinedButton(
-                    onPressed: controller.refreshSessions,
-                    child: Text(appText('刷新会话', 'Refresh sessions')),
-                  ),
-                  OutlinedButton(
-                    onPressed: () => controller.openSettings(
-                      detail: _modulesDetailForTab(ModulesTab.gateway),
-                      navigationContext: _modulesNavigationContext(
-                        ModulesTab.gateway,
-                      ),
-                    ),
-                    child: Text(appText('编辑设置', 'Edit settings')),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        SurfaceCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                appText('状态摘要', 'Status Summary'),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 14),
-              _KeyValueLine(
-                label: 'Health',
-                value: healthPayload.isEmpty
-                    ? appText('不可用', 'Unavailable')
-                    : encodePrettyJson(healthPayload),
-              ),
-              const SizedBox(height: 12),
-              _KeyValueLine(
-                label: 'Status',
-                value: statusPayload.isEmpty
-                    ? appText('不可用', 'Unavailable')
-                    : encodePrettyJson(statusPayload),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -990,33 +798,6 @@ StatusInfo _connectorStatus(GatewayConnectorSummary connector) {
     ),
     _ => StatusInfo(appText('空闲', 'Idle'), StatusTone.neutral),
   };
-}
-
-class _KeyValueLine extends StatelessWidget {
-  const _KeyValueLine({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 90,
-          child: Text(label, style: Theme.of(context).textTheme.labelLarge),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: SelectableText(
-            value,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 StatusInfo _connectionStatus(RuntimeConnectionStatus status) =>
