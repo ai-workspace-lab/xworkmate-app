@@ -341,8 +341,11 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
                 decoration: InputDecoration(
                   labelText: appText('Session API Token', 'Session API token'),
                   helperText: controller.storedWebSessionApiTokenMask == null
-                      ? null
-                      : '${appText('已保存', 'Stored')}: ${controller.storedWebSessionApiTokenMask}',
+                      ? appText(
+                          '只保留在当前浏览器会话内存中；刷新页面后需要重新输入。',
+                          'Kept only in the current browser session memory; re-enter it after reload.',
+                        )
+                      : '${appText('当前会话', 'This session')}: ${controller.storedWebSessionApiTokenMask} · ${appText('刷新后需重新输入', 'Re-enter after reload')}',
                 ),
               ),
             ],
