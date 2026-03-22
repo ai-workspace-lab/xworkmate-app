@@ -375,26 +375,65 @@ class AppController extends ChangeNotifier {
     return model.isEmpty ? appText('AI Gateway', 'AI Gateway') : model;
   }
 
-  String get assistantConnectionStatusLabel => isAiGatewayOnlyMode
-      ? appText('仅 AI Gateway', 'AI Gateway Only')
-      : connection.status.label;
+  AssistantThreadConnectionState get currentAssistantConnectionState =>
+      assistantConnectionStateForSession(currentSessionKey);
+
+  AssistantThreadConnectionState assistantConnectionStateForSession(
+    String sessionKey,
+  ) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final target = assistantExecutionTargetForSession(normalizedSessionKey);
+    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+      final model = assistantModelForSession(normalizedSessionKey);
+      final host = _aiGatewayHostLabel(settings.aiGateway.baseUrl);
+      final detail = _joinConnectionParts(<String>[model, host]);
+      return AssistantThreadConnectionState(
+        executionTarget: target,
+        status: canUseAiGatewayConversation
+            ? RuntimeConnectionStatus.connected
+            : RuntimeConnectionStatus.offline,
+        primaryLabel: target.label,
+        detailLabel: detail.isEmpty
+            ? appText('AI Gateway 未配置', 'AI Gateway not configured')
+            : detail,
+        ready: canUseAiGatewayConversation,
+        pairingRequired: false,
+        gatewayTokenMissing: false,
+        lastError: null,
+      );
+    }
+
+    final expectedMode = target == AssistantExecutionTarget.local
+        ? RuntimeConnectionMode.local
+        : RuntimeConnectionMode.remote;
+    final matchesTarget = connection.mode == expectedMode;
+    final fallbackProfile = _gatewayProfileForAssistantExecutionTarget(target);
+    final fallbackAddress = _gatewayAddressLabel(fallbackProfile);
+    final detail = matchesTarget
+        ? (connection.remoteAddress?.trim().isNotEmpty == true
+              ? connection.remoteAddress!.trim()
+              : fallbackAddress)
+        : fallbackAddress;
+    final status = matchesTarget
+        ? connection.status
+        : RuntimeConnectionStatus.offline;
+    return AssistantThreadConnectionState(
+      executionTarget: target,
+      status: status,
+      primaryLabel: status.label,
+      detailLabel: detail,
+      ready: status == RuntimeConnectionStatus.connected,
+      pairingRequired: matchesTarget && connection.pairingRequired,
+      gatewayTokenMissing: matchesTarget && connection.gatewayTokenMissing,
+      lastError: matchesTarget ? connection.lastError?.trim() : null,
+    );
+  }
+
+  String get assistantConnectionStatusLabel =>
+      currentAssistantConnectionState.primaryLabel;
 
   String get assistantConnectionTargetLabel {
-    if (!isAiGatewayOnlyMode) {
-      return connection.remoteAddress ?? appText('未连接目标', 'No target');
-    }
-    final model = resolvedAssistantModel;
-    final host = _aiGatewayHostLabel(settings.aiGateway.baseUrl);
-    if (model.isNotEmpty && host.isNotEmpty) {
-      return '$model · $host';
-    }
-    if (model.isNotEmpty) {
-      return model;
-    }
-    if (host.isNotEmpty) {
-      return host;
-    }
-    return appText('AI Gateway 未配置', 'AI Gateway not configured');
+    return currentAssistantConnectionState.detailLabel;
   }
 
   Future<String> loadAiGatewayApiKey() async {
@@ -662,6 +701,22 @@ class AppController extends ChangeNotifier {
         profile.port != defaults.port ||
         profile.tls != defaults.tls ||
         profile.mode != defaults.mode;
+  }
+
+  String _joinConnectionParts(List<String> parts) {
+    final normalized = parts
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+    return normalized.join(' · ');
+  }
+
+  String _gatewayAddressLabel(GatewayConnectionProfile profile) {
+    final host = profile.host.trim();
+    if (host.isEmpty || profile.port <= 0) {
+      return appText('未连接目标', 'No target');
+    }
+    return '$host:${profile.port}';
   }
 
   List<SecretReferenceEntry> get secretReferences =>

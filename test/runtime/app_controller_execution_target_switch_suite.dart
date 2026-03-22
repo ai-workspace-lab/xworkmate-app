@@ -20,6 +20,7 @@ class _FakeGatewayRuntime extends GatewayRuntime {
 
   final List<GatewayConnectionProfile> connectedProfiles =
       <GatewayConnectionProfile>[];
+  final Set<RuntimeConnectionMode> _failingModes = <RuntimeConnectionMode>{};
   int disconnectCount = 0;
   GatewayConnectionSnapshot _snapshot = GatewayConnectionSnapshot.initial();
 
@@ -39,6 +40,17 @@ class _FakeGatewayRuntime extends GatewayRuntime {
     String authPasswordOverride = '',
   }) async {
     connectedProfiles.add(profile);
+    if (_failingModes.remove(profile.mode)) {
+      _snapshot = GatewayConnectionSnapshot.initial(mode: profile.mode)
+          .copyWith(
+            status: RuntimeConnectionStatus.error,
+            statusText: 'Error',
+            remoteAddress: '${profile.host}:${profile.port}',
+            lastError: 'Failed to connect ${profile.mode.name}',
+          );
+      notifyListeners();
+      throw StateError('Failed to connect ${profile.mode.name}');
+    }
     _snapshot = GatewayConnectionSnapshot.initial(mode: profile.mode).copyWith(
       status: RuntimeConnectionStatus.connected,
       statusText: 'Connected',
@@ -98,6 +110,10 @@ class _FakeGatewayRuntime extends GatewayRuntime {
       default:
         return <String, dynamic>{};
     }
+  }
+
+  void failNextConnect(RuntimeConnectionMode mode) {
+    _failingModes.add(mode);
   }
 }
 
@@ -349,6 +365,96 @@ void main() {
       expect(
         controller.settings.assistantExecutionTarget,
         AssistantExecutionTarget.local,
+      );
+    },
+  );
+
+  test(
+    'AppController keeps the thread connection chip aligned with the selected target',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-connection-chip-',
+      );
+      addTearDown(() async {
+        await _deleteDirectoryWithRetry(tempDirectory);
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final gateway = _FakeGatewayRuntime(store: store);
+      final controller = AppController(
+        store: store,
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: gateway,
+          codex: _FakeCodexRuntime(),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      await controller.saveSettings(
+        controller.settings.copyWith(
+          aiGateway: controller.settings.aiGateway.copyWith(
+            baseUrl: 'http://127.0.0.1:11434/v1',
+            availableModels: const <String>['qwen2.5-coder:latest'],
+            selectedModels: const <String>['qwen2.5-coder:latest'],
+          ),
+          defaultModel: 'qwen2.5-coder:latest',
+          gateway: controller.settings.gateway.copyWith(
+            mode: RuntimeConnectionMode.remote,
+            host: 'gateway.example.com',
+            port: 9443,
+            tls: true,
+          ),
+        ),
+        refreshAfterSave: false,
+      );
+
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.remote,
+      );
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.local,
+      );
+      expect(controller.assistantConnectionStatusLabel, '已连接');
+      expect(controller.assistantConnectionTargetLabel, '127.0.0.1:18789');
+
+      controller.initializeAssistantThreadContext(
+        'remote-thread',
+        executionTarget: AssistantExecutionTarget.remote,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      gateway.failNextConnect(RuntimeConnectionMode.remote);
+
+      await controller.switchSession('remote-thread');
+
+      expect(
+        controller.assistantExecutionTarget,
+        AssistantExecutionTarget.remote,
+      );
+      expect(controller.assistantConnectionStatusLabel, '错误');
+      expect(
+        controller.assistantConnectionTargetLabel,
+        'gateway.example.com:9443',
+      );
+      expect(
+        controller.currentAssistantConnectionState.lastError,
+        'Failed to connect remote',
+      );
+
+      controller.initializeAssistantThreadContext(
+        'main',
+        executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+      );
+      await controller.switchSession('main');
+
+      expect(controller.assistantConnectionStatusLabel, '仅 AI Gateway');
+      expect(
+        controller.assistantConnectionTargetLabel,
+        'qwen2.5-coder:latest · 127.0.0.1:11434',
       );
     },
   );
