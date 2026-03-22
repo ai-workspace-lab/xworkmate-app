@@ -536,11 +536,39 @@ class GatewayConnectionProfile {
   final String selectedAgentId;
 
   factory GatewayConnectionProfile.defaults() {
+    return GatewayConnectionProfile.defaultsRemote();
+  }
+
+  factory GatewayConnectionProfile.defaultsLocal() {
+    return const GatewayConnectionProfile(
+      mode: RuntimeConnectionMode.local,
+      useSetupCode: false,
+      setupCode: '',
+      host: '127.0.0.1',
+      port: 18789,
+      tls: false,
+      selectedAgentId: '',
+    );
+  }
+
+  factory GatewayConnectionProfile.defaultsRemote() {
     return const GatewayConnectionProfile(
       mode: RuntimeConnectionMode.remote,
       useSetupCode: false,
       setupCode: '',
       host: 'openclaw.svc.plus',
+      port: 443,
+      tls: true,
+      selectedAgentId: '',
+    );
+  }
+
+  factory GatewayConnectionProfile.emptySlot({required int index}) {
+    return const GatewayConnectionProfile(
+      mode: RuntimeConnectionMode.unconfigured,
+      useSetupCode: false,
+      setupCode: '',
+      host: '',
       port: 443,
       tls: true,
       selectedAgentId: '',
@@ -601,6 +629,96 @@ class GatewayConnectionProfile {
       selectedAgentId: json['selectedAgentId'] as String? ?? '',
     );
   }
+}
+
+const int kGatewayProfileListLength = 5;
+const int kGatewayLocalProfileIndex = 0;
+const int kGatewayRemoteProfileIndex = 1;
+const int kGatewayCustomProfileStartIndex = 2;
+
+List<GatewayConnectionProfile> normalizeGatewayProfiles({
+  Iterable<GatewayConnectionProfile>? profiles,
+}) {
+  final defaults = List<GatewayConnectionProfile>.generate(
+    kGatewayProfileListLength,
+    (index) => switch (index) {
+      kGatewayLocalProfileIndex => GatewayConnectionProfile.defaultsLocal(),
+      kGatewayRemoteProfileIndex => GatewayConnectionProfile.defaultsRemote(),
+      _ => GatewayConnectionProfile.emptySlot(index: index),
+    },
+    growable: false,
+  );
+  final incoming =
+      profiles?.toList(growable: false) ?? const <GatewayConnectionProfile>[];
+  final normalized = <GatewayConnectionProfile>[];
+  for (var index = 0; index < kGatewayProfileListLength; index += 1) {
+    final fallback = defaults[index];
+    final current = index < incoming.length ? incoming[index] : fallback;
+    if (index == kGatewayLocalProfileIndex) {
+      normalized.add(
+        current.copyWith(
+          mode: RuntimeConnectionMode.local,
+          useSetupCode: false,
+          setupCode: '',
+          host: current.host.trim().isEmpty ? fallback.host : current.host,
+          port: current.port > 0 ? current.port : fallback.port,
+          tls: false,
+        ),
+      );
+      continue;
+    }
+    if (index == kGatewayRemoteProfileIndex) {
+      final useDefaultRemoteEndpoint =
+          current.host.trim().isEmpty || current.port <= 0;
+      normalized.add(
+        current.copyWith(
+          mode: RuntimeConnectionMode.remote,
+          host: useDefaultRemoteEndpoint ? fallback.host : current.host,
+          port: useDefaultRemoteEndpoint ? fallback.port : current.port,
+          tls: useDefaultRemoteEndpoint ? fallback.tls : current.tls,
+        ),
+      );
+      continue;
+    }
+    final slotMode = switch (current.mode) {
+      RuntimeConnectionMode.local => RuntimeConnectionMode.local,
+      RuntimeConnectionMode.remote => RuntimeConnectionMode.remote,
+      RuntimeConnectionMode.unconfigured =>
+        current.host.trim().isNotEmpty
+            ? RuntimeConnectionMode.remote
+            : RuntimeConnectionMode.unconfigured,
+    };
+    normalized.add(
+      current.copyWith(
+        mode: slotMode,
+        useSetupCode: slotMode == RuntimeConnectionMode.local
+            ? false
+            : current.useSetupCode,
+        setupCode: slotMode == RuntimeConnectionMode.local
+            ? ''
+            : current.setupCode,
+        port: current.port > 0
+            ? current.port
+            : slotMode == RuntimeConnectionMode.local
+            ? 18789
+            : 443,
+        tls: slotMode == RuntimeConnectionMode.local ? false : current.tls,
+      ),
+    );
+  }
+  return List<GatewayConnectionProfile>.unmodifiable(normalized);
+}
+
+List<GatewayConnectionProfile> replaceGatewayProfileAt(
+  List<GatewayConnectionProfile> profiles,
+  int index,
+  GatewayConnectionProfile profile,
+) {
+  final normalizedProfiles = normalizeGatewayProfiles(profiles: profiles);
+  final next = List<GatewayConnectionProfile>.from(normalizedProfiles);
+  final clampedIndex = index.clamp(0, kGatewayProfileListLength - 1);
+  next[clampedIndex] = profile;
+  return normalizeGatewayProfiles(profiles: next);
 }
 
 ({String host, int port, bool tls}) _normalizeGatewayManualEndpoint({
@@ -1002,7 +1120,7 @@ class SettingsSnapshot {
     required this.codexCliPath,
     required this.defaultModel,
     required this.defaultProvider,
-    required this.gateway,
+    required this.gatewayProfiles,
     required this.ollamaLocal,
     required this.ollamaCloud,
     required this.vault,
@@ -1036,7 +1154,7 @@ class SettingsSnapshot {
   final String codexCliPath;
   final String defaultModel;
   final String defaultProvider;
-  final GatewayConnectionProfile gateway;
+  final List<GatewayConnectionProfile> gatewayProfiles;
   final OllamaLocalConfig ollamaLocal;
   final OllamaCloudConfig ollamaCloud;
   final VaultConfig vault;
@@ -1071,7 +1189,7 @@ class SettingsSnapshot {
       codexCliPath: '',
       defaultModel: '',
       defaultProvider: 'gateway',
-      gateway: GatewayConnectionProfile.defaults(),
+      gatewayProfiles: normalizeGatewayProfiles(),
       ollamaLocal: OllamaLocalConfig.defaults(),
       ollamaCloud: OllamaCloudConfig.defaults(),
       vault: VaultConfig.defaults(),
@@ -1107,7 +1225,7 @@ class SettingsSnapshot {
     String? codexCliPath,
     String? defaultModel,
     String? defaultProvider,
-    GatewayConnectionProfile? gateway,
+    List<GatewayConnectionProfile>? gatewayProfiles,
     OllamaLocalConfig? ollamaLocal,
     OllamaCloudConfig? ollamaCloud,
     VaultConfig? vault,
@@ -1129,6 +1247,9 @@ class SettingsSnapshot {
     List<String>? assistantArchivedTaskKeys,
     String? assistantLastSessionKey,
   }) {
+    final resolvedGatewayProfiles = gatewayProfiles != null
+        ? normalizeGatewayProfiles(profiles: gatewayProfiles)
+        : this.gatewayProfiles;
     return SettingsSnapshot(
       appLanguage: appLanguage ?? this.appLanguage,
       appActive: appActive ?? this.appActive,
@@ -1141,7 +1262,7 @@ class SettingsSnapshot {
       codexCliPath: codexCliPath ?? this.codexCliPath,
       defaultModel: defaultModel ?? this.defaultModel,
       defaultProvider: defaultProvider ?? this.defaultProvider,
-      gateway: gateway ?? this.gateway,
+      gatewayProfiles: resolvedGatewayProfiles,
       ollamaLocal: ollamaLocal ?? this.ollamaLocal,
       ollamaCloud: ollamaCloud ?? this.ollamaCloud,
       vault: vault ?? this.vault,
@@ -1186,7 +1307,9 @@ class SettingsSnapshot {
       'codexCliPath': codexCliPath,
       'defaultModel': defaultModel,
       'defaultProvider': defaultProvider,
-      'gateway': gateway.toJson(),
+      'gatewayProfiles': gatewayProfiles
+          .map((item) => item.toJson())
+          .toList(growable: false),
       'ollamaLocal': ollamaLocal.toJson(),
       'ollamaCloud': ollamaCloud.toJson(),
       'vault': vault.toJson(),
@@ -1258,6 +1381,14 @@ class SettingsSnapshot {
                 .whereType<WorkspaceDestination>(),
           )
         : kAssistantNavigationDestinationDefaults;
+    final gatewayProfiles = normalizeGatewayProfiles(
+      profiles: ((json['gatewayProfiles'] as List?) ?? const <Object>[])
+          .whereType<Map>()
+          .map(
+            (item) =>
+                GatewayConnectionProfile.fromJson(item.cast<String, dynamic>()),
+          ),
+    );
     return SettingsSnapshot(
       appLanguage: AppLanguageCopy.fromJsonValue(
         json['appLanguage'] as String?,
@@ -1285,9 +1416,7 @@ class SettingsSnapshot {
       defaultProvider:
           json['defaultProvider'] as String? ??
           SettingsSnapshot.defaults().defaultProvider,
-      gateway: GatewayConnectionProfile.fromJson(
-        (json['gateway'] as Map?)?.cast<String, dynamic>() ?? const {},
-      ),
+      gatewayProfiles: gatewayProfiles,
       ollamaLocal: OllamaLocalConfig.fromJson(
         (json['ollamaLocal'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
@@ -1353,6 +1482,46 @@ class SettingsSnapshot {
   }
 
   String toJsonString() => jsonEncode(toJson());
+
+  GatewayConnectionProfile get primaryLocalGatewayProfile =>
+      gatewayProfiles[kGatewayLocalProfileIndex];
+
+  GatewayConnectionProfile get primaryRemoteGatewayProfile =>
+      gatewayProfiles[kGatewayRemoteProfileIndex];
+
+  GatewayConnectionProfile? gatewayProfileForExecutionTarget(
+    AssistantExecutionTarget target,
+  ) {
+    return switch (target) {
+      AssistantExecutionTarget.aiGatewayOnly => null,
+      AssistantExecutionTarget.local => primaryLocalGatewayProfile,
+      AssistantExecutionTarget.remote => primaryRemoteGatewayProfile,
+    };
+  }
+
+  SettingsSnapshot copyWithGatewayProfileAt(
+    int index,
+    GatewayConnectionProfile profile,
+  ) {
+    return copyWith(
+      gatewayProfiles: replaceGatewayProfileAt(gatewayProfiles, index, profile),
+    );
+  }
+
+  SettingsSnapshot copyWithGatewayProfileForExecutionTarget(
+    AssistantExecutionTarget target,
+    GatewayConnectionProfile profile,
+  ) {
+    final index = switch (target) {
+      AssistantExecutionTarget.local => kGatewayLocalProfileIndex,
+      AssistantExecutionTarget.remote => kGatewayRemoteProfileIndex,
+      AssistantExecutionTarget.aiGatewayOnly => null,
+    };
+    if (index == null) {
+      return this;
+    }
+    return copyWithGatewayProfileAt(index, profile);
+  }
 }
 
 class GatewayConnectionSnapshot {

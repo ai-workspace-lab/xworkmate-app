@@ -57,12 +57,10 @@ class _SettingsPageState extends State<SettingsPage> {
   String _gatewayTestState = 'idle';
   String _gatewayTestMessage = '';
   String _gatewayTestEndpoint = '';
+  int _selectedGatewayProfileIndex = kGatewayLocalProfileIndex;
   String _gatewaySetupCodeSyncedValue = '';
   String _gatewayHostSyncedValue = '';
   String _gatewayPortSyncedValue = '';
-  RuntimeConnectionMode? _gatewayDraftMode;
-  bool? _gatewayDraftUseSetupCode;
-  bool? _gatewayDraftTls;
   bool _aiGatewayTesting = false;
   String _aiGatewayTestState = 'idle';
   String _aiGatewayTestMessage = '';
@@ -904,11 +902,22 @@ class _SettingsPageState extends State<SettingsPage> {
   ) {
     _syncGatewayDraftControllers(settings);
     final theme = Theme.of(context);
-    final gatewayMode = _gatewayDraftMode ?? settings.gateway.mode;
-    final useSetupCode = _gatewayDraftUseSetupCode ?? settings.gateway.useSetupCode;
+    final gatewayProfiles = settings.gatewayProfiles;
+    final selectedProfileIndex = _selectedGatewayProfileIndex.clamp(
+      0,
+      gatewayProfiles.length - 1,
+    );
+    final gatewayProfile = gatewayProfiles[selectedProfileIndex];
+    final gatewayMode = _gatewayProfileModeForSlot(
+      selectedProfileIndex,
+      gatewayProfile,
+    );
+    final useSetupCode = selectedProfileIndex == kGatewayLocalProfileIndex
+        ? false
+        : gatewayProfile.useSetupCode;
     final gatewayTls = gatewayMode == RuntimeConnectionMode.local
         ? false
-        : (_gatewayDraftTls ?? settings.gateway.tls);
+        : gatewayProfile.tls;
     final hasStoredGatewayToken = controller.hasStoredGatewayToken;
     final hasStoredGatewayPassword =
         controller.settingsController.secureRefs['gateway_password'] != null;
@@ -918,75 +927,63 @@ class _SettingsPageState extends State<SettingsPage> {
     final showSharedTokenStatusCard =
         gatewayMode != RuntimeConnectionMode.unconfigured &&
         (willUseStoredGatewayToken || typedGatewayToken.isNotEmpty);
-    final connectionDescription = controller.connection.remoteAddress ??
-        '${settings.gateway.host}:${settings.gateway.port}';
-    final gatewayTarget = _assistantExecutionTargetForMode(gatewayMode);
 
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'OpenClaw Gateway',
-            style: theme.textTheme.titleLarge,
-          ),
+          Text('OpenClaw Gateway', style: theme.textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
             appText(
-              '统一编辑本地 / 远程 OpenClaw Gateway 的连接参数。保存：仅保存配置，不立即生效。应用：立即按当前配置生效。',
-              'Edit local and remote OpenClaw gateway settings in one place. Save persists configuration only and does not apply it immediately. Apply makes the current configuration take effect immediately.',
+              '这里仅维护 OpenClaw 连接源 profile。工作模式在会话区单独切换；保存：仅保存配置，不立即生效。应用：立即按当前配置生效。',
+              'This card edits OpenClaw connection source profiles only. Work mode is switched in the session UI. Save persists configuration only, while Apply makes it take effect immediately.',
             ),
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),
-          _buildNotice(
-            context,
-            tone: Theme.of(context).colorScheme.surfaceContainerHighest,
-            title: controller.connection.status.label,
-            message:
-                '$connectionDescription\n${appText('认证诊断', 'Auth Diagnostics')}\n${controller.connection.connectAuthSummary}',
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List<Widget>.generate(gatewayProfiles.length, (index) {
+              final profile = gatewayProfiles[index];
+              final configured =
+                  profile.setupCode.trim().isNotEmpty ||
+                  profile.host.trim().isNotEmpty;
+              return ChoiceChip(
+                key: ValueKey('gateway-profile-chip-$index'),
+                selected: index == selectedProfileIndex,
+                avatar: Icon(switch (index) {
+                  kGatewayLocalProfileIndex => Icons.computer_rounded,
+                  kGatewayRemoteProfileIndex => Icons.cloud_outlined,
+                  _ => Icons.link_rounded,
+                }, size: 18),
+                label: Text(
+                  configured
+                      ? _gatewayProfileSlotLabel(index)
+                      : appText(
+                          '${_gatewayProfileSlotLabel(index)}（空）',
+                          '${_gatewayProfileSlotLabel(index)} (empty)',
+                        ),
+                ),
+                onSelected: (_) {
+                  setState(() {
+                    _selectedGatewayProfileIndex = index;
+                    _gatewayTestState = 'idle';
+                    _gatewayTestMessage = '';
+                    _gatewayTestEndpoint = '';
+                  });
+                },
+              );
+            }),
           ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<RuntimeConnectionMode>(
-            key: const ValueKey('gateway-mode-field'),
-            initialValue: gatewayMode,
-            decoration: InputDecoration(
-              labelText: appText('工作模式', 'Work Mode'),
-            ),
-            items: const <RuntimeConnectionMode>[
-              RuntimeConnectionMode.unconfigured,
-              RuntimeConnectionMode.local,
-              RuntimeConnectionMode.remote,
-            ]
-                .map(
-                  (mode) => DropdownMenuItem<RuntimeConnectionMode>(
-                    value: mode,
-                    child: Text(_connectionModeLabel(mode)),
-                  ),
-                )
-                .toList(growable: false),
-            onChanged: (value) {
-              if (value == null) {
-                return;
-              }
-              setState(() {
-                _gatewayDraftMode = value;
-                if (value == RuntimeConnectionMode.local) {
-                  _gatewayDraftUseSetupCode = false;
-                  _gatewayDraftTls = false;
-                  _gatewayHostController.text = '127.0.0.1';
-                  _gatewayPortController.text = '18789';
-                } else if (value == RuntimeConnectionMode.unconfigured) {
-                  _gatewayDraftUseSetupCode = false;
-                } else {
-                  _gatewayDraftTls ??= true;
-                }
-              });
-              unawaited(_saveGatewayDraft(controller, settings).catchError((_) {}));
-            },
+          const SizedBox(height: 12),
+          Text(
+            _gatewayProfileSlotDescription(selectedProfileIndex),
+            style: theme.textTheme.bodySmall,
           ),
-          if (gatewayMode != RuntimeConnectionMode.unconfigured) ...[
-            const SizedBox(height: 12),
+          const SizedBox(height: 12),
+          if (selectedProfileIndex != kGatewayLocalProfileIndex) ...[
             SectionTabs(
               items: [appText('配置码', 'Setup Code'), appText('手动配置', 'Manual')],
               value: useSetupCode
@@ -994,163 +991,159 @@ class _SettingsPageState extends State<SettingsPage> {
                   : appText('手动配置', 'Manual'),
               size: SectionTabsSize.small,
               onChanged: (value) {
-                setState(() {
-                  _gatewayDraftUseSetupCode =
-                      value == appText('配置码', 'Setup Code');
-                });
+                final nextUseSetupCode = value == appText('配置码', 'Setup Code');
                 unawaited(
-                  _saveGatewayDraft(controller, settings).catchError((_) {}),
+                  _saveGatewayProfile(
+                    controller,
+                    settings,
+                    gatewayProfile.copyWith(useSetupCode: nextUseSetupCode),
+                  ).catchError((_) {}),
                 );
               },
             ),
             const SizedBox(height: 12),
-            if (useSetupCode) ...[
-              TextField(
-                key: const ValueKey('gateway-setup-code-field'),
-                controller: _gatewaySetupCodeController,
-                minLines: 4,
-                maxLines: 6,
-                decoration: InputDecoration(
-                  labelText: appText('配置码', 'Setup Code'),
-                  hintText: appText(
-                    '粘贴 Gateway 配置码或 JSON 负载',
-                    'Paste gateway setup code or JSON payload',
-                  ),
-                ),
-                onChanged: (_) => unawaited(
-                  _saveGatewayDraft(controller, settings).catchError((_) {}),
-                ),
-                onSubmitted: (_) => _saveGatewayDraft(controller, settings),
-              ),
-            ] else ...[
-              TextField(
-                key: const ValueKey('gateway-host-field'),
-                controller: _gatewayHostController,
-                decoration: InputDecoration(
-                  labelText: appText('主机', 'Host'),
-                ),
-                onChanged: (_) => unawaited(
-                  _saveGatewayDraft(controller, settings).catchError((_) {}),
-                ),
-                onSubmitted: (_) => _saveGatewayDraft(controller, settings),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: TextField(
-                      key: const ValueKey('gateway-port-field'),
-                      controller: _gatewayPortController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: appText('端口', 'Port'),
-                      ),
-                      onChanged: (_) => unawaited(
-                        _saveGatewayDraft(controller, settings).catchError((_) {}),
-                      ),
-                      onSubmitted: (_) => _saveGatewayDraft(controller, settings),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: Opacity(
-                      opacity:
-                          gatewayMode == RuntimeConnectionMode.local ? 0.6 : 1,
-                      child: _InlineSwitchField(
-                        label: 'TLS',
-                        value: gatewayTls,
-                        onChanged: (value) {
-                          if (gatewayMode == RuntimeConnectionMode.local) {
-                            return;
-                          }
-                          setState(() => _gatewayDraftTls = value);
-                          unawaited(
-                            _saveGatewayDraft(controller, settings)
-                                .catchError((_) {}),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 16),
+          ],
+          if (selectedProfileIndex != kGatewayLocalProfileIndex &&
+              useSetupCode) ...[
             TextField(
-              key: const ValueKey('gateway-shared-token-field'),
-              controller: _gatewayTokenController,
-              obscureText: true,
-              enableSuggestions: false,
-              autocorrect: false,
+              key: const ValueKey('gateway-setup-code-field'),
+              controller: _gatewaySetupCodeController,
+              minLines: 4,
+              maxLines: 6,
               decoration: InputDecoration(
-                labelText: appText('共享 Token', 'Shared Token'),
+                labelText: appText('配置码', 'Setup Code'),
                 hintText: appText(
-                  '可选：覆盖默认 Gateway Token',
-                  'Optional override for gateway token',
+                  '粘贴 Gateway 配置码或 JSON 负载',
+                  'Paste gateway setup code or JSON payload',
                 ),
               ),
-              onChanged: (_) => controller.saveGatewayTokenDraft(
-                _gatewayTokenController.text,
+              onChanged: (_) => unawaited(
+                _saveGatewayDraft(controller, settings).catchError((_) {}),
               ),
-            ),
-            if (showSharedTokenStatusCard) ...[
-              const SizedBox(height: 10),
-              _GatewaySecretStatusCard(
-                message: willUseStoredGatewayToken
-                    ? appText(
-                        '已安全保存 shared token（${controller.storedGatewayTokenMask}）。留空时会直接使用它连接。',
-                        'A shared token is already stored securely (${controller.storedGatewayTokenMask}). Leave the field empty to connect with it.',
-                      )
-                    : appText(
-                        '本次输入会覆盖已安全保存的 shared token。',
-                        'This entry will overwrite the stored shared token.',
-                      ),
-                locked: hasStoredGatewayToken,
-                onClear: hasStoredGatewayToken
-                    ? () async {
-                        await controller.clearStoredGatewayToken();
-                        if (mounted) {
-                          setState(() {});
-                        }
-                      }
-                    : null,
-              ),
-            ],
-            const SizedBox(height: 12),
-            TextField(
-              key: const ValueKey('gateway-password-field'),
-              controller: _gatewayPasswordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: appText('密码', 'Password'),
-                hintText: appText('可选：共享密码', 'Optional shared password'),
-                helperText: hasStoredGatewayPassword
-                    ? appText(
-                        '已存在安全保存的密码；输入新值后会在保存时覆盖。',
-                        'A password is already stored securely; entering a new value replaces it on Save.',
-                      )
-                    : appText(
-                        '输入后先进入草稿；保存后才会写入安全存储。',
-                        'Values stage into draft first and only persist after Save.',
-                      ),
-              ),
-              onChanged: (_) => controller.saveGatewayPasswordDraft(
-                _gatewayPasswordController.text,
-              ),
+              onSubmitted: (_) => _saveGatewayDraft(controller, settings),
             ),
           ] else ...[
-            const SizedBox(height: 12),
-            Text(
-              appText(
-                '当前模式仅通过 AI Gateway 处理任务，不会建立 OpenClaw Gateway 会话。',
-                'This mode routes tasks through AI Gateway only and does not establish an OpenClaw Gateway session.',
+            TextField(
+              key: const ValueKey('gateway-host-field'),
+              controller: _gatewayHostController,
+              decoration: InputDecoration(labelText: appText('主机', 'Host')),
+              onChanged: (_) => unawaited(
+                _saveGatewayDraft(controller, settings).catchError((_) {}),
               ),
-              style: theme.textTheme.bodyMedium,
+              onSubmitted: (_) => _saveGatewayDraft(controller, settings),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    key: const ValueKey('gateway-port-field'),
+                    controller: _gatewayPortController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: appText('端口', 'Port'),
+                    ),
+                    onChanged: (_) => unawaited(
+                      _saveGatewayDraft(
+                        controller,
+                        settings,
+                      ).catchError((_) {}),
+                    ),
+                    onSubmitted: (_) => _saveGatewayDraft(controller, settings),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: Opacity(
+                    opacity: gatewayMode == RuntimeConnectionMode.local
+                        ? 0.6
+                        : 1,
+                    child: _InlineSwitchField(
+                      label: 'TLS',
+                      value: gatewayTls,
+                      onChanged: (value) {
+                        if (gatewayMode == RuntimeConnectionMode.local) {
+                          return;
+                        }
+                        unawaited(
+                          _saveGatewayProfile(
+                            controller,
+                            settings,
+                            gatewayProfile.copyWith(tls: value),
+                          ).catchError((_) {}),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
+          const SizedBox(height: 16),
+          TextField(
+            key: const ValueKey('gateway-shared-token-field'),
+            controller: _gatewayTokenController,
+            obscureText: true,
+            enableSuggestions: false,
+            autocorrect: false,
+            decoration: InputDecoration(
+              labelText: appText('共享 Token', 'Shared Token'),
+              hintText: appText(
+                '可选：覆盖默认 Gateway Token',
+                'Optional override for gateway token',
+              ),
+            ),
+            onChanged: (_) =>
+                controller.saveGatewayTokenDraft(_gatewayTokenController.text),
+          ),
+          if (showSharedTokenStatusCard) ...[
+            const SizedBox(height: 10),
+            _GatewaySecretStatusCard(
+              message: willUseStoredGatewayToken
+                  ? appText(
+                      '已安全保存 shared token（${controller.storedGatewayTokenMask}）。留空时会直接使用它连接。',
+                      'A shared token is already stored securely (${controller.storedGatewayTokenMask}). Leave the field empty to connect with it.',
+                    )
+                  : appText(
+                      '本次输入会覆盖已安全保存的 shared token。',
+                      'This entry will overwrite the stored shared token.',
+                    ),
+              locked: hasStoredGatewayToken,
+              onClear: hasStoredGatewayToken
+                  ? () async {
+                      await controller.clearStoredGatewayToken();
+                      if (mounted) {
+                        setState(() {});
+                      }
+                    }
+                  : null,
+            ),
+          ],
+          const SizedBox(height: 12),
+          TextField(
+            key: const ValueKey('gateway-password-field'),
+            controller: _gatewayPasswordController,
+            obscureText: true,
+            decoration: InputDecoration(
+              labelText: appText('密码', 'Password'),
+              hintText: appText('可选：共享密码', 'Optional shared password'),
+              helperText: hasStoredGatewayPassword
+                  ? appText(
+                      '已存在安全保存的密码；输入新值后会在保存时覆盖。',
+                      'A password is already stored securely; entering a new value replaces it on Save.',
+                    )
+                  : appText(
+                      '输入后先进入草稿；保存后才会写入安全存储。',
+                      'Values stage into draft first and only persist after Save.',
+                    ),
+            ),
+            onChanged: (_) => controller.saveGatewayPasswordDraft(
+              _gatewayPasswordController.text,
+            ),
+          ),
           const SizedBox(height: 16),
           _buildSettingsSectionActions(
             controller: controller,
@@ -1158,11 +1151,7 @@ class _SettingsPageState extends State<SettingsPage> {
             saveKey: const ValueKey('gateway-save-button'),
             applyKey: const ValueKey('gateway-apply-button'),
             testing: _gatewayTesting,
-            onTest: () => _testGatewayConnection(
-              controller,
-              settings,
-              executionTarget: gatewayTarget,
-            ),
+            onTest: () => _testGatewayConnection(controller, settings),
             onSave: () => _saveGatewayAndPersist(controller, settings),
             onApply: () => _saveGatewayAndApply(controller, settings),
           ),
@@ -1205,9 +1194,7 @@ class _SettingsPageState extends State<SettingsPage> {
             value: settings.vault.address,
             onSubmitted: (value) => _saveSettings(
               controller,
-              settings.copyWith(
-                vault: settings.vault.copyWith(address: value),
-              ),
+              settings.copyWith(vault: settings.vault.copyWith(address: value)),
             ),
           ),
           _EditableField(
@@ -1357,25 +1344,25 @@ class _SettingsPageState extends State<SettingsPage> {
             onSubmitted: (_) => _saveAiGatewayDraft(controller, settings),
           ),
           _buildSecureField(
-              fieldKey: const ValueKey('ai-gateway-api-key-field'),
-              controller: _aiGatewayApiKeyController,
-              label:
-                  '${appText('API Key', 'API Key')} (${_aiGatewayApiKeyRefController.text.trim().isEmpty ? settings.aiGateway.apiKeyRef : _aiGatewayApiKeyRefController.text.trim()})',
-              hasStoredValue: hasStoredAiGatewayApiKey,
-              fieldState: _aiGatewayApiKeyState,
-              onStateChanged: (value) =>
-                  setState(() => _aiGatewayApiKeyState = value),
-              loadValue: controller.settingsController.loadAiGatewayApiKey,
-              onSubmitted: (value) async =>
-                  controller.saveAiGatewayApiKeyDraft(value),
-              storedHelperText: appText(
-                '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存/应用提交。',
-                'Stored securely. Test directly or submit it with the local Save / Apply actions.',
-              ),
-              emptyHelperText: appText(
-                '输入后可直接测试，也可通过本区或顶部按钮统一保存/应用。',
-                'Test it now, or use the local or top-level Save / Apply actions.',
-              ),
+            fieldKey: const ValueKey('ai-gateway-api-key-field'),
+            controller: _aiGatewayApiKeyController,
+            label:
+                '${appText('API Key', 'API Key')} (${_aiGatewayApiKeyRefController.text.trim().isEmpty ? settings.aiGateway.apiKeyRef : _aiGatewayApiKeyRefController.text.trim()})',
+            hasStoredValue: hasStoredAiGatewayApiKey,
+            fieldState: _aiGatewayApiKeyState,
+            onStateChanged: (value) =>
+                setState(() => _aiGatewayApiKeyState = value),
+            loadValue: controller.settingsController.loadAiGatewayApiKey,
+            onSubmitted: (value) async =>
+                controller.saveAiGatewayApiKeyDraft(value),
+            storedHelperText: appText(
+              '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存/应用提交。',
+              'Stored securely. Test directly or submit it with the local Save / Apply actions.',
+            ),
+            emptyHelperText: appText(
+              '输入后可直接测试，也可通过本区或顶部按钮统一保存/应用。',
+              'Test it now, or use the local or top-level Save / Apply actions.',
+            ),
           ),
           const SizedBox(height: 12),
           _buildSettingsSectionActions(
@@ -2505,82 +2492,109 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  String _connectionModeLabel(RuntimeConnectionMode mode) {
-    return switch (mode) {
-      RuntimeConnectionMode.unconfigured => appText(
-        '仅 AI Gateway',
-        'AI Gateway Only',
-      ),
-      RuntimeConnectionMode.local => appText(
-        '本地 OpenClaw Gateway',
-        'Local OpenClaw Gateway',
-      ),
-      RuntimeConnectionMode.remote => appText(
-        '远程 OpenClaw Gateway',
-        'Remote OpenClaw Gateway',
-      ),
-    };
-  }
-
-  AssistantExecutionTarget _assistantExecutionTargetForMode(
-    RuntimeConnectionMode mode,
-  ) {
-    return switch (mode) {
-      RuntimeConnectionMode.unconfigured =>
-        AssistantExecutionTarget.aiGatewayOnly,
-      RuntimeConnectionMode.local => AssistantExecutionTarget.local,
-      RuntimeConnectionMode.remote => AssistantExecutionTarget.remote,
-    };
-  }
-
   void _syncGatewayDraftControllers(SettingsSnapshot settings) {
-    final mode = _gatewayDraftMode ?? settings.gateway.mode;
-    final useSetupCode =
-        _gatewayDraftUseSetupCode ?? settings.gateway.useSetupCode;
-    final tls = mode == RuntimeConnectionMode.local
-        ? false
-        : (_gatewayDraftTls ?? settings.gateway.tls);
-    _gatewayDraftMode = mode;
-    _gatewayDraftUseSetupCode = useSetupCode;
-    _gatewayDraftTls = tls;
+    final current = _selectedGatewayProfile(settings);
     _syncDraftControllerValue(
       _gatewaySetupCodeController,
-      settings.gateway.setupCode,
+      current.setupCode,
       syncedValue: _gatewaySetupCodeSyncedValue,
       onSyncedValueChanged: (value) => _gatewaySetupCodeSyncedValue = value,
     );
     _syncDraftControllerValue(
       _gatewayHostController,
-      settings.gateway.host,
+      current.host,
       syncedValue: _gatewayHostSyncedValue,
       onSyncedValueChanged: (value) => _gatewayHostSyncedValue = value,
     );
     _syncDraftControllerValue(
       _gatewayPortController,
-      '${settings.gateway.port}',
+      '${current.port}',
       syncedValue: _gatewayPortSyncedValue,
       onSyncedValueChanged: (value) => _gatewayPortSyncedValue = value,
     );
   }
 
-  GatewayConnectionProfile _buildGatewayDraftProfile(SettingsSnapshot settings) {
-    final current = settings.gateway;
-    final mode = _gatewayDraftMode ?? current.mode;
-    final useSetupCode = mode == RuntimeConnectionMode.unconfigured
+  GatewayConnectionProfile _selectedGatewayProfile(SettingsSnapshot settings) {
+    final profiles = settings.gatewayProfiles;
+    final index = _selectedGatewayProfileIndex.clamp(0, profiles.length - 1);
+    return profiles[index];
+  }
+
+  RuntimeConnectionMode _gatewayProfileModeForSlot(
+    int index,
+    GatewayConnectionProfile profile,
+  ) {
+    if (index == kGatewayLocalProfileIndex) {
+      return RuntimeConnectionMode.local;
+    }
+    if (index == kGatewayRemoteProfileIndex) {
+      return RuntimeConnectionMode.remote;
+    }
+    return switch (profile.mode) {
+      RuntimeConnectionMode.local => RuntimeConnectionMode.local,
+      RuntimeConnectionMode.remote => RuntimeConnectionMode.remote,
+      RuntimeConnectionMode.unconfigured =>
+        profile.host.trim().isNotEmpty || profile.setupCode.trim().isNotEmpty
+            ? RuntimeConnectionMode.remote
+            : RuntimeConnectionMode.unconfigured,
+    };
+  }
+
+  String _gatewayProfileSlotLabel(int index) {
+    return switch (index) {
+      kGatewayLocalProfileIndex => appText(
+        '本地 OpenClaw Gateway',
+        'Local OpenClaw Gateway',
+      ),
+      kGatewayRemoteProfileIndex => appText(
+        '远程 OpenClaw Gateway',
+        'Remote OpenClaw Gateway',
+      ),
+      _ => appText(
+        '自定义连接源 ${index - kGatewayCustomProfileStartIndex + 1}',
+        'Custom source ${index - kGatewayCustomProfileStartIndex + 1}',
+      ),
+    };
+  }
+
+  String _gatewayProfileSlotDescription(int index) {
+    return switch (index) {
+      kGatewayLocalProfileIndex => appText(
+        '固定本地连接源，默认 127.0.0.1:18789。这里只维护本地源参数，不切换当前工作模式。',
+        'Fixed local source with default 127.0.0.1:18789. This card edits the local source only and does not switch the current work mode.',
+      ),
+      kGatewayRemoteProfileIndex => appText(
+        '固定远程连接源，默认 openclaw.svc.plus:443。这里只维护远程源参数，不切换当前工作模式。',
+        'Fixed remote source with default openclaw.svc.plus:443. This card edits the remote source only and does not switch the current work mode.',
+      ),
+      _ => appText(
+        '预留自定义 OpenClaw 连接源槽位。当前版本先做配置存储，不绑定固定工作模式。',
+        'Reserved custom OpenClaw source slot. In this build it stores connection settings only and is not bound to a fixed work mode.',
+      ),
+    };
+  }
+
+  GatewayConnectionProfile _buildGatewayDraftProfile(
+    SettingsSnapshot settings,
+  ) {
+    final current = _selectedGatewayProfile(settings);
+    final mode = _gatewayProfileModeForSlot(
+      _selectedGatewayProfileIndex,
+      current,
+    );
+    final useSetupCode = mode == RuntimeConnectionMode.local
         ? false
-        : (_gatewayDraftUseSetupCode ?? current.useSetupCode);
-    final tls = mode == RuntimeConnectionMode.local
-        ? false
-        : (_gatewayDraftTls ?? current.tls);
+        : current.useSetupCode;
+    final tls = mode == RuntimeConnectionMode.local ? false : current.tls;
     final parsedPort = int.tryParse(_gatewayPortController.text.trim());
     final decoded = useSetupCode
         ? decodeGatewaySetupCode(_gatewaySetupCodeController.text)
         : null;
-    final fallbackPort = mode == RuntimeConnectionMode.local
-        ? 18789
-        : tls
-        ? 443
-        : current.port;
+    final fallbackPort = switch (mode) {
+      RuntimeConnectionMode.local => 18789,
+      RuntimeConnectionMode.remote => tls ? 443 : current.port,
+      RuntimeConnectionMode.unconfigured => 443,
+    };
     return current.copyWith(
       mode: mode,
       useSetupCode: useSetupCode,
@@ -2595,13 +2609,14 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Future<void> _saveGatewayDraft(
+  Future<void> _saveGatewayProfile(
     AppController controller,
     SettingsSnapshot settings,
+    GatewayConnectionProfile profile,
   ) async {
-    final profile = _buildGatewayDraftProfile(settings);
-    final nextSettings = settings.copyWith(
-      gateway: profile,
+    final nextSettings = settings.copyWithGatewayProfileAt(
+      _selectedGatewayProfileIndex,
+      profile,
     );
     await _saveSettings(controller, nextSettings);
     if (!mounted) {
@@ -2611,13 +2626,18 @@ class _SettingsPageState extends State<SettingsPage> {
       _gatewaySetupCodeSyncedValue = profile.setupCode;
       _gatewayHostSyncedValue = profile.host;
       _gatewayPortSyncedValue = '${profile.port}';
-      _gatewayDraftMode = profile.mode;
-      _gatewayDraftUseSetupCode = profile.useSetupCode;
-      _gatewayDraftTls = profile.tls;
       _gatewayTestState = 'idle';
       _gatewayTestMessage = '';
       _gatewayTestEndpoint = '';
     });
+  }
+
+  Future<void> _saveGatewayDraft(
+    AppController controller,
+    SettingsSnapshot settings,
+  ) async {
+    final profile = _buildGatewayDraftProfile(settings);
+    await _saveGatewayProfile(controller, settings, profile);
   }
 
   Future<void> _saveGatewayAndPersist(
@@ -2753,11 +2773,15 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _testGatewayConnection(
     AppController controller,
-    SettingsSnapshot settings, {
-    required AssistantExecutionTarget executionTarget,
-  }) async {
+    SettingsSnapshot settings,
+  ) async {
     final messenger = ScaffoldMessenger.of(context);
     final gatewayDraft = _buildGatewayDraftProfile(settings);
+    final executionTarget = switch (gatewayDraft.mode) {
+      RuntimeConnectionMode.local => AssistantExecutionTarget.local,
+      RuntimeConnectionMode.remote => AssistantExecutionTarget.remote,
+      RuntimeConnectionMode.unconfigured => AssistantExecutionTarget.remote,
+    };
     final token = _gatewayTokenController.text.trim();
     final password = _gatewayPasswordController.text.trim();
     setState(() => _gatewayTesting = true);
@@ -3853,14 +3877,12 @@ class _GatewaySecretStatusCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(locked ? Icons.lock_rounded : Icons.info_outline_rounded, size: 18),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodySmall,
-            ),
+          Icon(
+            locked ? Icons.lock_rounded : Icons.info_outline_rounded,
+            size: 18,
           ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(message, style: theme.textTheme.bodySmall)),
           if (onClear != null)
             TextButton(
               onPressed: () => onClear!.call(),

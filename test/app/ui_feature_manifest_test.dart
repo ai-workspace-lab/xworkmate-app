@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_capabilities.dart';
 import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/models/app_models.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   test('fallback manifest applies release policy to feature availability', () {
@@ -49,6 +50,42 @@ void main() {
     expect(capabilities.supportsRelayGateway, isTrue);
     expect(capabilities.supportsDesktopRuntime, isFalse);
     expect(capabilities.supportsDiagnostics, isFalse);
+  });
+
+  test('execution target arrays stay fixed per platform', () {
+    final manifest = UiFeatureManifest.fallback();
+    final desktopAccess = manifest.forPlatform(
+      UiFeaturePlatform.desktop,
+      buildMode: UiFeatureBuildMode.release,
+    );
+    final mobileAccess = manifest.forPlatform(
+      UiFeaturePlatform.mobile,
+      buildMode: UiFeatureBuildMode.release,
+    );
+    final webAccess = manifest.forPlatform(
+      UiFeaturePlatform.web,
+      buildMode: UiFeatureBuildMode.release,
+    );
+
+    expect(
+      desktopAccess.availableExecutionTargets,
+      equals(<AssistantExecutionTarget>[
+        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.local,
+        AssistantExecutionTarget.remote,
+      ]),
+    );
+    expect(
+      mobileAccess.availableExecutionTargets,
+      equals(<AssistantExecutionTarget>[AssistantExecutionTarget.remote]),
+    );
+    expect(
+      webAccess.availableExecutionTargets,
+      equals(<AssistantExecutionTarget>[
+        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.remote,
+      ]),
+    );
   });
 
   test('parser rejects unsupported flag fields', () {

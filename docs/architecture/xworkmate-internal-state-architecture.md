@@ -25,6 +25,24 @@ Desktop controller currently owns the richest runtime and persistence path.
 Where Web has a parallel implementation with the same state semantics, that
 mapping is called out explicitly instead of being treated as an afterthought.
 
+Platform runtime matrix
+
+- Desktop runtime:
+  - Platforms: macOS, Windows, Linux
+  - Linux desktop shells explicitly supported in runtime integration: GNOME
+    (GTK) and KDE Plasma (Qt)
+  - Fixed work modes: AI Gateway, Local OpenClaw Gateway, Remote OpenClaw
+    Gateway
+- Mobile runtime:
+  - Platforms: iOS, Android
+  - Fixed work modes: Remote OpenClaw Gateway only
+- Web runtime:
+  - Platform: standard browser runtime
+  - Fixed work modes: AI Gateway, Remote OpenClaw Gateway
+
+These work-mode arrays come from feature-manifest capabilities. They are not
+derived from gateway profile data.
+
 ========================================================================
 1. Core Rule
 ========================================================================
@@ -170,6 +188,8 @@ Primary fields:
 - _pendingSettingsApply
 - _pendingGatewayApply
 - _pendingAiGatewayApply
+- settings.gatewayProfiles
+- settings.assistantExecutionTarget
 
 Sources:
 - settings
@@ -186,6 +206,8 @@ Responsibilities:
 - Store global default configuration
 - Persist app-level settings
 - Persist secure secrets
+- Persist OpenClaw connection source profiles
+- Persist the default work mode for newly created threads
 - Make the saved configuration take effect only when Apply is executed
 
 Important APIs:
@@ -197,6 +219,8 @@ Important APIs:
 Important rule:
 Settings center should define defaults, integrations, and persisted config.
 It should not be treated as the only truth for the current task thread.
+It also must not collapse `assistantExecutionTarget` and `gatewayProfiles`
+into the same field.
 
 2.2 Current assistant session state
 
@@ -281,6 +305,11 @@ Meaning:
 - Local OpenClaw Gateway
 - Remote OpenClaw Gateway
 
+Platform availability:
+- Desktop: aiGatewayOnly, local, remote
+- Mobile: remote
+- Web: aiGatewayOnly, remote
+
 Primary resolver:
 assistantExecutionTargetForSession(sessionKey)
 
@@ -295,6 +324,42 @@ Interpretation:
 Consequence:
 Changing settings alone does not automatically mean the current thread display
 has changed unless the current thread record is also synchronized.
+
+Important separation:
+- `assistantExecutionTarget` is the work-mode default / thread override axis
+- it is not a pointer into `gatewayProfiles`
+- AI Gateway only has no OpenClaw profile
+- there is no implicit local-to-remote or AI-to-remote profile fallback
+
+3.1.1 OpenClaw gateway profile list
+
+Primary owner:
+- SettingsSnapshot.gatewayProfiles
+
+Meaning:
+- OpenClaw connection sources saved in Settings center
+
+Fixed structure:
+- index 0: fixed Local OpenClaw profile
+- index 1: fixed Remote OpenClaw profile
+- index 2: custom slot
+- index 3: custom slot
+- index 4: custom slot
+
+Rules:
+- `gatewayProfiles` is a list, not a single gateway field
+- first two slots are reserved and normalized on load
+- Desktop may use both fixed OpenClaw profiles
+- Mobile only consumes the fixed remote profile
+- Web only consumes the fixed remote profile
+- custom slots are saved configuration only; they do not expand the platform
+  work-mode array by themselves
+
+Ownership rule:
+- work mode selects whether the current thread is AI, Local OpenClaw, or Remote
+  OpenClaw
+- profile selection provides connection parameters for OpenClaw-backed modes
+- changing a profile does not by itself change the current thread mode
 
 3.2 Model
 
@@ -461,6 +526,7 @@ Change execution target from Assistant page
 Save should update:
 - persisted settings snapshot
 - persisted secure secrets
+- persisted gatewayProfiles
 - pending apply markers
 
 Save should not update:
@@ -475,6 +541,8 @@ If Apply changes assistant execution behavior, it must synchronize:
 
 - settings.assistantExecutionTarget
 - current thread AssistantThreadRecord.executionTarget
+- the exact OpenClaw profile used by that execution target, if the target is
+  local or remote
 - runtime connection / disconnection path
 - session-specific skill visibility if mode changes
 - derived UI:
@@ -493,6 +561,13 @@ switchSession(sessionKey) must synchronize:
 - current thread selected/imported/discovered skills
 - current thread conversation content source
 - current thread connection label
+
+6.4 What must never happen implicitly
+
+- local OpenClaw selectedAgentId must not silently fall back to remote
+- AI Gateway only mode must not silently borrow a gateway profile
+- gatewayProfiles changes must not silently overwrite the current thread mode
+- platform capability filtering must not invent unsupported work modes
 
 6.4 What task list must never do
 

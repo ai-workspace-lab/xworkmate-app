@@ -23,6 +23,8 @@ import '../../widgets/pane_resize_handle.dart';
 import '../../widgets/surface_card.dart';
 
 const double _assistantComposerDefaultInputHeight = 78;
+const double _assistantWorkspaceMinConversationHeight = 180;
+const double _assistantWorkspaceMinLowerPaneHeight = 124;
 
 class AssistantPage extends StatefulWidget {
   const AssistantPage({
@@ -71,6 +73,7 @@ class _AssistantPageState extends State<AssistantPage> {
   String? _lastAutoAgentLabel;
   List<String> _lastSubmittedAttachments = const <String>[];
   double _composerInputHeight = _assistantComposerDefaultInputHeight;
+  double _workspaceLowerPaneHeightAdjustment = 0;
 
   @override
   void initState() {
@@ -376,7 +379,7 @@ class _AssistantPageState extends State<AssistantPage> {
           availableWidth: composerContentWidth,
           averageChipWidth: 132,
         );
-        final composerHeight = math.min(
+        final defaultComposerHeight = math.min(
           math.max(0.0, constraints.maxHeight - 2),
           baseComposerHeight +
               math.max(
@@ -386,6 +389,21 @@ class _AssistantPageState extends State<AssistantPage> {
               attachmentExtraHeight +
               selectedSkillExtraHeight,
         );
+        final composerHeightUpperBound = math.min(
+          math.max(0.0, constraints.maxHeight - 2),
+          math.max(
+            _assistantWorkspaceMinLowerPaneHeight,
+            constraints.maxHeight - _assistantWorkspaceMinConversationHeight,
+          ),
+        );
+        final composerHeightLowerBound = math.min(
+          _assistantWorkspaceMinLowerPaneHeight,
+          composerHeightUpperBound,
+        );
+        final composerHeight =
+            (defaultComposerHeight + _workspaceLowerPaneHeightAdjustment)
+                .clamp(composerHeightLowerBound, composerHeightUpperBound)
+                .toDouble();
 
         return Column(
           children: [
@@ -408,7 +426,25 @@ class _AssistantPageState extends State<AssistantPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 2),
+            SizedBox(
+              key: const Key('assistant-workspace-resize-handle'),
+              height: 10,
+              child: PaneResizeHandle(
+                axis: Axis.vertical,
+                onDelta: (delta) {
+                  setState(() {
+                    final nextComposerHeight = (composerHeight - delta)
+                        .clamp(
+                          composerHeightLowerBound,
+                          composerHeightUpperBound,
+                        )
+                        .toDouble();
+                    _workspaceLowerPaneHeightAdjustment =
+                        nextComposerHeight - defaultComposerHeight;
+                  });
+                },
+              ),
+            ),
             SizedBox(
               key: const Key('assistant-composer-shell'),
               height: composerHeight,
@@ -2017,7 +2053,9 @@ class _AssistantTaskRailState extends State<_AssistantTaskRail> {
               separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final group = groupedTasks[index];
-                final expanded = _expandedGroups.contains(group.executionTarget);
+                final expanded = _expandedGroups.contains(
+                  group.executionTarget,
+                );
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -2556,336 +2594,302 @@ class _ComposerBarState extends State<_ComposerBar> {
       borderRadius: 10,
       tone: SurfaceCardTone.chrome,
       child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                if (uiFeatures.supportsFileAttachments) ...[
-                  PopupMenuButton<String>(
-                    key: const Key('assistant-attachment-menu-button'),
-                    tooltip: appText('添加文件等', 'Add files'),
-                    offset: const Offset(0, 48),
-                    onSelected: (value) {
-                      switch (value) {
-                        case 'attach':
-                          widget.onPickAttachments();
-                          break;
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem<String>(
-                        value: 'attach',
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Icon(Icons.attach_file_rounded),
-                          title: Text('添加照片和文件'),
-                        ),
-                      ),
-                    ],
-                    child: const _ComposerIconButton(icon: Icons.add_rounded),
-                  ),
-                  const SizedBox(width: 6),
-                ],
-                PopupMenuButton<AssistantExecutionTarget>(
-                  key: const Key('assistant-execution-target-button'),
-                  tooltip: appText('任务对话模式', 'Task Dialog Mode'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (uiFeatures.supportsFileAttachments) ...[
+                PopupMenuButton<String>(
+                  key: const Key('assistant-attachment-menu-button'),
+                  tooltip: appText('添加文件等', 'Add files'),
+                  offset: const Offset(0, 48),
                   onSelected: (value) {
-                    controller.setAssistantExecutionTarget(value);
+                    switch (value) {
+                      case 'attach':
+                        widget.onPickAttachments();
+                        break;
+                    }
                   },
-                  itemBuilder: (context) => uiFeatures.availableExecutionTargets
-                      .map(
-                        (value) => PopupMenuItem<AssistantExecutionTarget>(
-                          value: value,
-                          child: Row(
-                            children: [
-                              Icon(value.icon, size: 18),
-                              const SizedBox(width: 10),
-                              Expanded(child: Text(value.label)),
-                              if (value == executionTarget)
-                                const Icon(Icons.check_rounded, size: 18),
-                            ],
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  child: _ComposerToolbarChip(
-                    icon: executionTarget.icon,
-                    label: executionTarget.label,
-                    showChevron: true,
-                    maxLabelWidth: 96,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
+                  itemBuilder: (context) => [
+                    const PopupMenuItem<String>(
+                      value: 'attach',
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.attach_file_rounded),
+                        title: Text('添加照片和文件'),
+                      ),
                     ),
-                  ),
+                  ],
+                  child: const _ComposerIconButton(icon: Icons.add_rounded),
                 ),
-                const SizedBox(width: 4),
-                if (uiFeatures.supportsMultiAgent) ...[
-                  Tooltip(
-                    message: appText(
-                      '多 Agent 协作模式（Architect 调度/文档 → Lead Engineer 主程 → Worker/Review）',
-                      'Multi-Agent Collaboration Mode (Architect docs/scheduler -> Lead Engineer -> Worker/Review)',
-                    ),
-                    child: AnimatedBuilder(
-                      animation: controller.multiAgentOrchestrator,
-                      builder: (context, _) {
-                        final collab = controller.multiAgentOrchestrator;
-                        final enabled = collab.config.enabled;
-                        return IconButton(
-                          key: const Key('assistant-collaboration-toggle'),
-                          icon: Icon(
-                            enabled
-                                ? Icons.auto_awesome
-                                : Icons.auto_awesome_outlined,
-                            size: 20,
-                            color: enabled ? Colors.orange : null,
-                          ),
-                          onPressed:
-                              collab.isRunning ||
-                                  controller.isMultiAgentRunPending
-                              ? null
-                              : () => unawaited(
-                                  controller.saveMultiAgentConfig(
-                                    collab.config.copyWith(enabled: !enabled),
-                                  ),
-                                ),
-                          splashRadius: 18,
-                        );
-                      },
-                    ),
-                  ),
-                  AnimatedBuilder(
-                    animation: controller.multiAgentOrchestrator,
-                    builder: (context, _) {
-                      final collab = controller.multiAgentOrchestrator;
-                      if (!collab.config.enabled) {
-                        return const SizedBox.shrink();
-                      }
-                      return Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: _ComposerToolbarChip(
-                          icon: Icons.hub_rounded,
-                          label: collab.config.usesAris
-                              ? appText('ARIS', 'ARIS')
-                              : appText('原生', 'Native'),
-                          showChevron: false,
-                          maxLabelWidth: 64,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 6,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                const SizedBox(width: 6),
               ],
-            ),
-            const SizedBox(height: 8),
-            if (widget.attachments.isNotEmpty) ...[
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: widget.attachments
+              PopupMenuButton<AssistantExecutionTarget>(
+                key: const Key('assistant-execution-target-button'),
+                tooltip: appText('任务对话模式', 'Task Dialog Mode'),
+                onSelected: (value) {
+                  controller.setAssistantExecutionTarget(value);
+                },
+                itemBuilder: (context) => uiFeatures.availableExecutionTargets
                     .map(
-                      (attachment) => InputChip(
-                        avatar: Icon(attachment.icon, size: 16),
-                        label: Text(attachment.name),
-                        onDeleted: () => widget.onRemoveAttachment(attachment),
+                      (value) => PopupMenuItem<AssistantExecutionTarget>(
+                        value: value,
+                        child: Row(
+                          children: [
+                            Icon(value.icon, size: 18),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(value.label)),
+                            if (value == executionTarget)
+                              const Icon(Icons.check_rounded, size: 18),
+                          ],
+                        ),
                       ),
                     )
                     .toList(),
-              ),
-              const SizedBox(height: 6),
-            ],
-            SizedBox(
-              key: const Key('assistant-composer-input-area'),
-              height: _inputHeight,
-              child: TextField(
-                controller: widget.inputController,
-                focusNode: widget.focusNode,
-                autofocus: true,
-                expands: true,
-                minLines: null,
-                maxLines: null,
-                textAlignVertical: TextAlignVertical.top,
-                decoration: InputDecoration(
-                  isCollapsed: true,
-                  filled: true,
-                  fillColor: palette.chromeSurface,
-                  contentPadding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: palette.chromeStroke),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(
-                      color: palette.accent.withValues(alpha: 0.18),
-                    ),
-                  ),
-                  hintText: appText(
-                    '输入需求、补充上下文、继续追问，XWorkmate 会沿用当前任务上下文持续处理。',
-                    'Describe the task, add context, or continue the thread. XWorkmate keeps the current task context.',
+                child: _ComposerToolbarChip(
+                  icon: executionTarget.icon,
+                  label: executionTarget.label,
+                  showChevron: true,
+                  maxLabelWidth: 96,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
                   ),
                 ),
-                onSubmitted: (_) => widget.onSend(),
               ),
-            ),
-            _ComposerResizeHandle(
-              key: const Key('assistant-composer-resize-handle'),
-              onDelta: _resizeInput,
-            ),
-            if (selectedSkills.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: selectedSkills
-                    .map(
-                      (skill) => _ComposerSelectedSkillChip(
-                        key: ValueKey<String>(
-                          'assistant-selected-skill-${skill.key}',
+              const SizedBox(width: 4),
+              if (uiFeatures.supportsMultiAgent) ...[
+                Tooltip(
+                  message: appText(
+                    '多 Agent 协作模式（Architect 调度/文档 → Lead Engineer 主程 → Worker/Review）',
+                    'Multi-Agent Collaboration Mode (Architect docs/scheduler -> Lead Engineer -> Worker/Review)',
+                  ),
+                  child: AnimatedBuilder(
+                    animation: controller.multiAgentOrchestrator,
+                    builder: (context, _) {
+                      final collab = controller.multiAgentOrchestrator;
+                      final enabled = collab.config.enabled;
+                      return IconButton(
+                        key: const Key('assistant-collaboration-toggle'),
+                        icon: Icon(
+                          enabled
+                              ? Icons.auto_awesome
+                              : Icons.auto_awesome_outlined,
+                          size: 20,
+                          color: enabled ? Colors.orange : null,
                         ),
-                        option: skill,
-                        onDeleted: () => widget.onToggleSkill(skill.key),
-                      ),
-                    )
-                    .toList(growable: false),
-              ),
-            ],
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (aiGatewayOnly && discoveredCount > 0) ...[
-                          InkWell(
-                            key: const Key('assistant-discovered-skills-button'),
-                            borderRadius: BorderRadius.circular(AppRadius.chip),
-                            onTap: () => _showDiscoveredSkillsDialog(context),
-                            child: _ComposerToolbarChip(
-                              icon: Icons.download_done_rounded,
-                              label: appText(
-                                '候选技能 $discoveredCount',
-                                'Candidates $discoveredCount',
-                              ),
-                              showChevron: true,
-                              maxLabelWidth: 148,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                        InkWell(
-                          key: const Key('assistant-skill-picker-button'),
-                          borderRadius: BorderRadius.circular(AppRadius.chip),
-                          onTap: () => _showSkillPickerDialog(context),
-                          child: _ComposerToolbarChip(
-                            icon: Icons.auto_awesome_rounded,
-                            label: selectedSkills.isEmpty
-                                ? appText('技能', 'Skills')
-                                : appText(
-                                    '已选技能 ${selectedSkills.length}',
-                                    'Skills ${selectedSkills.length}',
-                                  ),
-                            showChevron: true,
-                            maxLabelWidth: 132,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        PopupMenuButton<AssistantPermissionLevel>(
-                          key: const Key('assistant-permission-button'),
-                          tooltip: appText('权限', 'Permissions'),
-                          onSelected: (value) {
-                            controller.setAssistantPermissionLevel(value);
-                          },
-                          itemBuilder: (context) => AssistantPermissionLevel
-                              .values
-                              .map(
-                                (value) =>
-                                    PopupMenuItem<AssistantPermissionLevel>(
-                                      value: value,
-                                      child: Row(
-                                        children: [
-                                          Icon(value.icon, size: 18),
-                                          const SizedBox(width: 10),
-                                          Expanded(child: Text(value.label)),
-                                          if (value == permissionLevel)
-                                            const Icon(
-                                              Icons.check_rounded,
-                                              size: 18,
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                              )
-                              .toList(),
-                          child: _ComposerToolbarChip(
-                            icon: permissionLevel.icon,
-                            label: permissionLevel.label,
-                            showChevron: true,
-                            maxLabelWidth: 120,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        widget.modelOptions.isEmpty
-                            ? _ComposerToolbarChip(
-                                key: const Key('assistant-model-button'),
-                                icon: Icons.bolt_rounded,
-                                label: widget.modelLabel,
-                                showChevron: false,
-                                maxLabelWidth: 140,
-                              )
-                            : PopupMenuButton<String>(
-                                key: const Key('assistant-model-button'),
-                                tooltip: appText('模型', 'Model'),
-                                onSelected: widget.onModelChanged,
-                                itemBuilder: (context) => widget.modelOptions
-                                    .map(
-                                      (value) => PopupMenuItem<String>(
-                                        value: value,
-                                        child: Row(
-                                          children: [
-                                            Expanded(child: Text(value)),
-                                            if (value == widget.modelLabel)
-                                              const Icon(
-                                                Icons.check_rounded,
-                                                size: 18,
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                                child: _ComposerToolbarChip(
-                                  icon: Icons.bolt_rounded,
-                                  label: widget.modelLabel,
-                                  showChevron: true,
-                                  maxLabelWidth: 140,
+                        onPressed:
+                            collab.isRunning ||
+                                controller.isMultiAgentRunPending
+                            ? null
+                            : () => unawaited(
+                                controller.saveMultiAgentConfig(
+                                  collab.config.copyWith(enabled: !enabled),
                                 ),
                               ),
+                        splashRadius: 18,
+                      );
+                    },
+                  ),
+                ),
+                AnimatedBuilder(
+                  animation: controller.multiAgentOrchestrator,
+                  builder: (context, _) {
+                    final collab = controller.multiAgentOrchestrator;
+                    if (!collab.config.enabled) {
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: _ComposerToolbarChip(
+                        icon: Icons.hub_rounded,
+                        label: collab.config.usesAris
+                            ? appText('ARIS', 'ARIS')
+                            : appText('原生', 'Native'),
+                        showChevron: false,
+                        maxLabelWidth: 64,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (widget.attachments.isNotEmpty) ...[
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: widget.attachments
+                  .map(
+                    (attachment) => InputChip(
+                      avatar: Icon(attachment.icon, size: 16),
+                      label: Text(attachment.name),
+                      onDeleted: () => widget.onRemoveAttachment(attachment),
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 6),
+          ],
+          SizedBox(
+            key: const Key('assistant-composer-input-area'),
+            height: _inputHeight,
+            child: TextField(
+              controller: widget.inputController,
+              focusNode: widget.focusNode,
+              autofocus: true,
+              expands: true,
+              minLines: null,
+              maxLines: null,
+              textAlignVertical: TextAlignVertical.top,
+              decoration: InputDecoration(
+                isCollapsed: true,
+                filled: true,
+                fillColor: palette.chromeSurface,
+                contentPadding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: palette.chromeStroke),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: palette.accent.withValues(alpha: 0.18),
+                  ),
+                ),
+                hintText: appText(
+                  '输入需求、补充上下文、继续追问，XWorkmate 会沿用当前任务上下文持续处理。',
+                  'Describe the task, add context, or continue the thread. XWorkmate keeps the current task context.',
+                ),
+              ),
+              onSubmitted: (_) => widget.onSend(),
+            ),
+          ),
+          _ComposerResizeHandle(
+            key: const Key('assistant-composer-resize-handle'),
+            onDelta: _resizeInput,
+          ),
+          if (selectedSkills.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: selectedSkills
+                  .map(
+                    (skill) => _ComposerSelectedSkillChip(
+                      key: ValueKey<String>(
+                        'assistant-selected-skill-${skill.key}',
+                      ),
+                      option: skill,
+                      onDeleted: () => widget.onToggleSkill(skill.key),
+                    ),
+                  )
+                  .toList(growable: false),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (aiGatewayOnly && discoveredCount > 0) ...[
+                        InkWell(
+                          key: const Key('assistant-discovered-skills-button'),
+                          borderRadius: BorderRadius.circular(AppRadius.chip),
+                          onTap: () => _showDiscoveredSkillsDialog(context),
+                          child: _ComposerToolbarChip(
+                            icon: Icons.download_done_rounded,
+                            label: appText(
+                              '候选技能 $discoveredCount',
+                              'Candidates $discoveredCount',
+                            ),
+                            showChevron: true,
+                            maxLabelWidth: 148,
+                          ),
+                        ),
                         const SizedBox(width: 6),
-                        PopupMenuButton<String>(
-                          key: const Key('assistant-thinking-button'),
-                          tooltip: appText('推理强度', 'Reasoning'),
-                          onSelected: widget.onThinkingChanged,
-                          itemBuilder: (context) =>
-                              const <String>['low', 'medium', 'high', 'max']
+                      ],
+                      InkWell(
+                        key: const Key('assistant-skill-picker-button'),
+                        borderRadius: BorderRadius.circular(AppRadius.chip),
+                        onTap: () => _showSkillPickerDialog(context),
+                        child: _ComposerToolbarChip(
+                          icon: Icons.auto_awesome_rounded,
+                          label: selectedSkills.isEmpty
+                              ? appText('技能', 'Skills')
+                              : appText(
+                                  '已选技能 ${selectedSkills.length}',
+                                  'Skills ${selectedSkills.length}',
+                                ),
+                          showChevron: true,
+                          maxLabelWidth: 132,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      PopupMenuButton<AssistantPermissionLevel>(
+                        key: const Key('assistant-permission-button'),
+                        tooltip: appText('权限', 'Permissions'),
+                        onSelected: (value) {
+                          controller.setAssistantPermissionLevel(value);
+                        },
+                        itemBuilder: (context) => AssistantPermissionLevel
+                            .values
+                            .map(
+                              (value) =>
+                                  PopupMenuItem<AssistantPermissionLevel>(
+                                    value: value,
+                                    child: Row(
+                                      children: [
+                                        Icon(value.icon, size: 18),
+                                        const SizedBox(width: 10),
+                                        Expanded(child: Text(value.label)),
+                                        if (value == permissionLevel)
+                                          const Icon(
+                                            Icons.check_rounded,
+                                            size: 18,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                            )
+                            .toList(),
+                        child: _ComposerToolbarChip(
+                          icon: permissionLevel.icon,
+                          label: permissionLevel.label,
+                          showChevron: true,
+                          maxLabelWidth: 120,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      widget.modelOptions.isEmpty
+                          ? _ComposerToolbarChip(
+                              key: const Key('assistant-model-button'),
+                              icon: Icons.bolt_rounded,
+                              label: widget.modelLabel,
+                              showChevron: false,
+                              maxLabelWidth: 140,
+                            )
+                          : PopupMenuButton<String>(
+                              key: const Key('assistant-model-button'),
+                              tooltip: appText('模型', 'Model'),
+                              onSelected: widget.onModelChanged,
+                              itemBuilder: (context) => widget.modelOptions
                                   .map(
                                     (value) => PopupMenuItem<String>(
                                       value: value,
                                       child: Row(
                                         children: [
-                                          Expanded(
-                                            child: Text(
-                                              _assistantThinkingLabel(value),
-                                            ),
-                                          ),
-                                          if (value == widget.thinkingLabel)
+                                          Expanded(child: Text(value)),
+                                          if (value == widget.modelLabel)
                                             const Icon(
                                               Icons.check_rounded,
                                               size: 18,
@@ -2895,65 +2899,100 @@ class _ComposerBarState extends State<_ComposerBar> {
                                     ),
                                   )
                                   .toList(),
-                          child: _ComposerToolbarChip(
-                            icon: Icons.psychology_alt_outlined,
-                            label: _assistantThinkingLabel(widget.thinkingLabel),
-                            showChevron: true,
-                            maxLabelWidth: 96,
-                          ),
+                              child: _ComposerToolbarChip(
+                                icon: Icons.bolt_rounded,
+                                label: widget.modelLabel,
+                                showChevron: true,
+                                maxLabelWidth: 140,
+                              ),
+                            ),
+                      const SizedBox(width: 6),
+                      PopupMenuButton<String>(
+                        key: const Key('assistant-thinking-button'),
+                        tooltip: appText('推理强度', 'Reasoning'),
+                        onSelected: widget.onThinkingChanged,
+                        itemBuilder: (context) =>
+                            const <String>['low', 'medium', 'high', 'max']
+                                .map(
+                                  (value) => PopupMenuItem<String>(
+                                    value: value,
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            _assistantThinkingLabel(value),
+                                          ),
+                                        ),
+                                        if (value == widget.thinkingLabel)
+                                          const Icon(
+                                            Icons.check_rounded,
+                                            size: 18,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                        child: _ComposerToolbarChip(
+                          icon: Icons.psychology_alt_outlined,
+                          label: _assistantThinkingLabel(widget.thinkingLabel),
+                          showChevron: true,
+                          maxLabelWidth: 96,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                Tooltip(
-                  message: submitLabel,
-                  child: FilledButton(
-                    onPressed: connecting
-                        ? null
-                        : connected
-                        ? widget.onSend
-                        : aiGatewayOnly
-                        ? widget.onOpenAiGatewaySettings
-                        : reconnectAvailable
-                        ? () async {
-                            await widget.onReconnectGateway();
-                          }
-                        : widget.onOpenGateway,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      minimumSize: const Size(64, 28),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+              ),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: submitLabel,
+                child: FilledButton(
+                  key: const Key('assistant-submit-button'),
+                  onPressed: connecting
+                      ? null
+                      : connected
+                      ? widget.onSend
+                      : aiGatewayOnly
+                      ? widget.onOpenAiGatewaySettings
+                      : reconnectAvailable
+                      ? () async {
+                          await widget.onReconnectGateway();
+                        }
+                      : widget.onOpenGateway,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          connected
-                              ? Icons.arrow_upward_rounded
-                              : aiGatewayOnly
-                              ? Icons.hub_outlined
-                              : reconnectAvailable
-                              ? Icons.refresh_rounded
-                              : Icons.link_rounded,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(submitLabel),
-                      ],
+                    minimumSize: const Size(64, 28),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        connected
+                            ? Icons.arrow_upward_rounded
+                            : aiGatewayOnly
+                            ? Icons.hub_outlined
+                            : reconnectAvailable
+                            ? Icons.refresh_rounded
+                            : Icons.link_rounded,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(submitLabel),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -4607,7 +4646,6 @@ class _SkillPickerTile extends StatelessWidget {
     );
   }
 }
-
 
 class _ComposerAttachment {
   const _ComposerAttachment({

@@ -40,9 +40,13 @@ void main() {
           WorkspaceDestination.aiGateway,
           WorkspaceDestination.secrets,
         ],
-        gateway: GatewayConnectionProfile.defaults().copyWith(
-          host: 'gateway.example.com',
-          port: 9443,
+        gatewayProfiles: replaceGatewayProfileAt(
+          SettingsSnapshot.defaults().gatewayProfiles,
+          kGatewayRemoteProfileIndex,
+          GatewayConnectionProfile.defaultsRemote().copyWith(
+            host: 'gateway.example.com',
+            port: 9443,
+          ),
         ),
       );
 
@@ -69,8 +73,11 @@ void main() {
           WorkspaceDestination.secrets,
         ],
       );
-      expect(loadedSnapshot.gateway.host, 'gateway.example.com');
-      expect(loadedSnapshot.gateway.port, 9443);
+      expect(
+        loadedSnapshot.primaryRemoteGatewayProfile.host,
+        'gateway.example.com',
+      );
+      expect(loadedSnapshot.primaryRemoteGatewayProfile.port, 9443);
       expect(secureRefs['gateway_token'], 'token-secret');
       expect(secureRefs['gateway_password'], 'password-secret');
       expect(secureRefs['vault_token'], 'vault-secret');
@@ -97,9 +104,13 @@ void main() {
       final snapshot = SettingsSnapshot.defaults().copyWith(
         accountUsername: 'sqlite-user',
         accountWorkspace: 'sqlite-workspace',
-        gateway: GatewayConnectionProfile.defaults().copyWith(
-          host: 'sqlite.example.com',
-          port: 443,
+        gatewayProfiles: replaceGatewayProfileAt(
+          SettingsSnapshot.defaults().gatewayProfiles,
+          kGatewayRemoteProfileIndex,
+          GatewayConnectionProfile.defaultsRemote().copyWith(
+            host: 'sqlite.example.com',
+            port: 443,
+          ),
         ),
       );
       final entry = SecretAuditEntry(
@@ -127,7 +138,10 @@ void main() {
 
       expect(loadedSnapshot.accountUsername, 'sqlite-user');
       expect(loadedSnapshot.accountWorkspace, 'sqlite-workspace');
-      expect(loadedSnapshot.gateway.host, 'sqlite.example.com');
+      expect(
+        loadedSnapshot.primaryRemoteGatewayProfile.host,
+        'sqlite.example.com',
+      );
       expect(loadedAudit, hasLength(1));
       expect(loadedAudit.first.provider, 'Vault');
       expect(loadedAudit.first.target, 'vault_token');

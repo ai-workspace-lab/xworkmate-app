@@ -58,8 +58,11 @@ void main() {
 
     expect(reloaded.settings.aiGateway.baseUrl, 'https://api.example.com/v1');
     expect(reloaded.settings.defaultProvider, 'openai-compatible');
-    expect(reloaded.settings.gateway.host, 'relay.example.com');
-    expect(reloaded.settings.gateway.port, 443);
+    expect(
+      reloaded.settings.primaryRemoteGatewayProfile.host,
+      'relay.example.com',
+    );
+    expect(reloaded.settings.primaryRemoteGatewayProfile.port, 443);
     expect(
       reloaded.settings.webSessionPersistence.mode,
       WebSessionPersistenceMode.remote,

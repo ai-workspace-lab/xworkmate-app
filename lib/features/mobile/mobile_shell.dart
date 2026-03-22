@@ -362,7 +362,7 @@ class _MobileSafeStrip extends StatelessWidget {
     final hasPendingRun =
         controller.hasAssistantPendingRun || controller.activeRunId != null;
     final securePathLabel = _mobileSecurePathLabel(
-      profile: controller.settings.gateway,
+      profile: controller.settings.primaryRemoteGatewayProfile,
       connection: connection,
     );
 
@@ -549,7 +549,7 @@ class _MobileSafeSheet extends StatelessWidget {
                   controller.hasAssistantPendingRun ||
                   controller.activeRunId != null;
               final securePathLabel = _mobileSecurePathLabel(
-                profile: controller.settings.gateway,
+                profile: controller.settings.primaryRemoteGatewayProfile,
                 connection: connection,
               );
               final localDeviceLabel =
@@ -682,7 +682,10 @@ class _MobileSafeSheet extends StatelessWidget {
                                   child: Text(
                                     controller.canQuickConnectGateway
                                         ? appText('快速连接', 'Quick Connect')
-                                        : appText('打开集成设置', 'Open Integrations'),
+                                        : appText(
+                                            '打开集成设置',
+                                            'Open Integrations',
+                                          ),
                                   ),
                                 ),
                               if (hasPendingRun)
@@ -1147,7 +1150,7 @@ String _mobileTargetLabel(AppController controller) {
   if ((connection.remoteAddress ?? '').isNotEmpty) {
     return connection.remoteAddress!;
   }
-  final profile = controller.settings.gateway;
+  final profile = controller.settings.primaryRemoteGatewayProfile;
   final host = profile.host.trim();
   if (host.isNotEmpty && profile.port > 0) {
     return '$host:${profile.port}';

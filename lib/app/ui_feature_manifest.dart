@@ -200,16 +200,16 @@ mobile:
       ui_surface: mobile_workspace_hub
   assistant:
     direct_ai:
-      enabled: true
-      release_tier: stable
-      build_modes: [debug, profile, release]
-      description: Mobile direct AI assistant mode
+      enabled: false
+      release_tier: experimental
+      build_modes: []
+      description: Mobile does not expose direct AI assistant mode
       ui_surface: assistant_page
     local_gateway:
-      enabled: true
-      release_tier: stable
-      build_modes: [debug, profile, release]
-      description: Mobile local gateway assistant mode
+      enabled: false
+      release_tier: experimental
+      build_modes: []
+      description: Mobile does not expose local gateway assistant mode
       ui_surface: assistant_page
     relay_gateway:
       enabled: true
