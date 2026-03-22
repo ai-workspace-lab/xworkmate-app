@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../app/app_metadata.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,8 @@ class SecureConfigStore {
   static const _assistantThreadsKey = 'xworkmate.assistant.threads';
   static const _databaseFileName = 'config-store.sqlite3';
   static const _databaseTableName = 'config_entries';
+  static const _stateBackupFileName = 'assistant-state-backup.json';
+  static const _backupSchemaVersion = 1;
   static const _secureStorageTimeout = Duration(milliseconds: 400);
 
   static const _gatewayTokenKey = 'xworkmate.gateway.token';
@@ -68,34 +71,20 @@ class SecureConfigStore {
 
   Future<SettingsSnapshot> loadSettingsSnapshot() async {
     await initialize();
-    return SettingsSnapshot.fromJsonString(
-      await _readStoredString(_settingsKey),
-    );
+    final state = await _loadAssistantStateFromPrimaryOrBackup();
+    return state?.settings ?? SettingsSnapshot.defaults();
   }
 
   Future<void> saveSettingsSnapshot(SettingsSnapshot snapshot) async {
     await initialize();
     await _writeStoredString(_settingsKey, snapshot.toJsonString());
+    await _persistAssistantStateBackup(settings: snapshot);
   }
 
   Future<List<AssistantThreadRecord>> loadAssistantThreadRecords() async {
     await initialize();
-    final raw = await _readStoredString(_assistantThreadsKey);
-    if (raw == null || raw.trim().isEmpty) {
-      return const <AssistantThreadRecord>[];
-    }
-    try {
-      final decoded = jsonDecode(raw) as List<dynamic>;
-      return decoded
-          .whereType<Map>()
-          .map(
-            (item) =>
-                AssistantThreadRecord.fromJson(item.cast<String, dynamic>()),
-          )
-          .toList(growable: false);
-    } catch (_) {
-      return const <AssistantThreadRecord>[];
-    }
+    final state = await _loadAssistantStateFromPrimaryOrBackup();
+    return state?.assistantThreads ?? const <AssistantThreadRecord>[];
   }
 
   Future<void> saveAssistantThreadRecords(
@@ -106,6 +95,14 @@ class SecureConfigStore {
       _assistantThreadsKey,
       jsonEncode(records.map((item) => item.toJson()).toList(growable: false)),
     );
+    await _persistAssistantStateBackup(assistantThreads: records);
+  }
+
+  Future<void> clearAssistantLocalState() async {
+    await initialize();
+    await _deleteStoredString(_settingsKey);
+    await _deleteStoredString(_assistantThreadsKey);
+    await _deleteAssistantStateBackup();
   }
 
   Future<List<SecretAuditEntry>> loadAuditTrail() async {
@@ -326,6 +323,7 @@ class SecureConfigStore {
     }
     await _migrateLegacyPrefEntry(_settingsKey);
     await _migrateLegacyPrefEntry(_auditKey);
+    await _migrateLegacyPrefEntry(_assistantThreadsKey);
   }
 
   Future<void> _migrateLegacyPrefEntry(String key) async {
@@ -393,6 +391,25 @@ class SecureConfigStore {
     return _memoryStore[key];
   }
 
+  Future<void> _deleteStoredString(String key) async {
+    if (_database != null) {
+      try {
+        _database!.execute(
+          'DELETE FROM $_databaseTableName WHERE storage_key = ?',
+          <Object?>[key],
+        );
+      } catch (_) {
+        // Fall through to in-memory cleanup.
+      }
+    }
+    _memoryStore.remove(key);
+    try {
+      await _prefs?.remove(key);
+    } catch (_) {
+      // Ignore preference cleanup failures.
+    }
+  }
+
   Future<void> _writeStoredString(String key, String value) async {
     if (_database != null) {
       try {
@@ -403,6 +420,162 @@ class SecureConfigStore {
       }
     }
     _memoryStore[key] = value;
+  }
+
+  Future<_AssistantStateSnapshot?>
+  _loadAssistantStateFromPrimaryOrBackup() async {
+    final rawSettings = await _readStoredString(_settingsKey);
+    final rawThreads = await _readStoredString(_assistantThreadsKey);
+    final decodedSettings = _decodeSettingsSnapshot(rawSettings);
+    final decodedThreads = _decodeAssistantThreadRecords(rawThreads);
+    final primaryHasSettings = rawSettings != null;
+    final primaryHasThreads = rawThreads != null;
+    final primaryValid =
+        decodedSettings != null &&
+        decodedThreads != null &&
+        primaryHasSettings &&
+        primaryHasThreads;
+    if (primaryValid) {
+      return _AssistantStateSnapshot(
+        settings: decodedSettings,
+        assistantThreads: decodedThreads,
+      );
+    }
+    final backup = await _readAssistantStateBackup();
+    if (backup == null) {
+      return _AssistantStateSnapshot(
+        settings: decodedSettings ?? SettingsSnapshot.defaults(),
+        assistantThreads: decodedThreads ?? const <AssistantThreadRecord>[],
+      );
+    }
+    await _writeStoredString(_settingsKey, backup.settings.toJsonString());
+    await _writeStoredString(
+      _assistantThreadsKey,
+      jsonEncode(
+        backup.assistantThreads
+            .map((item) => item.toJson())
+            .toList(growable: false),
+      ),
+    );
+    return backup;
+  }
+
+  SettingsSnapshot? _decodeSettingsSnapshot(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      return SettingsSnapshot.fromJson(decoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<AssistantThreadRecord>? _decodeAssistantThreadRecords(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      return decoded
+          .whereType<Map>()
+          .map(
+            (item) =>
+                AssistantThreadRecord.fromJson(item.cast<String, dynamic>()),
+          )
+          .toList(growable: false);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _persistAssistantStateBackup({
+    SettingsSnapshot? settings,
+    List<AssistantThreadRecord>? assistantThreads,
+  }) async {
+    final resolvedSettings = settings ?? await loadSettingsSnapshot();
+    final resolvedThreads =
+        assistantThreads ?? await loadAssistantThreadRecords();
+    final payload = _AssistantStateSnapshot(
+      settings: resolvedSettings,
+      assistantThreads: resolvedThreads,
+    );
+    try {
+      final file = await _assistantStateBackupFile();
+      if (file == null) {
+        return;
+      }
+      await file.writeAsString(
+        jsonEncode(<String, dynamic>{
+          'schemaVersion': _backupSchemaVersion,
+          'appVersion': kAppVersion,
+          'backupCreatedAtMs': DateTime.now().millisecondsSinceEpoch,
+          'settings': payload.settings.toJson(),
+          'assistantThreads': payload.assistantThreads
+              .map((item) => item.toJson())
+              .toList(growable: false),
+        }),
+        flush: true,
+      );
+    } catch (_) {
+      return;
+    }
+  }
+
+  Future<_AssistantStateSnapshot?> _readAssistantStateBackup() async {
+    try {
+      final file = await _assistantStateBackupFile();
+      if (file == null || !await file.exists()) {
+        return null;
+      }
+      final decoded =
+          jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final settings = SettingsSnapshot.fromJson(
+        (decoded['settings'] as Map?)?.cast<String, dynamic>() ?? const {},
+      );
+      final threads = ((decoded['assistantThreads'] as List?) ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) =>
+                AssistantThreadRecord.fromJson(item.cast<String, dynamic>()),
+          )
+          .toList(growable: false);
+      return _AssistantStateSnapshot(
+        settings: settings,
+        assistantThreads: threads,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<File?> _assistantStateBackupFile() async {
+    try {
+      final resolvedPath = await _resolveDatabasePath();
+      if (resolvedPath == null || resolvedPath.trim().isEmpty) {
+        return null;
+      }
+      final directory = File(resolvedPath).parent;
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+      return File('${directory.path}/$_stateBackupFileName');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _deleteAssistantStateBackup() async {
+    try {
+      final file = await _assistantStateBackupFile();
+      if (file == null || !await file.exists()) {
+        return;
+      }
+      await file.delete();
+    } catch (_) {
+      return;
+    }
   }
 
   void _writeStoredStringInternal(String key, String value) {
@@ -637,4 +810,14 @@ class SecureConfigStore {
       return;
     }
   }
+}
+
+class _AssistantStateSnapshot {
+  const _AssistantStateSnapshot({
+    required this.settings,
+    required this.assistantThreads,
+  });
+
+  final SettingsSnapshot settings;
+  final List<AssistantThreadRecord> assistantThreads;
 }
