@@ -427,7 +427,9 @@ class AppController extends ChangeNotifier {
   }
 
   Future<String> testOllamaConnection({required bool cloud}) async {
-    return cloud ? 'Cloud test unavailable on web' : 'Local test unavailable on web';
+    return cloud
+        ? 'Cloud test unavailable on web'
+        : 'Local test unavailable on web';
   }
 
   Future<String> testOllamaConnectionDraft({
@@ -658,13 +660,19 @@ class AppController extends ChangeNotifier {
     required String token,
     required String password,
   }) async {
+    final remoteProfile = _settings.primaryRemoteGatewayProfile;
     _settings = _settings.copyWith(
-      gateway: _settings.gateway.copyWith(
-        mode: RuntimeConnectionMode.remote,
-        useSetupCode: false,
-        host: host.trim(),
-        port: port,
-        tls: tls,
+      gatewayProfiles: replaceGatewayProfileAt(
+        _settings.gatewayProfiles,
+        kGatewayRemoteProfileIndex,
+        remoteProfile.copyWith(
+          mode: RuntimeConnectionMode.remote,
+          useSetupCode: false,
+          setupCode: '',
+          host: host.trim(),
+          port: port,
+          tls: tls,
+        ),
       ),
     );
     _relayTokenCache = token.trim();
@@ -679,11 +687,13 @@ class AppController extends ChangeNotifier {
     _relayBusy = true;
     notifyListeners();
     try {
+      final remoteProfile = _settings.primaryRemoteGatewayProfile.copyWith(
+        mode: RuntimeConnectionMode.remote,
+        useSetupCode: false,
+        setupCode: '',
+      );
       await _relayClient.connect(
-        profile: _settings.gateway.copyWith(
-          mode: RuntimeConnectionMode.remote,
-          useSetupCode: false,
-        ),
+        profile: remoteProfile,
         authToken: _relayTokenCache,
         authPassword: _relayPasswordCache,
       );
@@ -913,11 +923,14 @@ class AppController extends ChangeNotifier {
         '';
     return snapshot.copyWith(
       assistantExecutionTarget: target,
-      gateway: snapshot.gateway.copyWith(
-        mode: target == AssistantExecutionTarget.remote
-            ? RuntimeConnectionMode.remote
-            : RuntimeConnectionMode.unconfigured,
-        useSetupCode: false,
+      gatewayProfiles: replaceGatewayProfileAt(
+        snapshot.gatewayProfiles,
+        kGatewayRemoteProfileIndex,
+        snapshot.primaryRemoteGatewayProfile.copyWith(
+          mode: RuntimeConnectionMode.remote,
+          useSetupCode: false,
+          setupCode: '',
+        ),
       ),
       webSessionPersistence: snapshot.webSessionPersistence.copyWith(
         remoteBaseUrl: normalizedSessionBaseUrl,

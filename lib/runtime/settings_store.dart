@@ -771,6 +771,7 @@ class SettingsStore {
   bool _looksLikeSettingsSnapshot(Map<String, dynamic> json) {
     return json.containsKey('appLanguage') ||
         json.containsKey('gateway') ||
+        json.containsKey('gatewayProfiles') ||
         json.containsKey('aiGateway') ||
         json.containsKey('accountUsername') ||
         json.containsKey('assistantExecutionTarget');
