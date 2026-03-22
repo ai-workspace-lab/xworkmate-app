@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/app_controller.dart';
+import '../app/ui_feature_manifest.dart';
 import '../i18n/app_language.dart';
 import '../runtime/runtime_bootstrap.dart';
 import '../runtime/runtime_models.dart';
@@ -86,6 +87,15 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final uiFeatures = widget.controller.featuresFor(
+      resolveUiFeaturePlatformFromContext(context),
+    );
+    _connectionMode = _sanitizeConnectionMode(_connectionMode, uiFeatures);
+  }
+
+  @override
   void dispose() {
     _setupCodeController.dispose();
     _hostController.dispose();
@@ -97,6 +107,10 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final uiFeatures = widget.controller.featuresFor(
+      resolveUiFeaturePlatformFromContext(context),
+    );
+    final availableConnectionModes = _availableConnectionModes(uiFeatures);
     final theme = Theme.of(context);
     final palette = context.palette;
     final horizontalPadding = widget.compact ? 20.0 : 24.0;
@@ -198,7 +212,7 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
                 decoration: InputDecoration(
                   labelText: appText('工作模式', 'Work Mode'),
                 ),
-                items: RuntimeConnectionMode.values
+                items: availableConnectionModes
                     .map(
                       (mode) => DropdownMenuItem<RuntimeConnectionMode>(
                         value: mode,
@@ -455,6 +469,30 @@ class _GatewayConnectDialogState extends State<GatewayConnectDialog> {
         setState(() => _submitting = false);
       }
     }
+  }
+
+  List<RuntimeConnectionMode> _availableConnectionModes(
+    UiFeatureAccess uiFeatures,
+  ) {
+    return <RuntimeConnectionMode>[
+      if (uiFeatures.supportsDirectAi) RuntimeConnectionMode.unconfigured,
+      if (uiFeatures.supportsLocalGateway) RuntimeConnectionMode.local,
+      if (uiFeatures.supportsRelayGateway) RuntimeConnectionMode.remote,
+    ];
+  }
+
+  RuntimeConnectionMode _sanitizeConnectionMode(
+    RuntimeConnectionMode mode,
+    UiFeatureAccess uiFeatures,
+  ) {
+    final available = _availableConnectionModes(uiFeatures);
+    if (available.contains(mode)) {
+      return mode;
+    }
+    if (available.isNotEmpty) {
+      return available.first;
+    }
+    return RuntimeConnectionMode.unconfigured;
   }
 }
 

@@ -48,6 +48,7 @@ class _AssistantFocusPanelState extends State<AssistantFocusPanel> {
     final palette = context.palette;
     final favorites = widget.controller.assistantNavigationDestinations;
     final available = kAssistantNavigationDestinationCandidates
+        .where(widget.controller.capabilities.supportsDestination)
         .where((item) => !favorites.contains(item))
         .toList(growable: false);
 

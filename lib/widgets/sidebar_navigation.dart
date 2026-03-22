@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_brand_logo.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
@@ -24,6 +25,7 @@ class SidebarNavigation extends StatelessWidget {
     this.expandedWidthOverride,
     this.marginOverride,
     this.showCollapseControl = true,
+    this.availableDestinations,
     this.favoriteDestinations = const <WorkspaceDestination>{},
     this.onToggleFavorite,
   });
@@ -44,6 +46,7 @@ class SidebarNavigation extends StatelessWidget {
   final double? expandedWidthOverride;
   final EdgeInsetsGeometry? marginOverride;
   final bool showCollapseControl;
+  final Set<WorkspaceDestination>? availableDestinations;
   final Set<WorkspaceDestination> favoriteDestinations;
   final Future<void> Function(WorkspaceDestination section)? onToggleFavorite;
 
@@ -70,6 +73,9 @@ class SidebarNavigation extends StatelessWidget {
     final palette = context.palette;
     final isExpanded = sidebarState == AppSidebarState.expanded;
     final isCollapsed = sidebarState == AppSidebarState.collapsed;
+    final primarySections = _filterSections(_primarySections);
+    final workspaceSections = _filterSections(_workspaceSections);
+    final toolSections = _filterSections(_toolSections);
     final expandedWidth =
         expandedWidthOverride ??
         (appLanguage == AppLanguage.zh
@@ -115,41 +121,46 @@ class SidebarNavigation extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _SidebarSectionGroup(
-                            sections: _primarySections,
-                            currentSection: currentSection,
-                            collapsed: isCollapsed,
-                            emphasis: _SidebarItemEmphasis.primary,
-                            favoriteDestinations: favoriteDestinations,
-                            onToggleFavorite: onToggleFavorite,
-                            onSectionChanged: onSectionChanged,
-                          ),
-                          const SizedBox(height: 6),
-                          _SidebarSectionGroup(
-                            title: appText('工作区', 'Workspace'),
-                            sections: _workspaceSections,
-                            currentSection: currentSection,
-                            collapsed: isCollapsed,
-                            emphasis: _SidebarItemEmphasis.secondary,
-                            favoriteDestinations: favoriteDestinations,
-                            onToggleFavorite: onToggleFavorite,
-                            onSectionChanged: onSectionChanged,
-                          ),
+                          if (primarySections.isNotEmpty)
+                            _SidebarSectionGroup(
+                              sections: primarySections,
+                              currentSection: currentSection,
+                              collapsed: isCollapsed,
+                              emphasis: _SidebarItemEmphasis.primary,
+                              favoriteDestinations: favoriteDestinations,
+                              onToggleFavorite: onToggleFavorite,
+                              onSectionChanged: onSectionChanged,
+                            ),
+                          if (primarySections.isNotEmpty &&
+                              workspaceSections.isNotEmpty)
+                            const SizedBox(height: 6),
+                          if (workspaceSections.isNotEmpty)
+                            _SidebarSectionGroup(
+                              title: appText('工作区', 'Workspace'),
+                              sections: workspaceSections,
+                              currentSection: currentSection,
+                              collapsed: isCollapsed,
+                              emphasis: _SidebarItemEmphasis.secondary,
+                              favoriteDestinations: favoriteDestinations,
+                              onToggleFavorite: onToggleFavorite,
+                              onSectionChanged: onSectionChanged,
+                            ),
                         ],
                       ),
                     ),
                   ),
-                  _SidebarSectionGroup(
-                    title: appText('工具', 'Tools'),
-                    sections: _toolSections,
-                    currentSection: currentSection,
-                    collapsed: isCollapsed,
-                    emphasis: _SidebarItemEmphasis.secondary,
-                    favoriteDestinations: favoriteDestinations,
-                    onToggleFavorite: onToggleFavorite,
-                    onSectionChanged: onSectionChanged,
-                  ),
-                  const SizedBox(height: 6),
+                  if (toolSections.isNotEmpty)
+                    _SidebarSectionGroup(
+                      title: appText('工具', 'Tools'),
+                      sections: toolSections,
+                      currentSection: currentSection,
+                      collapsed: isCollapsed,
+                      emphasis: _SidebarItemEmphasis.secondary,
+                      favoriteDestinations: favoriteDestinations,
+                      onToggleFavorite: onToggleFavorite,
+                      onSectionChanged: onSectionChanged,
+                    ),
+                  if (toolSections.isNotEmpty) const SizedBox(height: 6),
                   SidebarFooter(
                     isCollapsed: isCollapsed,
                     currentSection: currentSection,
@@ -159,9 +170,19 @@ class SidebarNavigation extends StatelessWidget {
                     onOpenThemeToggle: onOpenThemeToggle,
                     onOpenSettings: () =>
                         onSectionChanged(WorkspaceDestination.settings),
+                    showSettingsButton:
+                        availableDestinations == null ||
+                        availableDestinations!.contains(
+                          WorkspaceDestination.settings,
+                        ),
                     sidebarState: sidebarState,
                     onCycleSidebarState: onCycleSidebarState,
                     onOpenAccount: onOpenAccount,
+                    showAccountButton:
+                        availableDestinations == null ||
+                        availableDestinations!.contains(
+                          WorkspaceDestination.account,
+                        ),
                     accountName: accountName,
                     accountSubtitle: accountSubtitle,
                     accountSelected:
@@ -177,6 +198,16 @@ class SidebarNavigation extends StatelessWidget {
       ),
     );
   }
+
+  List<WorkspaceDestination> _filterSections(
+    List<WorkspaceDestination> sections,
+  ) {
+    final allowed = availableDestinations;
+    if (allowed == null) {
+      return sections;
+    }
+    return sections.where(allowed.contains).toList(growable: false);
+  }
 }
 
 class SidebarHeader extends StatelessWidget {
@@ -187,29 +218,9 @@ class SidebarHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
-
-    final content = Container(
-      width: isCollapsed ? 36 : 28,
-      height: isCollapsed ? 36 : 28,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            palette.chromeHighlight.withValues(alpha: 0.88),
-            palette.chromeSurfacePressed.withValues(alpha: 0.92),
-          ],
-        ),
-        border: Border.all(color: palette.chromeStroke),
-        boxShadow: [palette.chromeShadowLift],
-      ),
-      child: Icon(
-        Icons.crop_square_rounded,
-        color: palette.textSecondary,
-        size: AppSizes.sidebarIconSize,
-      ),
+    final content = AppBrandLogo(
+      size: isCollapsed ? 36 : 28,
+      borderRadius: isCollapsed ? 10 : 8,
     );
 
     if (onTap == null) {
@@ -507,9 +518,11 @@ class SidebarFooter extends StatelessWidget {
     required this.onToggleLanguage,
     required this.onOpenThemeToggle,
     required this.onOpenSettings,
+    required this.showSettingsButton,
     required this.sidebarState,
     required this.onCycleSidebarState,
     required this.onOpenAccount,
+    required this.showAccountButton,
     required this.accountName,
     required this.accountSubtitle,
     required this.accountSelected,
@@ -524,9 +537,11 @@ class SidebarFooter extends StatelessWidget {
   final VoidCallback onToggleLanguage;
   final VoidCallback onOpenThemeToggle;
   final VoidCallback onOpenSettings;
+  final bool showSettingsButton;
   final AppSidebarState sidebarState;
   final VoidCallback onCycleSidebarState;
   final VoidCallback onOpenAccount;
+  final bool showAccountButton;
   final String accountName;
   final String accountSubtitle;
   final bool accountSelected;
@@ -574,12 +589,14 @@ class SidebarFooter extends StatelessWidget {
             ),
             const SizedBox(height: 6),
           ],
-          _SidebarActionButton(
-            icon: Icons.tune_rounded,
-            tooltip: appText('设置', 'Settings'),
-            onPressed: onOpenSettings,
-          ),
-          const SizedBox(height: 6),
+          if (showSettingsButton) ...[
+            _SidebarActionButton(
+              icon: Icons.tune_rounded,
+              tooltip: appText('设置', 'Settings'),
+              onPressed: onOpenSettings,
+            ),
+            const SizedBox(height: 6),
+          ],
           if (onOpenOnlineWorkspace != null) ...[
             _SidebarActionButton(
               icon: Icons.open_in_new_rounded,
@@ -588,14 +605,15 @@ class SidebarFooter extends StatelessWidget {
             ),
             const SizedBox(height: 6),
           ],
-          _SidebarAccountTile(
-            selected: accountSelected,
-            onTap: onOpenAccount,
-            name: accountName,
-            subtitle: accountSubtitle,
-            onlineActionLabel: appText('在线版', 'Online'),
-            onOpenOnlineWorkspace: onOpenOnlineWorkspace,
-          ),
+          if (showAccountButton)
+            _SidebarAccountTile(
+              selected: accountSelected,
+              onTap: onOpenAccount,
+              name: accountName,
+              subtitle: accountSubtitle,
+              onlineActionLabel: appText('在线版', 'Online'),
+              onOpenOnlineWorkspace: onOpenOnlineWorkspace,
+            ),
         ],
       );
     }
@@ -609,16 +627,18 @@ class SidebarFooter extends StatelessWidget {
           color: palette.chromeStroke.withValues(alpha: 0.9),
         ),
         const SizedBox(height: AppSpacing.xs),
-        _SidebarNavItem(
-          section: WorkspaceDestination.settings,
-          selected: currentSection == WorkspaceDestination.settings,
-          collapsed: false,
-          emphasis: _SidebarItemEmphasis.secondary,
-          favorite: false,
-          showFavoriteToggle: false,
-          onTap: onOpenSettings,
-        ),
-        const SizedBox(height: AppSpacing.xs),
+        if (showSettingsButton) ...[
+          _SidebarNavItem(
+            section: WorkspaceDestination.settings,
+            selected: currentSection == WorkspaceDestination.settings,
+            collapsed: false,
+            emphasis: _SidebarItemEmphasis.secondary,
+            favorite: false,
+            showFavoriteToggle: false,
+            onTap: onOpenSettings,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
         Row(
           children: [
             Expanded(
@@ -649,14 +669,15 @@ class SidebarFooter extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.xs),
-        _SidebarAccountTile(
-          selected: accountSelected,
-          onTap: onOpenAccount,
-          name: accountName,
-          subtitle: accountSubtitle,
-          onlineActionLabel: appText('在线版', 'Online'),
-          onOpenOnlineWorkspace: onOpenOnlineWorkspace,
-        ),
+        if (showAccountButton)
+          _SidebarAccountTile(
+            selected: accountSelected,
+            onTap: onOpenAccount,
+            name: accountName,
+            subtitle: accountSubtitle,
+            onlineActionLabel: appText('在线版', 'Online'),
+            onOpenOnlineWorkspace: onOpenOnlineWorkspace,
+          ),
       ],
     );
   }

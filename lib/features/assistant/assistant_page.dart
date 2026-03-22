@@ -9,6 +9,7 @@ import 'package:markdown/markdown.dart' as md;
 
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
+import '../../app/ui_feature_manifest.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/multi_agent_orchestrator.dart';
@@ -524,6 +525,12 @@ class _AssistantPageState extends State<AssistantPage> {
   }
 
   Future<void> _pickAttachments() async {
+    final uiFeatures = widget.controller.featuresFor(
+      resolveUiFeaturePlatformFromContext(context),
+    );
+    if (!uiFeatures.supportsFileAttachments) {
+      return;
+    }
     final files = await openFiles(
       acceptedTypeGroups: const [
         XTypeGroup(
@@ -551,6 +558,9 @@ class _AssistantPageState extends State<AssistantPage> {
 
   Future<void> _submitPrompt() async {
     final controller = widget.controller;
+    final uiFeatures = controller.featuresFor(
+      resolveUiFeaturePlatformFromContext(context),
+    );
     final settings = controller.settings;
     final executionTarget = controller.assistantExecutionTarget;
     final rawPrompt = _inputController.text.trim();
@@ -608,7 +618,8 @@ class _AssistantPageState extends State<AssistantPage> {
       );
     });
 
-    if (controller.settings.multiAgent.enabled) {
+    if (uiFeatures.supportsMultiAgent &&
+        controller.settings.multiAgent.enabled) {
       final collaborationAttachments = _attachments
           .map(
             (item) => CollaborationAttachment(
@@ -2386,6 +2397,9 @@ class _ComposerBarState extends State<_ComposerBar> {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final controller = widget.controller;
+    final uiFeatures = controller.featuresFor(
+      resolveUiFeaturePlatformFromContext(context),
+    );
     final aiGatewayOnly = controller.isAiGatewayOnlyMode;
     final connected = aiGatewayOnly
         ? controller.canUseAiGatewayConversation
@@ -2417,37 +2431,39 @@ class _ComposerBarState extends State<_ComposerBar> {
         children: [
           Row(
             children: [
-              PopupMenuButton<String>(
-                key: const Key('assistant-attachment-menu-button'),
-                tooltip: appText('添加文件等', 'Add files'),
-                offset: const Offset(0, 48),
-                onSelected: (value) {
-                  switch (value) {
-                    case 'attach':
-                      widget.onPickAttachments();
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem<String>(
-                    value: 'attach',
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.attach_file_rounded),
-                      title: Text('添加照片和文件'),
+              if (uiFeatures.supportsFileAttachments) ...[
+                PopupMenuButton<String>(
+                  key: const Key('assistant-attachment-menu-button'),
+                  tooltip: appText('添加文件等', 'Add files'),
+                  offset: const Offset(0, 48),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'attach':
+                        widget.onPickAttachments();
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem<String>(
+                      value: 'attach',
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.attach_file_rounded),
+                        title: Text('添加照片和文件'),
+                      ),
                     ),
-                  ),
-                ],
-                child: const _ComposerIconButton(icon: Icons.add_rounded),
-              ),
-              const SizedBox(width: 6),
+                  ],
+                  child: const _ComposerIconButton(icon: Icons.add_rounded),
+                ),
+                const SizedBox(width: 6),
+              ],
               PopupMenuButton<AssistantExecutionTarget>(
                 key: const Key('assistant-execution-target-button'),
                 tooltip: appText('任务对话模式', 'Task Dialog Mode'),
                 onSelected: (value) {
                   controller.setAssistantExecutionTarget(value);
                 },
-                itemBuilder: (context) => AssistantExecutionTarget.values
+                itemBuilder: (context) => uiFeatures.availableExecutionTargets
                     .map(
                       (value) => PopupMenuItem<AssistantExecutionTarget>(
                         value: value,
@@ -2475,62 +2491,65 @@ class _ComposerBarState extends State<_ComposerBar> {
                 ),
               ),
               const SizedBox(width: 4),
-              Tooltip(
-                message: appText(
-                  '多 Agent 协作模式（Architect 调度/文档 → Lead Engineer 主程 → Worker/Review）',
-                  'Multi-Agent Collaboration Mode (Architect docs/scheduler -> Lead Engineer -> Worker/Review)',
+              if (uiFeatures.supportsMultiAgent) ...[
+                Tooltip(
+                  message: appText(
+                    '多 Agent 协作模式（Architect 调度/文档 → Lead Engineer 主程 → Worker/Review）',
+                    'Multi-Agent Collaboration Mode (Architect docs/scheduler -> Lead Engineer -> Worker/Review)',
+                  ),
+                  child: AnimatedBuilder(
+                    animation: controller.multiAgentOrchestrator,
+                    builder: (context, _) {
+                      final collab = controller.multiAgentOrchestrator;
+                      final enabled = collab.config.enabled;
+                      return IconButton(
+                        key: const Key('assistant-collaboration-toggle'),
+                        icon: Icon(
+                          enabled
+                              ? Icons.auto_awesome
+                              : Icons.auto_awesome_outlined,
+                          size: 20,
+                          color: enabled ? Colors.orange : null,
+                        ),
+                        onPressed:
+                            collab.isRunning ||
+                                controller.isMultiAgentRunPending
+                            ? null
+                            : () => unawaited(
+                                controller.saveMultiAgentConfig(
+                                  collab.config.copyWith(enabled: !enabled),
+                                ),
+                              ),
+                        splashRadius: 18,
+                      );
+                    },
+                  ),
                 ),
-                child: AnimatedBuilder(
+                AnimatedBuilder(
                   animation: controller.multiAgentOrchestrator,
                   builder: (context, _) {
                     final collab = controller.multiAgentOrchestrator;
-                    final enabled = collab.config.enabled;
-                    return IconButton(
-                      key: const Key('assistant-collaboration-toggle'),
-                      icon: Icon(
-                        enabled
-                            ? Icons.auto_awesome
-                            : Icons.auto_awesome_outlined,
-                        size: 20,
-                        color: enabled ? Colors.orange : null,
+                    if (!collab.config.enabled) {
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: _ComposerToolbarChip(
+                        icon: Icons.hub_rounded,
+                        label: collab.config.usesAris
+                            ? appText('ARIS', 'ARIS')
+                            : appText('原生', 'Native'),
+                        showChevron: false,
+                        maxLabelWidth: 64,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
                       ),
-                      onPressed:
-                          collab.isRunning || controller.isMultiAgentRunPending
-                          ? null
-                          : () => unawaited(
-                              controller.saveMultiAgentConfig(
-                                collab.config.copyWith(enabled: !enabled),
-                              ),
-                            ),
-                      splashRadius: 18,
                     );
                   },
                 ),
-              ),
-              AnimatedBuilder(
-                animation: controller.multiAgentOrchestrator,
-                builder: (context, _) {
-                  final collab = controller.multiAgentOrchestrator;
-                  if (!collab.config.enabled) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(left: 4),
-                    child: _ComposerToolbarChip(
-                      icon: Icons.hub_rounded,
-                      label: collab.config.usesAris
-                          ? appText('ARIS', 'ARIS')
-                          : appText('原生', 'Native'),
-                      showChevron: false,
-                      maxLabelWidth: 64,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 6,
-                      ),
-                    ),
-                  );
-                },
-              ),
+              ],
             ],
           ),
           const SizedBox(height: 8),

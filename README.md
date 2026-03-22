@@ -28,6 +28,15 @@ XWorkmate is an AI workspace shell built with Flutter.
 - Expanded task CRUD beyond the current assistant-thread-first workflow
 - Expanded memory APIs beyond `memory/sync`
 
+## Feature Planning
+
+- Source of truth: [config/feature_flags.yaml](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/config/feature_flags.yaml)
+- UI feature matrix: [docs/planning/xworkmate-ui-feature-matrix.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/planning/xworkmate-ui-feature-matrix.md)
+- Release roadmap: [docs/planning/xworkmate-ui-feature-roadmap.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/planning/xworkmate-ui-feature-roadmap.md)
+- Release notes: [docs/releases/xworkmate-release-notes.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/releases/xworkmate-release-notes.md)
+- Changelog: [docs/releases/xworkmate-changelog.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/releases/xworkmate-changelog.md)
+- Render command: `make render-release-docs`
+
 ## Known Issues
 
 - ARIS local-first collaboration still depends on a reachable local Ollama endpoint for the strongest offline workflow.
