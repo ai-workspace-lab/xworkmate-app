@@ -463,19 +463,81 @@ void main() {
     final resizeHandle = find.byKey(
       const Key('assistant-composer-resize-handle'),
     );
+    final conversationShell = find.byKey(
+      const Key('assistant-conversation-shell'),
+    );
+    final composerShell = find.byKey(const Key('assistant-composer-shell'));
 
     expect(inputArea, findsOneWidget);
     expect(resizeHandle, findsOneWidget);
+    expect(conversationShell, findsOneWidget);
+    expect(composerShell, findsOneWidget);
 
     final initialHeight = tester.getSize(inputArea).height;
+    final initialComposerHeight = tester.getRect(composerShell).height;
+    final initialConversationHeight = tester.getRect(conversationShell).height;
 
     await tester.drag(resizeHandle, const Offset(0, 40));
     await tester.pumpAndSettle();
 
     final expandedHeight = tester.getSize(inputArea).height;
+    final expandedComposerHeight = tester.getRect(composerShell).height;
+    final expandedConversationHeight = tester.getRect(conversationShell).height;
 
     expect(expandedHeight, greaterThan(initialHeight));
+    expect(expandedComposerHeight, greaterThan(initialComposerHeight));
+    expect(expandedConversationHeight, lessThan(initialConversationHeight));
   });
+
+  testWidgets(
+    'AssistantPage grows the composer shell for selected skills in short windows',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
+
+      await pumpPage(
+        tester,
+        size: const Size(1600, 620),
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+      );
+
+      final conversationShell = find.byKey(
+        const Key('assistant-conversation-shell'),
+      );
+      final composerShell = find.byKey(const Key('assistant-composer-shell'));
+      final skillPickerButton = find.byKey(
+        const Key('assistant-skill-picker-button'),
+      );
+
+      expect(conversationShell, findsOneWidget);
+      expect(composerShell, findsOneWidget);
+
+      final initialComposerHeight = tester.getRect(composerShell).height;
+      final initialConversationBottom = tester
+          .getRect(conversationShell)
+          .bottom;
+
+      await tester.tap(skillPickerButton);
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('assistant-skill-option-xlsx')),
+      );
+      await tester.pumpAndSettle();
+
+      final expandedComposerHeight = tester.getRect(composerShell).height;
+      final expandedConversationBottom = tester
+          .getRect(conversationShell)
+          .bottom;
+
+      expect(expandedComposerHeight, greaterThan(initialComposerHeight));
+      expect(
+        expandedConversationBottom,
+        lessThanOrEqualTo(tester.getRect(composerShell).top),
+      );
+      expect(expandedConversationBottom, lessThan(initialConversationBottom));
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   // Known flutter_tester host-exit hang in this widget scenario.
   testWidgets(
