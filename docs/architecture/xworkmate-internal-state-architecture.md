@@ -29,8 +29,9 @@ Platform runtime matrix
 
 - Desktop runtime:
   - Platforms: macOS, Windows, Linux
-  - Linux desktop shells explicitly supported in runtime integration: GNOME
-    (GTK) and KDE Plasma (Qt)
+  - Linux desktop shell support: GTK-based (GNOME/KDE/XFCE etc.);
+    KDE Plasma (Qt) integration is a future direction, not yet implemented in
+    runtime code
   - Fixed work modes: AI Gateway, Local OpenClaw Gateway, Remote OpenClaw
     Gateway
 - Mobile runtime:
@@ -259,6 +260,8 @@ Responsibilities:
 - Isolate thread behavior from other threads
 - Preserve per-thread mode, skills, model, and content
 - Allow thread state to differ from global default settings
+- Carry the authoritative `messages` list for the session (the primary
+  conversation content; see also Section 3.4 for all content sources)
 
 Important rule:
 If a value exists in AssistantThreadRecord for a session, that thread-level
