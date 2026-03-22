@@ -56,6 +56,16 @@ class _FakeCodexRuntime extends CodexRuntime {
   Future<void> stop() async {}
 }
 
+class _AiGatewayPageTestController extends AppController {
+  _AiGatewayPageTestController({
+    required super.store,
+    required super.runtimeCoordinator,
+  });
+
+  @override
+  Future<void> refreshMultiAgentMounts({bool sync = false}) async {}
+}
+
 void main() {
   testWidgets('AiGatewayPage edit settings opens detail context', (
     WidgetTester tester,
@@ -82,10 +92,18 @@ void main() {
     'Settings external agents detail shows Codex bridge runtime states',
     (WidgetTester tester) async {
       late AppController controller;
+      late Directory testRoot;
       await tester.runAsync(() async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
-        final store = SecureConfigStore();
-        controller = AppController(
+        testRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-ai-gateway-page-',
+        );
+        final store = SecureConfigStore(
+          enableSecureStorage: false,
+          databasePathResolver: () async => '${testRoot.path}/settings.sqlite3',
+          fallbackDirectoryPathResolver: () async => testRoot.path,
+        );
+        controller = _AiGatewayPageTestController(
           store: store,
           runtimeCoordinator: RuntimeCoordinator(
             gateway: _FakeGatewayRuntime(),
@@ -95,6 +113,11 @@ void main() {
         await _waitFor(() => !controller.initializing);
       });
       addTearDown(() => controller.dispose());
+      addTearDown(() async {
+        if (await testRoot.exists()) {
+          await testRoot.delete(recursive: true);
+        }
+      });
 
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(1600, 1000);

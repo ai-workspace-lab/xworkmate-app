@@ -426,6 +426,43 @@ class AppController extends ChangeNotifier {
     _saveSecretDraft(_draftOllamaApiKeyKey, value);
   }
 
+  Future<String> testOllamaConnection({required bool cloud}) async {
+    return cloud ? 'Cloud test unavailable on web' : 'Local test unavailable on web';
+  }
+
+  Future<String> testOllamaConnectionDraft({
+    required bool cloud,
+    required SettingsSnapshot snapshot,
+    String apiKeyOverride = '',
+  }) async {
+    return testOllamaConnection(cloud: cloud);
+  }
+
+  Future<String> testVaultConnection() async {
+    return 'Vault test unavailable on web';
+  }
+
+  Future<String> testVaultConnectionDraft({
+    required SettingsSnapshot snapshot,
+    String tokenOverride = '',
+  }) async {
+    return testVaultConnection();
+  }
+
+  Future<({String state, String message, String endpoint})>
+  testGatewayConnectionDraft({
+    required GatewayConnectionProfile profile,
+    required AssistantExecutionTarget executionTarget,
+    String tokenOverride = '',
+    String passwordOverride = '',
+  }) async {
+    return (
+      state: 'unsupported',
+      message: 'Gateway test unavailable on web',
+      endpoint: '',
+    );
+  }
+
   Future<void> persistSettingsDraft() async {
     if (!hasSettingsDraftChanges) {
       _settingsDraftStatusMessage = appText(

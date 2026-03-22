@@ -4,38 +4,44 @@ library;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/features/settings/settings_page.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
-import 'package:xworkmate/theme/app_theme.dart';
+
+import '../test_support.dart';
 
 void main() {
   testWidgets(
     'SettingsPage AI Gateway draft/save/apply flow persists edited fields through the global actions',
     (WidgetTester tester) async {
-      late AppController controller;
+      late _AiGatewaySettingsTestController controller;
       await tester.runAsync(() async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
-        controller = AppController(
+        final testRoot =
+            '${Directory.systemTemp.path}/xworkmate-widget-tests-${DateTime.now().microsecondsSinceEpoch}';
+        controller = _AiGatewaySettingsTestController(
           store: SecureConfigStore(
             enableSecureStorage: false,
-            fallbackDirectoryPathResolver: () async =>
-                '${Directory.systemTemp.path}/xworkmate-widget-tests',
+            databasePathResolver: () async => '$testRoot/settings.sqlite3',
+            fallbackDirectoryPathResolver: () async => testRoot,
           ),
         );
         await _waitFor(() => !controller.initializing);
-        final staleGateway = controller.settings.aiGateway.copyWith(
-          name: 'default',
-          baseUrl: '',
-          apiKeyRef: 'ai_gateway_api_key',
-          availableModels: const <String>['stale-model'],
-          selectedModels: const <String>['stale-model'],
-          syncState: 'invalid',
-          syncMessage: 'Missing AI Gateway URL',
-        );
+      });
+      addTearDown(controller.dispose);
+
+      final staleGateway = controller.settings.aiGateway.copyWith(
+        name: 'default',
+        baseUrl: '',
+        apiKeyRef: 'ai_gateway_api_key',
+        availableModels: const <String>['stale-model'],
+        selectedModels: const <String>['stale-model'],
+        syncState: 'invalid',
+        syncMessage: 'Missing AI Gateway URL',
+      );
+      await tester.runAsync(() async {
         await controller.saveSettings(
           controller.settings.copyWith(
             aiGateway: staleGateway,
@@ -46,29 +52,14 @@ void main() {
           refreshAfterSave: false,
         );
       });
-      addTearDown(controller.dispose);
 
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(1600, 1000);
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-
-      await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('zh'),
-          supportedLocales: const [Locale('zh'), Locale('en')],
-          localizationsDelegates: GlobalMaterialLocalizations.delegates,
-          theme: AppTheme.light(),
-          darkTheme: AppTheme.dark(),
-          home: Scaffold(body: SettingsPage(controller: controller)),
-        ),
+      await pumpPage(
+        tester,
+        child: SettingsPage(controller: controller),
       );
-      await tester.pump(const Duration(milliseconds: 200));
 
       await tester.tap(find.text('集成'));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
 
       await tester.enterText(
         find.byKey(const ValueKey('ai-gateway-name-field')),
@@ -82,10 +73,6 @@ void main() {
         find.byKey(const ValueKey('ai-gateway-api-key-ref-field')),
         'ai_gateway_api_key',
       );
-      await tester.enterText(
-        find.byKey(const ValueKey('ai-gateway-api-key-field')),
-        'live-secret',
-      );
 
       expect(
         tester
@@ -96,21 +83,8 @@ void main() {
             .text,
         'https://api.svc.plus/v1',
       );
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('ai-gateway-save-draft-button')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('ai-gateway-save-draft-button')),
-      );
-      await tester.pumpAndSettle();
-
-      expect(controller.settings.aiGateway.baseUrl, isEmpty);
-      expect(
-        controller.settingsDraft.aiGateway.baseUrl,
-        'https://api.svc.plus/v1',
-      );
-
+      expect(find.byKey(const ValueKey('ai-gateway-save-button')), findsOneWidget);
+      expect(find.byKey(const ValueKey('ai-gateway-apply-button')), findsOneWidget);
       expect(
         find.byKey(const ValueKey('settings-global-save-button')),
         findsOneWidget,
@@ -119,20 +93,30 @@ void main() {
         find.byKey(const ValueKey('settings-global-apply-button')),
         findsOneWidget,
       );
+
+      expect(controller.settingsDraft.aiGateway.baseUrl, 'https://api.svc.plus/v1');
+      expect(controller.settings.aiGateway.baseUrl, isEmpty);
+
+      final saveButton = tester.widget<OutlinedButton>(
+        find.byKey(const ValueKey('ai-gateway-save-button')),
+      );
       await tester.runAsync(() async {
-        await controller.persistSettingsDraft();
-      });
-      await tester.runAsync(() async {
+        saveButton.onPressed!.call();
         await _waitFor(() => controller.hasPendingSettingsApply);
       });
-      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(controller.hasPendingSettingsApply, isTrue);
+      expect(controller.settings.aiGateway.baseUrl, 'https://api.svc.plus/v1');
 
+      final applyButton = tester.widget<FilledButton>(
+        find.byKey(const ValueKey('ai-gateway-apply-button')),
+      );
       await tester.runAsync(() async {
-        await controller.applySettingsDraft();
+        applyButton.onPressed!.call();
+        await _waitFor(() => !controller.hasPendingSettingsApply);
       });
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(controller.settings.aiGateway.name, 'default');
       expect(controller.settings.aiGateway.baseUrl, 'https://api.svc.plus/v1');
@@ -148,11 +132,18 @@ void main() {
   );
 }
 
+class _AiGatewaySettingsTestController extends AppController {
+  _AiGatewaySettingsTestController({super.store});
+
+  @override
+  Future<void> refreshMultiAgentMounts({bool sync = false}) async {}
+}
+
 Future<void> _waitFor(bool Function() predicate) async {
   final deadline = DateTime.now().add(const Duration(seconds: 10));
   while (!predicate()) {
     if (DateTime.now().isAfter(deadline)) {
-      fail('condition not met before timeout');
+      throw StateError('condition not met before timeout');
     }
     await Future<void>.delayed(const Duration(milliseconds: 20));
   }
