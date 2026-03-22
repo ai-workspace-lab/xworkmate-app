@@ -149,6 +149,88 @@ void main() {
   );
 
   test(
+    'SecureConfigStore throws when durable settings path cannot be opened and in-memory fallback is disabled',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-fail-fast-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final store = SecureConfigStore(
+        allowInMemoryFallback: false,
+        databasePathResolver: () async =>
+            '${tempDirectory.path}/settings.sqlite3',
+        databaseOpener: (_) => throw StateError('sqlite open failed'),
+      );
+
+      await expectLater(
+        store.loadSettingsSnapshot(),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('Durable settings storage unavailable'),
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'SecureConfigStore persists across instances using default support fallback when primary resolvers fail',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-default-support-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final defaultSupportRoot =
+          '${tempDirectory.path}/plus.svc.xworkmate/xworkmate';
+
+      final firstStore = SecureConfigStore(
+        allowInMemoryFallback: false,
+        databasePathResolver: () async =>
+            throw StateError('primary unavailable'),
+        fallbackDirectoryPathResolver: () async =>
+            throw StateError('fallback unavailable'),
+        defaultSupportDirectoryPathResolver: () async => defaultSupportRoot,
+      );
+      final snapshot = SettingsSnapshot.defaults().copyWith(
+        accountUsername: 'fallback-user',
+      );
+      await firstStore.saveSettingsSnapshot(snapshot);
+      await firstStore.saveGatewayToken('fallback-token');
+
+      final secondStore = SecureConfigStore(
+        allowInMemoryFallback: false,
+        databasePathResolver: () async =>
+            throw StateError('primary unavailable'),
+        fallbackDirectoryPathResolver: () async =>
+            throw StateError('fallback unavailable'),
+        defaultSupportDirectoryPathResolver: () async => defaultSupportRoot,
+      );
+
+      final loadedSnapshot = await secondStore.loadSettingsSnapshot();
+      final loadedToken = await secondStore.loadGatewayToken();
+      final databaseFile = File(
+        '$defaultSupportRoot/${SettingsStore.databaseFileName}',
+      );
+
+      expect(await databaseFile.exists(), isTrue);
+      expect(loadedSnapshot.accountUsername, 'fallback-user');
+      expect(loadedToken, 'fallback-token');
+    },
+  );
+
+  test(
     'SecureConfigStore migrates legacy secret fallback files into primary secure storage',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
