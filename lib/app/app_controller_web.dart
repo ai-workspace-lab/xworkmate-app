@@ -213,25 +213,52 @@ class AppController extends ChangeNotifier {
       _aiGatewayApiKeyCache.trim().isNotEmpty &&
       resolvedAiGatewayModel.isNotEmpty;
 
-  String get assistantConnectionStatusLabel => isAiGatewayOnlyMode
-      ? (canUseAiGatewayConversation
-            ? appText('可用', 'Ready')
-            : appText('未配置', 'Not configured'))
-      : connection.status.label;
+  AssistantThreadConnectionState get currentAssistantConnectionState {
+    final target = currentAssistantExecutionTarget;
+    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+      final host = _hostLabel(_settings.aiGateway.baseUrl);
+      final model = resolvedAiGatewayModel;
+      final detail = _joinConnectionParts(<String>[model, host]);
+      return AssistantThreadConnectionState(
+        executionTarget: target,
+        status: canUseAiGatewayConversation
+            ? RuntimeConnectionStatus.connected
+            : RuntimeConnectionStatus.offline,
+        primaryLabel: target.label,
+        detailLabel: detail.isEmpty
+            ? appText('Direct AI 未配置', 'Direct AI not configured')
+            : detail,
+        ready: canUseAiGatewayConversation,
+        pairingRequired: false,
+        gatewayTokenMissing: false,
+        lastError: null,
+      );
+    }
+    return AssistantThreadConnectionState(
+      executionTarget: target,
+      status: connection.status,
+      primaryLabel: connection.status.label,
+      detailLabel:
+          connection.remoteAddress ?? appText('Relay 未连接', 'Relay offline'),
+      ready: connection.status == RuntimeConnectionStatus.connected,
+      pairingRequired: false,
+      gatewayTokenMissing: false,
+      lastError: null,
+    );
+  }
+
+  String get assistantConnectionStatusLabel =>
+      currentAssistantConnectionState.primaryLabel;
 
   String get assistantConnectionTargetLabel {
-    if (!isAiGatewayOnlyMode) {
-      return connection.remoteAddress ?? appText('Relay 未连接', 'Relay offline');
-    }
-    final host = _hostLabel(_settings.aiGateway.baseUrl);
-    final model = resolvedAiGatewayModel;
-    if (host.isEmpty && model.isEmpty) {
-      return appText('Direct AI 未配置', 'Direct AI not configured');
-    }
-    if (host.isNotEmpty && model.isNotEmpty) {
-      return '$model · $host';
-    }
-    return host.isNotEmpty ? host : model;
+    return currentAssistantConnectionState.detailLabel;
+  }
+
+  String _joinConnectionParts(List<String> parts) {
+    return parts
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .join(' · ');
   }
 
   String get conversationPersistenceSummary {

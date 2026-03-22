@@ -606,6 +606,7 @@ class _AssistantPageState extends State<AssistantPage> {
         .map((item) => item.name)
         .toList(growable: false);
     final selectedSkillLabels = _resolveSelectedSkillLabels(controller);
+    final connectionState = controller.currentAssistantConnectionState;
     final prompt = _composePrompt(
       mode: _mode,
       prompt: rawPrompt,
@@ -632,8 +633,7 @@ class _AssistantPageState extends State<AssistantPage> {
         status:
             controller.hasAssistantPendingRun ||
                 executionTarget == AssistantExecutionTarget.aiGatewayOnly ||
-                controller.connection.status ==
-                    RuntimeConnectionStatus.connected
+                connectionState.connected
             ? 'running'
             : 'queued',
         owner: autoAgent?.name ?? _conversationOwnerLabel(controller),
@@ -2214,11 +2214,9 @@ class _AssistantEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final connection = controller.connection;
-    final aiGatewayOnly = controller.isAiGatewayOnlyMode;
-    final connected = aiGatewayOnly
-        ? controller.canUseAiGatewayConversation
-        : connection.status == RuntimeConnectionStatus.connected;
+    final connectionState = controller.currentAssistantConnectionState;
+    final aiGatewayOnly = connectionState.isAiGatewayOnly;
+    final connected = connectionState.connected;
     final reconnectAvailable = controller.canQuickConnectGateway;
     final title = aiGatewayOnly
         ? connected
@@ -2226,7 +2224,7 @@ class _AssistantEmptyState extends StatelessWidget {
               : appText('先配置 AI Gateway', 'Configure AI Gateway first')
         : connected
         ? appText('开始对话或运行任务', 'Start a chat or run a task')
-        : connection.status == RuntimeConnectionStatus.error
+        : connectionState.status == RuntimeConnectionStatus.error
         ? appText('Gateway 连接失败', 'Gateway connection failed')
         : appText('先连接 Gateway', 'Connect a gateway first');
     final description = aiGatewayOnly
@@ -2244,18 +2242,18 @@ class _AssistantEmptyState extends StatelessWidget {
             '输入需求后即可开始执行，结果会回到当前会话并同步到任务页。',
             'Type a request to start execution. Results return to this session and the Tasks page.',
           )
-        : connection.pairingRequired
+        : connectionState.pairingRequired
         ? appText(
             '当前设备还没通过 Gateway 配对审批。请先在已授权设备上批准该 pairing request，再重新连接。',
             'This device has not been approved yet. Approve the pairing request from an authorized device, then reconnect.',
           )
-        : connection.gatewayTokenMissing
+        : connectionState.gatewayTokenMissing
         ? appText(
             '首次连接需要共享 Token；配对完成后可继续使用本机的 device token。',
             'The first connection requires a shared token; after pairing, this device can continue with its device token.',
           )
-        : (connection.lastError?.trim().isNotEmpty == true
-              ? connection.lastError!.trim()
+        : (connectionState.lastError?.trim().isNotEmpty == true
+              ? connectionState.lastError!.trim()
               : appText(
                   '连接后可直接对话、创建任务，并在当前会话查看结果。',
                   'After connecting, you can chat, create tasks, and read results in this session.',
@@ -2445,14 +2443,11 @@ class _ComposerBarState extends State<_ComposerBar> {
     final uiFeatures = controller.featuresFor(
       resolveUiFeaturePlatformFromContext(context),
     );
-    final aiGatewayOnly = controller.isAiGatewayOnlyMode;
-    final connected = aiGatewayOnly
-        ? controller.canUseAiGatewayConversation
-        : controller.connection.status == RuntimeConnectionStatus.connected;
+    final connectionState = controller.currentAssistantConnectionState;
+    final aiGatewayOnly = connectionState.isAiGatewayOnly;
+    final connected = connectionState.connected;
     final reconnectAvailable = controller.canQuickConnectGateway;
-    final connecting =
-        !aiGatewayOnly &&
-        controller.connection.status == RuntimeConnectionStatus.connecting;
+    final connecting = connectionState.connecting;
     final executionTarget = controller.assistantExecutionTarget;
     final permissionLevel = controller.assistantPermissionLevel;
     final selectedSkills = widget.availableSkills
@@ -3810,11 +3805,12 @@ class _ConnectionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final connection = controller.connection;
-    final aiGatewayOnly = controller.isAiGatewayOnlyMode;
-    final color = aiGatewayOnly
-        ? context.palette.accentMuted
-        : switch (connection.status) {
+    final connectionState = controller.currentAssistantConnectionState;
+    final color = connectionState.isAiGatewayOnly
+        ? (connectionState.connected
+              ? context.palette.accentMuted
+              : context.palette.surfaceSecondary)
+        : switch (connectionState.status) {
             RuntimeConnectionStatus.connected => context.palette.accentMuted,
             RuntimeConnectionStatus.connecting =>
               context.palette.surfaceSecondary,
