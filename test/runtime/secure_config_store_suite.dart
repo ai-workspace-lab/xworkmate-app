@@ -1,7 +1,6 @@
 @TestOn('vm')
 library;
 
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -10,8 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:xworkmate/models/app_models.dart';
-import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   test(
@@ -136,47 +135,66 @@ void main() {
   );
 
   test(
-    'SecureConfigStore persists secure values across instances when secure storage times out',
+    'SecureConfigStore migrates legacy secret fallback files into primary secure storage',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-config-store-secure-fallback-',
+        'xworkmate-config-store-secret-fallback-',
       );
       addTearDown(() async {
         if (await tempDirectory.exists()) {
           await tempDirectory.delete(recursive: true);
         }
       });
-      final databasePath = '${tempDirectory.path}/settings.sqlite3';
-
-      final firstStore = SecureConfigStore(
-        databasePathResolver: () async => databasePath,
+      final secureStorage = _MapSecureStorageClient();
+      final store = SecureConfigStore(
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
-        secureStorage: _TimeoutSecureStorageClient(),
+        secureStorage: secureStorage,
       );
-      await firstStore.saveGatewayToken('token-secret');
-      await firstStore.saveGatewayPassword('password-secret');
-      await firstStore.saveAiGatewayApiKey('ai-gateway-secret');
 
-      final secondStore = SecureConfigStore(
-        databasePathResolver: () async => databasePath,
-        fallbackDirectoryPathResolver: () async => tempDirectory.path,
-        secureStorage: _TimeoutSecureStorageClient(),
+      await File(
+        '${tempDirectory.path}/gateway-token.txt',
+      ).writeAsString('token-secret', flush: true);
+      await File(
+        '${tempDirectory.path}/gateway-password.txt',
+      ).writeAsString('password-secret', flush: true);
+      await File(
+        '${tempDirectory.path}/ai-gateway-api-key.txt',
+      ).writeAsString('ai-gateway-secret', flush: true);
+
+      expect(await store.loadGatewayToken(), 'token-secret');
+      expect(await store.loadGatewayPassword(), 'password-secret');
+      expect(await store.loadAiGatewayApiKey(), 'ai-gateway-secret');
+      expect(secureStorage._values['xworkmate.gateway.token'], 'token-secret');
+      expect(
+        secureStorage._values['xworkmate.gateway.password'],
+        'password-secret',
       );
-      final secureRefs = await secondStore.loadSecureRefs();
-
-      expect(secureRefs['gateway_token'], 'token-secret');
-      expect(secureRefs['gateway_password'], 'password-secret');
-      expect(secureRefs['ai_gateway_api_key'], 'ai-gateway-secret');
+      expect(
+        secureStorage._values['xworkmate.ai_gateway.api_key'],
+        'ai-gateway-secret',
+      );
+      expect(
+        await File('${tempDirectory.path}/gateway-token.txt').exists(),
+        isFalse,
+      );
+      expect(
+        await File('${tempDirectory.path}/gateway-password.txt').exists(),
+        isFalse,
+      );
+      expect(
+        await File('${tempDirectory.path}/ai-gateway-api-key.txt').exists(),
+        isFalse,
+      );
     },
   );
 
   test(
-    'SecureConfigStore persists encrypted local settings and assistant threads when sqlite is unavailable',
+    'SecureConfigStore persists plain local settings and assistant threads when sqlite is unavailable',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-config-store-encrypted-local-state-',
+        'xworkmate-config-store-local-state-',
       );
       addTearDown(() async {
         if (await tempDirectory.exists()) {
@@ -184,15 +202,14 @@ void main() {
         }
       });
       final databasePath = '${tempDirectory.path}/settings.sqlite3';
-      final secureStorage = _MapSecureStorageClient();
       final snapshot = SettingsSnapshot.defaults().copyWith(
-        accountUsername: 'encrypted-user',
-        assistantLastSessionKey: 'draft:encrypted-1',
+        accountUsername: 'local-user',
+        assistantLastSessionKey: 'draft:local-1',
       );
       const records = <AssistantThreadRecord>[
         AssistantThreadRecord(
-          sessionKey: 'draft:encrypted-1',
-          title: '加密线程',
+          sessionKey: 'draft:local-1',
+          title: '本地线程',
           archived: false,
           executionTarget: AssistantExecutionTarget.local,
           messageViewMode: AssistantMessageViewMode.rendered,
@@ -201,7 +218,7 @@ void main() {
             GatewayChatMessage(
               id: 'assistant-1',
               role: 'assistant',
-              text: 'encrypted message',
+              text: 'plain local message',
               timestampMs: 1700000001000,
               toolCallId: null,
               toolName: null,
@@ -217,7 +234,6 @@ void main() {
         databasePathResolver: () async => databasePath,
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
         databaseOpener: (_) => throw StateError('sqlite unavailable'),
-        secureStorage: secureStorage,
       );
       await firstStore.saveSettingsSnapshot(snapshot);
       await firstStore.saveAssistantThreadRecords(records);
@@ -226,33 +242,26 @@ void main() {
       final threadsFile = File('${tempDirectory.path}/assistant-threads.json');
       expect(await settingsFile.exists(), isTrue);
       expect(await threadsFile.exists(), isTrue);
-      expect(
-        await settingsFile.readAsString(),
-        isNot(contains('encrypted-user')),
-      );
-      expect(
-        await threadsFile.readAsString(),
-        isNot(contains('encrypted message')),
-      );
+      expect(await settingsFile.readAsString(), contains('local-user'));
+      expect(await threadsFile.readAsString(), contains('plain local message'));
 
       final secondStore = SecureConfigStore(
         databasePathResolver: () async => databasePath,
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
         databaseOpener: (_) => throw StateError('sqlite unavailable'),
-        secureStorage: secureStorage,
       );
       final loadedSnapshot = await secondStore.loadSettingsSnapshot();
       final loadedThreads = await secondStore.loadAssistantThreadRecords();
 
-      expect(loadedSnapshot.accountUsername, 'encrypted-user');
-      expect(loadedSnapshot.assistantLastSessionKey, 'draft:encrypted-1');
+      expect(loadedSnapshot.accountUsername, 'local-user');
+      expect(loadedSnapshot.assistantLastSessionKey, 'draft:local-1');
       expect(loadedThreads, hasLength(1));
-      expect(loadedThreads.single.messages.single.text, 'encrypted message');
+      expect(loadedThreads.single.messages.single.text, 'plain local message');
     },
   );
 
   test(
-    'SecureConfigStore migrates plaintext local state into sealed storage and clears legacy prefs',
+    'SecureConfigStore migrates plaintext local state into the new settings store and clears legacy prefs',
     () async {
       final legacySnapshot = SettingsSnapshot.defaults().copyWith(
         accountUsername: 'legacy-user',
@@ -296,12 +305,10 @@ void main() {
         }
       });
       final databasePath = '${tempDirectory.path}/settings.sqlite3';
-      final secureStorage = _MapSecureStorageClient();
 
       final store = SecureConfigStore(
         databasePathResolver: () async => databasePath,
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
-        secureStorage: secureStorage,
       );
       final loadedSnapshot = await store.loadSettingsSnapshot();
       final loadedThreads = await store.loadAssistantThreadRecords();
@@ -314,44 +321,27 @@ void main() {
       expect(prefs.getString('xworkmate.settings.snapshot'), isNull);
       expect(prefs.getString('xworkmate.assistant.threads'), isNull);
 
-      final database = sqlite.sqlite3.open(databasePath);
-      addTearDown(database.dispose);
-      final settingsValue =
-          database
-                  .select(
-                    "SELECT value FROM config_entries WHERE storage_key = 'xworkmate.settings.snapshot' LIMIT 1",
-                  )
-                  .single['value']
-              as String;
-      final threadsValue =
-          database
-                  .select(
-                    "SELECT value FROM config_entries WHERE storage_key = 'xworkmate.assistant.threads' LIMIT 1",
-                  )
-                  .single['value']
-              as String;
-      expect(settingsValue, contains('xworkmate.sealed.local-state.v1'));
-      expect(threadsValue, contains('xworkmate.sealed.local-state.v1'));
-      expect(settingsValue, isNot(contains('legacy-user')));
-      expect(threadsValue, isNot(contains('legacy message')));
-
-      final backupFile = File(
-        '${tempDirectory.path}/assistant-state-backup.json',
+      final settingsValue = _readDatabaseValue(
+        databasePath,
+        SettingsStore.settingsKey,
       );
-      expect(await backupFile.exists(), isTrue);
-      final backupContents = await backupFile.readAsString();
-      expect(backupContents, contains('sealedState'));
-      expect(backupContents, isNot(contains('legacy-user')));
-      expect(backupContents, isNot(contains('legacy message')));
+      final threadsValue = _readDatabaseValue(
+        databasePath,
+        SettingsStore.assistantThreadsKey,
+      );
+      expect(settingsValue, contains('legacy-user'));
+      expect(threadsValue, contains('legacy message'));
+      expect(settingsValue, isNot(contains(SettingsStore.sealedStateFormat)));
+      expect(threadsValue, isNot(contains(SettingsStore.sealedStateFormat)));
     },
   );
 
   test(
-    'SecureConfigStore migrates legacy local-state key fallback into primary secure storage',
+    'SecureConfigStore recovers sealed legacy local state when the local-state key is available',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-config-store-local-state-key-migrate-',
+        'xworkmate-config-store-sealed-recovery-',
       );
       addTearDown(() async {
         if (await tempDirectory.exists()) {
@@ -395,7 +385,7 @@ void main() {
 
       await File('${tempDirectory.path}/settings-snapshot.json').writeAsString(
         await _sealLocalStateForTest(
-          key: 'xworkmate.settings.snapshot',
+          key: SettingsStore.settingsKey,
           plaintext: snapshot.toJsonString(),
           keyBytes: localStateKey,
         ),
@@ -403,7 +393,7 @@ void main() {
       );
       await File('${tempDirectory.path}/assistant-threads.json').writeAsString(
         await _sealLocalStateForTest(
-          key: 'xworkmate.assistant.threads',
+          key: SettingsStore.assistantThreadsKey,
           plaintext: jsonEncode(
             records.map((item) => item.toJson()).toList(growable: false),
           ),
@@ -422,8 +412,65 @@ void main() {
 
       expect(loadedSnapshot.accountUsername, 'migrated-user');
       expect(loadedThreads.single.messages.single.text, 'migrated message');
-      expect(secureStorage._values['xworkmate.local_state.key'], encodedKey);
+      expect(store.lastRecoveryReport.status, LegacyRecoveryStatus.migrated);
+      expect(
+        secureStorage._values[SecretStore.legacyLocalStateKey],
+        encodedKey,
+      );
       expect(await keyFallbackFile.exists(), isFalse);
+      expect(
+        _readDatabaseValue(databasePath, SettingsStore.settingsKey),
+        contains('migrated-user'),
+      );
+    },
+  );
+
+  test(
+    'SecureConfigStore reports locked legacy state when sealed settings exist without a recoverable key',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-locked-legacy-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final databasePath = '${tempDirectory.path}/settings.sqlite3';
+      final localStateKey = List<int>.generate(32, (index) => 32 - index);
+      final snapshot = SettingsSnapshot.defaults().copyWith(
+        accountUsername: 'locked-user',
+      );
+
+      await File('${tempDirectory.path}/settings-snapshot.json').writeAsString(
+        await _sealLocalStateForTest(
+          key: SettingsStore.settingsKey,
+          plaintext: snapshot.toJsonString(),
+          keyBytes: localStateKey,
+        ),
+        flush: true,
+      );
+
+      final store = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+        secureStorage: _MapSecureStorageClient(),
+      );
+      final loadedSnapshot = await store.loadSettingsSnapshot();
+
+      expect(
+        loadedSnapshot.accountUsername,
+        SettingsSnapshot.defaults().accountUsername,
+      );
+      expect(
+        store.lastRecoveryReport.status,
+        LegacyRecoveryStatus.lockedLegacyState,
+      );
+      expect(
+        store.lastRecoveryReport.details,
+        contains('could not restore the local-state key'),
+      );
     },
   );
 
@@ -652,11 +699,11 @@ void main() {
   );
 
   test(
-    'SecureConfigStore restores assistant state from backup when primary storage is missing',
+    'SecureConfigStore restores assistant state from durable files when sqlite entries are missing',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-config-store-backup-restore-',
+        'xworkmate-config-store-durable-restore-',
       );
       addTearDown(() async {
         if (await tempDirectory.exists()) {
@@ -698,17 +745,10 @@ void main() {
 
       await store.saveSettingsSnapshot(snapshot);
       await store.saveAssistantThreadRecords(records);
-      final backupFile = File(
-        '${tempDirectory.path}/assistant-state-backup.json',
-      );
-      expect(await backupFile.exists(), isTrue);
-      final backupContents = await backupFile.readAsString();
-      expect(backupContents, isNot(contains('backup-user')));
-      expect(backupContents, isNot(contains('backup message')));
 
       final database = sqlite.sqlite3.open(databasePath);
       addTearDown(database.dispose);
-      database.execute('DELETE FROM config_entries');
+      database.execute('DELETE FROM ${SettingsStore.databaseTableName}');
 
       final recoveredStore = SecureConfigStore(
         databasePathResolver: () async => databasePath,
@@ -775,12 +815,6 @@ void main() {
       expect(clearedSnapshot.assistantLastSessionKey, isEmpty);
       expect(clearedRecords, isEmpty);
       expect(await store.loadGatewayToken(), 'token-secret');
-      expect(
-        await File(
-          '${tempDirectory.path}/assistant-state-backup.json',
-        ).exists(),
-        isFalse,
-      );
       expect(
         await File('${tempDirectory.path}/settings-snapshot.json').exists(),
         isFalse,
@@ -895,20 +929,21 @@ void main() {
   );
 }
 
-class _TimeoutSecureStorageClient implements SecureStorageClient {
-  @override
-  Future<String?> read({required String key}) async {
-    throw TimeoutException('secure read timed out');
-  }
-
-  @override
-  Future<void> write({required String key, required String value}) async {
-    throw TimeoutException('secure write timed out');
-  }
-
-  @override
-  Future<void> delete({required String key}) async {
-    throw TimeoutException('secure delete timed out');
+String _readDatabaseValue(String databasePath, String key) {
+  final database = sqlite.sqlite3.open(databasePath);
+  try {
+    final result = database.select(
+      '''
+      SELECT value
+      FROM ${SettingsStore.databaseTableName}
+      WHERE storage_key = ?
+      LIMIT 1
+      ''',
+      <Object?>[key],
+    );
+    return result.single['value']! as String;
+  } finally {
+    database.dispose();
   }
 }
 
@@ -945,7 +980,7 @@ Future<String> _sealLocalStateForTest({
     aad: utf8.encode(key),
   );
   return jsonEncode(<String, dynamic>{
-    'storageFormat': 'xworkmate.sealed.local-state.v1',
+    'storageFormat': SettingsStore.sealedStateFormat,
     'nonce': _base64UrlNoPadding(secretBox.nonce),
     'cipherText': _base64UrlNoPadding(secretBox.cipherText),
     'mac': _base64UrlNoPadding(secretBox.mac.bytes),
