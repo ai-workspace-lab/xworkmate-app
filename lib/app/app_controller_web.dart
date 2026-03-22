@@ -479,8 +479,8 @@ class AppController extends ChangeNotifier {
     _settingsDraftInitialized = true;
     _pendingSettingsApply = true;
     _settingsDraftStatusMessage = appText(
-      '已保存设置，等待应用。',
-      'Settings saved. Apply to activate runtime changes.',
+      '已保存配置，不立即生效。',
+      'Settings saved. They do not take effect until Apply.',
     );
     notifyListeners();
   }
@@ -501,8 +501,8 @@ class AppController extends ChangeNotifier {
     _settingsDraftInitialized = true;
     _pendingSettingsApply = false;
     _settingsDraftStatusMessage = appText(
-      '已应用全部设置。',
-      'All saved settings have been applied.',
+      '已按当前配置生效。',
+      'The current configuration is now in effect.',
     );
     notifyListeners();
   }

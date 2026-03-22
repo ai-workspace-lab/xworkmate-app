@@ -212,6 +212,64 @@ void main() {
       );
     },
   );
+
+  test(
+    'GatewayRuntime clears a stale stored device token after NOT_PAIRED',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final store = SecureConfigStore();
+      final identityStore = DeviceIdentityStore(store);
+      final identity = await identityStore.loadOrCreate();
+      await store.saveDeviceToken(
+        deviceId: identity.deviceId,
+        role: 'operator',
+        token: 'stale-device-token',
+      );
+      final runtime = GatewayRuntime(
+        store: store,
+        identityStore: identityStore,
+      );
+      final server = await _FakeGatewayRuntimeServer.start(
+        connectErrorCode: 'NOT_PAIRED',
+        connectErrorDetailCode: 'PAIRING_REQUIRED',
+        connectErrorMessage: 'pairing required',
+        closeAfterConnectError: true,
+      );
+      addTearDown(runtime.dispose);
+      addTearDown(server.close);
+
+      await expectLater(
+        () => runtime.connectProfile(
+          GatewayConnectionProfile.defaults().copyWith(
+            mode: RuntimeConnectionMode.remote,
+            host: '127.0.0.1',
+            port: server.port,
+            tls: false,
+            useSetupCode: false,
+          ),
+        ),
+        throwsA(isA<GatewayRuntimeException>()),
+      );
+
+      expect(server.connectAuth?['token'], 'stale-device-token');
+      expect(server.connectAuth?['deviceToken'], 'stale-device-token');
+      expect(
+        await store.loadDeviceToken(
+          deviceId: identity.deviceId,
+          role: 'operator',
+        ),
+        isNull,
+      );
+      expect(
+        runtime.logs.any(
+          (entry) =>
+              entry.category == 'auth' &&
+              entry.message.contains('cleared stale device token'),
+        ),
+        isTrue,
+      );
+    },
+  );
 }
 
 class _FakeGatewayRuntimeServer {
