@@ -20,11 +20,15 @@ void main() {
       );
       addTearDown(() => tempDirectory.delete(recursive: true));
       final store = _createIsolatedStore(tempDirectory.path);
-      final controller = AppController(store: store);
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
+      );
       addTearDown(controller.dispose);
       addTearDown(store.dispose);
 
       await _waitFor(() => !controller.initializing);
+      await controller.settingsController.saveAiGatewayApiKey('live-key');
 
       await controller.saveSettings(
         controller.settings.copyWith(
@@ -53,7 +57,63 @@ void main() {
       );
       addTearDown(() => tempDirectory.delete(recursive: true));
       final store = _createIsolatedStore(tempDirectory.path);
-      final controller = AppController(store: store);
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
+      );
+      addTearDown(controller.dispose);
+      addTearDown(store.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      await controller.settingsController.saveAiGatewayApiKey('live-key');
+
+      await controller.saveSettings(
+        controller.settings.copyWith(
+          aiGateway: controller.settings.aiGateway.copyWith(
+            baseUrl: 'http://127.0.0.1:11434/v1',
+            availableModels: const <String>['qwen2.5-coder:latest'],
+            selectedModels: const <String>['qwen2.5-coder:latest'],
+          ),
+          defaultModel: 'gpt-5.4',
+          assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
+        ),
+      );
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+
+      expect(controller.assistantModelChoices, const <String>[
+        'qwen2.5-coder:latest',
+      ]);
+      expect(controller.resolvedAssistantModel, 'qwen2.5-coder:latest');
+      expect(controller.canUseAiGatewayConversation, isTrue);
+
+      await controller.saveSettings(
+        controller.settings.copyWith(
+          assistantExecutionTarget: AssistantExecutionTarget.local,
+        ),
+      );
+
+      expect(controller.resolvedAssistantModel, 'gpt-5.4');
+      expect(controller.assistantModelChoices, const <String>['gpt-5.4']);
+    },
+  );
+
+  test(
+    'AppController does not borrow AI Gateway model choices when an external Single Agent provider is available',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-app-controller-provider-models-',
+      );
+      addTearDown(() => tempDirectory.delete(recursive: true));
+      final store = _createIsolatedStore(tempDirectory.path);
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+      );
       addTearDown(controller.dispose);
       addTearDown(store.dispose);
 
@@ -65,25 +125,19 @@ void main() {
             availableModels: const <String>['qwen2.5-coder:latest'],
             selectedModels: const <String>['qwen2.5-coder:latest'],
           ),
-          defaultModel: 'gpt-5.4',
+          defaultModel: 'qwen2.5-coder:latest',
           assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
         ),
       );
-
-      expect(controller.assistantModelChoices, const <String>[
-        'qwen2.5-coder:latest',
-      ]);
-      expect(controller.resolvedAssistantModel, 'qwen2.5-coder:latest');
-      expect(controller.canUseAiGatewayConversation, isFalse);
-
-      await controller.saveSettings(
-        controller.settings.copyWith(
-          assistantExecutionTarget: AssistantExecutionTarget.local,
-        ),
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
       );
+      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
 
-      expect(controller.resolvedAssistantModel, 'gpt-5.4');
-      expect(controller.assistantModelChoices, const <String>['gpt-5.4']);
+      expect(controller.currentSingleAgentHasResolvedProvider, isTrue);
+      expect(controller.currentSingleAgentUsesAiChatFallback, isFalse);
+      expect(controller.assistantModelChoices, isEmpty);
+      expect(controller.resolvedAssistantModel, isEmpty);
     },
   );
 }
