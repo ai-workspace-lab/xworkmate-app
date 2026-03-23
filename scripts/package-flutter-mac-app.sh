@@ -11,6 +11,9 @@ APP_STORE_DEFINE="${APP_STORE_DEFINE:---dart-define=XWORKMATE_APP_STORE=${XWORKM
 PRODUCTS_DIR_NAME="$(tr '[:lower:]' '[:upper:]' <<< "${BUILD_MODE:0:1}")${BUILD_MODE:1}"
 BRIDGE_BINARY_NAME="${BRIDGE_BINARY_NAME:-xworkmate-go-core}"
 BRIDGE_BUILD_PATH="${ROOT_DIR}/build/bin/${BRIDGE_BINARY_NAME}"
+FLUTTER_BUILD_STATE_DIR="${ROOT_DIR}/.dart_tool/flutter_build"
+MACOS_BUILD_DIR="${ROOT_DIR}/build/macos"
+NATIVE_ASSETS_DIR="${ROOT_DIR}/build/native_assets"
 
 if [[ ! -f "$PUBSPEC_PATH" ]]; then
   echo "Missing pubspec: $PUBSPEC_PATH" >&2
@@ -41,6 +44,11 @@ echo "Building bundled Go core..."
 bash "$ROOT_DIR/scripts/build-go-core.sh"
 
 echo "Building $APP_NAME $APP_VERSION ($APP_BUILD) for macOS..."
+# Flutter caches native-asset installation state under .dart_tool/flutter_build,
+# but Xcode consumes the copied frameworks from build/native_assets/macos.
+# Reset both locations so packaging cannot reuse a stale stamp or stale layout.
+rm -rf "$FLUTTER_BUILD_STATE_DIR" "$MACOS_BUILD_DIR" "$NATIVE_ASSETS_DIR"
+
 BUILD_ARGS=(
   flutter build macos
   "--$BUILD_MODE"
@@ -50,10 +58,6 @@ BUILD_ARGS=(
   --dart-define="XWORKMATE_BUILD_NUMBER=$APP_BUILD"
   "$APP_STORE_DEFINE"
 )
-
-if [[ -f "$APP_DIR/.dart_tool/package_config.json" ]]; then
-  BUILD_ARGS+=(--no-pub)
-fi
 
 (
   cd "$APP_DIR"
