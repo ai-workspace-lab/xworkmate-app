@@ -50,10 +50,20 @@ void main() {
     );
   });
 
-  test('single-agent provider selection is forced to auto for app store', () {
+  test(
+    'app store policy keeps external codex but strips embedded-only providers',
+    () {
     expect(
       sanitizeAppStoreSingleAgentProvider(
         SingleAgentProvider.codex,
+        isAppleHost: true,
+        enabled: true,
+      ),
+      SingleAgentProvider.codex,
+    );
+    expect(
+      sanitizeAppStoreSingleAgentProvider(
+        SingleAgentProvider.gemini,
         isAppleHost: true,
         enabled: true,
       ),
@@ -66,6 +76,24 @@ void main() {
         enabled: true,
       ),
       SingleAgentProvider.gemini,
+    );
+    },
+  );
+
+  test('apple app store policy blocks embedded agent processes', () {
+    expect(
+      blocksAppStoreEmbeddedAgentProcesses(
+        isAppleHost: true,
+        enabled: true,
+      ),
+      isTrue,
+    );
+    expect(
+      blocksAppStoreEmbeddedAgentProcesses(
+        isAppleHost: false,
+        enabled: true,
+      ),
+      isFalse,
     );
   });
 }

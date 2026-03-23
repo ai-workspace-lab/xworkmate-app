@@ -36,8 +36,8 @@ class GatewayAcpCapabilities {
   final Map<String, dynamic> raw;
 }
 
-class GatewayAcpSessionUpdate {
-  const GatewayAcpSessionUpdate({
+class _GatewayAcpSessionUpdate {
+  const _GatewayAcpSessionUpdate({
     required this.method,
     required this.sessionId,
     required this.threadId,
@@ -56,50 +56,6 @@ class GatewayAcpSessionUpdate {
   final String textDelta;
   final int? sequence;
   final Map<String, dynamic> payload;
-}
-
-class GatewayAcpSingleAgentRequest {
-  const GatewayAcpSingleAgentRequest({
-    required this.sessionId,
-    required this.threadId,
-    required this.provider,
-    required this.prompt,
-    required this.model,
-    required this.workingDirectory,
-    required this.attachments,
-    required this.selectedSkills,
-    required this.aiGatewayBaseUrl,
-    required this.aiGatewayApiKey,
-    required this.resumeSession,
-  });
-
-  final String sessionId;
-  final String threadId;
-  final SingleAgentProvider provider;
-  final String prompt;
-  final String model;
-  final String workingDirectory;
-  final List<CollaborationAttachment> attachments;
-  final List<String> selectedSkills;
-  final String aiGatewayBaseUrl;
-  final String aiGatewayApiKey;
-  final bool resumeSession;
-}
-
-class GatewayAcpSingleAgentResult {
-  const GatewayAcpSingleAgentResult({
-    required this.success,
-    required this.output,
-    required this.errorMessage,
-    required this.turnId,
-    required this.raw,
-  });
-
-  final bool success;
-  final String output;
-  final String errorMessage;
-  final String turnId;
-  final Map<String, dynamic> raw;
 }
 
 class GatewayAcpMultiAgentRequest {
@@ -187,82 +143,6 @@ class GatewayAcpClient {
     );
     _capabilitiesRefreshedAt = DateTime.now();
     return _cachedCapabilities;
-  }
-
-  Future<GatewayAcpSingleAgentResult> runSingleAgent(
-    GatewayAcpSingleAgentRequest request, {
-    void Function(GatewayAcpSessionUpdate update)? onUpdate,
-  }) async {
-    final capabilities = await loadCapabilities();
-    if (!capabilities.singleAgent ||
-        !capabilities.providers.contains(request.provider)) {
-      throw GatewayAcpException(
-        'Single-agent provider ${request.provider.providerId} is unavailable from ACP capabilities',
-        code: 'ACP_SINGLE_AGENT_UNAVAILABLE',
-      );
-    }
-    final outputBuffer = StringBuffer();
-    var lastSequence = -1;
-    final rpcRequest = _GatewayAcpRpcRequest(
-      id: _nextRequestId('single-agent'),
-      method: request.resumeSession ? 'session.message' : 'session.start',
-      params: <String, dynamic>{
-        'sessionId': request.sessionId,
-        'threadId': request.threadId,
-        'mode': 'single-agent',
-        'provider': request.provider.providerId,
-        'taskPrompt': request.prompt,
-        'model': request.model,
-        'workingDirectory': request.workingDirectory,
-        'attachments': request.attachments
-            .map(
-              (item) => <String, dynamic>{
-                'name': item.name,
-                'description': item.description,
-                'path': item.path,
-              },
-            )
-            .toList(growable: false),
-        'selectedSkills': request.selectedSkills,
-        'aiGatewayBaseUrl': request.aiGatewayBaseUrl,
-        'aiGatewayApiKey': request.aiGatewayApiKey,
-      },
-    );
-    final response = await _requestWithFallback(
-      rpcRequest,
-      onNotification: (notification) {
-        final update = _sessionUpdateFromNotification(notification);
-        if (update == null) {
-          return;
-        }
-        if (update.sessionId != request.sessionId) {
-          return;
-        }
-        if (update.sequence != null && update.sequence! <= lastSequence) {
-          return;
-        }
-        if (update.sequence != null) {
-          lastSequence = update.sequence!;
-        }
-        if (update.textDelta.isNotEmpty) {
-          outputBuffer.write(update.textDelta);
-        }
-        onUpdate?.call(update);
-      },
-    );
-    final result = asMap(response['result']);
-    final explicitOutput = _extractOutput(result);
-    final output = explicitOutput.isNotEmpty
-        ? explicitOutput
-        : outputBuffer.toString().trim();
-    final success = boolValue(result['success']) ?? output.isNotEmpty;
-    return GatewayAcpSingleAgentResult(
-      success: success,
-      output: output,
-      errorMessage: stringValue(result['error']) ?? '',
-      turnId: stringValue(result['turnId']) ?? '',
-      raw: result,
-    );
   }
 
   Stream<MultiAgentRunEvent> runMultiAgent(
@@ -589,7 +469,7 @@ class GatewayAcpClient {
     return resolved;
   }
 
-  GatewayAcpSessionUpdate? _sessionUpdateFromNotification(
+  _GatewayAcpSessionUpdate? _sessionUpdateFromNotification(
     Map<String, dynamic> notification,
   ) {
     final method = stringValue(notification['method']) ?? '';
@@ -597,7 +477,7 @@ class GatewayAcpClient {
       return null;
     }
     final params = asMap(notification['params']);
-    return GatewayAcpSessionUpdate(
+    return _GatewayAcpSessionUpdate(
       method: method,
       sessionId: stringValue(params['sessionId']) ?? '',
       threadId: stringValue(params['threadId']) ?? '',
@@ -640,27 +520,6 @@ class GatewayAcpClient {
       score: intValue(update.payload['score']),
       data: update.payload,
     );
-  }
-
-  String _extractOutput(Map<String, dynamic> result) {
-    final direct = stringValue(result['output']);
-    if ((direct ?? '').trim().isNotEmpty) {
-      return direct!.trim();
-    }
-    final text = stringValue(result['text']);
-    if ((text ?? '').trim().isNotEmpty) {
-      return text!.trim();
-    }
-    final summary = stringValue(result['summary']);
-    if ((summary ?? '').trim().isNotEmpty) {
-      return summary!.trim();
-    }
-    final message = asMap(result['message']);
-    final messageContent = stringValue(message['content']);
-    if ((messageContent ?? '').trim().isNotEmpty) {
-      return messageContent!.trim();
-    }
-    return '';
   }
 
   Map<String, dynamic> asMap(Object? raw) {
