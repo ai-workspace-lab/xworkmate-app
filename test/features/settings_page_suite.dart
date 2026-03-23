@@ -474,4 +474,41 @@ void main() {
     expect(controller.settingsDetail, isNull);
     expect(find.text('搜索设置'), findsOneWidget);
   });
+
+  testWidgets('SettingsPage expands optional LLM endpoints with add button', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+    controller.openSettings(
+      detail: SettingsDetailPage.aiGatewayIntegration,
+      navigationContext: SettingsNavigationContext(
+        rootLabel: '设置',
+        destination: WorkspaceDestination.settings,
+        sectionLabel: SettingsTab.gateway.label,
+        settingsTab: SettingsTab.gateway,
+      ),
+    );
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(
+        controller: controller,
+        initialTab: controller.settingsTab,
+        initialDetail: controller.settingsDetail,
+        navigationContext: controller.settingsNavigationContext,
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('llm-endpoint-chip-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('llm-endpoint-chip-1')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('llm-endpoint-add-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('llm-endpoint-chip-1')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('llm-endpoint-panel-ollamaLocal')),
+      findsOneWidget,
+    );
+  });
 }

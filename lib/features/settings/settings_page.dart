@@ -71,6 +71,8 @@ class _SettingsPageState extends State<SettingsPage> {
   String _aiGatewayTestState = 'idle';
   String _aiGatewayTestMessage = '';
   String _aiGatewayTestEndpoint = '';
+  int _llmEndpointSlotLimit = 1;
+  int _selectedLlmEndpointIndex = 0;
   String _aiGatewayNameSyncedValue = '';
   String _aiGatewayUrlSyncedValue = '';
   String _aiGatewayApiKeyRefSyncedValue = '';
@@ -273,7 +275,6 @@ class _SettingsPageState extends State<SettingsPage> {
     UiFeatureAccess uiFeatures,
     SettingsDetailPage detail,
   ) {
-    final workspaceSections = _buildWorkspace(context, controller, settings);
     return switch (detail) {
       SettingsDetailPage.gatewayConnection => <Widget>[
         _buildDetailIntro(
@@ -291,19 +292,19 @@ class _SettingsPageState extends State<SettingsPage> {
           _buildVaultProviderCard(context, controller, settings),
         ],
         const SizedBox(height: 16),
-        _buildAiGatewayCard(context, controller, settings),
+        _buildLlmEndpointManager(context, controller, settings),
       ],
       SettingsDetailPage.aiGatewayIntegration => <Widget>[
         _buildDetailIntro(
           context,
           title: detail.label,
           description: appText(
-            '统一管理 LLM API Endpoint、LLM API Token、模型目录同步和默认选择。',
-            'Manage LLM API Endpoint, LLM API Token, model catalog sync, and default selections from one screen.',
+            '把主 LLM API 与可选兼容端点统一收口成接入点列表。默认先显示主接入点，需要时可通过 + 扩展更多端点。',
+            'Manage the primary LLM API and optional compatible endpoints from one endpoint list. Start with the primary entry and expand more endpoints with + when needed.',
           ),
         ),
         const SizedBox(height: 16),
-        _buildAiGatewayCard(context, controller, settings),
+        _buildLlmEndpointManager(context, controller, settings),
       ],
       SettingsDetailPage.vaultProvider => <Widget>[
         _buildDetailIntro(
@@ -326,18 +327,6 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
           ),
-      ],
-      SettingsDetailPage.ollamaProvider => <Widget>[
-        _buildDetailIntro(
-          context,
-          title: detail.label,
-          description: appText(
-            '本地与云端 Ollama 提供方参数统一放在这个 detail 页面中维护。',
-            'Local and cloud Ollama provider settings live in this dedicated detail page.',
-          ),
-        ),
-        const SizedBox(height: 16),
-        ...workspaceSections.skip(1),
       ],
       SettingsDetailPage.externalAgents => <Widget>[
         _buildDetailIntro(
@@ -725,9 +714,6 @@ class _SettingsPageState extends State<SettingsPage> {
     AppController controller,
     SettingsSnapshot settings,
   ) {
-    final hasStoredOllamaApiKey =
-        controller.settingsController.secureRefs['ollama_cloud_api_key'] !=
-        null;
     return [
       SurfaceCard(
         child: Column(
@@ -779,144 +765,6 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
       ),
-      SurfaceCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              appText('本地 Ollama', 'Ollama Local'),
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            _EditableField(
-              label: appText('服务地址', 'Endpoint'),
-              value: settings.ollamaLocal.endpoint,
-              onSubmitted: (value) => _saveSettings(
-                controller,
-                settings.copyWith(
-                  ollamaLocal: settings.ollamaLocal.copyWith(endpoint: value),
-                ),
-              ),
-            ),
-            _EditableField(
-              label: appText('默认模型', 'Default Model'),
-              value: settings.ollamaLocal.defaultModel,
-              onSubmitted: (value) => _saveSettings(
-                controller,
-                settings.copyWith(
-                  ollamaLocal: settings.ollamaLocal.copyWith(
-                    defaultModel: value,
-                  ),
-                ),
-              ),
-            ),
-            _SwitchRow(
-              label: appText('自动发现', 'Auto Discover'),
-              value: settings.ollamaLocal.autoDiscover,
-              onChanged: (value) => _saveSettings(
-                controller,
-                settings.copyWith(
-                  ollamaLocal: settings.ollamaLocal.copyWith(
-                    autoDiscover: value,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton(
-                onPressed: () => controller.testOllamaConnection(cloud: false),
-                child: Text(
-                  '${appText('测试连接', 'Test Connection')} · ${controller.settingsController.ollamaStatus}',
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 16),
-      SurfaceCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              appText('Ollama Cloud', 'Ollama Cloud'),
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            _EditableField(
-              label: appText('基础地址', 'Base URL'),
-              value: settings.ollamaCloud.baseUrl,
-              onSubmitted: (value) => _saveSettings(
-                controller,
-                settings.copyWith(
-                  ollamaCloud: settings.ollamaCloud.copyWith(baseUrl: value),
-                ),
-              ),
-            ),
-            _EditableField(
-              label: appText('工作区 / 组织', 'Workspace / Org'),
-              value:
-                  '${settings.ollamaCloud.organization} / ${settings.ollamaCloud.workspace}',
-              onSubmitted: (value) {
-                final parts = value.split('/');
-                _saveSettings(
-                  controller,
-                  settings.copyWith(
-                    ollamaCloud: settings.ollamaCloud.copyWith(
-                      organization: parts.isNotEmpty ? parts.first.trim() : '',
-                      workspace: parts.length > 1 ? parts[1].trim() : '',
-                    ),
-                  ),
-                );
-              },
-            ),
-            _EditableField(
-              label: appText('默认模型', 'Default Model'),
-              value: settings.ollamaCloud.defaultModel,
-              onSubmitted: (value) => _saveSettings(
-                controller,
-                settings.copyWith(
-                  ollamaCloud: settings.ollamaCloud.copyWith(
-                    defaultModel: value,
-                  ),
-                ),
-              ),
-            ),
-            _buildSecureField(
-              controller: _ollamaApiKeyController,
-              label:
-                  '${appText('API Key', 'API Key')} (${settings.ollamaCloud.apiKeyRef})',
-              hasStoredValue: hasStoredOllamaApiKey,
-              fieldState: _ollamaApiKeyState,
-              onStateChanged: (value) =>
-                  setState(() => _ollamaApiKeyState = value),
-              loadValue: controller.settingsController.loadOllamaCloudApiKey,
-              onSubmitted: (value) async =>
-                  controller.saveOllamaCloudApiKeyDraft(value),
-              storedHelperText: appText(
-                '已安全保存，默认以 **** 显示，点击查看后读取真实值。',
-                'Stored securely. Shows as **** until you reveal it.',
-              ),
-              emptyHelperText: appText(
-                '输入后先进入草稿；顶部保存后才会写入安全存储。',
-                'Values stage into draft first and only persist to secure storage after Save.',
-              ),
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton(
-                onPressed: () => controller.testOllamaConnection(cloud: true),
-                child: Text(
-                  '${appText('测试云端', 'Test Cloud')} · ${controller.settingsController.ollamaStatus}',
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     ];
   }
 
@@ -951,14 +799,130 @@ class _SettingsPageState extends State<SettingsPage> {
       const SizedBox(height: 16),
       _buildCollapsibleGatewaySection(
         context: context,
-        title: appText('LLM API', 'LLM API'),
+        title: appText('LLM 接入点', 'LLM Endpoints'),
         expanded: _aiGatewayExpanded,
         onChanged: (value) => setState(() {
           _aiGatewayExpanded = value;
         }),
-        child: _buildAiGatewayCard(context, controller, settings),
+        child: _buildLlmEndpointManager(context, controller, settings),
       ),
     ];
+  }
+
+  Widget _buildLlmEndpointManager(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
+    final visibleCount = _resolvedVisibleLlmEndpointCount(controller, settings);
+    if (_selectedLlmEndpointIndex >= visibleCount) {
+      _selectedLlmEndpointIndex = visibleCount - 1;
+    }
+    final activeSlot = _llmEndpointSlots[_selectedLlmEndpointIndex];
+    final canExpand = visibleCount < _llmEndpointSlots.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: List<Widget>.generate(visibleCount, (index) {
+            return ChoiceChip(
+              key: ValueKey('llm-endpoint-chip-$index'),
+              selected: index == _selectedLlmEndpointIndex,
+              avatar: const Icon(Icons.link_rounded, size: 18),
+              label: Text(_llmEndpointChipLabel(controller, settings, index)),
+              onSelected: (_) => setState(() {
+                _selectedLlmEndpointIndex = index;
+              }),
+            );
+          }),
+        ),
+        if (canExpand) ...[
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              key: const ValueKey('llm-endpoint-add-button'),
+              onPressed: () => setState(() {
+                final nextCount = (_llmEndpointSlotLimit + 1).clamp(
+                  1,
+                  _llmEndpointSlots.length,
+                );
+                _llmEndpointSlotLimit = nextCount;
+                _selectedLlmEndpointIndex = nextCount - 1;
+              }),
+              icon: const Icon(Icons.add_rounded),
+              label: Text(appText('添加连接源', 'Add source')),
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        SurfaceCard(
+          key: ValueKey('llm-endpoint-panel-${activeSlot.name}'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                appText(
+                  '自定义连接源 ${_selectedLlmEndpointIndex + 1}',
+                  'Custom source ${_selectedLlmEndpointIndex + 1}',
+                ),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+              _buildLlmEndpointBody(
+                context,
+                controller,
+                settings,
+                slot: activeSlot,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _llmEndpointChipLabel(
+    AppController controller,
+    SettingsSnapshot settings,
+    int index,
+  ) {
+    final configured = _isLlmEndpointSlotConfigured(
+      controller,
+      settings,
+      _llmEndpointSlots[index],
+    );
+    return appText(
+      '自定义连接源 ${index + 1}（${configured ? '已配置' : '空'}）',
+      'Custom source ${index + 1} (${configured ? 'Configured' : 'Empty'})',
+    );
+  }
+
+  Widget _buildLlmEndpointBody(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings, {
+    required _LlmEndpointSlot slot,
+  }) {
+    return switch (slot) {
+      _LlmEndpointSlot.aiGateway => _buildAiGatewayCardBody(
+        context,
+        controller,
+        settings,
+      ),
+      _LlmEndpointSlot.ollamaLocal => _buildOllamaLocalEndpointBody(
+        context,
+        controller,
+        settings,
+      ),
+      _LlmEndpointSlot.ollamaCloud => _buildOllamaCloudEndpointBody(
+        context,
+        controller,
+        settings,
+      ),
+    };
   }
 
   Widget _buildCollapsibleGatewaySection({
@@ -1352,16 +1316,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildAiGatewayCard(
-    BuildContext context,
-    AppController controller,
-    SettingsSnapshot settings,
-  ) {
-    return SurfaceCard(
-      child: _buildAiGatewayCardBody(context, controller, settings),
-    );
-  }
-
   Widget _buildAiGatewayCardBody(
     BuildContext context,
     AppController controller,
@@ -1602,6 +1556,220 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
       ],
     );
+  }
+
+  Widget _buildOllamaLocalEndpointBody(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _EditableField(
+          label: appText('服务地址', 'Endpoint'),
+          value: settings.ollamaLocal.endpoint,
+          onSubmitted: (value) => _saveSettings(
+            controller,
+            settings.copyWith(
+              ollamaLocal: settings.ollamaLocal.copyWith(endpoint: value),
+            ),
+          ),
+        ),
+        _EditableField(
+          label: appText('默认模型', 'Default Model'),
+          value: settings.ollamaLocal.defaultModel,
+          onSubmitted: (value) => _saveSettings(
+            controller,
+            settings.copyWith(
+              ollamaLocal: settings.ollamaLocal.copyWith(defaultModel: value),
+            ),
+          ),
+        ),
+        _SwitchRow(
+          label: appText('自动发现', 'Auto Discover'),
+          value: settings.ollamaLocal.autoDiscover,
+          onChanged: (value) => _saveSettings(
+            controller,
+            settings.copyWith(
+              ollamaLocal: settings.ollamaLocal.copyWith(autoDiscover: value),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton(
+            onPressed: () => controller.testOllamaConnection(cloud: false),
+            child: Text(
+              '${appText('测试连接', 'Test Connection')} · ${controller.settingsController.ollamaStatus}',
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOllamaCloudEndpointBody(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
+    final hasStoredOllamaApiKey =
+        controller.settingsController.secureRefs['ollama_cloud_api_key'] !=
+        null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _EditableField(
+          label: appText('基础地址', 'Base URL'),
+          value: settings.ollamaCloud.baseUrl,
+          onSubmitted: (value) => _saveSettings(
+            controller,
+            settings.copyWith(
+              ollamaCloud: settings.ollamaCloud.copyWith(baseUrl: value),
+            ),
+          ),
+        ),
+        _EditableField(
+          label: appText('工作区 / 组织', 'Workspace / Org'),
+          value:
+              '${settings.ollamaCloud.organization} / ${settings.ollamaCloud.workspace}',
+          onSubmitted: (value) {
+            final parts = value.split('/');
+            _saveSettings(
+              controller,
+              settings.copyWith(
+                ollamaCloud: settings.ollamaCloud.copyWith(
+                  organization: parts.isNotEmpty ? parts.first.trim() : '',
+                  workspace: parts.length > 1 ? parts[1].trim() : '',
+                ),
+              ),
+            );
+          },
+        ),
+        _EditableField(
+          label: appText('默认模型', 'Default Model'),
+          value: settings.ollamaCloud.defaultModel,
+          onSubmitted: (value) => _saveSettings(
+            controller,
+            settings.copyWith(
+              ollamaCloud: settings.ollamaCloud.copyWith(defaultModel: value),
+            ),
+          ),
+        ),
+        _buildSecureField(
+          controller: _ollamaApiKeyController,
+          label:
+              '${appText('API Key', 'API Key')} (${settings.ollamaCloud.apiKeyRef})',
+          hasStoredValue: hasStoredOllamaApiKey,
+          fieldState: _ollamaApiKeyState,
+          onStateChanged: (value) => setState(() => _ollamaApiKeyState = value),
+          loadValue: controller.settingsController.loadOllamaCloudApiKey,
+          onSubmitted: (value) async =>
+              controller.saveOllamaCloudApiKeyDraft(value),
+          storedHelperText: appText(
+            '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存/应用提交。',
+            'Stored securely. Test directly or submit it with the local Save / Apply actions.',
+          ),
+          emptyHelperText: appText(
+            '输入后可直接测试，也可通过本区保存/应用提交。',
+            'Test it now, or submit it with the local Save / Apply actions.',
+          ),
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton(
+            onPressed: () => controller.testOllamaConnection(cloud: true),
+            child: Text(
+              '${appText('测试云端', 'Test Cloud')} · ${controller.settingsController.ollamaStatus}',
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  int _resolvedVisibleLlmEndpointCount(
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
+    final requiredCount = _requiredLlmEndpointSlotCount(controller, settings);
+    return requiredCount > _llmEndpointSlotLimit
+        ? requiredCount
+        : _llmEndpointSlotLimit;
+  }
+
+  int _requiredLlmEndpointSlotCount(
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
+    var requiredCount = 1;
+    if (_isOllamaLocalEndpointConfigured(settings)) {
+      requiredCount = 2;
+    }
+    if (_isOllamaCloudEndpointConfigured(controller, settings)) {
+      requiredCount = 3;
+    }
+    return requiredCount;
+  }
+
+  bool _isLlmEndpointSlotConfigured(
+    AppController controller,
+    SettingsSnapshot settings,
+    _LlmEndpointSlot slot,
+  ) {
+    return switch (slot) {
+      _LlmEndpointSlot.aiGateway => _isAiGatewayEndpointConfigured(
+        controller,
+        settings,
+      ),
+      _LlmEndpointSlot.ollamaLocal => _isOllamaLocalEndpointConfigured(
+        settings,
+      ),
+      _LlmEndpointSlot.ollamaCloud => _isOllamaCloudEndpointConfigured(
+        controller,
+        settings,
+      ),
+    };
+  }
+
+  bool _isAiGatewayEndpointConfigured(
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
+    final defaults = AiGatewayProfile.defaults();
+    final config = settings.aiGateway;
+    return config.name.trim() != defaults.name ||
+        config.baseUrl.trim().isNotEmpty ||
+        config.apiKeyRef.trim() != defaults.apiKeyRef ||
+        config.availableModels.isNotEmpty ||
+        config.selectedModels.isNotEmpty ||
+        controller.settingsController.secureRefs['ai_gateway_api_key'] != null;
+  }
+
+  bool _isOllamaLocalEndpointConfigured(SettingsSnapshot settings) {
+    final defaults = OllamaLocalConfig.defaults();
+    final config = settings.ollamaLocal;
+    return config.endpoint.trim() != defaults.endpoint ||
+        config.defaultModel.trim() != defaults.defaultModel ||
+        config.autoDiscover != defaults.autoDiscover;
+  }
+
+  bool _isOllamaCloudEndpointConfigured(
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
+    final defaults = OllamaCloudConfig.defaults();
+    final config = settings.ollamaCloud;
+    return config.baseUrl.trim() != defaults.baseUrl ||
+        config.organization.trim().isNotEmpty ||
+        config.workspace.trim().isNotEmpty ||
+        config.defaultModel.trim() != defaults.defaultModel ||
+        config.apiKeyRef.trim() != defaults.apiKeyRef ||
+        controller.settingsController.secureRefs['ollama_cloud_api_key'] !=
+            null;
   }
 
   List<Widget> _buildAppearance(
@@ -4361,3 +4529,11 @@ class _WorkflowStep extends StatelessWidget {
     );
   }
 }
+
+enum _LlmEndpointSlot { aiGateway, ollamaLocal, ollamaCloud }
+
+const List<_LlmEndpointSlot> _llmEndpointSlots = <_LlmEndpointSlot>[
+  _LlmEndpointSlot.aiGateway,
+  _LlmEndpointSlot.ollamaLocal,
+  _LlmEndpointSlot.ollamaCloud,
+];
