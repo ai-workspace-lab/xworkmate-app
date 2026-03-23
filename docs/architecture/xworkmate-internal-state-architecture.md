@@ -102,8 +102,7 @@ graph TB
     subgraph R["③ Resolver / Accessor Layer"]
         executionTargetResolver["assistantExecutionTargetForSession(sessionKey)"]
         modelResolver["assistantModelForSession(sessionKey)"]
-        discoveredSkillsR["assistantDiscoveredSkillsForSession(sessionKey)"]
-        importedSkillsR["assistantImportedSkillsForSession(sessionKey)"]
+        availableSkillsR["assistantImportedSkillsForSession(sessionKey)"]
         selectedSkillsR["assistantSelectedSkillKeysForSession(sessionKey)"]
         connectionStateR["assistantConnectionStateForSession(sessionKey)"]
     end
@@ -134,7 +133,7 @@ graph TB
     _pendingApply -->|Apply triggers| settings
 
     %% Thread record is the per-session state core
-    _assistantThreadRecords -->|executionTarget<br/>assistantModelId<br/>selectedSkillKeys<br/>discoveredSkills<br/>importedSkills<br/>messageViewMode| R
+    _assistantThreadRecords -->|executionTarget<br/>assistantModelId<br/>selectedSkillKeys<br/>importedSkills<br/>messageViewMode| R
     _assistantThreadMessages -->|gateway-backed messages| R
     _gatewayHistoryCache -->|gateway history| R
     _localSessionMessages -->|local messages| R
@@ -144,8 +143,7 @@ graph TB
     executionTargetResolver -->|currentAssistantExecutionTarget| execSelector
     executionTargetResolver -->|connection state| connectionChip
     modelResolver -->|resolved model| modelLabel
-    discoveredSkillsR -->|discovered skills| skillPanel
-    importedSkillsR -->|imported skills| skillPanel
+    availableSkillsR -->|available skills| skillPanel
     selectedSkillsR -->|selected keys| skillPanel
     connectionStateR -->|connection state| connectionChip
 
@@ -262,7 +260,7 @@ AssistantThreadRecord
 AssistantThreadRecord fields that matter most:
 - executionTarget
 - messageViewMode
-- discoveredSkills
+- discoveredSkills (legacy / reserved)
 - importedSkills
 - selectedSkillKeys
 - assistantModelId
@@ -401,13 +399,12 @@ Primary owner:
 AssistantThreadRecord
 
 Fields:
-- discoveredSkills
 - importedSkills
 - selectedSkillKeys
 
 Resolution rule:
-- The selected/imported/discovered skills shown in UI belong to the current
-  session thread
+- The available and selected skills shown in UI belong to the current session
+  thread
 - Settings center must not be treated as the source of selected thread skills
 
 3.4 Conversation content
@@ -521,7 +518,6 @@ Change execution target from Assistant page
 - current session key
 - assistantImportedSkillsForSession(sessionKey)
 - assistantSelectedSkillKeysForSession(sessionKey)
-- assistantDiscoveredSkillsForSession(sessionKey)
 
 5.5 Top-right status chip depends on
 
@@ -582,7 +578,7 @@ switchSession(sessionKey) must synchronize:
 - current thread executionTarget
 - current thread message view mode
 - current thread model
-- current thread selected/imported/discovered skills
+- current thread available / selected skills
 - current thread conversation content source
 - current thread connection label
 
@@ -704,6 +700,8 @@ Scope: thread
 Field: discoveredSkills
 Owner: AssistantThreadRecord
 Scope: thread
+Note: legacy / reserved candidate layer; current UI resolves from available
+thread skills plus selected keys
 
 Field: messageViewMode
 Owner: AssistantThreadRecord

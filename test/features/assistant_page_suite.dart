@@ -761,7 +761,7 @@ void main() {
 Future<AppController> _createControllerWithThreadRecords({
   required List<AssistantThreadRecord> records,
   bool useFakeGatewayRuntime = false,
-  List<String>? gatewayOnlySkillScanRoots,
+  List<String>? singleAgentLocalSkillScanRoots,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   final tempDirectory = await Directory.systemTemp.createTemp(
@@ -792,7 +792,7 @@ Future<AppController> _createControllerWithThreadRecords({
             codex: _FakeCodexRuntime(),
           )
         : null,
-    gatewayOnlySkillScanRoots: gatewayOnlySkillScanRoots,
+    singleAgentLocalSkillScanRoots: singleAgentLocalSkillScanRoots,
   );
   final deadline = DateTime.now().add(const Duration(seconds: 5));
   while (controller.initializing) {
