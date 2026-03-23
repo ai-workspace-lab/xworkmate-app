@@ -777,15 +777,6 @@ void main() {
           archived: true,
           executionTarget: AssistantExecutionTarget.remote,
           messageViewMode: AssistantMessageViewMode.raw,
-          discoveredSkills: <AssistantThreadSkillEntry>[
-            AssistantThreadSkillEntry(
-              key: '/tmp/discovered-skill',
-              label: 'Discovered Skill',
-              description: 'candidate only',
-              sourcePath: '/tmp/discovered-skill',
-              sourceLabel: 'codex/discovered',
-            ),
-          ],
           importedSkills: <AssistantThreadSkillEntry>[
             AssistantThreadSkillEntry(
               key: '/tmp/imported-skill',
@@ -850,7 +841,6 @@ void main() {
         reloadedRecords.first.messageViewMode,
         AssistantMessageViewMode.raw,
       );
-      expect(reloadedRecords.first.discoveredSkills, hasLength(1));
       expect(reloadedRecords.first.importedSkills, hasLength(1));
       expect(reloadedRecords.first.selectedSkillKeys, const <String>[
         '/tmp/imported-skill',
@@ -887,12 +877,17 @@ void main() {
         'archived': false,
         'executionTarget': 'aiGatewayOnly',
         'messageViewMode': 'rendered',
+        'discoveredSkills': const <Object>[
+          <String, Object?>{
+            'key': '/tmp/legacy-discovered-skill',
+            'label': 'Legacy Discovered Skill',
+          },
+        ],
         'singleAgentProvider': 'gemini',
         'gatewayEntryState': 'ai-gateway-only',
       });
 
       expect(decoded.executionTarget, AssistantExecutionTarget.singleAgent);
-      expect(decoded.discoveredSkills, isEmpty);
       expect(decoded.importedSkills, isEmpty);
       expect(decoded.selectedSkillKeys, isEmpty);
       expect(decoded.assistantModelId, isEmpty);

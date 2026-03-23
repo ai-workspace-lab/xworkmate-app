@@ -35,10 +35,7 @@ enum AssistantExecutionTarget { singleAgent, local, remote }
 
 extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   String get label => switch (this) {
-    AssistantExecutionTarget.singleAgent => appText(
-      '单机智能体',
-      'Single Agent',
-    ),
+    AssistantExecutionTarget.singleAgent => appText('单机智能体', 'Single Agent'),
     AssistantExecutionTarget.local => appText(
       '本地 OpenClaw Gateway',
       'Local OpenClaw Gateway',
@@ -2013,7 +2010,6 @@ class AssistantThreadRecord {
     required this.archived,
     required this.executionTarget,
     required this.messageViewMode,
-    this.discoveredSkills = const <AssistantThreadSkillEntry>[],
     this.importedSkills = const <AssistantThreadSkillEntry>[],
     this.selectedSkillKeys = const <String>[],
     this.assistantModelId = '',
@@ -2028,7 +2024,6 @@ class AssistantThreadRecord {
   final bool archived;
   final AssistantExecutionTarget? executionTarget;
   final AssistantMessageViewMode messageViewMode;
-  final List<AssistantThreadSkillEntry> discoveredSkills;
   final List<AssistantThreadSkillEntry> importedSkills;
   final List<String> selectedSkillKeys;
   final String assistantModelId;
@@ -2044,7 +2039,6 @@ class AssistantThreadRecord {
     AssistantExecutionTarget? executionTarget,
     bool clearExecutionTarget = false,
     AssistantMessageViewMode? messageViewMode,
-    List<AssistantThreadSkillEntry>? discoveredSkills,
     List<AssistantThreadSkillEntry>? importedSkills,
     List<String>? selectedSkillKeys,
     String? assistantModelId,
@@ -2062,7 +2056,6 @@ class AssistantThreadRecord {
           ? null
           : (executionTarget ?? this.executionTarget),
       messageViewMode: messageViewMode ?? this.messageViewMode,
-      discoveredSkills: discoveredSkills ?? this.discoveredSkills,
       importedSkills: importedSkills ?? this.importedSkills,
       selectedSkillKeys: selectedSkillKeys ?? this.selectedSkillKeys,
       assistantModelId: assistantModelId ?? this.assistantModelId,
@@ -2082,9 +2075,6 @@ class AssistantThreadRecord {
       'archived': archived,
       'executionTarget': executionTarget?.name,
       'messageViewMode': messageViewMode.name,
-      'discoveredSkills': discoveredSkills
-          .map((item) => item.toJson())
-          .toList(growable: false),
       'importedSkills': importedSkills
           .map((item) => item.toJson())
           .toList(growable: false),
@@ -2159,6 +2149,10 @@ class AssistantThreadRecord {
       return normalized;
     }
 
+    // Keep tolerating legacy payloads that still contain discoveredSkills,
+    // but do not map the retired field back into the runtime model.
+    normalizeSkillEntries(json['discoveredSkills']);
+
     return AssistantThreadRecord(
       sessionKey: json['sessionKey']?.toString() ?? '',
       messages: messages,
@@ -2173,7 +2167,6 @@ class AssistantThreadRecord {
       messageViewMode: AssistantMessageViewModeCopy.fromJsonValue(
         json['messageViewMode']?.toString(),
       ),
-      discoveredSkills: normalizeSkillEntries(json['discoveredSkills']),
       importedSkills: normalizeSkillEntries(json['importedSkills']),
       selectedSkillKeys: normalizeSkillKeys(json['selectedSkillKeys']),
       assistantModelId: json['assistantModelId']?.toString() ?? '',
