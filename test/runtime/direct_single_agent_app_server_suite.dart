@@ -53,6 +53,12 @@ void main() {
       expect(result.success, isTrue);
       expect(result.output, 'hello world from app server');
       expect(result.resolvedModel, 'codex-sonnet');
+      expect(
+        server.lastTurnInput,
+        <Object?>[
+          <String, dynamic>{'type': 'text', 'text': 'hello world'},
+        ],
+      );
       expect(deltas.join(), 'hello world from app server');
       expect(
         server.methods,
@@ -134,6 +140,7 @@ class _FakeAppServer {
   final Map<String, Completer<void>> _methodWaiters =
       <String, Completer<void>>{};
   int _threadCounter = 0;
+  List<Object?>? lastTurnInput;
 
   int get port => _server.port;
   Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${_server.port}');
@@ -252,6 +259,34 @@ class _FakeAppServer {
           break;
         case 'turn/start':
           final threadId = params['threadId']?.toString() ?? 'thread-1';
+          if (params.containsKey('userInput')) {
+            socket.add(
+              jsonEncode(<String, dynamic>{
+                'jsonrpc': '2.0',
+                'id': id,
+                'error': <String, dynamic>{
+                  'code': -32600,
+                  'message': 'Invalid request: missing field `input`',
+                },
+              }),
+            );
+            break;
+          }
+          final input = params['input'];
+          if (input is! List) {
+            socket.add(
+              jsonEncode(<String, dynamic>{
+                'jsonrpc': '2.0',
+                'id': id,
+                'error': <String, dynamic>{
+                  'code': -32600,
+                  'message': 'Invalid request: invalid type: expected a sequence',
+                },
+              }),
+            );
+            break;
+          }
+          lastTurnInput = List<Object?>.from(input);
           socket.add(
             jsonEncode(<String, dynamic>{
               'jsonrpc': '2.0',
