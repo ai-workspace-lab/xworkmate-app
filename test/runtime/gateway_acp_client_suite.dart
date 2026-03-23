@@ -1,0 +1,389 @@
+@TestOn('vm')
+library;
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:xworkmate/runtime/gateway_acp_client.dart';
+import 'package:xworkmate/runtime/multi_agent_orchestrator.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
+
+void main() {
+  group('GatewayAcpClient', () {
+    test(
+      'prefers websocket for single-agent run and streams updates',
+      () async {
+        final server = await _AcpFakeServer.start();
+        addTearDown(server.close);
+
+        final client = GatewayAcpClient(
+          endpointResolver: () => server.baseHttpUri,
+        );
+
+        final updates = <GatewayAcpSessionUpdate>[];
+        final result = await client.runSingleAgent(
+          GatewayAcpSingleAgentRequest(
+            sessionId: 'session-ws',
+            threadId: 'thread-ws',
+            provider: SingleAgentProvider.codex,
+            prompt: 'hello ws',
+            model: 'gpt-4.1',
+            workingDirectory: '/tmp',
+            attachments: const <CollaborationAttachment>[],
+            selectedSkills: const <String>['review'],
+            aiGatewayBaseUrl: 'https://example.invalid',
+            aiGatewayApiKey: 'test-key',
+            resumeSession: false,
+          ),
+          onUpdate: updates.add,
+        );
+
+        expect(result.success, isTrue);
+        expect(result.output, 'single-agent result (codex)');
+        expect(result.turnId, 'turn-single');
+        expect(updates, isNotEmpty);
+        expect(updates.first.textDelta, 'delta-single');
+        expect(server.rpcMethods, contains('acp.capabilities'));
+        expect(server.rpcMethods, contains('session.start'));
+      },
+    );
+
+    test('falls back to HTTP+SSE when websocket is unavailable', () async {
+      final server = await _AcpFakeServer.start(disableWebSocket: true);
+      addTearDown(server.close);
+
+      final client = GatewayAcpClient(
+        endpointResolver: () => server.baseHttpUri,
+      );
+
+      final updates = <GatewayAcpSessionUpdate>[];
+      final result = await client.runSingleAgent(
+        GatewayAcpSingleAgentRequest(
+          sessionId: 'session-sse',
+          threadId: 'thread-sse',
+          provider: SingleAgentProvider.claude,
+          prompt: 'hello sse',
+          model: 'claude-sonnet',
+          workingDirectory: '/tmp',
+          attachments: const <CollaborationAttachment>[],
+          selectedSkills: const <String>[],
+          aiGatewayBaseUrl: 'https://example.invalid',
+          aiGatewayApiKey: 'test-key',
+          resumeSession: false,
+        ),
+        onUpdate: updates.add,
+      );
+
+      expect(result.success, isTrue);
+      expect(result.output, 'single-agent result (claude)');
+      expect(updates.map((item) => item.textDelta), contains('delta-single'));
+      expect(server.rpcMethods, contains('acp.capabilities'));
+      expect(server.rpcMethods, contains('session.start'));
+    });
+
+    test(
+      'streams multi-agent events and supports cancel/close session',
+      () async {
+        final server = await _AcpFakeServer.start();
+        addTearDown(server.close);
+
+        final client = GatewayAcpClient(
+          endpointResolver: () => server.baseHttpUri,
+        );
+
+        final events = await client
+            .runMultiAgent(
+              GatewayAcpMultiAgentRequest(
+                sessionId: 'session-ma',
+                threadId: 'thread-ma',
+                prompt: 'run multi-agent',
+                workingDirectory: '/tmp',
+                attachments: const <CollaborationAttachment>[],
+                selectedSkills: const <String>['design'],
+                aiGatewayBaseUrl: 'https://example.invalid',
+                aiGatewayApiKey: 'test-key',
+                resumeSession: false,
+              ),
+            )
+            .toList();
+
+        expect(events, isNotEmpty);
+        expect(events.first.type, 'step');
+        expect(events.last.type, 'result');
+        expect(events.last.error, isFalse);
+
+        await client.cancelSession(
+          sessionId: 'session-ma',
+          threadId: 'thread-ma',
+        );
+        await client.closeSession(
+          sessionId: 'session-ma',
+          threadId: 'thread-ma',
+        );
+
+        expect(server.rpcMethods, contains('session.cancel'));
+        expect(server.rpcMethods, contains('session.close'));
+      },
+    );
+  });
+}
+
+class _AcpFakeServer {
+  _AcpFakeServer._(this._server, {required this.disableWebSocket});
+
+  final HttpServer _server;
+  final bool disableWebSocket;
+  final List<String> rpcMethods = <String>[];
+
+  Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${_server.port}');
+
+  static Future<_AcpFakeServer> start({bool disableWebSocket = false}) async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final fake = _AcpFakeServer._(server, disableWebSocket: disableWebSocket);
+    unawaited(fake._listen());
+    return fake;
+  }
+
+  Future<void> close() async {
+    await _server.close(force: true);
+  }
+
+  Future<void> _listen() async {
+    await for (final request in _server) {
+      if (!disableWebSocket &&
+          request.uri.path == '/acp' &&
+          WebSocketTransformer.isUpgradeRequest(request)) {
+        final socket = await WebSocketTransformer.upgrade(request);
+        unawaited(_handleWebSocket(socket));
+        continue;
+      }
+      if (request.uri.path == '/acp/rpc' && request.method == 'POST') {
+        await _handleHttpRpc(request);
+        continue;
+      }
+      request.response
+        ..statusCode = HttpStatus.notFound
+        ..write('not found');
+      await request.response.close();
+    }
+  }
+
+  Future<void> _handleWebSocket(WebSocket socket) async {
+    await for (final raw in socket) {
+      final envelope = _decodeMap(raw);
+      final id = envelope['id'];
+      final method = envelope['method']?.toString() ?? '';
+      final params = _asMap(envelope['params']);
+      if (method.isEmpty) {
+        continue;
+      }
+      rpcMethods.add(method);
+      await _dispatch(
+        method: method,
+        id: id,
+        params: params,
+        notify: (notification) async {
+          socket.add(jsonEncode(notification));
+        },
+        respond: (response) async {
+          socket.add(jsonEncode(response));
+        },
+      );
+    }
+  }
+
+  Future<void> _handleHttpRpc(HttpRequest request) async {
+    final body = await utf8.decodeStream(request);
+    final envelope = _decodeMap(body);
+    final id = envelope['id'];
+    final method = envelope['method']?.toString() ?? '';
+    final params = _asMap(envelope['params']);
+    if (method.isEmpty) {
+      request.response.statusCode = HttpStatus.badRequest;
+      await request.response.close();
+      return;
+    }
+    rpcMethods.add(method);
+
+    request.response.headers.set(
+      HttpHeaders.contentTypeHeader,
+      'text/event-stream',
+    );
+    request.response.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+
+    Future<void> notify(Map<String, dynamic> notification) async {
+      request.response.write('data: ${jsonEncode(notification)}\n\n');
+      await request.response.flush();
+    }
+
+    Future<void> respond(Map<String, dynamic> response) async {
+      request.response.write('data: ${jsonEncode(response)}\n\n');
+      await request.response.flush();
+      await request.response.close();
+    }
+
+    await _dispatch(
+      method: method,
+      id: id,
+      params: params,
+      notify: notify,
+      respond: respond,
+    );
+  }
+
+  Future<void> _dispatch({
+    required String method,
+    required Object? id,
+    required Map<String, dynamic> params,
+    required Future<void> Function(Map<String, dynamic> notification) notify,
+    required Future<void> Function(Map<String, dynamic> response) respond,
+  }) async {
+    switch (method) {
+      case 'acp.capabilities':
+        await respond(
+          _resultEnvelope(
+            id: id,
+            result: <String, dynamic>{
+              'singleAgent': true,
+              'multiAgent': true,
+              'providers': <String>['codex', 'claude', 'gemini', 'opencode'],
+              'capabilities': <String, dynamic>{
+                'single_agent': true,
+                'multi_agent': true,
+                'providers': <String>['codex', 'claude', 'gemini', 'opencode'],
+              },
+            },
+          ),
+        );
+        return;
+      case 'session.start':
+      case 'session.message':
+        final sessionId = params['sessionId']?.toString() ?? 'session-default';
+        final threadId = params['threadId']?.toString() ?? sessionId;
+        final mode = params['mode']?.toString() ?? 'single-agent';
+        if (mode == 'multi-agent') {
+          await notify(
+            _notificationEnvelope(
+              method: 'multi_agent.event',
+              params: <String, dynamic>{
+                'type': 'step',
+                'title': 'Architect',
+                'message': 'planning',
+                'pending': false,
+                'error': false,
+                'data': <String, dynamic>{'seq': 1},
+              },
+            ),
+          );
+          await respond(
+            _resultEnvelope(
+              id: id,
+              result: <String, dynamic>{
+                'success': true,
+                'summary': 'multi-agent done',
+                'finalScore': 9,
+                'iterations': 1,
+              },
+            ),
+          );
+          return;
+        }
+        final provider = params['provider']?.toString() ?? 'unknown';
+        await notify(
+          _notificationEnvelope(
+            method: 'session.update',
+            params: <String, dynamic>{
+              'sessionId': sessionId,
+              'threadId': threadId,
+              'turnId': 'turn-single',
+              'type': 'delta',
+              'delta': 'delta-single',
+              'seq': 1,
+              'mode': 'single-agent',
+            },
+          ),
+        );
+        await respond(
+          _resultEnvelope(
+            id: id,
+            result: <String, dynamic>{
+              'success': true,
+              'output': 'single-agent result ($provider)',
+              'turnId': 'turn-single',
+            },
+          ),
+        );
+        return;
+      case 'session.cancel':
+        await respond(
+          _resultEnvelope(
+            id: id,
+            result: const <String, dynamic>{
+              'accepted': true,
+              'cancelled': true,
+            },
+          ),
+        );
+        return;
+      case 'session.close':
+        await respond(
+          _resultEnvelope(
+            id: id,
+            result: const <String, dynamic>{'accepted': true, 'closed': true},
+          ),
+        );
+        return;
+      default:
+        await respond(<String, dynamic>{
+          'jsonrpc': '2.0',
+          'id': id,
+          'error': <String, dynamic>{
+            'code': -32601,
+            'message': 'method not found',
+          },
+        });
+    }
+  }
+
+  Map<String, dynamic> _resultEnvelope({
+    required Object? id,
+    required Map<String, dynamic> result,
+  }) {
+    return <String, dynamic>{'jsonrpc': '2.0', 'id': id, 'result': result};
+  }
+
+  Map<String, dynamic> _notificationEnvelope({
+    required String method,
+    required Map<String, dynamic> params,
+  }) {
+    return <String, dynamic>{
+      'jsonrpc': '2.0',
+      'method': method,
+      'params': params,
+    };
+  }
+
+  Map<String, dynamic> _decodeMap(Object raw) {
+    if (raw is String) {
+      final decoded = jsonDecode(raw);
+      return _asMap(decoded);
+    }
+    if (raw is List<int>) {
+      final decoded = jsonDecode(utf8.decode(raw));
+      return _asMap(decoded);
+    }
+    return _asMap(raw);
+  }
+
+  Map<String, dynamic> _asMap(Object? raw) {
+    if (raw is Map<String, dynamic>) {
+      return raw;
+    }
+    if (raw is Map) {
+      return raw.cast<String, dynamic>();
+    }
+    return const <String, dynamic>{};
+  }
+}

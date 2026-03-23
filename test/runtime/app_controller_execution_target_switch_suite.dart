@@ -236,15 +236,21 @@ void main() {
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.local,
       );
+      final expectedLocalProfile =
+          controller.settings.primaryLocalGatewayProfile;
 
       expect(
         gateway.connectedProfiles.last,
         isA<GatewayConnectionProfile>()
             .having((item) => item.mode, 'mode', RuntimeConnectionMode.local)
-            .having((item) => item.host, 'host', '127.0.0.1')
-            .having((item) => item.port, 'port', 18789)
+            .having((item) => item.host, 'host', expectedLocalProfile.host)
+            .having((item) => item.port, 'port', expectedLocalProfile.port)
             .having((item) => item.tls, 'tls', isFalse)
-            .having((item) => item.selectedAgentId, 'selectedAgentId', ''),
+            .having(
+              (item) => item.selectedAgentId,
+              'selectedAgentId',
+              expectedLocalProfile.selectedAgentId,
+            ),
       );
       expect(
         controller.settings.assistantExecutionTarget,
@@ -272,8 +278,7 @@ void main() {
       expect(
         controller.settings.primaryRemoteGatewayProfile.host,
         'gateway.example.com',
-        reason:
-            'Single Agent mode should preserve the saved remote endpoint.',
+        reason: 'Single Agent mode should preserve the saved remote endpoint.',
       );
       expect(controller.settings.primaryRemoteGatewayProfile.port, 9443);
       expect(controller.settings.primaryRemoteGatewayProfile.tls, isTrue);
@@ -771,7 +776,12 @@ void main() {
         AssistantExecutionTarget.local,
       );
       expect(controller.assistantConnectionStatusLabel, '已连接');
-      expect(controller.assistantConnectionTargetLabel, '127.0.0.1:18789');
+      final expectedLocalProfile =
+          controller.settings.primaryLocalGatewayProfile;
+      expect(
+        controller.assistantConnectionTargetLabel,
+        '${expectedLocalProfile.host}:${expectedLocalProfile.port}',
+      );
 
       controller.initializeAssistantThreadContext(
         'remote-thread',
