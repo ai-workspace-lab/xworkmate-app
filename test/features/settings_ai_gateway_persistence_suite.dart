@@ -17,20 +17,28 @@ void main() {
     'SettingsPage AI Gateway draft/save/apply flow persists edited fields through local actions',
     (WidgetTester tester) async {
       late _AiGatewaySettingsTestController controller;
+      late Directory testRoot;
       await tester.runAsync(() async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
-        final testRoot =
-            '${Directory.systemTemp.path}/xworkmate-widget-tests-${DateTime.now().microsecondsSinceEpoch}';
+        testRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-widget-tests-',
+        );
         controller = _AiGatewaySettingsTestController(
           store: SecureConfigStore(
             enableSecureStorage: false,
-            databasePathResolver: () async => '$testRoot/settings.sqlite3',
-            fallbackDirectoryPathResolver: () async => testRoot,
+            databasePathResolver: () async =>
+                '${testRoot.path}/settings.sqlite3',
+            fallbackDirectoryPathResolver: () async => testRoot.path,
           ),
         );
         await _waitFor(() => !controller.initializing);
       });
       addTearDown(controller.dispose);
+      addTearDown(() async {
+        if (await testRoot.exists()) {
+          await testRoot.delete(recursive: true);
+        }
+      });
 
       final staleGateway = controller.settings.aiGateway.copyWith(
         name: 'default',

@@ -124,6 +124,8 @@ class SettingsStore {
     await _deleteDurableStateFile(settingsKey);
     await _deleteDurableStateFile(assistantThreadsKey);
     await _deleteLegacyBackupFile();
+    _lastRecoveryReport = const LegacyRecoveryReport();
+    _recoveryAttempted = true;
   }
 
   Future<List<SecretAuditEntry>> loadAuditTrail() async {
@@ -365,13 +367,17 @@ class SettingsStore {
     final results = <String>{};
     final databasePath = await _resolveDatabasePath();
     final fallbackRoot = await _fallbackDirectoryPathResolver?.call();
-    final defaultSupportRoot = await _defaultSupportDirectoryPathResolver
-        ?.call();
+    final hasExplicitPaths =
+        _databasePathResolver != null || _fallbackDirectoryPathResolver != null;
+    String? defaultSupportRoot;
     String? supportPath;
-    try {
-      supportPath = (await getApplicationSupportDirectory()).path;
-    } catch (_) {
-      supportPath = null;
+    if (!hasExplicitPaths) {
+      defaultSupportRoot = await _defaultSupportDirectoryPathResolver?.call();
+      try {
+        supportPath = (await getApplicationSupportDirectory()).path;
+      } catch (_) {
+        supportPath = null;
+      }
     }
 
     void addPath(String? path) {
@@ -385,7 +391,6 @@ class SettingsStore {
     if (databasePath != null && databasePath.trim().isNotEmpty) {
       final directory = File(databasePath).parent.path;
       addPath(directory);
-      addPath(Directory(directory).parent.path);
     }
     addPath(fallbackRoot);
     addPath(fallbackRoot == null ? null : '$fallbackRoot/xworkmate');

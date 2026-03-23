@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
+import '../../app/app_store_policy.dart';
 import '../../app/ui_feature_manifest.dart';
 import '../../app/workspace_navigation.dart';
 import '../../i18n/app_language.dart';
@@ -2482,11 +2483,129 @@ class _SettingsPageState extends State<SettingsPage> {
               label: appText('包名', 'Package'),
               value: controller.runtime.packageInfo.packageName,
             ),
+            if (kAppStoreDistribution) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  appText(
+                    '当前构建启用了 App Store 分发策略：Apple 渠道会隐藏实验入口，并禁用外部 CLI / 本地 Runtime 能力。',
+                    'This build enables the App Store distribution policy: Apple storefront builds hide experimental surfaces and disable external CLI / local runtime capabilities.',
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
+      SurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              appText('隐私政策', 'Privacy Policy'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              appText(
+                '说明本应用会保存哪些本地设置、哪些用户数据会按你的操作发送到外部网关或 LLM 端点，以及如何清除本地数据。',
+                'Explains which settings stay on-device, which user data is sent to your configured gateway or LLM endpoints, and how to clear local data.',
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.tonalIcon(
+              key: const ValueKey('settings-open-privacy-policy'),
+              onPressed: () => _showPrivacyPolicyDialog(context),
+              icon: const Icon(Icons.privacy_tip_outlined),
+              label: Text(appText('查看隐私政策', 'View Privacy Policy')),
+            ),
           ],
         ),
       ),
     ];
   }
+
+  Future<void> _showPrivacyPolicyDialog(BuildContext context) {
+    final theme = Theme.of(context);
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(appText('隐私政策', 'Privacy Policy')),
+          content: SizedBox(
+            width: 560,
+            child: SingleChildScrollView(
+              child: Text(
+                appText(_privacyPolicyZh, _privacyPolicyEn),
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(appText('关闭', 'Close')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  static const String _privacyPolicyZh = '''
+XWorkmate 隐私政策
+
+1. 本地保存
+- 应用会在本机保存你主动配置的工作区设置、界面偏好、线程草稿和诊断状态。
+- 共享 Token、密码、API Key 等敏感信息使用系统安全存储；不会写入普通 SharedPreferences。
+
+2. 发送到外部服务的数据
+- 只有在你主动发起连接、发送消息、上传附件或测试连接时，应用才会把当前输入内容发送到你配置的 OpenClaw Gateway 或 LLM API Endpoint。
+- 发送内容可能包括：提示词、会话上下文、你明确选择的附件路径与文件内容、以及完成请求所需的认证头。
+
+3. 不会做的事情
+- 不会接入广告 SDK，不会做跨应用追踪，不会在未操作时自动读取工作区文件。
+- 不会把你的网关密码、共享 Token 或 LLM API Token 上传到本项目默认的开发者服务。
+
+4. 第三方处理
+- 你配置的 OpenClaw Gateway、LLM API Endpoint、对象存储或其它外部服务，将按你自己的服务条款处理收到的数据。
+- 你需要确认这些外部服务具备你要求的合规能力。
+
+5. 删除与撤回
+- 你可以在“设置 -> 诊断/集成”中清除本地线程、移除本地配置，并删除已保存的安全凭据。
+- 如果你希望删除已经发送到外部服务的数据，需要在对应外部服务侧执行删除或撤回。
+''';
+
+  static const String _privacyPolicyEn = '''
+XWorkmate Privacy Policy
+
+1. Local storage
+- The app stores the settings, UI preferences, draft threads, and diagnostic state that you explicitly save on this device.
+- Shared tokens, passwords, and API keys are stored in platform secure storage instead of plain SharedPreferences.
+
+2. Data sent to external services
+- Data is only sent when you explicitly connect, send a message, attach a file, or run a connection test against your configured OpenClaw Gateway or LLM API endpoint.
+- Sent data can include prompts, conversation context, user-selected attachment paths and file contents, and the authentication headers required to complete the request.
+
+3. What the app does not do
+- It does not include advertising SDKs, cross-app tracking, or automatic workspace file reads without a user action.
+- It does not upload your gateway passwords, shared tokens, or LLM API tokens to developer-operated services by default.
+
+4. Third-party processing
+- Your configured OpenClaw Gateway, LLM API endpoint, object storage, or other external services process the data you send under their own terms.
+- You are responsible for confirming that those external services meet your compliance requirements.
+
+5. Deletion and withdrawal
+- You can clear local threads, remove local settings, and delete stored secrets from Settings.
+- If you need data removed from an external service, you must request deletion from that external service directly.
+''';
 
   Future<void> _saveSettings(
     AppController controller,
