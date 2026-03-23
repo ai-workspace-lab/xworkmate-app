@@ -14,6 +14,8 @@ null/
 .svn/
 .swiftpm/
 migrate_working_dir/
+tmp/*
+!tmp/.gitkeep
 
 # IntelliJ related
 *.iml
