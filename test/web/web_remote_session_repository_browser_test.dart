@@ -62,7 +62,7 @@ void main() {
           updatedAtMs: 1,
           title: 'hello',
           archived: false,
-          executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+          executionTarget: AssistantExecutionTarget.singleAgent,
           messageViewMode: AssistantMessageViewMode.rendered,
         ),
       ];

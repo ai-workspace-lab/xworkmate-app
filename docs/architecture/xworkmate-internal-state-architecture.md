@@ -318,14 +318,14 @@ state.
 3.1 Execution target / work mode
 
 Meaning:
-- AI Gateway only
+- Single Agent
 - Local OpenClaw Gateway
 - Remote OpenClaw Gateway
 
 Platform availability:
-- Desktop: aiGatewayOnly, local, remote
+- Desktop: singleAgent, local, remote
 - Mobile: remote
-- Web: aiGatewayOnly, remote
+- Web: singleAgent, remote
 
 Primary resolver:
 assistantExecutionTargetForSession(sessionKey)
@@ -345,7 +345,7 @@ has changed unless the current thread record is also synchronized.
 Important separation:
 - `assistantExecutionTarget` is the work-mode default / thread override axis
 - it is not a pointer into `gatewayProfiles`
-- AI Gateway only has no OpenClaw profile
+- Single Agent has no OpenClaw profile
 - there is no implicit local-to-remote or AI-to-remote profile fallback
 
 3.1.1 OpenClaw gateway profile list
@@ -388,7 +388,7 @@ Resolution order:
 2. resolved model for current execution target
 
 Fallback rules:
-- If target is aiGatewayOnly, use resolvedAiGatewayModel
+- If target is singleAgent, use resolvedAiGatewayModel
 - If target is local or remote, use resolvedDefaultModel
 
 Interpretation:
@@ -589,7 +589,7 @@ switchSession(sessionKey) must synchronize:
 6.4 What must never happen implicitly
 
 - local OpenClaw selectedAgentId must not silently fall back to remote
-- AI Gateway only mode must not silently borrow a gateway profile
+- Single Agent mode must not silently borrow a gateway profile
 - gatewayProfiles changes must not silently overwrite the current thread mode
 - platform capability filtering must not invent unsupported work modes
 

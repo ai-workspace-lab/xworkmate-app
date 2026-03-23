@@ -10,7 +10,7 @@ The Web app keeps only:
 
 - `Assistant`
 - `Settings`
-- `Direct AI Gateway`
+- `Single Agent`
 - `Relay OpenClaw Gateway`
 
 The following remain desktop-only:
@@ -48,7 +48,7 @@ flutter build web --release --base-href /
 
 ## Network Requirements
 
-- `Direct AI Gateway` must be browser-reachable from the end user device.
+- `Single Agent` must be browser-reachable from the end user device.
 - Direct gateway endpoints must allow the Web origin with correct CORS headers.
 - If a provider cannot satisfy browser reachability or CORS constraints, users must use `Relay OpenClaw Gateway` instead.
 - Relay endpoints should stay on TLS in production and must not silently downgrade to insecure transport for remote usage.

@@ -17,14 +17,14 @@
 
 ### Highlights
 - 本地配置、Gateway 凭证和 Assistant 任务会话改为以 secure storage 管理的密钥做加密持久化，重启和覆盖安装后不再丢失。
-- `仅 AI Gateway` 线程补齐本地技能自动发现和当前线程可选技能列表恢复，线程状态与模型选择继续保持隔离。
+- `单机智能体` 线程补齐本地技能自动发现和当前线程可选技能列表恢复，线程状态与模型选择继续保持隔离。
 - Flutter Web assistant shell、Web Chrome 会话持久化和移动端安全控件一起补齐，多端可用性明显提升。
 - Assistant composer 高度自适应、执行目标切换即时刷新、侧栏默认宽度等桌面交互问题已收敛。
 - Windows / Linux parity、macOS DMG 打包和多平台构建发布流程持续补强。
 
 ### Current Delivery Scope
 - 已交付：加密后的本地 settings snapshot、assistant threads 和 sealed backup 恢复链路。
-- 已交付：Gateway-only 线程技能自动发现、线程状态清理和重启恢复。
+- 已交付：Single Agent 线程技能自动发现、线程状态清理和重启恢复。
 - 已交付：Flutter Web assistant shell、Web 持久化修复、移动端安全壳控件和桌面布局微调。
 - 已交付：Windows / Linux parity 修复、多平台 build and release workflow、macOS 安装与分发产物。
 
@@ -45,13 +45,13 @@
 
 ### Highlights
 - Assistant 任务线程升级为持续会话：支持流式回复、继续追问、线程归档和重启恢复。
-- 任务列表按 `仅 AI Gateway / 本地 OpenClaw Gateway / 远程 OpenClaw Gateway` 分组，保持极简列表布局。
+- 任务列表按 `单机智能体 / 本地 OpenClaw Gateway / 远程 OpenClaw Gateway` 分组，保持极简列表布局。
 - Multi-Agent 协作正式升级为 `Architect / Engineer / Tester`，并可选 `ARIS` 作为最强协作框架。
 - ARIS bundle 作为只读资产内嵌进 App，`skills/` 直接复用 upstream，`llm-chat` 与 `claude-review` 切到 Go bridge。
 - `Ollama Cloud` 文案与默认地址统一，打包后的 `.app` 会随同分发 `xworkmate-aris-bridge` helper。
 
 ### Current Delivery Scope
-- 已交付：AI Gateway-only streaming threads、OpenClaw 本地/远程任务线程、手动归档与持续会话恢复。
+- 已交付：Single Agent streaming threads、OpenClaw 本地/远程任务线程、手动归档与持续会话恢复。
 - 已交付：Multi-Agent managed runtime、ARIS framework preset、本地优先 Ollama 回退、Go bridge runtime 和打包分发。
 - 已交付：Settings / Assistant 里的 ARIS 轻量状态展示、任务分组、Ollama Cloud 设置迁移。
 - 保持 truth-first：Scheduled Tasks 仍是 `cron.list` 只读视图；Memory 仍是 `memory/sync` 同步能力，不宣传 CRUD。

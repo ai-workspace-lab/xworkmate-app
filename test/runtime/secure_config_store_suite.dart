@@ -699,7 +699,7 @@ void main() {
           ],
           selectedSkillKeys: <String>['/tmp/imported-skill'],
           assistantModelId: 'gpt-5.4-mini',
-          gatewayEntryState: 'ai-gateway-only',
+          gatewayEntryState: 'single-agent',
           updatedAtMs: 1700000000000,
           messages: <GatewayChatMessage>[
             GatewayChatMessage(
@@ -757,7 +757,7 @@ void main() {
         '/tmp/imported-skill',
       ]);
       expect(reloadedRecords.first.assistantModelId, 'gpt-5.4-mini');
-      expect(reloadedRecords.first.gatewayEntryState, 'ai-gateway-only');
+      expect(reloadedRecords.first.gatewayEntryState, 'single-agent');
       expect(reloadedRecords.first.messages, hasLength(2));
       expect(reloadedRecords.first.messages.last.text, '第一条回复');
     },
@@ -782,17 +782,28 @@ void main() {
         'updatedAtMs': 1700000000000,
         'title': 'Legacy',
         'archived': false,
-        'executionTarget': 'local',
+        'executionTarget': 'aiGatewayOnly',
         'messageViewMode': 'rendered',
+        'gatewayEntryState': 'ai-gateway-only',
       });
 
+      expect(decoded.executionTarget, AssistantExecutionTarget.singleAgent);
       expect(decoded.discoveredSkills, isEmpty);
       expect(decoded.importedSkills, isEmpty);
       expect(decoded.selectedSkillKeys, isEmpty);
       expect(decoded.assistantModelId, isEmpty);
-      expect(decoded.gatewayEntryState, isNull);
+      expect(decoded.gatewayEntryState, 'single-agent');
     },
   );
+
+  test('SettingsSnapshot keeps compatibility with legacy target json values', () {
+    final decoded = SettingsSnapshot.fromJson(<String, dynamic>{
+      ...SettingsSnapshot.defaults().toJson(),
+      'assistantExecutionTarget': 'aiGatewayOnly',
+    });
+
+    expect(decoded.assistantExecutionTarget, AssistantExecutionTarget.singleAgent);
+  });
 
   test(
     'SecureConfigStore restores assistant state from durable files when sqlite entries are missing',
@@ -820,7 +831,7 @@ void main() {
           sessionKey: 'draft:backup-1',
           title: '备份线程',
           archived: false,
-          executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+          executionTarget: AssistantExecutionTarget.singleAgent,
           messageViewMode: AssistantMessageViewMode.rendered,
           updatedAtMs: 1700000000000,
           messages: <GatewayChatMessage>[

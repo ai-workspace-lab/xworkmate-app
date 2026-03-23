@@ -192,7 +192,7 @@ void main() {
       await controller.saveSettings(
         _withRemoteGatewayProfile(
           controller.settings.copyWith(
-            assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
+            assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
             aiGateway: controller.settings.aiGateway.copyWith(
               baseUrl: 'http://127.0.0.1:11434/v1',
               availableModels: const <String>['qwen2.5-coder:latest'],
@@ -262,18 +262,18 @@ void main() {
       );
 
       await controller.setAssistantExecutionTarget(
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
       );
 
       expect(
         controller.settings.assistantExecutionTarget,
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
       );
       expect(
         controller.settings.primaryRemoteGatewayProfile.host,
         'gateway.example.com',
         reason:
-            'AI Gateway-only mode should preserve the saved remote endpoint.',
+            'Single Agent mode should preserve the saved remote endpoint.',
       );
       expect(controller.settings.primaryRemoteGatewayProfile.port, 9443);
       expect(controller.settings.primaryRemoteGatewayProfile.tls, isTrue);
@@ -282,7 +282,7 @@ void main() {
         RuntimeConnectionMode.remote,
       );
       expect(gateway.disconnectCount, 1);
-      expect(controller.assistantConnectionStatusLabel, '仅 AI Gateway');
+      expect(controller.assistantConnectionStatusLabel, '单机智能体');
       expect(
         controller.assistantConnectionTargetLabel,
         'qwen2.5-coder:latest · 127.0.0.1:11434',
@@ -290,7 +290,7 @@ void main() {
       expect(
         gateway.connectedProfiles,
         hasLength(2),
-        reason: 'AI Gateway-only mode should not open another gateway session.',
+        reason: 'Single Agent mode should not open another gateway session.',
       );
 
       await controller.setAssistantExecutionTarget(
@@ -539,7 +539,7 @@ void main() {
   );
 
   test(
-    'AppController notifies aiGatewayOnly target changes before disconnect completes',
+    'AppController notifies singleAgent target changes before disconnect completes',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -567,7 +567,7 @@ void main() {
       await controller.saveSettings(
         _withRemoteGatewayProfile(
           controller.settings.copyWith(
-            assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
+            assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
             aiGateway: controller.settings.aiGateway.copyWith(
               baseUrl: 'http://127.0.0.1:11434/v1',
               availableModels: const <String>['qwen2.5-coder:latest'],
@@ -598,7 +598,7 @@ void main() {
       gateway.holdNextDisconnect(disconnectGate);
 
       final switchFuture = controller.setAssistantExecutionTarget(
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
       );
       var completed = false;
       switchFuture.then((_) {
@@ -611,9 +611,9 @@ void main() {
         expect(notificationCount, greaterThan(0));
         expect(
           controller.assistantExecutionTarget,
-          AssistantExecutionTarget.aiGatewayOnly,
+          AssistantExecutionTarget.singleAgent,
         );
-        expect(controller.assistantConnectionStatusLabel, '仅 AI Gateway');
+        expect(controller.assistantConnectionStatusLabel, '单机智能体');
         expect(completed, isFalse);
       } finally {
         if (!disconnectGate.isCompleted) {
@@ -625,13 +625,13 @@ void main() {
 
       expect(
         controller.settings.assistantExecutionTarget,
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
       );
       expect(
         controller.assistantExecutionTarget,
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
       );
-      expect(controller.assistantConnectionStatusLabel, '仅 AI Gateway');
+      expect(controller.assistantConnectionStatusLabel, '单机智能体');
     },
   );
 
@@ -683,7 +683,7 @@ void main() {
 
       controller.initializeAssistantThreadContext(
         'main',
-        executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+        executionTarget: AssistantExecutionTarget.singleAgent,
       );
       controller.initializeAssistantThreadContext(
         'remote-thread',
@@ -707,10 +707,10 @@ void main() {
 
       expect(
         controller.assistantExecutionTarget,
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
       );
       expect(gateway.disconnectCount, 1);
-      expect(controller.assistantConnectionStatusLabel, '仅 AI Gateway');
+      expect(controller.assistantConnectionStatusLabel, '单机智能体');
       expect(
         controller.settings.assistantExecutionTarget,
         AssistantExecutionTarget.local,
@@ -798,11 +798,11 @@ void main() {
 
       controller.initializeAssistantThreadContext(
         'main',
-        executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+        executionTarget: AssistantExecutionTarget.singleAgent,
       );
       await controller.switchSession('main');
 
-      expect(controller.assistantConnectionStatusLabel, '仅 AI Gateway');
+      expect(controller.assistantConnectionStatusLabel, '单机智能体');
       expect(
         controller.assistantConnectionTargetLabel,
         'qwen2.5-coder:latest · 127.0.0.1:11434',
@@ -897,7 +897,7 @@ void main() {
       firstController.initializeAssistantThreadContext(
         'draft:alpha',
         title: 'Alpha',
-        executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+        executionTarget: AssistantExecutionTarget.singleAgent,
       );
       firstController.initializeAssistantThreadContext(
         'draft:beta',
