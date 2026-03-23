@@ -254,10 +254,12 @@ class DirectSingleAgentAppServerClient {
           'turn/start',
           params: <String, dynamic>{
             'threadId': threadId,
-            'userInput': <String, dynamic>{
-              'type': 'message',
-              'content': request.prompt,
-            },
+            'input': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'type': 'text',
+                'text': request.prompt,
+              },
+            ],
           },
         );
         resolvedModel = _extractModel(started) ?? resolvedModel;
