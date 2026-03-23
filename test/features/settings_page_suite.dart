@@ -106,7 +106,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('OpenClaw Gateway'), findsOneWidget);
-    expect(find.text('Vault Server'), findsOneWidget);
+    expect(find.text('Vault Server'), findsNothing);
     expect(find.byKey(const ValueKey('ai-gateway-url-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('gateway-mode-field')), findsNothing);
     expect(find.text('认证诊断'), findsNothing);
@@ -137,6 +137,33 @@ void main() {
       find.byKey(const ValueKey('gateway-device-security-card')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('SettingsPage can expose vault section when feature enabled', (
+    WidgetTester tester,
+  ) async {
+    final manifest = UiFeatureManifest.fallback().copyWithFeature(
+      platform: UiFeaturePlatform.desktop,
+      module: 'settings',
+      feature: 'vault_server',
+      enabled: true,
+      releaseTier: UiFeatureReleaseTier.experimental,
+    );
+    final controller = await createTestController(
+      tester,
+      uiFeatureManifest: manifest,
+    );
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
+
+    await tester.tap(find.text('集成'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Vault Server'), findsOneWidget);
   });
 
   testWidgets('SettingsPage gateway sections can collapse individually', (
