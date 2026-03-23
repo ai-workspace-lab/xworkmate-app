@@ -12,7 +12,7 @@ import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/device_identity_store.dart';
 import '../runtime/aris_bundle.dart';
-import '../runtime/aris_bridge.dart';
+import '../runtime/go_core.dart';
 import '../runtime/runtime_bootstrap.dart';
 import '../runtime/desktop_platform_service.dart';
 import '../runtime/gateway_runtime.dart';
@@ -151,14 +151,14 @@ class AppController extends ChangeNotifier {
     _availableSingleAgentProvidersOverride =
         availableSingleAgentProvidersOverride;
     _arisBundleRepository = ArisBundleRepository();
-    _arisBridgeLocator = ArisBridgeLocator();
+    _goCoreLocator = GoCoreLocator();
     _singleAgentRunner =
         singleAgentRunner ??
         DefaultSingleAgentRunner(appServerClient: _singleAgentAppServerClient);
     _multiAgentOrchestrator = MultiAgentOrchestrator(
       config: _resolveMultiAgentConfig(_settingsController.snapshot),
       arisBundleRepository: _arisBundleRepository,
-      arisBridgeLocator: _arisBridgeLocator,
+      goCoreLocator: _goCoreLocator,
     );
 
     _attachChildListeners();
@@ -189,7 +189,7 @@ class AppController extends ChangeNotifier {
   late final DirectSingleAgentAppServerClient _singleAgentAppServerClient;
   late final List<SingleAgentProvider>? _availableSingleAgentProvidersOverride;
   late final ArisBundleRepository _arisBundleRepository;
-  late final ArisBridgeLocator _arisBridgeLocator;
+  late final GoCoreLocator _goCoreLocator;
   late final SingleAgentRunner _singleAgentRunner;
   late final MultiAgentOrchestrator _multiAgentOrchestrator;
   DirectSingleAgentCapabilities _singleAgentCapabilities =

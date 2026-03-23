@@ -9,7 +9,7 @@ APP_NAME="${APP_NAME:-XWorkmate}"
 BUILD_MODE="${BUILD_MODE:-release}"
 APP_STORE_DEFINE="${APP_STORE_DEFINE:---dart-define=XWORKMATE_APP_STORE=${XWORKMATE_APP_STORE:-true}}"
 PRODUCTS_DIR_NAME="$(tr '[:lower:]' '[:upper:]' <<< "${BUILD_MODE:0:1}")${BUILD_MODE:1}"
-BRIDGE_BINARY_NAME="${BRIDGE_BINARY_NAME:-xworkmate-aris-bridge}"
+BRIDGE_BINARY_NAME="${BRIDGE_BINARY_NAME:-xworkmate-go-core}"
 BRIDGE_BUILD_PATH="${ROOT_DIR}/build/bin/${BRIDGE_BINARY_NAME}"
 
 if [[ ! -f "$PUBSPEC_PATH" ]]; then
@@ -37,8 +37,8 @@ HELPER_PATH="$HELPERS_DIR/$BRIDGE_BINARY_NAME"
 
 mkdir -p "$DIST_DIR"
 
-echo "Building bundled ARIS bridge..."
-bash "$ROOT_DIR/scripts/build-aris-bridge.sh"
+echo "Building bundled Go core..."
+bash "$ROOT_DIR/scripts/build-go-core.sh"
 
 echo "Building $APP_NAME $APP_VERSION ($APP_BUILD) for macOS..."
 BUILD_ARGS=(

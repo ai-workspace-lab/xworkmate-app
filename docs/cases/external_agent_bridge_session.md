@@ -2,13 +2,13 @@
 
 ## 目标
 
-验证 `Go bridge` 驱动的 reviewer / CLI 会话是持续的 session，而不是一次 prompt 一次退出。
+验证 `Go core` 驱动的 reviewer / CLI 会话是持续的 session，而不是一次 prompt 一次退出。
 
 ## 推荐配置
 
 - 框架：`ARIS`
 - 本地 Ollama 可用
-- `llm-chat` / `claude-review` 走 Go bridge
+- `llm-chat` / `claude-review` 走 Go core
 - Assistant 使用现有线程，不切新页面
 
 ## 建议任务

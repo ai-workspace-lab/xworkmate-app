@@ -6,7 +6,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xworkmate/runtime/aris_bridge.dart';
+import 'package:xworkmate/runtime/go_core.dart';
 import 'package:xworkmate/runtime/aris_llm_chat_client.dart';
 
 void main() {
@@ -112,8 +112,8 @@ void main() {
   });
 }
 
-ArisBridgeLocator _fixedLocator() {
-  return ArisBridgeLocator(
+GoCoreLocator _fixedLocator() {
+  return GoCoreLocator(
     binaryExistsResolver: (_) async => true,
     workspaceRoot: Directory.systemTemp.path,
     resolvedExecutableResolver: () =>

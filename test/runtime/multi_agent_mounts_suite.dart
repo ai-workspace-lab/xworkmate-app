@@ -5,7 +5,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/aris_bundle.dart';
-import 'package:xworkmate/runtime/aris_bridge.dart';
+import 'package:xworkmate/runtime/go_core.dart';
 import 'package:xworkmate/runtime/codex_config_bridge.dart';
 import 'package:xworkmate/runtime/multi_agent_mounts.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
@@ -14,7 +14,7 @@ void main() {
   test('ArisMountAdapter reports error when bundle is unavailable', () async {
     final adapter = ArisMountAdapter(
       _ThrowingArisBundleRepository(),
-      ArisBridgeLocator(binaryExistsResolver: (_) async => false),
+      GoCoreLocator(binaryExistsResolver: (_) async => false),
     );
 
     final state = await adapter.reconcile(
@@ -44,7 +44,7 @@ void main() {
       final bundle = await _writeFakeBundle(tempDir);
       final adapter = ArisMountAdapter(
         _FixedArisBundleRepository(bundle),
-        ArisBridgeLocator(
+        GoCoreLocator(
           workspaceRoot: tempDir.path,
           binaryExistsResolver: (_) async => false,
         ),
@@ -63,7 +63,7 @@ void main() {
       expect(state.syncState, 'embedded');
       expect(state.discoveredMcpCount, 1);
       expect(state.managedMcpCount, 0);
-      expect(state.detail, contains('bridge is not available'));
+      expect(state.detail, contains('Go core is not available'));
     },
   );
 
@@ -83,10 +83,10 @@ void main() {
         '${tempDir.path}/XWorkmate.app/Contents/Helpers',
       );
       await helperDir.create(recursive: true);
-      final helper = File('${helperDir.path}/xworkmate-aris-bridge');
+      final helper = File('${helperDir.path}/xworkmate-go-core');
       await helper.writeAsString('#!/bin/sh\nexit 0\n');
       await Process.run('chmod', <String>['+x', helper.path]);
-      final locator = ArisBridgeLocator(
+      final locator = GoCoreLocator(
         workspaceRoot: tempDir.path,
         binaryExistsResolver: (_) async => false,
         resolvedExecutableResolver: () =>

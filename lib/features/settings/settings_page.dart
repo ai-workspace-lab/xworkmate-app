@@ -2463,8 +2463,8 @@ class _SettingsPageState extends State<SettingsPage> {
               const SizedBox(height: 4),
               Text(
                 appText(
-                  'ARIS 模式会把内嵌 skills 与 Go bridge reviewer 作为本地 Ollama 协作增强层，不会覆盖你原有的 CLI 全局配置。',
-                  'ARIS mode injects embedded skills and the Go bridge reviewer for local Ollama collaboration without overwriting your existing CLI global config.',
+                  'ARIS 模式会把内嵌 skills 与 Go core reviewer 作为本地 Ollama 协作增强层，不会覆盖你原有的 CLI 全局配置。',
+                  'ARIS mode injects embedded skills and the Go core reviewer for local Ollama collaboration without overwriting your existing CLI global config.',
                 ),
                 style: theme.textTheme.bodySmall,
               ),

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'aris_bundle.dart';
-import 'aris_bridge.dart';
+import 'go_core.dart';
 import 'codex_config_bridge.dart';
 import 'opencode_config_bridge.dart';
 import 'runtime_models.dart';
@@ -12,11 +12,11 @@ class MultiAgentMountManager {
     CodexConfigBridge? codexConfigBridge,
     OpencodeConfigBridge? opencodeConfigBridge,
     ArisBundleRepository? arisBundleRepository,
-    ArisBridgeLocator? arisBridgeLocator,
+    GoCoreLocator? goCoreLocator,
   }) : this._(
          arisAdapter: ArisMountAdapter(
            arisBundleRepository ?? ArisBundleRepository(),
-           arisBridgeLocator ?? ArisBridgeLocator(),
+           goCoreLocator ?? GoCoreLocator(),
          ),
          codexConfigBridge: codexConfigBridge ?? CodexConfigBridge(),
          opencodeConfigBridge: opencodeConfigBridge ?? OpencodeConfigBridge(),
@@ -154,10 +154,10 @@ abstract class CliMountAdapter {
 }
 
 class ArisMountAdapter extends CliMountAdapter {
-  ArisMountAdapter(this._bundleRepository, this._bridgeLocator);
+  ArisMountAdapter(this._bundleRepository, this._goCoreLocator);
 
   final ArisBundleRepository _bundleRepository;
-  final ArisBridgeLocator _bridgeLocator;
+  final GoCoreLocator _goCoreLocator;
   String _lastBundleVersion = '';
 
   String get lastBundleVersion => _lastBundleVersion;
@@ -197,7 +197,7 @@ class ArisMountAdapter extends CliMountAdapter {
       final bundle = await _bundleRepository.ensureReady();
       _lastBundleVersion = bundle.manifest.bundleVersion;
       final skillCount = await _bundleRepository.countSkillFiles();
-      final bridgeAvailable = await _bridgeLocator.isAvailable();
+      final bridgeAvailable = await _goCoreLocator.isAvailable();
       final llmChatEntry = bundle.manifest.llmChatServerPath.trim();
       final llmChatReady = llmChatEntry.isNotEmpty;
       return ManagedMountTargetState.placeholder(
@@ -219,8 +219,8 @@ class ArisMountAdapter extends CliMountAdapter {
             : 0,
         detail: llmChatReady
             ? bridgeAvailable
-                  ? 'Embedded bundle ${bundle.manifest.bundleVersion} ready; XWorkmate Go bridge manages llm-chat and claude-review.'
-                  : 'Embedded bundle is ready, but the XWorkmate Go bridge is not available yet.'
+                  ? 'Embedded bundle ${bundle.manifest.bundleVersion} ready; XWorkmate Go core manages llm-chat and claude-review.'
+                  : 'Embedded bundle is ready, but the XWorkmate Go core is not available yet.'
             : 'Embedded bundle extracted, but llm-chat metadata is missing.',
       );
     } catch (error) {

@@ -4,14 +4,14 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:xworkmate/runtime/aris_bridge.dart';
+import 'package:xworkmate/runtime/go_core.dart';
 
 void main() {
   test(
-    'ArisBridgeLocator prefers bundled helper inside macOS app bundle',
+    'GoCoreLocator prefers bundled helper inside macOS app bundle',
     () async {
       final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-aris-bridge-bundle-',
+        'xworkmate-go-core-bundle-',
       );
       addTearDown(() async {
         if (await tempDirectory.exists()) {
@@ -22,11 +22,11 @@ void main() {
         '${tempDirectory.path}/XWorkmate.app/Contents/Helpers',
       );
       await helpersDir.create(recursive: true);
-      final helperFile = File('${helpersDir.path}/xworkmate-aris-bridge');
+      final helperFile = File('${helpersDir.path}/xworkmate-go-core');
       await helperFile.writeAsString('#!/bin/sh\nexit 0\n');
       await Process.run('chmod', <String>['+x', helperFile.path]);
 
-      final locator = ArisBridgeLocator(
+      final locator = GoCoreLocator(
         workspaceRoot: tempDirectory.path,
         binaryExistsResolver: (_) async => true,
         resolvedExecutableResolver: () =>
@@ -43,10 +43,10 @@ void main() {
   );
 
   test(
-    'ArisBridgeLocator falls back to go run in the local bridge package',
+    'GoCoreLocator falls back to go run in the local bridge package',
     () async {
       final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-aris-bridge-',
+        'xworkmate-go-core-',
       );
       addTearDown(() async {
         if (await tempDirectory.exists()) {
@@ -54,10 +54,10 @@ void main() {
         }
       });
       await Directory(
-        '${tempDirectory.path}/go/aris_bridge',
+        '${tempDirectory.path}/go/go_core',
       ).create(recursive: true);
 
-      final locator = ArisBridgeLocator(
+      final locator = GoCoreLocator(
         workspaceRoot: tempDirectory.path,
         binaryExistsResolver: (command) async => command == 'go',
       );
@@ -67,7 +67,7 @@ void main() {
       expect(launch, isNotNull);
       expect(launch!.executable, 'go');
       expect(launch.arguments, const <String>['run', '.']);
-      expect(launch.workingDirectory, '${tempDirectory.path}/go/aris_bridge');
+      expect(launch.workingDirectory, '${tempDirectory.path}/go/go_core');
     },
   );
 }
