@@ -11,7 +11,7 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   test(
-    'AppController auto-discovers gateway-only skills into the available list without selecting them',
+    'AppController loads Single Agent skills from the current thread provider roots',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -25,7 +25,7 @@ void main() {
         }
       });
       final codexRoot = Directory('${tempDirectory.path}/codex-skills');
-      final workbuddyRoot = Directory('${tempDirectory.path}/workbuddy-skills');
+      final claudeRoot = Directory('${tempDirectory.path}/claude-skills');
       await _writeSkill(
         codexRoot,
         'idea-discovery',
@@ -33,10 +33,10 @@ void main() {
         description: 'Discover ideas',
       );
       await _writeSkill(
-        workbuddyRoot,
-        'release-checks',
-        skillName: 'Release Checks',
-        description: 'Run release checks',
+        claudeRoot,
+        'incident-review',
+        skillName: 'Incident Review',
+        description: 'Review incidents',
       );
 
       final controller = AppController(
@@ -46,18 +46,21 @@ void main() {
               '${tempDirectory.path}/settings.sqlite3',
           fallbackDirectoryPathResolver: () async => tempDirectory.path,
         ),
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+          SingleAgentProvider.claude,
+        ],
         gatewayOnlySkillScanRoots: <String>[
           codexRoot.path,
-          codexRoot.path,
-          workbuddyRoot.path,
+          claudeRoot.path,
         ],
       );
       addTearDown(controller.dispose);
       await _waitFor(() => !controller.initializing);
-
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.singleAgent,
       );
+      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
 
       expect(
         controller.assistantDiscoveredSkillsForSession(
@@ -69,7 +72,14 @@ void main() {
         controller.assistantImportedSkillsForSession(
           controller.currentSessionKey,
         ),
-        hasLength(2),
+        hasLength(1),
+      );
+      expect(
+        controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .single
+            .label,
+        'Idea Discovery',
       );
 
       expect(
@@ -82,7 +92,7 @@ void main() {
   );
 
   test(
-    'AppController keeps imported skills and model choices isolated per thread',
+    'AppController keeps provider-owned imported skills and model choices isolated per thread',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -96,11 +106,18 @@ void main() {
         }
       });
       final codexRoot = Directory('${tempDirectory.path}/codex-skills');
+      final claudeRoot = Directory('${tempDirectory.path}/claude-skills');
       await _writeSkill(
         codexRoot,
         'analysis',
         skillName: 'Analysis',
         description: 'Analyze tasks',
+      );
+      await _writeSkill(
+        claudeRoot,
+        'review',
+        skillName: 'Review',
+        description: 'Review tasks',
       );
 
       final controller = AppController(
@@ -110,14 +127,18 @@ void main() {
               '${tempDirectory.path}/settings.sqlite3',
           fallbackDirectoryPathResolver: () async => tempDirectory.path,
         ),
-        gatewayOnlySkillScanRoots: <String>[codexRoot.path],
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+          SingleAgentProvider.claude,
+        ],
+        gatewayOnlySkillScanRoots: <String>[codexRoot.path, claudeRoot.path],
       );
       addTearDown(controller.dispose);
       await _waitFor(() => !controller.initializing);
-
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.singleAgent,
       );
+      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
       final firstSessionKey = controller.currentSessionKey;
       expect(
         controller.assistantImportedSkillsForSession(firstSessionKey),
@@ -140,8 +161,15 @@ void main() {
         title: 'Thread 2',
         executionTarget: AssistantExecutionTarget.singleAgent,
         messageViewMode: AssistantMessageViewMode.rendered,
+        singleAgentProvider: SingleAgentProvider.claude,
       );
       await controller.switchSession('draft:thread-2');
+      expect(
+        controller.assistantImportedSkillsForSession(
+          controller.currentSessionKey,
+        ).single.label,
+        'Review',
+      );
       await controller.selectAssistantModelForSession(
         controller.currentSessionKey,
         'model-b',

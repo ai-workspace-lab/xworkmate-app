@@ -42,6 +42,7 @@ void main() {
       final gateway = _FakeGatewayRuntime(store: store);
       final controller = AppController(
         store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
         runtimeCoordinator: RuntimeCoordinator(
           gateway: gateway,
           codex: _FakeCodexRuntime(),
@@ -60,6 +61,13 @@ void main() {
             selectedModels: const <String>['qwen2.5-coder:latest'],
           ),
           defaultModel: 'gpt-5.4',
+          multiAgent: controller.settings.multiAgent.copyWith(
+            autoSync: false,
+            mountTargets: _withAvailableMountTargets(
+              controller.settings.multiAgent.mountTargets,
+              const <String>[],
+            ),
+          ),
         ),
         refreshAfterSave: false,
       );
@@ -103,6 +111,7 @@ void main() {
       final secondGateway = _FakeGatewayRuntime(store: secondStore);
       final secondController = AppController(
         store: secondStore,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
         runtimeCoordinator: RuntimeCoordinator(
           gateway: secondGateway,
           codex: _FakeCodexRuntime(),
@@ -158,7 +167,7 @@ void main() {
       expect(secondController.assistantConnectionStatusLabel, '单机智能体');
       expect(
         secondController.assistantConnectionTargetLabel,
-        'Auto · qwen2.5-coder:latest · 127.0.0.1:${server.port}',
+        'AI Chat fallback · qwen2.5-coder:latest · 127.0.0.1:${server.port}',
       );
       expect(secondController.chatMessages.last.text, 'SECOND_REPLY');
       expect(gateway.connectedProfiles, isEmpty);
@@ -190,6 +199,7 @@ void main() {
       );
       final controller = AppController(
         store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
         runtimeCoordinator: RuntimeCoordinator(
           gateway: _FakeGatewayRuntime(store: store),
           codex: _FakeCodexRuntime(),
@@ -208,6 +218,13 @@ void main() {
             selectedModels: const <String>['moonshotai/kimi-k2.5'],
           ),
           defaultModel: 'moonshotai/kimi-k2.5',
+          multiAgent: controller.settings.multiAgent.copyWith(
+            autoSync: false,
+            mountTargets: _withAvailableMountTargets(
+              controller.settings.multiAgent.mountTargets,
+              const <String>[],
+            ),
+          ),
         ),
         refreshAfterSave: false,
       );
@@ -253,6 +270,7 @@ void main() {
       );
       final controller = AppController(
         store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
         runtimeCoordinator: RuntimeCoordinator(
           gateway: _FakeGatewayRuntime(store: store),
           codex: _FakeCodexRuntime(),
@@ -271,6 +289,13 @@ void main() {
             selectedModels: const <String>['z-ai/glm5'],
           ),
           defaultModel: 'z-ai/glm5',
+          multiAgent: controller.settings.multiAgent.copyWith(
+            autoSync: false,
+            mountTargets: _withAvailableMountTargets(
+              controller.settings.multiAgent.mountTargets,
+              const <String>[],
+            ),
+          ),
         ),
         refreshAfterSave: false,
       );
@@ -331,6 +356,9 @@ void main() {
       );
       final controller = AppController(
         store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
         runtimeCoordinator: RuntimeCoordinator(
           gateway: _FakeGatewayRuntime(store: store),
           codex: _FakeCodexRuntime(),
@@ -364,7 +392,86 @@ void main() {
   );
 
   test(
-    'AppController falls back to AI Chat when the selected Single Agent provider is unavailable',
+    'AppController keeps the thread provider strict when another external CLI is available',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-single-agent-strict-provider-',
+      );
+      final server = await _FakeAiGatewayServer.start(
+        responseMode: _AiGatewayResponseMode.json,
+      );
+      addTearDown(() async {
+        await server.close();
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final runner = _FakeSingleAgentRunner(
+        resolvedProvider: null,
+        fallbackReason: 'Codex CLI is unavailable on this device.',
+      );
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.claude,
+        ],
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: _FakeGatewayRuntime(store: store),
+          codex: _FakeCodexRuntime(),
+        ),
+        singleAgentRunner: runner,
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      await controller.settingsController.saveAiGatewayApiKey('live-key');
+      await controller.saveSettings(
+        controller.settings.copyWith(
+          aiGateway: controller.settings.aiGateway.copyWith(
+            baseUrl: server.baseUrl,
+            availableModels: const <String>['moonshotai/kimi-k2.5'],
+            selectedModels: const <String>['moonshotai/kimi-k2.5'],
+          ),
+          defaultModel: 'moonshotai/kimi-k2.5',
+          multiAgent: controller.settings.multiAgent.copyWith(
+            autoSync: false,
+            mountTargets: _withAvailableMountTargets(
+              controller.settings.multiAgent.mountTargets,
+              const <String>['claude'],
+            ),
+          ),
+        ),
+        refreshAfterSave: false,
+      );
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+
+      await controller.sendChatMessage('你好', thinking: 'low');
+
+      expect(runner.resolveCalls, 1);
+      expect(runner.runCalls, 0);
+      expect(server.requestCount, 0);
+      expect(controller.currentAssistantConnectionState.connected, isFalse);
+      expect(
+        controller.chatMessages.any(
+          (message) => message.text.contains('可切到 Auto'),
+        ),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'AppController falls back to AI Chat when no external CLI is available',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -391,6 +498,7 @@ void main() {
       );
       final controller = AppController(
         store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
         runtimeCoordinator: RuntimeCoordinator(
           gateway: _FakeGatewayRuntime(store: store),
           codex: _FakeCodexRuntime(),
@@ -542,6 +650,7 @@ class _FakeSingleAgentRunner implements SingleAgentRunner {
 
   int resolveCalls = 0;
   int runCalls = 0;
+  int abortCalls = 0;
   SingleAgentRunRequest? lastRequest;
 
   @override
@@ -561,6 +670,9 @@ class _FakeSingleAgentRunner implements SingleAgentRunner {
   Future<SingleAgentRunResult> run(SingleAgentRunRequest request) async {
     runCalls += 1;
     lastRequest = request;
+    if (result?.output.isNotEmpty == true) {
+      request.onOutput?.call(result!.output);
+    }
     return result ??
         SingleAgentRunResult(
           provider: request.provider,
@@ -569,6 +681,11 @@ class _FakeSingleAgentRunner implements SingleAgentRunner {
           errorMessage: 'no result configured',
           shouldFallbackToAiChat: false,
         );
+  }
+
+  @override
+  Future<void> abort(String sessionId) async {
+    abortCalls += 1;
   }
 }
 
@@ -691,6 +808,22 @@ class _FakeAiGatewayServer {
 }
 
 enum _AiGatewayResponseMode { json, sse }
+
+List<ManagedMountTargetState> _withAvailableMountTargets(
+  List<ManagedMountTargetState> current,
+  List<String> availableIds,
+) {
+  final nextIds = availableIds.toSet();
+  return current
+      .map(
+        (item) => item.copyWith(
+          available: nextIds.contains(item.targetId),
+          discoveryState: nextIds.contains(item.targetId) ? 'ready' : 'idle',
+          syncState: nextIds.contains(item.targetId) ? 'ready' : 'idle',
+        ),
+      )
+      .toList(growable: false);
+}
 
 Future<void> _waitFor(
   bool Function() predicate, {

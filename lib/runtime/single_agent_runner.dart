@@ -18,6 +18,7 @@ class SingleAgentProviderResolution {
 
 class SingleAgentRunRequest {
   const SingleAgentRunRequest({
+    required this.sessionId,
     required this.provider,
     required this.prompt,
     required this.model,
@@ -27,9 +28,11 @@ class SingleAgentRunRequest {
     required this.aiGatewayBaseUrl,
     required this.aiGatewayApiKey,
     required this.config,
+    this.onOutput,
     this.configuredCodexCliPath = '',
   });
 
+  final String sessionId;
   final SingleAgentProvider provider;
   final String prompt;
   final String model;
@@ -39,6 +42,7 @@ class SingleAgentRunRequest {
   final String aiGatewayBaseUrl;
   final String aiGatewayApiKey;
   final MultiAgentConfig config;
+  final void Function(String text)? onOutput;
   final String configuredCodexCliPath;
 }
 
@@ -49,6 +53,7 @@ class SingleAgentRunResult {
     required this.success,
     required this.errorMessage,
     required this.shouldFallbackToAiChat,
+    this.aborted = false,
     this.fallbackReason,
   });
 
@@ -57,6 +62,7 @@ class SingleAgentRunResult {
   final bool success;
   final String errorMessage;
   final bool shouldFallbackToAiChat;
+  final bool aborted;
   final String? fallbackReason;
 }
 
@@ -67,6 +73,8 @@ abstract class SingleAgentRunner {
   });
 
   Future<SingleAgentRunResult> run(SingleAgentRunRequest request);
+
+  Future<void> abort(String sessionId);
 }
 
 class DefaultSingleAgentRunner implements SingleAgentRunner {
@@ -94,6 +102,8 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
 
   final Future<bool> Function(String command)? _binaryExistsResolver;
   final CliProcessStarter _processStarter;
+  final Map<String, Process> _activeProcesses = <String, Process>{};
+  final Set<String> _abortedSessionIds = <String>{};
 
   @override
   Future<SingleAgentProviderResolution> resolveProvider({
@@ -164,22 +174,56 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
             ? null
             : request.workingDirectory,
       );
+      _activeProcesses[request.sessionId] = process;
       await process.stdin.close();
       final timeout = Duration(seconds: request.config.timeoutSeconds);
-      final stdout = await process.stdout
+      final stdoutBuffer = StringBuffer();
+      final stderrBuffer = StringBuffer();
+      final stdoutFuture = process.stdout
           .transform(utf8.decoder)
-          .join()
-          .timeout(timeout, onTimeout: () => '');
-      final stderr = await process.stderr
+          .listen((chunk) {
+            if (chunk.isEmpty) {
+              return;
+            }
+            stdoutBuffer.write(chunk);
+            request.onOutput?.call(stdoutBuffer.toString());
+          })
+          .asFuture<void>();
+      final stderrFuture = process.stderr
           .transform(utf8.decoder)
-          .join()
-          .timeout(timeout, onTimeout: () => '');
-      final exitCode = await process.exitCode.timeout(
-        timeout,
-        onTimeout: () => -1,
-      );
+          .listen((chunk) {
+            if (chunk.isEmpty) {
+              return;
+            }
+            stderrBuffer.write(chunk);
+          })
+          .asFuture<void>();
+      final exitCode = await process.exitCode.timeout(timeout, onTimeout: () {
+        try {
+          process.kill(ProcessSignal.sigkill);
+        } catch (_) {
+          // Best effort only.
+        }
+        return -1;
+      });
+      await Future.wait<void>(<Future<void>>[
+        stdoutFuture.timeout(timeout, onTimeout: () {}),
+        stderrFuture.timeout(timeout, onTimeout: () {}),
+      ]);
 
-      final output = stdout.trim().isNotEmpty ? stdout.trim() : stderr.trim();
+      final output = stdoutBuffer.toString().trim().isNotEmpty
+          ? stdoutBuffer.toString().trim()
+          : stderrBuffer.toString().trim();
+      if (_abortedSessionIds.remove(request.sessionId)) {
+        return SingleAgentRunResult(
+          provider: request.provider,
+          output: output,
+          success: false,
+          errorMessage: 'aborted',
+          shouldFallbackToAiChat: false,
+          aborted: true,
+        );
+      }
       if (exitCode == 0 && output.isNotEmpty) {
         return SingleAgentRunResult(
           provider: request.provider,
@@ -190,20 +234,33 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
         );
       }
 
-      final fallbackReason = _isLaunchFailureExit(exitCode, stderr)
+      final fallbackReason = _isLaunchFailureExit(
+            exitCode,
+            stderrBuffer.toString(),
+          )
           ? '${request.provider.label} CLI could not be launched.'
           : null;
       return SingleAgentRunResult(
         provider: request.provider,
         output: output,
         success: false,
-        errorMessage: stderr.trim().isNotEmpty
-            ? stderr.trim()
+        errorMessage: stderrBuffer.toString().trim().isNotEmpty
+            ? stderrBuffer.toString().trim()
             : 'CLI exited with code $exitCode',
         shouldFallbackToAiChat: fallbackReason != null,
         fallbackReason: fallbackReason,
       );
     } catch (error) {
+      if (_abortedSessionIds.remove(request.sessionId)) {
+        return SingleAgentRunResult(
+          provider: request.provider,
+          output: '',
+          success: false,
+          errorMessage: 'aborted',
+          shouldFallbackToAiChat: false,
+          aborted: true,
+        );
+      }
       final fallbackReason = _isLaunchFailureError(error)
           ? '${request.provider.label} CLI could not be launched.'
           : null;
@@ -215,6 +272,26 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
         shouldFallbackToAiChat: fallbackReason != null,
         fallbackReason: fallbackReason,
       );
+    } finally {
+      _activeProcesses.remove(request.sessionId);
+    }
+  }
+
+  @override
+  Future<void> abort(String sessionId) async {
+    final normalized = sessionId.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+    _abortedSessionIds.add(normalized);
+    final process = _activeProcesses[normalized];
+    if (process == null) {
+      return;
+    }
+    try {
+      process.kill(ProcessSignal.sigterm);
+    } catch (_) {
+      // Best effort only.
     }
   }
 
