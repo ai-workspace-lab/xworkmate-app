@@ -3086,6 +3086,14 @@ class _ComposerBarState extends State<_ComposerBar> {
   }
 
   Future<void> _showSkillPickerDialog(BuildContext context) async {
+    if (widget.controller.isSingleAgentMode) {
+      await widget.controller.discoverGatewayOnlySkillsForSession(
+        widget.controller.currentSessionKey,
+      );
+      if (!context.mounted) {
+        return;
+      }
+    }
     final searchController = TextEditingController();
     String query = '';
     await showDialog<void>(
@@ -4575,7 +4583,7 @@ _ComposerSkillOption _skillOptionFromThreadSkill(
     key: skill.key,
     label: skill.label.trim().isEmpty ? skill.key : skill.label.trim(),
     description: skill.description.trim().isEmpty
-        ? appText('已导入到当前线程的技能。', 'Skill imported into this thread.')
+        ? appText('已绑定到当前线程的本地技能。', 'Local skill bound to this thread.')
         : skill.description.trim(),
     sourceLabel: skill.sourceLabel.trim().isEmpty
         ? skill.sourcePath

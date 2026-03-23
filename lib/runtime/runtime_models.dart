@@ -1945,28 +1945,36 @@ class AssistantThreadSkillEntry {
     required this.key,
     required this.label,
     required this.description,
+    this.source = '',
     required this.sourcePath,
+    this.scope = '',
     required this.sourceLabel,
   });
 
   final String key;
   final String label;
   final String description;
+  final String source;
   final String sourcePath;
+  final String scope;
   final String sourceLabel;
 
   AssistantThreadSkillEntry copyWith({
     String? key,
     String? label,
     String? description,
+    String? source,
     String? sourcePath,
+    String? scope,
     String? sourceLabel,
   }) {
     return AssistantThreadSkillEntry(
       key: key ?? this.key,
       label: label ?? this.label,
       description: description ?? this.description,
+      source: source ?? this.source,
       sourcePath: sourcePath ?? this.sourcePath,
+      scope: scope ?? this.scope,
       sourceLabel: sourceLabel ?? this.sourceLabel,
     );
   }
@@ -1976,7 +1984,9 @@ class AssistantThreadSkillEntry {
       'key': key,
       'label': label,
       'description': description,
+      'source': source,
       'sourcePath': sourcePath,
+      'scope': scope,
       'sourceLabel': sourceLabel,
     };
   }
@@ -1986,7 +1996,9 @@ class AssistantThreadSkillEntry {
       key: json['key']?.toString() ?? '',
       label: json['label']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
+      source: json['source']?.toString() ?? '',
       sourcePath: json['sourcePath']?.toString() ?? '',
+      scope: json['scope']?.toString() ?? '',
       sourceLabel: json['sourceLabel']?.toString() ?? '',
     );
   }

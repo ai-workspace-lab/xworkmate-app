@@ -32,14 +32,61 @@ import '../runtime/single_agent_runner.dart';
 
 enum CodexCooperationState { notStarted, bridgeOnly, registered }
 
+class _SingleAgentSkillScanRoot {
+  const _SingleAgentSkillScanRoot({
+    required this.path,
+    required this.source,
+    required this.scope,
+  });
+
+  final String path;
+  final String source;
+  final String scope;
+}
+
 class AppController extends ChangeNotifier {
-  static const List<String> _defaultGatewayOnlySkillScanRoots = <String>[
-    '.codex/skills',
-    '.workbuddy/skills',
-    '.claude/skills',
-    '.gemini/skills',
-    '.opencode/skills',
-    '.openclaw/skills',
+  static const List<_SingleAgentSkillScanRoot>
+  _defaultGatewayOnlySkillScanRoots = <_SingleAgentSkillScanRoot>[
+    _SingleAgentSkillScanRoot(
+      path: '.agents/skills',
+      source: 'agents',
+      scope: 'workspace',
+    ),
+    _SingleAgentSkillScanRoot(
+      path: '.claude/skills',
+      source: 'claude',
+      scope: 'workspace',
+    ),
+    _SingleAgentSkillScanRoot(
+      path: '.codex/skills',
+      source: 'codex',
+      scope: 'workspace',
+    ),
+    _SingleAgentSkillScanRoot(
+      path: '~/.agents/skills',
+      source: 'agents',
+      scope: 'user',
+    ),
+    _SingleAgentSkillScanRoot(
+      path: '~/.claude/skills',
+      source: 'claude',
+      scope: 'user',
+    ),
+    _SingleAgentSkillScanRoot(
+      path: '~/.codex/skills',
+      source: 'codex',
+      scope: 'user',
+    ),
+    _SingleAgentSkillScanRoot(
+      path: '~/.config/opencode/skills',
+      source: 'opencode',
+      scope: 'user',
+    ),
+    _SingleAgentSkillScanRoot(
+      path: '/etc/codex/skills',
+      source: 'codex',
+      scope: 'system',
+    ),
   ];
 
   AppController({
@@ -90,10 +137,13 @@ class AppController extends ChangeNotifier {
     _desktopPlatformService =
         desktopPlatformService ?? createDesktopPlatformService();
     _gatewayOnlySkillScanRoots =
-        gatewayOnlySkillScanRoots ??
-        (_isFlutterTestEnvironment
-            ? const <String>[]
-            : _defaultGatewayOnlySkillScanRoots);
+        (gatewayOnlySkillScanRoots ??
+                (_isFlutterTestEnvironment
+                    ? const <String>[]
+                    : null))
+            ?.map(_singleAgentSkillScanRootFromOverride)
+            .toList(growable: false) ??
+        _resolveDefaultSingleAgentSkillScanRoots();
     _gatewayAcpClient = GatewayAcpClient(
       endpointResolver: _resolveGatewayAcpEndpoint,
     );
@@ -136,7 +186,7 @@ class AppController extends ChangeNotifier {
   late final DevicesController _devicesController;
   late final DerivedTasksController _tasksController;
   late final DesktopPlatformService _desktopPlatformService;
-  late final List<String> _gatewayOnlySkillScanRoots;
+  late final List<_SingleAgentSkillScanRoot> _gatewayOnlySkillScanRoots;
   late final GatewayAcpClient _gatewayAcpClient;
   late final DirectSingleAgentAppServerClient _singleAgentAppServerClient;
   late final List<SingleAgentProvider>? _availableSingleAgentProvidersOverride;
@@ -1756,9 +1806,6 @@ class AppController extends ChangeNotifier {
     _upsertAssistantThreadRecord(
       sessionKey,
       singleAgentProvider: sanitizedProvider,
-      discoveredSkills: const <AssistantThreadSkillEntry>[],
-      importedSkills: const <AssistantThreadSkillEntry>[],
-      selectedSkillKeys: const <String>[],
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     _recomputeTasks();
@@ -1948,9 +1995,7 @@ class AppController extends ChangeNotifier {
       return;
     }
 
-    final discovered = await _scanGatewayOnlySkillCandidatesForSession(
-      normalizedSessionKey,
-    );
+    final discovered = await _scanGatewayOnlySkillCandidatesForSession();
     _upsertAssistantThreadRecord(
       normalizedSessionKey,
       discoveredSkills: const <AssistantThreadSkillEntry>[],
@@ -3905,28 +3950,11 @@ class AppController extends ChangeNotifier {
   }
 
   Future<List<AssistantThreadSkillEntry>>
-  _scanGatewayOnlySkillCandidatesForSession(String sessionKey) async {
-    final provider = singleAgentResolvedProviderForSession(sessionKey);
-    if (provider == null) {
-      return const <AssistantThreadSkillEntry>[];
-    }
-    final home = Platform.environment['HOME']?.trim() ?? '';
-    if (home.isEmpty &&
-        _gatewayOnlySkillScanRoots.every((item) => !item.startsWith('/'))) {
-      return const <AssistantThreadSkillEntry>[];
-    }
+  _scanGatewayOnlySkillCandidatesForSession() async {
     final entries = <AssistantThreadSkillEntry>[];
-    final seen = <String>{};
-    for (final relativeRoot in _gatewayOnlySkillScanRoots) {
-      if (!_shouldIncludeSingleAgentSkillRoot(
-        relativeRoot,
-        provider: provider,
-      )) {
-        continue;
-      }
-      final root = Directory(
-        relativeRoot.startsWith('/') ? relativeRoot : '$home/$relativeRoot',
-      );
+    final seenNames = <String>{};
+    for (final rootSpec in _gatewayOnlySkillScanRoots) {
+      final root = Directory(_resolveSingleAgentSkillRootPath(rootSpec.path));
       if (!await root.exists()) {
         continue;
       }
@@ -3937,55 +3965,97 @@ class AppController extends ChangeNotifier {
         if (entity is! File || entity.uri.pathSegments.last != 'SKILL.md') {
           continue;
         }
-        final directory = entity.parent.path;
-        final normalizedKey = directory.trim();
-        if (normalizedKey.isEmpty || !seen.add(normalizedKey)) {
+        final entry = await _skillEntryFromFile(entity, rootSpec);
+        final normalizedName = entry.label.trim().toLowerCase();
+        if (normalizedName.isEmpty || !seenNames.add(normalizedName)) {
           continue;
         }
-        entries.add(await _skillEntryFromFile(entity, root.path));
+        entries.add(entry);
       }
     }
     entries.sort((left, right) => left.label.compareTo(right.label));
     return entries;
   }
 
-  bool _shouldIncludeSingleAgentSkillRoot(
-    String root, {
-    required SingleAgentProvider provider,
-  }) {
-    final normalized = root.trim().toLowerCase();
-    if (normalized.isEmpty) {
-      return false;
-    }
-    if (normalized.contains('workbuddy')) {
-      return true;
-    }
-    if (normalized.contains('openclaw')) {
-      return false;
-    }
-    final scopedProvider = _providerForSingleAgentSkillRoot(normalized);
-    return scopedProvider == provider;
+  List<_SingleAgentSkillScanRoot> _resolveDefaultSingleAgentSkillScanRoots() {
+    final workspacePath = settings.workspacePath.trim();
+    return _defaultGatewayOnlySkillScanRoots
+        .where((item) {
+          if (item.scope != 'workspace') {
+            return true;
+          }
+          return workspacePath.isNotEmpty;
+        })
+        .toList(growable: false);
   }
 
-  SingleAgentProvider? _providerForSingleAgentSkillRoot(String root) {
-    if (root.contains('codex')) {
-      return SingleAgentProvider.codex;
+  _SingleAgentSkillScanRoot _singleAgentSkillScanRootFromOverride(
+    String rawPath,
+  ) {
+    final normalizedPath = rawPath.trim();
+    final lowered = normalizedPath.toLowerCase();
+    final workspacePath = settings.workspacePath.trim();
+    final normalizedWorkspace = workspacePath.endsWith('/')
+        ? workspacePath
+        : '$workspacePath/';
+    final inferredWorkspace =
+        lowered.contains('/workspace/.agents/') ||
+        lowered.contains('/workspace/.claude/') ||
+        lowered.contains('/workspace/.codex/');
+    final scope = normalizedPath.startsWith('/etc/')
+        ? 'system'
+        : (workspacePath.isNotEmpty &&
+                  (normalizedPath == workspacePath ||
+                      normalizedPath.startsWith(normalizedWorkspace)) ||
+              inferredWorkspace ||
+              lowered.startsWith('.agents/') ||
+              lowered.startsWith('.claude/') ||
+              lowered.startsWith('.codex/'))
+        ? 'workspace'
+        : 'user';
+    return _SingleAgentSkillScanRoot(
+      path: normalizedPath,
+      source: _sourceForSkillRootPath(lowered),
+      scope: scope,
+    );
+  }
+
+  String _resolveSingleAgentSkillRootPath(String rawPath) {
+    final trimmed = rawPath.trim();
+    if (trimmed.isEmpty) {
+      return trimmed;
     }
-    if (root.contains('opencode')) {
-      return SingleAgentProvider.opencode;
+    if (trimmed.startsWith('/')) {
+      return trimmed;
     }
-    if (root.contains('claude')) {
-      return SingleAgentProvider.claude;
+    if (trimmed.startsWith('~/')) {
+      final home = Platform.environment['HOME']?.trim() ?? '';
+      return home.isEmpty ? trimmed : '$home/${trimmed.substring(2)}';
     }
-    if (root.contains('gemini')) {
-      return SingleAgentProvider.gemini;
+    final workspacePath = settings.workspacePath.trim();
+    if (workspacePath.isNotEmpty) {
+      return '$workspacePath/$trimmed';
     }
-    return null;
+    final home = Platform.environment['HOME']?.trim() ?? '';
+    return home.isEmpty ? trimmed : '$home/$trimmed';
+  }
+
+  String _sourceForSkillRootPath(String path) {
+    if (path.contains('opencode')) {
+      return 'opencode';
+    }
+    if (path.contains('.claude/') || path.contains('/claude/')) {
+      return 'claude';
+    }
+    if (path.contains('.agents/') || path.contains('/agents/')) {
+      return 'agents';
+    }
+    return 'codex';
   }
 
   Future<AssistantThreadSkillEntry> _skillEntryFromFile(
     File file,
-    String rootPath,
+    _SingleAgentSkillScanRoot root,
   ) async {
     final content = await file.readAsString();
     final nameMatch = RegExp(
@@ -4003,19 +4073,23 @@ class AppController extends ChangeNotifier {
                     .where((item) => item.isNotEmpty)
                     .last)
             .trim();
+    final rootPath = _resolveSingleAgentSkillRootPath(root.path);
     final relativeSource = directory.path.startsWith(rootPath)
         ? directory.path
               .substring(rootPath.length)
               .replaceFirst(RegExp(r'^/'), '')
         : directory.path;
+    final sourceLabel = '${root.source} · ${root.scope}';
     return AssistantThreadSkillEntry(
       key: directory.path,
       label: label,
       description: (descriptionMatch?.group(1) ?? '').trim(),
+      source: root.source,
       sourcePath: directory.path,
+      scope: root.scope,
       sourceLabel: relativeSource.isEmpty
-          ? directory.path.split('/').where((item) => item.isNotEmpty).last
-          : relativeSource,
+          ? sourceLabel
+          : '$sourceLabel · $relativeSource',
     );
   }
 
