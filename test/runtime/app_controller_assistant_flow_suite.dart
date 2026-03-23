@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   test(
@@ -16,8 +17,21 @@ void main() {
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final gateway = await _FakeGatewayServer.start();
-      final controller = AppController();
-      addTearDown(controller.dispose);
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-assistant-flow-',
+      );
+      addTearDown(() async {
+        await _deleteDirectoryWithRetry(tempDirectory);
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final controller = AppController(store: store);
+      addTearDown(() async {
+        controller.dispose();
+      });
       addTearDown(gateway.close);
 
       await _waitFor(() => !controller.initializing);
@@ -103,6 +117,24 @@ class _FakeGatewayServer {
 
   Future<void> _serve() async {
     await for (final request in _server) {
+      if (request.uri.path == '/acp/rpc' && request.method == 'POST') {
+        await _serveAcpRpc(request);
+        continue;
+      }
+      if (request.uri.path == '/acp' &&
+          WebSocketTransformer.isUpgradeRequest(request)) {
+        final acpSocket = await WebSocketTransformer.upgrade(request);
+        await acpSocket.close(
+          WebSocketStatus.normalClosure,
+          'test gateway runtime only',
+        );
+        continue;
+      }
+      if (!WebSocketTransformer.isUpgradeRequest(request)) {
+        request.response.statusCode = HttpStatus.notFound;
+        await request.response.close();
+        continue;
+      }
       final socket = await WebSocketTransformer.upgrade(request);
       _socket = socket;
       _send(socket, <String, dynamic>{
@@ -277,6 +309,35 @@ class _FakeGatewayServer {
     }
   }
 
+  Future<void> _serveAcpRpc(HttpRequest request) async {
+    final body = await utf8.decodeStream(request);
+    final envelope = (jsonDecode(body) as Map).cast<String, dynamic>();
+    final id = envelope['id'];
+    final method = envelope['method']?.toString() ?? '';
+    final response = <String, dynamic>{
+      'jsonrpc': '2.0',
+      'id': id,
+      'result': method == 'acp.capabilities'
+          ? <String, dynamic>{
+              'singleAgent': true,
+              'multiAgent': true,
+              'providers': <String>['claude', 'codex', 'gemini', 'opencode'],
+              'capabilities': <String, dynamic>{
+                'single_agent': true,
+                'multi_agent': true,
+                'providers': <String>['claude', 'codex', 'gemini', 'opencode'],
+              },
+            }
+          : const <String, dynamic>{},
+    };
+    request.response.headers.set(
+      HttpHeaders.contentTypeHeader,
+      'text/event-stream; charset=utf-8',
+    );
+    request.response.write('data: ${jsonEncode(response)}\n\n');
+    await request.response.close();
+  }
+
   Future<void> _emitAssistantResult(
     WebSocket socket, {
     required String runId,
@@ -333,6 +394,23 @@ class _FakeGatewayServer {
 
   void _send(WebSocket socket, Map<String, dynamic> frame) {
     socket.add(jsonEncode(frame));
+  }
+}
+
+Future<void> _deleteDirectoryWithRetry(Directory directory) async {
+  if (!await directory.exists()) {
+    return;
+  }
+  for (var attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await directory.delete(recursive: true);
+      return;
+    } on FileSystemException {
+      if (attempt == 2) {
+        rethrow;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
   }
 }
 

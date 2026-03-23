@@ -2041,12 +2041,16 @@ class AppController extends ChangeNotifier {
     );
     if (archived) {
       unawaited(
-        _gatewayAcpClient
-            .closeSession(
+        _enqueueThreadTurn<void>(normalizedSessionKey, () async {
+          try {
+            await _gatewayAcpClient.closeSession(
               sessionId: normalizedSessionKey,
               threadId: normalizedSessionKey,
-            )
-            .catchError((_) {}),
+            );
+          } catch (_) {
+            // Best effort only.
+          }
+        }).catchError((_) {}),
       );
     }
     _upsertAssistantThreadRecord(
@@ -2236,6 +2240,7 @@ class AppController extends ChangeNotifier {
   Future<void> clearAssistantLocalState() async {
     await _flushAssistantThreadPersistence();
     await _store.clearAssistantLocalState();
+    await _store.saveAssistantThreadRecords(const <AssistantThreadRecord>[]);
     _assistantThreadPersistQueue = Future<void>.value();
     final defaults = SettingsSnapshot.defaults();
     _assistantThreadRecords.clear();
@@ -4645,12 +4650,6 @@ class AppController extends ChangeNotifier {
   }
 
   Uri? _resolveAcpEndpoint() {
-    final aiGatewayBase = _normalizeAiGatewayBaseUrl(
-      settings.aiGateway.baseUrl,
-    );
-    if (aiGatewayBase != null) {
-      return aiGatewayBase;
-    }
     final target = assistantExecutionTargetForSession(
       _sessionsController.currentSessionKey,
     );
