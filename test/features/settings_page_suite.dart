@@ -91,6 +91,48 @@ void main() {
     expect(controller.themeMode, ThemeMode.light);
   });
 
+  testWidgets('SettingsPage hides account access controls by default', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
+
+    expect(find.text('账号访问'), findsNothing);
+    expect(find.text('Account Access'), findsNothing);
+    expect(find.text('账号本地模式'), findsNothing);
+    expect(find.text('Account local mode'), findsNothing);
+  });
+
+  testWidgets('SettingsPage can expose account access when feature enabled', (
+    WidgetTester tester,
+  ) async {
+    final manifest = UiFeatureManifest.fallback().copyWithFeature(
+      platform: UiFeaturePlatform.desktop,
+      module: 'settings',
+      feature: 'account_access',
+      enabled: true,
+      releaseTier: UiFeatureReleaseTier.experimental,
+    );
+    final controller = await createTestController(
+      tester,
+      uiFeatureManifest: manifest,
+    );
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
+
+    expect(find.text('账号访问'), findsOneWidget);
+    expect(find.text('账号本地模式'), findsOneWidget);
+  });
+
   testWidgets('SettingsPage integration tab exposes unified gateway controls', (
     WidgetTester tester,
   ) async {
