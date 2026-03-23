@@ -211,11 +211,6 @@ class RuntimeCoordinator extends ChangeNotifier {
         throw StateError('Failed to connect: ${result.error}');
       }
 
-      // Step 2: Start code-agent runtime according to selected mode.
-      if (preferredMode != GatewayMode.offline) {
-        await _ensureCodeAgentRuntime();
-      }
-
       _state = CoordinatorState.ready;
       notifyListeners();
     } catch (e) {
@@ -246,10 +241,6 @@ class RuntimeCoordinator extends ChangeNotifier {
 
       if (!result.success) {
         throw StateError('No available connection mode: ${result.error}');
-      }
-
-      if (result.mode != GatewayMode.offline) {
-        await _ensureCodeAgentRuntime();
       }
 
       _state = CoordinatorState.ready;
@@ -283,8 +274,7 @@ class RuntimeCoordinator extends ChangeNotifier {
       }
       return null;
     }
-
-    return codex.findCodexBinary();
+    return null;
   }
 
   /// Start the code-agent runtime without changing the Gateway connection state.
@@ -297,49 +287,14 @@ class RuntimeCoordinator extends ChangeNotifier {
     _codexPath = codexPath?.trim();
     _cwd = workingDirectory ?? _cwd ?? Directory.current.path;
     _lastError = null;
-
-    if (runtimeMode == CodeAgentRuntimeMode.builtIn) {
-      if (codex.isConnected) {
-        await codex.stop();
-      }
-      _state = CoordinatorState.ready;
-      notifyListeners();
-      return;
-    }
-
-    final resolvedCodexPath = await resolveCodexPath(codexPath: _codexPath);
-    if (resolvedCodexPath == null) {
-      _state = CoordinatorState.error;
-      _lastError = 'Codex CLI not found';
-      notifyListeners();
-      throw StateError('Codex CLI not found');
-    }
-
-    _codexPath = resolvedCodexPath;
-    if (codex.isConnected) {
-      _state = CoordinatorState.ready;
-      notifyListeners();
-      return;
-    }
-
-    _state = CoordinatorState.connecting;
+    _state = CoordinatorState.ready;
     notifyListeners();
-
-    try {
-      await codex.startStdio(codexPath: resolvedCodexPath, cwd: _cwd);
-      _state = CoordinatorState.ready;
-      notifyListeners();
-    } catch (error) {
-      _state = CoordinatorState.error;
-      _lastError = error.toString();
-      notifyListeners();
-      rethrow;
-    }
   }
 
   Future<void> stopCodeAgentRuntime() async {
-    await codex.stop();
-    _state = CoordinatorState.disconnected;
+    _state = gateway.isConnected
+        ? CoordinatorState.ready
+        : CoordinatorState.disconnected;
     notifyListeners();
   }
 
@@ -404,7 +359,7 @@ class RuntimeCoordinator extends ChangeNotifier {
     _state = CoordinatorState.disconnected;
     notifyListeners();
 
-    await Future.wait([codex.stop(), gateway.disconnect()]);
+    await gateway.disconnect();
   }
 
   Future<ModeSwitchResult> _switchMode(GatewayMode mode) {
@@ -415,28 +370,6 @@ class RuntimeCoordinator extends ChangeNotifier {
         return modeSwitcher.switchToRemote();
       case GatewayMode.offline:
         return modeSwitcher.switchToOffline();
-    }
-  }
-
-  Future<void> _ensureCodeAgentRuntime() async {
-    if (_runtimeMode == CodeAgentRuntimeMode.builtIn) {
-      // Built-in mode: runtime is assumed internal, no external process needed.
-      return;
-    }
-
-    final resolvedCodexPath = await resolveCodexPath(codexPath: _codexPath);
-    if (resolvedCodexPath == null) {
-      // Fall back to offline mode if external Codex CLI is unavailable.
-      await modeSwitcher.switchToOffline();
-      return;
-    }
-
-    _codexPath = resolvedCodexPath;
-    try {
-      await codex.startStdio(codexPath: resolvedCodexPath, cwd: _cwd);
-    } catch (_) {
-      // Continue without external code agent in offline mode.
-      await modeSwitcher.switchToOffline();
     }
   }
 
