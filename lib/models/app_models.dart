@@ -231,7 +231,6 @@ enum SettingsDetailPage {
   gatewayConnection,
   aiGatewayIntegration,
   vaultProvider,
-  ollamaProvider,
   externalAgents,
   diagnosticsAdvanced,
 }
@@ -243,16 +242,12 @@ extension SettingsDetailPageCopy on SettingsDetailPage {
       'Gateway Connection',
     ),
     SettingsDetailPage.aiGatewayIntegration => appText(
-      'LLM API 集成参数',
-      'LLM API Integration',
+      'LLM 接入点',
+      'LLM Endpoints',
     ),
     SettingsDetailPage.vaultProvider => appText(
       'Vault 提供方参数',
       'Vault Provider',
-    ),
-    SettingsDetailPage.ollamaProvider => appText(
-      'Ollama 提供方参数',
-      'Ollama Provider',
     ),
     SettingsDetailPage.externalAgents => appText(
       '多 Agent 协作参数',
@@ -268,7 +263,6 @@ extension SettingsDetailPageCopy on SettingsDetailPage {
     SettingsDetailPage.gatewayConnection ||
     SettingsDetailPage.aiGatewayIntegration ||
     SettingsDetailPage.vaultProvider => SettingsTab.gateway,
-    SettingsDetailPage.ollamaProvider => SettingsTab.workspace,
     SettingsDetailPage.externalAgents => SettingsTab.agents,
     SettingsDetailPage.diagnosticsAdvanced => SettingsTab.diagnostics,
   };
