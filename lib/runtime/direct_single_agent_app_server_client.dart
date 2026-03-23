@@ -35,12 +35,14 @@ class DirectSingleAgentRunResult {
     required this.output,
     required this.errorMessage,
     this.aborted = false,
+    this.resolvedModel = '',
   });
 
   final bool success;
   final String output;
   final String errorMessage;
   final bool aborted;
+  final String resolvedModel;
 }
 
 class DirectSingleAgentRunRequest {
@@ -166,6 +168,7 @@ class DirectSingleAgentAppServerClient {
       );
 
       final output = StringBuffer();
+      String resolvedModel = '';
       final completion = Completer<DirectSingleAgentRunResult>();
       late final StreamSubscription<Map<String, dynamic>> subscription;
       subscription = connection.notifications.listen(
@@ -189,6 +192,7 @@ class DirectSingleAgentAppServerClient {
                 success: true,
                 output: output.toString(),
                 errorMessage: '',
+                resolvedModel: resolvedModel,
               ),
             );
             return;
@@ -206,6 +210,7 @@ class DirectSingleAgentAppServerClient {
                 success: false,
                 output: output.toString(),
                 aborted: aborted,
+                resolvedModel: resolvedModel,
                 errorMessage:
                     params['message']?.toString() ??
                     params['error']?.toString() ??
@@ -222,6 +227,7 @@ class DirectSingleAgentAppServerClient {
                 output: output.toString(),
                 errorMessage: error.toString(),
                 aborted: _abortedSessions.contains(normalizedSessionId),
+                resolvedModel: resolvedModel,
               ),
             );
           }
@@ -236,6 +242,7 @@ class DirectSingleAgentAppServerClient {
                     ? 'Single-agent app-server run aborted.'
                     : 'Single-agent app-server connection closed before completion.',
                 aborted: _abortedSessions.contains(normalizedSessionId),
+                resolvedModel: resolvedModel,
               ),
             );
           }
@@ -243,7 +250,7 @@ class DirectSingleAgentAppServerClient {
       );
 
       try {
-        await connection.request(
+        final started = await connection.request(
           'turn/start',
           params: <String, dynamic>{
             'threadId': threadId,
@@ -253,6 +260,7 @@ class DirectSingleAgentAppServerClient {
             },
           },
         );
+        resolvedModel = _extractModel(started) ?? resolvedModel;
         return await completion.future.timeout(
           const Duration(minutes: 10),
           onTimeout: () => DirectSingleAgentRunResult(
@@ -260,6 +268,7 @@ class DirectSingleAgentAppServerClient {
             output: output.toString(),
             errorMessage: 'Single-agent app-server request timed out.',
             aborted: _abortedSessions.contains(normalizedSessionId),
+            resolvedModel: resolvedModel,
           ),
         );
       } finally {
@@ -271,6 +280,7 @@ class DirectSingleAgentAppServerClient {
         output: '',
         errorMessage: error.toString(),
         aborted: _abortedSessions.contains(normalizedSessionId),
+        resolvedModel: '',
       );
     } finally {
       _activeConnections.remove(normalizedSessionId);
@@ -325,7 +335,7 @@ class DirectSingleAgentAppServerClient {
             if (workingDirectory.trim().isNotEmpty) 'cwd': workingDirectory,
           },
         );
-        final resumedId = resumed['id']?.toString().trim() ?? existingThreadId;
+        final resumedId = _extractThreadId(resumed) ?? existingThreadId;
         _threadIds[sessionId] = resumedId;
         return resumedId;
       } catch (_) {
@@ -340,12 +350,33 @@ class DirectSingleAgentAppServerClient {
         if (model.trim().isNotEmpty) 'model': model.trim(),
       },
     );
-    final threadId = created['id']?.toString().trim() ?? '';
+    final threadId = _extractThreadId(created) ?? '';
     if (threadId.isEmpty) {
       throw StateError('Single-agent app-server returned an empty thread id.');
     }
     _threadIds[sessionId] = threadId;
     return threadId;
+  }
+
+  String? _extractThreadId(Map<String, dynamic> payload) {
+    final topLevelId = payload['id']?.toString().trim() ?? '';
+    if (topLevelId.isNotEmpty) {
+      return topLevelId;
+    }
+    final thread = _asMap(payload['thread']);
+    final nestedId = thread['id']?.toString().trim() ?? '';
+    if (nestedId.isNotEmpty) {
+      return nestedId;
+    }
+    return null;
+  }
+
+  String? _extractModel(Map<String, dynamic> payload) {
+    final model = payload['model']?.toString().trim() ?? '';
+    if (model.isNotEmpty) {
+      return model;
+    }
+    return null;
   }
 
   Uri? _resolveWebSocketEndpoint(SingleAgentProvider provider) {

@@ -52,6 +52,7 @@ void main() {
 
       expect(result.success, isTrue);
       expect(result.output, 'hello world from app server');
+      expect(result.resolvedModel, 'codex-sonnet');
       expect(deltas.join(), 'hello world from app server');
       expect(
         server.methods,
@@ -87,14 +88,47 @@ void main() {
       expect(result.aborted, isTrue);
       expect(server.methods, contains('turn/interrupt'));
     });
+
+    test(
+      'accepts nested thread objects returned by codex app-server',
+      () async {
+        final server = await _FakeAppServer.start(nestedThreadResult: true);
+        addTearDown(server.close);
+
+        final client = DirectSingleAgentAppServerClient(
+          endpointResolver: (_) => server.baseHttpUri,
+        );
+        addTearDown(client.dispose);
+
+        final result = await client.run(
+          const DirectSingleAgentRunRequest(
+            sessionId: 'session-nested',
+            provider: SingleAgentProvider.codex,
+            prompt: 'hello nested world',
+            model: 'qwen2.5-coder:latest',
+            workingDirectory: '/tmp',
+            gatewayToken: '',
+          ),
+        );
+
+        expect(result.success, isTrue);
+        expect(result.output, 'hello world from app server');
+        expect(result.resolvedModel, 'codex-sonnet');
+      },
+    );
   });
 }
 
 class _FakeAppServer {
-  _FakeAppServer._(this._server, {required this.delayCompletion});
+  _FakeAppServer._(
+    this._server, {
+    required this.delayCompletion,
+    required this.nestedThreadResult,
+  });
 
   final HttpServer _server;
   final bool delayCompletion;
+  final bool nestedThreadResult;
   final List<String> methods = <String>[];
   final List<String> authorizationHeaders = <String>[];
   final Map<String, Completer<void>> _methodWaiters =
@@ -104,9 +138,16 @@ class _FakeAppServer {
   int get port => _server.port;
   Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${_server.port}');
 
-  static Future<_FakeAppServer> start({bool delayCompletion = false}) async {
+  static Future<_FakeAppServer> start({
+    bool delayCompletion = false,
+    bool nestedThreadResult = false,
+  }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final fake = _FakeAppServer._(server, delayCompletion: delayCompletion);
+    final fake = _FakeAppServer._(
+      server,
+      delayCompletion: delayCompletion,
+      nestedThreadResult: nestedThreadResult,
+    );
     unawaited(fake._listen());
     return fake;
   }
@@ -166,28 +207,46 @@ class _FakeAppServer {
           break;
         case 'thread/start':
           _threadCounter += 1;
+          final result = nestedThreadResult
+              ? <String, dynamic>{
+                  'thread': <String, dynamic>{
+                    'id': 'thread-$_threadCounter',
+                    'path': params['cwd'] ?? '/tmp',
+                    'ephemeral': false,
+                  },
+                }
+              : <String, dynamic>{
+                  'id': 'thread-$_threadCounter',
+                  'path': params['cwd'] ?? '/tmp',
+                  'ephemeral': false,
+                };
           socket.add(
             jsonEncode(<String, dynamic>{
               'jsonrpc': '2.0',
               'id': id,
-              'result': <String, dynamic>{
-                'id': 'thread-$_threadCounter',
-                'path': params['cwd'] ?? '/tmp',
-                'ephemeral': false,
-              },
+              'result': result,
             }),
           );
           break;
         case 'thread/resume':
+          final result = nestedThreadResult
+              ? <String, dynamic>{
+                  'thread': <String, dynamic>{
+                    'id': params['threadId'] ?? 'thread-resumed',
+                    'path': params['cwd'] ?? '/tmp',
+                    'ephemeral': false,
+                  },
+                }
+              : <String, dynamic>{
+                  'id': params['threadId'] ?? 'thread-resumed',
+                  'path': params['cwd'] ?? '/tmp',
+                  'ephemeral': false,
+                };
           socket.add(
             jsonEncode(<String, dynamic>{
               'jsonrpc': '2.0',
               'id': id,
-              'result': <String, dynamic>{
-                'id': params['threadId'] ?? 'thread-resumed',
-                'path': params['cwd'] ?? '/tmp',
-                'ephemeral': false,
-              },
+              'result': result,
             }),
           );
           break;
@@ -201,6 +260,7 @@ class _FakeAppServer {
                 'id': 'turn-1',
                 'threadId': threadId,
                 'status': 'started',
+                'model': 'codex-sonnet',
               },
             }),
           );

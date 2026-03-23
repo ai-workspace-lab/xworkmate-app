@@ -205,6 +205,8 @@ class AppController extends ChangeNotifier {
       <String, List<GatewayChatMessage>>{};
   final Map<String, String> _aiGatewayStreamingTextBySession =
       <String, String>{};
+  final Map<String, String> _singleAgentRuntimeModelBySession =
+      <String, String>{};
   final Map<String, HttpClient> _aiGatewayStreamingClients =
       <String, HttpClient>{};
   final Set<String> _aiGatewayPendingSessionKeys = <String>{};
@@ -517,16 +519,25 @@ class AppController extends ChangeNotifier {
   String assistantModelForSession(String sessionKey) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
+    if (target == AssistantExecutionTarget.singleAgent) {
+      if (singleAgentUsesAiChatFallbackForSession(normalizedSessionKey)) {
+        final recordModel =
+            _assistantThreadRecords[normalizedSessionKey]?.assistantModelId
+                .trim() ??
+            '';
+        if (recordModel.isNotEmpty) {
+          return recordModel;
+        }
+        return resolvedAiGatewayModel;
+      }
+      return singleAgentRuntimeModelForSession(normalizedSessionKey);
+    }
     final recordModel =
         _assistantThreadRecords[normalizedSessionKey]?.assistantModelId
             .trim() ??
         '';
     if (recordModel.isNotEmpty) {
       return recordModel;
-    }
-    if (target == AssistantExecutionTarget.singleAgent &&
-        singleAgentUsesAiChatFallbackForSession(normalizedSessionKey)) {
-      return resolvedAiGatewayModel;
     }
     return _resolvedAssistantModelForTarget(target);
   }
@@ -603,8 +614,20 @@ class AppController extends ChangeNotifier {
   bool get currentSingleAgentShouldSuggestAutoSwitch =>
       singleAgentShouldSuggestAutoSwitchForSession(currentSessionKey);
 
+  String singleAgentRuntimeModelForSession(String sessionKey) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    return _singleAgentRuntimeModelBySession[normalizedSessionKey]?.trim() ?? '';
+  }
+
+  String get currentSingleAgentRuntimeModel =>
+      singleAgentRuntimeModelForSession(currentSessionKey);
+
   String singleAgentModelDisplayLabelForSession(String sessionKey) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final runtimeModel = singleAgentRuntimeModelForSession(normalizedSessionKey);
+    if (runtimeModel.isNotEmpty) {
+      return runtimeModel;
+    }
     final model = assistantModelForSession(normalizedSessionKey);
     if (model.isNotEmpty) {
       return model;
@@ -623,6 +646,21 @@ class AppController extends ChangeNotifier {
 
   String get currentSingleAgentModelDisplayLabel =>
       singleAgentModelDisplayLabelForSession(currentSessionKey);
+
+  bool singleAgentShouldShowModelControlForSession(String sessionKey) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    if (assistantExecutionTargetForSession(normalizedSessionKey) !=
+        AssistantExecutionTarget.singleAgent) {
+      return true;
+    }
+    if (singleAgentUsesAiChatFallbackForSession(normalizedSessionKey)) {
+      return true;
+    }
+    return singleAgentRuntimeModelForSession(normalizedSessionKey).isNotEmpty;
+  }
+
+  bool get currentSingleAgentShouldShowModelControl =>
+      singleAgentShouldShowModelControlForSession(currentSessionKey);
 
   List<SingleAgentProvider> get singleAgentProviderOptions =>
       const <SingleAgentProvider>[
@@ -1786,6 +1824,7 @@ class AppController extends ChangeNotifier {
     if (singleAgentProviderForSession(sessionKey) == sanitizedProvider) {
       return;
     }
+    _singleAgentRuntimeModelBySession.remove(sessionKey);
     _upsertAssistantThreadRecord(
       sessionKey,
       singleAgentProvider: sanitizedProvider,
@@ -1838,6 +1877,9 @@ class AppController extends ChangeNotifier {
   }) async {
     final resolvedTarget = _sanitizeExecutionTarget(target);
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    if (resolvedTarget != AssistantExecutionTarget.singleAgent) {
+      _singleAgentRuntimeModelBySession.remove(normalizedSessionKey);
+    }
     if (!matchesSessionKey(
       normalizedSessionKey,
       _sessionsController.currentSessionKey,
@@ -3209,6 +3251,10 @@ class AppController extends ChangeNotifier {
             configuredCodexCliPath: configuredCodexCliPath,
           ),
         );
+        final resolvedRuntimeModel = result.resolvedModel.trim();
+        if (resolvedRuntimeModel.isNotEmpty) {
+          _singleAgentRuntimeModelBySession[sessionKey] = resolvedRuntimeModel;
+        }
         _clearAiGatewayStreamingText(sessionKey);
         if (result.aborted) {
           final partial = result.output.trim();
