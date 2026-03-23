@@ -139,6 +139,33 @@ void main() {
     );
   });
 
+  testWidgets('SettingsPage gateway sections can collapse individually', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
+
+    await tester.tap(find.text('集成'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('OpenClaw Gateway'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('gateway-host-field')), findsNothing);
+    expect(find.byKey(const ValueKey('gateway-test-button')), findsNothing);
+
+    await tester.tap(find.text('OpenClaw Gateway'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('gateway-host-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('gateway-test-button')), findsOneWidget);
+  });
+
   testWidgets('SettingsPage shows Linux desktop integration controls', (
     WidgetTester tester,
   ) async {
