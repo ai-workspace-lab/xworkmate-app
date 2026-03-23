@@ -34,6 +34,13 @@ class SettingsStore {
   SettingsSnapshot _settingsSnapshot = SettingsSnapshot.defaults();
   List<AssistantThreadRecord> _threadRecords = const <AssistantThreadRecord>[];
   List<SecretAuditEntry> _auditTrail = const <SecretAuditEntry>[];
+  PersistentWriteFailure? _settingsWriteFailure;
+  PersistentWriteFailure? _tasksWriteFailure;
+  PersistentWriteFailure? _auditWriteFailure;
+
+  PersistentWriteFailure? get settingsWriteFailure => _settingsWriteFailure;
+  PersistentWriteFailure? get tasksWriteFailure => _tasksWriteFailure;
+  PersistentWriteFailure? get auditWriteFailure => _auditWriteFailure;
 
   Future<void> initialize() async {
     if (_initialized) {
@@ -61,6 +68,11 @@ class SettingsStore {
     _settingsSnapshot = snapshot;
     final layout = _layout;
     if (layout == null) {
+      _settingsWriteFailure = _buildWriteFailure(
+        PersistentStoreScope.settings,
+        'saveSettingsSnapshot',
+        StateError('Persistent settings path unavailable; using memory only.'),
+      );
       return;
     }
     try {
@@ -68,8 +80,13 @@ class SettingsStore {
         layout.settingsFile,
         encodeYamlDocument(snapshot.toJson()),
       );
-    } catch (_) {
-      // Preserve the in-memory snapshot when the persistent write fails.
+      _settingsWriteFailure = null;
+    } catch (error) {
+      _settingsWriteFailure = _buildWriteFailure(
+        PersistentStoreScope.settings,
+        'saveSettingsSnapshot',
+        error,
+      );
     }
   }
 
@@ -88,6 +105,11 @@ class SettingsStore {
     _threadRecords = normalized;
     final layout = _layout;
     if (layout == null) {
+      _tasksWriteFailure = _buildWriteFailure(
+        PersistentStoreScope.tasks,
+        'saveAssistantThreadRecords',
+        StateError('Persistent task path unavailable; using memory only.'),
+      );
       return;
     }
     final keptPaths = <String>{};
@@ -120,8 +142,13 @@ class SettingsStore {
           await entity.delete();
         }
       }
-    } catch (_) {
-      // Keep the in-memory task cache if the durable write partially fails.
+      _tasksWriteFailure = null;
+    } catch (error) {
+      _tasksWriteFailure = _buildWriteFailure(
+        PersistentStoreScope.tasks,
+        'saveAssistantThreadRecords',
+        error,
+      );
     }
   }
 
@@ -131,18 +158,44 @@ class SettingsStore {
     _threadRecords = const <AssistantThreadRecord>[];
     final layout = _layout;
     if (layout == null) {
+      _settingsWriteFailure = _buildWriteFailure(
+        PersistentStoreScope.settings,
+        'clearAssistantLocalState',
+        StateError(
+          'Persistent settings path unavailable; reset kept in memory.',
+        ),
+      );
+      _tasksWriteFailure = _buildWriteFailure(
+        PersistentStoreScope.tasks,
+        'clearAssistantLocalState',
+        StateError('Persistent task path unavailable; reset kept in memory.'),
+      );
       return;
     }
     try {
       await deleteIfExists(layout.settingsFile);
+      _settingsWriteFailure = null;
+    } catch (error) {
+      _settingsWriteFailure = _buildWriteFailure(
+        PersistentStoreScope.settings,
+        'clearAssistantLocalState',
+        error,
+      );
+    }
+    try {
       await deleteIfExists(layout.taskIndexFile);
       await for (final entity in layout.tasksDirectory.list()) {
         if (entity is File && entity.path.endsWith('.json')) {
           await entity.delete();
         }
       }
-    } catch (_) {
-      // Keep the memory reset even if filesystem cleanup is incomplete.
+      _tasksWriteFailure = null;
+    } catch (error) {
+      _tasksWriteFailure = _buildWriteFailure(
+        PersistentStoreScope.tasks,
+        'clearAssistantLocalState',
+        error,
+      );
     }
   }
 
@@ -160,6 +213,11 @@ class SettingsStore {
     _auditTrail = next;
     final layout = _layout;
     if (layout == null) {
+      _auditWriteFailure = _buildWriteFailure(
+        PersistentStoreScope.audit,
+        'appendAudit',
+        StateError('Persistent audit path unavailable; audit kept in memory.'),
+      );
       return;
     }
     try {
@@ -167,8 +225,13 @@ class SettingsStore {
         layout.auditFile,
         jsonEncode(next.map((item) => item.toJson()).toList(growable: false)),
       );
-    } catch (_) {
-      // Preserve the in-memory audit trail if the durable write fails.
+      _auditWriteFailure = null;
+    } catch (error) {
+      _auditWriteFailure = _buildWriteFailure(
+        PersistentStoreScope.audit,
+        'appendAudit',
+        error,
+      );
     }
   }
 
@@ -274,5 +337,18 @@ class SettingsStore {
       }
     } catch (_) {}
     return const <SecretAuditEntry>[];
+  }
+
+  PersistentWriteFailure _buildWriteFailure(
+    PersistentStoreScope scope,
+    String operation,
+    Object error,
+  ) {
+    return PersistentWriteFailure(
+      scope: scope,
+      operation: operation,
+      message: error.toString(),
+      timestampMs: DateTime.now().millisecondsSinceEpoch,
+    );
   }
 }
