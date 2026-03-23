@@ -8,12 +8,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/models/app_models.dart';
 
+import '../test_support.dart';
+
 void main() {
   test(
     'AppController keeps tasks destination in focused destinations',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final controller = AppController();
+      final controller = AppController(store: createIsolatedTestStore());
       addTearDown(controller.dispose);
 
       await _waitFor(() => !controller.initializing);
@@ -43,7 +45,7 @@ void main() {
 
   test('AppController toggles focused navigation destinations', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
-    final controller = AppController();
+    final controller = AppController(store: createIsolatedTestStore());
     addTearDown(controller.dispose);
 
     await _waitFor(() => !controller.initializing);

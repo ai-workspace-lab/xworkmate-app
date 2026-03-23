@@ -4,6 +4,15 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:yaml/yaml.dart';
 
+String? _persistentSupportRootOverride;
+
+void debugOverridePersistentSupportRoot(String? path) {
+  final trimmed = path?.trim() ?? '';
+  _persistentSupportRootOverride = trimmed.isEmpty
+      ? null
+      : normalizeStoreDirectoryPath(trimmed);
+}
+
 enum PersistentStoreScope { settings, tasks, secrets, audit }
 
 class PersistentWriteFailure {
@@ -120,6 +129,10 @@ class StoreLayoutResolver {
   }
 
   Future<String?> _defaultSupportRootPath() async {
+    final override = _persistentSupportRootOverride;
+    if (override != null && override.isNotEmpty) {
+      return override;
+    }
     try {
       final supportDirectory = await getApplicationSupportDirectory();
       return '${supportDirectory.path}/xworkmate';
