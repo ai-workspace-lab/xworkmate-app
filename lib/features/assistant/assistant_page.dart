@@ -2357,7 +2357,7 @@ class _AssistantEmptyState extends StatelessWidget {
             ? appText('开始单机智能体任务', 'Start a single-agent task')
             : singleAgentNeedsAiGateway
             ? appText('先配置 LLM API', 'Configure LLM API first')
-            : appText('先准备外部 CLI', 'Prepare the external CLI first')
+            : appText('先准备外部 Agent', 'Prepare the external Agent first')
         : connected
         ? appText('开始对话或运行任务', 'Start a chat or run a task')
         : connectionState.status == RuntimeConnectionStatus.error
@@ -2367,8 +2367,8 @@ class _AssistantEmptyState extends StatelessWidget {
         ? connected
             ? (singleAgentFallback
                   ? appText(
-                      '当前没有可用的外部 CLI，这个线程已降级到 AI Chat fallback，不会建立 OpenClaw Gateway 会话。',
-                      'No external CLI is available for this thread, so it is running in AI Chat fallback without opening an OpenClaw Gateway session.',
+                      '当前没有可用的外部 Agent ACP 连接，这个线程已降级到 AI Chat fallback，不会建立 OpenClaw Gateway 会话。',
+                      'No external Agent ACP connection is available for this thread, so it is running in AI Chat fallback without opening an OpenClaw Gateway session.',
                     )
                   : appText(
                       '当前模式使用单机智能体处理当前任务，不会建立 OpenClaw Gateway 会话。',
@@ -2376,8 +2376,8 @@ class _AssistantEmptyState extends StatelessWidget {
                     ))
             : singleAgentSuggestsAuto
             ? appText(
-                '当前线程固定为 $providerLabel，但它在这台设备上不可用。检测到其他外部 CLI 时不会自动切换，可在工具栏里改成 Auto。',
-                'This thread is pinned to $providerLabel, but it is unavailable on this device. XWorkmate will not switch to another external CLI automatically. Change the provider to Auto in the toolbar.',
+                '当前线程固定为 $providerLabel，但它在这台设备上不可用。检测到其他外部 Agent ACP 端点时不会自动切换，可在工具栏里改成 Auto。',
+                'This thread is pinned to $providerLabel, but it is unavailable on this device. XWorkmate will not switch to another external Agent ACP endpoint automatically. Change the provider to Auto in the toolbar.',
               )
             : singleAgentNeedsAiGateway
             ? appText(
@@ -2385,8 +2385,8 @@ class _AssistantEmptyState extends StatelessWidget {
                 'Set the LLM API Endpoint, LLM API Token, and default model in Settings -> Integrations, then continue this task in Single Agent mode.',
               )
             : appText(
-                '当前线程的外部 CLI 尚未就绪。请先安装或配置 $providerLabel，或切换到 Auto。',
-                'The external CLI for this thread is not ready yet. Install or configure $providerLabel first, or switch to Auto.',
+                '当前线程的外部 Agent ACP 连接尚未就绪。请先配置 $providerLabel 对应端点，或切换到 Auto。',
+                'The external Agent ACP connection for this thread is not ready yet. Configure the endpoint for $providerLabel first, or switch to Auto.',
               )
         : connected
         ? appText(
