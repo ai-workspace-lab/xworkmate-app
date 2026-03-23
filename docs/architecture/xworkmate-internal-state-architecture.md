@@ -260,7 +260,6 @@ AssistantThreadRecord
 AssistantThreadRecord fields that matter most:
 - executionTarget
 - messageViewMode
-- discoveredSkills (legacy / reserved)
 - importedSkills
 - selectedSkillKeys
 - assistantModelId
@@ -696,12 +695,6 @@ Scope: thread
 Field: importedSkills
 Owner: AssistantThreadRecord
 Scope: thread
-
-Field: discoveredSkills
-Owner: AssistantThreadRecord
-Scope: thread
-Note: legacy / reserved candidate layer; current UI resolves from available
-thread skills plus selected keys
 
 Field: messageViewMode
 Owner: AssistantThreadRecord

@@ -1979,7 +1979,6 @@ class AppController extends ChangeNotifier {
     final availableSkills = await _scanSingleAgentLocalSkillEntries();
     _upsertAssistantThreadRecord(
       normalizedSessionKey,
-      discoveredSkills: const <AssistantThreadSkillEntry>[],
       importedSkills: availableSkills,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
@@ -4073,7 +4072,6 @@ class AppController extends ChangeNotifier {
     bool? archived,
     AssistantExecutionTarget? executionTarget,
     AssistantMessageViewMode? messageViewMode,
-    List<AssistantThreadSkillEntry>? discoveredSkills,
     List<AssistantThreadSkillEntry>? importedSkills,
     List<String>? selectedSkillKeys,
     String? assistantModelId,
@@ -4117,10 +4115,6 @@ class AppController extends ChangeNotifier {
           messageViewMode ??
           existing?.messageViewMode ??
           AssistantMessageViewMode.rendered,
-      discoveredSkills:
-          discoveredSkills ??
-          existing?.discoveredSkills ??
-          const <AssistantThreadSkillEntry>[],
       importedSkills: nextImportedSkills,
       selectedSkillKeys: nextSelectedSkillKeys,
       assistantModelId:
