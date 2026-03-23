@@ -630,12 +630,12 @@ class AppController extends ChangeNotifier {
               normalizedSessionKey,
             )
           ? appText(
-              '没有可用的外部 CLI，请配置 LLM API fallback。',
-              'No external CLI is available. Configure LLM API fallback.',
+              '没有可用的外部 Agent ACP 端点，请配置 LLM API fallback。',
+              'No external Agent ACP endpoint is available. Configure LLM API fallback.',
             )
           : appText(
-              '当前线程的外部 CLI 尚未就绪。',
-              'The external CLI for this thread is not ready yet.',
+              '当前线程的外部 Agent ACP 连接尚未就绪。',
+              'The external Agent ACP connection for this thread is not ready yet.',
             );
       return AssistantThreadConnectionState(
         executionTarget: target,
@@ -3660,12 +3660,12 @@ class AppController extends ChangeNotifier {
     final detail = reason?.trim() ?? '';
     return detail.isEmpty
         ? appText(
-            '未发现可用的外部 CLI，已回退到 AI Chat。',
-            'No external CLI provider is available. Falling back to AI Chat.',
+            '未发现可用的外部 Agent ACP 端点，已回退到 AI Chat。',
+            'No external Agent ACP endpoint is available. Falling back to AI Chat.',
           )
         : appText(
-            '外部 CLI 不可用，已回退到 AI Chat：$detail',
-            'External CLI is unavailable. Falling back to AI Chat: $detail',
+            '外部 Agent ACP 连接不可用，已回退到 AI Chat：$detail',
+            'External Agent ACP connection is unavailable. Falling back to AI Chat: $detail',
           );
   }
 
@@ -3676,12 +3676,12 @@ class AppController extends ChangeNotifier {
     if (singleAgentShouldSuggestAutoSwitchForSession(normalizedSessionKey)) {
       return detail.isEmpty
           ? appText(
-              '当前线程固定为 ${selection.label}，但它在这台设备上不可用。检测到其他外部 CLI 时不会自动改线，可切到 Auto。',
-              'This thread is pinned to ${selection.label}, but it is unavailable on this device. XWorkmate will not reroute to another external CLI automatically. Switch to Auto instead.',
+              '当前线程固定为 ${selection.label}，但它在这台设备上不可用。检测到其他外部 Agent ACP 端点时不会自动改线，可切到 Auto。',
+              'This thread is pinned to ${selection.label}, but it is unavailable on this device. XWorkmate will not reroute to another external Agent ACP endpoint automatically. Switch to Auto instead.',
             )
           : appText(
-              '当前线程固定为 ${selection.label}：$detail 检测到其他外部 CLI 时不会自动改线，可切到 Auto。',
-              'This thread is pinned to ${selection.label}: $detail XWorkmate will not reroute to another external CLI automatically. Switch to Auto instead.',
+              '当前线程固定为 ${selection.label}：$detail 检测到其他外部 Agent ACP 端点时不会自动改线，可切到 Auto。',
+              'This thread is pinned to ${selection.label}: $detail XWorkmate will not reroute to another external Agent ACP endpoint automatically. Switch to Auto instead.',
             );
     }
     if (singleAgentNeedsAiGatewayConfigurationForSession(
@@ -3689,22 +3689,22 @@ class AppController extends ChangeNotifier {
     )) {
       return detail.isEmpty
           ? appText(
-              '当前没有可用的外部 CLI，也没有可用的 AI Chat fallback。请先安装外部 CLI，或配置 LLM API。',
-              'No external CLI is available, and AI Chat fallback is not configured. Install an external CLI or configure LLM API first.',
+              '当前没有可用的外部 Agent ACP 端点，也没有可用的 AI Chat fallback。请先配置外部 Agent 连接，或配置 LLM API。',
+              'No external Agent ACP endpoint is available, and AI Chat fallback is not configured. Configure an external Agent connection or configure LLM API first.',
             )
           : appText(
-              '$detail 当前没有可用的外部 CLI，也没有可用的 AI Chat fallback。请先安装外部 CLI，或配置 LLM API。',
-              '$detail No external CLI is available, and AI Chat fallback is not configured. Install an external CLI or configure LLM API first.',
+              '$detail 当前没有可用的外部 Agent ACP 端点，也没有可用的 AI Chat fallback。请先配置外部 Agent 连接，或配置 LLM API。',
+              '$detail No external Agent ACP endpoint is available, and AI Chat fallback is not configured. Configure an external Agent connection or configure LLM API first.',
             );
     }
     return detail.isEmpty
         ? appText(
-            '当前线程的外部 CLI 尚未就绪。',
-            'The external CLI for this thread is not ready yet.',
+            '当前线程的外部 Agent ACP 连接尚未就绪。',
+            'The external Agent ACP connection for this thread is not ready yet.',
           )
         : appText(
-            '当前线程的外部 CLI 尚未就绪：$detail',
-            'The external CLI for this thread is not ready yet: $detail',
+            '当前线程的外部 Agent ACP 连接尚未就绪：$detail',
+            'The external Agent ACP connection for this thread is not ready yet: $detail',
           );
   }
 

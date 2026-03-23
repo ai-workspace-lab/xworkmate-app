@@ -333,8 +333,8 @@ class _SettingsPageState extends State<SettingsPage> {
           context,
           title: detail.label,
           description: appText(
-            '多 Agent 协作、角色编排和外部 CLI 工具的详细参数集中在这里。',
-            'Detailed multi-agent collaboration, role orchestration, and external CLI settings are edited here.',
+            '多 Agent 协作、角色编排和外部 Agent / ACP 连接的详细参数集中在这里。',
+            'Detailed multi-agent collaboration, role orchestration, and external Agent / ACP connection settings are edited here.',
           ),
         ),
         const SizedBox(height: 16),
@@ -1020,8 +1020,8 @@ class _SettingsPageState extends State<SettingsPage> {
       children: [
         Text(
           appText(
-            '这里维护外部 Gateway / app-server 连接源 profile。工作模式在会话区单独切换：single-agent 直连外部 WS app-server；local/remote 继续走 Gateway。保存：仅保存配置，不立即生效。应用：立即按当前配置生效。',
-            'This card edits external Gateway and app-server endpoint profiles. Work mode is switched in the session UI: single-agent connects to an external WS app-server directly, while local/remote continue through Gateway. Save persists configuration only, while Apply makes it take effect immediately.',
+            '这里维护外部 Gateway / ACP endpoint 连接源 profile。工作模式在会话区单独切换：single-agent 通过标准 ACP 协议直连外部 Agent；local/remote 继续走 Gateway。保存：仅保存配置，不立即生效。应用：立即按当前配置生效。',
+            'This card edits external Gateway / ACP endpoint profiles. Work mode is switched in the session UI: single-agent connects to an external Agent over the standard ACP protocol, while local/remote continue through Gateway. Save persists configuration only, while Apply makes it take effect immediately.',
           ),
           style: theme.textTheme.bodyMedium,
         ),
