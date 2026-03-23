@@ -56,7 +56,7 @@ void main() {
       await _waitFor(() => !controller.initializing);
 
       await controller.setAssistantExecutionTarget(
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
       );
 
       expect(
@@ -116,7 +116,7 @@ void main() {
       await _waitFor(() => !controller.initializing);
 
       await controller.setAssistantExecutionTarget(
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
       );
       final firstSessionKey = controller.currentSessionKey;
       expect(
@@ -138,7 +138,7 @@ void main() {
       controller.initializeAssistantThreadContext(
         'draft:thread-2',
         title: 'Thread 2',
-        executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+        executionTarget: AssistantExecutionTarget.singleAgent,
         messageViewMode: AssistantMessageViewMode.rendered,
       );
       await controller.switchSession('draft:thread-2');

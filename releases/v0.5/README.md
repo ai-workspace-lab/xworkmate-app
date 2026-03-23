@@ -9,7 +9,7 @@
 ## Release Focus
 
 - 持续 Assistant 任务线程与流式 AI Gateway 对话
-- `仅 AI Gateway / 本地 OpenClaw Gateway / 远程 OpenClaw Gateway` 三模式统一
+- `单机智能体 / 本地 OpenClaw Gateway / 远程 OpenClaw Gateway` 三模式统一
 - `Architect / Engineer / Tester` 多 Agent 协作
 - 可选 `ARIS` 框架、内嵌 skills、Go bridge runtime
 - `Ollama Cloud` 文案和默认地址统一

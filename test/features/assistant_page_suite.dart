@@ -196,7 +196,7 @@ void main() {
     await _pumpForUiSync(tester);
 
     await controller.setAssistantExecutionTarget(
-      AssistantExecutionTarget.aiGatewayOnly,
+      AssistantExecutionTarget.singleAgent,
     );
     await _pumpForUiSync(tester);
 
@@ -212,7 +212,7 @@ void main() {
     await _pumpForUiSync(tester);
 
     final aiGroup = find.byKey(
-      const ValueKey<String>('assistant-task-group-aiGatewayOnly'),
+      const ValueKey<String>('assistant-task-group-singleAgent'),
     );
     final localGroup = find.byKey(
       const ValueKey<String>('assistant-task-group-local'),
@@ -246,7 +246,7 @@ void main() {
     );
 
     expect(
-      find.byKey(const ValueKey<String>('assistant-task-group-aiGatewayOnly')),
+      find.byKey(const ValueKey<String>('assistant-task-group-singleAgent')),
       findsOneWidget,
     );
     expect(
@@ -450,7 +450,7 @@ void main() {
     );
     await _pumpForUiSync(tester);
 
-    expect(find.text('仅 AI Gateway'), findsWidgets);
+    expect(find.text('单机智能体'), findsWidgets);
     expect(find.text('本地 OpenClaw Gateway'), findsWidgets);
     expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
   });
@@ -586,7 +586,7 @@ void main() {
       await _pumpForUiSync(tester);
 
       await controller.setAssistantExecutionTarget(
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
       );
       await _pumpForUiSync(tester);
 
@@ -619,11 +619,11 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const Key('assistant-execution-target-button')),
-          matching: find.text('仅 AI Gateway'),
+          matching: find.text('单机智能体'),
         ),
         findsOneWidget,
       );
-      expect(find.textContaining('仅 AI Gateway'), findsWidgets);
+      expect(find.textContaining('单机智能体'), findsWidgets);
     },
     skip: true,
   );
@@ -655,7 +655,7 @@ void main() {
           sessionKey: 'main',
           title: '研发任务',
           archived: false,
-          executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+          executionTarget: AssistantExecutionTarget.singleAgent,
           messageViewMode: AssistantMessageViewMode.rendered,
           updatedAtMs: 1700000000000,
           messages: <GatewayChatMessage>[
@@ -711,7 +711,7 @@ void main() {
 
   // Known flutter_tester host-exit hang in this widget scenario.
   testWidgets(
-    'AssistantPage shows AI Gateway-only chip and keeps task rows minimal',
+    'AssistantPage shows Single Agent chip and keeps task rows minimal',
     (WidgetTester tester) async {
       final controller = await createTestController(tester);
       await controller.settingsController.saveAiGatewayApiKey('live-key');
@@ -723,7 +723,7 @@ void main() {
             selectedModels: const <String>['qwen2.5-coder:latest'],
           ),
           defaultModel: 'qwen2.5-coder:latest',
-          assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
+          assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
         ),
         refreshAfterSave: false,
       );
@@ -738,7 +738,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('仅 AI Gateway · qwen2.5-coder:latest · 127.0.0.1:11434'),
+        find.text('单机智能体 · qwen2.5-coder:latest · 127.0.0.1:11434'),
         findsOneWidget,
       );
       expect(find.text('等待描述这个任务的第一条消息'), findsNothing);
@@ -773,7 +773,7 @@ Future<AppController> _createControllerWithThreadRecords({
         availableModels: const <String>['qwen2.5-coder:latest'],
         selectedModels: const <String>['qwen2.5-coder:latest'],
       ),
-      assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
+      assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
       defaultModel: 'qwen2.5-coder:latest',
     ),
   );

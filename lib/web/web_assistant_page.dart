@@ -42,7 +42,7 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
       builder: (context, _) {
         final uiFeatures = controller.featuresFor(UiFeaturePlatform.web);
         final allDirect = controller.conversationsForTarget(
-          AssistantExecutionTarget.aiGatewayOnly,
+          AssistantExecutionTarget.singleAgent,
         );
         final allRelay = controller.conversationsForTarget(
           AssistantExecutionTarget.remote,
@@ -53,12 +53,12 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
         final availableTargets = uiFeatures.availableExecutionTargets
             .where(
               (target) =>
-                  target == AssistantExecutionTarget.aiGatewayOnly ||
+                  target == AssistantExecutionTarget.singleAgent ||
                   target == AssistantExecutionTarget.remote,
             )
             .toList(growable: false);
         final connected =
-            currentTarget == AssistantExecutionTarget.aiGatewayOnly
+            currentTarget == AssistantExecutionTarget.singleAgent
             ? controller.canUseAiGatewayConversation
             : controller.connection.status == RuntimeConnectionStatus.connected;
         final currentMessages = controller.chatMessages;
@@ -83,8 +83,8 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
           eyebrow: appText('Web Workspace', 'Web Workspace'),
           title: appText('助手', 'Assistant'),
           subtitle: appText(
-            'Direct AI 与 Relay Gateway 共用一个入口，左侧保留会话/任务历史。',
-            'Use one Assistant surface for Direct AI and Relay Gateway, with embedded conversation history on the left.',
+            '单机智能体与 Relay Gateway 共用一个入口，左侧保留会话/任务历史。',
+            'Use one Assistant surface for Single Agent and Relay Gateway, with embedded conversation history on the left.',
           ),
           toolbar: Wrap(
             spacing: 10,
@@ -232,12 +232,12 @@ class _ConversationRail extends StatelessWidget {
               children: [
                 if (showDirect)
                   _ConversationGroup(
-                    title: appText('Direct AI Gateway', 'Direct AI Gateway'),
+                    title: appText('Single Agent', 'Single Agent'),
                     icon: Icons.hub_rounded,
                     items: direct,
                     emptyLabel: appText(
-                      '还没有 Direct AI 对话',
-                      'No Direct AI conversations yet',
+                      '还没有单机智能体对话',
+                      'No Single Agent conversations yet',
                     ),
                     onSelect: controller.switchConversation,
                   ),
@@ -381,7 +381,7 @@ class _ConversationPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final currentTarget = controller.assistantExecutionTarget;
-    final targetReady = currentTarget == AssistantExecutionTarget.aiGatewayOnly
+    final targetReady = currentTarget == AssistantExecutionTarget.singleAgent
         ? controller.canUseAiGatewayConversation
         : controller.connection.status == RuntimeConnectionStatus.connected;
 
@@ -431,10 +431,10 @@ class _ConversationPanel extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    currentTarget == AssistantExecutionTarget.aiGatewayOnly
+                    currentTarget == AssistantExecutionTarget.singleAgent
                         ? appText(
-                            '当前 Direct AI 配置还不完整，请先在 Settings 中保存地址、API Key 和默认模型。',
-                            'Direct AI is not ready yet. Save the endpoint, API key, and default model in Settings first.',
+                            '当前单机智能体配置还不完整，请先在 Settings 中保存 AI Gateway 地址、API Key 和默认模型。',
+                            'Single Agent is not ready yet. Save the AI Gateway endpoint, API key, and default model in Settings first.',
                           )
                         : appText(
                             '当前 Relay Gateway 尚未连接，请先在 Settings 中保存配置并连接。',
@@ -506,10 +506,10 @@ class _ConversationPanel extends StatelessWidget {
                           Expanded(
                             child: Text(
                               currentTarget ==
-                                      AssistantExecutionTarget.aiGatewayOnly
+                                      AssistantExecutionTarget.singleAgent
                                   ? appText(
-                                      'Web 端 Direct AI 只保留纯网络能力，不提供本地文件和 CLI。',
-                                      'Direct AI on web keeps network-only capabilities and does not expose local files or CLI.',
+                                      'Web 端单机智能体只保留纯网络能力，不提供本地文件和 CLI。',
+                                      'Single Agent on web keeps network-only capabilities and does not expose local files or CLI.',
                                     )
                                   : appText(
                                       'Web 端 Relay 模式使用远程 OpenClaw Gateway，不区分 local / remote。',
@@ -637,9 +637,9 @@ class _TargetChip extends StatelessWidget {
 
 String _targetLabel(AssistantExecutionTarget target) {
   return switch (target) {
-    AssistantExecutionTarget.aiGatewayOnly => appText(
-      'Direct AI Gateway',
-      'Direct AI Gateway',
+    AssistantExecutionTarget.singleAgent => appText(
+      'Single Agent',
+      'Single Agent',
     ),
     AssistantExecutionTarget.remote => appText(
       'Relay OpenClaw Gateway',

@@ -17,7 +17,7 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   test(
-    'AppController streams and restores persistent AI Gateway-only conversation turns',
+    'AppController streams and restores persistent Single Agent conversation turns',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -62,12 +62,12 @@ void main() {
         refreshAfterSave: false,
       );
       await controller.setAssistantExecutionTarget(
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
       );
 
       const firstQuestion =
           'Execution context:\n'
-          '- target: ai-gateway-only\n'
+          '- target: single-agent\n'
           '- workspace_root: /opt/data/workspace\n'
           '- permission: full-access\n\n'
           '今天聊点什么';
@@ -114,7 +114,7 @@ void main() {
       expect(secondController.chatMessages.last.text, 'FIRST_REPLY');
       expect(
         secondController.settings.assistantExecutionTarget,
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
       );
 
       final secondTurn = secondController.sendChatMessage(
@@ -152,7 +152,7 @@ void main() {
         secondController.connection.status,
         RuntimeConnectionStatus.offline,
       );
-      expect(secondController.assistantConnectionStatusLabel, '仅 AI Gateway');
+      expect(secondController.assistantConnectionStatusLabel, '单机智能体');
       expect(
         secondController.assistantConnectionTargetLabel,
         'qwen2.5-coder:latest · 127.0.0.1:${server.port}',
@@ -208,7 +208,7 @@ void main() {
         refreshAfterSave: false,
       );
       await controller.setAssistantExecutionTarget(
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
       );
 
       await controller.sendChatMessage('你好', thinking: 'low');
@@ -226,7 +226,7 @@ void main() {
   );
 
   test(
-    'AppController abortRun stops AI Gateway-only streaming requests',
+    'AppController abortRun stops Single Agent streaming requests',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -270,7 +270,7 @@ void main() {
         refreshAfterSave: false,
       );
       await controller.setAssistantExecutionTarget(
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
       );
 
       final pendingTurn = controller.sendChatMessage('今天聊点什么', thinking: 'low');
