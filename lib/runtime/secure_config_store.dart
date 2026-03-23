@@ -1,6 +1,7 @@
 export 'secret_store.dart';
 export 'settings_store.dart';
 
+import 'file_store_support.dart';
 import 'runtime_models.dart';
 import 'secret_store.dart';
 import 'settings_store.dart';
@@ -14,20 +15,25 @@ class SecureConfigStore {
     SecureStorageClient? secureStorage,
     bool enableSecureStorage = true,
   }) {
+    final layoutResolver = StoreLayoutResolver(
+      localRootPathResolver: databasePathResolver,
+      secretRootPathResolver: fallbackDirectoryPathResolver,
+      supportRootPathResolver: defaultSupportDirectoryPathResolver,
+    );
     _secretStore = SecretStore(
       fallbackDirectoryPathResolver: fallbackDirectoryPathResolver,
       databasePathResolver: databasePathResolver,
-      defaultSupportDirectoryPathResolver:
-          defaultSupportDirectoryPathResolver,
+      defaultSupportDirectoryPathResolver: defaultSupportDirectoryPathResolver,
       secureStorage: secureStorage,
       enableSecureStorage: enableSecureStorage,
+      layoutResolver: layoutResolver,
     );
     _settingsStore = SettingsStore(
       fallbackDirectoryPathResolver: fallbackDirectoryPathResolver,
       databasePathResolver: databasePathResolver,
-      defaultSupportDirectoryPathResolver:
-          defaultSupportDirectoryPathResolver,
+      defaultSupportDirectoryPathResolver: defaultSupportDirectoryPathResolver,
       databaseOpener: databaseOpener,
+      layoutResolver: layoutResolver,
     );
   }
 

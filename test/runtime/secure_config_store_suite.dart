@@ -210,32 +210,31 @@ void main() {
   );
 
   test(
-    'SecureConfigStore defaults to fail-fast when durable settings path cannot be opened',
+    'SecureConfigStore keeps settings in memory when no durable path is available',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-config-store-fail-fast-',
-      );
-      addTearDown(() async {
-        if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
-        }
-      });
+      const unavailablePath = '/dev/null/xworkmate/settings.sqlite3';
       final store = SecureConfigStore(
-        databasePathResolver: () async =>
-            '${tempDirectory.path}/settings.sqlite3',
-        databaseOpener: (_) => throw StateError('sqlite open failed'),
+        databasePathResolver: () async => unavailablePath,
+        fallbackDirectoryPathResolver: () async =>
+            '/dev/null/xworkmate/secrets',
+      );
+      final snapshot = SettingsSnapshot.defaults().copyWith(
+        accountUsername: 'memory-user',
       );
 
-      await expectLater(
-        store.loadSettingsSnapshot(),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            contains('Durable settings storage unavailable'),
-          ),
-        ),
+      await store.saveSettingsSnapshot(snapshot);
+      final loadedSnapshot = await store.loadSettingsSnapshot();
+      final reloadedSnapshot = await SecureConfigStore(
+        databasePathResolver: () async => unavailablePath,
+        fallbackDirectoryPathResolver: () async =>
+            '/dev/null/xworkmate/secrets',
+      ).loadSettingsSnapshot();
+
+      expect(loadedSnapshot.accountUsername, 'memory-user');
+      expect(
+        reloadedSnapshot.accountUsername,
+        SettingsSnapshot.defaults().accountUsername,
       );
     },
   );
@@ -272,10 +271,15 @@ void main() {
         SettingsSnapshot.defaults().accountUsername,
       );
       expect(
-        await Directory('${tempDirectory.path}/settings').exists(),
+        await Directory('${tempDirectory.path}/settings/config').exists(),
         isTrue,
       );
-      expect(await File(explicitSettingsPath).exists(), isTrue);
+      expect(
+        await File(
+          '${tempDirectory.path}/settings/config/settings.yaml',
+        ).exists(),
+        isFalse,
+      );
     },
   );
 
@@ -311,7 +315,7 @@ void main() {
   );
 
   test(
-    'SecureConfigStore persists across instances using default support fallback when primary resolvers fail',
+    'SecureConfigStore persists across instances using default support root when overrides fail',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -348,73 +352,50 @@ void main() {
 
       final loadedSnapshot = await secondStore.loadSettingsSnapshot();
       final loadedToken = await secondStore.loadGatewayToken();
-      final databaseFile = File(
-        '$defaultSupportRoot/${SettingsStore.databaseFileName}',
-      );
+      final settingsFile = File('$defaultSupportRoot/config/settings.yaml');
+      final secretDirectory = Directory('$defaultSupportRoot/secrets');
 
-      expect(await databaseFile.exists(), isTrue);
+      expect(await settingsFile.exists(), isTrue);
+      expect(await secretDirectory.exists(), isTrue);
       expect(loadedSnapshot.accountUsername, 'fallback-user');
       expect(loadedToken, 'fallback-token');
     },
   );
 
-  test(
-    'SecureConfigStore migrates legacy secret fallback files into primary secure storage',
-    () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-config-store-secret-fallback-',
-      );
-      addTearDown(() async {
-        if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
-        }
-      });
-      final secureStorage = _MapSecureStorageClient();
-      final store = SecureConfigStore(
-        fallbackDirectoryPathResolver: () async => tempDirectory.path,
-        secureStorage: secureStorage,
-      );
+  test('SecureConfigStore writes secrets into the fixed secret path', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final tempDirectory = await Directory.systemTemp.createTemp(
+      'xworkmate-config-store-secret-path-',
+    );
+    addTearDown(() async {
+      if (await tempDirectory.exists()) {
+        await tempDirectory.delete(recursive: true);
+      }
+    });
+    final store = SecureConfigStore(
+      fallbackDirectoryPathResolver: () async =>
+          '${tempDirectory.path}/secrets',
+    );
 
-      await File(
-        '${tempDirectory.path}/gateway-token.txt',
-      ).writeAsString('token-secret', flush: true);
-      await File(
-        '${tempDirectory.path}/gateway-password.txt',
-      ).writeAsString('password-secret', flush: true);
-      await File(
-        '${tempDirectory.path}/ai-gateway-api-key.txt',
-      ).writeAsString('ai-gateway-secret', flush: true);
+    await store.saveGatewayToken('token-secret');
+    await store.saveGatewayPassword('password-secret');
+    await store.saveAiGatewayApiKey('ai-gateway-secret');
 
-      expect(await store.loadGatewayToken(), 'token-secret');
-      expect(await store.loadGatewayPassword(), 'password-secret');
-      expect(await store.loadAiGatewayApiKey(), 'ai-gateway-secret');
-      expect(secureStorage._values['xworkmate.gateway.token'], 'token-secret');
-      expect(
-        secureStorage._values['xworkmate.gateway.password'],
-        'password-secret',
-      );
-      expect(
-        secureStorage._values['xworkmate.ai_gateway.api_key'],
-        'ai-gateway-secret',
-      );
-      expect(
-        await File('${tempDirectory.path}/gateway-token.txt').exists(),
-        isFalse,
-      );
-      expect(
-        await File('${tempDirectory.path}/gateway-password.txt').exists(),
-        isFalse,
-      );
-      expect(
-        await File('${tempDirectory.path}/ai-gateway-api-key.txt').exists(),
-        isFalse,
-      );
-    },
-  );
+    expect(await store.loadGatewayToken(), 'token-secret');
+    expect(await store.loadGatewayPassword(), 'password-secret');
+    expect(await store.loadAiGatewayApiKey(), 'ai-gateway-secret');
+    final secretFiles = await Directory(
+      '${tempDirectory.path}/secrets',
+    ).list().where((entity) => entity is File).toList();
+    expect(secretFiles, hasLength(3));
+    expect(
+      secretFiles.every((entity) => entity.path.endsWith('.secret')),
+      isTrue,
+    );
+  });
 
   test(
-    'SecureConfigStore fails fast and keeps stray local-state files untouched when sqlite is unavailable',
+    'SecureConfigStore ignores legacy local-state files and keeps them untouched',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -434,19 +415,16 @@ void main() {
       final firstStore = SecureConfigStore(
         databasePathResolver: () async => databasePath,
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
-        databaseOpener: (_) => throw StateError('sqlite unavailable'),
       );
 
-      await expectLater(
-        firstStore.loadSettingsSnapshot(),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            contains('sqlite unavailable'),
-          ),
-        ),
+      final loadedSnapshot = await firstStore.loadSettingsSnapshot();
+      final loadedThreads = await firstStore.loadAssistantThreadRecords();
+
+      expect(
+        loadedSnapshot.accountUsername,
+        SettingsSnapshot.defaults().accountUsername,
       );
+      expect(loadedThreads, isEmpty);
       expect(await settingsFile.exists(), isTrue);
       expect(await threadsFile.exists(), isTrue);
     },
@@ -1047,23 +1025,4 @@ void main() {
       expect(reloadedToken, 'device-token');
     },
   );
-}
-
-class _MapSecureStorageClient implements SecureStorageClient {
-  final Map<String, String> _values = <String, String>{};
-
-  @override
-  Future<void> delete({required String key}) async {
-    _values.remove(key);
-  }
-
-  @override
-  Future<String?> read({required String key}) async {
-    return _values[key];
-  }
-
-  @override
-  Future<void> write({required String key, required String value}) async {
-    _values[key] = value;
-  }
 }
