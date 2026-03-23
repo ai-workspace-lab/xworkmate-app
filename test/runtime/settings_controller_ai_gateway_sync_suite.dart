@@ -13,7 +13,7 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   test(
-    'SettingsController syncs AI Gateway models with an inline API key override',
+    'SettingsController syncs LLM API models with an inline token override',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final server = await _FakeAiGatewayServer.start();
@@ -62,7 +62,7 @@ void main() {
   );
 
   test(
-    'SettingsController keeps AI Gateway api key in secure storage while retaining local selected models',
+    'SettingsController keeps LLM API api key in secure storage while retaining local selected models',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final server = await _FakeAiGatewayServer.start();
@@ -141,7 +141,7 @@ void main() {
   );
 
   test(
-    'SettingsController tests AI Gateway auth without persisting draft values',
+    'SettingsController tests LLM API auth without persisting draft values',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final server = await _FakeAiGatewayServer.start(
@@ -172,7 +172,7 @@ void main() {
   );
 
   test(
-    'SettingsController reports AI Gateway auth failures with a detailed message',
+    'SettingsController reports LLM API auth failures with a detailed message',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final server = await _FakeAiGatewayServer.start(

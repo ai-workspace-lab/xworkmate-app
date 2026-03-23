@@ -33,7 +33,7 @@ class WebAiGatewayClient {
     if (normalizedBaseUrl == null) {
       return const AiGatewayConnectionCheck(
         state: 'invalid',
-        message: 'Missing AI Gateway URL',
+        message: 'Missing LLM API Endpoint',
         endpoint: '',
         modelCount: 0,
       );
@@ -43,7 +43,7 @@ class WebAiGatewayClient {
     if (trimmedApiKey.isEmpty) {
       return AiGatewayConnectionCheck(
         state: 'invalid',
-        message: 'Missing AI Gateway API key',
+        message: 'Missing LLM API Token',
         endpoint: endpoint,
         modelCount: 0,
       );
@@ -144,7 +144,7 @@ class WebAiGatewayClient {
   }) async {
     final normalizedBaseUrl = normalizeBaseUrl(baseUrl);
     if (normalizedBaseUrl == null) {
-      throw const WebAiGatewayException(message: 'Missing AI Gateway URL');
+      throw const WebAiGatewayException(message: 'Missing LLM API Endpoint');
     }
     final response = await http.post(
       _chatUri(normalizedBaseUrl),

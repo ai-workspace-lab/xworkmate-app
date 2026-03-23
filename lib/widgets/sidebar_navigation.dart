@@ -501,7 +501,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
       WorkspaceDestination.mcpServer => 'MCP Hub',
       WorkspaceDestination.clawHub => 'ClawHub',
       WorkspaceDestination.secrets => appText('密钥', 'Secrets'),
-      WorkspaceDestination.aiGateway => 'AI Gateway',
+      WorkspaceDestination.aiGateway => 'LLM API',
       WorkspaceDestination.settings => appText('设置', 'Settings'),
       WorkspaceDestination.account => appText('账户', 'Account'),
     };

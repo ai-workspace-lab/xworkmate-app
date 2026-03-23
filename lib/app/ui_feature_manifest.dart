@@ -193,7 +193,7 @@ mobile:
       enabled: true
       release_tier: stable
       build_modes: [debug, profile, release]
-      description: Mobile workspace AI Gateway launcher
+      description: Mobile workspace LLM API launcher
       ui_surface: mobile_workspace_hub
     account:
       enabled: true
@@ -378,7 +378,7 @@ desktop:
       enabled: true
       release_tier: stable
       build_modes: [debug, profile, release]
-      description: Desktop AI Gateway destination
+      description: Desktop LLM API destination
       ui_surface: sidebar_navigation
     settings:
       enabled: true

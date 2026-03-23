@@ -12,7 +12,7 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   test(
-    'AppController exposes selected AI Gateway models to the assistant',
+    'AppController exposes selected LLM API models to the assistant',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -100,7 +100,7 @@ void main() {
   );
 
   test(
-    'AppController does not borrow AI Gateway model choices when an external Single Agent provider is available',
+    'AppController does not borrow LLM API model choices when an external Single Agent provider is available',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(

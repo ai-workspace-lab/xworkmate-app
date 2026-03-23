@@ -361,7 +361,7 @@ class _CodexIntegrationCardState extends State<CodexIntegrationCard> {
 
       if (gatewayUrl.isEmpty) {
         throw Exception(
-          appText('AI Gateway URL 未配置', 'AI Gateway URL not configured'),
+          appText('LLM API Endpoint 未配置', 'LLM API Endpoint not configured'),
         );
       }
 

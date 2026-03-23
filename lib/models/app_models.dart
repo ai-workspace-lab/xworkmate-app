@@ -26,7 +26,7 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
     WorkspaceDestination.mcpServer => 'MCP Hub',
     WorkspaceDestination.clawHub => 'ClawHub',
     WorkspaceDestination.secrets => appText('密钥', 'Secrets'),
-    WorkspaceDestination.aiGateway => 'AI Gateway',
+    WorkspaceDestination.aiGateway => 'LLM API',
     WorkspaceDestination.settings => appText('设置', 'Settings'),
     WorkspaceDestination.account => appText('账号', 'Account'),
   };
@@ -79,8 +79,8 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
       'Secrets and Vault configuration now live in the Settings center.',
     ),
     WorkspaceDestination.aiGateway => appText(
-      'AI Gateway 配置统一收口到设置中心。',
-      'AI Gateway configuration now lives in the Settings center.',
+      'LLM API 配置统一收口到设置中心。',
+      'LLM API configuration now lives in the Settings center.',
     ),
     WorkspaceDestination.settings => appText(
       '全局配置中心，只负责系统设置与诊断，不承担业务模块入口。',
@@ -243,8 +243,8 @@ extension SettingsDetailPageCopy on SettingsDetailPage {
       'Gateway Connection',
     ),
     SettingsDetailPage.aiGatewayIntegration => appText(
-      'AI Gateway 集成参数',
-      'AI Gateway Integration',
+      'LLM API 集成参数',
+      'LLM API Integration',
     ),
     SettingsDetailPage.vaultProvider => appText(
       'Vault 提供方参数',

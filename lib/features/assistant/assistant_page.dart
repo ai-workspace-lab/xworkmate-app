@@ -2356,7 +2356,7 @@ class _AssistantEmptyState extends StatelessWidget {
         ? connected
             ? appText('开始单机智能体任务', 'Start a single-agent task')
             : singleAgentNeedsAiGateway
-            ? appText('先配置 AI Gateway', 'Configure AI Gateway first')
+            ? appText('先配置 LLM API', 'Configure LLM API first')
             : appText('先准备外部 CLI', 'Prepare the external CLI first')
         : connected
         ? appText('开始对话或运行任务', 'Start a chat or run a task')
@@ -2381,8 +2381,8 @@ class _AssistantEmptyState extends StatelessWidget {
               )
             : singleAgentNeedsAiGateway
             ? appText(
-                '请先在 设置 -> 集成 中配置 AI Gateway 地址、API Key 和默认模型，然后以单机智能体模式继续当前任务。',
-                'Set the AI Gateway URL, API key, and default model in Settings -> Integrations, then continue this task in Single Agent mode.',
+                '请先在 设置 -> 集成 中配置 LLM API Endpoint、LLM API Token 和默认模型，然后以单机智能体模式继续当前任务。',
+                'Set the LLM API Endpoint, LLM API Token, and default model in Settings -> Integrations, then continue this task in Single Agent mode.',
               )
             : appText(
                 '当前线程的外部 CLI 尚未就绪。请先安装或配置 $providerLabel，或切换到 Auto。',
@@ -2629,7 +2629,7 @@ class _ComposerBarState extends State<_ComposerBar> {
         ? appText('提交', 'Submit')
         : singleAgent
         ? singleAgentNeedsAiGateway
-              ? appText('配置 AI Gateway', 'Configure AI Gateway')
+              ? appText('配置 LLM API', 'Configure LLM API')
               : appText('查看工具栏', 'Open toolbar')
         : connecting
         ? appText('连接中…', 'Connecting…')

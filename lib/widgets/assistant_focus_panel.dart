@@ -427,8 +427,8 @@ class _SkillsFocusPreview extends StatelessWidget {
             controller.isSingleAgentMode
             ? (controller.currentSingleAgentNeedsAiGatewayConfiguration
                   ? appText(
-                      '当前没有可用外部 CLI，请先配置 AI Gateway fallback。',
-                      'No external CLI is available. Configure AI Gateway fallback first.',
+                      '当前没有可用外部 CLI，请先配置 LLM API fallback。',
+                      'No external CLI is available. Configure LLM API fallback first.',
                     )
                   : appText(
                       '当前线程还没有已加载技能。切换 provider 后会读取该线程自己的 skills 列表。',
@@ -669,8 +669,8 @@ class _AiGatewayFocusPreview extends StatelessWidget {
         if (items.isEmpty)
           _PreviewEmptyState(
             message: appText(
-              '当前没有 AI Gateway 模型摘要。',
-              'No AI Gateway model summary is available yet.',
+              '当前没有 LLM API 模型摘要。',
+              'No LLM API model summary is available yet.',
             ),
           )
         else

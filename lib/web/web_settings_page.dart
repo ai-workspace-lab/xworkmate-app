@@ -420,7 +420,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
             TextField(
               controller: _directBaseUrlController,
               decoration: InputDecoration(
-                labelText: appText('Base URL', 'Base URL'),
+                labelText: appText('LLM API Endpoint', 'LLM API Endpoint'),
                 hintText: 'https://api.example.com/v1',
               ),
             ),
@@ -429,7 +429,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
               controller: _directApiKeyController,
               obscureText: true,
               decoration: InputDecoration(
-                labelText: appText('API Key', 'API Key'),
+                labelText: appText('LLM API Token', 'LLM API Token'),
                 helperText: controller.storedAiGatewayApiKeyMask == null
                     ? null
                     : '${appText('已保存', 'Stored')}: ${controller.storedAiGatewayApiKeyMask}',
@@ -750,8 +750,8 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
             const SizedBox(height: 8),
             Text(
               appText(
-                'Root SPA 目标部署到 https://xworkmate.svc.plus/ 。单机智能体依赖的 AI Gateway endpoint 需要浏览器可达且支持 CORS；否则请使用 Relay 模式。',
-                'The root SPA targets https://xworkmate.svc.plus/ . Single Agent AI Gateway endpoints must be browser-reachable and CORS-compatible; otherwise use relay mode.',
+                'Root SPA 目标部署到 https://xworkmate.svc.plus/ 。单机智能体依赖的 LLM API endpoint 需要浏览器可达且支持 CORS；否则请使用 Relay 模式。',
+                'The root SPA targets https://xworkmate.svc.plus/ . Single Agent LLM API endpoints must be browser-reachable and CORS-compatible; otherwise use relay mode.',
               ),
             ),
           ],

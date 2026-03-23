@@ -316,8 +316,8 @@ class CodexMountAdapter extends CliMountAdapter {
       discoveredMcpCount: discoveredMcpCount,
       managedMcpCount: managedMcpServers.length,
       detail: aiGatewayUrl.isNotEmpty
-          ? 'AI Gateway uses launch-scoped defaults for collaboration runs.'
-          : 'AI Gateway not configured.',
+          ? 'LLM API uses launch-scoped defaults for collaboration runs.'
+          : 'LLM API not configured.',
     );
   }
 }
@@ -367,7 +367,7 @@ class ClaudeMountAdapter extends CliMountAdapter {
           .where((item) => item.enabled)
           .length,
       detail:
-          'MCP discovery uses `claude mcp list`; AI Gateway stays launch-scoped.',
+          'MCP discovery uses `claude mcp list`; LLM API stays launch-scoped.',
     );
   }
 }
@@ -417,7 +417,7 @@ class GeminiMountAdapter extends CliMountAdapter {
           .where((item) => item.enabled)
           .length,
       detail:
-          'MCP discovery uses `gemini mcp list`; AI Gateway stays launch-scoped.',
+          'MCP discovery uses `gemini mcp list`; LLM API stays launch-scoped.',
     );
   }
 }

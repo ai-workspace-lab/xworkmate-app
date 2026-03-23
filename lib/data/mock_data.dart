@@ -188,7 +188,7 @@ class MockData {
 
   static const gatewayModules = [
     ModuleSummary(
-      name: 'AI Gateway',
+      name: 'LLM API',
       description:
           'Healthy · version $kAppVersion · 3 nodes · 12 active sessions',
       status: StatusInfo('Healthy', StatusTone.success),
@@ -576,7 +576,7 @@ class MockData {
     SettingSummary(
       title: 'Gateway default route',
       description: '控制面启动后默认挂载的主路由。',
-      value: 'AI Gateway',
+      value: 'LLM API',
     ),
     SettingSummary(
       title: 'Session retention',
