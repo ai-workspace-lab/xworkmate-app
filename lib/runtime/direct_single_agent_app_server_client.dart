@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'runtime_models.dart';
+
 class DirectSingleAgentCapabilities {
   const DirectSingleAgentCapabilities({
     required this.available,
-    required this.supportsCodex,
+    required this.supportedProviders,
     required this.endpoint,
     this.errorMessage,
   });
@@ -14,12 +16,17 @@ class DirectSingleAgentCapabilities {
     required this.endpoint,
     this.errorMessage,
   }) : available = false,
-       supportsCodex = false;
+       supportedProviders = const <SingleAgentProvider>[];
 
   final bool available;
-  final bool supportsCodex;
+  final List<SingleAgentProvider> supportedProviders;
   final String endpoint;
   final String? errorMessage;
+
+  bool get supportsCodex => supportsProvider(SingleAgentProvider.codex);
+
+  bool supportsProvider(SingleAgentProvider provider) =>
+      supportedProviders.contains(provider);
 }
 
 class DirectSingleAgentRunResult {
@@ -39,6 +46,7 @@ class DirectSingleAgentRunResult {
 class DirectSingleAgentRunRequest {
   const DirectSingleAgentRunRequest({
     required this.sessionId,
+    required this.provider,
     required this.prompt,
     required this.model,
     required this.workingDirectory,
@@ -47,6 +55,7 @@ class DirectSingleAgentRunRequest {
   });
 
   final String sessionId;
+  final SingleAgentProvider provider;
   final String prompt;
   final String model;
   final String workingDirectory;
@@ -57,36 +66,41 @@ class DirectSingleAgentRunRequest {
 class DirectSingleAgentAppServerClient {
   DirectSingleAgentAppServerClient({required this.endpointResolver});
 
-  final Uri? Function() endpointResolver;
+  final Uri? Function(SingleAgentProvider provider) endpointResolver;
 
   final Map<String, _DirectAppServerConnection> _activeConnections =
       <String, _DirectAppServerConnection>{};
   final Map<String, String> _threadIds = <String, String>{};
   final Set<String> _abortedSessions = <String>{};
 
-  DirectSingleAgentCapabilities _cachedCapabilities =
-      const DirectSingleAgentCapabilities.unavailable(endpoint: '');
-  DateTime? _capabilitiesRefreshedAt;
+  final Map<SingleAgentProvider, DirectSingleAgentCapabilities>
+  _cachedCapabilities = <SingleAgentProvider, DirectSingleAgentCapabilities>{};
+  final Map<SingleAgentProvider, DateTime> _capabilitiesRefreshedAt =
+      <SingleAgentProvider, DateTime>{};
 
   Future<DirectSingleAgentCapabilities> loadCapabilities({
+    required SingleAgentProvider provider,
     bool forceRefresh = false,
     String gatewayToken = '',
   }) async {
+    final cached = _cachedCapabilities[provider];
+    final refreshedAt = _capabilitiesRefreshedAt[provider];
     if (!forceRefresh &&
-        _capabilitiesRefreshedAt != null &&
-        DateTime.now().difference(_capabilitiesRefreshedAt!) <
-            const Duration(seconds: 15)) {
-      return _cachedCapabilities;
+        cached != null &&
+        refreshedAt != null &&
+        DateTime.now().difference(refreshedAt) < const Duration(seconds: 15)) {
+      return cached;
     }
 
-    final endpoint = _resolveWebSocketEndpoint();
+    final endpoint = _resolveWebSocketEndpoint(provider);
     if (endpoint == null) {
-      _cachedCapabilities = const DirectSingleAgentCapabilities.unavailable(
+      final unavailable = const DirectSingleAgentCapabilities.unavailable(
         endpoint: '',
         errorMessage: 'Single-agent app-server endpoint is not configured.',
       );
-      _capabilitiesRefreshedAt = DateTime.now();
-      return _cachedCapabilities;
+      _cachedCapabilities[provider] = unavailable;
+      _capabilitiesRefreshedAt[provider] = DateTime.now();
+      return unavailable;
     }
 
     _DirectAppServerConnection? connection;
@@ -96,28 +110,28 @@ class DirectSingleAgentAppServerClient {
         gatewayToken: gatewayToken,
       );
       await connection.initialize();
-      _cachedCapabilities = DirectSingleAgentCapabilities(
+      _cachedCapabilities[provider] = DirectSingleAgentCapabilities(
         available: true,
-        supportsCodex: true,
+        supportedProviders: <SingleAgentProvider>[provider],
         endpoint: endpoint.toString(),
       );
     } catch (error) {
-      _cachedCapabilities = DirectSingleAgentCapabilities.unavailable(
+      _cachedCapabilities[provider] = DirectSingleAgentCapabilities.unavailable(
         endpoint: endpoint.toString(),
         errorMessage: error.toString(),
       );
     } finally {
-      _capabilitiesRefreshedAt = DateTime.now();
+      _capabilitiesRefreshedAt[provider] = DateTime.now();
       await connection?.close();
     }
 
-    return _cachedCapabilities;
+    return _cachedCapabilities[provider]!;
   }
 
   Future<DirectSingleAgentRunResult> run(
     DirectSingleAgentRunRequest request,
   ) async {
-    final endpoint = _resolveWebSocketEndpoint();
+    final endpoint = _resolveWebSocketEndpoint(request.provider);
     if (endpoint == null) {
       return const DirectSingleAgentRunResult(
         success: false,
@@ -334,8 +348,8 @@ class DirectSingleAgentAppServerClient {
     return threadId;
   }
 
-  Uri? _resolveWebSocketEndpoint() {
-    final base = endpointResolver();
+  Uri? _resolveWebSocketEndpoint(SingleAgentProvider provider) {
+    final base = endpointResolver(provider);
     if (base == null) {
       return null;
     }
@@ -378,15 +392,16 @@ class _DirectAppServerConnection {
     if (normalizedToken.isNotEmpty) {
       headers[HttpHeaders.authorizationHeader] = 'Bearer $normalizedToken';
     }
-    final socket = await WebSocket.connect(
-      endpoint.toString(),
-      headers: headers.isEmpty ? null : headers,
-    ).timeout(
-      const Duration(seconds: 8),
-      onTimeout: () => throw TimeoutException(
-        'Single-agent app-server websocket connect timed out.',
-      ),
-    );
+    final socket =
+        await WebSocket.connect(
+          endpoint.toString(),
+          headers: headers.isEmpty ? null : headers,
+        ).timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => throw TimeoutException(
+            'Single-agent app-server websocket connect timed out.',
+          ),
+        );
     final connection = _DirectAppServerConnection(socket);
     connection._attach();
     return connection;
@@ -399,10 +414,7 @@ class _DirectAppServerConnection {
     await request(
       'initialize',
       params: const <String, dynamic>{
-        'clientInfo': <String, dynamic>{
-          'name': 'xworkmate',
-          'version': '0',
-        },
+        'clientInfo': <String, dynamic>{'name': 'xworkmate', 'version': '0'},
         'capabilities': <String, dynamic>{
           'optOutNotificationMethods': <String>[],
         },
@@ -432,7 +444,9 @@ class _DirectAppServerConnection {
       timeout,
       onTimeout: () {
         _pendingRequests.remove(id);
-        throw TimeoutException('Single-agent app-server request $method timed out.');
+        throw TimeoutException(
+          'Single-agent app-server request $method timed out.',
+        );
       },
     );
   }
