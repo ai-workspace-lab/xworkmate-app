@@ -71,6 +71,7 @@ class _AssistantPageState extends State<AssistantPage> {
   String? _lastSubmittedPrompt;
   String? _lastSubmittedSessionKey;
   String? _lastAutoAgentLabel;
+  String _lastConversationScrollSignature = '';
   List<String> _lastSubmittedAttachments = const <String>[];
   double _composerInputHeight = _assistantComposerDefaultInputHeight;
   double _workspaceLowerPaneHeightAdjustment = 0;
@@ -117,17 +118,23 @@ class _AssistantPageState extends State<AssistantPage> {
           tasks,
           controller.currentSessionKey,
         );
+        final scrollSignature = messages.isEmpty
+            ? controller.currentSessionKey
+            : '${controller.currentSessionKey}:${messages.length}:${messages.last.id}:${messages.last.pending}:${messages.last.error}';
 
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || !_conversationController.hasClients) {
-            return;
-          }
-          _conversationController.animateTo(
-            _conversationController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-          );
-        });
+        if (scrollSignature != _lastConversationScrollSignature) {
+          _lastConversationScrollSignature = scrollSignature;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || !_conversationController.hasClients) {
+              return;
+            }
+            _conversationController.animateTo(
+              _conversationController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+            );
+          });
+        }
 
         return DesktopWorkspaceScaffold(
           padding: EdgeInsets.zero,
@@ -687,6 +694,7 @@ class _AssistantPageState extends State<AssistantPage> {
       attachmentNames: attachmentNames,
       selectedSkillLabels: selectedSkillLabels,
       executionTarget: executionTarget,
+      singleAgentProvider: controller.currentSingleAgentProvider,
       permissionLevel: settings.assistantPermissionLevel,
       workspacePath: settings.workspacePath,
       remoteProjectRoot: settings.remoteProjectRoot,
@@ -740,6 +748,16 @@ class _AssistantPageState extends State<AssistantPage> {
         prompt,
         thinking: _thinkingLabel,
         attachments: attachmentPayloads,
+        localAttachments: _attachments
+            .map(
+              (item) => CollaborationAttachment(
+                name: item.name,
+                description: item.mimeType,
+                path: item.path,
+              ),
+            )
+            .toList(growable: false),
+        selectedSkillLabels: selectedSkillLabels,
       );
     }
 
@@ -883,6 +901,7 @@ class _AssistantPageState extends State<AssistantPage> {
     required List<String> attachmentNames,
     required List<String> selectedSkillLabels,
     required AssistantExecutionTarget executionTarget,
+    required SingleAgentProvider singleAgentProvider,
     required AssistantPermissionLevel permissionLevel,
     required String workspacePath,
     required String remoteProjectRoot,
@@ -899,6 +918,7 @@ class _AssistantPageState extends State<AssistantPage> {
     final executionContext =
         'Execution context:\n'
         '- target: ${executionTarget.promptValue}\n'
+        '${executionTarget == AssistantExecutionTarget.singleAgent ? '- provider: ${singleAgentProvider.providerId}\n' : ''}'
         '- workspace_root: ${targetRoot.isEmpty ? 'not-set' : targetRoot}\n'
         '- permission: ${permissionLevel.promptValue}\n\n';
 
@@ -971,6 +991,7 @@ class _AssistantPageState extends State<AssistantPage> {
       title: appText('新对话', 'New conversation'),
       executionTarget: inheritedTarget,
       messageViewMode: inheritedViewMode,
+      singleAgentProvider: widget.controller.currentSingleAgentProvider,
     );
     await widget.controller.switchSession(sessionKey);
     _focusComposer();
@@ -1870,15 +1891,6 @@ class _ConversationArea extends StatelessWidget {
                             detail: item.detail!,
                             owner: item.owner!,
                             sessionKey: item.sessionKey!,
-                            isCurrentSession:
-                                item.sessionKey == controller.currentSessionKey,
-                            onContinueConversation: () {
-                              controller.switchSession(item.sessionKey!);
-                              onFocusComposer();
-                            },
-                            onOpenTasks: () {
-                              controller.navigateTo(WorkspaceDestination.tasks);
-                            },
                           ),
                         };
                       },
@@ -2658,6 +2670,42 @@ class _ComposerBarState extends State<_ComposerBar> {
                 ),
               ),
               const SizedBox(width: 4),
+              if (singleAgent) ...[
+                PopupMenuButton<SingleAgentProvider>(
+                  key: const Key('assistant-single-agent-provider-button'),
+                  tooltip: appText('单机智能体执行器', 'Single Agent Provider'),
+                  onSelected: (value) {
+                    unawaited(controller.setSingleAgentProvider(value));
+                  },
+                  itemBuilder: (context) => controller
+                      .singleAgentProviderOptions
+                      .map(
+                        (value) => PopupMenuItem<SingleAgentProvider>(
+                          value: value,
+                          child: Row(
+                            children: [
+                              Expanded(child: Text(value.label)),
+                              if (value ==
+                                  controller.currentSingleAgentProvider)
+                                const Icon(Icons.check_rounded, size: 18),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  child: _ComposerToolbarChip(
+                    icon: Icons.smart_toy_outlined,
+                    label: controller.currentSingleAgentProvider.label,
+                    showChevron: true,
+                    maxLabelWidth: 92,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
               if (uiFeatures.supportsMultiAgent) ...[
                 Tooltip(
                   message: appText(
@@ -2763,8 +2811,8 @@ class _ComposerBarState extends State<_ComposerBar> {
                   ),
                 ),
                 hintText: appText(
-                  '输入需求、补充上下文、继续追问，XWorkmate 会沿用当前任务上下文持续处理。',
-                  'Describe the task, add context, or continue the thread. XWorkmate keeps the current task context.',
+                  '输入需求、补充上下文，XWorkmate 会沿用当前任务上下文持续处理。',
+                  'Describe the task or add context. XWorkmate keeps the current task context.',
                 ),
               ),
               onSubmitted: (_) => widget.onSend(),
@@ -3574,9 +3622,6 @@ class _TaskStatusCard extends StatelessWidget {
     required this.detail,
     required this.owner,
     required this.sessionKey,
-    required this.isCurrentSession,
-    required this.onContinueConversation,
-    required this.onOpenTasks,
   });
 
   final String title;
@@ -3585,9 +3630,6 @@ class _TaskStatusCard extends StatelessWidget {
   final String detail;
   final String owner;
   final String sessionKey;
-  final bool isCurrentSession;
-  final VoidCallback onContinueConversation;
-  final VoidCallback onOpenTasks;
 
   @override
   Widget build(BuildContext context) {
@@ -3605,7 +3647,7 @@ class _TaskStatusCard extends StatelessWidget {
       'queued' => appText('排队等待执行', 'Waiting in queue'),
       'running' => appText('正在执行中', 'Working now'),
       'failed' => appText('需要处理', 'Needs attention'),
-      _ => appText('可继续在当前会话处理', 'Continue in session'),
+      _ => appText('已进入当前会话', 'Active in this session'),
     };
 
     return Align(
@@ -3693,34 +3735,11 @@ class _TaskStatusCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Text(
-                      hint,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: palette.textMuted,
-                      ),
-                    ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: onContinueConversation,
-                      icon: Icon(
-                        isCurrentSession
-                            ? Icons.edit_outlined
-                            : Icons.forum_outlined,
-                        size: 16,
-                      ),
-                      label: Text(
-                        isCurrentSession
-                            ? appText('继续', 'Continue')
-                            : appText('打开会话', 'Open Session'),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: onOpenTasks,
-                      child: Text(appText('打开任务', 'Open Tasks')),
-                    ),
-                  ],
+                Text(
+                  hint,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: palette.textMuted,
+                  ),
                 ),
               ],
             ),

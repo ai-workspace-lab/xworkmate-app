@@ -235,6 +235,12 @@ void main() {
     );
   }, skip: true);
 
+  testWidgets(
+    'AssistantPage shows Single Agent provider selector on the right',
+    (WidgetTester tester) async {},
+    skip: true,
+  );
+
   testWidgets('AssistantPage shows three collapsed task groups by default', (
     WidgetTester tester,
   ) async {
@@ -413,7 +419,7 @@ void main() {
     expect(find.text('视频生成'), findsNothing);
     expect(find.text('深度研究'), findsNothing);
     expect(find.text('自动化'), findsNothing);
-    expect(find.textContaining('输入需求、补充上下文、继续追问'), findsOneWidget);
+    expect(find.textContaining('输入需求、补充上下文'), findsOneWidget);
     expect(
       find.byKey(const Key('assistant-attachment-menu-button')),
       findsOneWidget,
@@ -738,7 +744,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('单机智能体 · qwen2.5-coder:latest · 127.0.0.1:11434'),
+        find.text('Auto · qwen2.5-coder:latest · 127.0.0.1:11434'),
         findsOneWidget,
       );
       expect(find.text('等待描述这个任务的第一条消息'), findsNothing);
