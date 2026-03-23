@@ -14,6 +14,7 @@ import 'package:xworkmate/runtime/gateway_runtime.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
+import 'package:xworkmate/runtime/single_agent_runner.dart';
 
 void main() {
   test(
@@ -45,6 +46,7 @@ void main() {
           gateway: gateway,
           codex: _FakeCodexRuntime(),
         ),
+        singleAgentRunner: _FallbackOnlySingleAgentRunner(),
       );
       addTearDown(controller.dispose);
 
@@ -105,6 +107,7 @@ void main() {
           gateway: secondGateway,
           codex: _FakeCodexRuntime(),
         ),
+        singleAgentRunner: _FallbackOnlySingleAgentRunner(),
       );
       addTearDown(secondController.dispose);
 
@@ -155,7 +158,7 @@ void main() {
       expect(secondController.assistantConnectionStatusLabel, '单机智能体');
       expect(
         secondController.assistantConnectionTargetLabel,
-        'qwen2.5-coder:latest · 127.0.0.1:${server.port}',
+        'Auto · qwen2.5-coder:latest · 127.0.0.1:${server.port}',
       );
       expect(secondController.chatMessages.last.text, 'SECOND_REPLY');
       expect(gateway.connectedProfiles, isEmpty);
@@ -191,6 +194,7 @@ void main() {
           gateway: _FakeGatewayRuntime(store: store),
           codex: _FakeCodexRuntime(),
         ),
+        singleAgentRunner: _FallbackOnlySingleAgentRunner(),
       );
       addTearDown(controller.dispose);
 
@@ -253,6 +257,7 @@ void main() {
           gateway: _FakeGatewayRuntime(store: store),
           codex: _FakeCodexRuntime(),
         ),
+        singleAgentRunner: _FallbackOnlySingleAgentRunner(),
       );
       addTearDown(controller.dispose);
 
@@ -292,6 +297,145 @@ void main() {
       expect(
         controller.chatMessages.where((message) => message.error),
         isEmpty,
+      );
+    },
+  );
+
+  test(
+    'AppController uses the selected Single Agent provider before AI Chat fallback',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-single-agent-provider-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final runner = _FakeSingleAgentRunner(
+        resolvedProvider: SingleAgentProvider.codex,
+        result: const SingleAgentRunResult(
+          provider: SingleAgentProvider.codex,
+          output: 'CODEX_REPLY',
+          success: true,
+          errorMessage: '',
+          shouldFallbackToAiChat: false,
+        ),
+      );
+      final controller = AppController(
+        store: store,
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: _FakeGatewayRuntime(store: store),
+          codex: _FakeCodexRuntime(),
+        ),
+        singleAgentRunner: runner,
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+
+      await controller.sendChatMessage('请输出 CODEX_REPLY', thinking: 'low');
+
+      expect(runner.resolveCalls, 1);
+      expect(runner.runCalls, 1);
+      expect(runner.lastRequest?.provider, SingleAgentProvider.codex);
+      expect(
+        controller.chatMessages.any(
+          (message) => message.role == 'assistant' && message.text == 'CODEX_REPLY',
+        ),
+        isTrue,
+      );
+      expect(
+        controller.chatMessages.any((message) => message.toolName == 'Codex'),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'AppController falls back to AI Chat when the selected Single Agent provider is unavailable',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-single-agent-fallback-',
+      );
+      final server = await _FakeAiGatewayServer.start(
+        responseMode: _AiGatewayResponseMode.json,
+      );
+      addTearDown(() async {
+        await server.close();
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final runner = _FakeSingleAgentRunner(
+        resolvedProvider: null,
+        fallbackReason: 'Codex CLI is unavailable on this device.',
+      );
+      final controller = AppController(
+        store: store,
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: _FakeGatewayRuntime(store: store),
+          codex: _FakeCodexRuntime(),
+        ),
+        singleAgentRunner: runner,
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      await controller.settingsController.saveAiGatewayApiKey('live-key');
+      await controller.saveSettings(
+        controller.settings.copyWith(
+          aiGateway: controller.settings.aiGateway.copyWith(
+            baseUrl: server.baseUrl,
+            availableModels: const <String>['moonshotai/kimi-k2.5'],
+            selectedModels: const <String>['moonshotai/kimi-k2.5'],
+          ),
+          defaultModel: 'moonshotai/kimi-k2.5',
+        ),
+        refreshAfterSave: false,
+      );
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+
+      await controller.sendChatMessage('你好', thinking: 'low');
+
+      expect(runner.resolveCalls, 1);
+      expect(runner.runCalls, 0);
+      expect(server.requestCount, 1);
+      expect(
+        controller.chatMessages.any(
+          (message) =>
+              message.toolName == 'AI Chat fallback' &&
+              message.text.contains('Codex CLI is unavailable'),
+        ),
+        isTrue,
+      );
+      expect(
+        controller.chatMessages.any(
+          (message) =>
+              message.role == 'assistant' && message.text == 'FIRST_REPLY',
+        ),
+        isTrue,
       );
     },
   );
@@ -383,6 +527,57 @@ class _FakeCodexRuntime extends CodexRuntime {
 
   @override
   Future<void> stop() async {}
+}
+
+class _FakeSingleAgentRunner implements SingleAgentRunner {
+  _FakeSingleAgentRunner({
+    required this.resolvedProvider,
+    this.result,
+    this.fallbackReason,
+  });
+
+  final SingleAgentProvider? resolvedProvider;
+  final SingleAgentRunResult? result;
+  final String? fallbackReason;
+
+  int resolveCalls = 0;
+  int runCalls = 0;
+  SingleAgentRunRequest? lastRequest;
+
+  @override
+  Future<SingleAgentProviderResolution> resolveProvider({
+    required SingleAgentProvider selection,
+    required String configuredCodexCliPath,
+  }) async {
+    resolveCalls += 1;
+    return SingleAgentProviderResolution(
+      selection: selection,
+      resolvedProvider: resolvedProvider,
+      fallbackReason: fallbackReason,
+    );
+  }
+
+  @override
+  Future<SingleAgentRunResult> run(SingleAgentRunRequest request) async {
+    runCalls += 1;
+    lastRequest = request;
+    return result ??
+        SingleAgentRunResult(
+          provider: request.provider,
+          output: '',
+          success: false,
+          errorMessage: 'no result configured',
+          shouldFallbackToAiChat: false,
+        );
+  }
+}
+
+class _FallbackOnlySingleAgentRunner extends _FakeSingleAgentRunner {
+  _FallbackOnlySingleAgentRunner()
+    : super(
+        resolvedProvider: null,
+        fallbackReason: 'No supported external CLI provider is available.',
+      );
 }
 
 class _FakeAiGatewayServer {

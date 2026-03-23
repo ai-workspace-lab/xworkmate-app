@@ -922,8 +922,6 @@ class _SettingsPageState extends State<SettingsPage> {
         }),
         child: _buildAiGatewayCard(context, controller, settings),
       ),
-      const SizedBox(height: 16),
-      _buildDeviceSecurityCard(context, controller),
     ];
   }
 
@@ -1213,6 +1211,8 @@ class _SettingsPageState extends State<SettingsPage> {
           onSave: () => _saveGatewayAndPersist(controller, settings),
           onApply: () => _saveGatewayAndApply(controller, settings),
         ),
+        const SizedBox(height: 16),
+        _buildDeviceSecurityCard(context, controller),
         if (_gatewayTestMessage.isNotEmpty) ...[
           const SizedBox(height: 12),
           _buildNotice(

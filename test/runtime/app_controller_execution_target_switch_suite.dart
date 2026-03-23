@@ -285,7 +285,7 @@ void main() {
       expect(controller.assistantConnectionStatusLabel, '单机智能体');
       expect(
         controller.assistantConnectionTargetLabel,
-        'qwen2.5-coder:latest · 127.0.0.1:11434',
+        'Auto · qwen2.5-coder:latest · 127.0.0.1:11434',
       );
       expect(
         gateway.connectedProfiles,
@@ -805,7 +805,7 @@ void main() {
       expect(controller.assistantConnectionStatusLabel, '单机智能体');
       expect(
         controller.assistantConnectionTargetLabel,
-        'qwen2.5-coder:latest · 127.0.0.1:11434',
+        'Auto · qwen2.5-coder:latest · 127.0.0.1:11434',
       );
     },
   );
