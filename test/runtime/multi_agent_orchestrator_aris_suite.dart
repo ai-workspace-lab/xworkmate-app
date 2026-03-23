@@ -13,11 +13,11 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   test(
-    'MultiAgentOrchestrator falls back to local Ollama + ARIS Go chat bridge',
+    'MultiAgentOrchestrator falls back to local Ollama + ARIS Go core chat runtime',
     () async {
       final fakeOllama = await _FakeOllamaServer.start();
       addTearDown(fakeOllama.close);
-      final bridgeClient = _FakeArisBridgeClient();
+      final bridgeClient = _FakeGoCoreClient();
       final orchestrator = MultiAgentOrchestrator(
         config: MultiAgentConfig.defaults().copyWith(
           enabled: true,
@@ -68,11 +68,11 @@ void main() {
   );
 
   test(
-    'MultiAgentOrchestrator routes tester claude reviews through the same Go bridge',
+    'MultiAgentOrchestrator routes tester claude reviews through the same Go core runtime',
     () async {
       final fakeOllama = await _FakeOllamaServer.start();
       addTearDown(fakeOllama.close);
-      final bridgeClient = _FakeArisBridgeClient();
+      final bridgeClient = _FakeGoCoreClient();
       final orchestrator = MultiAgentOrchestrator(
         config: MultiAgentConfig.defaults().copyWith(
           enabled: true,
@@ -117,8 +117,8 @@ void main() {
   );
 }
 
-class _FakeArisBridgeClient extends ArisLlmChatClient {
-  _FakeArisBridgeClient();
+class _FakeGoCoreClient extends ArisLlmChatClient {
+  _FakeGoCoreClient();
 
   int chatCallCount = 0;
   int claudeReviewCallCount = 0;

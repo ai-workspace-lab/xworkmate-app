@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../app/app_store_policy.dart';
-import 'aris_bridge.dart';
+import 'go_core.dart';
 
 typedef ArisProcessStarter =
     Future<Process> Function(
@@ -16,7 +16,7 @@ typedef ArisProcessStarter =
 class ArisLlmChatClient {
   ArisLlmChatClient({
     ArisProcessStarter? processStarter,
-    ArisBridgeLocator? bridgeLocator,
+    GoCoreLocator? bridgeLocator,
     Duration rpcTimeout = const Duration(minutes: 2),
   }) : _processStarter =
            processStarter ??
@@ -28,11 +28,11 @@ class ArisLlmChatClient {
                workingDirectory: workingDirectory,
              );
            }),
-       _bridgeLocator = bridgeLocator ?? ArisBridgeLocator(),
+       _bridgeLocator = bridgeLocator ?? GoCoreLocator(),
        _rpcTimeout = rpcTimeout;
 
   final ArisProcessStarter _processStarter;
-  final ArisBridgeLocator _bridgeLocator;
+  final GoCoreLocator _bridgeLocator;
   final Duration _rpcTimeout;
 
   Future<String> chat({
@@ -92,12 +92,12 @@ class ArisLlmChatClient {
       isAppleHost: Platform.isIOS || Platform.isMacOS,
     )) {
       throw UnsupportedError(
-        'App Store builds do not allow launching the bundled ARIS bridge process.',
+        'App Store builds do not allow launching the bundled Go core process.',
       );
     }
     final launch = await _bridgeLocator.locate();
     if (launch == null) {
-      throw StateError('ARIS Go bridge is unavailable.');
+      throw StateError('Go core is unavailable.');
     }
 
     final process = await _processStarter(
@@ -126,7 +126,7 @@ class ArisLlmChatClient {
           } catch (error) {
             if (!responseCompleter.isCompleted) {
               responseCompleter.completeError(
-                StateError('ARIS bridge returned invalid JSON: $error'),
+                StateError('Go core returned invalid JSON: $error'),
               );
             }
             return;
@@ -149,7 +149,7 @@ class ArisLlmChatClient {
               !responseCompleter.isCompleted) {
             final error = (message['error'] as Map).cast<String, dynamic>();
             responseCompleter.completeError(
-              StateError(error['message']?.toString() ?? 'ARIS bridge error'),
+              StateError(error['message']?.toString() ?? 'Go core error'),
             );
           }
         });
@@ -168,7 +168,7 @@ class ArisLlmChatClient {
             StateError(
               stderrText.isNotEmpty
                   ? stderrText
-                  : 'ARIS bridge exited with code $exitCode',
+                  : 'Go core exited with code $exitCode',
             ),
           );
           return;
@@ -177,7 +177,7 @@ class ArisLlmChatClient {
           StateError(
             stderrText.isNotEmpty
                 ? stderrText
-                : 'ARIS bridge closed without returning a tool result.',
+                : 'Go core closed without returning a tool result.',
           ),
         );
       });
@@ -209,7 +209,7 @@ class ArisLlmChatClient {
       return await responseCompleter.future.timeout(
         _rpcTimeout,
         onTimeout: () => throw TimeoutException(
-          'ARIS bridge timed out after ${_rpcTimeout.inSeconds}s',
+          'Go core timed out after ${_rpcTimeout.inSeconds}s',
           _rpcTimeout,
         ),
       );
