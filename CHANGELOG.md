@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.7.0 — 2026-03-24
+
+### Highlights
+- 设置页新增 `ACP 外部接入`，支持为 `Codex / OpenCode / Claude / Gemini` 分别配置独立的外部 ACP endpoint。
+- Single Agent 外部 ACP 模式不再错误复用本地 LLM API 模型；当前线程会改为显示 ACP 真实返回的运行时模型。
+- Codex ACP 直连链路补齐当前协议：`thread/start`/`turn/start` 与新的 `input` item 序列兼容，真实 WebSocket 任务执行已跑通。
+- 本地持久化与 macOS 打包链路延续稳定化，`settings.yaml` / `tasks/*.json` / `secrets/*.secret` 的文件存储布局保持不变。
+
+### Current Delivery Scope
+- 已交付：外部 ACP endpoint 配置 UI、Codex ACP provider 选择、运行时模型归属修正。
+- 已交付：Codex app-server thread/turn 协议适配与 websocket 真实链路验证。
+- 已交付：macOS DMG 打包、覆盖安装到 `/Applications/XWorkmate.app` 的发布路径。
+
+### Known Issues
+- `flutter test` 全量仍有既有失败：`assistant_page_test` 2 个 pending timer、`modules_page_test` 1 个重复文案断言。
+- macOS device-run 仍可能出现 `Failed to foreground app; open returned 1`，需要串行执行并结合人工检查。
+
+### Dev
+- `pubspec.yaml`: 当前版本更新为 `0.7.0+1`
+- 发版分支：`release/v0.7`
+- 预期 tag：`v0.7.0`
+
 ## 0.6.1 — 2026-03-22
 
 ### Highlights
