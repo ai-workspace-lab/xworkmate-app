@@ -240,6 +240,14 @@ void main() {
     expect(find.text('Claude'), findsOneWidget);
     expect(find.text('Gemini'), findsOneWidget);
     expect(find.textContaining('ws://127.0.0.1:9001'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('settings-global-save-button')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('settings-global-apply-button')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('SettingsPage gateway sections can collapse individually', (
