@@ -22,8 +22,7 @@ class SecureConfigStore {
     final resolvedDefaultSupportDirectoryPathResolver =
         defaultSupportDirectoryPathResolver ??
         _resolveDefaultSupportDirectoryPath;
-    final resolvedAllowInMemoryFallback =
-        allowInMemoryFallback ?? _isFlutterTestEnvironment();
+    final resolvedAllowInMemoryFallback = allowInMemoryFallback ?? false;
     _secretStore = SecretStore(
       fallbackDirectoryPathResolver: fallbackDirectoryPathResolver,
       databasePathResolver: databasePathResolver,
@@ -162,9 +161,6 @@ class SecureConfigStore {
     return SecretStore.maskValue(value);
   }
 }
-
-bool _isFlutterTestEnvironment() =>
-    Platform.environment.containsKey('FLUTTER_TEST');
 
 const String _defaultBundleIdentifier = 'plus.svc.xworkmate';
 

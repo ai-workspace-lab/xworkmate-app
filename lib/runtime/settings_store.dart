@@ -13,6 +13,16 @@ import 'runtime_models.dart';
 typedef SecureConfigDatabaseOpener =
     FutureOr<sqlite.Database?> Function(String resolvedPath);
 
+class _DatabasePathCandidate {
+  const _DatabasePathCandidate({
+    required this.path,
+    required this.createParentDirectory,
+  });
+
+  final String path;
+  final bool createParentDirectory;
+}
+
 class SettingsStore {
   SettingsStore({
     Future<String?> Function()? fallbackDirectoryPathResolver,
@@ -170,10 +180,10 @@ class SettingsStore {
 
   Future<void> _initializeDatabase() async {
     final candidates = await _resolveDatabasePathCandidates();
-    for (final resolvedPath in candidates) {
+    for (final candidate in candidates) {
       try {
-        _database = await _openDatabase(resolvedPath);
-        _resolvedDatabasePath = resolvedPath;
+        _database = await _openDatabase(candidate);
+        _resolvedDatabasePath = candidate.path;
         _usingInMemoryDatabase = false;
         break;
       } catch (_) {
@@ -192,14 +202,20 @@ class SettingsStore {
       }
     }
     if (_database == null) {
+      final candidatePaths = candidates
+          .map((candidate) => candidate.path)
+          .toList(growable: false);
       throw StateError(
-        'Durable settings storage unavailable: cannot resolve or open $databaseFileName. Candidates: ${candidates.join(', ')}',
+        'Durable settings storage unavailable: cannot resolve or open $databaseFileName. Candidates: ${candidatePaths.join(', ')}',
       );
     }
     await _migrateLegacyPrefs();
   }
 
-  Future<sqlite.Database?> _openDatabase(String resolvedPath) async {
+  Future<sqlite.Database?> _openDatabase(
+    _DatabasePathCandidate candidate,
+  ) async {
+    final resolvedPath = candidate.path;
     if (_databaseOpener != null) {
       final database = await _databaseOpener(resolvedPath);
       if (database != null) {
@@ -208,7 +224,15 @@ class SettingsStore {
       return database;
     }
     final file = File(resolvedPath);
-    await file.parent.create(recursive: true);
+    if (!await file.parent.exists()) {
+      if (candidate.createParentDirectory) {
+        await file.parent.create(recursive: true);
+      } else {
+        throw StateError(
+          'Durable settings database directory does not exist: ${file.parent.path}',
+        );
+      }
+    }
     final database = sqlite.sqlite3.open(file.path);
     _configureDatabase(database);
     return database;
@@ -580,33 +604,54 @@ class SettingsStore {
     }
   }
 
-  Future<List<String>> _resolveDatabasePathCandidates() async {
-    final candidates = <String>{};
+  Future<List<_DatabasePathCandidate>> _resolveDatabasePathCandidates() async {
+    final candidates = <_DatabasePathCandidate>[];
+    final seen = <String>{};
 
-    void addPath(String? path) {
+    void addPath(String? path, {required bool createParentDirectory}) {
       final trimmed = path?.trim() ?? '';
-      if (trimmed.isNotEmpty) {
-        candidates.add(trimmed);
+      if (trimmed.isNotEmpty && seen.add(trimmed)) {
+        candidates.add(
+          _DatabasePathCandidate(
+            path: trimmed,
+            createParentDirectory: createParentDirectory,
+          ),
+        );
+      }
+    }
+
+    if (_databasePathResolver != null) {
+      try {
+        final resolvedPath = await _databasePathResolver();
+        final trimmedPath = resolvedPath?.trim() ?? '';
+        if (trimmedPath.isNotEmpty) {
+          addPath(trimmedPath, createParentDirectory: false);
+          return candidates;
+        }
+      } catch (_) {
+        // Fall through to default locations.
       }
     }
 
     try {
-      final resolvedPath = await _databasePathResolver?.call();
-      addPath(resolvedPath);
-    } catch (_) {
-      // Fall through to the default locations.
-    }
-
-    try {
       final supportDirectory = await getApplicationSupportDirectory();
-      addPath('${supportDirectory.path}/xworkmate/$databaseFileName');
+      addPath(
+        '${supportDirectory.path}/xworkmate/$databaseFileName',
+        createParentDirectory: true,
+      );
     } catch (_) {
       // Continue below to deterministic fallbacks.
     }
 
     try {
       final fallbackRoot = await _fallbackDirectoryPathResolver?.call();
-      addPath('${fallbackRoot?.trim()}/$databaseFileName');
+      final trimmedFallbackRoot = fallbackRoot?.trim() ?? '';
+      if (trimmedFallbackRoot.isNotEmpty) {
+        addPath(
+          '$trimmedFallbackRoot/$databaseFileName',
+          createParentDirectory: true,
+        );
+      }
     } catch (_) {
       // Continue to default support directory fallback.
     }
@@ -614,12 +659,18 @@ class SettingsStore {
     try {
       final defaultSupportRoot = await _defaultSupportDirectoryPathResolver
           ?.call();
-      addPath('${defaultSupportRoot?.trim()}/$databaseFileName');
+      final trimmedDefaultSupportRoot = defaultSupportRoot?.trim() ?? '';
+      if (trimmedDefaultSupportRoot.isNotEmpty) {
+        addPath(
+          '$trimmedDefaultSupportRoot/$databaseFileName',
+          createParentDirectory: true,
+        );
+      }
     } catch (_) {
       // Ignore and fall through.
     }
 
-    return candidates.toList(growable: false);
+    return candidates;
   }
 
   Future<String?> _resolveDatabasePath() async {
@@ -631,7 +682,7 @@ class SettingsStore {
     if (candidates.isEmpty) {
       return null;
     }
-    return candidates.first;
+    return candidates.first.path;
   }
 
   Future<String?> _readStoredString(String key) async {
@@ -797,7 +848,7 @@ class SettingsStore {
           );
           final durableFile = await _durableStateFileForPath(
             entry.key,
-            candidate,
+            candidate.path,
           );
           if (durableFile != null) {
             await durableFile.writeAsString(entry.value, flush: true);
@@ -805,7 +856,7 @@ class SettingsStore {
         }
         final previousDatabase = _database;
         _database = durableDatabase;
-        _resolvedDatabasePath = candidate;
+        _resolvedDatabasePath = candidate.path;
         _usingInMemoryDatabase = false;
         if (previousDatabase != null &&
             !identical(previousDatabase, _database)) {

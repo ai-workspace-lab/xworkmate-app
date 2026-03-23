@@ -149,7 +149,7 @@ void main() {
   );
 
   test(
-    'SecureConfigStore throws when durable settings path cannot be opened and in-memory fallback is disabled',
+    'SecureConfigStore defaults to fail-fast when durable settings path cannot be opened',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -161,7 +161,6 @@ void main() {
         }
       });
       final store = SecureConfigStore(
-        allowInMemoryFallback: false,
         databasePathResolver: () async =>
             '${tempDirectory.path}/settings.sqlite3',
         databaseOpener: (_) => throw StateError('sqlite open failed'),
@@ -174,6 +173,80 @@ void main() {
             (error) => error.message,
             'message',
             contains('Durable settings storage unavailable'),
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'SecureConfigStore throws when explicit settings directory does not exist',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-missing-settings-path-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final existingSecretsDirectory = Directory(
+        '${tempDirectory.path}/secrets',
+      );
+      await existingSecretsDirectory.create(recursive: true);
+
+      final store = SecureConfigStore(
+        databasePathResolver: () async =>
+            '${tempDirectory.path}/settings/${SettingsStore.databaseFileName}',
+        fallbackDirectoryPathResolver: () async =>
+            existingSecretsDirectory.path,
+      );
+
+      await expectLater(
+        store.loadSettingsSnapshot(),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('Durable settings storage unavailable'),
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'SecureConfigStore throws when explicit secrets directory does not exist',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-missing-secrets-path-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final existingSettingsDirectory = Directory(
+        '${tempDirectory.path}/settings',
+      );
+      await existingSettingsDirectory.create(recursive: true);
+
+      final store = SecureConfigStore(
+        databasePathResolver: () async =>
+            '${existingSettingsDirectory.path}/${SettingsStore.databaseFileName}',
+        fallbackDirectoryPathResolver: () async =>
+            '${tempDirectory.path}/secrets',
+      );
+
+      await expectLater(
+        store.saveGatewayToken('token-secret'),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('Durable secret storage path does not exist'),
           ),
         ),
       );
@@ -327,6 +400,7 @@ void main() {
       ];
 
       final firstStore = SecureConfigStore(
+        allowInMemoryFallback: true,
         databasePathResolver: () async => databasePath,
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
         databaseOpener: (_) => throw StateError('sqlite unavailable'),
@@ -342,6 +416,7 @@ void main() {
       expect(await threadsFile.readAsString(), contains('plain local message'));
 
       final secondStore = SecureConfigStore(
+        allowInMemoryFallback: true,
         databasePathResolver: () async => databasePath,
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
         databaseOpener: (_) => throw StateError('sqlite unavailable'),
@@ -803,14 +878,20 @@ void main() {
     },
   );
 
-  test('SettingsSnapshot keeps compatibility with legacy target json values', () {
-    final decoded = SettingsSnapshot.fromJson(<String, dynamic>{
-      ...SettingsSnapshot.defaults().toJson(),
-      'assistantExecutionTarget': 'aiGatewayOnly',
-    });
+  test(
+    'SettingsSnapshot keeps compatibility with legacy target json values',
+    () {
+      final decoded = SettingsSnapshot.fromJson(<String, dynamic>{
+        ...SettingsSnapshot.defaults().toJson(),
+        'assistantExecutionTarget': 'aiGatewayOnly',
+      });
 
-    expect(decoded.assistantExecutionTarget, AssistantExecutionTarget.singleAgent);
-  });
+      expect(
+        decoded.assistantExecutionTarget,
+        AssistantExecutionTarget.singleAgent,
+      );
+    },
+  );
 
   test(
     'SecureConfigStore restores assistant state from durable files when sqlite entries are missing',
