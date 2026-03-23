@@ -176,6 +176,14 @@ void main() {
       findsOneWidget,
     );
     expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('gateway-profile-chip-2')),
+        matching: find.text('连接源 1（空）'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('自定义连接源 1（空）'), findsNothing);
+    expect(
       find.byKey(const ValueKey('gateway-device-security-card')),
       findsOneWidget,
     );
