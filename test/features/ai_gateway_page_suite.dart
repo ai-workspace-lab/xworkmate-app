@@ -22,11 +22,13 @@ import 'package:xworkmate/theme/app_theme.dart';
 import '../test_support.dart';
 
 class _FakeGatewayRuntime extends GatewayRuntime {
-  _FakeGatewayRuntime()
-    : super(
-        store: SecureConfigStore(),
-        identityStore: DeviceIdentityStore(SecureConfigStore()),
-      );
+  factory _FakeGatewayRuntime() {
+    final store = createIsolatedTestStore();
+    return _FakeGatewayRuntime._(store);
+  }
+
+  _FakeGatewayRuntime._(SecureConfigStore store)
+    : super(store: store, identityStore: DeviceIdentityStore(store));
 
   @override
   Future<void> connectProfile(

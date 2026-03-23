@@ -13,16 +13,19 @@ import 'package:xworkmate/runtime/gateway_runtime.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
+import '../test_support.dart';
 
 const String _manualCodexBridgeSkipReason =
     'Disabled by default: reserved for manual validation with a dedicated Codex environment only.';
 
 class _FakeGatewayRuntime extends GatewayRuntime {
-  _FakeGatewayRuntime({required bool connected})
-    : super(
-        store: SecureConfigStore(),
-        identityStore: DeviceIdentityStore(SecureConfigStore()),
-      ) {
+  factory _FakeGatewayRuntime({required bool connected}) {
+    final store = createIsolatedTestStore();
+    return _FakeGatewayRuntime._(store, connected: connected);
+  }
+
+  _FakeGatewayRuntime._(SecureConfigStore store, {required bool connected})
+    : super(store: store, identityStore: DeviceIdentityStore(store)) {
     setConnected(connected);
   }
 
@@ -134,7 +137,7 @@ void main() {
         'AppController enables external Codex bridge and registers to gateway',
         () async {
           SharedPreferences.setMockInitialValues(<String, Object>{});
-          final store = SecureConfigStore();
+          final store = createIsolatedTestStore();
           final gateway = _FakeGatewayRuntime(connected: true);
           final codex = _FakeCodexRuntime();
           final coordinator = RuntimeCoordinator(
@@ -201,7 +204,7 @@ void main() {
         'AppController keeps bridge running when gateway registration is unavailable',
         () async {
           SharedPreferences.setMockInitialValues(<String, Object>{});
-          final store = SecureConfigStore();
+          final store = createIsolatedTestStore();
           final gateway = _FakeGatewayRuntime(connected: false);
           final codex = _FakeCodexRuntime();
           final coordinator = RuntimeCoordinator(
@@ -258,7 +261,7 @@ void main() {
         'AppController preserves built-in mode and does not require external codex binary',
         () async {
           SharedPreferences.setMockInitialValues(<String, Object>{});
-          final store = SecureConfigStore();
+          final store = createIsolatedTestStore();
           final gateway = _FakeGatewayRuntime(connected: false);
           final codex = _FakeCodexRuntime();
           final coordinator = RuntimeCoordinator(

@@ -180,7 +180,7 @@ void main() {
   );
 
   test(
-    'SecureConfigStore throws when explicit settings directory does not exist',
+    'SecureConfigStore auto-creates an explicit settings directory on first install',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -191,33 +191,26 @@ void main() {
           await tempDirectory.delete(recursive: true);
         }
       });
-      final existingSecretsDirectory = Directory(
-        '${tempDirectory.path}/secrets',
-      );
+      final existingSecretsDirectory = Directory('${tempDirectory.path}/secrets');
       await existingSecretsDirectory.create(recursive: true);
+      final explicitSettingsPath =
+          '${tempDirectory.path}/settings/${SettingsStore.databaseFileName}';
 
       final store = SecureConfigStore(
-        databasePathResolver: () async =>
-            '${tempDirectory.path}/settings/${SettingsStore.databaseFileName}',
-        fallbackDirectoryPathResolver: () async =>
-            existingSecretsDirectory.path,
+        databasePathResolver: () async => explicitSettingsPath,
+        fallbackDirectoryPathResolver: () async => existingSecretsDirectory.path,
       );
 
-      await expectLater(
-        store.loadSettingsSnapshot(),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            contains('Durable settings storage unavailable'),
-          ),
-        ),
-      );
+      final snapshot = await store.loadSettingsSnapshot();
+
+      expect(snapshot.accountUsername, SettingsSnapshot.defaults().accountUsername);
+      expect(await Directory('${tempDirectory.path}/settings').exists(), isTrue);
+      expect(await File(explicitSettingsPath).exists(), isTrue);
     },
   );
 
   test(
-    'SecureConfigStore throws when explicit secrets directory does not exist',
+    'SecureConfigStore auto-creates an explicit secrets directory on first install',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -240,16 +233,10 @@ void main() {
             '${tempDirectory.path}/secrets',
       );
 
-      await expectLater(
-        store.saveGatewayToken('token-secret'),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            contains('Durable secret storage path does not exist'),
-          ),
-        ),
-      );
+      await store.saveGatewayToken('token-secret');
+
+      expect(await Directory('${tempDirectory.path}/secrets').exists(), isTrue);
+      expect(await store.loadGatewayToken(), 'token-secret');
     },
   );
 
@@ -269,7 +256,6 @@ void main() {
           '${tempDirectory.path}/plus.svc.xworkmate/xworkmate';
 
       final firstStore = SecureConfigStore(
-        allowInMemoryFallback: false,
         databasePathResolver: () async =>
             throw StateError('primary unavailable'),
         fallbackDirectoryPathResolver: () async =>
@@ -283,7 +269,6 @@ void main() {
       await firstStore.saveGatewayToken('fallback-token');
 
       final secondStore = SecureConfigStore(
-        allowInMemoryFallback: false,
         databasePathResolver: () async =>
             throw StateError('primary unavailable'),
         fallbackDirectoryPathResolver: () async =>
@@ -359,7 +344,7 @@ void main() {
   );
 
   test(
-    'SecureConfigStore persists plain local settings and assistant threads when sqlite is unavailable',
+    'SecureConfigStore fails fast and keeps legacy files untouched when sqlite is unavailable',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -371,63 +356,29 @@ void main() {
         }
       });
       final databasePath = '${tempDirectory.path}/settings.sqlite3';
-      final snapshot = SettingsSnapshot.defaults().copyWith(
-        accountUsername: 'local-user',
-        assistantLastSessionKey: 'draft:local-1',
-      );
-      const records = <AssistantThreadRecord>[
-        AssistantThreadRecord(
-          sessionKey: 'draft:local-1',
-          title: '本地线程',
-          archived: false,
-          executionTarget: AssistantExecutionTarget.local,
-          messageViewMode: AssistantMessageViewMode.rendered,
-          updatedAtMs: 1700000000000,
-          messages: <GatewayChatMessage>[
-            GatewayChatMessage(
-              id: 'assistant-1',
-              role: 'assistant',
-              text: 'plain local message',
-              timestampMs: 1700000001000,
-              toolCallId: null,
-              toolName: null,
-              stopReason: null,
-              pending: false,
-              error: false,
-            ),
-          ],
-        ),
-      ];
-
-      final firstStore = SecureConfigStore(
-        allowInMemoryFallback: true,
-        databasePathResolver: () async => databasePath,
-        fallbackDirectoryPathResolver: () async => tempDirectory.path,
-        databaseOpener: (_) => throw StateError('sqlite unavailable'),
-      );
-      await firstStore.saveSettingsSnapshot(snapshot);
-      await firstStore.saveAssistantThreadRecords(records);
-
       final settingsFile = File('${tempDirectory.path}/settings-snapshot.json');
       final threadsFile = File('${tempDirectory.path}/assistant-threads.json');
-      expect(await settingsFile.exists(), isTrue);
-      expect(await threadsFile.exists(), isTrue);
-      expect(await settingsFile.readAsString(), contains('local-user'));
-      expect(await threadsFile.readAsString(), contains('plain local message'));
+      await settingsFile.writeAsString('{"accountUsername":"local-user"}');
+      await threadsFile.writeAsString('[]');
 
-      final secondStore = SecureConfigStore(
-        allowInMemoryFallback: true,
+      final firstStore = SecureConfigStore(
         databasePathResolver: () async => databasePath,
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
         databaseOpener: (_) => throw StateError('sqlite unavailable'),
       );
-      final loadedSnapshot = await secondStore.loadSettingsSnapshot();
-      final loadedThreads = await secondStore.loadAssistantThreadRecords();
 
-      expect(loadedSnapshot.accountUsername, 'local-user');
-      expect(loadedSnapshot.assistantLastSessionKey, 'draft:local-1');
-      expect(loadedThreads, hasLength(1));
-      expect(loadedThreads.single.messages.single.text, 'plain local message');
+      await expectLater(
+        firstStore.loadSettingsSnapshot(),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('sqlite unavailable'),
+          ),
+        ),
+      );
+      expect(await settingsFile.exists(), isTrue);
+      expect(await threadsFile.exists(), isTrue);
     },
   );
 
@@ -894,7 +845,7 @@ void main() {
   );
 
   test(
-    'SecureConfigStore restores assistant state from durable files when sqlite entries are missing',
+    'SecureConfigStore restart keeps database state and legacy session files untouched',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -940,10 +891,10 @@ void main() {
 
       await store.saveSettingsSnapshot(snapshot);
       await store.saveAssistantThreadRecords(records);
-
-      final database = sqlite.sqlite3.open(databasePath);
-      addTearDown(database.dispose);
-      database.execute('DELETE FROM ${SettingsStore.databaseTableName}');
+      final settingsFile = File('${tempDirectory.path}/settings-snapshot.json');
+      final threadsFile = File('${tempDirectory.path}/assistant-threads.json');
+      await settingsFile.writeAsString('legacy-settings-snapshot', flush: true);
+      await threadsFile.writeAsString('legacy-assistant-threads', flush: true);
 
       final recoveredStore = SecureConfigStore(
         databasePathResolver: () async => databasePath,
@@ -958,6 +909,8 @@ void main() {
       expect(recoveredRecords, hasLength(1));
       expect(recoveredRecords.first.sessionKey, 'draft:backup-1');
       expect(recoveredRecords.first.messages.single.text, 'backup message');
+      expect(await settingsFile.readAsString(), 'legacy-settings-snapshot');
+      expect(await threadsFile.readAsString(), 'legacy-assistant-threads');
     },
   );
 
@@ -1060,7 +1013,19 @@ void main() {
     'SecureConfigStore clears gateway token without touching snapshot',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final store = SecureConfigStore();
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-clear-token-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final store = SecureConfigStore(
+        databasePathResolver: () async =>
+            '${tempDirectory.path}/${SettingsStore.databaseFileName}',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
 
       await store.saveGatewayToken('token-secret');
       expect(await store.loadGatewayToken(), 'token-secret');
