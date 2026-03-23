@@ -136,6 +136,7 @@ void main() {
 
       expect(controller.currentSingleAgentHasResolvedProvider, isTrue);
       expect(controller.currentSingleAgentUsesAiChatFallback, isFalse);
+      expect(controller.currentSingleAgentShouldShowModelControl, isFalse);
       expect(controller.assistantModelChoices, isEmpty);
       expect(controller.resolvedAssistantModel, isEmpty);
     },
