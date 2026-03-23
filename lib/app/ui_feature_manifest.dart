@@ -65,6 +65,7 @@ abstract final class UiFeatureKeys {
   static const settingsGeneral = 'settings.general';
   static const settingsWorkspace = 'settings.workspace';
   static const settingsGateway = 'settings.gateway';
+  static const settingsAccountAccess = 'settings.account_access';
   static const settingsVaultServer = 'settings.vault_server';
   static const settingsGatewaySetupCode = 'settings.gateway_setup_code';
   static const settingsAgents = 'settings.agents';
@@ -256,6 +257,12 @@ mobile:
       build_modes: [debug, profile, release]
       description: Mobile settings gateway tab
       ui_surface: settings_page
+    account_access:
+      enabled: false
+      release_tier: experimental
+      build_modes: [debug, profile, release]
+      description: Mobile account access section
+      ui_surface: settings_page
     vault_server:
       enabled: false
       release_tier: experimental
@@ -441,6 +448,12 @@ desktop:
       build_modes: [debug, profile, release]
       description: Desktop settings gateway tab
       ui_surface: settings_page
+    account_access:
+      enabled: false
+      release_tier: experimental
+      build_modes: [debug, profile, release]
+      description: Desktop account access section
+      ui_surface: settings_page
     vault_server:
       enabled: false
       release_tier: experimental
@@ -565,6 +578,12 @@ web:
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Web settings gateway tab
+      ui_surface: web_settings_page
+    account_access:
+      enabled: false
+      release_tier: experimental
+      build_modes: []
+      description: Web does not expose account access section
       ui_surface: web_settings_page
     vault_server:
       enabled: false
@@ -947,6 +966,9 @@ class UiFeatureAccess {
 
   bool get supportsDiagnostics =>
       isEnabledPath(UiFeatureKeys.settingsDiagnostics);
+
+  bool get supportsAccountAccess =>
+      isEnabledPath(UiFeatureKeys.settingsAccountAccess);
 
   bool get supportsGatewaySetupCode =>
       isEnabledPath(UiFeatureKeys.settingsGatewaySetupCode);
