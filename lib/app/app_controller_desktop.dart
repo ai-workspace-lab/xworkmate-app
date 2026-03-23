@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'app_metadata.dart';
 import 'app_capabilities.dart';
+import 'app_store_policy.dart';
 import 'ui_feature_manifest.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
@@ -203,7 +204,12 @@ class AppController extends ChangeNotifier {
   String? get bootstrapError => _bootstrapError;
 
   UiFeatureAccess featuresFor(UiFeaturePlatform platform) {
-    return _uiFeatureManifest.forPlatform(platform);
+    final manifest = applyAppleAppStorePolicy(
+      _uiFeatureManifest,
+      hostPlatform: platform,
+      isAppleHost: Platform.isIOS || Platform.isMacOS,
+    );
+    return manifest.forPlatform(platform);
   }
 
   RuntimeCoordinator get runtimeCoordinator => _runtimeCoordinator;
@@ -323,6 +329,11 @@ class AppController extends ChangeNotifier {
       availableSingleAgentProviders.isNotEmpty;
 
   bool _canUseSingleAgentProvider(SingleAgentProvider provider) {
+    if (!allowsAppStoreExternalSingleAgentProviders(
+      isAppleHost: Platform.isIOS || Platform.isMacOS,
+    )) {
+      return false;
+    }
     final override = _availableSingleAgentProvidersOverride;
     if (override != null) {
       return provider != SingleAgentProvider.auto &&
@@ -460,8 +471,11 @@ class AppController extends ChangeNotifier {
 
   SingleAgentProvider singleAgentProviderForSession(String sessionKey) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    return _assistantThreadRecords[normalizedSessionKey]?.singleAgentProvider ??
-        SingleAgentProvider.auto;
+    return sanitizeAppStoreSingleAgentProvider(
+      _assistantThreadRecords[normalizedSessionKey]?.singleAgentProvider ??
+          SingleAgentProvider.auto,
+      isAppleHost: Platform.isIOS || Platform.isMacOS,
+    );
   }
 
   SingleAgentProvider get currentSingleAgentProvider =>
@@ -549,7 +563,11 @@ class AppController extends ChangeNotifier {
       singleAgentModelDisplayLabelForSession(currentSessionKey);
 
   List<SingleAgentProvider> get singleAgentProviderOptions =>
-      SingleAgentProvider.values;
+      allowsAppStoreExternalSingleAgentProviders(
+        isAppleHost: Platform.isIOS || Platform.isMacOS,
+      )
+      ? SingleAgentProvider.values
+      : const <SingleAgentProvider>[SingleAgentProvider.auto];
 
   String singleAgentProviderLabelForSession(String sessionKey) {
     return singleAgentProviderForSession(sessionKey).label;
@@ -1688,12 +1706,16 @@ class AppController extends ChangeNotifier {
 
   Future<void> setSingleAgentProvider(SingleAgentProvider provider) async {
     final sessionKey = _normalizedAssistantSessionKey(currentSessionKey);
-    if (singleAgentProviderForSession(sessionKey) == provider) {
+    final sanitizedProvider = sanitizeAppStoreSingleAgentProvider(
+      provider,
+      isAppleHost: Platform.isIOS || Platform.isMacOS,
+    );
+    if (singleAgentProviderForSession(sessionKey) == sanitizedProvider) {
       return;
     }
     _upsertAssistantThreadRecord(
       sessionKey,
-      singleAgentProvider: provider,
+      singleAgentProvider: sanitizedProvider,
       discoveredSkills: const <AssistantThreadSkillEntry>[],
       importedSkills: const <AssistantThreadSkillEntry>[],
       selectedSkillKeys: const <String>[],
@@ -2606,6 +2628,7 @@ class AppController extends ChangeNotifier {
       setActiveAppLanguage(settings.appLanguage);
       await _desktopPlatformService.initialize(settings.linuxDesktop);
       await _desktopPlatformService.setLaunchAtLogin(settings.launchAtLogin);
+      await _refreshResolvedCodexCliPath();
       _registerCodexExternalProvider();
       await _refreshAcpCapabilities(persistMountTargets: true);
       if (_disposed) {
@@ -2791,6 +2814,7 @@ class AppController extends ChangeNotifier {
     }
     if (previous.codexCliPath != current.codexCliPath ||
         previous.codeAgentRuntimeMode != current.codeAgentRuntimeMode) {
+      await _refreshResolvedCodexCliPath();
       _registerCodexExternalProvider();
     }
     if (previous.linuxDesktop.toJson().toString() !=
@@ -4395,13 +4419,6 @@ class AppController extends ChangeNotifier {
       capabilities = const GatewayAcpCapabilities.empty();
     }
     _acpCapabilities = capabilities;
-    _resolvedCodexCliPath =
-        capabilities.providers.contains(SingleAgentProvider.codex)
-        ? appText(
-            '通过 Gateway ACP 能力协商检测到 Codex Provider',
-            'Detected Codex provider via Gateway ACP capability negotiation',
-          )
-        : null;
     if (persistMountTargets && !_disposed) {
       final currentConfig = settings.multiAgent;
       final nextTargets = _mergeAcpCapabilitiesIntoMountTargets(
@@ -4418,6 +4435,30 @@ class AppController extends ChangeNotifier {
       }
     }
     _notifyIfActive();
+  }
+
+  Future<void> _refreshResolvedCodexCliPath() async {
+    if (effectiveCodeAgentRuntimeMode != CodeAgentRuntimeMode.externalCli) {
+      _resolvedCodexCliPath = null;
+      return;
+    }
+
+    final configuredPath = configuredCodexCliPath;
+    String? detectedPath;
+    if (configuredPath.isNotEmpty) {
+      try {
+        if (await File(configuredPath).exists()) {
+          detectedPath = configuredPath;
+        }
+      } catch (_) {
+        detectedPath = null;
+      }
+    }
+    detectedPath ??= await _runtimeCoordinator.codex.findCodexBinary();
+    if (_disposed) {
+      return;
+    }
+    _resolvedCodexCliPath = detectedPath;
   }
 
   List<ManagedMountTargetState> _mergeAcpCapabilitiesIntoMountTargets(

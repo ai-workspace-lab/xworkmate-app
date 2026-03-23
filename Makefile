@@ -6,6 +6,7 @@ FLUTTER ?= flutter
 PNPM ?= pnpm
 DART ?= dart
 DEVICE ?= macos
+APP_STORE_DART_DEFINE ?= --dart-define=XWORKMATE_APP_STORE=true
 
 .PHONY: help deps analyze test check format run build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-aris-bridge render-release-docs
 
@@ -36,10 +37,10 @@ build-linux: ## Build the Linux app in release mode
 	$(FLUTTER) build linux --release
 
 build-macos: ## Build the macOS app in release mode
-	$(FLUTTER) build macos --release
+	$(FLUTTER) build macos --release $(APP_STORE_DART_DEFINE)
 
 build-ios-sim: ## Build the iOS app for the simulator
-	$(FLUTTER) build ios --simulator
+	$(FLUTTER) build ios --simulator $(APP_STORE_DART_DEFINE)
 
 build-aris-bridge: ## Build the ARIS Go bridge helper
 	bash scripts/build-aris-bridge.sh
@@ -54,10 +55,10 @@ package-linux: ## Create both Linux packages
 	bash scripts/package-linux.sh
 
 package-mac: ## Create the macOS .app and DMG
-	bash scripts/package-flutter-mac-app.sh
+	XWORKMATE_APP_STORE=true bash scripts/package-flutter-mac-app.sh
 
 install-mac: ## Package and install the macOS app into /Applications
-	bash scripts/package-flutter-mac-app.sh
+	XWORKMATE_APP_STORE=true bash scripts/package-flutter-mac-app.sh
 	bash scripts/install-flutter-mac-dmg.sh
 
 clean: ## Remove generated artifacts

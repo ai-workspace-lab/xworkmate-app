@@ -50,10 +50,7 @@ void main() {
           SingleAgentProvider.codex,
           SingleAgentProvider.claude,
         ],
-        gatewayOnlySkillScanRoots: <String>[
-          codexRoot.path,
-          claudeRoot.path,
-        ],
+        gatewayOnlySkillScanRoots: <String>[codexRoot.path, claudeRoot.path],
       );
       addTearDown(controller.dispose);
       await _waitFor(() => !controller.initializing);
@@ -165,9 +162,10 @@ void main() {
       );
       await controller.switchSession('draft:thread-2');
       expect(
-        controller.assistantImportedSkillsForSession(
-          controller.currentSessionKey,
-        ).single.label,
+        controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .single
+            .label,
         'Review',
       );
       await controller.selectAssistantModelForSession(

@@ -7,6 +7,7 @@ PUBSPEC_PATH="$ROOT_DIR/pubspec.yaml"
 DIST_DIR="$ROOT_DIR/dist"
 APP_NAME="${APP_NAME:-XWorkmate}"
 BUILD_MODE="${BUILD_MODE:-release}"
+APP_STORE_DEFINE="${APP_STORE_DEFINE:---dart-define=XWORKMATE_APP_STORE=${XWORKMATE_APP_STORE:-true}}"
 PRODUCTS_DIR_NAME="$(tr '[:lower:]' '[:upper:]' <<< "${BUILD_MODE:0:1}")${BUILD_MODE:1}"
 BRIDGE_BINARY_NAME="${BRIDGE_BINARY_NAME:-xworkmate-aris-bridge}"
 BRIDGE_BUILD_PATH="${ROOT_DIR}/build/bin/${BRIDGE_BINARY_NAME}"
@@ -47,6 +48,7 @@ BUILD_ARGS=(
   --build-number="$APP_BUILD"
   --dart-define="XWORKMATE_DISPLAY_VERSION=$APP_VERSION"
   --dart-define="XWORKMATE_BUILD_NUMBER=$APP_BUILD"
+  "$APP_STORE_DEFINE"
 )
 
 if [[ -f "$APP_DIR/.dart_tool/package_config.json" ]]; then

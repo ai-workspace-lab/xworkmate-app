@@ -28,6 +28,6 @@ void main() {
     );
 
     expect(find.text('OpenClaw Gateway'), findsOneWidget);
-    expect(find.text('Vault Server'), findsOneWidget);
+    expect(find.text('Vault Server'), findsNothing);
   });
 }
