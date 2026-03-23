@@ -1,3 +1,4 @@
+export 'file_store_support.dart';
 export 'secret_store.dart';
 export 'settings_store.dart';
 
@@ -146,6 +147,14 @@ class SecureConfigStore {
   }) {
     return _secretStore.clearDeviceToken(deviceId: deviceId, role: role);
   }
+
+  PersistentWriteFailures get persistentWriteFailures =>
+      PersistentWriteFailures(
+        settings: _settingsStore.settingsWriteFailure,
+        tasks: _settingsStore.tasksWriteFailure,
+        secrets: _secretStore.secretsWriteFailure,
+        audit: _settingsStore.auditWriteFailure,
+      );
 
   void dispose() {
     _settingsStore.dispose();

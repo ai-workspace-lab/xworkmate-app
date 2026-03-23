@@ -225,6 +225,7 @@ void main() {
 
       await store.saveSettingsSnapshot(snapshot);
       final loadedSnapshot = await store.loadSettingsSnapshot();
+      final writeFailures = store.persistentWriteFailures;
       final reloadedSnapshot = await SecureConfigStore(
         databasePathResolver: () async => unavailablePath,
         fallbackDirectoryPathResolver: () async =>
@@ -232,10 +233,49 @@ void main() {
       ).loadSettingsSnapshot();
 
       expect(loadedSnapshot.accountUsername, 'memory-user');
+      expect(writeFailures.settings, isNotNull);
+      expect(writeFailures.settings?.scope, PersistentStoreScope.settings);
+      expect(writeFailures.settings?.operation, 'saveSettingsSnapshot');
+      expect(writeFailures.settings?.message, contains('Persistent settings'));
       expect(
         reloadedSnapshot.accountUsername,
         SettingsSnapshot.defaults().accountUsername,
       );
+    },
+  );
+
+  test(
+    'SecureConfigStore exposes an explicit tasks write failure when durable task storage is unavailable',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      const unavailablePath = '/dev/null/xworkmate/settings.sqlite3';
+      final store = SecureConfigStore(
+        databasePathResolver: () async => unavailablePath,
+        fallbackDirectoryPathResolver: () async =>
+            '/dev/null/xworkmate/secrets',
+      );
+
+      await store.saveAssistantThreadRecords(const <AssistantThreadRecord>[
+        AssistantThreadRecord(
+          sessionKey: 'draft:memory-only',
+          title: 'Memory only',
+          archived: false,
+          executionTarget: AssistantExecutionTarget.local,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          updatedAtMs: 1700000000000,
+          messages: <GatewayChatMessage>[],
+        ),
+      ]);
+
+      final loadedRecords = await store.loadAssistantThreadRecords();
+      final writeFailures = store.persistentWriteFailures;
+
+      expect(loadedRecords, hasLength(1));
+      expect(loadedRecords.first.sessionKey, 'draft:memory-only');
+      expect(writeFailures.tasks, isNotNull);
+      expect(writeFailures.tasks?.scope, PersistentStoreScope.tasks);
+      expect(writeFailures.tasks?.operation, 'saveAssistantThreadRecords');
+      expect(writeFailures.tasks?.message, contains('Persistent task path'));
     },
   );
 
@@ -384,15 +424,65 @@ void main() {
     expect(await store.loadGatewayToken(), 'token-secret');
     expect(await store.loadGatewayPassword(), 'password-secret');
     expect(await store.loadAiGatewayApiKey(), 'ai-gateway-secret');
-    final secretFiles = await Directory(
-      '${tempDirectory.path}/secrets',
-    ).list().where((entity) => entity is File).toList();
+    final secretDirectory = Directory('${tempDirectory.path}/secrets');
+    final secretFiles = await secretDirectory
+        .list()
+        .where((entity) => entity is File)
+        .toList();
     expect(secretFiles, hasLength(3));
     expect(
       secretFiles.every((entity) => entity.path.endsWith('.secret')),
       isTrue,
     );
+    expect(store.persistentWriteFailures.secrets, isNull);
+    if (!Platform.isWindows) {
+      expect((await secretDirectory.stat()).modeString(), 'rwx------');
+      for (final entity in secretFiles) {
+        expect((await entity.stat()).modeString(), 'rw-------');
+      }
+    }
   });
+
+  test(
+    'SecureConfigStore exposes an explicit secrets write failure when durable secret storage is unavailable',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-secrets-memory-fallback-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final store = SecureConfigStore(
+        databasePathResolver: () async => tempDirectory.path,
+        fallbackDirectoryPathResolver: () async =>
+            '/dev/null/xworkmate/secrets',
+      );
+
+      await store.saveGatewayToken('token-secret');
+
+      expect(await store.loadGatewayToken(), 'token-secret');
+      expect(store.persistentWriteFailures.secrets, isNotNull);
+      expect(
+        store.persistentWriteFailures.secrets?.scope,
+        PersistentStoreScope.secrets,
+      );
+      expect(store.persistentWriteFailures.secrets?.operation, 'writeSecret');
+      expect(
+        store.persistentWriteFailures.secrets?.message,
+        contains('Persistent secret'),
+      );
+
+      final reloadedStore = SecureConfigStore(
+        databasePathResolver: () async => tempDirectory.path,
+        fallbackDirectoryPathResolver: () async =>
+            '/dev/null/xworkmate/secrets',
+      );
+      expect(await reloadedStore.loadGatewayToken(), isNull);
+    },
+  );
 
   test(
     'SecureConfigStore ignores legacy local-state files and keeps them untouched',
