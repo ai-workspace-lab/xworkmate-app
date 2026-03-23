@@ -349,6 +349,7 @@ void main() {
           success: true,
           errorMessage: '',
           shouldFallbackToAiChat: false,
+          resolvedModel: 'codex-sonnet',
         ),
       );
       final controller = AppController(
@@ -375,6 +376,8 @@ void main() {
       expect(runner.resolveCalls, 1);
       expect(runner.runCalls, 1);
       expect(runner.lastRequest?.provider, SingleAgentProvider.codex);
+      expect(runner.lastRequest?.model, isEmpty);
+      expect(controller.currentSingleAgentModelDisplayLabel, 'codex-sonnet');
       expect(
         controller.chatMessages.any(
           (message) =>

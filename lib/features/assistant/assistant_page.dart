@@ -459,6 +459,9 @@ class _AssistantPageState extends State<AssistantPage> {
                 inputController: _inputController,
                 focusNode: _composerFocusNode,
                 thinkingLabel: _thinkingLabel,
+                showModelControl: !controller.isSingleAgentMode
+                    ? true
+                    : controller.currentSingleAgentShouldShowModelControl,
                 modelLabel: controller.isSingleAgentMode
                     ? controller.currentSingleAgentModelDisplayLabel
                     : controller.resolvedAssistantModel.isEmpty
@@ -1617,6 +1620,7 @@ class _AssistantLowerPane extends StatelessWidget {
     required this.inputController,
     required this.focusNode,
     required this.thinkingLabel,
+    required this.showModelControl,
     required this.modelLabel,
     required this.modelOptions,
     required this.attachments,
@@ -1638,6 +1642,7 @@ class _AssistantLowerPane extends StatelessWidget {
   final TextEditingController inputController;
   final FocusNode focusNode;
   final String thinkingLabel;
+  final bool showModelControl;
   final String modelLabel;
   final List<String> modelOptions;
   final List<_ComposerAttachment> attachments;
@@ -1665,6 +1670,7 @@ class _AssistantLowerPane extends StatelessWidget {
           inputController: inputController,
           focusNode: focusNode,
           thinkingLabel: thinkingLabel,
+          showModelControl: showModelControl,
           modelLabel: modelLabel,
           modelOptions: modelOptions,
           attachments: attachments,
@@ -2495,6 +2501,7 @@ class _ComposerBar extends StatefulWidget {
     required this.inputController,
     required this.focusNode,
     required this.thinkingLabel,
+    required this.showModelControl,
     required this.modelLabel,
     required this.modelOptions,
     required this.attachments,
@@ -2516,6 +2523,7 @@ class _ComposerBar extends StatefulWidget {
   final TextEditingController inputController;
   final FocusNode focusNode;
   final String thinkingLabel;
+  final bool showModelControl;
   final String modelLabel;
   final List<String> modelOptions;
   final List<_ComposerAttachment> attachments;
@@ -2899,43 +2907,45 @@ class _ComposerBarState extends State<_ComposerBar> {
                           maxLabelWidth: 120,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      widget.modelOptions.isEmpty
-                          ? _ComposerToolbarChip(
-                              key: const Key('assistant-model-button'),
-                              icon: Icons.bolt_rounded,
-                              label: widget.modelLabel,
-                              showChevron: false,
-                              maxLabelWidth: 140,
-                            )
-                          : PopupMenuButton<String>(
-                              key: const Key('assistant-model-button'),
-                              tooltip: appText('模型', 'Model'),
-                              onSelected: widget.onModelChanged,
-                              itemBuilder: (context) => widget.modelOptions
-                                  .map(
-                                    (value) => PopupMenuItem<String>(
-                                      value: value,
-                                      child: Row(
-                                        children: [
-                                          Expanded(child: Text(value)),
-                                          if (value == widget.modelLabel)
-                                            const Icon(
-                                              Icons.check_rounded,
-                                              size: 18,
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              child: _ComposerToolbarChip(
+                      if (widget.showModelControl) ...[
+                        const SizedBox(width: 6),
+                        widget.modelOptions.isEmpty
+                            ? _ComposerToolbarChip(
+                                key: const Key('assistant-model-button'),
                                 icon: Icons.bolt_rounded,
                                 label: widget.modelLabel,
-                                showChevron: true,
+                                showChevron: false,
                                 maxLabelWidth: 140,
+                              )
+                            : PopupMenuButton<String>(
+                                key: const Key('assistant-model-button'),
+                                tooltip: appText('模型', 'Model'),
+                                onSelected: widget.onModelChanged,
+                                itemBuilder: (context) => widget.modelOptions
+                                    .map(
+                                      (value) => PopupMenuItem<String>(
+                                        value: value,
+                                        child: Row(
+                                          children: [
+                                            Expanded(child: Text(value)),
+                                            if (value == widget.modelLabel)
+                                              const Icon(
+                                                Icons.check_rounded,
+                                                size: 18,
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                child: _ComposerToolbarChip(
+                                  icon: Icons.bolt_rounded,
+                                  label: widget.modelLabel,
+                                  showChevron: true,
+                                  maxLabelWidth: 140,
+                                ),
                               ),
-                            ),
+                      ],
                       const SizedBox(width: 6),
                       PopupMenuButton<String>(
                         key: const Key('assistant-thinking-button'),

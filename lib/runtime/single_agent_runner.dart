@@ -55,6 +55,7 @@ class SingleAgentRunResult {
     required this.shouldFallbackToAiChat,
     this.aborted = false,
     this.fallbackReason,
+    this.resolvedModel = '',
   });
 
   final SingleAgentProvider provider;
@@ -64,6 +65,7 @@ class SingleAgentRunResult {
   final bool shouldFallbackToAiChat;
   final bool aborted;
   final String? fallbackReason;
+  final String resolvedModel;
 }
 
 abstract class SingleAgentRunner {
@@ -166,6 +168,7 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
         errorMessage: result.errorMessage,
         shouldFallbackToAiChat: !result.success && result.output.isEmpty,
         aborted: result.aborted,
+        resolvedModel: result.resolvedModel,
         fallbackReason: !result.success
             ? 'Single-agent app-server run failed: ${result.errorMessage}'
             : null,
@@ -178,6 +181,7 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
         success: false,
         errorMessage: error.toString(),
         shouldFallbackToAiChat: shouldFallback,
+        resolvedModel: '',
         fallbackReason: shouldFallback
             ? '${request.provider.label} provider is unavailable from the direct app-server endpoint.'
             : null,
