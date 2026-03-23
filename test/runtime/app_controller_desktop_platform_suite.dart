@@ -108,12 +108,12 @@ class _ThrowingSecureConfigStore extends SecureConfigStore {
     : super(enableSecureStorage: false);
 
   @override
-  Future<String?> loadGatewayToken() async {
+  Future<String?> loadGatewayToken({int? profileIndex}) async {
     throw StateError('main store gateway token should not be used');
   }
 
   @override
-  Future<String?> loadGatewayPassword() async {
+  Future<String?> loadGatewayPassword({int? profileIndex}) async {
     throw StateError('main store gateway password should not be used');
   }
 

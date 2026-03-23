@@ -13,29 +13,17 @@ import 'runtime_models.dart';
 typedef SecureConfigDatabaseOpener =
     FutureOr<sqlite.Database?> Function(String resolvedPath);
 
-class _DatabasePathCandidate {
-  const _DatabasePathCandidate({
-    required this.path,
-    required this.createParentDirectory,
-  });
-
-  final String path;
-  final bool createParentDirectory;
-}
-
 class SettingsStore {
   SettingsStore({
     Future<String?> Function()? fallbackDirectoryPathResolver,
     Future<String?> Function()? databasePathResolver,
     Future<String?> Function()? defaultSupportDirectoryPathResolver,
-    bool allowInMemoryFallback = false,
     SecureConfigDatabaseOpener? databaseOpener,
     Future<List<int>?> Function()? legacyLocalStateKeyLoader,
   }) : _fallbackDirectoryPathResolver = fallbackDirectoryPathResolver,
        _databasePathResolver = databasePathResolver,
        _defaultSupportDirectoryPathResolver =
            defaultSupportDirectoryPathResolver,
-       _allowInMemoryFallback = allowInMemoryFallback,
        _databaseOpener = databaseOpener,
        _legacyLocalStateKeyLoader = legacyLocalStateKeyLoader;
 
@@ -55,15 +43,12 @@ class SettingsStore {
   final Future<String?> Function()? _fallbackDirectoryPathResolver;
   final Future<String?> Function()? _databasePathResolver;
   final Future<String?> Function()? _defaultSupportDirectoryPathResolver;
-  final bool _allowInMemoryFallback;
   final SecureConfigDatabaseOpener? _databaseOpener;
   final Future<List<int>?> Function()? _legacyLocalStateKeyLoader;
   final Cipher _legacyCipher = AesGcm.with256bits();
-  final Map<String, String> _memoryStore = <String, String>{};
   SharedPreferences? _prefs;
   sqlite.Database? _database;
   String? _resolvedDatabasePath;
-  bool _usingInMemoryDatabase = false;
   bool _initialized = false;
   bool _recoveryAttempted = false;
   LegacyRecoveryReport _lastRecoveryReport = const LegacyRecoveryReport();
@@ -94,7 +79,6 @@ class SettingsStore {
     await initialize();
     final encoded = snapshot.toJsonString();
     await _writeStoredString(settingsKey, encoded);
-    await _writeDurableStateFile(settingsKey, encoded);
     _lastRecoveryReport = const LegacyRecoveryReport();
   }
 
@@ -114,7 +98,6 @@ class SettingsStore {
       records.map((item) => item.toJson()).toList(growable: false),
     );
     await _writeStoredString(assistantThreadsKey, encoded);
-    await _writeDurableStateFile(assistantThreadsKey, encoded);
   }
 
   Future<void> clearAssistantLocalState() async {
@@ -161,9 +144,6 @@ class SettingsStore {
   }
 
   void dispose() {
-    if (_usingInMemoryDatabase) {
-      unawaited(_syncInMemoryStoreToDurableStore());
-    }
     final database = _database;
     _database = null;
     if (database != null) {
@@ -176,64 +156,35 @@ class SettingsStore {
     _prefs = null;
     _initialized = false;
     _resolvedDatabasePath = null;
-    _usingInMemoryDatabase = false;
-    _memoryStore.clear();
   }
 
   Future<void> _initializeDatabase() async {
-    final candidates = await _resolveDatabasePathCandidates();
-    for (final candidate in candidates) {
-      try {
-        _database = await _openDatabase(candidate);
-        _resolvedDatabasePath = candidate.path;
-        _usingInMemoryDatabase = false;
-        break;
-      } catch (_) {
-        _database = null;
-      }
-    }
-    if (_database == null && _allowInMemoryFallback) {
-      try {
-        final database = sqlite.sqlite3.openInMemory();
-        _configureDatabase(database);
-        _database = database;
-        _usingInMemoryDatabase = true;
-      } catch (_) {
-        _database = null;
-        _usingInMemoryDatabase = false;
-      }
-    }
-    if (_database == null) {
-      final candidatePaths = candidates
-          .map((candidate) => candidate.path)
-          .toList(growable: false);
+    final resolvedPath = await _resolveDatabasePath();
+    try {
+      _database = await _openDatabase(resolvedPath);
+      _resolvedDatabasePath = resolvedPath;
+    } catch (error) {
       throw StateError(
-        'Durable settings storage unavailable: cannot resolve or open $databaseFileName. Candidates: ${candidatePaths.join(', ')}',
+        'Durable settings storage unavailable: failed to open $resolvedPath. Cause: $error',
       );
     }
     await _migrateLegacyPrefs();
   }
 
-  Future<sqlite.Database?> _openDatabase(
-    _DatabasePathCandidate candidate,
-  ) async {
-    final resolvedPath = candidate.path;
+  Future<sqlite.Database> _openDatabase(String resolvedPath) async {
     if (_databaseOpener != null) {
       final database = await _databaseOpener(resolvedPath);
-      if (database != null) {
-        _configureDatabase(database);
+      if (database == null) {
+        throw StateError(
+          'Durable settings storage unavailable: database opener returned null for $resolvedPath.',
+        );
       }
+      _configureDatabase(database);
       return database;
     }
     final file = File(resolvedPath);
     if (!await file.parent.exists()) {
-      if (candidate.createParentDirectory) {
-        await file.parent.create(recursive: true);
-      } else {
-        throw StateError(
-          'Durable settings database directory does not exist: ${file.parent.path}',
-        );
-      }
+      await file.parent.create(recursive: true);
     }
     final database = sqlite.sqlite3.open(file.path);
     _configureDatabase(database);
@@ -273,9 +224,6 @@ class SettingsStore {
     );
     if (existing.isEmpty) {
       await _writeStoredString(key, legacyValue);
-      if (_durableStateFileNames.containsKey(key)) {
-        await _writeDurableStateFile(key, legacyValue);
-      }
     }
     await _prefs!.remove(key);
   }
@@ -328,18 +276,6 @@ class SettingsStore {
                 .toList(growable: false),
           ),
         );
-        await _writeDurableStateFile(
-          settingsKey,
-          recoveredSettings.toJsonString(),
-        );
-        await _writeDurableStateFile(
-          assistantThreadsKey,
-          jsonEncode(
-            recoveredThreads
-                .map((item) => item.toJson())
-                .toList(growable: false),
-          ),
-        );
         return LegacyRecoveryReport(
           status: LegacyRecoveryStatus.migrated,
           sourcePath: source.sourcePath,
@@ -364,40 +300,8 @@ class SettingsStore {
   }
 
   Future<List<String>> _legacyCandidateDirectories() async {
-    final results = <String>{};
     final databasePath = await _resolveDatabasePath();
-    final fallbackRoot = await _fallbackDirectoryPathResolver?.call();
-    final hasExplicitPaths =
-        _databasePathResolver != null || _fallbackDirectoryPathResolver != null;
-    String? defaultSupportRoot;
-    String? supportPath;
-    if (!hasExplicitPaths) {
-      defaultSupportRoot = await _defaultSupportDirectoryPathResolver?.call();
-      try {
-        supportPath = (await getApplicationSupportDirectory()).path;
-      } catch (_) {
-        supportPath = null;
-      }
-    }
-
-    void addPath(String? path) {
-      final trimmed = path?.trim() ?? '';
-      if (trimmed.isEmpty) {
-        return;
-      }
-      results.add(trimmed);
-    }
-
-    if (databasePath != null && databasePath.trim().isNotEmpty) {
-      final directory = File(databasePath).parent.path;
-      addPath(directory);
-    }
-    addPath(fallbackRoot);
-    addPath(fallbackRoot == null ? null : '$fallbackRoot/xworkmate');
-    addPath(defaultSupportRoot);
-    addPath(supportPath);
-    addPath(supportPath == null ? null : '$supportPath/xworkmate');
-    return results.toList(growable: false);
+    return <String>[File(databasePath).parent.path];
   }
 
   Future<_LegacySourceResult> _readLegacySource(String directoryPath) async {
@@ -609,121 +513,54 @@ class SettingsStore {
     }
   }
 
-  Future<List<_DatabasePathCandidate>> _resolveDatabasePathCandidates() async {
-    final candidates = <_DatabasePathCandidate>[];
-    final seen = <String>{};
-
-    void addPath(String? path, {required bool createParentDirectory}) {
-      final trimmed = path?.trim() ?? '';
-      if (trimmed.isNotEmpty && seen.add(trimmed)) {
-        candidates.add(
-          _DatabasePathCandidate(
-            path: trimmed,
-            createParentDirectory: createParentDirectory,
-          ),
-        );
-      }
-    }
-
-    if (_databasePathResolver != null) {
-      try {
-        final resolvedPath = await _databasePathResolver();
-        final trimmedPath = resolvedPath?.trim() ?? '';
-        if (trimmedPath.isNotEmpty) {
-          addPath(trimmedPath, createParentDirectory: false);
-          return candidates;
-        }
-      } catch (_) {
-        // Fall through to default locations.
-      }
-    }
-
-    try {
-      final supportDirectory = await getApplicationSupportDirectory();
-      addPath(
-        '${supportDirectory.path}/xworkmate/$databaseFileName',
-        createParentDirectory: true,
-      );
-    } catch (_) {
-      // Continue below to deterministic fallbacks.
-    }
-
-    try {
-      final fallbackRoot = await _fallbackDirectoryPathResolver?.call();
-      final trimmedFallbackRoot = fallbackRoot?.trim() ?? '';
-      if (trimmedFallbackRoot.isNotEmpty) {
-        addPath(
-          '$trimmedFallbackRoot/$databaseFileName',
-          createParentDirectory: true,
-        );
-      }
-    } catch (_) {
-      // Continue to default support directory fallback.
-    }
-
-    try {
-      final defaultSupportRoot = await _defaultSupportDirectoryPathResolver
-          ?.call();
-      final trimmedDefaultSupportRoot = defaultSupportRoot?.trim() ?? '';
-      if (trimmedDefaultSupportRoot.isNotEmpty) {
-        addPath(
-          '$trimmedDefaultSupportRoot/$databaseFileName',
-          createParentDirectory: true,
-        );
-      }
-    } catch (_) {
-      // Ignore and fall through.
-    }
-
-    return candidates;
-  }
-
-  Future<String?> _resolveDatabasePath() async {
+  Future<String> _resolveDatabasePath() async {
     final resolved = _resolvedDatabasePath?.trim() ?? '';
     if (resolved.isNotEmpty) {
       return resolved;
     }
-    final candidates = await _resolveDatabasePathCandidates();
-    if (candidates.isEmpty) {
-      return null;
+    final explicitDatabasePath = await _resolvePath(_databasePathResolver);
+    if (explicitDatabasePath != null) {
+      return explicitDatabasePath;
     }
-    return candidates.first.path;
+    final fallbackRoot = await _resolvePath(_fallbackDirectoryPathResolver);
+    if (fallbackRoot != null) {
+      return '$fallbackRoot/$databaseFileName';
+    }
+    final defaultSupportRoot = await _resolvePath(
+      _defaultSupportDirectoryPathResolver,
+    );
+    if (defaultSupportRoot != null) {
+      return '$defaultSupportRoot/$databaseFileName';
+    }
+    try {
+      final supportDirectory = await getApplicationSupportDirectory();
+      return '${supportDirectory.path}/xworkmate/$databaseFileName';
+    } catch (_) {
+      throw StateError(
+        'Durable settings storage unavailable: cannot resolve $databaseFileName.',
+      );
+    }
   }
 
   Future<String?> _readStoredString(String key) async {
-    final memoryValue = _memoryStore[key];
-    if (memoryValue != null) {
-      return memoryValue;
-    }
-    if (_database != null) {
-      try {
-        final result = _database!.select(
-          'SELECT value FROM $databaseTableName WHERE storage_key = ? LIMIT 1',
-          <Object?>[key],
-        );
-        if (result.isNotEmpty) {
-          final value = result.first['value'];
-          if (value is String && value.trim().isNotEmpty) {
-            return value;
-          }
-        }
-      } catch (_) {
-        // Fall through to durable fallback.
-      }
-    }
-    final durable = await _readDurableStateFile(key);
-    if (durable != null) {
-      return durable;
+    if (_database == null) {
+      throw StateError('Durable settings storage unavailable: database not initialized.');
     }
     try {
-      final prefValue = _prefs?.getString(key);
-      if (prefValue != null && prefValue.trim().isNotEmpty) {
-        return prefValue;
+      final result = _database!.select(
+        'SELECT value FROM $databaseTableName WHERE storage_key = ? LIMIT 1',
+        <Object?>[key],
+      );
+      if (result.isEmpty) {
+        return null;
       }
+      final value = result.first['value'];
+      return value is String && value.trim().isNotEmpty ? value : null;
     } catch (_) {
-      // Ignore.
+      throw StateError(
+        'Durable settings storage unavailable: failed to read $key from $_resolvedDatabasePath.',
+      );
     }
-    return null;
   }
 
   Future<void> _writeStoredString(String key, String value) async {
@@ -731,43 +568,40 @@ class SettingsStore {
     if (trimmed.isEmpty) {
       return;
     }
-    _memoryStore[key] = trimmed;
-    if (_database != null) {
-      try {
-        _database!.execute(
-          '''
-          INSERT INTO $databaseTableName (storage_key, value, updated_at_ms)
-          VALUES (?, ?, ?)
-          ON CONFLICT(storage_key) DO UPDATE SET
-            value = excluded.value,
-            updated_at_ms = excluded.updated_at_ms
-          ''',
-          <Object?>[key, trimmed, DateTime.now().millisecondsSinceEpoch],
-        );
-        if (_usingInMemoryDatabase) {
-          await _syncInMemoryStoreToDurableStore();
-        }
-        return;
-      } catch (_) {
-        // Fall through to durable file fallback.
-      }
+    if (_database == null) {
+      throw StateError('Durable settings storage unavailable: database not initialized.');
     }
-    if (_usingInMemoryDatabase) {
-      await _syncInMemoryStoreToDurableStore();
+    try {
+      _database!.execute(
+        '''
+        INSERT INTO $databaseTableName (storage_key, value, updated_at_ms)
+        VALUES (?, ?, ?)
+        ON CONFLICT(storage_key) DO UPDATE SET
+          value = excluded.value,
+          updated_at_ms = excluded.updated_at_ms
+        ''',
+        <Object?>[key, trimmed, DateTime.now().millisecondsSinceEpoch],
+      );
+    } catch (_) {
+      throw StateError(
+        'Durable settings storage unavailable: failed to write $key to $_resolvedDatabasePath.',
+      );
     }
   }
 
   Future<void> _deleteStoredString(String key) async {
-    _memoryStore.remove(key);
-    if (_database != null) {
-      try {
-        _database!.execute(
-          'DELETE FROM $databaseTableName WHERE storage_key = ?',
-          <Object?>[key],
-        );
-      } catch (_) {
-        // Ignore.
-      }
+    if (_database == null) {
+      throw StateError('Durable settings storage unavailable: database not initialized.');
+    }
+    try {
+      _database!.execute(
+        'DELETE FROM $databaseTableName WHERE storage_key = ?',
+        <Object?>[key],
+      );
+    } catch (_) {
+      throw StateError(
+        'Durable settings storage unavailable: failed to delete $key from $_resolvedDatabasePath.',
+      );
     }
     try {
       await _prefs?.remove(key);
@@ -782,106 +616,8 @@ class SettingsStore {
       return null;
     }
     final databasePath = await _resolveDatabasePath();
-    if (databasePath == null || databasePath.trim().isEmpty) {
-      return null;
-    }
     final directory = File(databasePath).parent;
-    if (!await directory.exists()) {
-      await directory.create(recursive: true);
-    }
     return File('${directory.path}/$fileName');
-  }
-
-  Future<File?> _durableStateFileForPath(
-    String key,
-    String databasePath,
-  ) async {
-    final fileName = _durableStateFileNames[key];
-    if (fileName == null) {
-      return null;
-    }
-    final directory = File(databasePath).parent;
-    if (!await directory.exists()) {
-      await directory.create(recursive: true);
-    }
-    return File('${directory.path}/$fileName');
-  }
-
-  Future<String?> _readDurableStateFile(String key) async {
-    final file = await _durableStateFile(key);
-    if (file == null || !await file.exists()) {
-      return null;
-    }
-    final value = await file.readAsString();
-    return value.trim().isEmpty ? null : value;
-  }
-
-  Future<void> _writeDurableStateFile(String key, String value) async {
-    final file = await _durableStateFile(key);
-    if (file == null) {
-      return;
-    }
-    await file.writeAsString(value, flush: true);
-  }
-
-  Future<void> _syncInMemoryStoreToDurableStore() async {
-    if (!_usingInMemoryDatabase || _memoryStore.isEmpty) {
-      return;
-    }
-    final candidates = await _resolveDatabasePathCandidates();
-    if (candidates.isEmpty) {
-      return;
-    }
-    for (final candidate in candidates) {
-      sqlite.Database? durableDatabase;
-      try {
-        durableDatabase = await _openDatabase(candidate);
-        if (durableDatabase == null) {
-          continue;
-        }
-        final updatedAtMs = DateTime.now().millisecondsSinceEpoch;
-        for (final entry in _memoryStore.entries) {
-          durableDatabase.execute(
-            '''
-            INSERT INTO $databaseTableName (storage_key, value, updated_at_ms)
-            VALUES (?, ?, ?)
-            ON CONFLICT(storage_key) DO UPDATE SET
-              value = excluded.value,
-              updated_at_ms = excluded.updated_at_ms
-            ''',
-            <Object?>[entry.key, entry.value, updatedAtMs],
-          );
-          final durableFile = await _durableStateFileForPath(
-            entry.key,
-            candidate.path,
-          );
-          if (durableFile != null) {
-            await durableFile.writeAsString(entry.value, flush: true);
-          }
-        }
-        final previousDatabase = _database;
-        _database = durableDatabase;
-        _resolvedDatabasePath = candidate.path;
-        _usingInMemoryDatabase = false;
-        if (previousDatabase != null &&
-            !identical(previousDatabase, _database)) {
-          try {
-            previousDatabase.dispose();
-          } catch (_) {
-            // Ignore close errors during promotion.
-          }
-        }
-        return;
-      } catch (_) {
-        if (durableDatabase != null) {
-          try {
-            durableDatabase.dispose();
-          } catch (_) {
-            // Ignore close errors while probing candidates.
-          }
-        }
-      }
-    }
   }
 
   Future<void> _deleteDurableStateFile(String key) async {
@@ -894,9 +630,6 @@ class SettingsStore {
 
   Future<void> _deleteLegacyBackupFile() async {
     final databasePath = await _resolveDatabasePath();
-    if (databasePath == null || databasePath.trim().isEmpty) {
-      return;
-    }
     final file = File('${File(databasePath).parent.path}/$stateBackupFileName');
     if (await file.exists()) {
       await file.delete();
@@ -970,6 +703,19 @@ class SettingsStore {
         json.containsKey('aiGateway') ||
         json.containsKey('accountUsername') ||
         json.containsKey('assistantExecutionTarget');
+  }
+
+  Future<String?> _resolvePath(Future<String?> Function()? resolver) async {
+    if (resolver == null) {
+      return null;
+    }
+    try {
+      final resolved = await resolver();
+      final trimmed = resolved?.trim() ?? '';
+      return trimmed.isEmpty ? null : trimmed;
+    } catch (_) {
+      return null;
+    }
   }
 }
 

@@ -14,7 +14,6 @@ class SecureConfigStore {
     Future<String?> Function()? fallbackDirectoryPathResolver,
     Future<String?> Function()? databasePathResolver,
     Future<String?> Function()? defaultSupportDirectoryPathResolver,
-    bool? allowInMemoryFallback,
     SecureConfigDatabaseOpener? databaseOpener,
     SecureStorageClient? secureStorage,
     bool enableSecureStorage = true,
@@ -22,13 +21,11 @@ class SecureConfigStore {
     final resolvedDefaultSupportDirectoryPathResolver =
         defaultSupportDirectoryPathResolver ??
         _resolveDefaultSupportDirectoryPath;
-    final resolvedAllowInMemoryFallback = allowInMemoryFallback ?? false;
     _secretStore = SecretStore(
       fallbackDirectoryPathResolver: fallbackDirectoryPathResolver,
       databasePathResolver: databasePathResolver,
       defaultSupportDirectoryPathResolver:
           resolvedDefaultSupportDirectoryPathResolver,
-      allowInMemoryFallback: resolvedAllowInMemoryFallback,
       secureStorage: secureStorage,
       enableSecureStorage: enableSecureStorage,
     );
@@ -37,7 +34,6 @@ class SecureConfigStore {
       databasePathResolver: databasePathResolver,
       defaultSupportDirectoryPathResolver:
           resolvedDefaultSupportDirectoryPathResolver,
-      allowInMemoryFallback: resolvedAllowInMemoryFallback,
       databaseOpener: databaseOpener,
       legacyLocalStateKeyLoader: _secretStore.loadLegacyLocalStateKeyBytes,
     );
@@ -86,19 +82,23 @@ class SecureConfigStore {
     return _secretStore.loadSecureRefs();
   }
 
-  Future<String?> loadGatewayToken() => _secretStore.loadGatewayToken();
+  Future<String?> loadGatewayToken({int? profileIndex}) =>
+      _secretStore.loadGatewayToken(profileIndex: profileIndex);
 
-  Future<void> saveGatewayToken(String value) =>
-      _secretStore.saveGatewayToken(value);
+  Future<void> saveGatewayToken(String value, {int? profileIndex}) =>
+      _secretStore.saveGatewayToken(value, profileIndex: profileIndex);
 
-  Future<void> clearGatewayToken() => _secretStore.clearGatewayToken();
+  Future<void> clearGatewayToken({int? profileIndex}) =>
+      _secretStore.clearGatewayToken(profileIndex: profileIndex);
 
-  Future<String?> loadGatewayPassword() => _secretStore.loadGatewayPassword();
+  Future<String?> loadGatewayPassword({int? profileIndex}) =>
+      _secretStore.loadGatewayPassword(profileIndex: profileIndex);
 
-  Future<void> saveGatewayPassword(String value) =>
-      _secretStore.saveGatewayPassword(value);
+  Future<void> saveGatewayPassword(String value, {int? profileIndex}) =>
+      _secretStore.saveGatewayPassword(value, profileIndex: profileIndex);
 
-  Future<void> clearGatewayPassword() => _secretStore.clearGatewayPassword();
+  Future<void> clearGatewayPassword({int? profileIndex}) =>
+      _secretStore.clearGatewayPassword(profileIndex: profileIndex);
 
   Future<String?> loadOllamaCloudApiKey() =>
       _secretStore.loadOllamaCloudApiKey();

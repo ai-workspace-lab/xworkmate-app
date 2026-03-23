@@ -10,6 +10,23 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
 
+SecureConfigStore createIsolatedTestStore({bool enableSecureStorage = true}) {
+  final testRoot = Directory.systemTemp.createTempSync(
+    'xworkmate-store-test-',
+  );
+  addTearDown(() async {
+    if (await testRoot.exists()) {
+      await testRoot.delete(recursive: true);
+    }
+  });
+  return SecureConfigStore(
+    enableSecureStorage: enableSecureStorage,
+    databasePathResolver: () async =>
+        '${testRoot.path}/${SettingsStore.databaseFileName}',
+    fallbackDirectoryPathResolver: () async => testRoot.path,
+  );
+}
+
 Future<AppController> createTestController(
   WidgetTester tester, {
   DesktopPlatformService? desktopPlatformService,

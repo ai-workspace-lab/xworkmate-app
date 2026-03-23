@@ -10,14 +10,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
-import 'package:xworkmate/runtime/secure_config_store.dart';
+import '../test_support.dart';
 
 void main() {
   test(
     'GatewayRuntime uses explicit shared token override for the initial connect handshake',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final store = SecureConfigStore();
+      final store = createIsolatedTestStore();
       final runtime = GatewayRuntime(
         store: store,
         identityStore: DeviceIdentityStore(store),
@@ -64,7 +64,7 @@ void main() {
     'GatewayRuntime sends stored operator device token using auth.deviceToken',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final store = SecureConfigStore();
+      final store = createIsolatedTestStore();
       final identityStore = DeviceIdentityStore(store);
       final identity = await identityStore.loadOrCreate();
       await store.saveDeviceToken(
@@ -109,7 +109,7 @@ void main() {
     'GatewayRuntime parses device pairing state and syncs rotated local role tokens',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final store = SecureConfigStore();
+      final store = createIsolatedTestStore();
       final identityStore = DeviceIdentityStore(store);
       final identity = await identityStore.loadOrCreate();
       final runtime = GatewayRuntime(
@@ -170,7 +170,7 @@ void main() {
     'GatewayRuntime does not auto reconnect after non-retryable pairing errors',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final store = SecureConfigStore();
+      final store = createIsolatedTestStore();
       final runtime = GatewayRuntime(
         store: store,
         identityStore: DeviceIdentityStore(store),
@@ -217,7 +217,7 @@ void main() {
     'GatewayRuntime clears a stale stored device token after NOT_PAIRED',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final store = SecureConfigStore();
+      final store = createIsolatedTestStore();
       final identityStore = DeviceIdentityStore(store);
       final identity = await identityStore.loadOrCreate();
       await store.saveDeviceToken(
