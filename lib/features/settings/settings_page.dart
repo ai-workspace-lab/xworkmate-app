@@ -229,13 +229,24 @@ class _SettingsPageState extends State<SettingsPage> {
     UiFeatureAccess uiFeatures,
   ) {
     if (_detail != null) {
-      return _buildDetailContent(context, controller, settings, _detail!);
+      return _buildDetailContent(
+        context,
+        controller,
+        settings,
+        uiFeatures,
+        _detail!,
+      );
     }
 
     return switch (_tab) {
       SettingsTab.general => _buildGeneral(context, controller, settings),
       SettingsTab.workspace => _buildWorkspace(context, controller, settings),
-      SettingsTab.gateway => _buildGateway(context, controller, settings),
+      SettingsTab.gateway => _buildGateway(
+        context,
+        controller,
+        settings,
+        uiFeatures,
+      ),
       SettingsTab.agents => _buildAgents(context, controller, settings),
       SettingsTab.appearance => _buildAppearance(context, controller),
       SettingsTab.diagnostics => _buildDiagnostics(context, controller),
@@ -253,6 +264,7 @@ class _SettingsPageState extends State<SettingsPage> {
     BuildContext context,
     AppController controller,
     SettingsSnapshot settings,
+    UiFeatureAccess uiFeatures,
     SettingsDetailPage detail,
   ) {
     final workspaceSections = _buildWorkspace(context, controller, settings);
@@ -268,8 +280,10 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         const SizedBox(height: 16),
         _buildOpenClawGatewayCard(context, controller, settings),
-        const SizedBox(height: 16),
-        _buildVaultProviderCard(context, controller, settings),
+        if (uiFeatures.supportsVaultServer) ...[
+          const SizedBox(height: 16),
+          _buildVaultProviderCard(context, controller, settings),
+        ],
         const SizedBox(height: 16),
         _buildAiGatewayCard(context, controller, settings),
       ],
@@ -295,7 +309,17 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
         const SizedBox(height: 16),
-        _buildVaultProviderCard(context, controller, settings),
+        if (uiFeatures.supportsVaultServer)
+          _buildVaultProviderCard(context, controller, settings)
+        else
+          SurfaceCard(
+            child: Text(
+              appText(
+                '当前发布配置未开放 Vault Server 参数。',
+                'Vault Server settings are disabled in this release configuration.',
+              ),
+            ),
+          ),
       ],
       SettingsDetailPage.ollamaProvider => <Widget>[
         _buildDetailIntro(
@@ -891,6 +915,7 @@ class _SettingsPageState extends State<SettingsPage> {
     BuildContext context,
     AppController controller,
     SettingsSnapshot settings,
+    UiFeatureAccess uiFeatures,
   ) {
     return [
       _buildCollapsibleGatewaySection(
@@ -902,16 +927,18 @@ class _SettingsPageState extends State<SettingsPage> {
         }),
         child: _buildOpenClawGatewayCard(context, controller, settings),
       ),
-      const SizedBox(height: 16),
-      _buildCollapsibleGatewaySection(
-        context: context,
-        title: appText('Vault Server', 'Vault Server'),
-        expanded: _vaultServerExpanded,
-        onChanged: (value) => setState(() {
-          _vaultServerExpanded = value;
-        }),
-        child: _buildVaultProviderCard(context, controller, settings),
-      ),
+      if (uiFeatures.supportsVaultServer) ...[
+        const SizedBox(height: 16),
+        _buildCollapsibleGatewaySection(
+          context: context,
+          title: appText('Vault Server', 'Vault Server'),
+          expanded: _vaultServerExpanded,
+          onChanged: (value) => setState(() {
+            _vaultServerExpanded = value;
+          }),
+          child: _buildVaultProviderCard(context, controller, settings),
+        ),
+      ],
       const SizedBox(height: 16),
       _buildCollapsibleGatewaySection(
         context: context,
