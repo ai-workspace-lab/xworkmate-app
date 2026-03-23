@@ -85,7 +85,7 @@ class _TasksPageState extends State<TasksPage> {
           eyebrow: appText('任务与线程', 'Tasks and sessions'),
           title: appText('任务工作台', 'Task workspace'),
           subtitle: appText(
-            '左侧筛选和切换任务，右侧查看当前任务详情并回到对话。',
+            '左侧筛选和切换任务，右侧查看当前任务详情。',
             'Filter and switch tasks on the left, inspect the current task on the right.',
           ),
           toolbar: Wrap(
@@ -125,14 +125,7 @@ class _TasksPageState extends State<TasksPage> {
                 onPressed: controller.refreshSessions,
                 icon: const Icon(Icons.refresh_rounded),
               ),
-              if (_tab != TasksTab.scheduled)
-                FilledButton.tonalIcon(
-                  onPressed: () =>
-                      controller.navigateTo(WorkspaceDestination.assistant),
-                  icon: const Icon(Icons.edit_note_rounded),
-                  label: Text(appText('继续对话', 'Continue in assistant')),
-                )
-              else
+              if (_tab == TasksTab.scheduled)
                 Chip(
                   avatar: const Icon(Icons.lock_outline_rounded, size: 16),
                   label: Text(
@@ -509,26 +502,13 @@ class _TaskDetailPanel extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              FilledButton.icon(
-                onPressed: tab == TasksTab.scheduled
-                    ? null
-                    : () async {
-                        await controller.switchSession(selected!.sessionKey);
-                        controller.navigateTo(WorkspaceDestination.assistant);
-                      },
-                icon: const Icon(Icons.forum_outlined),
-                label: Text(appText('回到持续对话', 'Open conversation')),
-              ),
-              OutlinedButton.icon(
-                onPressed: controller.refreshSessions,
-                icon: const Icon(Icons.refresh_rounded),
-                label: Text(appText('刷新', 'Refresh')),
-              ),
-            ],
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: controller.refreshSessions,
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text(appText('刷新', 'Refresh')),
+            ),
           ),
         ],
       ),
