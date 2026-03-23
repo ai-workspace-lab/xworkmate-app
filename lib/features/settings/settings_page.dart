@@ -1072,12 +1072,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 _ => Icons.link_rounded,
               }, size: 18),
               label: Text(
-                configured
-                    ? _gatewayProfileSlotLabel(index)
-                    : appText(
-                        '${_gatewayProfileSlotLabel(index)}（空）',
-                        '${_gatewayProfileSlotLabel(index)} (empty)',
-                      ),
+                _gatewayProfileChipLabel(index, configured: configured),
               ),
               onSelected: (_) {
                 setState(() {
@@ -2997,6 +2992,21 @@ XWorkmate Privacy Policy
         'Custom source ${index - kGatewayCustomProfileStartIndex + 1}',
       ),
     };
+  }
+
+  String _gatewayProfileChipLabel(int index, {required bool configured}) {
+    final label = switch (index) {
+      kGatewayLocalProfileIndex => _gatewayProfileSlotLabel(index),
+      kGatewayRemoteProfileIndex => _gatewayProfileSlotLabel(index),
+      _ => appText(
+        '连接源 ${index - kGatewayCustomProfileStartIndex + 1}',
+        'Source ${index - kGatewayCustomProfileStartIndex + 1}',
+      ),
+    };
+    return appText(
+      configured ? label : '$label（空）',
+      configured ? label : '$label (empty)',
+    );
   }
 
   String _gatewayProfileSlotDescription(int index) {
