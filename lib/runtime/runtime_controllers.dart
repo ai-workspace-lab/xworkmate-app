@@ -202,7 +202,7 @@ class SettingsController extends ChangeNotifier {
       SecretAuditEntry(
         timeLabel: _timeLabel(),
         action: 'Updated',
-        provider: 'AI Gateway',
+        provider: 'LLM API',
         target: _snapshot.aiGateway.apiKeyRef,
         module: 'Settings',
         status: 'Success',
@@ -327,7 +327,7 @@ class SettingsController extends ChangeNotifier {
     if (normalizedBaseUrl == null) {
       final next = profile.copyWith(
         syncState: 'invalid',
-        syncMessage: 'Missing AI Gateway URL',
+        syncMessage: 'Missing LLM API Endpoint',
       );
       _aiGatewayStatus = next.syncMessage;
       _snapshot = _snapshot.copyWith(aiGateway: next);
@@ -342,7 +342,7 @@ class SettingsController extends ChangeNotifier {
       final next = profile.copyWith(
         baseUrl: normalizedBaseUrl.toString(),
         syncState: 'invalid',
-        syncMessage: 'Missing AI Gateway API key',
+        syncMessage: 'Missing LLM API Token',
       );
       _aiGatewayStatus = next.syncMessage;
       _snapshot = _snapshot.copyWith(aiGateway: next);
@@ -410,7 +410,7 @@ class SettingsController extends ChangeNotifier {
     if (normalizedBaseUrl == null) {
       return const AiGatewayConnectionCheck(
         state: 'invalid',
-        message: 'Missing AI Gateway URL',
+        message: 'Missing LLM API Endpoint',
         endpoint: '',
         modelCount: 0,
       );
@@ -422,7 +422,7 @@ class SettingsController extends ChangeNotifier {
     if (apiKey.isEmpty) {
       return AiGatewayConnectionCheck(
         state: 'invalid',
-        message: 'Missing AI Gateway API key',
+        message: 'Missing LLM API Token',
         endpoint: endpoint,
         modelCount: 0,
       );
@@ -490,7 +490,7 @@ class SettingsController extends ChangeNotifier {
       ),
       SecretReferenceEntry(
         name: _snapshot.aiGateway.name,
-        provider: 'AI Gateway',
+        provider: 'LLM API',
         module: 'Settings',
         maskedValue: _snapshot.aiGateway.baseUrl.trim().isEmpty
             ? 'Not set'
@@ -518,7 +518,7 @@ class SettingsController extends ChangeNotifier {
       return 'Ollama Cloud';
     }
     if (key.contains('ai_gateway')) {
-      return 'AI Gateway';
+      return 'LLM API';
     }
     if (key.contains('gateway')) {
       return 'Gateway';
@@ -625,7 +625,7 @@ class SettingsController extends ChangeNotifier {
             provider:
                 stringValue(map['provider']) ??
                 stringValue(map['owned_by']) ??
-                'AI Gateway',
+                'LLM API',
             contextWindow:
                 intValue(map['contextWindow']) ??
                 intValue(map['context_window']),
@@ -646,7 +646,7 @@ class SettingsController extends ChangeNotifier {
       return error.message;
     }
     if (error is SocketException) {
-      return 'Unable to reach the AI Gateway';
+      return 'Unable to reach the LLM API';
     }
     if (error is HandshakeException) {
       return 'TLS handshake failed';
@@ -655,7 +655,7 @@ class SettingsController extends ChangeNotifier {
       return 'Connection timed out';
     }
     if (error is FormatException) {
-      return 'AI Gateway returned invalid JSON';
+      return 'LLM API returned invalid JSON';
     }
     return 'Failed: $error';
   }
@@ -666,9 +666,9 @@ class SettingsController extends ChangeNotifier {
       401 => 'Authentication failed (401)',
       403 => 'Access denied (403)',
       404 => 'Model catalog endpoint not found (404)',
-      429 => 'Rate limited by AI Gateway (429)',
-      >= 500 => 'AI Gateway unavailable ($statusCode)',
-      _ => 'AI Gateway responded $statusCode',
+      429 => 'Rate limited by LLM API (429)',
+      >= 500 => 'LLM API unavailable ($statusCode)',
+      _ => 'LLM API responded $statusCode',
     };
     return detail.isEmpty ? base : '$base · $detail';
   }
@@ -1262,7 +1262,7 @@ class ModelsController extends ChangeNotifier {
           (item) => GatewayModelSummary(
             id: item,
             name: item,
-            provider: 'AI Gateway',
+            provider: 'LLM API',
             contextWindow: null,
             maxOutputTokens: null,
           ),

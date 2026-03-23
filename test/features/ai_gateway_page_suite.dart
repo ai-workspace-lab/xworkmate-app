@@ -68,7 +68,7 @@ class _AiGatewaySettingsShortcutTestController extends AppController {
 }
 
 void main() {
-  testWidgets('AI Gateway shortcut routes to Settings center', (
+  testWidgets('LLM API shortcut routes to Settings center', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
@@ -89,7 +89,7 @@ void main() {
     );
 
     expect(find.text('OpenClaw Gateway'), findsOneWidget);
-    expect(find.text('AI Gateway'), findsWidgets);
+    expect(find.text('LLM API'), findsWidgets);
   });
 
   testWidgets(

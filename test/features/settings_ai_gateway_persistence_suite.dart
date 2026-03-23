@@ -14,7 +14,7 @@ import '../test_support.dart';
 
 void main() {
   testWidgets(
-    'SettingsPage AI Gateway draft/save/apply flow persists edited fields through local actions',
+    'SettingsPage LLM API draft/save/apply flow persists edited fields through local actions',
     (WidgetTester tester) async {
       late _AiGatewaySettingsTestController controller;
       late Directory testRoot;
@@ -47,7 +47,7 @@ void main() {
         availableModels: const <String>['stale-model'],
         selectedModels: const <String>['stale-model'],
         syncState: 'invalid',
-        syncMessage: 'Missing AI Gateway URL',
+        syncMessage: 'Missing LLM API Endpoint',
       );
       await tester.runAsync(() async {
         await controller.saveSettings(
@@ -140,7 +140,7 @@ void main() {
       expect(controller.settings.aiGateway.syncState, 'idle');
       expect(controller.settings.aiGateway.syncMessage, 'Ready to sync models');
       expect(controller.hasPendingSettingsApply, isFalse);
-      expect(find.text('Missing AI Gateway URL'), findsNothing);
+      expect(find.text('Missing LLM API Endpoint'), findsNothing);
       expect(find.text('Ready to sync models'), findsOneWidget);
     },
   );

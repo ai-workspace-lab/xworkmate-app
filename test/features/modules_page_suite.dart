@@ -29,7 +29,7 @@ void main() {
       );
 
       expect(find.text('OpenClaw Gateway'), findsOneWidget);
-      expect(find.text('AI Gateway'), findsWidgets);
+      expect(find.text('LLM API'), findsWidgets);
 
       controller.navigateTo(WorkspaceDestination.nodes);
       await pumpPage(
