@@ -502,20 +502,24 @@ class SecretStore {
   }
 
   Future<Directory?> _resolveFallbackDirectory() async {
-    try {
-      final explicit = await _fallbackDirectoryPathResolver?.call();
+    if (_fallbackDirectoryPathResolver != null) {
+      String? explicit;
+      try {
+        explicit = await _fallbackDirectoryPathResolver();
+      } catch (_) {
+        // Continue to next fallback candidate.
+      }
       final explicitTrimmed = explicit?.trim() ?? '';
       if (explicitTrimmed.isNotEmpty) {
-        return _ensureDirectory(explicitTrimmed);
+        return _requireExistingDirectory(explicitTrimmed);
       }
-    } catch (_) {
-      // Continue to next fallback candidate.
     }
+
     try {
       final databasePath = await _databasePathResolver?.call();
       final databaseTrimmed = databasePath?.trim() ?? '';
       if (databaseTrimmed.isNotEmpty) {
-        return _ensureDirectory(File(databaseTrimmed).parent.path);
+        return _requireExistingDirectory(File(databaseTrimmed).parent.path);
       }
     } catch (_) {
       // Continue to next fallback candidate.
@@ -565,6 +569,14 @@ class SecretStore {
     final directory = Directory(path);
     if (!await directory.exists()) {
       await directory.create(recursive: true);
+    }
+    return directory;
+  }
+
+  Future<Directory> _requireExistingDirectory(String path) async {
+    final directory = Directory(path);
+    if (!await directory.exists()) {
+      throw StateError('Durable secret storage path does not exist: $path');
     }
     return directory;
   }
