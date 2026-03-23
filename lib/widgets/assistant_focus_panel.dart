@@ -401,11 +401,40 @@ class _SkillsFocusPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = controller.skills.take(4).toList(growable: false);
+    final items = controller.isSingleAgentMode
+        ? controller
+              .assistantImportedSkillsForSession(controller.currentSessionKey)
+              .take(4)
+              .map(
+                (skill) => GatewaySkillSummary(
+                  name: skill.label,
+                  description: skill.description,
+                  source: skill.sourcePath,
+                  skillKey: skill.key,
+                  primaryEnv: null,
+                  eligible: true,
+                  disabled: false,
+                  missingBins: const <String>[],
+                  missingEnv: const <String>[],
+                  missingConfig: const <String>[],
+                ),
+              )
+              .toList(growable: false)
+        : controller.skills.take(4).toList(growable: false);
     if (items.isEmpty) {
       return _PreviewEmptyState(
         message:
-            controller.connection.status == RuntimeConnectionStatus.connected
+            controller.isSingleAgentMode
+            ? (controller.currentSingleAgentNeedsAiGatewayConfiguration
+                  ? appText(
+                      '当前没有可用外部 CLI，请先配置 AI Gateway fallback。',
+                      'No external CLI is available. Configure AI Gateway fallback first.',
+                    )
+                  : appText(
+                      '当前线程还没有已加载技能。切换 provider 后会读取该线程自己的 skills 列表。',
+                      'No skills are loaded for this thread yet. Switching the provider reloads the thread-owned skills list.',
+                    ))
+            : controller.connection.status == RuntimeConnectionStatus.connected
             ? appText(
                 '当前代理没有已加载技能。',
                 'No skills are loaded for the active agent.',
@@ -543,6 +572,9 @@ class _ClawHubFocusPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final skillCount = controller.isSingleAgentMode
+        ? controller.currentAssistantSkillCount
+        : controller.skills.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -552,8 +584,8 @@ class _ClawHubFocusPreview extends StatelessWidget {
           children: [
             _FocusPill(
               label: appText(
-                '已加载技能 ${controller.skills.length}',
-                'Loaded skills ${controller.skills.length}',
+                '已加载技能 $skillCount',
+                'Loaded skills $skillCount',
               ),
             ),
             _FocusPill(

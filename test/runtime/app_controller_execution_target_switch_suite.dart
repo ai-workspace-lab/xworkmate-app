@@ -285,7 +285,7 @@ void main() {
       expect(controller.assistantConnectionStatusLabel, '单机智能体');
       expect(
         controller.assistantConnectionTargetLabel,
-        'Auto · qwen2.5-coder:latest · 127.0.0.1:11434',
+        '没有可用的外部 CLI，请配置 AI Gateway fallback。',
       );
       expect(
         gateway.connectedProfiles,
@@ -805,7 +805,7 @@ void main() {
       expect(controller.assistantConnectionStatusLabel, '单机智能体');
       expect(
         controller.assistantConnectionTargetLabel,
-        'Auto · qwen2.5-coder:latest · 127.0.0.1:11434',
+        '没有可用的外部 CLI，请配置 AI Gateway fallback。',
       );
     },
   );

@@ -459,7 +459,9 @@ class _AssistantPageState extends State<AssistantPage> {
                 inputController: _inputController,
                 focusNode: _composerFocusNode,
                 thinkingLabel: _thinkingLabel,
-                modelLabel: controller.resolvedAssistantModel.isEmpty
+                modelLabel: controller.isSingleAgentMode
+                    ? controller.currentSingleAgentModelDisplayLabel
+                    : controller.resolvedAssistantModel.isEmpty
                     ? appText('未选择模型', 'No model selected')
                     : controller.resolvedAssistantModel,
                 modelOptions: controller.assistantModelChoices,
@@ -2031,7 +2033,7 @@ class _AssistantTaskRailState extends State<_AssistantTaskRail> {
                     ),
                     _MetaPill(
                       label:
-                          '${appText('技能', 'Skills')} ${widget.controller.skills.length}',
+                          '${appText('技能', 'Skills')} ${widget.controller.currentAssistantSkillCount}',
                       icon: Icons.auto_awesome_rounded,
                     ),
                   ],
@@ -2343,11 +2345,19 @@ class _AssistantEmptyState extends StatelessWidget {
     final connectionState = controller.currentAssistantConnectionState;
     final singleAgent = connectionState.isSingleAgent;
     final connected = connectionState.connected;
+    final singleAgentFallback = controller.currentSingleAgentUsesAiChatFallback;
+    final singleAgentNeedsAiGateway =
+        controller.currentSingleAgentNeedsAiGatewayConfiguration;
+    final singleAgentSuggestsAuto =
+        controller.currentSingleAgentShouldSuggestAutoSwitch;
+    final providerLabel = controller.currentSingleAgentProvider.label;
     final reconnectAvailable = controller.canQuickConnectGateway;
     final title = singleAgent
         ? connected
-              ? appText('开始单机智能体任务', 'Start a single-agent task')
-              : appText('先配置 AI Gateway', 'Configure AI Gateway first')
+            ? appText('开始单机智能体任务', 'Start a single-agent task')
+            : singleAgentNeedsAiGateway
+            ? appText('先配置 AI Gateway', 'Configure AI Gateway first')
+            : appText('先准备外部 CLI', 'Prepare the external CLI first')
         : connected
         ? appText('开始对话或运行任务', 'Start a chat or run a task')
         : connectionState.status == RuntimeConnectionStatus.error
@@ -2355,14 +2365,29 @@ class _AssistantEmptyState extends StatelessWidget {
         : appText('先连接 Gateway', 'Connect a gateway first');
     final description = singleAgent
         ? connected
-              ? appText(
-                  '当前模式使用单机智能体处理当前任务，不会建立 OpenClaw Gateway 会话。',
-                  'This mode uses a single agent for the current task and does not open an OpenClaw Gateway session.',
-                )
-              : appText(
-                  '请先在 设置 -> 集成 中配置 AI Gateway 地址、API Key 和默认模型，然后以单机智能体模式继续当前任务。',
-                  'Set the AI Gateway URL, API key, and default model in Settings -> Integrations, then continue this task in Single Agent mode.',
-                )
+            ? (singleAgentFallback
+                  ? appText(
+                      '当前没有可用的外部 CLI，这个线程已降级到 AI Chat fallback，不会建立 OpenClaw Gateway 会话。',
+                      'No external CLI is available for this thread, so it is running in AI Chat fallback without opening an OpenClaw Gateway session.',
+                    )
+                  : appText(
+                      '当前模式使用单机智能体处理当前任务，不会建立 OpenClaw Gateway 会话。',
+                      'This mode uses a single agent for the current task and does not open an OpenClaw Gateway session.',
+                    ))
+            : singleAgentSuggestsAuto
+            ? appText(
+                '当前线程固定为 $providerLabel，但它在这台设备上不可用。检测到其他外部 CLI 时不会自动切换，可在工具栏里改成 Auto。',
+                'This thread is pinned to $providerLabel, but it is unavailable on this device. XWorkmate will not switch to another external CLI automatically. Change the provider to Auto in the toolbar.',
+              )
+            : singleAgentNeedsAiGateway
+            ? appText(
+                '请先在 设置 -> 集成 中配置 AI Gateway 地址、API Key 和默认模型，然后以单机智能体模式继续当前任务。',
+                'Set the AI Gateway URL, API key, and default model in Settings -> Integrations, then continue this task in Single Agent mode.',
+              )
+            : appText(
+                '当前线程的外部 CLI 尚未就绪。请先安装或配置 $providerLabel，或切换到 Auto。',
+                'The external CLI for this thread is not ready yet. Install or configure $providerLabel first, or switch to Auto.',
+              )
         : connected
         ? appText(
             '输入需求后即可开始执行，结果会回到当前会话并同步到任务页。',
@@ -2415,7 +2440,9 @@ class _AssistantEmptyState extends StatelessWidget {
                       onPressed: connected
                           ? onFocusComposer
                           : singleAgent
-                          ? onOpenAiGatewaySettings
+                          ? singleAgentNeedsAiGateway
+                                ? onOpenAiGatewaySettings
+                                : onFocusComposer
                           : reconnectAvailable
                           ? () async {
                               await onReconnectGateway();
@@ -2425,7 +2452,9 @@ class _AssistantEmptyState extends StatelessWidget {
                         connected
                             ? Icons.edit_rounded
                             : singleAgent
-                            ? Icons.tune_rounded
+                            ? singleAgentNeedsAiGateway
+                                  ? Icons.tune_rounded
+                                  : Icons.smart_toy_outlined
                             : reconnectAvailable
                             ? Icons.refresh_rounded
                             : Icons.link_rounded,
@@ -2434,7 +2463,9 @@ class _AssistantEmptyState extends StatelessWidget {
                         connected
                             ? appText('开始输入', 'Start typing')
                             : singleAgent
-                            ? appText('打开配置中心', 'Open settings')
+                            ? singleAgentNeedsAiGateway
+                                  ? appText('打开配置中心', 'Open settings')
+                                  : appText('查看线程工具栏', 'Open toolbar')
                             : reconnectAvailable
                             ? appText('重新连接', 'Reconnect')
                             : appText('连接 Gateway', 'Connect gateway'),
@@ -2450,7 +2481,7 @@ class _AssistantEmptyState extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (!connected)
+                    if (!connected && (!singleAgent || singleAgentNeedsAiGateway))
                       OutlinedButton.icon(
                         onPressed: singleAgent
                             ? onOpenAiGatewaySettings
@@ -2584,6 +2615,8 @@ class _ComposerBarState extends State<_ComposerBar> {
     final connectionState = controller.currentAssistantConnectionState;
     final singleAgent = connectionState.isSingleAgent;
     final connected = connectionState.connected;
+    final singleAgentNeedsAiGateway =
+        controller.currentSingleAgentNeedsAiGatewayConfiguration;
     final reconnectAvailable = controller.canQuickConnectGateway;
     final connecting = connectionState.connecting;
     final executionTarget = controller.assistantExecutionTarget;
@@ -2595,7 +2628,9 @@ class _ComposerBarState extends State<_ComposerBar> {
     final submitLabel = connected
         ? appText('提交', 'Submit')
         : singleAgent
-        ? appText('配置 AI Gateway', 'Configure AI Gateway')
+        ? singleAgentNeedsAiGateway
+              ? appText('配置 AI Gateway', 'Configure AI Gateway')
+              : appText('查看工具栏', 'Open toolbar')
         : connecting
         ? appText('连接中…', 'Connecting…')
         : reconnectAvailable
@@ -3002,7 +3037,11 @@ class _ComposerBarState extends State<_ComposerBar> {
                       : connected
                       ? widget.onSend
                       : singleAgent
-                      ? widget.onOpenAiGatewaySettings
+                      ? singleAgentNeedsAiGateway
+                            ? widget.onOpenAiGatewaySettings
+                            : () {
+                                widget.focusNode.requestFocus();
+                              }
                       : reconnectAvailable
                       ? () async {
                           await widget.onReconnectGateway();
@@ -3025,7 +3064,9 @@ class _ComposerBarState extends State<_ComposerBar> {
                         connected
                             ? Icons.arrow_upward_rounded
                             : singleAgent
-                            ? Icons.hub_outlined
+                            ? singleAgentNeedsAiGateway
+                                  ? Icons.hub_outlined
+                                  : Icons.smart_toy_outlined
                             : reconnectAvailable
                             ? Icons.refresh_rounded
                             : Icons.link_rounded,
