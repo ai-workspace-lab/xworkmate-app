@@ -1,10 +1,8 @@
 import 'dart:io';
 
-export 'legacy_settings_recovery.dart';
 export 'secret_store.dart';
 export 'settings_store.dart';
 
-import 'legacy_settings_recovery.dart';
 import 'runtime_models.dart';
 import 'secret_store.dart';
 import 'settings_store.dart';
@@ -35,15 +33,11 @@ class SecureConfigStore {
       defaultSupportDirectoryPathResolver:
           resolvedDefaultSupportDirectoryPathResolver,
       databaseOpener: databaseOpener,
-      legacyLocalStateKeyLoader: _secretStore.loadLegacyLocalStateKeyBytes,
     );
   }
 
   late final SecretStore _secretStore;
   late final SettingsStore _settingsStore;
-
-  LegacyRecoveryReport get lastRecoveryReport =>
-      _settingsStore.lastRecoveryReport;
 
   Future<void> initialize() async {
     await _secretStore.initialize();

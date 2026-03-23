@@ -748,7 +748,6 @@ Persistence:
 - lib/runtime/secure_config_store.dart
 - lib/runtime/settings_store.dart
 - lib/runtime/secret_store.dart
-- lib/runtime/legacy_settings_recovery.dart
 
 Supporting architecture docs:
 - docs/architecture/assistant-thread-information-architecture.md
