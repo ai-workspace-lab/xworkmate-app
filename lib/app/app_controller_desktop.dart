@@ -696,6 +696,7 @@ class AppController extends ChangeNotifier {
     final reconciled = await _multiAgentMountManager.reconcile(
       config: sync ? resolved : resolved.copyWith(autoSync: false),
       aiGatewayUrl: aiGatewayUrl,
+      configuredCodexCliPath: _resolvedCodexCliPath ?? settings.codexCliPath,
     );
     if (_disposed) {
       return;
