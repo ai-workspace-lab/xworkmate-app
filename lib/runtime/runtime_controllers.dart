@@ -67,32 +67,36 @@ class SettingsController extends ChangeNotifier {
   }
 
   Future<void> saveGatewaySecrets({
+    int? profileIndex,
     required String token,
     required String password,
   }) async {
     final trimmedToken = token.trim();
     final trimmedPassword = password.trim();
     if (trimmedToken.isNotEmpty) {
-      await _store.saveGatewayToken(trimmedToken);
+      await _store.saveGatewayToken(trimmedToken, profileIndex: profileIndex);
       await appendAudit(
         SecretAuditEntry(
           timeLabel: _timeLabel(),
           action: 'Updated',
           provider: 'Gateway',
-          target: 'gateway_token',
+          target: _gatewaySecretTarget('gateway_token', profileIndex),
           module: 'Assistant',
           status: 'Success',
         ),
       );
     }
     if (trimmedPassword.isNotEmpty) {
-      await _store.saveGatewayPassword(trimmedPassword);
+      await _store.saveGatewayPassword(
+        trimmedPassword,
+        profileIndex: profileIndex,
+      );
       await appendAudit(
         SecretAuditEntry(
           timeLabel: _timeLabel(),
           action: 'Updated',
           provider: 'Gateway',
-          target: 'gateway_password',
+          target: _gatewaySecretTarget('gateway_password', profileIndex),
           module: 'Assistant',
           status: 'Success',
         ),
@@ -103,30 +107,31 @@ class SettingsController extends ChangeNotifier {
   }
 
   Future<void> clearGatewaySecrets({
+    int? profileIndex,
     bool token = false,
     bool password = false,
   }) async {
     if (token) {
-      await _store.clearGatewayToken();
+      await _store.clearGatewayToken(profileIndex: profileIndex);
       await appendAudit(
         SecretAuditEntry(
           timeLabel: _timeLabel(),
           action: 'Cleared',
           provider: 'Gateway',
-          target: 'gateway_token',
+          target: _gatewaySecretTarget('gateway_token', profileIndex),
           module: 'Assistant',
           status: 'Success',
         ),
       );
     }
     if (password) {
-      await _store.clearGatewayPassword();
+      await _store.clearGatewayPassword(profileIndex: profileIndex);
       await appendAudit(
         SecretAuditEntry(
           timeLabel: _timeLabel(),
           action: 'Cleared',
           provider: 'Gateway',
-          target: 'gateway_password',
+          target: _gatewaySecretTarget('gateway_password', profileIndex),
           module: 'Assistant',
           status: 'Success',
         ),
@@ -136,13 +141,37 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String> loadGatewayToken() async {
-    return (await _store.loadGatewayToken())?.trim() ?? '';
+  Future<String> loadGatewayToken({int? profileIndex}) async {
+    return (await _store.loadGatewayToken(
+          profileIndex: profileIndex,
+        ))?.trim() ??
+        '';
   }
 
-  Future<String> loadGatewayPassword() async {
-    return (await _store.loadGatewayPassword())?.trim() ?? '';
+  Future<String> loadGatewayPassword({int? profileIndex}) async {
+    return (await _store.loadGatewayPassword(
+          profileIndex: profileIndex,
+        ))?.trim() ??
+        '';
   }
+
+  bool hasStoredGatewayTokenForProfile(int profileIndex) =>
+      _secureRefs.containsKey(SecretStore.gatewayTokenRefKey(profileIndex)) ||
+      _secureRefs.containsKey('gateway_token');
+
+  bool hasStoredGatewayPasswordForProfile(int profileIndex) =>
+      _secureRefs.containsKey(
+        SecretStore.gatewayPasswordRefKey(profileIndex),
+      ) ||
+      _secureRefs.containsKey('gateway_password');
+
+  String? storedGatewayTokenMaskForProfile(int profileIndex) =>
+      _secureRefs[SecretStore.gatewayTokenRefKey(profileIndex)] ??
+      _secureRefs['gateway_token'];
+
+  String? storedGatewayPasswordMaskForProfile(int profileIndex) =>
+      _secureRefs[SecretStore.gatewayPasswordRefKey(profileIndex)] ??
+      _secureRefs['gateway_password'];
 
   Future<void> saveOllamaCloudApiKey(String value) async {
     final trimmed = value.trim();
@@ -753,6 +782,13 @@ class SettingsController extends ChangeNotifier {
   String _timeLabel() {
     final now = DateTime.now();
     return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _gatewaySecretTarget(String base, int? profileIndex) {
+    if (profileIndex == null) {
+      return base;
+    }
+    return '$base.$profileIndex';
   }
 }
 

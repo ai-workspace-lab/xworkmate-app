@@ -33,6 +33,7 @@ class _FakeGatewayRuntime extends GatewayRuntime {
   @override
   Future<void> connectProfile(
     GatewayConnectionProfile profile, {
+    int? profileIndex,
     String authTokenOverride = '',
     String authPasswordOverride = '',
   }) async {}

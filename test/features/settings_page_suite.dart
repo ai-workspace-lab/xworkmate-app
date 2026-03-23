@@ -505,6 +505,22 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('llm-endpoint-add-button')));
     await tester.pumpAndSettle();
 
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('llm-endpoint-chip-0')),
+        matching: find.textContaining('主 LLM API'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('llm-endpoint-chip-1')),
+        matching: find.textContaining('Ollama 本地'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('连接源详情'), findsOneWidget);
+    expect(find.textContaining('自定义连接源'), findsNothing);
     expect(find.byKey(const ValueKey('llm-endpoint-chip-1')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('llm-endpoint-panel-ollamaLocal')),
