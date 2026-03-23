@@ -19,13 +19,12 @@ import '../runtime/runtime_controllers.dart';
 import '../runtime/runtime_models.dart';
 import '../runtime/secure_config_store.dart';
 import '../runtime/runtime_coordinator.dart';
+import '../runtime/gateway_acp_client.dart';
 import '../runtime/codex_runtime.dart';
 import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
-import '../runtime/multi_agent_broker.dart';
-import '../runtime/multi_agent_mounts.dart';
 import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/single_agent_runner.dart';
 
@@ -93,15 +92,14 @@ class AppController extends ChangeNotifier {
         (_isFlutterTestEnvironment
             ? const <String>[]
             : _defaultGatewayOnlySkillScanRoots);
+    _gatewayAcpClient = GatewayAcpClient(endpointResolver: _resolveAcpEndpoint);
     _availableSingleAgentProvidersOverride =
         availableSingleAgentProvidersOverride;
     _arisBundleRepository = ArisBundleRepository();
     _arisBridgeLocator = ArisBridgeLocator();
-    _multiAgentMountManager = MultiAgentMountManager(
-      arisBundleRepository: _arisBundleRepository,
-      arisBridgeLocator: _arisBridgeLocator,
-    );
-    _singleAgentRunner = singleAgentRunner ?? DefaultSingleAgentRunner();
+    _singleAgentRunner =
+        singleAgentRunner ??
+        DefaultSingleAgentRunner(acpClient: _gatewayAcpClient);
     _multiAgentOrchestrator = MultiAgentOrchestrator(
       config: _resolveMultiAgentConfig(_settingsController.snapshot),
       arisBundleRepository: _arisBundleRepository,
@@ -132,14 +130,14 @@ class AppController extends ChangeNotifier {
   late final DerivedTasksController _tasksController;
   late final DesktopPlatformService _desktopPlatformService;
   late final List<String> _gatewayOnlySkillScanRoots;
+  late final GatewayAcpClient _gatewayAcpClient;
   late final List<SingleAgentProvider>? _availableSingleAgentProvidersOverride;
   late final ArisBundleRepository _arisBundleRepository;
   late final ArisBridgeLocator _arisBridgeLocator;
-  late final MultiAgentMountManager _multiAgentMountManager;
   late final SingleAgentRunner _singleAgentRunner;
   late final MultiAgentOrchestrator _multiAgentOrchestrator;
-  MultiAgentBrokerServer? _multiAgentBrokerServer;
-  MultiAgentBrokerClient? _multiAgentBrokerClient;
+  GatewayAcpCapabilities _acpCapabilities =
+      const GatewayAcpCapabilities.empty();
   final Map<String, List<GatewayChatMessage>> _assistantThreadMessages =
       <String, List<GatewayChatMessage>>{};
   final Map<String, AssistantThreadRecord> _assistantThreadRecords =
@@ -155,7 +153,8 @@ class AppController extends ChangeNotifier {
   final Set<String> _aiGatewayPendingSessionKeys = <String>{};
   final Set<String> _aiGatewayAbortedSessionKeys = <String>{};
   final Set<String> _singleAgentExternalCliPendingSessionKeys = <String>{};
-  final Set<String> _activeMultiAgentBrokerSessions = <String>{};
+  final Map<String, Future<void>> _assistantThreadTurnQueues =
+      <String, Future<void>>{};
   bool _multiAgentRunPending = false;
   int _localMessageCounter = 0;
 
@@ -326,21 +325,13 @@ class AppController extends ChangeNotifier {
   bool _canUseSingleAgentProvider(SingleAgentProvider provider) {
     final override = _availableSingleAgentProvidersOverride;
     if (override != null) {
-      return provider != SingleAgentProvider.auto && override.contains(provider);
+      return provider != SingleAgentProvider.auto &&
+          override.contains(provider);
     }
     if (provider == SingleAgentProvider.auto) {
-      return settings.multiAgent.mountTargets.any(
-        (item) =>
-            item.available &&
-            (item.targetId == 'codex' ||
-                item.targetId == 'opencode' ||
-                item.targetId == 'claude' ||
-                item.targetId == 'gemini'),
-      );
+      return _acpCapabilities.providers.isNotEmpty;
     }
-    return settings.multiAgent.mountTargets.any(
-      (item) => item.targetId == provider.providerId && item.available,
-    );
+    return _acpCapabilities.providers.contains(provider);
   }
 
   SingleAgentProvider? _resolvedSingleAgentProvider(
@@ -476,7 +467,9 @@ class AppController extends ChangeNotifier {
   SingleAgentProvider get currentSingleAgentProvider =>
       singleAgentProviderForSession(currentSessionKey);
 
-  SingleAgentProvider? singleAgentResolvedProviderForSession(String sessionKey) {
+  SingleAgentProvider? singleAgentResolvedProviderForSession(
+    String sessionKey,
+  ) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
     return _resolvedSingleAgentProvider(
       singleAgentProviderForSession(normalizedSessionKey),
@@ -590,18 +583,17 @@ class AppController extends ChangeNotifier {
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
     if (target == AssistantExecutionTarget.singleAgent) {
       final provider = singleAgentProviderForSession(normalizedSessionKey);
-      final resolvedProvider =
-          singleAgentResolvedProviderForSession(normalizedSessionKey);
+      final resolvedProvider = singleAgentResolvedProviderForSession(
+        normalizedSessionKey,
+      );
       final model = assistantModelForSession(normalizedSessionKey);
-      final fallbackReady =
-          singleAgentUsesAiChatFallbackForSession(normalizedSessionKey);
+      final fallbackReady = singleAgentUsesAiChatFallbackForSession(
+        normalizedSessionKey,
+      );
       final host = _aiGatewayHostLabel(settings.aiGateway.baseUrl);
       final providerReady = resolvedProvider != null;
       final detail = providerReady
-          ? _joinConnectionParts(<String>[
-              resolvedProvider.label,
-              model,
-            ])
+          ? _joinConnectionParts(<String>[resolvedProvider.label, model])
           : fallbackReady
           ? _joinConnectionParts(<String>[
               appText('AI Chat fallback', 'AI Chat fallback'),
@@ -614,8 +606,8 @@ class AppController extends ChangeNotifier {
               '${provider.label} is unavailable. Switch to Auto.',
             )
           : singleAgentNeedsAiGatewayConfigurationForSession(
-                normalizedSessionKey,
-              )
+              normalizedSessionKey,
+            )
           ? appText(
               '没有可用的外部 CLI，请配置 AI Gateway fallback。',
               'No external CLI is available. Configure AI Gateway fallback.',
@@ -689,29 +681,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> refreshMultiAgentMounts({bool sync = false}) async {
-    if (_disposed) {
-      return;
-    }
-    final resolved = _resolveMultiAgentConfig(settings);
-    final reconciled = await _multiAgentMountManager.reconcile(
-      config: sync ? resolved : resolved.copyWith(autoSync: false),
-      aiGatewayUrl: aiGatewayUrl,
-      configuredCodexCliPath: _resolvedCodexCliPath ?? settings.codexCliPath,
-    );
-    if (_disposed) {
-      return;
-    }
-    if (jsonEncode(reconciled.toJson()) !=
-        jsonEncode(settings.multiAgent.toJson())) {
-      await _settingsController.saveSnapshot(
-        settings.copyWith(multiAgent: reconciled),
-      );
-    }
-    if (_disposed) {
-      return;
-    }
-    _multiAgentOrchestrator.updateConfig(reconciled);
-    _notifyIfActive();
+    await _refreshAcpCapabilities(persistMountTargets: true);
   }
 
   Future<void> runMultiAgentCollaboration({
@@ -723,125 +693,122 @@ class AppController extends ChangeNotifier {
     final sessionKey = currentSessionKey.trim().isEmpty
         ? 'main'
         : currentSessionKey;
-    final client = await _ensureMultiAgentBrokerClient();
-    final aiGatewayApiKey = await loadAiGatewayApiKey();
-    _multiAgentRunPending = true;
-    _appendLocalSessionMessage(
-      sessionKey,
-      GatewayChatMessage(
-        id: _nextLocalMessageId(),
-        role: 'user',
-        text: rawPrompt,
-        timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        toolCallId: null,
-        toolName: null,
-        stopReason: null,
-        pending: false,
-        error: false,
-      ),
-    );
-    _recomputeTasks();
-    try {
-      final taskStream = settings.multiAgent.usesAris
-          ? (_activeMultiAgentBrokerSessions.contains(sessionKey)
-                ? client.sendSessionMessage(
-                    sessionId: sessionKey,
-                    taskPrompt: composedPrompt,
-                    workingDirectory:
-                        _resolveCodexWorkingDirectory() ??
-                        Directory.current.path,
-                    attachments: attachments,
-                    selectedSkills: selectedSkillLabels,
-                    aiGatewayBaseUrl: aiGatewayUrl,
-                    aiGatewayApiKey: aiGatewayApiKey,
-                  )
-                : client.startSession(
-                    sessionId: sessionKey,
-                    taskPrompt: composedPrompt,
-                    workingDirectory:
-                        _resolveCodexWorkingDirectory() ??
-                        Directory.current.path,
-                    attachments: attachments,
-                    selectedSkills: selectedSkillLabels,
-                    aiGatewayBaseUrl: aiGatewayUrl,
-                    aiGatewayApiKey: aiGatewayApiKey,
-                  ))
-          : client.runTask(
-              taskPrompt: composedPrompt,
-              workingDirectory:
-                  _resolveCodexWorkingDirectory() ?? Directory.current.path,
-              attachments: attachments,
-              selectedSkills: selectedSkillLabels,
-              aiGatewayBaseUrl: aiGatewayUrl,
-              aiGatewayApiKey: aiGatewayApiKey,
+    await _enqueueThreadTurn<void>(sessionKey, () async {
+      final aiGatewayApiKey = await loadAiGatewayApiKey();
+      _multiAgentRunPending = true;
+      _appendLocalSessionMessage(
+        sessionKey,
+        GatewayChatMessage(
+          id: _nextLocalMessageId(),
+          role: 'user',
+          text: rawPrompt,
+          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          toolCallId: null,
+          toolName: null,
+          stopReason: null,
+          pending: false,
+          error: false,
+        ),
+      );
+      _recomputeTasks();
+      try {
+        final taskStream = _gatewayAcpClient.runMultiAgent(
+          GatewayAcpMultiAgentRequest(
+            sessionId: sessionKey,
+            threadId: sessionKey,
+            prompt: composedPrompt,
+            workingDirectory:
+                _resolveCodexWorkingDirectory() ?? Directory.current.path,
+            attachments: attachments,
+            selectedSkills: selectedSkillLabels,
+            aiGatewayBaseUrl: aiGatewayUrl,
+            aiGatewayApiKey: aiGatewayApiKey,
+            resumeSession: true,
+          ),
+        );
+        await for (final event in taskStream) {
+          if (event.type == 'result') {
+            final success = event.data['success'] == true;
+            final finalScore = event.data['finalScore'];
+            final iterations = event.data['iterations'];
+            _appendLocalSessionMessage(
+              sessionKey,
+              GatewayChatMessage(
+                id: _nextLocalMessageId(),
+                role: 'assistant',
+                text: success
+                    ? appText(
+                        '多 Agent 协作完成，评分 ${finalScore ?? '-'}，迭代 ${iterations ?? 0} 次。',
+                        'Multi-agent collaboration completed with score ${finalScore ?? '-'} after ${iterations ?? 0} iteration(s).',
+                      )
+                    : appText(
+                        '多 Agent 协作失败：${event.data['error'] ?? event.message}',
+                        'Multi-agent collaboration failed: ${event.data['error'] ?? event.message}',
+                      ),
+                timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+                toolCallId: null,
+                toolName: null,
+                stopReason: null,
+                pending: false,
+                error: !success,
+              ),
             );
-      if (settings.multiAgent.usesAris) {
-        _activeMultiAgentBrokerSessions.add(sessionKey);
-      }
-      await for (final event in taskStream) {
-        if (event.type == 'result') {
-          final success = event.data['success'] == true;
-          final finalScore = event.data['finalScore'];
-          final iterations = event.data['iterations'];
+            continue;
+          }
           _appendLocalSessionMessage(
             sessionKey,
             GatewayChatMessage(
               id: _nextLocalMessageId(),
               role: 'assistant',
-              text: success
-                  ? appText(
-                      '多 Agent 协作完成，评分 ${finalScore ?? '-'}，迭代 ${iterations ?? 0} 次。',
-                      'Multi-agent collaboration completed with score ${finalScore ?? '-'} after ${iterations ?? 0} iteration(s).',
-                    )
-                  : appText(
-                      '多 Agent 协作失败：${event.data['error'] ?? event.message}',
-                      'Multi-agent collaboration failed: ${event.data['error'] ?? event.message}',
-                    ),
+              text: event.message,
               timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
               toolCallId: null,
-              toolName: null,
+              toolName: event.title,
               stopReason: null,
-              pending: false,
-              error: !success,
+              pending: event.pending,
+              error: event.error,
             ),
           );
-          continue;
         }
+      } on GatewayAcpException catch (error) {
         _appendLocalSessionMessage(
           sessionKey,
           GatewayChatMessage(
             id: _nextLocalMessageId(),
             role: 'assistant',
-            text: event.message,
+            text: appText(
+              '多 Agent 协作不可用（Gateway ACP）：${error.message}',
+              'Multi-agent collaboration is unavailable (Gateway ACP): ${error.message}',
+            ),
             timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
             toolCallId: null,
-            toolName: event.title,
+            toolName: 'Multi-Agent',
             stopReason: null,
-            pending: event.pending,
-            error: event.error,
+            pending: false,
+            error: true,
           ),
         );
+      } catch (error) {
+        _appendLocalSessionMessage(
+          sessionKey,
+          GatewayChatMessage(
+            id: _nextLocalMessageId(),
+            role: 'assistant',
+            text: error.toString(),
+            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            toolCallId: null,
+            toolName: 'Multi-Agent',
+            stopReason: null,
+            pending: false,
+            error: true,
+          ),
+        );
+      } finally {
+        _multiAgentRunPending = false;
+        _recomputeTasks();
+        _notifyIfActive();
       }
-    } catch (error) {
-      _appendLocalSessionMessage(
-        sessionKey,
-        GatewayChatMessage(
-          id: _nextLocalMessageId(),
-          role: 'assistant',
-          text: error.toString(),
-          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          toolCallId: null,
-          toolName: 'Multi-Agent',
-          stopReason: null,
-          pending: false,
-          error: true,
-        ),
-      );
-    } finally {
-      _multiAgentRunPending = false;
-      _recomputeTasks();
-      _notifyIfActive();
-    }
+    });
   }
 
   Future<void> openOnlineWorkspace() async {
@@ -887,10 +854,10 @@ class AppController extends ChangeNotifier {
       if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
         return aiGatewayConversationModelChoices;
       }
-      final selectedModel = _assistantThreadRecords[
-              _normalizedAssistantSessionKey(sessionKey)]
-          ?.assistantModelId
-          .trim();
+      final selectedModel =
+          _assistantThreadRecords[_normalizedAssistantSessionKey(sessionKey)]
+              ?.assistantModelId
+              .trim();
       if (selectedModel?.isNotEmpty == true) {
         return <String>[selectedModel!];
       }
@@ -1651,10 +1618,14 @@ class AppController extends ChangeNotifier {
       final sessionKey = _normalizedAssistantSessionKey(
         _sessionsController.currentSessionKey,
       );
-      if (_activeMultiAgentBrokerSessions.contains(sessionKey)) {
-        await _multiAgentBrokerClient?.cancelSession(sessionKey);
+      try {
+        await _gatewayAcpClient.cancelSession(
+          sessionId: sessionKey,
+          threadId: sessionKey,
+        );
+      } catch (_) {
+        // Best effort cancellation only.
       }
-      await _multiAgentOrchestrator.abort();
       _multiAgentRunPending = false;
       _recomputeTasks();
       _notifyIfActive();
@@ -2069,8 +2040,14 @@ class AppController extends ChangeNotifier {
       refreshAfterSave: false,
     );
     if (archived) {
-      _activeMultiAgentBrokerSessions.remove(normalizedSessionKey);
-      unawaited(_multiAgentBrokerClient?.closeSession(normalizedSessionKey));
+      unawaited(
+        _gatewayAcpClient
+            .closeSession(
+              sessionId: normalizedSessionKey,
+              threadId: normalizedSessionKey,
+            )
+            .catchError((_) {}),
+      );
     }
     _upsertAssistantThreadRecord(
       normalizedSessionKey,
@@ -2270,7 +2247,7 @@ class AppController extends ChangeNotifier {
     _aiGatewayPendingSessionKeys.clear();
     _aiGatewayAbortedSessionKeys.clear();
     _singleAgentExternalCliPendingSessionKeys.clear();
-    _activeMultiAgentBrokerSessions.clear();
+    _assistantThreadTurnQueues.clear();
     _multiAgentRunPending = false;
     setActiveAppLanguage(defaults.appLanguage);
     await _settingsController.resetSnapshot(defaults);
@@ -2500,18 +2477,16 @@ class AppController extends ChangeNotifier {
         );
       }
 
+      await _refreshAcpCapabilities(forceRefresh: true);
       final runtimeMode = effectiveCodeAgentRuntimeMode;
-      String? codexPath;
-      if (runtimeMode == CodeAgentRuntimeMode.externalCli) {
-        codexPath = await _resolveCodexCliPath();
-        if (codexPath == null) {
-          throw StateError(
-            appText(
-              '未找到 Codex CLI。请先安装或填写可执行文件路径。',
-              'Codex CLI not found. Install it or set a manual binary path.',
-            ),
-          );
-        }
+      if (runtimeMode == CodeAgentRuntimeMode.externalCli &&
+          !_canUseSingleAgentProvider(SingleAgentProvider.codex)) {
+        throw StateError(
+          appText(
+            'Gateway ACP 未报告 Codex Provider 可用，请先检查 Agent Gateway / ACP Adapter 配置。',
+            'Gateway ACP did not report a Codex provider. Check Agent Gateway / ACP Adapter settings first.',
+          ),
+        );
       }
 
       await _runtimeCoordinator.configureCodexForGateway(
@@ -2519,13 +2494,7 @@ class AppController extends ChangeNotifier {
         apiKey: apiKey,
       );
 
-      await _runtimeCoordinator.startCodeAgentRuntime(
-        runtimeMode: runtimeMode,
-        codexPath: codexPath,
-        workingDirectory: _resolveCodexWorkingDirectory(),
-      );
-
-      _registerCodexExternalProvider(codexPath: codexPath);
+      _registerCodexExternalProvider();
       _isCodexBridgeEnabled = true;
       _codexCooperationState = CodexCooperationState.bridgeOnly;
       await _ensureCodexGatewayRegistration();
@@ -2552,7 +2521,6 @@ class AppController extends ChangeNotifier {
       } else {
         _codeAgentBridgeRegistry.clearRegistration();
       }
-      await _runtimeCoordinator.stopCodeAgentRuntime();
       _isCodexBridgeEnabled = false;
       _codexCooperationState = CodexCooperationState.notStarted;
       _codexBridgeError = null;
@@ -2589,7 +2557,7 @@ class AppController extends ChangeNotifier {
     _tasksController.dispose();
     _store.dispose();
     _desktopPlatformService.dispose();
-    unawaited(_multiAgentBrokerServer?.stop() ?? Future<void>.value());
+    unawaited(_gatewayAcpClient.dispose());
     super.dispose();
   }
 
@@ -2634,7 +2602,7 @@ class AppController extends ChangeNotifier {
       await _desktopPlatformService.initialize(settings.linuxDesktop);
       await _desktopPlatformService.setLaunchAtLogin(settings.launchAtLogin);
       _registerCodexExternalProvider();
-      await _refreshCodexCliAvailability();
+      await _refreshAcpCapabilities(persistMountTargets: true);
       if (_disposed) {
         return;
       }
@@ -2675,10 +2643,6 @@ class AppController extends ChangeNotifier {
           // Keep the shell usable when auto-connect fails.
         }
       }
-      // Mount reconciliation may invoke multiple external CLIs. Keep startup
-      // responsive and let the mounts refresh in the background instead of
-      // blocking app initialization on those probes.
-      unawaited(refreshMultiAgentMounts(sync: settings.multiAgent.autoSync));
       _settingsDraft = settings;
       _lastAppliedSettings = settings;
       _settingsDraftInitialized = true;
@@ -2822,11 +2786,7 @@ class AppController extends ChangeNotifier {
     }
     if (previous.codexCliPath != current.codexCliPath ||
         previous.codeAgentRuntimeMode != current.codeAgentRuntimeMode) {
-      _registerCodexExternalProvider(codexPath: current.codexCliPath);
-      await _refreshCodexCliAvailability();
-      if (_disposed) {
-        return;
-      }
+      _registerCodexExternalProvider();
     }
     if (previous.linuxDesktop.toJson().toString() !=
             current.linuxDesktop.toJson().toString() ||
@@ -2840,7 +2800,7 @@ class AppController extends ChangeNotifier {
     if (refreshAfterSave) {
       _recomputeTasks();
     }
-    unawaited(refreshMultiAgentMounts(sync: current.multiAgent.autoSync));
+    unawaited(_refreshAcpCapabilities(persistMountTargets: true));
     notifyListeners();
   }
 
@@ -3053,33 +3013,6 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  Future<MultiAgentBrokerClient> _ensureMultiAgentBrokerClient() async {
-    _multiAgentBrokerServer ??= MultiAgentBrokerServer(_multiAgentOrchestrator);
-    await _multiAgentBrokerServer!.start();
-    final uri = _multiAgentBrokerServer!.wsUri;
-    if (uri == null) {
-      throw StateError('Multi-agent broker is unavailable');
-    }
-    _runtimeCoordinator.registerExternalCodeAgent(
-      ExternalCodeAgentProvider(
-        id: 'aris-broker',
-        name: 'ARIS Broker',
-        command: 'xworkmate-multi-agent-broker',
-        transport: ExternalAgentTransport.websocketJsonRpc,
-        endpoint: uri.toString(),
-        capabilities: const <String>[
-          'architect',
-          'engineer',
-          'tester',
-          'multi-agent',
-          'session-stream',
-        ],
-      ),
-    );
-    _multiAgentBrokerClient = MultiAgentBrokerClient(uri);
-    return _multiAgentBrokerClient!;
-  }
-
   Future<void> _sendSingleAgentMessage(
     String message, {
     required String thinking,
@@ -3094,203 +3027,14 @@ class AppController extends ChangeNotifier {
     if (trimmed.isEmpty && attachments.isEmpty) {
       return;
     }
-
-    final userText = trimmed.isEmpty ? 'See attached.' : trimmed;
-    _appendAssistantThreadMessage(
-      sessionKey,
-      GatewayChatMessage(
-        id: _nextLocalMessageId(),
-        role: 'user',
-        text: userText,
-        timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        toolCallId: null,
-        toolName: null,
-        stopReason: null,
-        pending: false,
-        error: false,
-      ),
-    );
-    _aiGatewayPendingSessionKeys.add(sessionKey);
-    _recomputeTasks();
-    _notifyIfActive();
-
-    try {
-      final selection = singleAgentProviderForSession(sessionKey);
-      final resolution = await _singleAgentRunner.resolveProvider(
-        selection: selection,
-        configuredCodexCliPath: configuredCodexCliPath,
-      );
-      final provider = resolution.resolvedProvider;
-      if (provider == null) {
-        if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
-          _appendAssistantThreadMessage(
-            sessionKey,
-            GatewayChatMessage(
-              id: _nextLocalMessageId(),
-              role: 'assistant',
-              text: _singleAgentFallbackLabel(resolution.fallbackReason),
-              timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-              toolCallId: null,
-              toolName: 'AI Chat fallback',
-              stopReason: null,
-              pending: false,
-              error: false,
-            ),
-          );
-          await _sendAiGatewayMessage(
-            message,
-            thinking: thinking,
-            attachments: attachments,
-            sessionKeyOverride: sessionKey,
-            appendUserMessage: false,
-            managePendingState: false,
-          );
-        } else {
-          _appendAssistantThreadMessage(
-            sessionKey,
-            GatewayChatMessage(
-              id: _nextLocalMessageId(),
-              role: 'assistant',
-              text: _singleAgentUnavailableLabel(
-                sessionKey,
-                resolution.fallbackReason,
-              ),
-              timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-              toolCallId: null,
-              toolName: provider?.label ?? selection.label,
-              stopReason: null,
-              pending: false,
-              error: false,
-            ),
-          );
-        }
-        return;
-      }
-
+    await _enqueueThreadTurn<void>(sessionKey, () async {
+      final userText = trimmed.isEmpty ? 'See attached.' : trimmed;
       _appendAssistantThreadMessage(
         sessionKey,
         GatewayChatMessage(
           id: _nextLocalMessageId(),
-          role: 'assistant',
-          text: appText(
-            '单机智能体已切换到 ${provider.label} 执行当前任务。',
-            'Single Agent is using ${provider.label} for this task.',
-          ),
-          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          toolCallId: null,
-          toolName: provider.label,
-          stopReason: null,
-          pending: false,
-          error: false,
-        ),
-      );
-      _singleAgentExternalCliPendingSessionKeys.add(sessionKey);
-
-      final result = await _singleAgentRunner.run(
-        SingleAgentRunRequest(
-          sessionId: sessionKey,
-          provider: provider,
-          prompt: message,
-          model: assistantModelForSession(sessionKey),
-          workingDirectory:
-              _resolveCodexWorkingDirectory() ?? Directory.current.path,
-          attachments: localAttachments,
-          selectedSkills: selectedSkillLabels,
-          aiGatewayBaseUrl: aiGatewayUrl,
-          aiGatewayApiKey: await loadAiGatewayApiKey(),
-          config: settings.multiAgent,
-          onOutput: (text) => _setAiGatewayStreamingText(sessionKey, text),
-          configuredCodexCliPath: configuredCodexCliPath,
-        ),
-      );
-      _clearAiGatewayStreamingText(sessionKey);
-      if (result.aborted) {
-        final partial = result.output.trim();
-        if (partial.isNotEmpty) {
-          _appendAssistantThreadMessage(
-            sessionKey,
-            GatewayChatMessage(
-              id: _nextLocalMessageId(),
-              role: 'assistant',
-              text: partial,
-              timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-              toolCallId: null,
-              toolName: null,
-              stopReason: 'aborted',
-              pending: false,
-              error: false,
-            ),
-          );
-        }
-        return;
-      }
-      if (result.shouldFallbackToAiChat) {
-        if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
-          _appendAssistantThreadMessage(
-            sessionKey,
-            GatewayChatMessage(
-              id: _nextLocalMessageId(),
-              role: 'assistant',
-              text: _singleAgentFallbackLabel(
-                result.fallbackReason ?? result.errorMessage,
-              ),
-              timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-              toolCallId: null,
-              toolName: 'AI Chat fallback',
-              stopReason: null,
-              pending: false,
-              error: false,
-            ),
-          );
-          await _sendAiGatewayMessage(
-            message,
-            thinking: thinking,
-            attachments: attachments,
-            sessionKeyOverride: sessionKey,
-            appendUserMessage: false,
-            managePendingState: false,
-          );
-        } else {
-          _appendAssistantThreadMessage(
-            sessionKey,
-            GatewayChatMessage(
-              id: _nextLocalMessageId(),
-              role: 'assistant',
-              text: _singleAgentUnavailableLabel(
-                sessionKey,
-                result.fallbackReason ?? result.errorMessage,
-              ),
-              timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-              toolCallId: null,
-              toolName: provider.label,
-              stopReason: null,
-              pending: false,
-              error: false,
-            ),
-          );
-        }
-        return;
-      }
-
-      if (!result.success) {
-        _appendAssistantThreadMessage(
-          sessionKey,
-          _assistantErrorMessage(
-            appText(
-              '单机智能体执行失败：${result.errorMessage}',
-              'Single Agent execution failed: ${result.errorMessage}',
-            ),
-          ),
-        );
-        return;
-      }
-
-      _appendAssistantThreadMessage(
-        sessionKey,
-        GatewayChatMessage(
-          id: _nextLocalMessageId(),
-          role: 'assistant',
-          text: result.output,
+          role: 'user',
+          text: userText,
           timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
           toolCallId: null,
           toolName: null,
@@ -3299,19 +3043,209 @@ class AppController extends ChangeNotifier {
           error: false,
         ),
       );
-    } catch (error) {
-      _clearAiGatewayStreamingText(sessionKey);
-      _appendAssistantThreadMessage(
-        sessionKey,
-        _assistantErrorMessage(error.toString()),
-      );
-    } finally {
-      _singleAgentExternalCliPendingSessionKeys.remove(sessionKey);
-      _clearAiGatewayStreamingText(sessionKey);
-      _aiGatewayPendingSessionKeys.remove(sessionKey);
+      _aiGatewayPendingSessionKeys.add(sessionKey);
       _recomputeTasks();
       _notifyIfActive();
-    }
+
+      try {
+        final selection = singleAgentProviderForSession(sessionKey);
+        final resolution = await _singleAgentRunner.resolveProvider(
+          selection: selection,
+          configuredCodexCliPath: configuredCodexCliPath,
+        );
+        final provider = resolution.resolvedProvider;
+        if (provider == null) {
+          if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
+            _appendAssistantThreadMessage(
+              sessionKey,
+              GatewayChatMessage(
+                id: _nextLocalMessageId(),
+                role: 'assistant',
+                text: _singleAgentFallbackLabel(resolution.fallbackReason),
+                timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+                toolCallId: null,
+                toolName: 'AI Chat fallback',
+                stopReason: null,
+                pending: false,
+                error: false,
+              ),
+            );
+            await _sendAiGatewayMessage(
+              message,
+              thinking: thinking,
+              attachments: attachments,
+              sessionKeyOverride: sessionKey,
+              appendUserMessage: false,
+              managePendingState: false,
+            );
+          } else {
+            _appendAssistantThreadMessage(
+              sessionKey,
+              GatewayChatMessage(
+                id: _nextLocalMessageId(),
+                role: 'assistant',
+                text: _singleAgentUnavailableLabel(
+                  sessionKey,
+                  resolution.fallbackReason,
+                ),
+                timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+                toolCallId: null,
+                toolName: provider?.label ?? selection.label,
+                stopReason: null,
+                pending: false,
+                error: false,
+              ),
+            );
+          }
+          return;
+        }
+
+        _appendAssistantThreadMessage(
+          sessionKey,
+          GatewayChatMessage(
+            id: _nextLocalMessageId(),
+            role: 'assistant',
+            text: appText(
+              '单机智能体已切换到 ${provider.label} 执行当前任务。',
+              'Single Agent is using ${provider.label} for this task.',
+            ),
+            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            toolCallId: null,
+            toolName: provider.label,
+            stopReason: null,
+            pending: false,
+            error: false,
+          ),
+        );
+        _singleAgentExternalCliPendingSessionKeys.add(sessionKey);
+
+        final result = await _singleAgentRunner.run(
+          SingleAgentRunRequest(
+            sessionId: sessionKey,
+            provider: provider,
+            prompt: message,
+            model: assistantModelForSession(sessionKey),
+            workingDirectory:
+                _resolveCodexWorkingDirectory() ?? Directory.current.path,
+            attachments: localAttachments,
+            selectedSkills: selectedSkillLabels,
+            aiGatewayBaseUrl: aiGatewayUrl,
+            aiGatewayApiKey: await loadAiGatewayApiKey(),
+            config: settings.multiAgent,
+            onOutput: (text) => _appendAiGatewayStreamingText(sessionKey, text),
+            configuredCodexCliPath: configuredCodexCliPath,
+          ),
+        );
+        _clearAiGatewayStreamingText(sessionKey);
+        if (result.aborted) {
+          final partial = result.output.trim();
+          if (partial.isNotEmpty) {
+            _appendAssistantThreadMessage(
+              sessionKey,
+              GatewayChatMessage(
+                id: _nextLocalMessageId(),
+                role: 'assistant',
+                text: partial,
+                timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+                toolCallId: null,
+                toolName: null,
+                stopReason: 'aborted',
+                pending: false,
+                error: false,
+              ),
+            );
+          }
+          return;
+        }
+        if (result.shouldFallbackToAiChat) {
+          if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
+            _appendAssistantThreadMessage(
+              sessionKey,
+              GatewayChatMessage(
+                id: _nextLocalMessageId(),
+                role: 'assistant',
+                text: _singleAgentFallbackLabel(
+                  result.fallbackReason ?? result.errorMessage,
+                ),
+                timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+                toolCallId: null,
+                toolName: 'AI Chat fallback',
+                stopReason: null,
+                pending: false,
+                error: false,
+              ),
+            );
+            await _sendAiGatewayMessage(
+              message,
+              thinking: thinking,
+              attachments: attachments,
+              sessionKeyOverride: sessionKey,
+              appendUserMessage: false,
+              managePendingState: false,
+            );
+          } else {
+            _appendAssistantThreadMessage(
+              sessionKey,
+              GatewayChatMessage(
+                id: _nextLocalMessageId(),
+                role: 'assistant',
+                text: _singleAgentUnavailableLabel(
+                  sessionKey,
+                  result.fallbackReason ?? result.errorMessage,
+                ),
+                timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+                toolCallId: null,
+                toolName: provider.label,
+                stopReason: null,
+                pending: false,
+                error: false,
+              ),
+            );
+          }
+          return;
+        }
+
+        if (!result.success) {
+          _appendAssistantThreadMessage(
+            sessionKey,
+            _assistantErrorMessage(
+              appText(
+                '单机智能体执行失败：${result.errorMessage}',
+                'Single Agent execution failed: ${result.errorMessage}',
+              ),
+            ),
+          );
+          return;
+        }
+
+        _appendAssistantThreadMessage(
+          sessionKey,
+          GatewayChatMessage(
+            id: _nextLocalMessageId(),
+            role: 'assistant',
+            text: result.output,
+            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            toolCallId: null,
+            toolName: null,
+            stopReason: null,
+            pending: false,
+            error: false,
+          ),
+        );
+      } catch (error) {
+        _clearAiGatewayStreamingText(sessionKey);
+        _appendAssistantThreadMessage(
+          sessionKey,
+          _assistantErrorMessage(error.toString()),
+        );
+      } finally {
+        _singleAgentExternalCliPendingSessionKeys.remove(sessionKey);
+        _clearAiGatewayStreamingText(sessionKey);
+        _aiGatewayPendingSessionKeys.remove(sessionKey);
+        _recomputeTasks();
+        _notifyIfActive();
+      }
+    });
   }
 
   Future<void> _sendAiGatewayMessage(
@@ -3701,7 +3635,9 @@ class AppController extends ChangeNotifier {
               'This thread is pinned to ${selection.label}: $detail XWorkmate will not reroute to another external CLI automatically. Switch to Auto instead.',
             );
     }
-    if (singleAgentNeedsAiGatewayConfigurationForSession(normalizedSessionKey)) {
+    if (singleAgentNeedsAiGatewayConfigurationForSession(
+      normalizedSessionKey,
+    )) {
       return detail.isEmpty
           ? appText(
               '当前没有可用的外部 CLI，也没有可用的 AI Chat fallback。请先安装外部 CLI，或配置 AI Gateway。',
@@ -3858,9 +3794,8 @@ class AppController extends ChangeNotifier {
     return target.promptValue;
   }
 
-  Future<List<AssistantThreadSkillEntry>> _scanGatewayOnlySkillCandidatesForSession(
-    String sessionKey,
-  ) async {
+  Future<List<AssistantThreadSkillEntry>>
+  _scanGatewayOnlySkillCandidatesForSession(String sessionKey) async {
     final provider = singleAgentResolvedProviderForSession(sessionKey);
     if (provider == null) {
       return const <AssistantThreadSkillEntry>[];
@@ -4139,10 +4074,14 @@ class AppController extends ChangeNotifier {
         settings.assistantLastSessionKey == normalizedSessionKey) {
       return;
     }
-    await saveSettings(
-      settings.copyWith(assistantLastSessionKey: normalizedSessionKey),
-      refreshAfterSave: false,
-    );
+    try {
+      await saveSettings(
+        settings.copyWith(assistantLastSessionKey: normalizedSessionKey),
+        refreshAfterSave: false,
+      );
+    } catch (_) {
+      // Best effort only during teardown-sensitive transitions.
+    }
   }
 
   void _setAiGatewayStreamingText(String sessionKey, String text) {
@@ -4152,6 +4091,16 @@ class AppController extends ChangeNotifier {
     } else {
       _aiGatewayStreamingTextBySession[key] = text;
     }
+    _notifyIfActive();
+  }
+
+  void _appendAiGatewayStreamingText(String sessionKey, String delta) {
+    if (delta.isEmpty) {
+      return;
+    }
+    final key = _normalizedAssistantSessionKey(sessionKey);
+    final current = _aiGatewayStreamingTextBySession[key] ?? '';
+    _aiGatewayStreamingTextBySession[key] = '$current$delta';
     _notifyIfActive();
   }
 
@@ -4165,6 +4114,30 @@ class AppController extends ChangeNotifier {
   String _nextLocalMessageId() {
     _localMessageCounter += 1;
     return 'local-${DateTime.now().microsecondsSinceEpoch}-$_localMessageCounter';
+  }
+
+  Future<T> _enqueueThreadTurn<T>(String threadId, Future<T> Function() task) {
+    final normalizedThreadId = _normalizedAssistantSessionKey(threadId);
+    final previous =
+        _assistantThreadTurnQueues[normalizedThreadId] ?? Future<void>.value();
+    final completer = Completer<T>();
+    late final Future<void> next;
+    next = previous
+        .catchError((_) {})
+        .then((_) async {
+          try {
+            completer.complete(await task());
+          } catch (error, stackTrace) {
+            completer.completeError(error, stackTrace);
+          }
+        })
+        .whenComplete(() {
+          if (identical(_assistantThreadTurnQueues[normalizedThreadId], next)) {
+            _assistantThreadTurnQueues.remove(normalizedThreadId);
+          }
+        });
+    _assistantThreadTurnQueues[normalizedThreadId] = next;
+    return completer.future;
   }
 
   Uri? _normalizeAiGatewayBaseUrl(String raw) {
@@ -4404,19 +4377,81 @@ class AppController extends ChangeNotifier {
     return snapshot.copyWith(codexCliPath: normalizedPath);
   }
 
-  Future<void> _refreshCodexCliAvailability() async {
-    _resolvedCodexCliPath = await _runtimeCoordinator.resolveCodexPath(
-      codexPath: settings.codexCliPath,
-    );
+  Future<void> _refreshAcpCapabilities({
+    bool forceRefresh = false,
+    bool persistMountTargets = false,
+  }) async {
+    GatewayAcpCapabilities capabilities;
+    try {
+      capabilities = await _gatewayAcpClient.loadCapabilities(
+        forceRefresh: forceRefresh,
+      );
+    } catch (_) {
+      capabilities = const GatewayAcpCapabilities.empty();
+    }
+    _acpCapabilities = capabilities;
+    _resolvedCodexCliPath =
+        capabilities.providers.contains(SingleAgentProvider.codex)
+        ? appText(
+            '通过 Gateway ACP 能力协商检测到 Codex Provider',
+            'Detected Codex provider via Gateway ACP capability negotiation',
+          )
+        : null;
+    if (persistMountTargets && !_disposed) {
+      final currentConfig = settings.multiAgent;
+      final nextTargets = _mergeAcpCapabilitiesIntoMountTargets(
+        currentConfig.mountTargets,
+        capabilities,
+      );
+      final nextConfig = currentConfig.copyWith(mountTargets: nextTargets);
+      if (jsonEncode(nextConfig.toJson()) !=
+          jsonEncode(currentConfig.toJson())) {
+        await _settingsController.saveSnapshot(
+          settings.copyWith(multiAgent: nextConfig),
+        );
+        _multiAgentOrchestrator.updateConfig(nextConfig);
+      }
+    }
     _notifyIfActive();
   }
 
-  Future<String?> _resolveCodexCliPath() async {
-    if (_resolvedCodexCliPath != null) {
-      return _resolvedCodexCliPath;
-    }
-    await _refreshCodexCliAvailability();
-    return _resolvedCodexCliPath;
+  List<ManagedMountTargetState> _mergeAcpCapabilitiesIntoMountTargets(
+    List<ManagedMountTargetState> current,
+    GatewayAcpCapabilities capabilities,
+  ) {
+    final source = current.isEmpty
+        ? ManagedMountTargetState.defaults()
+        : current;
+    final providers = capabilities.providers
+        .map((item) => item.providerId)
+        .toSet();
+    return source
+        .map((item) {
+          final available = switch (item.targetId) {
+            'codex' => providers.contains('codex'),
+            'opencode' => providers.contains('opencode'),
+            'claude' => providers.contains('claude'),
+            'gemini' => providers.contains('gemini'),
+            'aris' => capabilities.multiAgent,
+            'openclaw' => capabilities.multiAgent || capabilities.singleAgent,
+            _ => false,
+          };
+          return item.copyWith(
+            available: available,
+            discoveryState: available ? 'ready' : 'unavailable',
+            syncState: available ? item.syncState : 'idle',
+            detail: available
+                ? appText(
+                    '来源：Gateway ACP capabilities',
+                    'Source: Gateway ACP capabilities',
+                  )
+                : appText(
+                    'Gateway ACP 未报告该能力。',
+                    'Gateway ACP did not report this capability.',
+                  ),
+          );
+        })
+        .toList(growable: false);
   }
 
   String? _resolveCodexWorkingDirectory() {
@@ -4428,20 +4463,27 @@ class AppController extends ChangeNotifier {
     return directory.existsSync() ? directory.path : null;
   }
 
-  void _registerCodexExternalProvider({String? codexPath}) {
+  void _registerCodexExternalProvider() {
+    final endpoint = _resolveAcpEndpoint()?.replace(
+      path: '/acp',
+      query: null,
+      fragment: null,
+    );
     _runtimeCoordinator.registerExternalCodeAgent(
       ExternalCodeAgentProvider(
         id: 'codex',
-        name: 'Codex CLI',
-        command: (codexPath?.trim().isNotEmpty ?? false)
-            ? codexPath!.trim()
-            : 'codex',
-        defaultArgs: const <String>['app-server', '--listen', 'stdio://'],
+        name: 'Codex ACP',
+        command: 'xworkmate-agent-gateway',
+        transport: ExternalAgentTransport.websocketJsonRpc,
+        endpoint: endpoint?.toString() ?? '',
+        defaultArgs: const <String>[],
         capabilities: const <String>[
           'chat',
           'code-edit',
           'gateway-bridge',
           'memory-sync',
+          'single-agent',
+          'multi-agent',
         ],
       ),
     );
@@ -4600,6 +4642,42 @@ class AppController extends ChangeNotifier {
       return;
     }
     notifyListeners();
+  }
+
+  Uri? _resolveAcpEndpoint() {
+    final aiGatewayBase = _normalizeAiGatewayBaseUrl(
+      settings.aiGateway.baseUrl,
+    );
+    if (aiGatewayBase != null) {
+      return aiGatewayBase;
+    }
+    final target = assistantExecutionTargetForSession(
+      _sessionsController.currentSessionKey,
+    );
+    if (target == AssistantExecutionTarget.singleAgent) {
+      final remote = _gatewayProfileBaseUri(
+        settings.primaryRemoteGatewayProfile,
+      );
+      if (remote != null) {
+        return remote;
+      }
+      return _gatewayProfileBaseUri(settings.primaryLocalGatewayProfile);
+    }
+    return _gatewayProfileBaseUri(
+      _gatewayProfileForAssistantExecutionTarget(target),
+    );
+  }
+
+  Uri? _gatewayProfileBaseUri(GatewayConnectionProfile profile) {
+    final host = profile.host.trim();
+    if (host.isEmpty || profile.port <= 0) {
+      return null;
+    }
+    return Uri(
+      scheme: profile.tls ? 'https' : 'http',
+      host: host,
+      port: profile.port,
+    );
   }
 
   RuntimeConnectionMode _modeFromHost(String host) {
