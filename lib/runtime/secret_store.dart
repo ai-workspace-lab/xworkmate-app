@@ -41,7 +41,7 @@ class FileSecureStorageClient implements SecureStorageClient {
     if (file == null) {
       throw StateError('Secret directory unavailable for $key');
     }
-    await atomicWriteString(file, '$value\n');
+    await atomicWriteString(file, '$value\n', ownerOnly: true);
   }
 
   Future<File?> _fileForKey(String key) async {
@@ -52,6 +52,7 @@ class FileSecureStorageClient implements SecureStorageClient {
     if (!await directory.exists()) {
       await directory.create(recursive: true);
     }
+    await ensureOwnerOnlyDirectory(directory);
     return File('${directory.path}/${encodeStableFileKey(key)}.secret');
   }
 }
@@ -94,6 +95,9 @@ class SecretStore {
   StoreLayout? _layout;
   SecureStorageClient? _secureStorage;
   bool _initialized = false;
+  PersistentWriteFailure? _secretsWriteFailure;
+
+  PersistentWriteFailure? get secretsWriteFailure => _secretsWriteFailure;
 
   Future<void> initialize() async {
     if (_initialized) {
@@ -378,12 +382,17 @@ class SecretStore {
     _memorySecure[key] = trimmed;
     final client = _secureStorage;
     if (client == null) {
+      _secretsWriteFailure = _buildWriteFailure(
+        'writeSecret',
+        StateError('Persistent secret path unavailable; using memory only.'),
+      );
       return;
     }
     try {
       await client.write(key: key, value: trimmed);
-    } catch (_) {
-      // Memory remains authoritative until the next successful durable write.
+      _secretsWriteFailure = null;
+    } catch (error) {
+      _secretsWriteFailure = _buildWriteFailure('writeSecret', error);
     }
   }
 
@@ -392,12 +401,19 @@ class SecretStore {
     _memorySecure.remove(key);
     final client = _secureStorage;
     if (client == null) {
+      _secretsWriteFailure = _buildWriteFailure(
+        'deleteSecret',
+        StateError(
+          'Persistent secret path unavailable; clear applied in memory only.',
+        ),
+      );
       return;
     }
     try {
       await client.delete(key: key);
-    } catch (_) {
-      // Ignore durable delete failures and keep the memory state cleared.
+      _secretsWriteFailure = null;
+    } catch (error) {
+      _secretsWriteFailure = _buildWriteFailure('deleteSecret', error);
     }
   }
 
@@ -416,5 +432,14 @@ class SecretStore {
     final normalized = value.replaceAll('-', '+').replaceAll('_', '/');
     final padded = normalized + '=' * ((4 - normalized.length % 4) % 4);
     return base64.decode(padded);
+  }
+
+  PersistentWriteFailure _buildWriteFailure(String operation, Object error) {
+    return PersistentWriteFailure(
+      scope: PersistentStoreScope.secrets,
+      operation: operation,
+      message: error.toString(),
+      timestampMs: DateTime.now().millisecondsSinceEpoch,
+    );
   }
 }

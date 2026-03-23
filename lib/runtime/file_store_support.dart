@@ -4,6 +4,39 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:yaml/yaml.dart';
 
+enum PersistentStoreScope { settings, tasks, secrets, audit }
+
+class PersistentWriteFailure {
+  const PersistentWriteFailure({
+    required this.scope,
+    required this.operation,
+    required this.message,
+    required this.timestampMs,
+  });
+
+  final PersistentStoreScope scope;
+  final String operation;
+  final String message;
+  final int timestampMs;
+}
+
+class PersistentWriteFailures {
+  const PersistentWriteFailures({
+    this.settings,
+    this.tasks,
+    this.secrets,
+    this.audit,
+  });
+
+  final PersistentWriteFailure? settings;
+  final PersistentWriteFailure? tasks;
+  final PersistentWriteFailure? secrets;
+  final PersistentWriteFailure? audit;
+
+  bool get hasFailures =>
+      settings != null || tasks != null || secrets != null || audit != null;
+}
+
 class StoreLayout {
   const StoreLayout({
     required this.rootDirectory,
@@ -75,6 +108,7 @@ class StoreLayoutResolver {
     final secretDirectory = await ensureDirectory(
       normalizeStoreDirectoryPath(secretRootPath),
     );
+    await ensureOwnerOnlyDirectory(secretDirectory);
     final layout = StoreLayout(
       rootDirectory: rootDirectory,
       configDirectory: configDirectory,
@@ -157,11 +191,29 @@ Future<Directory> ensureDirectory(String path) async {
   return directory;
 }
 
+Future<void> ensureOwnerOnlyDirectory(Directory directory) async {
+  if (Platform.isWindows) {
+    return;
+  }
+  await _setUnixPermissions(directory.path, '700');
+}
+
+Future<void> ensureOwnerOnlyFile(File file) async {
+  if (Platform.isWindows) {
+    return;
+  }
+  await _setUnixPermissions(file.path, '600');
+}
+
 String encodeStableFileKey(String key) {
   return base64Url.encode(utf8.encode(key)).replaceAll('=', '');
 }
 
-Future<void> atomicWriteString(File file, String contents) async {
+Future<void> atomicWriteString(
+  File file,
+  String contents, {
+  bool ownerOnly = false,
+}) async {
   if (!await file.parent.exists()) {
     await file.parent.create(recursive: true);
   }
@@ -169,7 +221,14 @@ Future<void> atomicWriteString(File file, String contents) async {
     '${file.path}.tmp-${DateTime.now().microsecondsSinceEpoch}',
   );
   await tempFile.writeAsString(contents, flush: true);
+  if (ownerOnly) {
+    await ensureOwnerOnlyDirectory(file.parent);
+    await ensureOwnerOnlyFile(tempFile);
+  }
   await tempFile.rename(file.path);
+  if (ownerOnly) {
+    await ensureOwnerOnlyFile(file);
+  }
 }
 
 Future<void> deleteIfExists(File file) async {
@@ -210,6 +269,19 @@ String encodeYamlDocument(Object? value) {
     buffer.writeln();
   }
   return buffer.toString();
+}
+
+Future<void> _setUnixPermissions(String path, String mode) async {
+  final result = await Process.run('chmod', <String>[mode, path]);
+  if (result.exitCode == 0) {
+    return;
+  }
+  throw ProcessException(
+    'chmod',
+    <String>[mode, path],
+    '${result.stderr}'.trim(),
+    result.exitCode,
+  );
 }
 
 void _writeYamlValue(
