@@ -2,6 +2,14 @@
 
 - Use `xworkmate-secure-development` for any change that touches gateway auth, `.env`, secure storage, tokens, passwords, TLS, file upload, native entitlements, packaging, or release-sensitive settings.
 - Use `xworkmate-acceptance` before claiming build, packaging, installation, or release readiness for this repo.
+- For non-trivial implementation work, default to the repo skill `xworkmate-worktree-task-mode` and follow its worktree-first execution flow without asking the user to restate that preference each time.
+
+## Default Task Mode
+
+- Default to an isolated `git worktree` for non-trivial tasks. Create the worktree from `main`, do the work there, merge back to `main`, then remove the temporary worktree when done.
+- Default to concurrent execution for independent sub-tasks. Keep the main agent on the critical path and use parallel lanes only for bounded side work that does not block the next local step.
+- Do not repeatedly ask whether worktree mode or concurrent execution should be used for this repo; treat that as the default unless the user explicitly asks for a different flow.
+- Keep the branch/worktree lifecycle explicit: inspect, implement, verify, merge, clean up.
 
 ## Security Rules
 
