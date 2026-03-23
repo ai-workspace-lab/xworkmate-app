@@ -400,13 +400,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final theme = Theme.of(context);
     final hasDraft = controller.hasSettingsDraftChanges;
     final hasPendingApply = controller.hasPendingSettingsApply;
-    final recoveryIssue = controller.legacyRecoveryReport.hasIssue;
-    final message = recoveryIssue
-        ? appText(
-            '检测到旧版本配置，但当前版本无法解锁旧加密状态。',
-            'Detected legacy settings, but this build could not unlock the old encrypted state.',
-          )
-        : controller.settingsDraftStatusMessage;
+    final message = controller.settingsDraftStatusMessage;
     return SurfaceCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -421,7 +415,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  recoveryIssue
+                  message.isNotEmpty
                       ? message
                       : hasDraft
                       ? appText(
@@ -451,14 +445,14 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               OutlinedButton(
                 key: const ValueKey('settings-global-save-button'),
-                onPressed: (!hasDraft && !recoveryIssue)
-                    ? null
-                    : () => _handleTopLevelSave(controller),
+                onPressed: hasDraft
+                    ? () => _handleTopLevelSave(controller)
+                    : null,
                 child: Text(appText('保存', 'Save')),
               ),
               FilledButton.tonal(
                 key: const ValueKey('settings-global-apply-button'),
-                onPressed: (!hasDraft && !hasPendingApply && !recoveryIssue)
+                onPressed: (!hasDraft && !hasPendingApply)
                     ? null
                     : () => _handleTopLevelApply(controller),
                 child: Text(appText('应用', 'Apply')),

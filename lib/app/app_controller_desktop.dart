@@ -306,7 +306,6 @@ class AppController extends ChangeNotifier {
       _draftSecretValues.isNotEmpty;
   bool get hasPendingSettingsApply => _pendingSettingsApply;
   String get settingsDraftStatusMessage => _settingsDraftStatusMessage;
-  LegacyRecoveryReport get legacyRecoveryReport => _store.lastRecoveryReport;
   List<GatewayAgentSummary> get agents => _agentsController.agents;
   List<GatewaySessionSummary> get sessions => isSingleAgentMode
       ? _assistantSessionSummaries()
@@ -2704,12 +2703,7 @@ class AppController extends ChangeNotifier {
       _settingsDraft = settings;
       _lastAppliedSettings = settings;
       _settingsDraftInitialized = true;
-      _settingsDraftStatusMessage = legacyRecoveryReport.hasIssue
-          ? appText(
-              '检测到旧版本配置，但当前版本无法解锁旧加密状态。',
-              'Detected legacy settings, but this build could not unlock the old encrypted state.',
-            )
-          : '';
+      _settingsDraftStatusMessage = '';
     } catch (error) {
       if (_disposed) {
         return;

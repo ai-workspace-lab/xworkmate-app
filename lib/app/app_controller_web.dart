@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
-import '../runtime/legacy_settings_recovery.dart';
 import '../runtime/runtime_models.dart';
 import '../web/web_ai_gateway_client.dart';
 import '../web/web_relay_gateway_client.dart';
@@ -86,7 +85,6 @@ class AppController extends ChangeNotifier {
       _draftSecretValues.isNotEmpty;
   bool get hasPendingSettingsApply => _pendingSettingsApply;
   String get settingsDraftStatusMessage => _settingsDraftStatusMessage;
-  LegacyRecoveryReport get legacyRecoveryReport => const LegacyRecoveryReport();
   AppLanguage get appLanguage => _settings.appLanguage;
   GatewayConnectionSnapshot get connection => _relayClient.snapshot;
   bool get relayBusy => _relayBusy;
