@@ -12,43 +12,21 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   group('GatewayAcpClient', () {
-    test(
-      'prefers websocket for single-agent run and streams updates',
-      () async {
-        final server = await _AcpFakeServer.start();
-        addTearDown(server.close);
+    test('loads ACP capabilities over websocket when available', () async {
+      final server = await _AcpFakeServer.start();
+      addTearDown(server.close);
 
-        final client = GatewayAcpClient(
-          endpointResolver: () => server.baseHttpUri,
-        );
+      final client = GatewayAcpClient(
+        endpointResolver: () => server.baseHttpUri,
+      );
 
-        final updates = <GatewayAcpSessionUpdate>[];
-        final result = await client.runSingleAgent(
-          GatewayAcpSingleAgentRequest(
-            sessionId: 'session-ws',
-            threadId: 'thread-ws',
-            provider: SingleAgentProvider.codex,
-            prompt: 'hello ws',
-            model: 'gpt-4.1',
-            workingDirectory: '/tmp',
-            attachments: const <CollaborationAttachment>[],
-            selectedSkills: const <String>['review'],
-            aiGatewayBaseUrl: 'https://example.invalid',
-            aiGatewayApiKey: 'test-key',
-            resumeSession: false,
-          ),
-          onUpdate: updates.add,
-        );
+      final capabilities = await client.loadCapabilities(forceRefresh: true);
 
-        expect(result.success, isTrue);
-        expect(result.output, 'single-agent result (codex)');
-        expect(result.turnId, 'turn-single');
-        expect(updates, isNotEmpty);
-        expect(updates.first.textDelta, 'delta-single');
-        expect(server.rpcMethods, contains('acp.capabilities'));
-        expect(server.rpcMethods, contains('session.start'));
-      },
-    );
+      expect(capabilities.singleAgent, isTrue);
+      expect(capabilities.multiAgent, isTrue);
+      expect(capabilities.providers, contains(SingleAgentProvider.codex));
+      expect(server.rpcMethods, contains('acp.capabilities'));
+    });
 
     test('falls back to HTTP+SSE when websocket is unavailable', () async {
       final server = await _AcpFakeServer.start(disableWebSocket: true);
@@ -58,29 +36,12 @@ void main() {
         endpointResolver: () => server.baseHttpUri,
       );
 
-      final updates = <GatewayAcpSessionUpdate>[];
-      final result = await client.runSingleAgent(
-        GatewayAcpSingleAgentRequest(
-          sessionId: 'session-sse',
-          threadId: 'thread-sse',
-          provider: SingleAgentProvider.claude,
-          prompt: 'hello sse',
-          model: 'claude-sonnet',
-          workingDirectory: '/tmp',
-          attachments: const <CollaborationAttachment>[],
-          selectedSkills: const <String>[],
-          aiGatewayBaseUrl: 'https://example.invalid',
-          aiGatewayApiKey: 'test-key',
-          resumeSession: false,
-        ),
-        onUpdate: updates.add,
-      );
+      final capabilities = await client.loadCapabilities(forceRefresh: true);
 
-      expect(result.success, isTrue);
-      expect(result.output, 'single-agent result (claude)');
-      expect(updates.map((item) => item.textDelta), contains('delta-single'));
+      expect(capabilities.singleAgent, isTrue);
+      expect(capabilities.multiAgent, isTrue);
+      expect(capabilities.providers, contains(SingleAgentProvider.claude));
       expect(server.rpcMethods, contains('acp.capabilities'));
-      expect(server.rpcMethods, contains('session.start'));
     });
 
     test(

@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../app/app_store_policy.dart';
 import 'aris_bundle.dart';
 import 'aris_bridge.dart';
 import 'aris_llm_chat_client.dart';
@@ -123,6 +124,16 @@ class MultiAgentOrchestrator extends ChangeNotifier {
     }
   }
 
+  void _assertEmbeddedProcessesAllowed() {
+    if (blocksAppStoreEmbeddedAgentProcesses(
+      isAppleHost: Platform.isIOS || Platform.isMacOS,
+    )) {
+      throw UnsupportedError(
+        'App Store builds do not allow launching embedded multi-agent subprocesses.',
+      );
+    }
+  }
+
   /// 启用协作模式
   void enable() {
     _config = _config.copyWith(enabled: true);
@@ -159,6 +170,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
     String aiGatewayApiKey = '',
     void Function(MultiAgentRunEvent event)? onEvent,
   }) async {
+    _assertEmbeddedProcessesAllowed();
     if (_isRunning) {
       throw StateError('Collaboration is already running');
     }
