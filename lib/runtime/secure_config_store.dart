@@ -1,5 +1,3 @@
-import 'dart:io';
-
 export 'secret_store.dart';
 export 'settings_store.dart';
 
@@ -16,14 +14,11 @@ class SecureConfigStore {
     SecureStorageClient? secureStorage,
     bool enableSecureStorage = true,
   }) {
-    final resolvedDefaultSupportDirectoryPathResolver =
-        defaultSupportDirectoryPathResolver ??
-        _resolveDefaultSupportDirectoryPath;
     _secretStore = SecretStore(
       fallbackDirectoryPathResolver: fallbackDirectoryPathResolver,
       databasePathResolver: databasePathResolver,
       defaultSupportDirectoryPathResolver:
-          resolvedDefaultSupportDirectoryPathResolver,
+          defaultSupportDirectoryPathResolver,
       secureStorage: secureStorage,
       enableSecureStorage: enableSecureStorage,
     );
@@ -31,7 +26,7 @@ class SecureConfigStore {
       fallbackDirectoryPathResolver: fallbackDirectoryPathResolver,
       databasePathResolver: databasePathResolver,
       defaultSupportDirectoryPathResolver:
-          resolvedDefaultSupportDirectoryPathResolver,
+          defaultSupportDirectoryPathResolver,
       databaseOpener: databaseOpener,
     );
   }
@@ -154,35 +149,4 @@ class SecureConfigStore {
   static String maskValue(String value) {
     return SecretStore.maskValue(value);
   }
-}
-
-const String _defaultBundleIdentifier = 'plus.svc.xworkmate';
-
-Future<String?> _resolveDefaultSupportDirectoryPath() async {
-  final home = Platform.environment['HOME']?.trim() ?? '';
-  if (home.isNotEmpty) {
-    if (Platform.isMacOS) {
-      return '$home/Library/Application Support/$_defaultBundleIdentifier/xworkmate';
-    }
-    if (Platform.isLinux) {
-      final xdgStateHome = Platform.environment['XDG_STATE_HOME']?.trim() ?? '';
-      if (xdgStateHome.isNotEmpty) {
-        return '$xdgStateHome/$_defaultBundleIdentifier/xworkmate';
-      }
-      return '$home/.local/state/$_defaultBundleIdentifier/xworkmate';
-    }
-  }
-
-  if (Platform.isWindows) {
-    final appData = Platform.environment['APPDATA']?.trim() ?? '';
-    if (appData.isNotEmpty) {
-      return '$appData\\$_defaultBundleIdentifier\\xworkmate';
-    }
-    final localAppData = Platform.environment['LOCALAPPDATA']?.trim() ?? '';
-    if (localAppData.isNotEmpty) {
-      return '$localAppData\\$_defaultBundleIdentifier\\xworkmate';
-    }
-  }
-
-  return null;
 }
