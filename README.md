@@ -1,14 +1,14 @@
 # XWorkmate
 
 XWorkmate is an AI workspace shell built with Flutter.
-`v0.5` ships persistent assistant task threads, optional ARIS-powered multi-agent collaboration, and a bundled Go bridge runtime that travels with the macOS app.
+`v0.5` ships persistent assistant task threads, optional ARIS-powered multi-agent collaboration, and a bundled Go core runtime that travels with the macOS app.
 
 ## v0.5 Highlights
 
 - Assistant 任务线程支持流式回复、继续追问和手动归档，不再是一问一答即结束。
 - 任务列表按 `单机智能体 / 本地 OpenClaw Gateway / 远程 OpenClaw Gateway` 分组显示。
 - Multi-Agent 协作支持 `Architect / Engineer / Tester`，并可切换 `Native / ARIS` 框架。
-- ARIS `skills/` 直接随 App 内置，`llm-chat` 与 `claude-review` 统一由 Go bridge 驱动。
+- ARIS `skills/` 直接随 App 内置，`llm-chat` 与 `claude-review` 统一由 Go core 驱动。
 - `Ollama Cloud` 设置、ARIS helper bundling、macOS DMG 打包与安装链路已打通。
 
 ## Current Scope
@@ -17,7 +17,7 @@ XWorkmate is an AI workspace shell built with Flutter.
 - Single Agent streaming assistant threads
 - OpenClaw local/remote task threads with persistent context
 - Multi-Agent orchestration with optional ARIS preset
-- Bundled ARIS skills, Go bridge helper, `llm-chat` reviewer, and `claude-review`
+- Bundled ARIS skills, Go core helper, `llm-chat` reviewer, and `claude-review`
 - Ollama Cloud settings, task grouping, and macOS packaged delivery
 - Flutter Web shell with `Assistant` + `Settings` only, supporting `Single Agent` and `Relay OpenClaw Gateway`
 

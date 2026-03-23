@@ -1,4 +1,4 @@
-module xworkmate/aris_bridge
+module xworkmate/go_core
 
 go 1.25.0
 

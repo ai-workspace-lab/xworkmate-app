@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../app/app_store_policy.dart';
 import 'aris_bundle.dart';
-import 'aris_bridge.dart';
+import 'go_core.dart';
 import 'aris_llm_chat_client.dart';
 import 'multi_agent_frameworks.dart';
 import 'runtime_models.dart';
@@ -32,16 +32,16 @@ class MultiAgentOrchestrator extends ChangeNotifier {
   MultiAgentOrchestrator({
     required MultiAgentConfig config,
     ArisBundleRepository? arisBundleRepository,
-    ArisBridgeLocator? arisBridgeLocator,
+    GoCoreLocator? goCoreLocator,
     Future<bool> Function(String command)? binaryExistsResolver,
     HttpClient Function()? httpClientFactory,
     ArisLlmChatClient? arisLlmChatClient,
     CliProcessStarter? processStarter,
   }) : _config = config,
        _arisBundleRepository = arisBundleRepository ?? ArisBundleRepository(),
-       _arisBridgeLocator =
-           arisBridgeLocator ??
-           ArisBridgeLocator(binaryExistsResolver: binaryExistsResolver),
+       _goCoreLocator =
+           goCoreLocator ??
+           GoCoreLocator(binaryExistsResolver: binaryExistsResolver),
        _binaryExistsResolver = binaryExistsResolver,
        _httpClientFactory = httpClientFactory ?? HttpClient.new,
        _processStarter =
@@ -58,15 +58,15 @@ class MultiAgentOrchestrator extends ChangeNotifier {
            arisLlmChatClient ??
            ArisLlmChatClient(
              bridgeLocator:
-                 arisBridgeLocator ??
-                 ArisBridgeLocator(binaryExistsResolver: binaryExistsResolver),
+                 goCoreLocator ??
+                 GoCoreLocator(binaryExistsResolver: binaryExistsResolver),
            );
 
   /// 当前配置
   MultiAgentConfig _config;
   MultiAgentConfig get config => _config;
   final ArisBundleRepository _arisBundleRepository;
-  final ArisBridgeLocator _arisBridgeLocator;
+  final GoCoreLocator _goCoreLocator;
   final Future<bool> Function(String command)? _binaryExistsResolver;
   final HttpClient Function() _httpClientFactory;
   final CliProcessStarter _processStarter;
@@ -1051,10 +1051,10 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
     required String aiGatewayApiKey,
   }) async {
     try {
-      if (!await _arisBridgeLocator.isAvailable()) {
+      if (!await _goCoreLocator.isAvailable()) {
         return const CliResult(
           output: '',
-          error: 'ARIS Go bridge is unavailable for llm-chat',
+          error: 'Go core is unavailable for llm-chat',
           exitCode: -1,
         );
       }
@@ -1081,10 +1081,10 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
     required String prompt,
   }) async {
     try {
-      if (!await _arisBridgeLocator.isAvailable()) {
+      if (!await _goCoreLocator.isAvailable()) {
         return const CliResult(
           output: '',
-          error: 'ARIS Go bridge is unavailable for claude-review',
+          error: 'Go core is unavailable for claude-review',
           exitCode: -1,
         );
       }
@@ -1217,10 +1217,7 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
     };
   }
 
-  bool _prefersOllamaLaunch({
-    required String tool,
-    required String model,
-  }) {
+  bool _prefersOllamaLaunch({required String tool, required String model}) {
     final normalizedTool = tool.trim().toLowerCase();
     final normalizedModel = model.trim();
     if (normalizedModel.isEmpty) {

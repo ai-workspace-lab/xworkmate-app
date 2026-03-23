@@ -203,7 +203,7 @@ func handleToolBridgeRequest(request rpcRequest) map[string]any {
 					"tools": map[string]any{},
 				},
 				"serverInfo": map[string]any{
-					"name":    "xworkmate-aris-bridge",
+					"name":    "xworkmate-go-core",
 					"version": "0.2.0",
 				},
 			},

@@ -1,5 +1,5 @@
 import '../test_suite_stub.dart'
-    if (dart.library.io) 'aris_bridge_suite.dart'
+    if (dart.library.io) 'go_core_suite.dart'
     as suite;
 
 void main() {

@@ -7,7 +7,7 @@
 - `远程 OpenClaw Gateway`
 - `ARIS + 本地 Ollama`
 - `Architect / Engineer / Tester`
-- `Go bridge reviewer`
+- `Go core reviewer`
 - `外部 Agent CLI / JSON-RPC session`
 
 ## 推荐验证顺序
@@ -29,7 +29,7 @@
 - 本地 Ollama 可用时，即便缺失部分云端 CLI，也应能退化运行
 - 线程应可继续追问，不是一答即结束
 - 任务列表仍保持极简，只显示名称、时间、归档
-- `llm-chat` 和 `claude-review` 由 Go bridge 驱动，不依赖 `go run`
+- `llm-chat` 和 `claude-review` 由 Go core 驱动，不依赖 `go run`
 
 ## 建议记录项
 
