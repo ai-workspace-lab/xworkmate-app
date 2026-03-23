@@ -2,39 +2,50 @@
 
 ## 概述
 
-XWorkmate 现阶段的集成基线已经从“单一 Codex bridge”升级为“统一发现与分发中心”。App 负责发现、托管和分发三类协作资产：
+XWorkmate 现阶段已经不只是“单一 Codex bridge”，但当前实现也不是一个单独的 “Discovery / Distribution Catalog” 模块。
 
-1. `skills`
-2. `MCP server list`
-3. `AI Gateway` 默认注入
+当前集成能力分散在几条明确的实现路径里：
 
-运行时上，XWorkmate 不再把 CLI 视为孤立工具，而是通过本地 broker 与编排层统一驱动 `OpenClaw / Codex / Claude / Gemini / OpenCode`。
+1. `GatewayRuntime`
+   - 负责 OpenClaw Gateway 的实时 RPC、会话、chat、pairing、cron
+2. `MultiAgentBrokerServer` + `MultiAgentOrchestrator`
+   - 负责多 Agent 协作运行
+3. `MultiAgentMountManager`
+   - 负责按 adapter 做 CLI 能力探测、MCP reconcile、挂载状态汇总
+4. `CodexConfigBridge` / `OpencodeConfigBridge`
+   - 负责特定 CLI 的配置文件写入
+5. Assistant composer 与 feature flags
+   - 决定当前哪些集成入口真实对用户可见
+
+也就是说，当前架构更接近“分布式集成面”，不是单一 catalog service。
 
 ## 当前架构基线
 
 ```mermaid
 flowchart LR
-    X["XWorkmate App"] --> D["Discovery / Distribution Catalog"]
-    X --> B["MultiAgentBroker<br/>WebSocket JSON-RPC"]
-    X --> G["OpenClaw Gateway / Host"]
-    B --> O["MultiAgentOrchestrator"]
-    O --> C["Codex CLI"]
-    O --> L["Claude CLI"]
-    O --> M["Gemini CLI"]
-    O --> P["OpenCode CLI"]
-    C --> A["AI Gateway"]
-    L --> A
-    M --> A
-    P --> A
-    A --> OL["Ollama / Upstream Model Endpoints"]
+    X["XWorkmate App"] --> GR["GatewayRuntime"]
+    X --> BM["MultiAgentBrokerServer<br/>WebSocket JSON-RPC"]
+    X --> MM["MultiAgentMountManager"]
+    X --> NO["CodeAgentNodeOrchestrator"]
+    X --> UI["Assistant composer / Settings / Feature flags"]
+
+    BM --> O["MultiAgentOrchestrator"]
+    O --> C["Codex / Claude / Gemini / OpenCode"]
+
+    MM --> MA["Codex / Claude / Gemini / OpenCode / OpenClaw adapters"]
+    MA --> CFG["Managed config writes / mcp list / local file discovery"]
+
+    GR --> G["OpenClaw Gateway / Host"]
+    NO --> G
+    C --> A["AI Gateway or Ollama endpoint"]
 ```
 
 关键点：
 
-- `XWorkmate App` 是唯一的 discovery / distribution center。
 - `MultiAgentBroker` 是多 CLI 协作的本地运行时入口。
-- `OpenClaw` 既是现有 Gateway 集成面，也是可被托管发现的宿主控制面。
-- `AI Gateway` 的语义是“XWorkmate 协作运行默认 provider”，不是用户全局 provider 替换器。
+- `OpenClaw` 既是现有 Gateway 集成面，也是当前 app-mediated code-agent dispatch 的宿主控制面。
+- `AI Gateway` 既可以是 direct AI 对话入口，也可以是协作运行的注入式模型入口。
+- 当前没有一个单独命名为 `Discovery / Distribution Catalog` 的实现模块。
 
 ## 1. OpenClaw Gateway / Host
 
@@ -57,19 +68,19 @@ flowchart LR
 - `agent/register`
 - `memory/sync`
 
-新的定位：
+当前定位：
 
-- 继续作为 Gateway RPC 面存在。
-- 额外纳入“可挂载目标”集合。
-- 发现 `agents / skills / plugins` 状态，但不覆盖用户现有默认 agent。
+- 继续作为 Gateway RPC 面存在
+- 也是 app-mediated code-agent dispatch 的控制面目标
+- 在 mount 视角下，OpenClaw 目前更多是“本地发现 + 宿主控制面”，不是一个统一的 skills / plugins catalog service
 
 ## 2. AI Gateway
 
 用途：
 
-- 统一模型入口
-- 作为 XWorkmate 协作运行的默认模型路由
-- 为外部 CLI 提供 launch-scoped 或托管 provider 注入
+- direct AI 对话入口
+- 协作运行时的模型注入入口
+- 对部分 CLI 的配置桥接入口
 
 边界：
 
@@ -79,9 +90,12 @@ flowchart LR
 
 当前策略：
 
-- `Codex` 可以追加 `xworkmate` provider 托管块
-- `Claude / Gemini / OpenCode` 优先采用 launch-scoped 注入
-- Gateway 不可用时允许回退到 CLI 原有配置
+- `CodexConfigBridge` 可以写入受管 provider / MCP block
+- `MultiAgentOrchestrator` 在协作运行中会通过环境变量或 `ollama launch` 传递模型入口
+- `Claude / Gemini` 的 mount reconcile 目前主要做 discovery，AI Gateway 仍保持 launch-scoped
+- `OpenCode` 当前有受管 MCP config；AI Gateway 语义仍偏 launch-scoped / runtime injection
+
+换句话说，AI Gateway 能力是分散落地的，不是所有 CLI 都通过同一条托管 provider 路径接入。
 
 ## 3. Multi-Agent Runtime
 
@@ -107,12 +121,15 @@ flowchart LR
 ### UI 接线
 
 - Assistant 继续复用现有 composer、附件、当前会话
-- Settings 继续复用现有 Multi-Agent 区块
+- 桌面端真正对用户可见的协作入口，当前主要是 Assistant composer 上的协作 toggle
+- `SettingsPage` 里有 Multi-Agent 配置区块与 detail 页面代码，但桌面端 `settings.agents` 仍被 feature flag 关闭
 - 不新增独立任务页面
 
 ## 4. 发现与分发
 
-XWorkmate 统一维护两类状态：
+当前实现里，`managed / external` 更像一套按 adapter 执行的操作规则，而不是单独的中心化状态目录。
+
+XWorkmate 仍然区分两类对象：
 
 - `managed`
   - 由 App 创建与维护的托管项
@@ -124,16 +141,17 @@ XWorkmate 统一维护两类状态：
 - 只更新 XWorkmate 托管项
 - 不删除外部已有项
 - 启动时与保存设置后自动 reconcile
+- 这套规则当前由 `MultiAgentMountManager` 在各 adapter 上分别执行
 
 ## 5. 挂载入口矩阵
 
 | 目标 | Skills 挂载入口 | MCP 挂载入口 | AI Gateway 挂载入口 |
 | --- | --- | --- | --- |
-| OpenClaw | 发现 `skills / plugins / agents`，broker 注入上下文 | 不作为 MCP 主挂载点 | XWorkmate 协作路径默认 route |
-| Codex | `AGENTS.md` / skill 上下文 / broker 注入 | `~/.codex/config.toml` 托管块 | `model_providers.xworkmate`，不替换用户默认 |
-| Claude | broker 注入 | `claude mcp list/add/remove` 发现与兼容 | 启动参数 / 环境注入 |
-| Gemini | broker 注入，后续可扩展 `extensions` | `gemini mcp list/add/remove` 发现与兼容 | 启动参数 / 环境注入 |
-| OpenCode | broker 注入，后续可扩展 agent preset | `~/.opencode/config.toml` 托管块 | 启动参数或托管 preset 注入 |
+| OpenClaw | 本地文件 / 目录发现 + Gateway 控制面 | 不作为 MCP 主挂载点 | app-mediated dispatch / gateway route |
+| Codex | 当前线程 skills 上下文 +协作运行注入 | `~/.codex/config.toml` 受管 MCP block | 受管 provider bridge + runtime injection |
+| Claude | 当前线程 skills 上下文 +协作运行注入 | `claude mcp list` 做 discovery | launch-scoped / env / `ollama launch` |
+| Gemini | 当前线程 skills 上下文 +协作运行注入 | `gemini mcp list` 做 discovery | launch-scoped / env |
+| OpenCode | 当前线程 skills 上下文 +协作运行注入 | `~/.opencode/config.toml` 受管 MCP block | runtime injection |
 
 ## 6. 外部 Provider 与执行路径
 
@@ -149,7 +167,7 @@ XWorkmate 统一维护两类状态：
 现状：
 
 - `codex` 仍是当前最完整 provider
-- 其他 CLI 通过 `CliMountAdapter` 与 broker 接入
+- 其他 CLI 当前主要通过 `CliMountAdapter` discovery / reconcile 与 `MultiAgentOrchestrator` 运行时调用接入
 - 多 provider 调度 UI 不是当前交付目标
 
 ## 7. 安全边界
@@ -172,17 +190,21 @@ XWorkmate 统一维护两类状态：
 实现约束：
 
 - Gateway 集成页不再重复显示顶层全局 `Save / Apply`，避免与卡片内动作语义冲突。
-- `settings.gateway_setup_code` 与 `settings.agents` 当前均按 `experimental + enabled: false` 发布策略控制。
+- 桌面端 `settings.gateway_setup_code` 与 `settings.agents` 当前都被 feature flag 关闭。
+- 但桌面端 `assistant.multi_agent` 仍然开启，所以协作入口当前主要暴露在 Assistant composer，而不是设置页独立标签。
 
 ## 相关代码
 
-- `lib/app/app_controller.dart`
+- `lib/app/app_controller_desktop.dart`
+- `lib/app/app_controller_web.dart`
 - `lib/features/assistant/assistant_page.dart`
 - `lib/features/settings/settings_page.dart`
+- `lib/runtime/gateway_runtime.dart`
 - `lib/runtime/runtime_models.dart`
 - `lib/runtime/multi_agent_orchestrator.dart`
 - `lib/runtime/multi_agent_broker.dart`
 - `lib/runtime/multi_agent_mounts.dart`
 - `lib/runtime/codex_config_bridge.dart`
 - `lib/runtime/opencode_config_bridge.dart`
+- `lib/runtime/code_agent_node_orchestrator.dart`
 - `lib/runtime/runtime_coordinator.dart`

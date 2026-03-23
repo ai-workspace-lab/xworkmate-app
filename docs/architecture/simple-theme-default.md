@@ -17,15 +17,20 @@ This document records the default `simple` theme token set for `XWorkmate.svc.pl
 
 ## Radius
 
-- card radius: `6`
-- input radius: `8`
-- button radius: `8`
-- dialog radius: `5`
+- card radius: `16`
+- input radius: `14`
+- button radius: `12`
+- dialog radius: `18`
+- chip radius: `12`
+- sidebar radius: `20`
 
 ## Size
 
-- input height: `36`
-- button height: `16`
+- textarea height: `36`
+- input height: `40`
+- button height: `30` desktop / `36` mobile
+- toolbar height: `40`
+- sidebar item height: `34`
 
 ## Source Of Truth
 
