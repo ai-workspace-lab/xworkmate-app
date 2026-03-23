@@ -27,7 +27,9 @@ void main() {
       final workspaceCodexRoot = Directory(
         '${tempDirectory.path}/workspace/.codex/skills',
       );
-      final userCodexRoot = Directory('${tempDirectory.path}/user-codex-skills');
+      final userCodexRoot = Directory(
+        '${tempDirectory.path}/user-codex-skills',
+      );
       final userClaudeRoot = Directory(
         '${tempDirectory.path}/user-claude-skills',
       );
@@ -61,7 +63,7 @@ void main() {
           SingleAgentProvider.codex,
           SingleAgentProvider.claude,
         ],
-        gatewayOnlySkillScanRoots: <String>[
+        singleAgentLocalSkillScanRoots: <String>[
           '${tempDirectory.path}/workspace/.codex/skills',
           userCodexRoot.path,
           userClaudeRoot.path,
@@ -73,13 +75,6 @@ void main() {
         AssistantExecutionTarget.singleAgent,
       );
       await controller.setSingleAgentProvider(SingleAgentProvider.codex);
-
-      expect(
-        controller.assistantDiscoveredSkillsForSession(
-          controller.currentSessionKey,
-        ),
-        isEmpty,
-      );
       expect(
         controller.assistantImportedSkillsForSession(
           controller.currentSessionKey,
@@ -157,7 +152,10 @@ void main() {
           SingleAgentProvider.codex,
           SingleAgentProvider.claude,
         ],
-        gatewayOnlySkillScanRoots: <String>[codexRoot.path, claudeRoot.path],
+        singleAgentLocalSkillScanRoots: <String>[
+          codexRoot.path,
+          claudeRoot.path,
+        ],
       );
       addTearDown(controller.dispose);
       await _waitFor(() => !controller.initializing);

@@ -94,7 +94,7 @@ class AppController extends ChangeNotifier {
     RuntimeCoordinator? runtimeCoordinator,
     DesktopPlatformService? desktopPlatformService,
     UiFeatureManifest? uiFeatureManifest,
-    List<String>? gatewayOnlySkillScanRoots,
+    List<String>? singleAgentLocalSkillScanRoots,
     List<SingleAgentProvider>? availableSingleAgentProvidersOverride,
     SingleAgentRunner? singleAgentRunner,
   }) {
@@ -136,11 +136,9 @@ class AppController extends ChangeNotifier {
     _tasksController = DerivedTasksController();
     _desktopPlatformService =
         desktopPlatformService ?? createDesktopPlatformService();
-    _gatewayOnlySkillScanRoots =
-        (gatewayOnlySkillScanRoots ??
-                (_isFlutterTestEnvironment
-                    ? const <String>[]
-                    : null))
+    _singleAgentLocalSkillScanRoots =
+        (singleAgentLocalSkillScanRoots ??
+                (_isFlutterTestEnvironment ? const <String>[] : null))
             ?.map(_singleAgentSkillScanRootFromOverride)
             .toList(growable: false) ??
         _resolveDefaultSingleAgentSkillScanRoots();
@@ -186,7 +184,7 @@ class AppController extends ChangeNotifier {
   late final DevicesController _devicesController;
   late final DerivedTasksController _tasksController;
   late final DesktopPlatformService _desktopPlatformService;
-  late final List<_SingleAgentSkillScanRoot> _gatewayOnlySkillScanRoots;
+  late final List<_SingleAgentSkillScanRoot> _singleAgentLocalSkillScanRoots;
   late final GatewayAcpClient _gatewayAcpClient;
   late final DirectSingleAgentAppServerClient _singleAgentAppServerClient;
   late final List<SingleAgentProvider>? _availableSingleAgentProvidersOverride;
@@ -482,14 +480,6 @@ class AppController extends ChangeNotifier {
       return resolved;
     }
     return '';
-  }
-
-  List<AssistantThreadSkillEntry> assistantDiscoveredSkillsForSession(
-    String sessionKey,
-  ) {
-    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    return _assistantThreadRecords[normalizedSessionKey]?.discoveredSkills ??
-        const <AssistantThreadSkillEntry>[];
   }
 
   List<AssistantThreadSkillEntry> assistantImportedSkillsForSession(
@@ -1679,9 +1669,7 @@ class AppController extends ChangeNotifier {
       persistDefaultSelection: false,
     );
     if (nextTarget == AssistantExecutionTarget.singleAgent) {
-      await discoverGatewayOnlySkillsForSession(nextSessionKey);
-    } else {
-      await dismissDiscoveredSkillsForSession(nextSessionKey);
+      await refreshSingleAgentLocalSkillsForSession(nextSessionKey);
     }
     _recomputeTasks();
   }
@@ -1782,11 +1770,7 @@ class AppController extends ChangeNotifier {
       persistDefaultSelection: true,
     );
     if (resolvedTarget == AssistantExecutionTarget.singleAgent) {
-      await discoverGatewayOnlySkillsForSession(
-        _sessionsController.currentSessionKey,
-      );
-    } else {
-      await dismissDiscoveredSkillsForSession(
+      await refreshSingleAgentLocalSkillsForSession(
         _sessionsController.currentSessionKey,
       );
     }
@@ -1812,7 +1796,7 @@ class AppController extends ChangeNotifier {
     _notifyIfActive();
     if (assistantExecutionTargetForSession(sessionKey) ==
         AssistantExecutionTarget.singleAgent) {
-      await discoverGatewayOnlySkillsForSession(sessionKey);
+      await refreshSingleAgentLocalSkillsForSession(sessionKey);
     }
     unawaited(refreshMultiAgentMounts(sync: settings.multiAgent.autoSync));
   }
@@ -1983,77 +1967,20 @@ class AppController extends ChangeNotifier {
     _notifyIfActive();
   }
 
-  Future<void> discoverGatewayOnlySkillsForSession(String sessionKey) async {
+  Future<void> refreshSingleAgentLocalSkillsForSession(
+    String sessionKey,
+  ) async {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
     if (assistantExecutionTargetForSession(normalizedSessionKey) !=
         AssistantExecutionTarget.singleAgent) {
-      _upsertAssistantThreadRecord(
-        normalizedSessionKey,
-        discoveredSkills: const <AssistantThreadSkillEntry>[],
-        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      );
       return;
     }
 
-    final discovered = await _scanGatewayOnlySkillCandidatesForSession();
+    final availableSkills = await _scanSingleAgentLocalSkillEntries();
     _upsertAssistantThreadRecord(
       normalizedSessionKey,
       discoveredSkills: const <AssistantThreadSkillEntry>[],
-      importedSkills: discovered,
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
-    _notifyIfActive();
-  }
-
-  Future<void> confirmImportedSkillsForSession(
-    String sessionKey,
-    List<String> skillKeys,
-  ) async {
-    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    final requestedKeys = skillKeys
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toSet();
-    if (requestedKeys.isEmpty) {
-      return;
-    }
-    final discovered = assistantDiscoveredSkillsForSession(
-      normalizedSessionKey,
-    );
-    final existingImported = assistantImportedSkillsForSession(
-      normalizedSessionKey,
-    );
-    final importByKey = <String, AssistantThreadSkillEntry>{
-      for (final item in existingImported) item.key: item,
-      for (final item in discovered)
-        if (requestedKeys.contains(item.key)) item.key: item,
-    };
-    final nextImported = importByKey.values.toList(growable: false);
-    final nextDiscovered = discovered
-        .where((item) => !requestedKeys.contains(item.key))
-        .toList(growable: false);
-    final nextSelected = <String>{
-      ...assistantSelectedSkillKeysForSession(normalizedSessionKey),
-      ...requestedKeys.where(importByKey.containsKey),
-    }.toList(growable: false);
-    _upsertAssistantThreadRecord(
-      normalizedSessionKey,
-      discoveredSkills: nextDiscovered,
-      importedSkills: nextImported,
-      selectedSkillKeys: nextSelected,
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
-    _notifyIfActive();
-  }
-
-  Future<void> dismissDiscoveredSkillsForSession(String sessionKey) async {
-    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    if (assistantDiscoveredSkillsForSession(normalizedSessionKey).isEmpty) {
-      return;
-    }
-    _upsertAssistantThreadRecord(
-      normalizedSessionKey,
-      discoveredSkills: const <AssistantThreadSkillEntry>[],
+      importedSkills: availableSkills,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     _notifyIfActive();
@@ -2752,7 +2679,7 @@ class AppController extends ChangeNotifier {
       await _restoreInitialAssistantSessionSelection();
       await _ensureActiveAssistantThread();
       if (isSingleAgentMode) {
-        await discoverGatewayOnlySkillsForSession(currentSessionKey);
+        await refreshSingleAgentLocalSkillsForSession(currentSessionKey);
       }
       _runtimeEventsSubscription = _runtimeCoordinator.gateway.events.listen(
         _handleRuntimeEvent,
@@ -2974,9 +2901,7 @@ class AppController extends ChangeNotifier {
       persistDefaultSelection: false,
     );
     if (target == AssistantExecutionTarget.singleAgent) {
-      await discoverGatewayOnlySkillsForSession(sessionKey);
-    } else {
-      await dismissDiscoveredSkillsForSession(sessionKey);
+      await refreshSingleAgentLocalSkillsForSession(sessionKey);
     }
     _recomputeTasks();
     _notifyIfActive();
@@ -3950,10 +3875,10 @@ class AppController extends ChangeNotifier {
   }
 
   Future<List<AssistantThreadSkillEntry>>
-  _scanGatewayOnlySkillCandidatesForSession() async {
+  _scanSingleAgentLocalSkillEntries() async {
     final entries = <AssistantThreadSkillEntry>[];
     final seenNames = <String>{};
-    for (final rootSpec in _gatewayOnlySkillScanRoots) {
+    for (final rootSpec in _singleAgentLocalSkillScanRoots) {
       final root = Directory(_resolveSingleAgentSkillRootPath(rootSpec.path));
       if (!await root.exists()) {
         continue;

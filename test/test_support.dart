@@ -11,9 +11,7 @@ import 'package:xworkmate/theme/app_theme.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
 
 SecureConfigStore createIsolatedTestStore({bool enableSecureStorage = true}) {
-  final testRoot = Directory.systemTemp.createTempSync(
-    'xworkmate-store-test-',
-  );
+  final testRoot = Directory.systemTemp.createTempSync('xworkmate-store-test-');
   addTearDown(() async {
     if (await testRoot.exists()) {
       await testRoot.delete(recursive: true);
@@ -31,7 +29,7 @@ Future<AppController> createTestController(
   WidgetTester tester, {
   DesktopPlatformService? desktopPlatformService,
   UiFeatureManifest? uiFeatureManifest,
-  List<String>? gatewayOnlySkillScanRoots,
+  List<String>? singleAgentLocalSkillScanRoots,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   final testRoot =
@@ -44,7 +42,7 @@ Future<AppController> createTestController(
     ),
     desktopPlatformService: desktopPlatformService,
     uiFeatureManifest: uiFeatureManifest,
-    gatewayOnlySkillScanRoots: gatewayOnlySkillScanRoots,
+    singleAgentLocalSkillScanRoots: singleAgentLocalSkillScanRoots,
   );
   addTearDown(controller.dispose);
   await tester.pump(const Duration(milliseconds: 100));
