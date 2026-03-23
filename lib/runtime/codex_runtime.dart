@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../app/app_store_policy.dart';
 import '../app/app_metadata.dart';
 import 'platform_environment.dart';
 
@@ -353,6 +354,13 @@ class CodexRuntime extends ChangeNotifier {
     CodexApprovalPolicy approval = CodexApprovalPolicy.suggest,
     List<String> extraArgs = const [],
   }) async {
+    if (blocksAppStoreEmbeddedAgentProcesses(
+      isAppleHost: Platform.isIOS || Platform.isMacOS,
+    )) {
+      throw UnsupportedError(
+        'App Store builds do not allow launching a local Codex app-server process.',
+      );
+    }
     if (_process != null) {
       throw StateError('Codex already running');
     }
