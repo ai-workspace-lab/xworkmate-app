@@ -73,6 +73,43 @@ extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   }
 }
 
+enum SingleAgentProvider { auto, codex, opencode, claude, gemini }
+
+extension SingleAgentProviderCopy on SingleAgentProvider {
+  String get label => switch (this) {
+    SingleAgentProvider.auto => 'Auto',
+    SingleAgentProvider.codex => 'Codex',
+    SingleAgentProvider.opencode => 'OpenCode',
+    SingleAgentProvider.claude => 'Claude',
+    SingleAgentProvider.gemini => 'Gemini',
+  };
+
+  String get providerId => switch (this) {
+    SingleAgentProvider.auto => 'auto',
+    SingleAgentProvider.codex => 'codex',
+    SingleAgentProvider.opencode => 'opencode',
+    SingleAgentProvider.claude => 'claude',
+    SingleAgentProvider.gemini => 'gemini',
+  };
+
+  static SingleAgentProvider fromJsonValue(String? value) {
+    final normalized = value?.trim() ?? '';
+    switch (normalized) {
+      case 'codex':
+        return SingleAgentProvider.codex;
+      case 'opencode':
+        return SingleAgentProvider.opencode;
+      case 'claude':
+        return SingleAgentProvider.claude;
+      case 'gemini':
+        return SingleAgentProvider.gemini;
+      case 'auto':
+      default:
+        return SingleAgentProvider.auto;
+    }
+  }
+}
+
 class AssistantThreadConnectionState {
   const AssistantThreadConnectionState({
     required this.executionTarget,
@@ -1968,6 +2005,7 @@ class AssistantThreadRecord {
     this.importedSkills = const <AssistantThreadSkillEntry>[],
     this.selectedSkillKeys = const <String>[],
     this.assistantModelId = '',
+    this.singleAgentProvider = SingleAgentProvider.auto,
     this.gatewayEntryState,
   });
 
@@ -1982,6 +2020,7 @@ class AssistantThreadRecord {
   final List<AssistantThreadSkillEntry> importedSkills;
   final List<String> selectedSkillKeys;
   final String assistantModelId;
+  final SingleAgentProvider singleAgentProvider;
   final String? gatewayEntryState;
 
   AssistantThreadRecord copyWith({
@@ -1997,6 +2036,7 @@ class AssistantThreadRecord {
     List<AssistantThreadSkillEntry>? importedSkills,
     List<String>? selectedSkillKeys,
     String? assistantModelId,
+    SingleAgentProvider? singleAgentProvider,
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
   }) {
@@ -2014,6 +2054,7 @@ class AssistantThreadRecord {
       importedSkills: importedSkills ?? this.importedSkills,
       selectedSkillKeys: selectedSkillKeys ?? this.selectedSkillKeys,
       assistantModelId: assistantModelId ?? this.assistantModelId,
+      singleAgentProvider: singleAgentProvider ?? this.singleAgentProvider,
       gatewayEntryState: clearGatewayEntryState
           ? null
           : (gatewayEntryState ?? this.gatewayEntryState),
@@ -2037,6 +2078,7 @@ class AssistantThreadRecord {
           .toList(growable: false),
       'selectedSkillKeys': selectedSkillKeys,
       'assistantModelId': assistantModelId,
+      'singleAgentProvider': singleAgentProvider.providerId,
       'gatewayEntryState': gatewayEntryState,
     };
   }
@@ -2123,6 +2165,9 @@ class AssistantThreadRecord {
       importedSkills: normalizeSkillEntries(json['importedSkills']),
       selectedSkillKeys: normalizeSkillKeys(json['selectedSkillKeys']),
       assistantModelId: json['assistantModelId']?.toString() ?? '',
+      singleAgentProvider: SingleAgentProviderCopy.fromJsonValue(
+        json['singleAgentProvider']?.toString(),
+      ),
       gatewayEntryState: normalizeGatewayEntryState(json['gatewayEntryState']),
     );
   }

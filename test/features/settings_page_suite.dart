@@ -158,12 +158,20 @@ void main() {
 
     expect(find.byKey(const ValueKey('gateway-host-field')), findsNothing);
     expect(find.byKey(const ValueKey('gateway-test-button')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('gateway-device-security-card')),
+      findsNothing,
+    );
 
     await tester.tap(find.text('OpenClaw Gateway'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('gateway-host-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('gateway-test-button')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('gateway-device-security-card')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('SettingsPage shows Linux desktop integration controls', (

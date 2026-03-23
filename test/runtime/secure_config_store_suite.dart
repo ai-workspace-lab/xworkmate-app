@@ -699,6 +699,7 @@ void main() {
           ],
           selectedSkillKeys: <String>['/tmp/imported-skill'],
           assistantModelId: 'gpt-5.4-mini',
+          singleAgentProvider: SingleAgentProvider.claude,
           gatewayEntryState: 'single-agent',
           updatedAtMs: 1700000000000,
           messages: <GatewayChatMessage>[
@@ -757,6 +758,10 @@ void main() {
         '/tmp/imported-skill',
       ]);
       expect(reloadedRecords.first.assistantModelId, 'gpt-5.4-mini');
+      expect(
+        reloadedRecords.first.singleAgentProvider,
+        SingleAgentProvider.claude,
+      );
       expect(reloadedRecords.first.gatewayEntryState, 'single-agent');
       expect(reloadedRecords.first.messages, hasLength(2));
       expect(reloadedRecords.first.messages.last.text, '第一条回复');
@@ -784,6 +789,7 @@ void main() {
         'archived': false,
         'executionTarget': 'aiGatewayOnly',
         'messageViewMode': 'rendered',
+        'singleAgentProvider': 'gemini',
         'gatewayEntryState': 'ai-gateway-only',
       });
 
@@ -792,6 +798,7 @@ void main() {
       expect(decoded.importedSkills, isEmpty);
       expect(decoded.selectedSkillKeys, isEmpty);
       expect(decoded.assistantModelId, isEmpty);
+      expect(decoded.singleAgentProvider, SingleAgentProvider.gemini);
       expect(decoded.gatewayEntryState, 'single-agent');
     },
   );
