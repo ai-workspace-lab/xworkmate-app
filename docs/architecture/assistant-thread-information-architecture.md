@@ -134,7 +134,7 @@ flowchart LR
 | --- | --- | --- |
 | 消息历史 | 是 | 每个线程独立保存 / 解析历史 |
 | 执行模式 | 是 | `Single Agent / Local / Remote` 跟线程绑定 |
-| Skills | 是 | 已导入 / 已选 skills 跟线程绑定 |
+| Skills | 是 | 当前线程可用 / 已选 skills 跟线程绑定 |
 | 模型 | 是 | `assistantModelId` 跟线程绑定，没设时回退到默认模型 |
 | 顶部连接状态 | 是 | 只显示当前线程解析出的连接状态 |
 | message view mode | 是 | 跟线程绑定 |
@@ -197,7 +197,7 @@ flowchart LR
 
 - 当前线程决定执行模式
 - 当前线程决定模型
-- 当前线程决定 imported / selected skills
+- 当前线程决定 available / selected skills
 - 当前线程决定 connection chip 显示
 
 这也是后续继续扩展任务工作台能力的基础。
