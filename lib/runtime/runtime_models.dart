@@ -31,13 +31,13 @@ extension RuntimeConnectionStatusCopy on RuntimeConnectionStatus {
   };
 }
 
-enum AssistantExecutionTarget { aiGatewayOnly, local, remote }
+enum AssistantExecutionTarget { singleAgent, local, remote }
 
 extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   String get label => switch (this) {
-    AssistantExecutionTarget.aiGatewayOnly => appText(
-      '仅 AI Gateway',
-      'AI Gateway Only',
+    AssistantExecutionTarget.singleAgent => appText(
+      '单机智能体',
+      'Single Agent',
     ),
     AssistantExecutionTarget.local => appText(
       '本地 OpenClaw Gateway',
@@ -50,16 +50,26 @@ extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   };
 
   String get promptValue => switch (this) {
-    AssistantExecutionTarget.aiGatewayOnly => 'ai-gateway-only',
+    AssistantExecutionTarget.singleAgent => 'single-agent',
     AssistantExecutionTarget.local => 'local',
     AssistantExecutionTarget.remote => 'remote',
   };
 
   static AssistantExecutionTarget fromJsonValue(String? value) {
-    return AssistantExecutionTarget.values.firstWhere(
-      (item) => item.name == value,
-      orElse: () => AssistantExecutionTarget.local,
-    );
+    final normalized = value?.trim() ?? '';
+    switch (normalized) {
+      case 'singleAgent':
+      case 'aiGatewayOnly':
+      case 'single-agent':
+      case 'ai-gateway-only':
+        return AssistantExecutionTarget.singleAgent;
+      case 'local':
+        return AssistantExecutionTarget.local;
+      case 'remote':
+        return AssistantExecutionTarget.remote;
+      default:
+        return AssistantExecutionTarget.local;
+    }
   }
 }
 
@@ -84,13 +94,13 @@ class AssistantThreadConnectionState {
   final bool gatewayTokenMissing;
   final String? lastError;
 
-  bool get isAiGatewayOnly =>
-      executionTarget == AssistantExecutionTarget.aiGatewayOnly;
+  bool get isSingleAgent =>
+      executionTarget == AssistantExecutionTarget.singleAgent;
 
   bool get connected => ready;
 
   bool get connecting =>
-      !isAiGatewayOnly && status == RuntimeConnectionStatus.connecting;
+      !isSingleAgent && status == RuntimeConnectionStatus.connecting;
 }
 
 enum AssistantMessageViewMode { rendered, raw }
@@ -1493,7 +1503,7 @@ class SettingsSnapshot {
     AssistantExecutionTarget target,
   ) {
     return switch (target) {
-      AssistantExecutionTarget.aiGatewayOnly => null,
+      AssistantExecutionTarget.singleAgent => null,
       AssistantExecutionTarget.local => primaryLocalGatewayProfile,
       AssistantExecutionTarget.remote => primaryRemoteGatewayProfile,
     };
@@ -1515,7 +1525,7 @@ class SettingsSnapshot {
     final index = switch (target) {
       AssistantExecutionTarget.local => kGatewayLocalProfileIndex,
       AssistantExecutionTarget.remote => kGatewayRemoteProfileIndex,
-      AssistantExecutionTarget.aiGatewayOnly => null,
+      AssistantExecutionTarget.singleAgent => null,
     };
     if (index == null) {
       return this;
@@ -2084,6 +2094,17 @@ class AssistantThreadRecord {
       return keys;
     }
 
+    String? normalizeGatewayEntryState(Object? value) {
+      final normalized = value?.toString().trim() ?? '';
+      if (normalized.isEmpty) {
+        return null;
+      }
+      if (normalized == 'ai-gateway-only') {
+        return 'single-agent';
+      }
+      return normalized;
+    }
+
     return AssistantThreadRecord(
       sessionKey: json['sessionKey']?.toString() ?? '',
       messages: messages,
@@ -2102,7 +2123,7 @@ class AssistantThreadRecord {
       importedSkills: normalizeSkillEntries(json['importedSkills']),
       selectedSkillKeys: normalizeSkillKeys(json['selectedSkillKeys']),
       assistantModelId: json['assistantModelId']?.toString() ?? '',
-      gatewayEntryState: json['gatewayEntryState']?.toString(),
+      gatewayEntryState: normalizeGatewayEntryState(json['gatewayEntryState']),
     );
   }
 }

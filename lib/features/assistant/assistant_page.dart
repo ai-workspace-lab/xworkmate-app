@@ -668,7 +668,7 @@ class _AssistantPageState extends State<AssistantPage> {
     }
 
     final shouldUseGatewayAgent =
-        executionTarget != AssistantExecutionTarget.aiGatewayOnly;
+        executionTarget != AssistantExecutionTarget.singleAgent;
     final autoAgent = shouldUseGatewayAgent
         ? _pickAutoAgent(controller, rawPrompt)
         : null;
@@ -706,7 +706,7 @@ class _AssistantPageState extends State<AssistantPage> {
         preview: rawPrompt,
         status:
             controller.hasAssistantPendingRun ||
-                executionTarget == AssistantExecutionTarget.aiGatewayOnly ||
+                executionTarget == AssistantExecutionTarget.singleAgent ||
                 connectionState.connected
             ? 'running'
             : 'queued',
@@ -826,7 +826,7 @@ class _AssistantPageState extends State<AssistantPage> {
   }
 
   List<_ComposerSkillOption> _availableSkillOptions(AppController controller) {
-    if (controller.isAiGatewayOnlyMode) {
+    if (controller.isSingleAgentMode) {
       return controller
           .assistantImportedSkillsForSession(controller.currentSessionKey)
           .map(_skillOptionFromThreadSkill)
@@ -1275,7 +1275,7 @@ class _AssistantPageState extends State<AssistantPage> {
 
   String _buildDraftSessionKey(AppController controller) {
     final stamp = DateTime.now().millisecondsSinceEpoch;
-    if (controller.isAiGatewayOnlyMode) {
+    if (controller.isSingleAgentMode) {
       return 'draft:$stamp';
     }
     final selectedAgentId = controller.selectedAgentId.trim();
@@ -2329,27 +2329,27 @@ class _AssistantEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final connectionState = controller.currentAssistantConnectionState;
-    final aiGatewayOnly = connectionState.isAiGatewayOnly;
+    final singleAgent = connectionState.isSingleAgent;
     final connected = connectionState.connected;
     final reconnectAvailable = controller.canQuickConnectGateway;
-    final title = aiGatewayOnly
+    final title = singleAgent
         ? connected
-              ? appText('开始 AI 对话', 'Start an AI conversation')
+              ? appText('开始单机智能体任务', 'Start a single-agent task')
               : appText('先配置 AI Gateway', 'Configure AI Gateway first')
         : connected
         ? appText('开始对话或运行任务', 'Start a chat or run a task')
         : connectionState.status == RuntimeConnectionStatus.error
         ? appText('Gateway 连接失败', 'Gateway connection failed')
         : appText('先连接 Gateway', 'Connect a gateway first');
-    final description = aiGatewayOnly
+    final description = singleAgent
         ? connected
               ? appText(
-                  '当前模式只通过 AI Gateway 处理当前任务，不会建立 OpenClaw Gateway 会话。',
-                  'This mode handles the current task through AI Gateway only and does not open an OpenClaw Gateway session.',
+                  '当前模式使用单机智能体处理当前任务，不会建立 OpenClaw Gateway 会话。',
+                  'This mode uses a single agent for the current task and does not open an OpenClaw Gateway session.',
                 )
               : appText(
-                  '请先在 设置 -> 集成 中配置 AI Gateway 地址、API Key 和默认模型，然后继续当前任务。',
-                  'Set the AI Gateway URL, API key, and default model in Settings -> Integrations, then continue this task.',
+                  '请先在 设置 -> 集成 中配置 AI Gateway 地址、API Key 和默认模型，然后以单机智能体模式继续当前任务。',
+                  'Set the AI Gateway URL, API key, and default model in Settings -> Integrations, then continue this task in Single Agent mode.',
                 )
         : connected
         ? appText(
@@ -2402,7 +2402,7 @@ class _AssistantEmptyState extends StatelessWidget {
                     FilledButton.icon(
                       onPressed: connected
                           ? onFocusComposer
-                          : aiGatewayOnly
+                          : singleAgent
                           ? onOpenAiGatewaySettings
                           : reconnectAvailable
                           ? () async {
@@ -2412,7 +2412,7 @@ class _AssistantEmptyState extends StatelessWidget {
                       icon: Icon(
                         connected
                             ? Icons.edit_rounded
-                            : aiGatewayOnly
+                            : singleAgent
                             ? Icons.tune_rounded
                             : reconnectAvailable
                             ? Icons.refresh_rounded
@@ -2421,7 +2421,7 @@ class _AssistantEmptyState extends StatelessWidget {
                       label: Text(
                         connected
                             ? appText('开始输入', 'Start typing')
-                            : aiGatewayOnly
+                            : singleAgent
                             ? appText('打开配置中心', 'Open settings')
                             : reconnectAvailable
                             ? appText('重新连接', 'Reconnect')
@@ -2440,16 +2440,16 @@ class _AssistantEmptyState extends StatelessWidget {
                     ),
                     if (!connected)
                       OutlinedButton.icon(
-                        onPressed: aiGatewayOnly
+                        onPressed: singleAgent
                             ? onOpenAiGatewaySettings
                             : onOpenGateway,
                         icon: Icon(
-                          aiGatewayOnly
+                          singleAgent
                               ? Icons.hub_outlined
                               : Icons.settings_rounded,
                         ),
                         label: Text(
-                          aiGatewayOnly
+                          singleAgent
                               ? appText('打开设置中心', 'Open settings')
                               : appText('编辑连接', 'Edit connection'),
                         ),
@@ -2570,7 +2570,7 @@ class _ComposerBarState extends State<_ComposerBar> {
       resolveUiFeaturePlatformFromContext(context),
     );
     final connectionState = controller.currentAssistantConnectionState;
-    final aiGatewayOnly = connectionState.isAiGatewayOnly;
+    final singleAgent = connectionState.isSingleAgent;
     final connected = connectionState.connected;
     final reconnectAvailable = controller.canQuickConnectGateway;
     final connecting = connectionState.connecting;
@@ -2582,7 +2582,7 @@ class _ComposerBarState extends State<_ComposerBar> {
     final discoveredCount = widget.discoveredSkills.length;
     final submitLabel = connected
         ? appText('提交', 'Submit')
-        : aiGatewayOnly
+        : singleAgent
         ? appText('配置 AI Gateway', 'Configure AI Gateway')
         : connecting
         ? appText('连接中…', 'Connecting…')
@@ -2801,7 +2801,7 @@ class _ComposerBarState extends State<_ComposerBar> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (aiGatewayOnly && discoveredCount > 0) ...[
+                      if (singleAgent && discoveredCount > 0) ...[
                         InkWell(
                           key: const Key('assistant-discovered-skills-button'),
                           borderRadius: BorderRadius.circular(AppRadius.chip),
@@ -2953,7 +2953,7 @@ class _ComposerBarState extends State<_ComposerBar> {
                       ? null
                       : connected
                       ? widget.onSend
-                      : aiGatewayOnly
+                      : singleAgent
                       ? widget.onOpenAiGatewaySettings
                       : reconnectAvailable
                       ? () async {
@@ -2976,7 +2976,7 @@ class _ComposerBarState extends State<_ComposerBar> {
                       Icon(
                         connected
                             ? Icons.arrow_upward_rounded
-                            : aiGatewayOnly
+                            : singleAgent
                             ? Icons.hub_outlined
                             : reconnectAvailable
                             ? Icons.refresh_rounded
@@ -3427,7 +3427,7 @@ class _ComposerToolbarChipState extends State<_ComposerToolbarChip> {
 
 extension on AssistantExecutionTarget {
   IconData get icon => switch (this) {
-    AssistantExecutionTarget.aiGatewayOnly => Icons.hub_outlined,
+    AssistantExecutionTarget.singleAgent => Icons.hub_outlined,
     AssistantExecutionTarget.local => Icons.computer_outlined,
     AssistantExecutionTarget.remote => Icons.cloud_outlined,
   };
@@ -3933,7 +3933,7 @@ class _ConnectionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final connectionState = controller.currentAssistantConnectionState;
-    final color = connectionState.isAiGatewayOnly
+    final color = connectionState.isSingleAgent
         ? (connectionState.connected
               ? context.palette.accentMuted
               : context.palette.surfaceSecondary)

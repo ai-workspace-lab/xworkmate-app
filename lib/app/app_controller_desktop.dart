@@ -239,7 +239,7 @@ class AppController extends ChangeNotifier {
   String get settingsDraftStatusMessage => _settingsDraftStatusMessage;
   LegacyRecoveryReport get legacyRecoveryReport => _store.lastRecoveryReport;
   List<GatewayAgentSummary> get agents => _agentsController.agents;
-  List<GatewaySessionSummary> get sessions => isAiGatewayOnlyMode
+  List<GatewaySessionSummary> get sessions => isSingleAgentMode
       ? _assistantSessionSummaries()
       : _sessionsController.sessions;
   List<GatewaySessionSummary> get assistantSessions => _assistantSessions();
@@ -275,8 +275,8 @@ class AppController extends ChangeNotifier {
   String get aiGatewayUrl => settings.aiGateway.baseUrl.trim();
   bool get hasStoredAiGatewayApiKey =>
       _settingsController.secureRefs.containsKey('ai_gateway_api_key');
-  bool get isAiGatewayOnlyMode =>
-      currentAssistantExecutionTarget == AssistantExecutionTarget.aiGatewayOnly;
+  bool get isSingleAgentMode =>
+      currentAssistantExecutionTarget == AssistantExecutionTarget.singleAgent;
   bool get isCodexBridgeBusy => _isCodexBridgeBusy;
   String? get codexBridgeError => _codexBridgeError;
   String? get codexRuntimeWarning => _codexRuntimeWarning;
@@ -344,7 +344,7 @@ class AppController extends ChangeNotifier {
   }
 
   String _resolvedAssistantModelForTarget(AssistantExecutionTarget target) {
-    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+    if (target == AssistantExecutionTarget.singleAgent) {
       return resolvedAiGatewayModel;
     }
     final resolved = resolvedDefaultModel.trim();
@@ -397,7 +397,7 @@ class AppController extends ChangeNotifier {
   }
 
   String get assistantConversationOwnerLabel {
-    if (!isAiGatewayOnlyMode) {
+    if (!isSingleAgentMode) {
       return activeAgentName;
     }
     final model = resolvedAssistantModel;
@@ -412,7 +412,7 @@ class AppController extends ChangeNotifier {
   ) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
-    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+    if (target == AssistantExecutionTarget.singleAgent) {
       final model = assistantModelForSession(normalizedSessionKey);
       final host = _aiGatewayHostLabel(settings.aiGateway.baseUrl);
       final detail = _joinConnectionParts(<String>[model, host]);
@@ -674,7 +674,7 @@ class AppController extends ChangeNotifier {
 
   List<String> _assistantModelChoicesForSession(String sessionKey) {
     final target = assistantExecutionTargetForSession(sessionKey);
-    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+    if (target == AssistantExecutionTarget.singleAgent) {
       return aiGatewayConversationModelChoices;
     }
     final runtimeModels = connectedGatewayModelChoices;
@@ -714,7 +714,7 @@ class AppController extends ChangeNotifier {
 
   bool get canQuickConnectGateway {
     final target = currentAssistantExecutionTarget;
-    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+    if (target == AssistantExecutionTarget.singleAgent) {
       return false;
     }
     final profile = _gatewayProfileForAssistantExecutionTarget(target);
@@ -729,7 +729,7 @@ class AppController extends ChangeNotifier {
       return true;
     }
     final defaults = switch (target) {
-      AssistantExecutionTarget.aiGatewayOnly =>
+      AssistantExecutionTarget.singleAgent =>
         GatewayConnectionProfile.emptySlot(index: kGatewayRemoteProfileIndex),
       AssistantExecutionTarget.local =>
         GatewayConnectionProfile.defaultsLocal(),
@@ -773,11 +773,11 @@ class AppController extends ChangeNotifier {
       _sessionsController.currentSessionKey,
     );
     final items = List<GatewayChatMessage>.from(
-      isAiGatewayOnlyMode
+      isSingleAgentMode
           ? (_gatewayHistoryCache[sessionKey] ?? const <GatewayChatMessage>[])
           : _chatController.messages,
     );
-    final threadItems = isAiGatewayOnlyMode
+    final threadItems = isSingleAgentMode
         ? _assistantThreadMessages[sessionKey]
         : null;
     if (threadItems != null && threadItems.isNotEmpty) {
@@ -787,7 +787,7 @@ class AppController extends ChangeNotifier {
     if (localItems != null && localItems.isNotEmpty) {
       items.addAll(localItems);
     }
-    final streaming = isAiGatewayOnlyMode
+    final streaming = isSingleAgentMode
         ? (_aiGatewayStreamingTextBySession[sessionKey]?.trim() ?? '')
         : (_chatController.streamingAssistantText?.trim() ?? '');
     if (streaming.isNotEmpty) {
@@ -876,7 +876,7 @@ class AppController extends ChangeNotifier {
   bool assistantSessionHasPendingRun(String sessionKey) {
     final normalized = _normalizedAssistantSessionKey(sessionKey);
     if (assistantExecutionTargetForSession(normalized) ==
-        AssistantExecutionTarget.aiGatewayOnly) {
+        AssistantExecutionTarget.singleAgent) {
       return _aiGatewayPendingSessionKeys.contains(normalized);
     }
     return (_chatController.hasPendingRun || _multiAgentRunPending) &&
@@ -1246,7 +1246,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> connectSavedGateway() async {
     final target = currentAssistantExecutionTarget;
-    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+    if (target == AssistantExecutionTarget.singleAgent) {
       return;
     }
     await _connectProfile(_gatewayProfileForAssistantExecutionTarget(target));
@@ -1322,7 +1322,7 @@ class AppController extends ChangeNotifier {
   Future<void> selectAgent(String? agentId) async {
     _agentsController.selectAgent(agentId);
     if (currentAssistantExecutionTarget !=
-        AssistantExecutionTarget.aiGatewayOnly) {
+        AssistantExecutionTarget.singleAgent) {
       final target = currentAssistantExecutionTarget;
       final nextProfile = _gatewayProfileForAssistantExecutionTarget(
         target,
@@ -1368,7 +1368,7 @@ class AppController extends ChangeNotifier {
     final nextTarget = assistantExecutionTargetForSession(nextSessionKey);
     final nextViewMode = assistantMessageViewModeForSession(nextSessionKey);
 
-    if (!isAiGatewayOnlyMode) {
+    if (!isSingleAgentMode) {
       _preserveGatewayHistoryForSession(previousSessionKey);
     }
 
@@ -1384,7 +1384,7 @@ class AppController extends ChangeNotifier {
       sessionKey: nextSessionKey,
       persistDefaultSelection: false,
     );
-    if (nextTarget == AssistantExecutionTarget.aiGatewayOnly) {
+    if (nextTarget == AssistantExecutionTarget.singleAgent) {
       await discoverGatewayOnlySkillsForSession(nextSessionKey);
     } else {
       await dismissDiscoveredSkillsForSession(nextSessionKey);
@@ -1398,7 +1398,7 @@ class AppController extends ChangeNotifier {
     List<GatewayChatAttachmentPayload> attachments =
         const <GatewayChatAttachmentPayload>[],
   }) async {
-    if (isAiGatewayOnlyMode) {
+    if (isSingleAgentMode) {
       await _sendAiGatewayMessage(
         message,
         thinking: thinking,
@@ -1436,7 +1436,7 @@ class AppController extends ChangeNotifier {
       _notifyIfActive();
       return;
     }
-    if (isAiGatewayOnlyMode) {
+    if (isSingleAgentMode) {
       await _abortAiGatewayRun(_sessionsController.currentSessionKey);
       return;
     }
@@ -1466,7 +1466,7 @@ class AppController extends ChangeNotifier {
       sessionKey: _sessionsController.currentSessionKey,
       persistDefaultSelection: true,
     );
-    if (resolvedTarget == AssistantExecutionTarget.aiGatewayOnly) {
+    if (resolvedTarget == AssistantExecutionTarget.singleAgent) {
       await discoverGatewayOnlySkillsForSession(
         _sessionsController.currentSessionKey,
       );
@@ -1531,7 +1531,7 @@ class AppController extends ChangeNotifier {
       );
     }
 
-    if (resolvedTarget == AssistantExecutionTarget.aiGatewayOnly) {
+    if (resolvedTarget == AssistantExecutionTarget.singleAgent) {
       if (_runtime.isConnected) {
         _preserveGatewayHistoryForSession(normalizedSessionKey);
       }
@@ -1641,7 +1641,7 @@ class AppController extends ChangeNotifier {
   Future<void> discoverGatewayOnlySkillsForSession(String sessionKey) async {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
     if (assistantExecutionTargetForSession(normalizedSessionKey) !=
-        AssistantExecutionTarget.aiGatewayOnly) {
+        AssistantExecutionTarget.singleAgent) {
       _upsertAssistantThreadRecord(
         normalizedSessionKey,
         discoveredSkills: const <AssistantThreadSkillEntry>[],
@@ -2138,13 +2138,13 @@ class AppController extends ChangeNotifier {
     String tokenOverride = '',
     String passwordOverride = '',
   }) async {
-    if (executionTarget == AssistantExecutionTarget.aiGatewayOnly ||
+    if (executionTarget == AssistantExecutionTarget.singleAgent ||
         profile.mode == RuntimeConnectionMode.unconfigured) {
       return (
         state: 'inactive',
         message: appText(
-          '当前模式仅使用 AI Gateway，不建立 OpenClaw Gateway 会话。',
-          'The current mode uses AI Gateway only and does not open an OpenClaw Gateway session.',
+          '当前模式使用单机智能体，不建立 OpenClaw Gateway 会话。',
+          'The current mode uses Single Agent and does not open an OpenClaw Gateway session.',
         ),
         endpoint: '',
       );
@@ -2389,7 +2389,7 @@ class AppController extends ChangeNotifier {
       );
       await _restoreInitialAssistantSessionSelection();
       await _ensureActiveAssistantThread();
-      if (isAiGatewayOnlyMode) {
+      if (isSingleAgentMode) {
         await discoverGatewayOnlySkillsForSession(currentSessionKey);
       }
       _runtimeEventsSubscription = _runtimeCoordinator.gateway.events.listen(
@@ -2399,7 +2399,7 @@ class AppController extends ChangeNotifier {
         startupTarget,
       );
       final shouldAutoConnect =
-          startupTarget != AssistantExecutionTarget.aiGatewayOnly &&
+          startupTarget != AssistantExecutionTarget.singleAgent &&
           startupProfile != null &&
           startupProfile.useSetupCode &&
           startupProfile.setupCode.trim().isNotEmpty;
@@ -2596,7 +2596,7 @@ class AppController extends ChangeNotifier {
       sessionKey: sessionKey,
       persistDefaultSelection: false,
     );
-    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+    if (target == AssistantExecutionTarget.singleAgent) {
       await discoverGatewayOnlySkillsForSession(sessionKey);
     } else {
       await dismissDiscoveredSkillsForSession(sessionKey);
@@ -2620,7 +2620,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> _ensureActiveAssistantThread() async {
-    if (!isAiGatewayOnlyMode ||
+    if (!isSingleAgentMode ||
         !isAssistantTaskArchived(_sessionsController.currentSessionKey)) {
       return;
     }
@@ -3857,7 +3857,7 @@ class AppController extends ChangeNotifier {
       return GatewayMode.offline;
     }
     return switch (currentAssistantExecutionTarget) {
-      AssistantExecutionTarget.aiGatewayOnly => GatewayMode.offline,
+      AssistantExecutionTarget.singleAgent => GatewayMode.offline,
       AssistantExecutionTarget.local => GatewayMode.local,
       AssistantExecutionTarget.remote => GatewayMode.remote,
     };
@@ -4011,7 +4011,7 @@ class AppController extends ChangeNotifier {
   ) {
     return switch (mode) {
       RuntimeConnectionMode.unconfigured =>
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
       RuntimeConnectionMode.local => AssistantExecutionTarget.local,
       RuntimeConnectionMode.remote => AssistantExecutionTarget.remote,
     };
@@ -4023,8 +4023,8 @@ class AppController extends ChangeNotifier {
     return switch (target) {
       AssistantExecutionTarget.local => settings.primaryLocalGatewayProfile,
       AssistantExecutionTarget.remote => settings.primaryRemoteGatewayProfile,
-      AssistantExecutionTarget.aiGatewayOnly => throw StateError(
-        'AI Gateway only target has no OpenClaw gateway profile.',
+      AssistantExecutionTarget.singleAgent => throw StateError(
+        'Single Agent target has no OpenClaw gateway profile.',
       ),
     };
   }
@@ -4033,8 +4033,8 @@ class AppController extends ChangeNotifier {
     return switch (target) {
       AssistantExecutionTarget.local => kGatewayLocalProfileIndex,
       AssistantExecutionTarget.remote => kGatewayRemoteProfileIndex,
-      AssistantExecutionTarget.aiGatewayOnly => throw StateError(
-        'AI Gateway only target has no OpenClaw gateway profile index.',
+      AssistantExecutionTarget.singleAgent => throw StateError(
+        'Single Agent target has no OpenClaw gateway profile index.',
       ),
     };
   }

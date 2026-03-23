@@ -66,7 +66,7 @@ void main() {
             selectedModels: const <String>['qwen2.5-coder:latest'],
           ),
           defaultModel: 'gpt-5.4',
-          assistantExecutionTarget: AssistantExecutionTarget.aiGatewayOnly,
+          assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
         ),
       );
 

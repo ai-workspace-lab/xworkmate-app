@@ -70,7 +70,7 @@ void main() {
     expect(
       desktopAccess.availableExecutionTargets,
       equals(<AssistantExecutionTarget>[
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
         AssistantExecutionTarget.local,
         AssistantExecutionTarget.remote,
       ]),
@@ -82,7 +82,7 @@ void main() {
     expect(
       webAccess.availableExecutionTargets,
       equals(<AssistantExecutionTarget>[
-        AssistantExecutionTarget.aiGatewayOnly,
+        AssistantExecutionTarget.singleAgent,
         AssistantExecutionTarget.remote,
       ]),
     );

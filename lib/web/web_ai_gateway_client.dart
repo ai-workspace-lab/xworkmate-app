@@ -123,7 +123,7 @@ class WebAiGatewayClient {
           provider:
               _stringValue(map['provider']) ??
               _stringValue(map['owned_by']) ??
-              'Direct AI',
+              'Single Agent',
           contextWindow:
               _intValue(map['contextWindow']) ??
               _intValue(map['context_window']),

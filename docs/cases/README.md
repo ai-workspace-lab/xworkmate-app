@@ -2,7 +2,7 @@
 
 这组案例用于手动验证 `XWorkmate` 当前的多 Agent 协作链路，覆盖：
 
-- `仅 AI Gateway`
+- `单机智能体`
 - `本地 OpenClaw Gateway`
 - `远程 OpenClaw Gateway`
 - `ARIS + 本地 Ollama`
@@ -34,7 +34,7 @@
 ## 建议记录项
 
 - 当前使用的框架：`原生` 或 `ARIS`
-- 当前执行模式：`仅 AI Gateway` / `本地 OpenClaw Gateway` / `远程 OpenClaw Gateway`
+- 当前执行模式：`单机智能体` / `本地 OpenClaw Gateway` / `远程 OpenClaw Gateway`
 - 参与角色的 CLI 组合
 - 是否看到流式输出
 - 是否发生自动回退

@@ -136,8 +136,8 @@ class AppController extends ChangeNotifier {
       _currentRecord.executionTarget ?? _settings.assistantExecutionTarget;
   AssistantExecutionTarget get currentAssistantExecutionTarget =>
       assistantExecutionTarget;
-  bool get isAiGatewayOnlyMode =>
-      assistantExecutionTarget == AssistantExecutionTarget.aiGatewayOnly;
+  bool get isSingleAgentMode =>
+      assistantExecutionTarget == AssistantExecutionTarget.singleAgent;
   List<GatewayChatMessage> get chatMessages {
     final base = List<GatewayChatMessage>.from(_currentRecord.messages);
     final streaming = _streamingTextBySession[_currentSessionKey]?.trim() ?? '';
@@ -172,7 +172,7 @@ class AppController extends ChangeNotifier {
                     DateTime.now().millisecondsSinceEpoch.toDouble(),
                 executionTarget:
                     _sanitizeTarget(record.executionTarget) ??
-                    AssistantExecutionTarget.aiGatewayOnly,
+                    AssistantExecutionTarget.singleAgent,
                 pending: _pendingSessionKeys.contains(record.sessionKey),
                 current: record.sessionKey == _currentSessionKey,
               ),
@@ -233,7 +233,7 @@ class AppController extends ChangeNotifier {
 
   AssistantThreadConnectionState get currentAssistantConnectionState {
     final target = currentAssistantExecutionTarget;
-    if (target == AssistantExecutionTarget.aiGatewayOnly) {
+    if (target == AssistantExecutionTarget.singleAgent) {
       final host = _hostLabel(_settings.aiGateway.baseUrl);
       final model = resolvedAiGatewayModel;
       final detail = _joinConnectionParts(<String>[model, host]);
@@ -244,7 +244,7 @@ class AppController extends ChangeNotifier {
             : RuntimeConnectionStatus.offline,
         primaryLabel: target.label,
         detailLabel: detail.isEmpty
-            ? appText('Direct AI 未配置', 'Direct AI not configured')
+            ? appText('单机智能体未配置', 'Single Agent not configured')
             : detail,
         ready: canUseAiGatewayConversation,
         pairingRequired: false,
@@ -287,8 +287,8 @@ class AppController extends ChangeNotifier {
       );
     }
     return appText(
-      '当前会话列表会在浏览器本地保存，刷新后仍可恢复 Direct AI / Relay 的历史入口。',
-      'Conversation history is stored in this browser so Direct AI and Relay entries remain available after reload.',
+      '当前会话列表会在浏览器本地保存，刷新后仍可恢复单机智能体 / Relay 的历史入口。',
+      'Conversation history is stored in this browser so Single Agent and Relay entries remain available after reload.',
     );
   }
 
@@ -301,7 +301,7 @@ class AppController extends ChangeNotifier {
     }
     final target =
         _sanitizeTarget(_settings.assistantExecutionTarget) ??
-        AssistantExecutionTarget.aiGatewayOnly;
+        AssistantExecutionTarget.singleAgent;
     final record = _newRecord(target: target);
     _threadRecords[record.sessionKey] = record;
     _currentSessionKey = record.sessionKey;
@@ -548,7 +548,7 @@ class AppController extends ChangeNotifier {
     AssistantExecutionTarget target,
   ) async {
     final resolvedTarget =
-        _sanitizeTarget(target) ?? AssistantExecutionTarget.aiGatewayOnly;
+        _sanitizeTarget(target) ?? AssistantExecutionTarget.singleAgent;
     _settings = _settings.copyWith(assistantExecutionTarget: resolvedTarget);
     _replaceCurrentRecord(
       _currentRecord.copyWith(executionTarget: resolvedTarget),
@@ -570,7 +570,7 @@ class AppController extends ChangeNotifier {
       defaultProvider: provider.trim().isEmpty ? 'gateway' : provider.trim(),
       defaultModel: defaultModel.trim(),
       aiGateway: _settings.aiGateway.copyWith(
-        name: name.trim().isEmpty ? 'Direct AI' : name.trim(),
+        name: name.trim().isEmpty ? 'Single Agent' : name.trim(),
         baseUrl: normalizedBaseUrl?.toString() ?? baseUrl.trim(),
       ),
     );
@@ -625,7 +625,7 @@ class AppController extends ChangeNotifier {
         defaultProvider: provider.trim().isEmpty ? 'gateway' : provider.trim(),
         defaultModel: resolvedDefaultModel,
         aiGateway: _settings.aiGateway.copyWith(
-          name: name.trim().isEmpty ? 'Direct AI' : name.trim(),
+          name: name.trim().isEmpty ? 'Single Agent' : name.trim(),
           baseUrl:
               _aiGatewayClient.normalizeBaseUrl(baseUrl)?.toString() ??
               baseUrl.trim(),
@@ -836,12 +836,12 @@ class AppController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      if (target == AssistantExecutionTarget.aiGatewayOnly) {
+      if (target == AssistantExecutionTarget.singleAgent) {
         if (!canUseAiGatewayConversation) {
           throw Exception(
             appText(
-              '请先在 Settings 配置 Direct AI 的地址、API Key 和默认模型。',
-              'Configure Direct AI endpoint, API key, and default model first.',
+              '请先在 Settings 配置单机智能体所需的 AI Gateway 地址、API Key 和默认模型。',
+              'Configure the Single Agent AI Gateway endpoint, API key, and default model first.',
             ),
           );
         }
@@ -915,7 +915,7 @@ class AppController extends ChangeNotifier {
   SettingsSnapshot _sanitizeSettings(SettingsSnapshot snapshot) {
     final target =
         _sanitizeTarget(snapshot.assistantExecutionTarget) ??
-        AssistantExecutionTarget.aiGatewayOnly;
+        AssistantExecutionTarget.singleAgent;
     final normalizedSessionBaseUrl =
         RemoteWebSessionRepository.normalizeBaseUrl(
           snapshot.webSessionPersistence.remoteBaseUrl,
@@ -942,7 +942,7 @@ class AppController extends ChangeNotifier {
   AssistantThreadRecord _sanitizeRecord(AssistantThreadRecord record) {
     final target =
         _sanitizeTarget(record.executionTarget) ??
-        AssistantExecutionTarget.aiGatewayOnly;
+        AssistantExecutionTarget.singleAgent;
     return record.copyWith(
       executionTarget: target,
       title: record.title.trim().isEmpty
@@ -954,9 +954,9 @@ class AppController extends ChangeNotifier {
   AssistantExecutionTarget? _sanitizeTarget(AssistantExecutionTarget? target) {
     return switch (target) {
       AssistantExecutionTarget.remote => AssistantExecutionTarget.remote,
-      AssistantExecutionTarget.aiGatewayOnly =>
-        AssistantExecutionTarget.aiGatewayOnly,
-      _ => AssistantExecutionTarget.aiGatewayOnly,
+      AssistantExecutionTarget.singleAgent =>
+        AssistantExecutionTarget.singleAgent,
+      _ => AssistantExecutionTarget.singleAgent,
     };
   }
 

@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Assistant-first Flutter Web shell for Direct AI Gateway and Relay OpenClaw Gateway.",
+    "description": "Assistant-first Flutter Web shell for Single Agent and Relay OpenClaw Gateway.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

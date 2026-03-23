@@ -12,7 +12,7 @@ import 'package:xworkmate/web/web_store.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('web controller persists direct and relay configuration', () async {
+  test('web controller persists single-agent and relay configuration', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final remoteRecords = <AssistantThreadRecord>[];
 
@@ -24,7 +24,7 @@ void main() {
     await _waitForReady(controller);
 
     await controller.saveAiGatewayConfiguration(
-      name: 'Direct AI',
+      name: 'Single Agent',
       baseUrl: 'https://api.example.com/v1',
       provider: 'openai-compatible',
       apiKey: 'sk-test-web',
@@ -46,7 +46,7 @@ void main() {
       AssistantExecutionTarget.remote,
     );
     await controller.createConversation(
-      target: AssistantExecutionTarget.aiGatewayOnly,
+      target: AssistantExecutionTarget.singleAgent,
     );
 
     final reloaded = AppController(
@@ -133,7 +133,7 @@ void main() {
           updatedAtMs: 1,
           title: 'stale browser cache',
           archived: false,
-          executionTarget: AssistantExecutionTarget.aiGatewayOnly,
+          executionTarget: AssistantExecutionTarget.singleAgent,
           messageViewMode: AssistantMessageViewMode.rendered,
         ),
       ]);

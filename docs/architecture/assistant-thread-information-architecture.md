@@ -37,7 +37,7 @@ flowchart LR
   C["会话头部"] --> B
   D["底部 composer 工具栏"] --> B
 
-  A1["分组：仅 AI Gateway / 本地 / 远程"]
+  A1["分组：单机智能体 / 本地 / 远程"]
   A2["新对话"]
   A3["任务卡片"]
   A4["归档动作"]
@@ -133,7 +133,7 @@ flowchart LR
 | 维度 | 当前状态 | 说明 |
 | --- | --- | --- |
 | 消息历史 | 是 | 每个线程独立保存 / 解析历史 |
-| 执行模式 | 是 | `AI Gateway Only / Local / Remote` 跟线程绑定 |
+| 执行模式 | 是 | `Single Agent / Local / Remote` 跟线程绑定 |
 | Skills | 是 | 已导入 / 已选 skills 跟线程绑定 |
 | 模型 | 是 | `assistantModelId` 跟线程绑定，没设时回退到默认模型 |
 | 顶部连接状态 | 是 | 只显示当前线程解析出的连接状态 |

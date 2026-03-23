@@ -143,8 +143,8 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           eyebrow: appText('Web Preferences', 'Web Preferences'),
           title: appText('设置', 'Settings'),
           subtitle: appText(
-            'Web 版只保留 Direct AI / Relay Gateway、界面偏好和基础信息。',
-            'The web app keeps only Direct AI, Relay Gateway, appearance preferences, and basic product info.',
+            'Web 版只保留单机智能体 / Relay Gateway、界面偏好和基础信息。',
+            'The web app keeps only Single Agent, Relay Gateway, appearance preferences, and basic product info.',
           ),
           toolbar: Wrap(
             spacing: 10,
@@ -227,7 +227,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
         .availableExecutionTargets
         .where(
           (target) =>
-              target == AssistantExecutionTarget.aiGatewayOnly ||
+              target == AssistantExecutionTarget.singleAgent ||
               target == AssistantExecutionTarget.remote,
         )
         .toList(growable: false);
@@ -401,7 +401,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              appText('Direct AI', 'Direct AI'),
+              appText('单机智能体', 'Single Agent'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
@@ -750,8 +750,8 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
             const SizedBox(height: 8),
             Text(
               appText(
-                'Root SPA 目标部署到 https://xworkmate.svc.plus/ 。Direct AI 需要浏览器可达且支持 CORS；否则请使用 Relay 模式。',
-                'The root SPA targets https://xworkmate.svc.plus/ . Direct AI endpoints must be browser-reachable and CORS-compatible; otherwise use relay mode.',
+                'Root SPA 目标部署到 https://xworkmate.svc.plus/ 。单机智能体依赖的 AI Gateway endpoint 需要浏览器可达且支持 CORS；否则请使用 Relay 模式。',
+                'The root SPA targets https://xworkmate.svc.plus/ . Single Agent AI Gateway endpoints must be browser-reachable and CORS-compatible; otherwise use relay mode.',
               ),
             ),
           ],
@@ -782,9 +782,9 @@ String _themeLabel(ThemeMode mode) {
 
 String _targetLabel(AssistantExecutionTarget target) {
   return switch (target) {
-    AssistantExecutionTarget.aiGatewayOnly => appText(
-      'Direct AI Gateway',
-      'Direct AI Gateway',
+    AssistantExecutionTarget.singleAgent => appText(
+      'Single Agent',
+      'Single Agent',
     ),
     AssistantExecutionTarget.remote => appText(
       'Relay OpenClaw Gateway',

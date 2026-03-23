@@ -960,7 +960,7 @@ class UiFeatureAccess {
   List<AssistantExecutionTarget> get availableExecutionTargets {
     final targets = <AssistantExecutionTarget>[];
     if (supportsDirectAi) {
-      targets.add(AssistantExecutionTarget.aiGatewayOnly);
+      targets.add(AssistantExecutionTarget.singleAgent);
     }
     if (supportsLocalGateway) {
       targets.add(AssistantExecutionTarget.local);
@@ -980,12 +980,12 @@ class UiFeatureAccess {
     }
     final preferredOrder = platform == UiFeaturePlatform.web
         ? const <AssistantExecutionTarget>[
-            AssistantExecutionTarget.aiGatewayOnly,
+            AssistantExecutionTarget.singleAgent,
             AssistantExecutionTarget.remote,
           ]
         : const <AssistantExecutionTarget>[
             AssistantExecutionTarget.local,
-            AssistantExecutionTarget.aiGatewayOnly,
+            AssistantExecutionTarget.singleAgent,
             AssistantExecutionTarget.remote,
           ];
     for (final candidate in preferredOrder) {
@@ -994,7 +994,7 @@ class UiFeatureAccess {
       }
     }
     return platform == UiFeaturePlatform.web
-        ? AssistantExecutionTarget.aiGatewayOnly
+        ? AssistantExecutionTarget.singleAgent
         : AssistantExecutionTarget.local;
   }
 }

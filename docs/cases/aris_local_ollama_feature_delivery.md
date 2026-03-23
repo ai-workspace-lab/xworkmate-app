@@ -7,7 +7,7 @@
 ## 推荐配置
 
 - 框架：`ARIS`
-- 执行模式：`仅 AI Gateway` 或 `本地 OpenClaw Gateway`
+- 执行模式：`单机智能体` 或 `本地 OpenClaw Gateway`
 - Ollama 端点：`http://127.0.0.1:11434`
 - Architect：`gemini`
 - Engineer：`opencode`
