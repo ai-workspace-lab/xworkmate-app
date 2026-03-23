@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../app/app_store_policy.dart';
 import 'aris_bridge.dart';
 
 typedef ArisProcessStarter =
@@ -87,6 +88,13 @@ class ArisLlmChatClient {
     required Map<String, String> environment,
     required Map<String, dynamic> arguments,
   }) async {
+    if (blocksAppStoreEmbeddedAgentProcesses(
+      isAppleHost: Platform.isIOS || Platform.isMacOS,
+    )) {
+      throw UnsupportedError(
+        'App Store builds do not allow launching the bundled ARIS bridge process.',
+      );
+    }
     final launch = await _bridgeLocator.locate();
     if (launch == null) {
       throw StateError('ARIS Go bridge is unavailable.');

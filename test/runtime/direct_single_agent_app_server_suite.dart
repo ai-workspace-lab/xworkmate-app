@@ -1,0 +1,297 @@
+@TestOn('vm')
+library;
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:xworkmate/runtime/direct_single_agent_app_server_client.dart';
+
+void main() {
+  group('DirectSingleAgentAppServerClient', () {
+    test('probes websocket endpoint and reports codex support', () async {
+      final server = await _FakeAppServer.start();
+      addTearDown(server.close);
+
+      final client = DirectSingleAgentAppServerClient(
+        endpointResolver: () => server.baseHttpUri,
+      );
+
+      final capabilities = await client.loadCapabilities();
+
+      expect(capabilities.available, isTrue);
+      expect(capabilities.supportsCodex, isTrue);
+      expect(capabilities.endpoint, 'ws://127.0.0.1:${server.port}');
+      expect(server.methods, contains('initialize'));
+    });
+
+    test('runs single-agent turns over direct websocket app-server', () async {
+      final server = await _FakeAppServer.start();
+      addTearDown(server.close);
+
+      final client = DirectSingleAgentAppServerClient(
+        endpointResolver: () => server.baseHttpUri,
+      );
+      addTearDown(client.dispose);
+
+      final deltas = <String>[];
+      final result = await client.run(
+        const DirectSingleAgentRunRequest(
+          sessionId: 'session-1',
+          prompt: 'hello world',
+          model: 'gpt-4.1',
+          workingDirectory: '/tmp',
+          gatewayToken: 'token-1',
+        ).copyWith(onOutput: deltas.add),
+      );
+
+      expect(result.success, isTrue);
+      expect(result.output, 'hello world from app server');
+      expect(deltas.join(), 'hello world from app server');
+      expect(server.methods, containsAll(<String>[
+        'initialize',
+        'thread/start',
+        'turn/start',
+      ]));
+      expect(server.authorizationHeaders, contains('Bearer token-1'));
+    });
+
+    test('interrupts active turns on abort', () async {
+      final server = await _FakeAppServer.start(delayCompletion: true);
+      addTearDown(server.close);
+
+      final client = DirectSingleAgentAppServerClient(
+        endpointResolver: () => server.baseHttpUri,
+      );
+      addTearDown(client.dispose);
+
+      final runFuture = client.run(
+        const DirectSingleAgentRunRequest(
+          sessionId: 'session-abort',
+          prompt: 'abort me',
+          model: 'gpt-4.1',
+          workingDirectory: '/tmp',
+          gatewayToken: '',
+        ),
+      );
+
+      await server.waitForMethod('turn/start');
+      await client.abort('session-abort');
+      final result = await runFuture;
+
+      expect(result.aborted, isTrue);
+      expect(server.methods, contains('turn/interrupt'));
+    });
+  });
+}
+
+class _FakeAppServer {
+  _FakeAppServer._(this._server, {required this.delayCompletion});
+
+  final HttpServer _server;
+  final bool delayCompletion;
+  final List<String> methods = <String>[];
+  final List<String> authorizationHeaders = <String>[];
+  final Map<String, Completer<void>> _methodWaiters = <String, Completer<void>>{};
+  int _threadCounter = 0;
+
+  int get port => _server.port;
+  Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${_server.port}');
+
+  static Future<_FakeAppServer> start({bool delayCompletion = false}) async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final fake = _FakeAppServer._(server, delayCompletion: delayCompletion);
+    unawaited(fake._listen());
+    return fake;
+  }
+
+  Future<void> close() async {
+    await _server.close(force: true);
+  }
+
+  Future<void> waitForMethod(String method) async {
+    if (methods.contains(method)) {
+      return;
+    }
+    final completer = _methodWaiters.putIfAbsent(method, Completer<void>.new);
+    await completer.future.timeout(const Duration(seconds: 3));
+  }
+
+  Future<void> _listen() async {
+    await for (final request in _server) {
+      authorizationHeaders.add(
+        request.headers.value(HttpHeaders.authorizationHeader) ?? '',
+      );
+      if (request.uri.path == '/' && WebSocketTransformer.isUpgradeRequest(request)) {
+        final socket = await WebSocketTransformer.upgrade(request);
+        unawaited(_handleSocket(socket));
+        continue;
+      }
+      request.response.statusCode = HttpStatus.notFound;
+      await request.response.close();
+    }
+  }
+
+  Future<void> _handleSocket(WebSocket socket) async {
+    await for (final raw in socket) {
+      final message = _decodeMap(raw);
+      final method = message['method']?.toString() ?? '';
+      final id = message['id'];
+      final params = _asMap(message['params']);
+      if (method.isEmpty) {
+        continue;
+      }
+      methods.add(method);
+      _methodWaiters.remove(method)?.complete();
+      switch (method) {
+        case 'initialize':
+          socket.add(jsonEncode(<String, dynamic>{
+            'jsonrpc': '2.0',
+            'id': id,
+            'result': <String, dynamic>{
+              'serverInfo': <String, dynamic>{'name': 'fake-codex'},
+            },
+          }));
+          break;
+        case 'initialized':
+          break;
+        case 'thread/start':
+          _threadCounter += 1;
+          socket.add(jsonEncode(<String, dynamic>{
+            'jsonrpc': '2.0',
+            'id': id,
+            'result': <String, dynamic>{
+              'id': 'thread-$_threadCounter',
+              'path': params['cwd'] ?? '/tmp',
+              'ephemeral': false,
+            },
+          }));
+          break;
+        case 'thread/resume':
+          socket.add(jsonEncode(<String, dynamic>{
+            'jsonrpc': '2.0',
+            'id': id,
+            'result': <String, dynamic>{
+              'id': params['threadId'] ?? 'thread-resumed',
+              'path': params['cwd'] ?? '/tmp',
+              'ephemeral': false,
+            },
+          }));
+          break;
+        case 'turn/start':
+          final threadId = params['threadId']?.toString() ?? 'thread-1';
+          socket.add(jsonEncode(<String, dynamic>{
+            'jsonrpc': '2.0',
+            'id': id,
+            'result': <String, dynamic>{
+              'id': 'turn-1',
+              'threadId': threadId,
+              'status': 'started',
+            },
+          }));
+          unawaited(_emitTurn(socket, threadId));
+          break;
+        case 'turn/interrupt':
+          final threadId = params['threadId']?.toString() ?? 'thread-1';
+          socket.add(jsonEncode(<String, dynamic>{
+            'jsonrpc': '2.0',
+            'id': id,
+            'result': <String, dynamic>{'ok': true},
+          }));
+          socket.add(jsonEncode(<String, dynamic>{
+            'jsonrpc': '2.0',
+            'method': 'turn/error',
+            'params': <String, dynamic>{
+              'threadId': threadId,
+              'message': 'aborted',
+            },
+          }));
+          await socket.close();
+          break;
+        default:
+          socket.add(jsonEncode(<String, dynamic>{
+            'jsonrpc': '2.0',
+            'id': id,
+            'error': <String, dynamic>{
+              'code': -32601,
+              'message': 'unknown method $method',
+            },
+          }));
+      }
+    }
+  }
+
+  Future<void> _emitTurn(WebSocket socket, String threadId) async {
+    const parts = <String>['hello ', 'world ', 'from app server'];
+    for (final part in parts) {
+      try {
+        socket.add(jsonEncode(<String, dynamic>{
+          'jsonrpc': '2.0',
+          'method': 'item/agentMessage/delta',
+          'params': <String, dynamic>{
+            'threadId': threadId,
+            'turnId': 'turn-1',
+            'delta': part,
+          },
+        }));
+      } catch (_) {
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+    if (delayCompletion) {
+      return;
+    }
+    socket.add(jsonEncode(<String, dynamic>{
+      'jsonrpc': '2.0',
+      'method': 'turn/completed',
+      'params': <String, dynamic>{
+        'threadId': threadId,
+        'turnId': 'turn-1',
+      },
+    }));
+  }
+}
+
+Map<String, dynamic> _decodeMap(Object raw) {
+  if (raw is Map<String, dynamic>) {
+    return raw;
+  }
+  if (raw is Map) {
+    return raw.cast<String, dynamic>();
+  }
+  final decoded = jsonDecode(raw.toString());
+  if (decoded is Map<String, dynamic>) {
+    return decoded;
+  }
+  if (decoded is Map) {
+    return decoded.cast<String, dynamic>();
+  }
+  return const <String, dynamic>{};
+}
+
+Map<String, dynamic> _asMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.cast<String, dynamic>();
+  }
+  return const <String, dynamic>{};
+}
+
+extension on DirectSingleAgentRunRequest {
+  DirectSingleAgentRunRequest copyWith({
+    void Function(String text)? onOutput,
+  }) {
+    return DirectSingleAgentRunRequest(
+      sessionId: sessionId,
+      prompt: prompt,
+      model: model,
+      workingDirectory: workingDirectory,
+      gatewayToken: gatewayToken,
+      onOutput: onOutput ?? this.onOutput,
+    );
+  }
+}

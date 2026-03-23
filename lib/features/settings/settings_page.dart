@@ -1056,8 +1056,8 @@ class _SettingsPageState extends State<SettingsPage> {
       children: [
         Text(
           appText(
-            '这里仅维护 OpenClaw 连接源 profile。工作模式在会话区单独切换；保存：仅保存配置，不立即生效。应用：立即按当前配置生效。',
-            'This card edits OpenClaw connection source profiles only. Work mode is switched in the session UI. Save persists configuration only, while Apply makes it take effect immediately.',
+            '这里维护外部 Gateway / app-server 连接源 profile。工作模式在会话区单独切换：single-agent 直连外部 WS app-server；local/remote 继续走 Gateway。保存：仅保存配置，不立即生效。应用：立即按当前配置生效。',
+            'This card edits external Gateway and app-server endpoint profiles. Work mode is switched in the session UI: single-agent connects to an external WS app-server directly, while local/remote continue through Gateway. Save persists configuration only, while Apply makes it take effect immediately.',
           ),
           style: theme.textTheme.bodyMedium,
         ),
