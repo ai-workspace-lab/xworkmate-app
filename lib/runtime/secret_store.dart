@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'file_store_support.dart';
 import 'runtime_models.dart';
 
 abstract class SecureStorageClient {
@@ -8,6 +12,50 @@ abstract class SecureStorageClient {
   Future<void> delete({required String key});
 }
 
+class FileSecureStorageClient implements SecureStorageClient {
+  FileSecureStorageClient(this._directoryResolver);
+
+  final Future<Directory?> Function() _directoryResolver;
+
+  @override
+  Future<void> delete({required String key}) async {
+    final file = await _fileForKey(key);
+    if (file != null && await file.exists()) {
+      await file.delete();
+    }
+  }
+
+  @override
+  Future<String?> read({required String key}) async {
+    final file = await _fileForKey(key);
+    if (file == null || !await file.exists()) {
+      return null;
+    }
+    final value = (await file.readAsString()).trim();
+    return value.isEmpty ? null : value;
+  }
+
+  @override
+  Future<void> write({required String key, required String value}) async {
+    final file = await _fileForKey(key);
+    if (file == null) {
+      throw StateError('Secret directory unavailable for $key');
+    }
+    await atomicWriteString(file, '$value\n');
+  }
+
+  Future<File?> _fileForKey(String key) async {
+    final directory = await _directoryResolver();
+    if (directory == null) {
+      return null;
+    }
+    if (!await directory.exists()) {
+      await directory.create(recursive: true);
+    }
+    return File('${directory.path}/${encodeStableFileKey(key)}.secret');
+  }
+}
+
 class SecretStore {
   SecretStore({
     Future<String?> Function()? fallbackDirectoryPathResolver,
@@ -15,94 +63,197 @@ class SecretStore {
     Future<String?> Function()? defaultSupportDirectoryPathResolver,
     SecureStorageClient? secureStorage,
     bool enableSecureStorage = true,
-  });
+    StoreLayoutResolver? layoutResolver,
+  }) : _layoutResolver =
+           layoutResolver ??
+           StoreLayoutResolver(
+             localRootPathResolver: databasePathResolver,
+             secretRootPathResolver: fallbackDirectoryPathResolver,
+             supportRootPathResolver: defaultSupportDirectoryPathResolver,
+           ),
+       _secureStorageOverride = secureStorage;
 
   static const String legacyLocalStateKey = 'xworkmate.local_state.key';
 
-  Future<void> initialize() async {}
+  static const String _legacyGatewayTokenKey = 'xworkmate.gateway.token';
+  static const String _legacyGatewayPasswordKey = 'xworkmate.gateway.password';
+  static const String _gatewayDeviceIdKey = 'xworkmate.gateway.device.id';
+  static const String _gatewayDevicePublicKeyKey =
+      'xworkmate.gateway.device.public_key';
+  static const String _gatewayDevicePrivateKeyKey =
+      'xworkmate.gateway.device.private_key';
+  static const String _gatewayDeviceCreatedAtKey =
+      'xworkmate.gateway.device.created_at_ms';
+  static const String _ollamaCloudApiKeyKey = 'xworkmate.ollama.cloud.api_key';
+  static const String _vaultTokenKey = 'xworkmate.vault.token';
+  static const String _aiGatewayApiKeyKey = 'xworkmate.ai_gateway.api_key';
 
-  Future<String?> loadGatewayToken({int? profileIndex}) {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
+  final StoreLayoutResolver _layoutResolver;
+  final SecureStorageClient? _secureStorageOverride;
+  final Map<String, String> _memorySecure = <String, String>{};
+  StoreLayout? _layout;
+  SecureStorageClient? _secureStorage;
+  bool _initialized = false;
+
+  Future<void> initialize() async {
+    if (_initialized) {
+      return;
+    }
+    _initialized = true;
+    if (_secureStorageOverride != null) {
+      _secureStorage = _secureStorageOverride;
+      return;
+    }
+    try {
+      _layout = await _layoutResolver.resolve();
+      _secureStorage = FileSecureStorageClient(
+        () async => _layout?.secretDirectory,
+      );
+    } catch (_) {
+      _layout = null;
+      _secureStorage = null;
+    }
   }
 
-  Future<void> saveGatewayToken(String value, {int? profileIndex}) {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
+  Future<String?> loadGatewayToken({int? profileIndex}) async {
+    if (profileIndex != null) {
+      final scopedValue = await _readSecure(
+        _gatewayTokenKeyForProfile(profileIndex),
+      );
+      if ((scopedValue ?? '').trim().isNotEmpty) {
+        return scopedValue;
+      }
+      return _readSecure(_legacyGatewayTokenKey);
+    }
+    final legacyValue = await _readSecure(_legacyGatewayTokenKey);
+    if ((legacyValue ?? '').trim().isNotEmpty) {
+      return legacyValue;
+    }
+    for (final index in _gatewayProfileFallbackOrder) {
+      final scopedValue = await _readSecure(_gatewayTokenKeyForProfile(index));
+      if ((scopedValue ?? '').trim().isNotEmpty) {
+        return scopedValue;
+      }
+    }
+    return null;
   }
 
-  Future<void> clearGatewayToken({int? profileIndex}) {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
+  Future<void> saveGatewayToken(String value, {int? profileIndex}) =>
+      _writeSecure(
+        profileIndex == null
+            ? _legacyGatewayTokenKey
+            : _gatewayTokenKeyForProfile(profileIndex),
+        value,
+      );
+
+  Future<void> clearGatewayToken({int? profileIndex}) => _deleteSecure(
+    profileIndex == null
+        ? _legacyGatewayTokenKey
+        : _gatewayTokenKeyForProfile(profileIndex),
+  );
+
+  Future<String?> loadGatewayPassword({int? profileIndex}) async {
+    if (profileIndex != null) {
+      final scopedValue = await _readSecure(
+        _gatewayPasswordKeyForProfile(profileIndex),
+      );
+      if ((scopedValue ?? '').trim().isNotEmpty) {
+        return scopedValue;
+      }
+      return _readSecure(_legacyGatewayPasswordKey);
+    }
+    final legacyValue = await _readSecure(_legacyGatewayPasswordKey);
+    if ((legacyValue ?? '').trim().isNotEmpty) {
+      return legacyValue;
+    }
+    for (final index in _gatewayProfileFallbackOrder) {
+      final scopedValue = await _readSecure(
+        _gatewayPasswordKeyForProfile(index),
+      );
+      if ((scopedValue ?? '').trim().isNotEmpty) {
+        return scopedValue;
+      }
+    }
+    return null;
   }
 
-  Future<String?> loadGatewayPassword({int? profileIndex}) {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
-  }
+  Future<void> saveGatewayPassword(String value, {int? profileIndex}) =>
+      _writeSecure(
+        profileIndex == null
+            ? _legacyGatewayPasswordKey
+            : _gatewayPasswordKeyForProfile(profileIndex),
+        value,
+      );
 
-  Future<void> saveGatewayPassword(String value, {int? profileIndex}) {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
-  }
+  Future<void> clearGatewayPassword({int? profileIndex}) => _deleteSecure(
+    profileIndex == null
+        ? _legacyGatewayPasswordKey
+        : _gatewayPasswordKeyForProfile(profileIndex),
+  );
 
-  Future<void> clearGatewayPassword({int? profileIndex}) {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
-  }
+  Future<String?> loadOllamaCloudApiKey() => _readSecure(_ollamaCloudApiKeyKey);
 
-  Future<String?> loadOllamaCloudApiKey() {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
-  }
+  Future<void> saveOllamaCloudApiKey(String value) =>
+      _writeSecure(_ollamaCloudApiKeyKey, value);
 
-  Future<void> saveOllamaCloudApiKey(String value) {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
-  }
+  Future<String?> loadVaultToken() => _readSecure(_vaultTokenKey);
 
-  Future<String?> loadVaultToken() {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
-  }
+  Future<void> saveVaultToken(String value) =>
+      _writeSecure(_vaultTokenKey, value);
 
-  Future<void> saveVaultToken(String value) {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
-  }
+  Future<String?> loadAiGatewayApiKey() => _readSecure(_aiGatewayApiKeyKey);
 
-  Future<String?> loadAiGatewayApiKey() {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
-  }
+  Future<void> saveAiGatewayApiKey(String value) =>
+      _writeSecure(_aiGatewayApiKeyKey, value);
 
-  Future<void> saveAiGatewayApiKey(String value) {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
-  }
+  Future<void> clearAiGatewayApiKey() => _deleteSecure(_aiGatewayApiKeyKey);
 
-  Future<void> clearAiGatewayApiKey() {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
-  }
-
-  Future<Map<String, String>> loadSecureRefs() {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
+  Future<Map<String, String>> loadSecureRefs() async {
+    await initialize();
+    final secureRefs = <String, String>{};
+    final legacyGatewayToken = await _readSecure(_legacyGatewayTokenKey);
+    final legacyGatewayPassword = await _readSecure(_legacyGatewayPasswordKey);
+    if (legacyGatewayToken case final value?) {
+      secureRefs['gateway_token'] = value;
+    }
+    if (legacyGatewayPassword case final value?) {
+      secureRefs['gateway_password'] = value;
+    }
+    for (var index = 0; index < kGatewayProfileListLength; index += 1) {
+      final scopedToken = await _readSecure(_gatewayTokenKeyForProfile(index));
+      final scopedPassword = await _readSecure(
+        _gatewayPasswordKeyForProfile(index),
+      );
+      if (scopedToken case final value?) {
+        secureRefs[_gatewayTokenRefKey(index)] = value;
+      }
+      if (scopedPassword case final value?) {
+        secureRefs[_gatewayPasswordRefKey(index)] = value;
+      }
+    }
+    final deviceIdentity = await loadDeviceIdentity();
+    if (deviceIdentity != null) {
+      final deviceToken = await loadDeviceToken(
+        deviceId: deviceIdentity.deviceId,
+        role: 'operator',
+      );
+      if (deviceToken case final value?) {
+        secureRefs['gateway_device_token_operator'] = value;
+      }
+    }
+    final ollamaKey = await loadOllamaCloudApiKey();
+    final vaultToken = await loadVaultToken();
+    final aiGatewayApiKey = await loadAiGatewayApiKey();
+    if (ollamaKey case final value?) {
+      secureRefs['ollama_cloud_api_key'] = value;
+    }
+    if (vaultToken case final value?) {
+      secureRefs['vault_token'] = value;
+    }
+    if (aiGatewayApiKey case final value?) {
+      secureRefs['ai_gateway_api_key'] = value;
+    }
+    return secureRefs;
   }
 
   static String gatewayTokenRefKey(int profileIndex) =>
@@ -111,53 +262,69 @@ class SecretStore {
   static String gatewayPasswordRefKey(int profileIndex) =>
       _gatewayPasswordRefKey(profileIndex);
 
-  Future<LocalDeviceIdentity?> loadDeviceIdentity() {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
+  Future<LocalDeviceIdentity?> loadDeviceIdentity() async {
+    await initialize();
+    final deviceId = await _readSecure(_gatewayDeviceIdKey);
+    final publicKey = await _readSecure(_gatewayDevicePublicKeyKey);
+    final privateKey = await _readSecure(_gatewayDevicePrivateKeyKey);
+    if (deviceId == null || publicKey == null || privateKey == null) {
+      return null;
+    }
+    final createdAtMs =
+        int.tryParse(await _readSecure(_gatewayDeviceCreatedAtKey) ?? '') ?? 0;
+    return LocalDeviceIdentity(
+      deviceId: deviceId,
+      publicKeyBase64Url: publicKey,
+      privateKeyBase64Url: privateKey,
+      createdAtMs: createdAtMs,
     );
   }
 
-  Future<void> saveDeviceIdentity(LocalDeviceIdentity identity) {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
+  Future<void> saveDeviceIdentity(LocalDeviceIdentity identity) async {
+    await initialize();
+    await _writeSecure(_gatewayDeviceIdKey, identity.deviceId);
+    await _writeSecure(_gatewayDevicePublicKeyKey, identity.publicKeyBase64Url);
+    await _writeSecure(
+      _gatewayDevicePrivateKeyKey,
+      identity.privateKeyBase64Url,
+    );
+    await _writeSecure(
+      _gatewayDeviceCreatedAtKey,
+      identity.createdAtMs.toString(),
     );
   }
 
   Future<String?> loadDeviceToken({
     required String deviceId,
     required String role,
-  }) {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
-  }
+  }) => _readSecure(_deviceTokenKey(deviceId, role));
 
   Future<void> saveDeviceToken({
     required String deviceId,
     required String role,
     required String token,
-  }) {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
-  }
+  }) => _writeSecure(_deviceTokenKey(deviceId, role), token);
 
   Future<void> clearDeviceToken({
     required String deviceId,
     required String role,
-  }) {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
+  }) => _deleteSecure(_deviceTokenKey(deviceId, role));
+
+  Future<List<int>?> loadLegacyLocalStateKeyBytes() async {
+    final encoded = await _readSecure(legacyLocalStateKey);
+    final trimmed = encoded?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return _base64UrlDecode(trimmed);
   }
 
-  Future<List<int>?> loadLegacyLocalStateKeyBytes() {
-    throw StateError(
-      'Legacy secret persistence removed. New secret-path store is pending implementation.',
-    );
+  Future<void> dispose() async {
+    _memorySecure.clear();
+    _secureStorage = null;
+    _layout = null;
+    _initialized = false;
   }
-
-  Future<void> dispose() async {}
 
   static String maskValue(String value) {
     final trimmed = value.trim();
@@ -175,4 +342,79 @@ class SecretStore {
 
   static String _gatewayPasswordRefKey(int profileIndex) =>
       'gateway_password_$profileIndex';
+
+  static const List<int> _gatewayProfileFallbackOrder = <int>[
+    kGatewayRemoteProfileIndex,
+    kGatewayLocalProfileIndex,
+    2,
+    3,
+    4,
+  ];
+
+  Future<String?> _readSecure(String key) async {
+    await initialize();
+    final client = _secureStorage;
+    if (client != null) {
+      try {
+        final value = (await client.read(key: key))?.trim();
+        if (value != null && value.isNotEmpty) {
+          _memorySecure[key] = value;
+          return value;
+        }
+      } catch (_) {
+        // Fall back to memory only when the secret path is unavailable.
+      }
+    }
+    final memoryValue = _memorySecure[key]?.trim() ?? '';
+    return memoryValue.isEmpty ? null : memoryValue;
+  }
+
+  Future<void> _writeSecure(String key, String value) async {
+    await initialize();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    _memorySecure[key] = trimmed;
+    final client = _secureStorage;
+    if (client == null) {
+      return;
+    }
+    try {
+      await client.write(key: key, value: trimmed);
+    } catch (_) {
+      // Memory remains authoritative until the next successful durable write.
+    }
+  }
+
+  Future<void> _deleteSecure(String key) async {
+    await initialize();
+    _memorySecure.remove(key);
+    final client = _secureStorage;
+    if (client == null) {
+      return;
+    }
+    try {
+      await client.delete(key: key);
+    } catch (_) {
+      // Ignore durable delete failures and keep the memory state cleared.
+    }
+  }
+
+  static String _deviceTokenKey(String deviceId, String role) {
+    final safeRole = role.trim().isEmpty ? 'operator' : role.trim();
+    return 'xworkmate.gateway.device_token.$deviceId.$safeRole';
+  }
+
+  static String _gatewayTokenKeyForProfile(int profileIndex) =>
+      'xworkmate.gateway.profile.$profileIndex.token';
+
+  static String _gatewayPasswordKeyForProfile(int profileIndex) =>
+      'xworkmate.gateway.profile.$profileIndex.password';
+
+  static List<int> _base64UrlDecode(String value) {
+    final normalized = value.replaceAll('-', '+').replaceAll('_', '/');
+    final padded = normalized + '=' * ((4 - normalized.length % 4) % 4);
+    return base64.decode(padded);
+  }
 }
