@@ -187,7 +187,7 @@ void main() {
     );
 
     test(
-      'external mode resolves and starts codex process when binary exists',
+      'external mode keeps gateway ready without starting local codex process',
       () async {
         codex.findResult = '/usr/local/bin/codex';
 
@@ -197,14 +197,14 @@ void main() {
         );
 
         expect(coordinator.runtimeMode, CodeAgentRuntimeMode.externalCli);
-        expect(codex.findCalled, isTrue);
-        expect(codex.startCalled, isTrue);
+        expect(codex.findCalled, isFalse);
+        expect(codex.startCalled, isFalse);
         expect(modeSwitcher.currentMode, GatewayMode.remote);
       },
     );
 
     test(
-      'external mode falls back to offline when codex binary missing',
+      'external mode no longer forces offline when codex binary is missing',
       () async {
         codex.findResult = null;
 
@@ -213,10 +213,10 @@ void main() {
           runtimeMode: CodeAgentRuntimeMode.externalCli,
         );
 
-        expect(codex.findCalled, isTrue);
+        expect(codex.findCalled, isFalse);
         expect(codex.startCalled, isFalse);
-        expect(modeSwitcher.offlineSwitchCalled, isTrue);
-        expect(modeSwitcher.currentMode, GatewayMode.offline);
+        expect(modeSwitcher.offlineSwitchCalled, isFalse);
+        expect(modeSwitcher.currentMode, GatewayMode.remote);
       },
     );
   });
