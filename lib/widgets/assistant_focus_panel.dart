@@ -427,8 +427,8 @@ class _SkillsFocusPreview extends StatelessWidget {
             controller.isSingleAgentMode
             ? (controller.currentSingleAgentNeedsAiGatewayConfiguration
                   ? appText(
-                      '当前没有可用外部 CLI，请先配置 LLM API fallback。',
-                      'No external CLI is available. Configure LLM API fallback first.',
+                      '当前没有可用的外部 Agent ACP 端点，请先配置 LLM API fallback。',
+                      'No external Agent ACP endpoint is available. Configure LLM API fallback first.',
                     )
                   : appText(
                       '当前线程还没有已加载技能。切换 provider 后会读取该线程自己的 skills 列表。',
