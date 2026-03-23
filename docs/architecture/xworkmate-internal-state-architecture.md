@@ -198,6 +198,9 @@ Primary fields:
 - _pendingAiGatewayApply
 - settings.gatewayProfiles
 - settings.assistantExecutionTarget
+- settings.assistantCustomTaskTitles
+- settings.assistantArchivedTaskKeys
+- settings.assistantLastSessionKey
 
 Sources:
 - settings
@@ -216,6 +219,10 @@ Responsibilities:
 - Persist secure secrets
 - Persist OpenClaw connection source profiles
 - Persist the default work mode for newly created threads
+- Persist assistant task metadata that is not owned by `AssistantThreadRecord`
+  - custom task titles
+  - archived task keys
+  - last restored session key
 - Make the saved configuration take effect only when Apply is executed
 
 Important APIs:
@@ -423,10 +430,17 @@ Resolution rule:
 Primary source:
 - assistantSessions
 - _taskSeeds in AssistantPage as a rendering cache
+- settings.assistantCustomTaskTitles
+- settings.assistantArchivedTaskKeys
 
 Important rule:
 Task list is a derived representation of thread/session state.
 Task list must not become the owner of mode, model, or skill state.
+
+Important companion rule:
+Task titles, archive membership, and last-session recovery are not owned only by
+`AssistantThreadRecord`. Part of that metadata is persisted in `SettingsSnapshot`
+and must be considered when reconstructing the task list.
 
 Implementation note:
 _taskSeeds is still a cache of derived values such as title, preview, status,

@@ -2,10 +2,13 @@
 
 ## 目标
 
-这次补丁保持现有 UI 不变，只重设计 `XWorkmate` 的本地配置与任务会话持久层，满足两个约束：
+本文记录 `XWorkmate.svc.plus` 当前桌面端本地持久化实现的真实基线，并明确区分：
 
-- 本地配置和任务会话必须能跨重启、跨覆盖安装恢复。
-- 持久化以前提 `secure storage` 为本地信任根，避免把可恢复状态明文落盘。
+- 当前正在使用的持久化路径
+- 仅用于旧版本恢复的 legacy sealed-state 路径
+- secret 与 recoverable local state 的边界
+
+如果后续重新引入 sealed local state，这份文档必须和 `SettingsStore` 写路径、测试断言一起更新。
 
 ## 当前实现基线（v0.6.1）
 
@@ -15,68 +18,79 @@
 
 - `~/Library/Application Support/plus.svc.xworkmate/xworkmate`
 
-关键文件与目录：
+当前活跃文件与目录：
 
-- `config-store.sqlite3`（`SettingsStore` 主库）
-- `settings-snapshot.json`（durable mirror）
-- `assistant-threads.json`（durable mirror）
-- `gateway-auth/secure-storage/*`（`SecretStore` 文件型安全存储 fallback）
+- `config-store.sqlite3`
+  - `SettingsStore` 主库
+- `settings-snapshot.json`
+  - `SettingsSnapshot` 的 durable mirror
+- `assistant-threads.json`
+  - `AssistantThreadRecord` 列表的 durable mirror
+- `gateway-auth/secure-storage/*`
+  - `SecretStore` 的文件型 secure-storage fallback
 
 ### 2) 首次安装初始化
 
-- `SettingsStore.initialize()` 会初始化并打开 `config-store.sqlite3`。
-- `SecretStore.initialize()` 会初始化 `gateway-auth` 与 `secure-storage` 目录结构。
-- 因此 DMG 首次安装后，重启前无需手工“触发一次保存”即可完成持久化目录与主存储文件的准备。
+- `SettingsStore.initialize()` 会初始化并打开 `config-store.sqlite3`
+- `SecretStore.initialize()` 会初始化 `gateway-auth` 与 `secure-storage` 目录结构
+- 因此首次安装后，不需要等用户手工保存一次，目录与主存储文件就会被准备好
 
 ### 3) 升级与重启行为
 
-- 应用升级 / 系统更新重启不会改写或重置既有路径。
-- 只在用户主动执行“设置 -> 诊断 -> 清理任务线程与本地配置”时清理本地 settings/thread 状态。
-- 清理流程不删除已保存 secrets（Gateway token/password、AI Gateway API key、Vault token 等）。
+- 应用升级 / 系统更新重启不会改写既有持久化目录
+- 用户主动执行“设置 -> 诊断 -> 清理任务线程与本地配置”时，清理的是本地 settings / thread 状态
+- 清理流程不会删除已保存 secrets（Gateway token / password、AI Gateway API key、Vault token、device token 等）
 
 ### 4) 路径解析失败策略（默认）
 
-- 默认策略为 `fail-fast`：当 `SettingsStore` 无法解析或打开耐久数据库路径时，直接抛错，不再静默降级为内存持久化。
-- 这样可以避免“看起来保存成功、重启后全部丢失”的隐性故障。
+- 默认策略仍然是 `fail-fast`
+- 当 `SettingsStore` 无法解析或打开耐久数据库路径时，直接抛错
+- 只有显式开启 `allowInMemoryFallback` 时才允许内存数据库回退
 
-### 5) 内存回退（仅显式开启场景）
+### 5) 当前最重要的实现结论
 
-- 仅在显式开启 `allowInMemoryFallback`（主要用于测试/诊断）时允许内存回退。
-- 即使发生内存回退，也会在后续写入和销毁阶段尽力回写同步到耐久目录（若路径恢复可用）。
-
-核心结论：
-
-- `FlutterSecureStorage` 仍是长期 secret 的主存储。
-- 本地配置和任务会话不直接明文写入 SQLite / JSON，而是先用本地状态密钥加密后再落盘。
-- 本地状态密钥本身必须优先保存在主 secure storage，不再把它当成普通可降级 secret。
+- 长期 secret 继续通过 `SecretStore` 持久化，主路径是 `FlutterSecureStorage`
+- `SettingsSnapshot` 与 `AssistantThreadRecord` 当前写入的是明文 JSON 字符串
+  - 会写入 `config-store.sqlite3`
+  - 也会写入 `settings-snapshot.json` / `assistant-threads.json`
+- `assistant-state-backup.json`、`sealedState`、`xworkmate.local_state.key` 现在不是当前主写路径
+  - 它们只保留在旧版本恢复 / 迁移兼容逻辑里
 
 ## Trust Boundary
 
-需要明确区分 3 类状态：
+当前需要区分 3 类状态：
 
-1. 用户输入的高敏感 secret
-   - Gateway shared token
-   - Gateway password
-   - AI Gateway API key
-   - Vault token
+### 1. 高敏感 secret
 
-2. 可恢复但不应明文落盘的本地状态
-   - `SettingsSnapshot`
-   - Assistant 任务线程记录
-   - 最后活动线程
-   - 本地恢复 backup
+- Gateway shared token
+- Gateway password
+- AI Gateway API key
+- Vault token
+- device token / device identity 私钥材料
 
-3. 仅调试或测试环境可接受的替代路径
-   - 注入式 secure storage client
-   - 临时文件型 secure storage fallback
+### 2. 可恢复的本地应用状态
+
+- `SettingsSnapshot`
+- `AssistantThreadRecord` 列表
+- assistant custom task titles
+- archived task keys
+- last session key
+- 本地审计 trail
+
+### 3. Legacy sealed-state 恢复输入
+
+- 旧版 `assistant-state-backup.json`
+- 旧版 `xworkmate.sealed.local-state.v1` payload
+- `local-state-key.txt`
+- secure storage 里的 `xworkmate.local_state.key`
 
 边界规则：
 
-- 第 1 类状态优先进入 secure storage；secure storage 超时或异常时，可进入持久化 fallback 文件，但绝不退化成“仅内存”。
-- 第 2 类状态不直接进入 `SharedPreferences` 或明文 SQLite；必须先 sealed。
-- 第 3 类路径只用于 debug / test，不进入 release 行为。
+- 第 1 类状态走 `SecretStore`
+- 第 2 类状态当前走 `SettingsStore`，属于 recoverable app state，不是 secret store
+- 第 3 类状态只用于 recovery / migration，不是当前版本的常规写入目标
 
-## 架构图
+## 当前架构图
 
 ```mermaid
 flowchart TD
@@ -85,164 +99,173 @@ flowchart TD
   B --> E["SecureConfigStore"]
   D --> E
 
-  E --> F["Primary Secure Storage<br/>FlutterSecureStorage"]
-  E --> G["Local State Key<br/>xworkmate.local_state.key"]
-  G --> H["AES-GCM Seal / Unseal"]
+  E --> F["SecretStore"]
+  E --> G["SettingsStore"]
 
-  H --> I["SQLite config-store.sqlite3"]
-  H --> J["Durable state files<br/>settings-snapshot.json<br/>assistant-threads.json"]
-  H --> K["assistant-state-backup.json<br/>schemaVersion=2 / sealedState"]
+  F --> H["FlutterSecureStorage"]
+  F --> I["gateway-auth/secure-storage/*<br/>file fallback"]
 
-  E --> L["Secure secret fallback files<br/>gateway-auth/*"]
+  G --> J["config-store.sqlite3"]
+  G --> K["settings-snapshot.json"]
+  G --> L["assistant-threads.json"]
+
+  M["Legacy sealed-state sources"] --> N["legacy recovery / migration"]
+  N --> G
 ```
+
+说明：
+
+- 当前活跃写路径是 `SecretStore` + `SettingsStore`
+- legacy sealed-state 只参与读旧数据并迁移到当前 store，不参与当前常规写入
 
 ## 存储分层
 
-### 1. Primary Secure Storage
+### 1. 当前 secret 存储
 
 用途：
 
-- 保存 Gateway token / password / AI Gateway API key / Vault token
-- 保存本地状态密钥 `xworkmate.local_state.key`
+- 保存 Gateway token / password
+- 保存 AI Gateway API key
+- 保存 Vault token
+- 保存 device identity / device token
 
-关键要求：
+实现要点：
 
-- 主路径仍然是 `FlutterSecureStorage`
-- 本地状态密钥不允许再走“通用 secret fallback”
-- 如果主 secure storage 不可用，不允许把本地状态密钥退化成普通文件常态
+- 主路径是 `FlutterSecureStorage`
+- 当 secure storage 不可用时，`SecretStore` 会尝试提升到文件型 fallback
+- 文件型 fallback 位于 `gateway-auth/secure-storage/*`
 
-### 2. Sealed Local State
-
-本地配置和任务会话的持久化结构统一改为：
-
-- `storageFormat = xworkmate.sealed.local-state.v1`
-- `nonce`
-- `cipherText`
-- `mac`
-
-加密方式：
-
-- AES-GCM 256
-- 每次写入使用新的随机 nonce
-- AAD 绑定存储 key，避免跨 key 错读
+### 2. 当前本地状态持久化
 
 当前覆盖对象：
 
 - `xworkmate.settings.snapshot`
 - `xworkmate.assistant.threads`
-- `assistant-state-backup.json`
+- `xworkmate.secrets.audit`
 
-### 3. Durable Recovery Files
+实现要点：
 
-当 SQLite 不可用时，仍需保证本地状态可以恢复。为此保留两类耐久化文件：
+- `SettingsSnapshot` 通过 `toJsonString()` 写入
+- `AssistantThreadRecord` 列表通过 `jsonEncode(...)` 写入
+- 当前写路径没有 AES-GCM seal / unseal
+- durable mirror 文件内容当前也是明文 JSON，不是 sealed envelope
+
+### 3. Durable mirror files
+
+当前保留两类 durable mirror：
 
 - `settings-snapshot.json`
 - `assistant-threads.json`
 
-注意：
+语义：
 
-- 文件名虽然保持旧风格，但内容已改为 sealed payload，不再是明文 JSON。
+- 作为 SQLite 的文件镜像 / fallback 来源
+- 也是测试里会直接读取和断言的当前持久化内容
 
-### 4. Assistant Backup
+### 4. Legacy sealed-state recovery path
 
-`assistant-state-backup.json` 升级到 schema v2：
+旧版 sealed local state 兼容仍然保留，但仅用于 recovery：
 
-- 用 `sealedState` 保存整体恢复快照
-- 不再把 settings / threads 明文拼进 backup
+- 识别旧版 `xworkmate.sealed.local-state.v1`
+- 读取旧版 `assistant-state-backup.json` 里的 `sealedState`
+- 通过 legacy local state key 解密旧 payload
+- 成功恢复后重写到当前 `SettingsStore`
 
-这样做的目的：
+这条路径的目标是兼容旧数据，不代表当前版本仍在主动写 sealed local state。
 
-- 避免备份文件成为最容易泄露的明文副本
-- 保持“数据库损坏时仍可恢复”的能力
-
-## 写入流程
+## 当前写入流程
 
 ### SettingsSnapshot
 
-1. `SettingsController` 生成新的 `SettingsSnapshot`
-2. `SecureConfigStore.saveSettingsSnapshot()` 进入本地状态写队列
-3. 读取或生成 `xworkmate.local_state.key`
-4. 先 sealed，再写入 SQLite / durable file / backup
+1. `SettingsController` 或 `AppController` 生成新的 `SettingsSnapshot`
+2. `SecureConfigStore.saveSettingsSnapshot()`
+3. `SettingsStore.saveSettingsSnapshot()`
+4. `snapshot.toJsonString()`
+5. 写入 SQLite
+6. 同步写入 `settings-snapshot.json`
 
 ### Assistant Threads
 
 1. `AppController` 更新线程记录
-2. 持久化进入 `_assistantThreadPersistQueue`
-3. `SecureConfigStore.saveAssistantThreadRecords()` 串行 sealed 写入
-4. 同步刷新 SQLite / durable file / backup
+2. 更新被串行排入 `_assistantThreadPersistQueue`
+3. `SecureConfigStore.saveAssistantThreadRecords()`
+4. `jsonEncode(records.map(...))`
+5. 写入 SQLite
+6. 同步写入 `assistant-threads.json`
 
-这么做是为了避免异步写晚到，把旧线程快照覆盖新状态。
+这么做的目标是避免异步写晚到覆盖较新的线程快照；当前目标不是加密封装。
 
-## 读取与恢复流程
+## 当前读取与恢复流程
 
 恢复顺序：
 
-1. 优先读 SQLite
-2. SQLite 不可用时读 durable state files
-3. 若主状态缺失，再读 `assistant-state-backup.json`
-4. 若读到的是旧明文格式，则立即迁移为 sealed 格式
+1. 初始化 SQLite
+2. 优先读取 SQLite entry
+3. SQLite 读不到时，再读 durable mirror 文件
+4. 如果当前 state 不可读，再尝试 legacy recovery
+5. 若发现旧 sealed-state 但缺少 key，则产生 locked recovery report
 
-迁移原则：
+补充说明：
 
-- 兼容旧明文快照，避免升级后直接丢历史
-- 一旦成功恢复，就把旧格式重写成 sealed 新格式
-- legacy `SharedPreferences` 里的本地状态在迁移后会被清理
+- `SharedPreferences` 只作为旧数据迁移兼容来源，不是当前桌面端的主状态真值源
+- Web 端有独立的 `WebStore`，不适用这里的桌面持久化链路
 
-## Secure Secret Fallback
+## Legacy backup / sealedState 的当前语义
 
-Secret fallback 仍然保留，但语义变了：
+当前代码里：
 
-- 用于 Gateway token / password / API key 等长期 secret 的持久化兜底
-- 不再因为一次超时就退化成“仅内存”
-- 这样即使 secure storage 一时不可用，重启后 secret 仍能恢复
+- `assistant-state-backup.json` 只在 legacy recovery 时读取
+- `sealedState` 只在旧版 backup 或旧版 durable value 解密时出现
+- `xworkmate.local_state.key` 只通过 legacy loader 参与旧数据恢复
 
-约束：
+因此这三者现在应该被理解为：
 
-- `xworkmate.local_state.key` 不在通用 fallback 白名单里
-- 对旧版遗留的 `local-state-key.txt`，启动时做一次迁移，成功后删除
+- 兼容旧版本
+- 避免升级后直接丢历史
+- 不属于当前日常写入架构
 
 ## Clear 行为
 
-`clearAssistantLocalState()` 只清理：
+`clearAssistantLocalState()` 当前会清理：
 
-- 本地 settings snapshot
-- 本地 assistant thread records
-- durable state files
-- assistant backup
+- `SettingsSnapshot`
+- `AssistantThreadRecord` 列表
+- `settings-snapshot.json`
+- `assistant-threads.json`
+- 旧版 `assistant-state-backup.json`（如果存在）
 
 不会误删：
 
-- 已保存的 Gateway token / password
+- Gateway token / password
 - AI Gateway API key
 - Vault token
-- 其他 secure refs
+- device token / device identity
 
 ## Debug / Test 策略
 
-为了让测试稳定运行，新增了可注入的 secure storage 层：
+为了让测试稳定运行，当前保留可注入的 secure storage client：
 
 - `SecureStorageClient`
 - `FlutterSecureStorageClient`
 - `FileSecureStorageClient`
 - `MemorySecureStorageClient`
 
-策略是：
+策略：
 
-- release：使用真实 `FlutterSecureStorage`
-- debug / test：允许走注入式或文件型 secure storage，保证单测和回归可跑
+- release：优先真实 `FlutterSecureStorage`
+- debug / test：允许注入式或文件型 secure storage
+- `allowInMemoryFallback` 只在显式场景下允许内存数据库回退
 
-这不会改变 release 的安全边界。
+## 当前文档结论
 
-## 与现有 UI 的关系
+当前桌面端本地持久化不是 sealed local state 架构，而是：
 
-这次补丁不改：
+- secrets 走 secure storage / file fallback
+- recoverable local app state 走 SQLite + plain JSON durable mirrors
+- legacy sealed-state 只用于恢复旧数据
 
-- Gateway 设置页结构
-- Assistant 任务线程 UI
-- 模型、skills、入口按钮布局
+如果后续要把本地状态重新升级为 sealed payload，必须同步更新：
 
-变化只在持久层和恢复链路：
-
-- 重启后不再因为 secure storage 一次超时而丢本地配置
-- 覆盖安装后本地配置与任务会话仍可恢复
-- 本地 snapshot / backup 不再以明文保存
+- `SettingsStore` 写路径
+- 文档中的架构图与存储分层
+- 相关测试断言
