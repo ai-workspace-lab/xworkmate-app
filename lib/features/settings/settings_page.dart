@@ -298,8 +298,8 @@ class _SettingsPageState extends State<SettingsPage> {
           context,
           title: detail.label,
           description: appText(
-            '统一管理 AI Gateway 地址、API Key、模型目录同步和默认选择。',
-            'Manage AI Gateway endpoint, API key, model catalog sync, and default selections from one screen.',
+            '统一管理 LLM API Endpoint、LLM API Token、模型目录同步和默认选择。',
+            'Manage LLM API Endpoint, LLM API Token, model catalog sync, and default selections from one screen.',
           ),
         ),
         const SizedBox(height: 16),
@@ -951,7 +951,7 @@ class _SettingsPageState extends State<SettingsPage> {
       const SizedBox(height: 16),
       _buildCollapsibleGatewaySection(
         context: context,
-        title: appText('AI Gateway', 'AI Gateway'),
+        title: appText('LLM API', 'LLM API'),
         expanded: _aiGatewayExpanded,
         onChanged: (value) => setState(() {
           _aiGatewayExpanded = value;
@@ -1418,7 +1418,7 @@ class _SettingsPageState extends State<SettingsPage> {
           key: const ValueKey('ai-gateway-url-field'),
           controller: _aiGatewayUrlController,
           decoration: InputDecoration(
-            labelText: appText('Gateway URL', 'Gateway URL'),
+            labelText: appText('LLM API Endpoint', 'LLM API Endpoint'),
           ),
           onChanged: (_) => unawaited(
             _saveAiGatewayDraft(controller, settings).catchError((_) {}),
@@ -1430,7 +1430,7 @@ class _SettingsPageState extends State<SettingsPage> {
           key: const ValueKey('ai-gateway-api-key-ref-field'),
           controller: _aiGatewayApiKeyRefController,
           decoration: InputDecoration(
-            labelText: appText('API Key 引用', 'API Key Ref'),
+            labelText: appText('LLM API Token 引用', 'LLM API Token Ref'),
           ),
           onChanged: (_) => unawaited(
             _saveAiGatewayDraft(controller, settings).catchError((_) {}),
@@ -1441,7 +1441,7 @@ class _SettingsPageState extends State<SettingsPage> {
           fieldKey: const ValueKey('ai-gateway-api-key-field'),
           controller: _aiGatewayApiKeyController,
           label:
-              '${appText('API Key', 'API Key')} (${_aiGatewayApiKeyRefController.text.trim().isEmpty ? settings.aiGateway.apiKeyRef : _aiGatewayApiKeyRefController.text.trim()})',
+              '${appText('LLM API Token', 'LLM API Token')} (${_aiGatewayApiKeyRefController.text.trim().isEmpty ? settings.aiGateway.apiKeyRef : _aiGatewayApiKeyRefController.text.trim()})',
           hasStoredValue: hasStoredAiGatewayApiKey,
           fieldState: _aiGatewayApiKeyState,
           onStateChanged: (value) =>
@@ -2186,8 +2186,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(height: 4),
                     Text(
                       appText(
-                        'App 作为统一发现与分发中心，维护托管 skills、MCP server list 和 AI Gateway 默认注入，但不会覆盖用户原有 CLI 配置。',
-                        'The app acts as the discovery and distribution center for managed skills, MCP server lists, and AI Gateway defaults without overwriting existing CLI config.',
+                        'App 作为统一发现与分发中心，维护托管 skills、MCP server list 和 LLM API 默认注入，但不会覆盖用户原有 CLI 配置。',
+                        'The app acts as the discovery and distribution center for managed skills, MCP server lists, and LLM API defaults without overwriting existing CLI config.',
                       ),
                       style: theme.textTheme.bodyMedium,
                     ),
@@ -2230,7 +2230,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               initialValue: config.aiGatewayInjectionPolicy.name,
               decoration: InputDecoration(
-                labelText: appText('AI Gateway 注入策略', 'AI Gateway Injection'),
+                labelText: appText('LLM API 注入策略', 'LLM API Injection'),
               ),
               items: AiGatewayInjectionPolicy.values
                   .map(

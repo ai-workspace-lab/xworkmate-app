@@ -997,7 +997,7 @@ class AiGatewayProfile {
 
   factory AiGatewayProfile.defaults() {
     return const AiGatewayProfile(
-      name: 'AI Gateway',
+      name: 'LLM API',
       baseUrl: '',
       apiKeyRef: 'ai_gateway_api_key',
       availableModels: <String>[],

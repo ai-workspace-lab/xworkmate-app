@@ -840,8 +840,8 @@ class AppController extends ChangeNotifier {
         if (!canUseAiGatewayConversation) {
           throw Exception(
             appText(
-              '请先在 Settings 配置单机智能体所需的 AI Gateway 地址、API Key 和默认模型。',
-              'Configure the Single Agent AI Gateway endpoint, API key, and default model first.',
+              '请先在 Settings 配置单机智能体所需的 LLM API Endpoint、LLM API Token 和默认模型。',
+              'Configure the Single Agent LLM API Endpoint, LLM API Token, and default model first.',
             ),
           );
         }

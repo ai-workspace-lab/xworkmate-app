@@ -176,7 +176,7 @@ void main() {
   );
 
   test(
-    'AppController falls back when AI Gateway ignores stream mode',
+    'AppController falls back when LLM API ignores stream mode',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(

@@ -433,8 +433,8 @@ class _ConversationPanel extends StatelessWidget {
                   child: Text(
                     currentTarget == AssistantExecutionTarget.singleAgent
                         ? appText(
-                            '当前单机智能体配置还不完整，请先在 Settings 中保存 AI Gateway 地址、API Key 和默认模型。',
-                            'Single Agent is not ready yet. Save the AI Gateway endpoint, API key, and default model in Settings first.',
+                            '当前单机智能体配置还不完整，请先在 Settings 中保存 LLM API Endpoint、LLM API Token 和默认模型。',
+                            'Single Agent is not ready yet. Save the LLM API Endpoint, LLM API Token, and default model in Settings first.',
                           )
                         : appText(
                             '当前 Relay Gateway 尚未连接，请先在 Settings 中保存配置并连接。',

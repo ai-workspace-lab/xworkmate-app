@@ -600,12 +600,12 @@ class _FallbackHubPanel extends StatelessWidget {
         child: Text(
           hasAiGateway
               ? appText(
-                  '当前 AI Gateway 没有返回模型目录。',
-                  'No model catalog returned by the AI Gateway.',
+                  '当前 LLM API 没有返回模型目录。',
+                  'No model catalog returned by the LLM API.',
                 )
               : appText(
-                  '先在设置 -> 集成 中同步 AI Gateway 模型目录。',
-                  'Sync the AI Gateway model catalog from Settings -> Integrations.',
+                  '先在设置 -> 集成 中同步 LLM API 模型目录。',
+                  'Sync the LLM API model catalog from Settings -> Integrations.',
                 ),
         ),
       );
@@ -625,8 +625,8 @@ class _FallbackHubPanel extends StatelessWidget {
                     icon: Icons.psychology_alt_rounded,
                     status: StatusInfo(model.provider, StatusTone.accent),
                     description: appText(
-                      '来自 AI Gateway 的可用模型目录项。',
-                      'Model catalog entry exposed by the AI Gateway.',
+                      '来自 LLM API 的可用模型目录项。',
+                      'Model catalog entry exposed by the LLM API.',
                     ),
                     meta: [model.id, model.provider],
                     actions: [appText('刷新', 'Refresh')],

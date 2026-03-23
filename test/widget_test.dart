@@ -23,7 +23,7 @@ void main() {
     if (kIsWeb) {
       expect(find.text('设置'), findsWidgets);
       expect(find.text('Tasks'), findsNothing);
-      expect(find.text('AI Gateway'), findsNothing);
+      expect(find.text('LLM API'), findsNothing);
     } else {
       expect(find.text('幻灯片'), findsNothing);
     }

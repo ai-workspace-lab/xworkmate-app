@@ -627,8 +627,8 @@ class AppController extends ChangeNotifier {
               normalizedSessionKey,
             )
           ? appText(
-              '没有可用的外部 CLI，请配置 AI Gateway fallback。',
-              'No external CLI is available. Configure AI Gateway fallback.',
+              '没有可用的外部 CLI，请配置 LLM API fallback。',
+              'No external CLI is available. Configure LLM API fallback.',
             )
           : appText(
               '当前线程的外部 CLI 尚未就绪。',
@@ -2500,7 +2500,7 @@ class AppController extends ChangeNotifier {
 
       if (gatewayUrl.isEmpty) {
         throw StateError(
-          appText('AI Gateway URL 未配置', 'AI Gateway URL not configured'),
+          appText('LLM API Endpoint 未配置', 'LLM API Endpoint not configured'),
         );
       }
 
@@ -3299,8 +3299,8 @@ class AppController extends ChangeNotifier {
         sessionKey,
         _assistantErrorMessage(
           appText(
-            'AI Gateway URL 未配置，无法发送对话。',
-            'AI Gateway URL is not configured, so the conversation could not be sent.',
+            'LLM API Endpoint 未配置，无法发送对话。',
+            'LLM API Endpoint is not configured, so the conversation could not be sent.',
           ),
         ),
       );
@@ -3313,8 +3313,8 @@ class AppController extends ChangeNotifier {
         sessionKey,
         _assistantErrorMessage(
           appText(
-            'AI Gateway API Key 未配置，无法发送对话。',
-            'AI Gateway API key is not configured, so the conversation could not be sent.',
+            'LLM API Token 未配置，无法发送对话。',
+            'LLM API Token is not configured, so the conversation could not be sent.',
           ),
         ),
       );
@@ -3327,8 +3327,8 @@ class AppController extends ChangeNotifier {
         sessionKey,
         _assistantErrorMessage(
           appText(
-            '当前没有可用的 AI Gateway 对话模型。请先在 设置 -> 集成 中同步并选择可用模型。',
-            'No AI Gateway chat model is available yet. Sync and select a supported model in Settings -> Integrations first.',
+            '当前没有可用的 LLM API 对话模型。请先在 设置 -> 集成 中同步并选择可用模型。',
+            'No LLM API chat model is available yet. Sync and select a supported model in Settings -> Integrations first.',
           ),
         ),
       );
@@ -3669,12 +3669,12 @@ class AppController extends ChangeNotifier {
     )) {
       return detail.isEmpty
           ? appText(
-              '当前没有可用的外部 CLI，也没有可用的 AI Chat fallback。请先安装外部 CLI，或配置 AI Gateway。',
-              'No external CLI is available, and AI Chat fallback is not configured. Install an external CLI or configure AI Gateway first.',
+              '当前没有可用的外部 CLI，也没有可用的 AI Chat fallback。请先安装外部 CLI，或配置 LLM API。',
+              'No external CLI is available, and AI Chat fallback is not configured. Install an external CLI or configure LLM API first.',
             )
           : appText(
-              '$detail 当前没有可用的外部 CLI，也没有可用的 AI Chat fallback。请先安装外部 CLI，或配置 AI Gateway。',
-              '$detail No external CLI is available, and AI Chat fallback is not configured. Install an external CLI or configure AI Gateway first.',
+              '$detail 当前没有可用的外部 CLI，也没有可用的 AI Chat fallback。请先安装外部 CLI，或配置 LLM API。',
+              '$detail No external CLI is available, and AI Chat fallback is not configured. Install an external CLI or configure LLM API first.',
             );
     }
     return detail.isEmpty
@@ -4229,21 +4229,21 @@ class AppController extends ChangeNotifier {
       return error.message;
     }
     if (error is SocketException) {
-      return appText('无法连接到 AI Gateway。', 'Unable to reach the AI Gateway.');
+      return appText('无法连接到 LLM API。', 'Unable to reach the LLM API.');
     }
     if (error is HandshakeException) {
       return appText(
-        'AI Gateway TLS 握手失败。',
-        'AI Gateway TLS handshake failed.',
+        'LLM API TLS 握手失败。',
+        'LLM API TLS handshake failed.',
       );
     }
     if (error is TimeoutException) {
-      return appText('AI Gateway 请求超时。', 'AI Gateway request timed out.');
+      return appText('LLM API 请求超时。', 'LLM API request timed out.');
     }
     if (error is FormatException) {
       return appText(
-        'AI Gateway 返回了无法解析的响应。',
-        'AI Gateway returned an invalid response.',
+        'LLM API 返回了无法解析的响应。',
+        'LLM API returned an invalid response.',
       );
     }
     return error.toString();
@@ -4252,29 +4252,29 @@ class AppController extends ChangeNotifier {
   String _formatAiGatewayHttpError(int statusCode, String detail) {
     final base = switch (statusCode) {
       400 => appText(
-        'AI Gateway 请求无效 (400)',
-        'AI Gateway rejected the request (400)',
+        'LLM API 请求无效 (400)',
+        'LLM API rejected the request (400)',
       ),
       401 => appText(
-        'AI Gateway 鉴权失败 (401)',
-        'AI Gateway authentication failed (401)',
+        'LLM API 鉴权失败 (401)',
+        'LLM API authentication failed (401)',
       ),
-      403 => appText('AI Gateway 拒绝访问 (403)', 'AI Gateway denied access (403)'),
+      403 => appText('LLM API 拒绝访问 (403)', 'LLM API denied access (403)'),
       404 => appText(
-        'AI Gateway chat 接口不存在 (404)',
-        'AI Gateway chat endpoint was not found (404)',
+        'LLM API chat 接口不存在 (404)',
+        'LLM API chat endpoint was not found (404)',
       ),
       429 => appText(
-        'AI Gateway 限流 (429)',
-        'AI Gateway rate limited the request (429)',
+        'LLM API 限流 (429)',
+        'LLM API rate limited the request (429)',
       ),
       >= 500 => appText(
-        'AI Gateway 当前不可用 ($statusCode)',
-        'AI Gateway is unavailable right now ($statusCode)',
+        'LLM API 当前不可用 ($statusCode)',
+        'LLM API is unavailable right now ($statusCode)',
       ),
       _ => appText(
-        'AI Gateway 返回状态码 $statusCode',
-        'AI Gateway responded with status $statusCode',
+        'LLM API 返回状态码 $statusCode',
+        'LLM API responded with status $statusCode',
       ),
     };
     final trimmed = detail.trim();
