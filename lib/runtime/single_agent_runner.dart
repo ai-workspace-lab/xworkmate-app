@@ -92,31 +92,49 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
     required String gatewayToken,
   }) async {
     try {
-      final capabilities = await _appServerClient.loadCapabilities(
-        gatewayToken: gatewayToken,
-      );
-      if (!capabilities.available || !capabilities.supportsCodex) {
+      if (selection != SingleAgentProvider.auto) {
+        final capabilities = await _appServerClient.loadCapabilities(
+          provider: selection,
+          gatewayToken: gatewayToken,
+        );
+        if (!capabilities.available ||
+            !capabilities.supportsProvider(selection)) {
+          return SingleAgentProviderResolution(
+            selection: selection,
+            resolvedProvider: null,
+            fallbackReason:
+                capabilities.errorMessage ??
+                '${selection.label} endpoint is unavailable.',
+          );
+        }
         return SingleAgentProviderResolution(
           selection: selection,
-          resolvedProvider: null,
-          fallbackReason:
-              capabilities.errorMessage ??
-              'Single-agent app-server is unavailable.',
+          resolvedProvider: selection,
+          fallbackReason: null,
         );
       }
-      if (selection != SingleAgentProvider.auto &&
-          selection != SingleAgentProvider.codex) {
-        return SingleAgentProviderResolution(
-          selection: selection,
-          resolvedProvider: null,
-          fallbackReason:
-              '${selection.label} is unavailable from the direct app-server endpoint.',
+
+      String? fallbackReason;
+      for (final provider in kBuiltinExternalAcpProviders) {
+        final capabilities = await _appServerClient.loadCapabilities(
+          provider: provider,
+          gatewayToken: gatewayToken,
         );
+        if (capabilities.available && capabilities.supportsProvider(provider)) {
+          return SingleAgentProviderResolution(
+            selection: selection,
+            resolvedProvider: provider,
+            fallbackReason: null,
+          );
+        }
+        fallbackReason ??= capabilities.errorMessage;
       }
       return SingleAgentProviderResolution(
         selection: selection,
-        resolvedProvider: SingleAgentProvider.codex,
-        fallbackReason: null,
+        resolvedProvider: null,
+        fallbackReason:
+            fallbackReason ??
+            'No external ACP endpoint is currently available.',
       );
     } catch (error) {
       return SingleAgentProviderResolution(
@@ -133,6 +151,7 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
       final result = await _appServerClient.run(
         DirectSingleAgentRunRequest(
           sessionId: request.sessionId,
+          provider: request.provider,
           prompt: _augmentPrompt(request),
           model: request.model,
           workingDirectory: request.workingDirectory,

@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/direct_single_agent_app_server_client.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   group('DirectSingleAgentAppServerClient', () {
@@ -15,10 +16,12 @@ void main() {
       addTearDown(server.close);
 
       final client = DirectSingleAgentAppServerClient(
-        endpointResolver: () => server.baseHttpUri,
+        endpointResolver: (_) => server.baseHttpUri,
       );
 
-      final capabilities = await client.loadCapabilities();
+      final capabilities = await client.loadCapabilities(
+        provider: SingleAgentProvider.codex,
+      );
 
       expect(capabilities.available, isTrue);
       expect(capabilities.supportsCodex, isTrue);
@@ -31,7 +34,7 @@ void main() {
       addTearDown(server.close);
 
       final client = DirectSingleAgentAppServerClient(
-        endpointResolver: () => server.baseHttpUri,
+        endpointResolver: (_) => server.baseHttpUri,
       );
       addTearDown(client.dispose);
 
@@ -39,6 +42,7 @@ void main() {
       final result = await client.run(
         const DirectSingleAgentRunRequest(
           sessionId: 'session-1',
+          provider: SingleAgentProvider.codex,
           prompt: 'hello world',
           model: 'gpt-4.1',
           workingDirectory: '/tmp',
@@ -49,11 +53,10 @@ void main() {
       expect(result.success, isTrue);
       expect(result.output, 'hello world from app server');
       expect(deltas.join(), 'hello world from app server');
-      expect(server.methods, containsAll(<String>[
-        'initialize',
-        'thread/start',
-        'turn/start',
-      ]));
+      expect(
+        server.methods,
+        containsAll(<String>['initialize', 'thread/start', 'turn/start']),
+      );
       expect(server.authorizationHeaders, contains('Bearer token-1'));
     });
 
@@ -62,13 +65,14 @@ void main() {
       addTearDown(server.close);
 
       final client = DirectSingleAgentAppServerClient(
-        endpointResolver: () => server.baseHttpUri,
+        endpointResolver: (_) => server.baseHttpUri,
       );
       addTearDown(client.dispose);
 
       final runFuture = client.run(
         const DirectSingleAgentRunRequest(
           sessionId: 'session-abort',
+          provider: SingleAgentProvider.codex,
           prompt: 'abort me',
           model: 'gpt-4.1',
           workingDirectory: '/tmp',
@@ -93,7 +97,8 @@ class _FakeAppServer {
   final bool delayCompletion;
   final List<String> methods = <String>[];
   final List<String> authorizationHeaders = <String>[];
-  final Map<String, Completer<void>> _methodWaiters = <String, Completer<void>>{};
+  final Map<String, Completer<void>> _methodWaiters =
+      <String, Completer<void>>{};
   int _threadCounter = 0;
 
   int get port => _server.port;
@@ -123,7 +128,8 @@ class _FakeAppServer {
       authorizationHeaders.add(
         request.headers.value(HttpHeaders.authorizationHeader) ?? '',
       );
-      if (request.uri.path == '/' && WebSocketTransformer.isUpgradeRequest(request)) {
+      if (request.uri.path == '/' &&
+          WebSocketTransformer.isUpgradeRequest(request)) {
         final socket = await WebSocketTransformer.upgrade(request);
         unawaited(_handleSocket(socket));
         continue;
@@ -146,78 +152,92 @@ class _FakeAppServer {
       _methodWaiters.remove(method)?.complete();
       switch (method) {
         case 'initialize':
-          socket.add(jsonEncode(<String, dynamic>{
-            'jsonrpc': '2.0',
-            'id': id,
-            'result': <String, dynamic>{
-              'serverInfo': <String, dynamic>{'name': 'fake-codex'},
-            },
-          }));
+          socket.add(
+            jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'id': id,
+              'result': <String, dynamic>{
+                'serverInfo': <String, dynamic>{'name': 'fake-codex'},
+              },
+            }),
+          );
           break;
         case 'initialized':
           break;
         case 'thread/start':
           _threadCounter += 1;
-          socket.add(jsonEncode(<String, dynamic>{
-            'jsonrpc': '2.0',
-            'id': id,
-            'result': <String, dynamic>{
-              'id': 'thread-$_threadCounter',
-              'path': params['cwd'] ?? '/tmp',
-              'ephemeral': false,
-            },
-          }));
+          socket.add(
+            jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'id': id,
+              'result': <String, dynamic>{
+                'id': 'thread-$_threadCounter',
+                'path': params['cwd'] ?? '/tmp',
+                'ephemeral': false,
+              },
+            }),
+          );
           break;
         case 'thread/resume':
-          socket.add(jsonEncode(<String, dynamic>{
-            'jsonrpc': '2.0',
-            'id': id,
-            'result': <String, dynamic>{
-              'id': params['threadId'] ?? 'thread-resumed',
-              'path': params['cwd'] ?? '/tmp',
-              'ephemeral': false,
-            },
-          }));
+          socket.add(
+            jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'id': id,
+              'result': <String, dynamic>{
+                'id': params['threadId'] ?? 'thread-resumed',
+                'path': params['cwd'] ?? '/tmp',
+                'ephemeral': false,
+              },
+            }),
+          );
           break;
         case 'turn/start':
           final threadId = params['threadId']?.toString() ?? 'thread-1';
-          socket.add(jsonEncode(<String, dynamic>{
-            'jsonrpc': '2.0',
-            'id': id,
-            'result': <String, dynamic>{
-              'id': 'turn-1',
-              'threadId': threadId,
-              'status': 'started',
-            },
-          }));
+          socket.add(
+            jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'id': id,
+              'result': <String, dynamic>{
+                'id': 'turn-1',
+                'threadId': threadId,
+                'status': 'started',
+              },
+            }),
+          );
           unawaited(_emitTurn(socket, threadId));
           break;
         case 'turn/interrupt':
           final threadId = params['threadId']?.toString() ?? 'thread-1';
-          socket.add(jsonEncode(<String, dynamic>{
-            'jsonrpc': '2.0',
-            'id': id,
-            'result': <String, dynamic>{'ok': true},
-          }));
-          socket.add(jsonEncode(<String, dynamic>{
-            'jsonrpc': '2.0',
-            'method': 'turn/error',
-            'params': <String, dynamic>{
-              'threadId': threadId,
-              'message': 'aborted',
-            },
-          }));
+          socket.add(
+            jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'id': id,
+              'result': <String, dynamic>{'ok': true},
+            }),
+          );
+          socket.add(
+            jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'method': 'turn/error',
+              'params': <String, dynamic>{
+                'threadId': threadId,
+                'message': 'aborted',
+              },
+            }),
+          );
           await socket.close();
           break;
         default:
-          socket.add(jsonEncode(<String, dynamic>{
-            'jsonrpc': '2.0',
-            'id': id,
-            'error': <String, dynamic>{
-              'code': -32601,
-              'message': 'unknown method $method',
-            },
-          }));
+          socket.add(
+            jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'id': id,
+              'error': <String, dynamic>{
+                'code': -32601,
+                'message': 'unknown method $method',
+              },
+            }),
+          );
       }
     }
   }
@@ -226,15 +246,17 @@ class _FakeAppServer {
     const parts = <String>['hello ', 'world ', 'from app server'];
     for (final part in parts) {
       try {
-        socket.add(jsonEncode(<String, dynamic>{
-          'jsonrpc': '2.0',
-          'method': 'item/agentMessage/delta',
-          'params': <String, dynamic>{
-            'threadId': threadId,
-            'turnId': 'turn-1',
-            'delta': part,
-          },
-        }));
+        socket.add(
+          jsonEncode(<String, dynamic>{
+            'jsonrpc': '2.0',
+            'method': 'item/agentMessage/delta',
+            'params': <String, dynamic>{
+              'threadId': threadId,
+              'turnId': 'turn-1',
+              'delta': part,
+            },
+          }),
+        );
       } catch (_) {
         return;
       }
@@ -243,14 +265,13 @@ class _FakeAppServer {
     if (delayCompletion) {
       return;
     }
-    socket.add(jsonEncode(<String, dynamic>{
-      'jsonrpc': '2.0',
-      'method': 'turn/completed',
-      'params': <String, dynamic>{
-        'threadId': threadId,
-        'turnId': 'turn-1',
-      },
-    }));
+    socket.add(
+      jsonEncode(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'method': 'turn/completed',
+        'params': <String, dynamic>{'threadId': threadId, 'turnId': 'turn-1'},
+      }),
+    );
   }
 }
 
@@ -282,11 +303,10 @@ Map<String, dynamic> _asMap(Object? value) {
 }
 
 extension on DirectSingleAgentRunRequest {
-  DirectSingleAgentRunRequest copyWith({
-    void Function(String text)? onOutput,
-  }) {
+  DirectSingleAgentRunRequest copyWith({void Function(String text)? onOutput}) {
     return DirectSingleAgentRunRequest(
       sessionId: sessionId,
+      provider: provider,
       prompt: prompt,
       model: model,
       workingDirectory: workingDirectory,
