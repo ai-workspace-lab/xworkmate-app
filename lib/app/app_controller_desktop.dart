@@ -192,8 +192,9 @@ class AppController extends ChangeNotifier {
   late final GoCoreLocator _goCoreLocator;
   late final SingleAgentRunner _singleAgentRunner;
   late final MultiAgentOrchestrator _multiAgentOrchestrator;
-  DirectSingleAgentCapabilities _singleAgentCapabilities =
-      const DirectSingleAgentCapabilities.unavailable(endpoint: '');
+  Map<SingleAgentProvider, DirectSingleAgentCapabilities>
+  _singleAgentCapabilitiesByProvider =
+      const <SingleAgentProvider, DirectSingleAgentCapabilities>{};
   final Map<String, List<GatewayChatMessage>> _assistantThreadMessages =
       <String, List<GatewayChatMessage>>{};
   final Map<String, AssistantThreadRecord> _assistantThreadRecords =
@@ -392,8 +393,7 @@ class AppController extends ChangeNotifier {
       _settingsController.storedGatewayPasswordMaskForProfile(profileIndex);
 
   List<SingleAgentProvider> get availableSingleAgentProviders =>
-      (_availableSingleAgentProvidersOverride ??
-              const <SingleAgentProvider>[SingleAgentProvider.codex])
+      (_availableSingleAgentProvidersOverride ?? kBuiltinExternalAcpProviders)
           .where((item) => item != SingleAgentProvider.auto)
           .where(_canUseSingleAgentProvider)
           .toList(growable: false);
@@ -410,9 +410,9 @@ class AppController extends ChangeNotifier {
     if (provider == SingleAgentProvider.auto) {
       return hasAnyAvailableSingleAgentProvider;
     }
-    return provider == SingleAgentProvider.codex &&
-        _singleAgentCapabilities.available &&
-        _singleAgentCapabilities.supportsCodex;
+    final capabilities = _singleAgentCapabilitiesByProvider[provider];
+    return capabilities?.available == true &&
+        capabilities!.supportsProvider(provider);
   }
 
   SingleAgentProvider? _resolvedSingleAgentProvider(
@@ -627,7 +627,7 @@ class AppController extends ChangeNotifier {
   List<SingleAgentProvider> get singleAgentProviderOptions =>
       const <SingleAgentProvider>[
         SingleAgentProvider.auto,
-        SingleAgentProvider.codex,
+        ...kBuiltinExternalAcpProviders,
       ];
 
   String singleAgentProviderLabelForSession(String sessionKey) {
@@ -4504,16 +4504,29 @@ class AppController extends ChangeNotifier {
   Future<void> _refreshSingleAgentCapabilities({
     bool forceRefresh = false,
   }) async {
-    try {
-      _singleAgentCapabilities = await _singleAgentAppServerClient
-          .loadCapabilities(
-            forceRefresh: forceRefresh,
-            gatewayToken: await settingsController.loadGatewayToken(),
-          );
-    } catch (_) {
-      _singleAgentCapabilities =
-          const DirectSingleAgentCapabilities.unavailable(endpoint: '');
+    final gatewayToken = await settingsController.loadGatewayToken();
+    final next = <SingleAgentProvider, DirectSingleAgentCapabilities>{};
+    for (final provider in kBuiltinExternalAcpProviders) {
+      final profile = settings.externalAcpEndpointForProvider(provider);
+      if (!profile.enabled || profile.endpoint.trim().isEmpty) {
+        next[provider] = const DirectSingleAgentCapabilities.unavailable(
+          endpoint: '',
+        );
+        continue;
+      }
+      try {
+        next[provider] = await _singleAgentAppServerClient.loadCapabilities(
+          provider: provider,
+          forceRefresh: forceRefresh,
+          gatewayToken: gatewayToken,
+        );
+      } catch (_) {
+        next[provider] = const DirectSingleAgentCapabilities.unavailable(
+          endpoint: '',
+        );
+      }
     }
+    _singleAgentCapabilitiesByProvider = next;
     if (!_disposed) {
       _notifyIfActive();
     }
@@ -4598,11 +4611,7 @@ class AppController extends ChangeNotifier {
   }
 
   void _registerCodexExternalProvider() {
-    final endpoint = _resolveGatewayAcpEndpoint()?.replace(
-      path: '/acp',
-      query: null,
-      fragment: null,
-    );
+    final endpoint = _resolveSingleAgentEndpoint(SingleAgentProvider.codex);
     _runtimeCoordinator.registerExternalCodeAgent(
       ExternalCodeAgentProvider(
         id: 'codex',
@@ -4778,12 +4787,29 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Uri? _resolveSingleAgentEndpoint() {
-    final remote = _gatewayProfileBaseUri(settings.primaryRemoteGatewayProfile);
-    if (remote != null) {
-      return remote;
+  Uri? _resolveSingleAgentEndpoint(SingleAgentProvider provider) {
+    final endpoint = settings
+        .externalAcpEndpointForProvider(provider)
+        .endpoint
+        .trim();
+    if (endpoint.isEmpty) {
+      return null;
     }
-    return _gatewayProfileBaseUri(settings.primaryLocalGatewayProfile);
+    final normalizedInput = endpoint.contains('://')
+        ? endpoint
+        : 'ws://$endpoint';
+    final uri = Uri.tryParse(normalizedInput);
+    if (uri == null || uri.host.trim().isEmpty) {
+      return null;
+    }
+    final scheme = uri.scheme.trim().toLowerCase();
+    if (scheme != 'ws' &&
+        scheme != 'wss' &&
+        scheme != 'http' &&
+        scheme != 'https') {
+      return null;
+    }
+    return uri;
   }
 
   Uri? _resolveGatewayAcpEndpoint() {

@@ -147,9 +147,11 @@ void main() {
     await tester.tap(find.text('集成'));
     await tester.pumpAndSettle();
 
-    expect(find.text('OpenClaw Gateway'), findsOneWidget);
+    expect(find.text('OpenClaw Gateway'), findsWidgets);
+    expect(find.text('LLM 接入点'), findsOneWidget);
+    expect(find.text('ACP 外部接入'), findsOneWidget);
     expect(find.text('Vault Server'), findsNothing);
-    expect(find.byKey(const ValueKey('ai-gateway-url-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('ai-gateway-url-field')), findsNothing);
     expect(find.byKey(const ValueKey('gateway-mode-field')), findsNothing);
     expect(find.text('认证诊断'), findsNothing);
     expect(find.byKey(const ValueKey('gateway-test-button')), findsOneWidget);
@@ -216,6 +218,30 @@ void main() {
     expect(find.text('Vault Server'), findsOneWidget);
   });
 
+  testWidgets('SettingsPage integration tab exposes ACP provider endpoints', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
+
+    await tester.tap(find.text('集成'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ACP 外部接入').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('外部 ACP Server Endpoint'), findsOneWidget);
+    expect(find.text('Codex'), findsOneWidget);
+    expect(find.text('OpenCode'), findsOneWidget);
+    expect(find.text('Claude'), findsOneWidget);
+    expect(find.text('Gemini'), findsOneWidget);
+    expect(find.textContaining('ws://127.0.0.1:9001'), findsWidgets);
+  });
+
   testWidgets('SettingsPage gateway sections can collapse individually', (
     WidgetTester tester,
   ) async {
@@ -230,7 +256,7 @@ void main() {
     await tester.tap(find.text('集成'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('OpenClaw Gateway'));
+    await tester.tap(find.byTooltip('折叠').first);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('gateway-host-field')), findsNothing);
@@ -240,7 +266,7 @@ void main() {
       findsNothing,
     );
 
-    await tester.tap(find.text('OpenClaw Gateway'));
+    await tester.tap(find.byTooltip('展开').first);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('gateway-host-field')), findsOneWidget);

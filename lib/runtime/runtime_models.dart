@@ -107,6 +107,135 @@ extension SingleAgentProviderCopy on SingleAgentProvider {
   }
 }
 
+const List<SingleAgentProvider> kBuiltinExternalAcpProviders =
+    <SingleAgentProvider>[
+      SingleAgentProvider.codex,
+      SingleAgentProvider.opencode,
+      SingleAgentProvider.claude,
+      SingleAgentProvider.gemini,
+    ];
+
+class ExternalAcpEndpointProfile {
+  const ExternalAcpEndpointProfile({
+    required this.providerKey,
+    required this.label,
+    required this.endpoint,
+    required this.enabled,
+  });
+
+  final String providerKey;
+  final String label;
+  final String endpoint;
+  final bool enabled;
+
+  factory ExternalAcpEndpointProfile.defaultsForProvider(
+    SingleAgentProvider provider,
+  ) {
+    return ExternalAcpEndpointProfile(
+      providerKey: provider.providerId,
+      label: provider.label,
+      endpoint: '',
+      enabled: true,
+    );
+  }
+
+  ExternalAcpEndpointProfile copyWith({
+    String? providerKey,
+    String? label,
+    String? endpoint,
+    bool? enabled,
+  }) {
+    return ExternalAcpEndpointProfile(
+      providerKey: (providerKey ?? this.providerKey).trim(),
+      label: (label ?? this.label).trim(),
+      endpoint: (endpoint ?? this.endpoint).trim(),
+      enabled: enabled ?? this.enabled,
+    );
+  }
+
+  SingleAgentProvider? get builtinProvider {
+    final normalized = providerKey.trim().toLowerCase();
+    for (final provider in kBuiltinExternalAcpProviders) {
+      if (provider.providerId == normalized) {
+        return provider;
+      }
+    }
+    return null;
+  }
+
+  bool get isBuiltin => builtinProvider != null;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'providerKey': providerKey,
+      'label': label,
+      'endpoint': endpoint,
+      'enabled': enabled,
+    };
+  }
+
+  factory ExternalAcpEndpointProfile.fromJson(Map<String, dynamic> json) {
+    final providerKey = json['providerKey']?.toString().trim() ?? '';
+    final builtin = SingleAgentProviderCopy.fromJsonValue(providerKey);
+    final fallbackLabel = builtin == SingleAgentProvider.auto
+        ? providerKey
+        : builtin.label;
+    return ExternalAcpEndpointProfile(
+      providerKey: providerKey,
+      label: json['label']?.toString().trim().isNotEmpty == true
+          ? json['label'].toString().trim()
+          : fallbackLabel,
+      endpoint: json['endpoint']?.toString().trim() ?? '',
+      enabled: json['enabled'] as bool? ?? true,
+    );
+  }
+}
+
+List<ExternalAcpEndpointProfile> normalizeExternalAcpEndpoints({
+  Iterable<ExternalAcpEndpointProfile>? profiles,
+}) {
+  final incoming =
+      profiles?.toList(growable: false) ?? const <ExternalAcpEndpointProfile>[];
+  final byKey = <String, ExternalAcpEndpointProfile>{};
+  for (final item in incoming) {
+    final key = item.providerKey.trim().toLowerCase();
+    if (key.isEmpty || byKey.containsKey(key)) {
+      continue;
+    }
+    byKey[key] = item.copyWith(providerKey: key);
+  }
+
+  final normalized = <ExternalAcpEndpointProfile>[
+    for (final provider in kBuiltinExternalAcpProviders)
+      byKey.remove(provider.providerId) ??
+          ExternalAcpEndpointProfile.defaultsForProvider(provider),
+    ...byKey.values,
+  ];
+  return List<ExternalAcpEndpointProfile>.unmodifiable(normalized);
+}
+
+List<ExternalAcpEndpointProfile> replaceExternalAcpEndpointForProvider(
+  List<ExternalAcpEndpointProfile> profiles,
+  SingleAgentProvider provider,
+  ExternalAcpEndpointProfile profile,
+) {
+  final normalized = normalizeExternalAcpEndpoints(profiles: profiles);
+  final next = List<ExternalAcpEndpointProfile>.from(normalized);
+  final index = next.indexWhere(
+    (item) => item.providerKey.trim().toLowerCase() == provider.providerId,
+  );
+  final resolved = profile.copyWith(
+    providerKey: provider.providerId,
+    label: profile.label.trim().isEmpty ? provider.label : profile.label,
+  );
+  if (index == -1) {
+    next.add(resolved);
+  } else {
+    next[index] = resolved;
+  }
+  return normalizeExternalAcpEndpoints(profiles: next);
+}
+
 class AssistantThreadConnectionState {
   const AssistantThreadConnectionState({
     required this.executionTarget,
@@ -1165,6 +1294,7 @@ class SettingsSnapshot {
     required this.defaultModel,
     required this.defaultProvider,
     required this.gatewayProfiles,
+    required this.externalAcpEndpoints,
     required this.ollamaLocal,
     required this.ollamaCloud,
     required this.vault,
@@ -1199,6 +1329,7 @@ class SettingsSnapshot {
   final String defaultModel;
   final String defaultProvider;
   final List<GatewayConnectionProfile> gatewayProfiles;
+  final List<ExternalAcpEndpointProfile> externalAcpEndpoints;
   final OllamaLocalConfig ollamaLocal;
   final OllamaCloudConfig ollamaCloud;
   final VaultConfig vault;
@@ -1234,6 +1365,7 @@ class SettingsSnapshot {
       defaultModel: '',
       defaultProvider: 'gateway',
       gatewayProfiles: normalizeGatewayProfiles(),
+      externalAcpEndpoints: normalizeExternalAcpEndpoints(),
       ollamaLocal: OllamaLocalConfig.defaults(),
       ollamaCloud: OllamaCloudConfig.defaults(),
       vault: VaultConfig.defaults(),
@@ -1270,6 +1402,7 @@ class SettingsSnapshot {
     String? defaultModel,
     String? defaultProvider,
     List<GatewayConnectionProfile>? gatewayProfiles,
+    List<ExternalAcpEndpointProfile>? externalAcpEndpoints,
     OllamaLocalConfig? ollamaLocal,
     OllamaCloudConfig? ollamaCloud,
     VaultConfig? vault,
@@ -1294,6 +1427,9 @@ class SettingsSnapshot {
     final resolvedGatewayProfiles = gatewayProfiles != null
         ? normalizeGatewayProfiles(profiles: gatewayProfiles)
         : this.gatewayProfiles;
+    final resolvedExternalAcpEndpoints = externalAcpEndpoints != null
+        ? normalizeExternalAcpEndpoints(profiles: externalAcpEndpoints)
+        : this.externalAcpEndpoints;
     return SettingsSnapshot(
       appLanguage: appLanguage ?? this.appLanguage,
       appActive: appActive ?? this.appActive,
@@ -1307,6 +1443,7 @@ class SettingsSnapshot {
       defaultModel: defaultModel ?? this.defaultModel,
       defaultProvider: defaultProvider ?? this.defaultProvider,
       gatewayProfiles: resolvedGatewayProfiles,
+      externalAcpEndpoints: resolvedExternalAcpEndpoints,
       ollamaLocal: ollamaLocal ?? this.ollamaLocal,
       ollamaCloud: ollamaCloud ?? this.ollamaCloud,
       vault: vault ?? this.vault,
@@ -1352,6 +1489,9 @@ class SettingsSnapshot {
       'defaultModel': defaultModel,
       'defaultProvider': defaultProvider,
       'gatewayProfiles': gatewayProfiles
+          .map((item) => item.toJson())
+          .toList(growable: false),
+      'externalAcpEndpoints': externalAcpEndpoints
           .map((item) => item.toJson())
           .toList(growable: false),
       'ollamaLocal': ollamaLocal.toJson(),
@@ -1433,6 +1573,15 @@ class SettingsSnapshot {
                 GatewayConnectionProfile.fromJson(item.cast<String, dynamic>()),
           ),
     );
+    final externalAcpEndpoints = normalizeExternalAcpEndpoints(
+      profiles: ((json['externalAcpEndpoints'] as List?) ?? const <Object>[])
+          .whereType<Map>()
+          .map(
+            (item) => ExternalAcpEndpointProfile.fromJson(
+              item.cast<String, dynamic>(),
+            ),
+          ),
+    );
     return SettingsSnapshot(
       appLanguage: AppLanguageCopy.fromJsonValue(
         json['appLanguage'] as String?,
@@ -1461,6 +1610,7 @@ class SettingsSnapshot {
           json['defaultProvider'] as String? ??
           SettingsSnapshot.defaults().defaultProvider,
       gatewayProfiles: gatewayProfiles,
+      externalAcpEndpoints: externalAcpEndpoints,
       ollamaLocal: OllamaLocalConfig.fromJson(
         (json['ollamaLocal'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
@@ -1565,6 +1715,28 @@ class SettingsSnapshot {
       return this;
     }
     return copyWithGatewayProfileAt(index, profile);
+  }
+
+  ExternalAcpEndpointProfile externalAcpEndpointForProvider(
+    SingleAgentProvider provider,
+  ) {
+    return externalAcpEndpoints.firstWhere(
+      (item) => item.providerKey.trim().toLowerCase() == provider.providerId,
+      orElse: () => ExternalAcpEndpointProfile.defaultsForProvider(provider),
+    );
+  }
+
+  SettingsSnapshot copyWithExternalAcpEndpointForProvider(
+    SingleAgentProvider provider,
+    ExternalAcpEndpointProfile profile,
+  ) {
+    return copyWith(
+      externalAcpEndpoints: replaceExternalAcpEndpointForProvider(
+        externalAcpEndpoints,
+        provider,
+        profile,
+      ),
+    );
   }
 }
 

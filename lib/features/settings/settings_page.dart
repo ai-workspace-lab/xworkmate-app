@@ -71,6 +71,8 @@ class _SettingsPageState extends State<SettingsPage> {
   String _aiGatewayTestState = 'idle';
   String _aiGatewayTestMessage = '';
   String _aiGatewayTestEndpoint = '';
+  _GatewayIntegrationSubTab _integrationSubTab =
+      _GatewayIntegrationSubTab.gateway;
   int _llmEndpointSlotLimit = 1;
   int _selectedLlmEndpointIndex = 0;
   String _aiGatewayNameSyncedValue = '';
@@ -790,39 +792,169 @@ class _SettingsPageState extends State<SettingsPage> {
     SettingsSnapshot settings,
     UiFeatureAccess uiFeatures,
   ) {
+    final tabLabel = switch (_integrationSubTab) {
+      _GatewayIntegrationSubTab.gateway => 'OpenClaw Gateway',
+      _GatewayIntegrationSubTab.llm => appText('LLM 接入点', 'LLM Endpoints'),
+      _GatewayIntegrationSubTab.acp => appText('ACP 外部接入', 'External ACP'),
+    };
     return [
-      _buildCollapsibleGatewaySection(
-        context: context,
-        title: 'OpenClaw Gateway',
-        expanded: _openClawGatewayExpanded,
+      SectionTabs(
+        items: <String>[
+          'OpenClaw Gateway',
+          appText('LLM 接入点', 'LLM Endpoints'),
+          appText('ACP 外部接入', 'External ACP'),
+        ],
+        value: tabLabel,
         onChanged: (value) => setState(() {
-          _openClawGatewayExpanded = value;
+          _integrationSubTab = switch (value) {
+            'OpenClaw Gateway' => _GatewayIntegrationSubTab.gateway,
+            _ when value == appText('LLM 接入点', 'LLM Endpoints') =>
+              _GatewayIntegrationSubTab.llm,
+            _ => _GatewayIntegrationSubTab.acp,
+          };
         }),
-        child: _buildOpenClawGatewayCard(context, controller, settings),
       ),
-      if (uiFeatures.supportsVaultServer) ...[
-        const SizedBox(height: 16),
-        _buildCollapsibleGatewaySection(
-          context: context,
-          title: appText('Vault Server', 'Vault Server'),
-          expanded: _vaultServerExpanded,
-          onChanged: (value) => setState(() {
-            _vaultServerExpanded = value;
-          }),
-          child: _buildVaultProviderCard(context, controller, settings),
-        ),
-      ],
       const SizedBox(height: 16),
-      _buildCollapsibleGatewaySection(
-        context: context,
-        title: appText('LLM 接入点', 'LLM Endpoints'),
-        expanded: _aiGatewayExpanded,
-        onChanged: (value) => setState(() {
-          _aiGatewayExpanded = value;
-        }),
-        child: _buildLlmEndpointManager(context, controller, settings),
-      ),
+      ...switch (_integrationSubTab) {
+        _GatewayIntegrationSubTab.gateway => <Widget>[
+          _buildCollapsibleGatewaySection(
+            context: context,
+            title: 'OpenClaw Gateway',
+            expanded: _openClawGatewayExpanded,
+            onChanged: (value) => setState(() {
+              _openClawGatewayExpanded = value;
+            }),
+            child: _buildOpenClawGatewayCard(context, controller, settings),
+          ),
+          if (uiFeatures.supportsVaultServer) ...[
+            const SizedBox(height: 16),
+            _buildCollapsibleGatewaySection(
+              context: context,
+              title: appText('Vault Server', 'Vault Server'),
+              expanded: _vaultServerExpanded,
+              onChanged: (value) => setState(() {
+                _vaultServerExpanded = value;
+              }),
+              child: _buildVaultProviderCard(context, controller, settings),
+            ),
+          ],
+        ],
+        _GatewayIntegrationSubTab.llm => <Widget>[
+          _buildCollapsibleGatewaySection(
+            context: context,
+            title: appText('LLM 接入点', 'LLM Endpoints'),
+            expanded: _aiGatewayExpanded,
+            onChanged: (value) => setState(() {
+              _aiGatewayExpanded = value;
+            }),
+            child: _buildLlmEndpointManager(context, controller, settings),
+          ),
+        ],
+        _GatewayIntegrationSubTab.acp => <Widget>[
+          _buildExternalAcpEndpointManager(context, controller, settings),
+        ],
+      },
     ];
+  }
+
+  Widget _buildExternalAcpEndpointManager(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
+    final theme = Theme.of(context);
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            appText('外部 ACP Server Endpoint', 'External ACP Server Endpoints'),
+            style: theme.textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            appText(
+              '第一批内置 4 个 provider：Codex、OpenCode、Claude、Gemini。每个 provider 都可以自定义接入自己的 ACP Server Endpoint，协议支持 ws / wss / http / https。Gateway profile 与 ACP endpoint 分开存储，后续可在这个列表上扩展自定义 provider。',
+              'The first batch includes 4 built-in providers: Codex, OpenCode, Claude, and Gemini. Each provider can point to its own ACP server endpoint with ws / wss / http / https. Gateway profiles and ACP endpoints are stored separately, and this list is designed to extend to custom providers later.',
+            ),
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          ...kBuiltinExternalAcpProviders.map(
+            (provider) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildExternalAcpProviderCard(
+                context,
+                controller,
+                settings,
+                provider,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExternalAcpProviderCard(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+    SingleAgentProvider provider,
+  ) {
+    final profile = settings.externalAcpEndpointForProvider(provider);
+    final endpoint = profile.endpoint.trim();
+    final configured = endpoint.isNotEmpty;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  provider.label,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              _StatusChip(
+                label: configured
+                    ? appText('已配置', 'Configured')
+                    : appText('未配置', 'Empty'),
+                tone: configured ? _StatusChipTone.ready : _StatusChipTone.idle,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _EditableField(
+            label: appText(
+              '${provider.label} ACP Endpoint',
+              '${provider.label} ACP Endpoint',
+            ),
+            value: endpoint,
+            onSubmitted: (value) => _saveSettings(
+              controller,
+              settings.copyWithExternalAcpEndpointForProvider(
+                provider,
+                profile.copyWith(endpoint: value),
+              ),
+            ),
+          ),
+          Text(
+            appText(
+              '示例：ws://127.0.0.1:9001、wss://acp.example.com/rpc、http://127.0.0.1:8080、https://agent.example.com',
+              'Examples: ws://127.0.0.1:9001, wss://acp.example.com/rpc, http://127.0.0.1:8080, https://agent.example.com',
+            ),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildLlmEndpointManager(
@@ -4591,6 +4723,8 @@ class _WorkflowStep extends StatelessWidget {
   }
 }
 
+enum _GatewayIntegrationSubTab { gateway, llm, acp }
+
 enum _LlmEndpointSlot { aiGateway, ollamaLocal, ollamaCloud }
 
 const List<_LlmEndpointSlot> _llmEndpointSlots = <_LlmEndpointSlot>[
@@ -4598,3 +4732,40 @@ const List<_LlmEndpointSlot> _llmEndpointSlots = <_LlmEndpointSlot>[
   _LlmEndpointSlot.ollamaLocal,
   _LlmEndpointSlot.ollamaCloud,
 ];
+
+enum _StatusChipTone { idle, ready }
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.label, required this.tone});
+
+  final String label;
+  final _StatusChipTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final (background, foreground) = switch (tone) {
+      _StatusChipTone.ready => (
+        colorScheme.primaryContainer,
+        colorScheme.onPrimaryContainer,
+      ),
+      _StatusChipTone.idle => (
+        colorScheme.surfaceContainerHighest,
+        colorScheme.onSurfaceVariant,
+      ),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(
+          context,
+        ).textTheme.labelMedium?.copyWith(color: foreground),
+      ),
+    );
+  }
+}
