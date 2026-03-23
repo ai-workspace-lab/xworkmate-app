@@ -240,7 +240,12 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     return switch (_tab) {
-      SettingsTab.general => _buildGeneral(context, controller, settings),
+      SettingsTab.general => _buildGeneral(
+        context,
+        controller,
+        settings,
+        uiFeatures,
+      ),
       SettingsTab.workspace => _buildWorkspace(context, controller, settings),
       SettingsTab.gateway => _buildGateway(
         context,
@@ -458,6 +463,7 @@ class _SettingsPageState extends State<SettingsPage> {
     BuildContext context,
     AppController controller,
     SettingsSnapshot settings,
+    UiFeatureAccess uiFeatures,
   ) {
     return [
       SurfaceCard(
@@ -492,55 +498,57 @@ class _SettingsPageState extends State<SettingsPage> {
                 settings.copyWith(showDockIcon: value),
               ),
             ),
-            _SwitchRow(
-              label: appText('账号本地模式', 'Account local mode'),
-              value: settings.accountLocalMode,
-              onChanged: (value) => _saveSettings(
-                controller,
-                settings.copyWith(accountLocalMode: value),
+            if (uiFeatures.supportsAccountAccess)
+              _SwitchRow(
+                label: appText('账号本地模式', 'Account local mode'),
+                value: settings.accountLocalMode,
+                onChanged: (value) => _saveSettings(
+                  controller,
+                  settings.copyWith(accountLocalMode: value),
+                ),
               ),
-            ),
           ],
         ),
       ),
       if (controller.supportsDesktopIntegration)
         _buildLinuxDesktopIntegration(context, controller, settings),
-      SurfaceCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              appText('账号访问', 'Account Access'),
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            _EditableField(
-              label: appText('账号服务地址', 'Account Base URL'),
-              value: settings.accountBaseUrl,
-              onSubmitted: (value) => _saveSettings(
-                controller,
-                settings.copyWith(accountBaseUrl: value),
+      if (uiFeatures.supportsAccountAccess)
+        SurfaceCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                appText('账号访问', 'Account Access'),
+                style: Theme.of(context).textTheme.titleLarge,
               ),
-            ),
-            _EditableField(
-              label: appText('账号用户名', 'Account Username'),
-              value: settings.accountUsername,
-              onSubmitted: (value) => _saveSettings(
-                controller,
-                settings.copyWith(accountUsername: value),
+              const SizedBox(height: 16),
+              _EditableField(
+                label: appText('账号服务地址', 'Account Base URL'),
+                value: settings.accountBaseUrl,
+                onSubmitted: (value) => _saveSettings(
+                  controller,
+                  settings.copyWith(accountBaseUrl: value),
+                ),
               ),
-            ),
-            _EditableField(
-              label: appText('工作区名称', 'Workspace Label'),
-              value: settings.accountWorkspace,
-              onSubmitted: (value) => _saveSettings(
-                controller,
-                settings.copyWith(accountWorkspace: value),
+              _EditableField(
+                label: appText('账号用户名', 'Account Username'),
+                value: settings.accountUsername,
+                onSubmitted: (value) => _saveSettings(
+                  controller,
+                  settings.copyWith(accountUsername: value),
+                ),
               ),
-            ),
-          ],
+              _EditableField(
+                label: appText('工作区名称', 'Workspace Label'),
+                value: settings.accountWorkspace,
+                onSubmitted: (value) => _saveSettings(
+                  controller,
+                  settings.copyWith(accountWorkspace: value),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
     ];
   }
 

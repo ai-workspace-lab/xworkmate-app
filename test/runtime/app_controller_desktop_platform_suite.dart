@@ -236,7 +236,7 @@ void main() {
       final controller = AppController(desktopPlatformService: service);
       addTearDown(controller.dispose);
 
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await _waitFor(() => !controller.initializing);
 
       expect(controller.supportsDesktopIntegration, isTrue);
       expect(
@@ -276,7 +276,7 @@ void main() {
       addTearDown(server.close);
       addTearDown(controller.dispose);
 
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await _waitFor(() => !controller.initializing);
 
       final result = await controller.testGatewayConnectionDraft(
         profile: GatewayConnectionProfile.defaults().copyWith(
@@ -295,4 +295,17 @@ void main() {
       expect(result.message, isNot(contains('main store')));
     },
   );
+}
+
+Future<void> _waitFor(
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 2),
+}) async {
+  final stopwatch = Stopwatch()..start();
+  while (!condition()) {
+    if (stopwatch.elapsed > timeout) {
+      fail('Condition not met within ${timeout.inMilliseconds}ms');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
 }
