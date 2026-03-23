@@ -7,14 +7,17 @@ import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
+import '../test_support.dart';
 
 // Mock GatewayRuntime for testing
 class MockGatewayRuntime extends GatewayRuntime {
-  MockGatewayRuntime()
-    : super(
-        store: SecureConfigStore(),
-        identityStore: DeviceIdentityStore(SecureConfigStore()),
-      );
+  factory MockGatewayRuntime() {
+    final store = createIsolatedTestStore();
+    return MockGatewayRuntime._(store);
+  }
+
+  MockGatewayRuntime._(SecureConfigStore store)
+    : super(store: store, identityStore: DeviceIdentityStore(store));
 
   final Map<String, dynamic> _responses = {};
   final List<Map<String, dynamic>> _requests = [];

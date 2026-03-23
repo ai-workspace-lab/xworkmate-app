@@ -83,45 +83,24 @@ class FileSecureStorageClient implements SecureStorageClient {
   }
 }
 
-class MemorySecureStorageClient implements SecureStorageClient {
-  final Map<String, String> _values = <String, String>{};
-
-  @override
-  Future<void> delete({required String key}) async {
-    _values.remove(key);
-  }
-
-  @override
-  Future<String?> read({required String key}) async {
-    return _values[key];
-  }
-
-  @override
-  Future<void> write({required String key, required String value}) async {
-    _values[key] = value;
-  }
-}
-
 class SecretStore {
   SecretStore({
     Future<String?> Function()? fallbackDirectoryPathResolver,
     Future<String?> Function()? databasePathResolver,
     Future<String?> Function()? defaultSupportDirectoryPathResolver,
-    bool allowInMemoryFallback = false,
     SecureStorageClient? secureStorage,
     bool enableSecureStorage = true,
   }) : _fallbackDirectoryPathResolver = fallbackDirectoryPathResolver,
        _databasePathResolver = databasePathResolver,
        _defaultSupportDirectoryPathResolver =
            defaultSupportDirectoryPathResolver,
-       _allowInMemoryFallback = allowInMemoryFallback,
        _secureStorageOverride = secureStorage,
        _enableSecureStorage = enableSecureStorage;
 
   static const Duration _secureStorageTimeout = Duration(seconds: 5);
   static const String legacyLocalStateKey = 'xworkmate.local_state.key';
-  static const String _gatewayTokenKey = 'xworkmate.gateway.token';
-  static const String _gatewayPasswordKey = 'xworkmate.gateway.password';
+  static const String _legacyGatewayTokenKey = 'xworkmate.gateway.token';
+  static const String _legacyGatewayPasswordKey = 'xworkmate.gateway.password';
   static const String _gatewayDeviceIdKey = 'xworkmate.gateway.device.id';
   static const String _gatewayDevicePublicKeyKey =
       'xworkmate.gateway.device.public_key';
@@ -132,8 +111,8 @@ class SecretStore {
   static const String _aiGatewayApiKeyKey = 'xworkmate.ai_gateway.api_key';
 
   static const Map<String, String> _legacyFallbackFileNames = <String, String>{
-    _gatewayTokenKey: 'gateway-token.txt',
-    _gatewayPasswordKey: 'gateway-password.txt',
+    _legacyGatewayTokenKey: 'gateway-token.txt',
+    _legacyGatewayPasswordKey: 'gateway-password.txt',
     _ollamaCloudApiKeyKey: 'ollama-cloud-api-key.txt',
     _vaultTokenKey: 'vault-token.txt',
     _aiGatewayApiKeyKey: 'ai-gateway-api-key.txt',
@@ -143,7 +122,6 @@ class SecretStore {
   final Future<String?> Function()? _fallbackDirectoryPathResolver;
   final Future<String?> Function()? _databasePathResolver;
   final Future<String?> Function()? _defaultSupportDirectoryPathResolver;
-  final bool _allowInMemoryFallback;
   final SecureStorageClient? _secureStorageOverride;
   final bool _enableSecureStorage;
   SecureStorageClient? _secureStorage;
@@ -154,20 +132,18 @@ class SecretStore {
       return;
     }
     await _ensureDurableStorageLayout();
-    if (_enableSecureStorage) {
-      if (_secureStorageOverride != null) {
-        _secureStorage = _secureStorageOverride;
-      } else if (_useDebugSecureStorageFallback()) {
-        _secureStorage = _buildDebugSecureStorageClient();
-      } else {
-        try {
-          _secureStorage = FlutterSecureStorageClient(
-            const FlutterSecureStorage(),
-          );
-        } catch (_) {
-          _secureStorage = null;
-        }
+    if (_secureStorageOverride != null) {
+      _secureStorage = _secureStorageOverride;
+    } else if (_enableSecureStorage) {
+      try {
+        _secureStorage = FlutterSecureStorageClient(
+          const FlutterSecureStorage(),
+        );
+      } catch (_) {
+        _secureStorage = FileSecureStorageClient(() => _resolveFallbackDirectory());
       }
+    } else {
+      _secureStorage = FileSecureStorageClient(() => _resolveFallbackDirectory());
     }
     _initialized = true;
   }
@@ -175,9 +151,6 @@ class SecretStore {
   Future<void> _ensureDurableStorageLayout() async {
     final fallbackDirectory = await _resolveFallbackDirectory();
     if (fallbackDirectory == null) {
-      if (_allowInMemoryFallback) {
-        return;
-      }
       throw StateError(
         'Durable secret storage layout unavailable: cannot resolve fallback directory.',
       );
@@ -190,19 +163,59 @@ class SecretStore {
     }
   }
 
-  Future<String?> loadGatewayToken() => _readSecure(_gatewayTokenKey);
+  Future<String?> loadGatewayToken({int? profileIndex}) async {
+    if (profileIndex != null) {
+      final scopedValue = await _readSecure(
+        _gatewayTokenKeyForProfile(profileIndex),
+      );
+      if ((scopedValue ?? '').trim().isNotEmpty) {
+        return scopedValue;
+      }
+    }
+    return _readSecure(_legacyGatewayTokenKey);
+  }
 
-  Future<void> saveGatewayToken(String value) =>
-      _writeSecure(_gatewayTokenKey, value);
+  Future<void> saveGatewayToken(String value, {int? profileIndex}) =>
+      _writeSecure(
+        profileIndex == null
+            ? _legacyGatewayTokenKey
+            : _gatewayTokenKeyForProfile(profileIndex),
+        value,
+      );
 
-  Future<void> clearGatewayToken() => _deleteSecure(_gatewayTokenKey);
+  Future<void> clearGatewayToken({int? profileIndex}) =>
+      _deleteSecure(
+        profileIndex == null
+            ? _legacyGatewayTokenKey
+            : _gatewayTokenKeyForProfile(profileIndex),
+      );
 
-  Future<String?> loadGatewayPassword() => _readSecure(_gatewayPasswordKey);
+  Future<String?> loadGatewayPassword({int? profileIndex}) async {
+    if (profileIndex != null) {
+      final scopedValue = await _readSecure(
+        _gatewayPasswordKeyForProfile(profileIndex),
+      );
+      if ((scopedValue ?? '').trim().isNotEmpty) {
+        return scopedValue;
+      }
+    }
+    return _readSecure(_legacyGatewayPasswordKey);
+  }
 
-  Future<void> saveGatewayPassword(String value) =>
-      _writeSecure(_gatewayPasswordKey, value);
+  Future<void> saveGatewayPassword(String value, {int? profileIndex}) =>
+      _writeSecure(
+        profileIndex == null
+            ? _legacyGatewayPasswordKey
+            : _gatewayPasswordKeyForProfile(profileIndex),
+        value,
+      );
 
-  Future<void> clearGatewayPassword() => _deleteSecure(_gatewayPasswordKey);
+  Future<void> clearGatewayPassword({int? profileIndex}) =>
+      _deleteSecure(
+        profileIndex == null
+            ? _legacyGatewayPasswordKey
+            : _gatewayPasswordKeyForProfile(profileIndex),
+      );
 
   Future<String?> loadOllamaCloudApiKey() => _readSecure(_ollamaCloudApiKeyKey);
 
@@ -223,8 +236,8 @@ class SecretStore {
 
   Future<Map<String, String>> loadSecureRefs() async {
     await initialize();
-    final gatewayToken = await loadGatewayToken();
-    final gatewayPassword = await loadGatewayPassword();
+    final legacyGatewayToken = await _readSecure(_legacyGatewayTokenKey);
+    final legacyGatewayPassword = await _readSecure(_legacyGatewayPasswordKey);
     final deviceIdentity = await loadDeviceIdentity();
     final deviceToken = deviceIdentity == null
         ? null
@@ -236,11 +249,23 @@ class SecretStore {
     final vaultToken = await loadVaultToken();
     final aiGatewayApiKey = await loadAiGatewayApiKey();
     final secureRefs = <String, String>{};
-    if (gatewayToken case final value?) {
+    if (legacyGatewayToken case final value?) {
       secureRefs['gateway_token'] = value;
     }
-    if (gatewayPassword case final value?) {
+    if (legacyGatewayPassword case final value?) {
       secureRefs['gateway_password'] = value;
+    }
+    for (var index = 0; index < kGatewayProfileListLength; index += 1) {
+      final scopedToken = await _readSecure(_gatewayTokenKeyForProfile(index));
+      final scopedPassword = await _readSecure(
+        _gatewayPasswordKeyForProfile(index),
+      );
+      if (scopedToken case final value?) {
+        secureRefs[_gatewayTokenRefKey(index)] = value;
+      }
+      if (scopedPassword case final value?) {
+        secureRefs[_gatewayPasswordRefKey(index)] = value;
+      }
     }
     if (deviceToken case final value?) {
       secureRefs['gateway_device_token_operator'] = value;
@@ -256,6 +281,12 @@ class SecretStore {
     }
     return secureRefs;
   }
+
+  static String gatewayTokenRefKey(int profileIndex) =>
+      _gatewayTokenRefKey(profileIndex);
+
+  static String gatewayPasswordRefKey(int profileIndex) =>
+      _gatewayPasswordRefKey(profileIndex);
 
   Future<LocalDeviceIdentity?> loadDeviceIdentity() async {
     await initialize();
@@ -334,9 +365,6 @@ class SecretStore {
   }
 
   Future<void> dispose() async {
-    if (_allowInMemoryFallback && _memorySecure.isNotEmpty) {
-      await _syncMemorySecretsToDurableStore();
-    }
     _secureStorage = null;
     _initialized = false;
     _memorySecure.clear();
@@ -363,32 +391,34 @@ class SecretStore {
     if (migrated != null && migrated.trim().isNotEmpty) {
       return migrated.trim();
     }
-    return _memorySecure[key];
+    return null;
   }
 
   Future<String?> _readSecureRaw(String key) async {
-    if (_secureStorage != null) {
-      try {
-        final value = await _readSecureValue(_secureStorage!, key);
-        if (value != null && value.trim().isNotEmpty) {
-          _memorySecure[key] = value.trim();
-          return value.trim();
-        }
-      } catch (_) {
-        if (await _promoteToFileSecureStorageFallback()) {
-          try {
-            final value = await _readSecureValue(_secureStorage!, key);
-            if (value != null && value.trim().isNotEmpty) {
-              _memorySecure[key] = value.trim();
-              return value.trim();
-            }
-          } catch (_) {
-            // Fall through to in-memory cache.
-          }
-        }
+    final client = await _ensureSecureStorageClient();
+    try {
+      final value = await _readSecureValue(client, key);
+      if (value == null || value.trim().isEmpty) {
+        return null;
       }
+      final trimmed = value.trim();
+      _memorySecure[key] = trimmed;
+      return trimmed;
+    } catch (_) {
+      final promoted = await _promoteToFileSecureStorageFallback();
+      if (!promoted || _secureStorage == null) {
+        throw StateError(
+          'Durable secret storage unavailable for $key: failed to read secure value.',
+        );
+      }
+      final value = await _readSecureValue(_secureStorage!, key);
+      if (value == null || value.trim().isEmpty) {
+        return null;
+      }
+      final trimmed = value.trim();
+      _memorySecure[key] = trimmed;
+      return trimmed;
     }
-    return _memorySecure[key];
   }
 
   Future<void> _writeSecure(String key, String value) async {
@@ -397,22 +427,9 @@ class SecretStore {
     if (trimmed.isEmpty) {
       return;
     }
-    if (_secureStorage == null &&
-        !await _promoteToFileSecureStorageFallback()) {
-      if (_allowInMemoryFallback) {
-        _memorySecure[key] = trimmed;
-        unawaited(_syncMemorySecretsToDurableStore());
-        return;
-      }
-      throw StateError(
-        'Durable secret storage unavailable for $key: secure storage and file fallback both failed.',
-      );
-    }
-    if (_secureStorage == null) {
-      return;
-    }
+    final client = await _ensureSecureStorageClient();
     try {
-      await _writeSecureValue(_secureStorage!, key, trimmed);
+      await _writeSecureValue(client, key, trimmed);
       _memorySecure[key] = trimmed;
       final file = await _legacyFallbackFile(key);
       if (file != null && await file.exists()) {
@@ -421,21 +438,12 @@ class SecretStore {
     } catch (_) {
       final promoted = await _promoteToFileSecureStorageFallback();
       if (promoted && _secureStorage != null) {
-        try {
-          await _writeSecureValue(_secureStorage!, key, trimmed);
-          _memorySecure[key] = trimmed;
-          final file = await _legacyFallbackFile(key);
-          if (file != null && await file.exists()) {
-            await file.delete();
-          }
-          return;
-        } catch (_) {
-          // Fall through to strict fallback handling below.
-        }
-      }
-      if (_allowInMemoryFallback) {
+        await _writeSecureValue(_secureStorage!, key, trimmed);
         _memorySecure[key] = trimmed;
-        unawaited(_syncMemorySecretsToDurableStore());
+        final file = await _legacyFallbackFile(key);
+        if (file != null && await file.exists()) {
+          await file.delete();
+        }
         return;
       }
       throw StateError(
@@ -446,12 +454,17 @@ class SecretStore {
 
   Future<void> _deleteSecure(String key) async {
     await initialize();
-    if (_secureStorage != null) {
-      try {
-        await _deleteSecureValue(_secureStorage!, key);
-      } catch (_) {
-        // Best effort.
+    final client = await _ensureSecureStorageClient();
+    try {
+      await _deleteSecureValue(client, key);
+    } catch (_) {
+      final promoted = await _promoteToFileSecureStorageFallback();
+      if (!promoted || _secureStorage == null) {
+        throw StateError(
+          'Durable secret storage unavailable for $key: failed to delete secure value.',
+        );
       }
+      await _deleteSecureValue(_secureStorage!, key);
     }
     _memorySecure.remove(key);
     final file = await _legacyFallbackFile(key);
@@ -502,27 +515,19 @@ class SecretStore {
   }
 
   Future<Directory?> _resolveFallbackDirectory() async {
-    if (_fallbackDirectoryPathResolver != null) {
-      String? explicit;
-      try {
-        explicit = await _fallbackDirectoryPathResolver();
-      } catch (_) {
-        // Continue to next fallback candidate.
-      }
-      final explicitTrimmed = explicit?.trim() ?? '';
-      if (explicitTrimmed.isNotEmpty) {
-        return _requireExistingDirectory(explicitTrimmed);
-      }
+    final fallbackRoot = await _resolvePath(_fallbackDirectoryPathResolver);
+    if (fallbackRoot != null) {
+      return _ensureDirectory(fallbackRoot);
     }
-
-    try {
-      final databasePath = await _databasePathResolver?.call();
-      final databaseTrimmed = databasePath?.trim() ?? '';
-      if (databaseTrimmed.isNotEmpty) {
-        return _requireExistingDirectory(File(databaseTrimmed).parent.path);
-      }
-    } catch (_) {
-      // Continue to next fallback candidate.
+    final databasePath = await _resolvePath(_databasePathResolver);
+    if (databasePath != null) {
+      return _ensureDirectory(File(databasePath).parent.path);
+    }
+    final defaultSupportRoot = await _resolvePath(
+      _defaultSupportDirectoryPathResolver,
+    );
+    if (defaultSupportRoot != null) {
+      return _ensureDirectory('$defaultSupportRoot/gateway-auth');
     }
     try {
       final supportDirectory = await getApplicationSupportDirectory();
@@ -530,38 +535,7 @@ class SecretStore {
         '${supportDirectory.path}/xworkmate/gateway-auth',
       );
     } catch (_) {
-      // Continue below to deterministic fallback.
-    }
-    try {
-      final defaultSupportRoot = await _defaultSupportDirectoryPathResolver
-          ?.call();
-      final trimmed = defaultSupportRoot?.trim() ?? '';
-      if (trimmed.isNotEmpty) {
-        return _ensureDirectory('$trimmed/gateway-auth');
-      }
-    } catch (_) {
-      // Ignore and fall through.
-    }
-    return null;
-  }
-
-  Future<void> _syncMemorySecretsToDurableStore() async {
-    if (_memorySecure.isEmpty) {
-      return;
-    }
-    if (_secureStorage == null || _secureStorage is MemorySecureStorageClient) {
-      final promoted = await _promoteToFileSecureStorageFallback();
-      if (!promoted || _secureStorage == null) {
-        return;
-      }
-    }
-    final snapshot = Map<String, String>.from(_memorySecure);
-    for (final entry in snapshot.entries) {
-      try {
-        await _writeSecureValue(_secureStorage!, entry.key, entry.value);
-      } catch (_) {
-        // Best-effort sync for fallback memory mode.
-      }
+      return null;
     }
   }
 
@@ -573,19 +547,8 @@ class SecretStore {
     return directory;
   }
 
-  Future<Directory> _requireExistingDirectory(String path) async {
-    final directory = Directory(path);
-    if (!await directory.exists()) {
-      throw StateError('Durable secret storage path does not exist: $path');
-    }
-    return directory;
-  }
-
   Future<bool> _promoteToFileSecureStorageFallback() async {
-    if (_secureStorageOverride != null ||
-        (_databasePathResolver == null &&
-            _fallbackDirectoryPathResolver == null &&
-            _defaultSupportDirectoryPathResolver == null)) {
+    if (_secureStorageOverride != null) {
       return false;
     }
     final directory = await _resolveFallbackDirectory();
@@ -624,32 +587,51 @@ class SecretStore {
     return future;
   }
 
-  bool _useDebugSecureStorageFallback() {
-    var enabled = false;
-    assert(() {
-      enabled = true;
-      return true;
-    }());
-    return enabled;
-  }
-
-  SecureStorageClient _buildDebugSecureStorageClient() {
-    if (_databasePathResolver != null ||
-        _fallbackDirectoryPathResolver != null ||
-        _defaultSupportDirectoryPathResolver != null) {
-      return FileSecureStorageClient(() => _resolveFallbackDirectory());
-    }
-    return MemorySecureStorageClient();
-  }
-
   static String _deviceTokenKey(String deviceId, String role) {
     final safeRole = role.trim().isEmpty ? 'operator' : role.trim();
     return 'xworkmate.gateway.device_token.$deviceId.$safeRole';
   }
 
+  static String _gatewayTokenKeyForProfile(int profileIndex) =>
+      'xworkmate.gateway.profile.$profileIndex.token';
+
+  static String _gatewayPasswordKeyForProfile(int profileIndex) =>
+      'xworkmate.gateway.profile.$profileIndex.password';
+
+  static String _gatewayTokenRefKey(int profileIndex) =>
+      'gateway_token_$profileIndex';
+
+  static String _gatewayPasswordRefKey(int profileIndex) =>
+      'gateway_password_$profileIndex';
+
   static List<int> _base64UrlDecode(String value) {
     final normalized = value.replaceAll('-', '+').replaceAll('_', '/');
     final padded = normalized + '=' * ((4 - normalized.length % 4) % 4);
     return base64.decode(padded);
+  }
+
+  Future<SecureStorageClient> _ensureSecureStorageClient() async {
+    final client = _secureStorage;
+    if (client != null) {
+      return client;
+    }
+    final promoted = await _promoteToFileSecureStorageFallback();
+    if (promoted && _secureStorage != null) {
+      return _secureStorage!;
+    }
+    throw StateError('Durable secret storage unavailable: no persistent secure storage client.');
+  }
+
+  Future<String?> _resolvePath(Future<String?> Function()? resolver) async {
+    if (resolver == null) {
+      return null;
+    }
+    try {
+      final resolved = await resolver();
+      final trimmed = resolved?.trim() ?? '';
+      return trimmed.isEmpty ? null : trimmed;
+    } catch (_) {
+      return null;
+    }
   }
 }

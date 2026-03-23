@@ -11,13 +11,16 @@ import 'package:xworkmate/runtime/mode_switcher.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
+import '../test_support.dart';
 
 class _FakeGatewayRuntime extends GatewayRuntime {
-  _FakeGatewayRuntime()
-    : super(
-        store: SecureConfigStore(),
-        identityStore: DeviceIdentityStore(SecureConfigStore()),
-      );
+  factory _FakeGatewayRuntime() {
+    final store = createIsolatedTestStore();
+    return _FakeGatewayRuntime._(store);
+  }
+
+  _FakeGatewayRuntime._(SecureConfigStore store)
+    : super(store: store, identityStore: DeviceIdentityStore(store));
 
   GatewayConnectionSnapshot _snapshot = GatewayConnectionSnapshot.initial();
   final StreamController<GatewayPushEvent> _events =
