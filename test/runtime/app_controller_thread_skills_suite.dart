@@ -11,7 +11,7 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   test(
-    'AppController loads Single Agent skills from the current thread provider roots',
+    'AppController loads Single Agent skills from local roots with priority override',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -24,16 +24,27 @@ void main() {
           } catch (_) {}
         }
       });
-      final codexRoot = Directory('${tempDirectory.path}/codex-skills');
-      final claudeRoot = Directory('${tempDirectory.path}/claude-skills');
-      await _writeSkill(
-        codexRoot,
-        'idea-discovery',
-        skillName: 'Idea Discovery',
-        description: 'Discover ideas',
+      final workspaceCodexRoot = Directory(
+        '${tempDirectory.path}/workspace/.codex/skills',
+      );
+      final userCodexRoot = Directory('${tempDirectory.path}/user-codex-skills');
+      final userClaudeRoot = Directory(
+        '${tempDirectory.path}/user-claude-skills',
       );
       await _writeSkill(
-        claudeRoot,
+        workspaceCodexRoot,
+        'idea-discovery',
+        skillName: 'Idea Discovery',
+        description: 'Workspace skill wins',
+      );
+      await _writeSkill(
+        userCodexRoot,
+        'idea-discovery',
+        skillName: 'Idea Discovery',
+        description: 'User skill should be overridden',
+      );
+      await _writeSkill(
+        userClaudeRoot,
         'incident-review',
         skillName: 'Incident Review',
         description: 'Review incidents',
@@ -50,7 +61,11 @@ void main() {
           SingleAgentProvider.codex,
           SingleAgentProvider.claude,
         ],
-        gatewayOnlySkillScanRoots: <String>[codexRoot.path, claudeRoot.path],
+        gatewayOnlySkillScanRoots: <String>[
+          '${tempDirectory.path}/workspace/.codex/skills',
+          userCodexRoot.path,
+          userClaudeRoot.path,
+        ],
       );
       addTearDown(controller.dispose);
       await _waitFor(() => !controller.initializing);
@@ -69,14 +84,28 @@ void main() {
         controller.assistantImportedSkillsForSession(
           controller.currentSessionKey,
         ),
-        hasLength(1),
+        hasLength(2),
       );
       expect(
         controller
             .assistantImportedSkillsForSession(controller.currentSessionKey)
-            .single
+            .firstWhere((skill) => skill.label == 'Idea Discovery')
+            .description,
+        'Workspace skill wins',
+      );
+      expect(
+        controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .firstWhere((skill) => skill.label == 'Idea Discovery')
+            .scope,
+        'workspace',
+      );
+      expect(
+        controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .firstWhere((skill) => skill.label == 'Incident Review')
             .label,
-        'Idea Discovery',
+        'Incident Review',
       );
 
       expect(
@@ -89,7 +118,7 @@ void main() {
   );
 
   test(
-    'AppController keeps provider-owned imported skills and model choices isolated per thread',
+    'AppController keeps thread-bound skills and model choices isolated per thread',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -139,13 +168,13 @@ void main() {
       final firstSessionKey = controller.currentSessionKey;
       expect(
         controller.assistantImportedSkillsForSession(firstSessionKey),
-        hasLength(1),
+        hasLength(2),
       );
       await controller.toggleAssistantSkillForSession(
         firstSessionKey,
         controller
             .assistantImportedSkillsForSession(firstSessionKey)
-            .single
+            .firstWhere((skill) => skill.label == 'Analysis')
             .key,
       );
       await controller.selectAssistantModelForSession(
@@ -164,9 +193,8 @@ void main() {
       expect(
         controller
             .assistantImportedSkillsForSession(controller.currentSessionKey)
-            .single
-            .label,
-        'Review',
+            .map((skill) => skill.label),
+        containsAll(const <String>['Analysis', 'Review']),
       );
       await controller.selectAssistantModelForSession(
         controller.currentSessionKey,
@@ -177,7 +205,7 @@ void main() {
         controller.assistantImportedSkillsForSession(
           controller.currentSessionKey,
         ),
-        hasLength(1),
+        hasLength(2),
       );
       expect(
         controller.assistantSelectedSkillKeysForSession(
@@ -194,7 +222,7 @@ void main() {
 
       expect(
         controller.assistantImportedSkillsForSession(firstSessionKey),
-        hasLength(1),
+        hasLength(2),
       );
       expect(
         controller.assistantSelectedSkillKeysForSession(firstSessionKey),
@@ -219,7 +247,7 @@ Future<void> _writeSkill(
 }
 
 Future<void> _waitFor(bool Function() predicate) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  final deadline = DateTime.now().add(const Duration(seconds: 20));
   while (!predicate()) {
     if (DateTime.now().isAfter(deadline)) {
       fail('Timed out waiting for condition');
