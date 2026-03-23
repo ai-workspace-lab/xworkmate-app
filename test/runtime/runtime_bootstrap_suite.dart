@@ -91,4 +91,58 @@ remote-token: remote-test-token
       expect(config.workspacePath, tempDir.path);
     },
   );
+
+  test(
+    'RuntimeBootstrapConfig replaces deleted transient worktree paths during settings merge',
+    () async {
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-bootstrap-stale-worktree-',
+      );
+      final stalePath = tempDirectory.path;
+      await tempDirectory.delete(recursive: true);
+
+      const config = RuntimeBootstrapConfig(
+        workspacePath: null,
+        remoteProjectRoot: null,
+        cliPath: null,
+        localGateway: null,
+        remoteGateway: null,
+      );
+      final merged = config.mergeIntoSettings(
+        SettingsSnapshot.defaults().copyWith(
+          workspacePath: stalePath,
+          remoteProjectRoot: stalePath,
+        ),
+      );
+
+      expect(merged.workspacePath, SettingsSnapshot.defaults().workspacePath);
+      expect(
+        merged.remoteProjectRoot,
+        SettingsSnapshot.defaults().remoteProjectRoot,
+      );
+    },
+  );
+
+  test(
+    'RuntimeBootstrapConfig preserves missing non-transient custom paths during settings merge',
+    () {
+      const missingPath = '/Volumes/external/project';
+      const config = RuntimeBootstrapConfig(
+        workspacePath: null,
+        remoteProjectRoot: null,
+        cliPath: null,
+        localGateway: null,
+        remoteGateway: null,
+      );
+      final merged = config.mergeIntoSettings(
+        SettingsSnapshot.defaults().copyWith(
+          workspacePath: missingPath,
+          remoteProjectRoot: missingPath,
+        ),
+      );
+
+      expect(merged.workspacePath, missingPath);
+      expect(merged.remoteProjectRoot, missingPath);
+    },
+  );
 }

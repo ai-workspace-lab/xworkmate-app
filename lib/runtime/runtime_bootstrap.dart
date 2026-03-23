@@ -50,15 +50,30 @@ class RuntimeBootstrapConfig {
   SettingsSnapshot mergeIntoSettings(SettingsSnapshot snapshot) {
     var next = snapshot;
 
-    if (_isDefaultWorkspacePath(snapshot.workspacePath) &&
-        workspacePath != null &&
-        workspacePath!.trim().isNotEmpty) {
-      next = next.copyWith(workspacePath: workspacePath);
+    final resolvedWorkspacePath = workspacePath?.trim() ?? '';
+    final resolvedRemoteProjectRoot = remoteProjectRoot?.trim() ?? '';
+    final replaceWorkspacePath =
+        _isDefaultWorkspacePath(snapshot.workspacePath) ||
+        _isMissingTransientWorkspacePath(snapshot.workspacePath);
+    final replaceRemoteProjectRoot =
+        _isDefaultRemoteRoot(snapshot.remoteProjectRoot) ||
+        _isMissingTransientWorkspacePath(snapshot.remoteProjectRoot);
+
+    if (replaceWorkspacePath) {
+      next = next.copyWith(
+        workspacePath: resolvedWorkspacePath.isNotEmpty
+            ? resolvedWorkspacePath
+            : SettingsSnapshot.defaults().workspacePath,
+      );
     }
-    if (_isDefaultRemoteRoot(snapshot.remoteProjectRoot) &&
-        remoteProjectRoot != null &&
-        remoteProjectRoot!.trim().isNotEmpty) {
-      next = next.copyWith(remoteProjectRoot: remoteProjectRoot);
+    if (replaceRemoteProjectRoot) {
+      next = next.copyWith(
+        remoteProjectRoot: resolvedRemoteProjectRoot.isNotEmpty
+            ? resolvedRemoteProjectRoot
+            : (resolvedWorkspacePath.isNotEmpty
+                  ? resolvedWorkspacePath
+                  : SettingsSnapshot.defaults().remoteProjectRoot),
+      );
     }
     if (_isDefaultCliPath(snapshot.cliPath) &&
         cliPath != null &&
@@ -85,6 +100,34 @@ class RuntimeBootstrapConfig {
 
   static bool _isDefaultCliPath(String value) =>
       value.trim().isEmpty || value.trim() == 'openclaw';
+
+  static bool _isMissingTransientWorkspacePath(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return false;
+    }
+    if (_isLikelyTransientPath(trimmed) &&
+        FileSystemEntity.typeSync(trimmed) == FileSystemEntityType.notFound) {
+      return true;
+    }
+    return false;
+  }
+
+  static bool _isLikelyTransientPath(String path) {
+    final normalized = path.trim();
+    if (normalized.isEmpty) {
+      return false;
+    }
+    final systemTemp = Directory.systemTemp.path;
+    if (normalized == systemTemp || normalized.startsWith('$systemTemp/')) {
+      return true;
+    }
+    if (normalized.startsWith('/tmp/') ||
+        normalized.startsWith('/private/tmp/')) {
+      return true;
+    }
+    return false;
+  }
 }
 
 class GatewayBootstrapTarget {
