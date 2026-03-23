@@ -657,6 +657,7 @@ class _FakeSingleAgentRunner implements SingleAgentRunner {
   Future<SingleAgentProviderResolution> resolveProvider({
     required SingleAgentProvider selection,
     required String configuredCodexCliPath,
+    required String gatewayToken,
   }) async {
     resolveCalls += 1;
     return SingleAgentProviderResolution(

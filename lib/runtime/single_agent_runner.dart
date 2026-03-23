@@ -1,4 +1,4 @@
-import 'gateway_acp_client.dart';
+import 'direct_single_agent_app_server_client.dart';
 import 'multi_agent_orchestrator.dart';
 import 'runtime_models.dart';
 
@@ -21,6 +21,7 @@ class SingleAgentRunRequest {
     required this.prompt,
     required this.model,
     required this.workingDirectory,
+    required this.gatewayToken,
     required this.attachments,
     required this.selectedSkills,
     required this.aiGatewayBaseUrl,
@@ -35,6 +36,7 @@ class SingleAgentRunRequest {
   final String prompt;
   final String model;
   final String workingDirectory;
+  final String gatewayToken;
   final List<CollaborationAttachment> attachments;
   final List<String> selectedSkills;
   final String aiGatewayBaseUrl;
@@ -68,6 +70,7 @@ abstract class SingleAgentRunner {
   Future<SingleAgentProviderResolution> resolveProvider({
     required SingleAgentProvider selection,
     required String configuredCodexCliPath,
+    required String gatewayToken,
   });
 
   Future<SingleAgentRunResult> run(SingleAgentRunRequest request);
@@ -76,62 +79,50 @@ abstract class SingleAgentRunner {
 }
 
 class DefaultSingleAgentRunner implements SingleAgentRunner {
-  DefaultSingleAgentRunner({required GatewayAcpClient acpClient})
-    : _acpClient = acpClient;
+  DefaultSingleAgentRunner({
+    required DirectSingleAgentAppServerClient appServerClient,
+  }) : _appServerClient = appServerClient;
 
-  static const List<SingleAgentProvider> _autoOrder = <SingleAgentProvider>[
-    SingleAgentProvider.codex,
-    SingleAgentProvider.opencode,
-    SingleAgentProvider.claude,
-    SingleAgentProvider.gemini,
-  ];
-
-  final GatewayAcpClient _acpClient;
+  final DirectSingleAgentAppServerClient _appServerClient;
 
   @override
   Future<SingleAgentProviderResolution> resolveProvider({
     required SingleAgentProvider selection,
     required String configuredCodexCliPath,
+    required String gatewayToken,
   }) async {
     try {
-      final capabilities = await _acpClient.loadCapabilities();
-      if (!capabilities.singleAgent) {
+      final capabilities = await _appServerClient.loadCapabilities(
+        gatewayToken: gatewayToken,
+      );
+      if (!capabilities.available || !capabilities.supportsCodex) {
         return SingleAgentProviderResolution(
           selection: selection,
           resolvedProvider: null,
-          fallbackReason: 'ACP single-agent capability is unavailable.',
+          fallbackReason:
+              capabilities.errorMessage ??
+              'Single-agent app-server is unavailable.',
         );
       }
-      if (selection != SingleAgentProvider.auto) {
-        final available = capabilities.providers.contains(selection);
+      if (selection != SingleAgentProvider.auto &&
+          selection != SingleAgentProvider.codex) {
         return SingleAgentProviderResolution(
           selection: selection,
-          resolvedProvider: available ? selection : null,
-          fallbackReason: available
-              ? null
-              : '${selection.label} provider is unavailable from ACP adapter.',
+          resolvedProvider: null,
+          fallbackReason:
+              '${selection.label} is unavailable from the direct app-server endpoint.',
         );
       }
-
-      for (final provider in _autoOrder) {
-        if (capabilities.providers.contains(provider)) {
-          return SingleAgentProviderResolution(
-            selection: selection,
-            resolvedProvider: provider,
-            fallbackReason: null,
-          );
-        }
-      }
-      return const SingleAgentProviderResolution(
-        selection: SingleAgentProvider.auto,
-        resolvedProvider: null,
-        fallbackReason: 'No ACP single-agent provider is currently available.',
+      return SingleAgentProviderResolution(
+        selection: selection,
+        resolvedProvider: SingleAgentProvider.codex,
+        fallbackReason: null,
       );
     } catch (error) {
       return SingleAgentProviderResolution(
         selection: selection,
         resolvedProvider: null,
-        fallbackReason: 'ACP capability negotiation failed: $error',
+        fallbackReason: 'Single-agent app-server negotiation failed: $error',
       );
     }
   }
@@ -139,25 +130,15 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
   @override
   Future<SingleAgentRunResult> run(SingleAgentRunRequest request) async {
     try {
-      final result = await _acpClient.runSingleAgent(
-        GatewayAcpSingleAgentRequest(
+      final result = await _appServerClient.run(
+        DirectSingleAgentRunRequest(
           sessionId: request.sessionId,
-          threadId: request.sessionId,
-          provider: request.provider,
           prompt: _augmentPrompt(request),
           model: request.model,
           workingDirectory: request.workingDirectory,
-          attachments: request.attachments,
-          selectedSkills: request.selectedSkills,
-          aiGatewayBaseUrl: request.aiGatewayBaseUrl,
-          aiGatewayApiKey: request.aiGatewayApiKey,
-          resumeSession: true,
+          gatewayToken: request.gatewayToken,
+          onOutput: request.onOutput,
         ),
-        onUpdate: (update) {
-          if (update.textDelta.isNotEmpty) {
-            request.onOutput?.call(update.textDelta);
-          }
-        },
       );
       return SingleAgentRunResult(
         provider: request.provider,
@@ -165,12 +146,13 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
         success: result.success,
         errorMessage: result.errorMessage,
         shouldFallbackToAiChat: !result.success && result.output.isEmpty,
+        aborted: result.aborted,
         fallbackReason: !result.success
-            ? 'ACP single-agent run failed: ${result.errorMessage}'
+            ? 'Single-agent app-server run failed: ${result.errorMessage}'
             : null,
       );
-    } on GatewayAcpException catch (error) {
-      final shouldFallback = _shouldFallbackToAiChat(error.code, error.message);
+    } catch (error) {
+      final shouldFallback = _shouldFallbackToAiChat(error.toString());
       return SingleAgentRunResult(
         provider: request.provider,
         output: '',
@@ -178,18 +160,8 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
         errorMessage: error.toString(),
         shouldFallbackToAiChat: shouldFallback,
         fallbackReason: shouldFallback
-            ? '${request.provider.label} provider is unavailable from ACP adapter.'
+            ? '${request.provider.label} provider is unavailable from the direct app-server endpoint.'
             : null,
-      );
-    } catch (error) {
-      return SingleAgentRunResult(
-        provider: request.provider,
-        output: '',
-        success: false,
-        errorMessage: error.toString(),
-        shouldFallbackToAiChat: true,
-        fallbackReason:
-            '${request.provider.label} provider run failed before completion.',
       );
     }
   }
@@ -200,29 +172,16 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
     if (normalized.isEmpty) {
       return;
     }
-    try {
-      await _acpClient.cancelSession(
-        sessionId: normalized,
-        threadId: normalized,
-      );
-    } catch (_) {
-      // Best effort only.
-    }
+    await _appServerClient.abort(normalized);
   }
 
-  bool _shouldFallbackToAiChat(String? code, String message) {
-    final normalizedCode = code?.trim().toUpperCase() ?? '';
-    if (normalizedCode == 'ACP_ENDPOINT_MISSING' ||
-        normalizedCode == 'ACP_HTTP_ENDPOINT_MISSING' ||
-        normalizedCode == 'ACP_WS_CONNECT_TIMEOUT' ||
-        normalizedCode == 'ACP_WS_RUNTIME_ERROR' ||
-        normalizedCode == 'ACP_WS_EARLY_CLOSE') {
-      return true;
-    }
+  bool _shouldFallbackToAiChat(String message) {
     final normalizedMessage = message.toLowerCase();
     return normalizedMessage.contains('timeout') ||
         normalizedMessage.contains('unavailable') ||
-        normalizedMessage.contains('missing');
+        normalizedMessage.contains('missing') ||
+        normalizedMessage.contains('closed') ||
+        normalizedMessage.contains('connect');
   }
 
   String _augmentPrompt(SingleAgentRunRequest request) {
