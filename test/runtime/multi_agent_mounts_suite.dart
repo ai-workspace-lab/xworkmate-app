@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/aris_bundle.dart';
 import 'package:xworkmate/runtime/aris_bridge.dart';
+import 'package:xworkmate/runtime/codex_config_bridge.dart';
 import 'package:xworkmate/runtime/multi_agent_mounts.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
@@ -111,6 +112,31 @@ void main() {
       expect(state.detail, contains('manages llm-chat and claude-review'));
     },
   );
+
+  test('CodexMountAdapter marks configured codex path as available', () async {
+    final tempDir = await Directory.systemTemp.createTemp('codex-mount-');
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final configuredBinary = File('${tempDir.path}/custom-codex');
+    await configuredBinary.writeAsString('#!/bin/sh\nexit 0\n');
+    await Process.run('chmod', <String>['+x', configuredBinary.path]);
+    final adapter = CodexMountAdapter(
+      CodexConfigBridge(codexHome: '${tempDir.path}/codex-home'),
+    );
+
+    final state = await adapter.reconcile(
+      config: MultiAgentConfig.defaults().copyWith(autoSync: false),
+      aiGatewayUrl: '',
+      configuredCodexCliPath: configuredBinary.path,
+    );
+
+    expect(state.available, isTrue);
+    expect(state.discoveryState, 'ready');
+    expect(state.syncState, 'disabled');
+  });
 }
 
 Future<ResolvedArisBundle> _writeFakeBundle(Directory root) async {
