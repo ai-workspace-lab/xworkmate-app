@@ -171,7 +171,9 @@ class _SettingsPageState extends State<SettingsPage> {
         _navigationContext = controller.settingsNavigationContext;
         final settings = controller.settingsDraft;
         final showingDetail = _detail != null;
-        final showGlobalApplyBar = _tab != SettingsTab.gateway;
+        final showGlobalApplyBar =
+            _tab != SettingsTab.gateway ||
+            _integrationSubTab == _GatewayIntegrationSubTab.acp;
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
           child: Column(
