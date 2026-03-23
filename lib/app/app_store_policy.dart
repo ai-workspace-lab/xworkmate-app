@@ -123,11 +123,11 @@ UiFeatureManifest applyAppleAppStorePolicy(
   return next;
 }
 
-bool allowsAppStoreExternalSingleAgentProviders({
+bool blocksAppStoreEmbeddedAgentProcesses({
   required bool isAppleHost,
   bool? enabled,
 }) {
-  return !shouldApplyAppleAppStorePolicy(
+  return shouldApplyAppleAppStorePolicy(
     isAppleHost: isAppleHost,
     enabled: enabled,
   );
@@ -138,10 +138,12 @@ SingleAgentProvider sanitizeAppStoreSingleAgentProvider(
   required bool isAppleHost,
   bool? enabled,
 }) {
-  if (!allowsAppStoreExternalSingleAgentProviders(
-    isAppleHost: isAppleHost,
-    enabled: enabled,
-  )) {
+  if (blocksAppStoreEmbeddedAgentProcesses(
+        isAppleHost: isAppleHost,
+        enabled: enabled,
+      ) &&
+      provider != SingleAgentProvider.auto &&
+      provider != SingleAgentProvider.codex) {
     return SingleAgentProvider.auto;
   }
   return provider;

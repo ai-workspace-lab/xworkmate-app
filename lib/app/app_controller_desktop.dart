@@ -20,6 +20,7 @@ import '../runtime/runtime_controllers.dart';
 import '../runtime/runtime_models.dart';
 import '../runtime/secure_config_store.dart';
 import '../runtime/runtime_coordinator.dart';
+import '../runtime/direct_single_agent_app_server_client.dart';
 import '../runtime/gateway_acp_client.dart';
 import '../runtime/codex_runtime.dart';
 import '../runtime/codex_config_bridge.dart';
@@ -93,14 +94,18 @@ class AppController extends ChangeNotifier {
         (_isFlutterTestEnvironment
             ? const <String>[]
             : _defaultGatewayOnlySkillScanRoots);
-    _gatewayAcpClient = GatewayAcpClient(endpointResolver: _resolveAcpEndpoint);
+    _gatewayAcpClient =
+        GatewayAcpClient(endpointResolver: _resolveGatewayAcpEndpoint);
+    _singleAgentAppServerClient = DirectSingleAgentAppServerClient(
+      endpointResolver: _resolveSingleAgentEndpoint,
+    );
     _availableSingleAgentProvidersOverride =
         availableSingleAgentProvidersOverride;
     _arisBundleRepository = ArisBundleRepository();
     _arisBridgeLocator = ArisBridgeLocator();
     _singleAgentRunner =
         singleAgentRunner ??
-        DefaultSingleAgentRunner(acpClient: _gatewayAcpClient);
+        DefaultSingleAgentRunner(appServerClient: _singleAgentAppServerClient);
     _multiAgentOrchestrator = MultiAgentOrchestrator(
       config: _resolveMultiAgentConfig(_settingsController.snapshot),
       arisBundleRepository: _arisBundleRepository,
@@ -132,13 +137,14 @@ class AppController extends ChangeNotifier {
   late final DesktopPlatformService _desktopPlatformService;
   late final List<String> _gatewayOnlySkillScanRoots;
   late final GatewayAcpClient _gatewayAcpClient;
+  late final DirectSingleAgentAppServerClient _singleAgentAppServerClient;
   late final List<SingleAgentProvider>? _availableSingleAgentProvidersOverride;
   late final ArisBundleRepository _arisBundleRepository;
   late final ArisBridgeLocator _arisBridgeLocator;
   late final SingleAgentRunner _singleAgentRunner;
   late final MultiAgentOrchestrator _multiAgentOrchestrator;
-  GatewayAcpCapabilities _acpCapabilities =
-      const GatewayAcpCapabilities.empty();
+  DirectSingleAgentCapabilities _singleAgentCapabilities =
+      const DirectSingleAgentCapabilities.unavailable(endpoint: '');
   final Map<String, List<GatewayChatMessage>> _assistantThreadMessages =
       <String, List<GatewayChatMessage>>{};
   final Map<String, AssistantThreadRecord> _assistantThreadRecords =
@@ -320,7 +326,8 @@ class AppController extends ChangeNotifier {
       resolvedAiGatewayModel.isNotEmpty;
 
   List<SingleAgentProvider> get availableSingleAgentProviders =>
-      SingleAgentProvider.values
+      (_availableSingleAgentProvidersOverride ??
+              const <SingleAgentProvider>[SingleAgentProvider.codex])
           .where((item) => item != SingleAgentProvider.auto)
           .where(_canUseSingleAgentProvider)
           .toList(growable: false);
@@ -329,20 +336,17 @@ class AppController extends ChangeNotifier {
       availableSingleAgentProviders.isNotEmpty;
 
   bool _canUseSingleAgentProvider(SingleAgentProvider provider) {
-    if (!allowsAppStoreExternalSingleAgentProviders(
-      isAppleHost: Platform.isIOS || Platform.isMacOS,
-    )) {
-      return false;
-    }
     final override = _availableSingleAgentProvidersOverride;
     if (override != null) {
       return provider != SingleAgentProvider.auto &&
           override.contains(provider);
     }
     if (provider == SingleAgentProvider.auto) {
-      return _acpCapabilities.providers.isNotEmpty;
+      return hasAnyAvailableSingleAgentProvider;
     }
-    return _acpCapabilities.providers.contains(provider);
+    return provider == SingleAgentProvider.codex &&
+        _singleAgentCapabilities.available &&
+        _singleAgentCapabilities.supportsCodex;
   }
 
   SingleAgentProvider? _resolvedSingleAgentProvider(
@@ -563,11 +567,10 @@ class AppController extends ChangeNotifier {
       singleAgentModelDisplayLabelForSession(currentSessionKey);
 
   List<SingleAgentProvider> get singleAgentProviderOptions =>
-      allowsAppStoreExternalSingleAgentProviders(
-        isAppleHost: Platform.isIOS || Platform.isMacOS,
-      )
-      ? SingleAgentProvider.values
-      : const <SingleAgentProvider>[SingleAgentProvider.auto];
+      const <SingleAgentProvider>[
+        SingleAgentProvider.auto,
+        SingleAgentProvider.codex,
+      ];
 
   String singleAgentProviderLabelForSession(String sessionKey) {
     return singleAgentProviderForSession(sessionKey).label;
@@ -2490,6 +2493,16 @@ class AppController extends ChangeNotifier {
   /// Enable Codex ↔ Gateway bridge
   Future<void> enableCodexBridge() async {
     if (_isCodexBridgeEnabled || _isCodexBridgeBusy) return;
+    if (blocksAppStoreEmbeddedAgentProcesses(
+      isAppleHost: Platform.isIOS || Platform.isMacOS,
+    )) {
+      throw StateError(
+        appText(
+          'App Store 版本不允许在应用内启动或桥接外部 CLI 进程。',
+          'App Store builds do not allow in-app external CLI bridge processes.',
+        ),
+      );
+    }
 
     _isCodexBridgeBusy = true;
     _codexBridgeError = null;
@@ -2505,13 +2518,14 @@ class AppController extends ChangeNotifier {
       }
 
       await _refreshAcpCapabilities(forceRefresh: true);
+      await _refreshSingleAgentCapabilities(forceRefresh: true);
       final runtimeMode = effectiveCodeAgentRuntimeMode;
       if (runtimeMode == CodeAgentRuntimeMode.externalCli &&
           !_canUseSingleAgentProvider(SingleAgentProvider.codex)) {
         throw StateError(
           appText(
-            'Gateway ACP 未报告 Codex Provider 可用，请先检查 Agent Gateway / ACP Adapter 配置。',
-            'Gateway ACP did not report a Codex provider. Check Agent Gateway / ACP Adapter settings first.',
+            '外部 single-agent endpoint 未报告 Codex 可用，请先检查 app-server / Gateway 配置。',
+            'The external single-agent endpoint did not report Codex availability. Check the app-server or Gateway endpoint first.',
           ),
         );
       }
@@ -2585,6 +2599,7 @@ class AppController extends ChangeNotifier {
     _store.dispose();
     _desktopPlatformService.dispose();
     unawaited(_gatewayAcpClient.dispose());
+    unawaited(_singleAgentAppServerClient.dispose());
     super.dispose();
   }
 
@@ -2630,6 +2645,7 @@ class AppController extends ChangeNotifier {
       await _desktopPlatformService.setLaunchAtLogin(settings.launchAtLogin);
       await _refreshResolvedCodexCliPath();
       _registerCodexExternalProvider();
+      await _refreshSingleAgentCapabilities();
       await _refreshAcpCapabilities(persistMountTargets: true);
       if (_disposed) {
         return;
@@ -2817,6 +2833,7 @@ class AppController extends ChangeNotifier {
       await _refreshResolvedCodexCliPath();
       _registerCodexExternalProvider();
     }
+    unawaited(_refreshSingleAgentCapabilities());
     if (previous.linuxDesktop.toJson().toString() !=
             current.linuxDesktop.toJson().toString() ||
         previous.launchAtLogin != current.launchAtLogin) {
@@ -3078,9 +3095,11 @@ class AppController extends ChangeNotifier {
 
       try {
         final selection = singleAgentProviderForSession(sessionKey);
+        final gatewayToken = await settingsController.loadGatewayToken();
         final resolution = await _singleAgentRunner.resolveProvider(
           selection: selection,
           configuredCodexCliPath: configuredCodexCliPath,
+          gatewayToken: gatewayToken,
         );
         final provider = resolution.resolvedProvider;
         if (provider == null) {
@@ -3154,6 +3173,7 @@ class AppController extends ChangeNotifier {
             provider: provider,
             prompt: message,
             model: assistantModelForSession(sessionKey),
+            gatewayToken: gatewayToken,
             workingDirectory:
                 _resolveCodexWorkingDirectory() ?? Directory.current.path,
             attachments: localAttachments,
@@ -4418,7 +4438,6 @@ class AppController extends ChangeNotifier {
     } catch (_) {
       capabilities = const GatewayAcpCapabilities.empty();
     }
-    _acpCapabilities = capabilities;
     if (persistMountTargets && !_disposed) {
       final currentConfig = settings.multiAgent;
       final nextTargets = _mergeAcpCapabilitiesIntoMountTargets(
@@ -4437,8 +4456,32 @@ class AppController extends ChangeNotifier {
     _notifyIfActive();
   }
 
+  Future<void> _refreshSingleAgentCapabilities({
+    bool forceRefresh = false,
+  }) async {
+    try {
+      _singleAgentCapabilities = await _singleAgentAppServerClient
+          .loadCapabilities(
+            forceRefresh: forceRefresh,
+            gatewayToken: await settingsController.loadGatewayToken(),
+          );
+    } catch (_) {
+      _singleAgentCapabilities =
+          const DirectSingleAgentCapabilities.unavailable(endpoint: '');
+    }
+    if (!_disposed) {
+      _notifyIfActive();
+    }
+  }
+
   Future<void> _refreshResolvedCodexCliPath() async {
     if (effectiveCodeAgentRuntimeMode != CodeAgentRuntimeMode.externalCli) {
+      _resolvedCodexCliPath = null;
+      return;
+    }
+    if (blocksAppStoreEmbeddedAgentProcesses(
+      isAppleHost: Platform.isIOS || Platform.isMacOS,
+    )) {
       _resolvedCodexCliPath = null;
       return;
     }
@@ -4510,7 +4553,7 @@ class AppController extends ChangeNotifier {
   }
 
   void _registerCodexExternalProvider() {
-    final endpoint = _resolveAcpEndpoint()?.replace(
+    final endpoint = _resolveGatewayAcpEndpoint()?.replace(
       path: '/acp',
       query: null,
       fragment: null,
@@ -4690,14 +4733,20 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Uri? _resolveAcpEndpoint() {
+  Uri? _resolveSingleAgentEndpoint() {
+    final remote = _gatewayProfileBaseUri(settings.primaryRemoteGatewayProfile);
+    if (remote != null) {
+      return remote;
+    }
+    return _gatewayProfileBaseUri(settings.primaryLocalGatewayProfile);
+  }
+
+  Uri? _resolveGatewayAcpEndpoint() {
     final target = assistantExecutionTargetForSession(
       _sessionsController.currentSessionKey,
     );
     if (target == AssistantExecutionTarget.singleAgent) {
-      final remote = _gatewayProfileBaseUri(
-        settings.primaryRemoteGatewayProfile,
-      );
+      final remote = _gatewayProfileBaseUri(settings.primaryRemoteGatewayProfile);
       if (remote != null) {
         return remote;
       }
