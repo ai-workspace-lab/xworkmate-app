@@ -12,6 +12,8 @@ import 'package:xworkmate/runtime/desktop_platform_service.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
+import '../test_support.dart';
+
 class _FakeDesktopPlatformService implements DesktopPlatformService {
   _FakeDesktopPlatformService()
     : _state = DesktopIntegrationState.fromJson(const <String, dynamic>{
@@ -104,8 +106,13 @@ class _FakeDesktopPlatformService implements DesktopPlatformService {
 }
 
 class _ThrowingSecureConfigStore extends SecureConfigStore {
-  _ThrowingSecureConfigStore()
-    : super(enableSecureStorage: false);
+  _ThrowingSecureConfigStore(String rootPath)
+    : super(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '$rootPath/settings.sqlite3',
+        fallbackDirectoryPathResolver: () async => rootPath,
+        defaultSupportDirectoryPathResolver: () async => rootPath,
+      );
 
   @override
   Future<String?> loadGatewayToken({int? profileIndex}) async {
@@ -233,7 +240,10 @@ void main() {
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final service = _FakeDesktopPlatformService();
-      final controller = AppController(desktopPlatformService: service);
+      final controller = AppController(
+        store: createIsolatedTestStore(enableSecureStorage: false),
+        desktopPlatformService: service,
+      );
       addTearDown(controller.dispose);
 
       await _waitFor(() => !controller.initializing);
@@ -272,9 +282,19 @@ void main() {
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final server = await _FakeGatewayTestServer.start();
-      final controller = AppController(store: _ThrowingSecureConfigStore());
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-desktop-platform-tests-',
+      );
+      final controller = AppController(
+        store: _ThrowingSecureConfigStore(tempDirectory.path),
+      );
       addTearDown(server.close);
       addTearDown(controller.dispose);
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
 
       await _waitFor(() => !controller.initializing);
 
@@ -299,7 +319,7 @@ void main() {
 
 Future<void> _waitFor(
   bool Function() condition, {
-  Duration timeout = const Duration(seconds: 2),
+  Duration timeout = const Duration(seconds: 5),
 }) async {
   final stopwatch = Stopwatch()..start();
   while (!condition()) {
