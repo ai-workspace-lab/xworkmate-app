@@ -175,76 +175,73 @@ void main() {
     },
   );
 
-  test(
-    'AppController falls back when LLM API ignores stream mode',
-    () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-ai-gateway-json-fallback-',
-      );
-      final server = await _FakeAiGatewayServer.start(
-        responseMode: _AiGatewayResponseMode.json,
-      );
-      addTearDown(() async {
-        await server.close();
-        if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
-        }
-      });
+  test('AppController falls back when LLM API ignores stream mode', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final tempDirectory = await Directory.systemTemp.createTemp(
+      'xworkmate-ai-gateway-json-fallback-',
+    );
+    final server = await _FakeAiGatewayServer.start(
+      responseMode: _AiGatewayResponseMode.json,
+    );
+    addTearDown(() async {
+      await server.close();
+      if (await tempDirectory.exists()) {
+        await tempDirectory.delete(recursive: true);
+      }
+    });
 
-      final store = SecureConfigStore(
-        enableSecureStorage: false,
-        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
-        fallbackDirectoryPathResolver: () async => tempDirectory.path,
-      );
-      final controller = AppController(
-        store: store,
-        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
-        runtimeCoordinator: RuntimeCoordinator(
-          gateway: _FakeGatewayRuntime(store: store),
-          codex: _FakeCodexRuntime(),
+    final store = SecureConfigStore(
+      enableSecureStorage: false,
+      databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+      fallbackDirectoryPathResolver: () async => tempDirectory.path,
+    );
+    final controller = AppController(
+      store: store,
+      availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
+      runtimeCoordinator: RuntimeCoordinator(
+        gateway: _FakeGatewayRuntime(store: store),
+        codex: _FakeCodexRuntime(),
+      ),
+      singleAgentRunner: _FallbackOnlySingleAgentRunner(),
+    );
+    addTearDown(controller.dispose);
+
+    await _waitFor(() => !controller.initializing);
+    await controller.settingsController.saveAiGatewayApiKey('live-key');
+    await controller.saveSettings(
+      controller.settings.copyWith(
+        aiGateway: controller.settings.aiGateway.copyWith(
+          baseUrl: server.baseUrl,
+          availableModels: const <String>['moonshotai/kimi-k2.5'],
+          selectedModels: const <String>['moonshotai/kimi-k2.5'],
         ),
-        singleAgentRunner: _FallbackOnlySingleAgentRunner(),
-      );
-      addTearDown(controller.dispose);
-
-      await _waitFor(() => !controller.initializing);
-      await controller.settingsController.saveAiGatewayApiKey('live-key');
-      await controller.saveSettings(
-        controller.settings.copyWith(
-          aiGateway: controller.settings.aiGateway.copyWith(
-            baseUrl: server.baseUrl,
-            availableModels: const <String>['moonshotai/kimi-k2.5'],
-            selectedModels: const <String>['moonshotai/kimi-k2.5'],
-          ),
-          defaultModel: 'moonshotai/kimi-k2.5',
-          multiAgent: controller.settings.multiAgent.copyWith(
-            autoSync: false,
-            mountTargets: _withAvailableMountTargets(
-              controller.settings.multiAgent.mountTargets,
-              const <String>[],
-            ),
+        defaultModel: 'moonshotai/kimi-k2.5',
+        multiAgent: controller.settings.multiAgent.copyWith(
+          autoSync: false,
+          mountTargets: _withAvailableMountTargets(
+            controller.settings.multiAgent.mountTargets,
+            const <String>[],
           ),
         ),
-        refreshAfterSave: false,
-      );
-      await controller.setAssistantExecutionTarget(
-        AssistantExecutionTarget.singleAgent,
-      );
+      ),
+      refreshAfterSave: false,
+    );
+    await controller.setAssistantExecutionTarget(
+      AssistantExecutionTarget.singleAgent,
+    );
 
-      await controller.sendChatMessage('你好', thinking: 'low');
+    await controller.sendChatMessage('你好', thinking: 'low');
 
-      await _waitFor(
-        () => controller.chatMessages.any(
-          (message) =>
-              message.role == 'assistant' && message.text == 'FIRST_REPLY',
-        ),
-      );
+    await _waitFor(
+      () => controller.chatMessages.any(
+        (message) =>
+            message.role == 'assistant' && message.text == 'FIRST_REPLY',
+      ),
+    );
 
-      expect(server.requests.single['stream'], isTrue);
-      expect(controller.chatMessages.last.pending, isFalse);
-    },
-  );
+    expect(server.requests.single['stream'], isTrue);
+    expect(controller.chatMessages.last.pending, isFalse);
+  });
 
   test(
     'AppController abortRun stops Single Agent streaming requests',
@@ -380,7 +377,8 @@ void main() {
       expect(runner.lastRequest?.provider, SingleAgentProvider.codex);
       expect(
         controller.chatMessages.any(
-          (message) => message.role == 'assistant' && message.text == 'CODEX_REPLY',
+          (message) =>
+              message.role == 'assistant' && message.text == 'CODEX_REPLY',
         ),
         isTrue,
       );
@@ -569,6 +567,7 @@ class _FakeGatewayRuntime extends GatewayRuntime {
   @override
   Future<void> connectProfile(
     GatewayConnectionProfile profile, {
+    int? profileIndex,
     String authTokenOverride = '',
     String authPasswordOverride = '',
   }) async {

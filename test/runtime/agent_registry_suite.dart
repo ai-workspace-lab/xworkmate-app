@@ -73,6 +73,7 @@ class MockGatewayRuntime extends GatewayRuntime {
   @override
   Future<void> connectProfile(
     GatewayConnectionProfile profile, {
+    int? profileIndex,
     String authTokenOverride = '',
     String authPasswordOverride = '',
   }) async {}

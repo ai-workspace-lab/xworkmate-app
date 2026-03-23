@@ -140,10 +140,14 @@ class SecretStore {
           const FlutterSecureStorage(),
         );
       } catch (_) {
-        _secureStorage = FileSecureStorageClient(() => _resolveFallbackDirectory());
+        _secureStorage = FileSecureStorageClient(
+          () => _resolveFallbackDirectory(),
+        );
       }
     } else {
-      _secureStorage = FileSecureStorageClient(() => _resolveFallbackDirectory());
+      _secureStorage = FileSecureStorageClient(
+        () => _resolveFallbackDirectory(),
+      );
     }
     _initialized = true;
   }
@@ -171,8 +175,19 @@ class SecretStore {
       if ((scopedValue ?? '').trim().isNotEmpty) {
         return scopedValue;
       }
+      return _readSecure(_legacyGatewayTokenKey);
     }
-    return _readSecure(_legacyGatewayTokenKey);
+    final legacyValue = await _readSecure(_legacyGatewayTokenKey);
+    if ((legacyValue ?? '').trim().isNotEmpty) {
+      return legacyValue;
+    }
+    for (final index in _gatewayProfileFallbackOrder) {
+      final scopedValue = await _readSecure(_gatewayTokenKeyForProfile(index));
+      if ((scopedValue ?? '').trim().isNotEmpty) {
+        return scopedValue;
+      }
+    }
+    return null;
   }
 
   Future<void> saveGatewayToken(String value, {int? profileIndex}) =>
@@ -183,12 +198,11 @@ class SecretStore {
         value,
       );
 
-  Future<void> clearGatewayToken({int? profileIndex}) =>
-      _deleteSecure(
-        profileIndex == null
-            ? _legacyGatewayTokenKey
-            : _gatewayTokenKeyForProfile(profileIndex),
-      );
+  Future<void> clearGatewayToken({int? profileIndex}) => _deleteSecure(
+    profileIndex == null
+        ? _legacyGatewayTokenKey
+        : _gatewayTokenKeyForProfile(profileIndex),
+  );
 
   Future<String?> loadGatewayPassword({int? profileIndex}) async {
     if (profileIndex != null) {
@@ -198,8 +212,21 @@ class SecretStore {
       if ((scopedValue ?? '').trim().isNotEmpty) {
         return scopedValue;
       }
+      return _readSecure(_legacyGatewayPasswordKey);
     }
-    return _readSecure(_legacyGatewayPasswordKey);
+    final legacyValue = await _readSecure(_legacyGatewayPasswordKey);
+    if ((legacyValue ?? '').trim().isNotEmpty) {
+      return legacyValue;
+    }
+    for (final index in _gatewayProfileFallbackOrder) {
+      final scopedValue = await _readSecure(
+        _gatewayPasswordKeyForProfile(index),
+      );
+      if ((scopedValue ?? '').trim().isNotEmpty) {
+        return scopedValue;
+      }
+    }
+    return null;
   }
 
   Future<void> saveGatewayPassword(String value, {int? profileIndex}) =>
@@ -210,12 +237,11 @@ class SecretStore {
         value,
       );
 
-  Future<void> clearGatewayPassword({int? profileIndex}) =>
-      _deleteSecure(
-        profileIndex == null
-            ? _legacyGatewayPasswordKey
-            : _gatewayPasswordKeyForProfile(profileIndex),
-      );
+  Future<void> clearGatewayPassword({int? profileIndex}) => _deleteSecure(
+    profileIndex == null
+        ? _legacyGatewayPasswordKey
+        : _gatewayPasswordKeyForProfile(profileIndex),
+  );
 
   Future<String?> loadOllamaCloudApiKey() => _readSecure(_ollamaCloudApiKeyKey);
 
@@ -604,6 +630,14 @@ class SecretStore {
   static String _gatewayPasswordRefKey(int profileIndex) =>
       'gateway_password_$profileIndex';
 
+  static const List<int> _gatewayProfileFallbackOrder = <int>[
+    kGatewayRemoteProfileIndex,
+    kGatewayLocalProfileIndex,
+    2,
+    3,
+    4,
+  ];
+
   static List<int> _base64UrlDecode(String value) {
     final normalized = value.replaceAll('-', '+').replaceAll('_', '/');
     final padded = normalized + '=' * ((4 - normalized.length % 4) % 4);
@@ -619,7 +653,9 @@ class SecretStore {
     if (promoted && _secureStorage != null) {
       return _secureStorage!;
     }
-    throw StateError('Durable secret storage unavailable: no persistent secure storage client.');
+    throw StateError(
+      'Durable secret storage unavailable: no persistent secure storage client.',
+    );
   }
 
   Future<String?> _resolvePath(Future<String?> Function()? resolver) async {

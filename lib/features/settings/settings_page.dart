@@ -49,8 +49,8 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _gatewaySetupCodeController;
   late final TextEditingController _gatewayHostController;
   late final TextEditingController _gatewayPortController;
-  late final TextEditingController _gatewayTokenController;
-  late final TextEditingController _gatewayPasswordController;
+  late final List<TextEditingController> _gatewayTokenControllers;
+  late final List<TextEditingController> _gatewayPasswordControllers;
   late final TextEditingController _vaultTokenController;
   late final TextEditingController _ollamaApiKeyController;
   late final TextEditingController _runtimeLogFilterController;
@@ -65,8 +65,8 @@ class _SettingsPageState extends State<SettingsPage> {
   String _gatewaySetupCodeSyncedValue = '';
   String _gatewayHostSyncedValue = '';
   String _gatewayPortSyncedValue = '';
-  _SecretFieldUiState _gatewayTokenState = const _SecretFieldUiState();
-  _SecretFieldUiState _gatewayPasswordState = const _SecretFieldUiState();
+  late final List<_SecretFieldUiState> _gatewayTokenStates;
+  late final List<_SecretFieldUiState> _gatewayPasswordStates;
   bool _aiGatewayTesting = false;
   String _aiGatewayTestState = 'idle';
   String _aiGatewayTestMessage = '';
@@ -94,8 +94,26 @@ class _SettingsPageState extends State<SettingsPage> {
     _gatewaySetupCodeController = TextEditingController();
     _gatewayHostController = TextEditingController();
     _gatewayPortController = TextEditingController();
-    _gatewayTokenController = TextEditingController();
-    _gatewayPasswordController = TextEditingController();
+    _gatewayTokenControllers = List<TextEditingController>.generate(
+      kGatewayProfileListLength,
+      (_) => TextEditingController(),
+      growable: false,
+    );
+    _gatewayPasswordControllers = List<TextEditingController>.generate(
+      kGatewayProfileListLength,
+      (_) => TextEditingController(),
+      growable: false,
+    );
+    _gatewayTokenStates = List<_SecretFieldUiState>.filled(
+      kGatewayProfileListLength,
+      const _SecretFieldUiState(),
+      growable: false,
+    );
+    _gatewayPasswordStates = List<_SecretFieldUiState>.filled(
+      kGatewayProfileListLength,
+      const _SecretFieldUiState(),
+      growable: false,
+    );
     _vaultTokenController = TextEditingController();
     _ollamaApiKeyController = TextEditingController();
     _runtimeLogFilterController = TextEditingController();
@@ -125,8 +143,12 @@ class _SettingsPageState extends State<SettingsPage> {
     _gatewaySetupCodeController.dispose();
     _gatewayHostController.dispose();
     _gatewayPortController.dispose();
-    _gatewayTokenController.dispose();
-    _gatewayPasswordController.dispose();
+    for (final controller in _gatewayTokenControllers) {
+      controller.dispose();
+    }
+    for (final controller in _gatewayPasswordControllers) {
+      controller.dispose();
+    }
     _vaultTokenController.dispose();
     _ollamaApiKeyController.dispose();
     _runtimeLogFilterController.dispose();
@@ -864,10 +886,7 @@ class _SettingsPageState extends State<SettingsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                appText(
-                  '自定义连接源 ${_selectedLlmEndpointIndex + 1}',
-                  'Custom source ${_selectedLlmEndpointIndex + 1}',
-                ),
+                appText('连接源详情', 'Source details'),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 16),
@@ -889,14 +908,16 @@ class _SettingsPageState extends State<SettingsPage> {
     SettingsSnapshot settings,
     int index,
   ) {
-    final configured = _isLlmEndpointSlotConfigured(
-      controller,
-      settings,
-      _llmEndpointSlots[index],
-    );
+    final slot = _llmEndpointSlots[index];
+    final configured = _isLlmEndpointSlotConfigured(controller, settings, slot);
+    final label = switch (slot) {
+      _LlmEndpointSlot.aiGateway => appText('主 LLM API', 'Primary LLM API'),
+      _LlmEndpointSlot.ollamaLocal => appText('Ollama 本地', 'Ollama Local'),
+      _LlmEndpointSlot.ollamaCloud => appText('Ollama Cloud', 'Ollama Cloud'),
+    };
     return appText(
-      '自定义连接源 ${index + 1}（${configured ? '已配置' : '空'}）',
-      'Custom source ${index + 1} (${configured ? 'Configured' : 'Empty'})',
+      configured ? label : '$label（空）',
+      configured ? label : '$label (empty)',
     );
   }
 
@@ -1001,6 +1022,12 @@ class _SettingsPageState extends State<SettingsPage> {
       selectedProfileIndex,
       gatewayProfile,
     );
+    final gatewayTokenController =
+        _gatewayTokenControllers[selectedProfileIndex];
+    final gatewayPasswordController =
+        _gatewayPasswordControllers[selectedProfileIndex];
+    final gatewayTokenState = _gatewayTokenStates[selectedProfileIndex];
+    final gatewayPasswordState = _gatewayPasswordStates[selectedProfileIndex];
     final uiFeatures = controller.featuresFor(
       resolveUiFeaturePlatformFromContext(context),
     );
@@ -1011,9 +1038,11 @@ class _SettingsPageState extends State<SettingsPage> {
     final gatewayTls = gatewayMode == RuntimeConnectionMode.local
         ? false
         : gatewayProfile.tls;
-    final hasStoredGatewayToken = controller.hasStoredGatewayToken;
-    final hasStoredGatewayPassword =
-        controller.settingsController.secureRefs['gateway_password'] != null;
+    final hasStoredGatewayToken = controller.hasStoredGatewayTokenForProfile(
+      selectedProfileIndex,
+    );
+    final hasStoredGatewayPassword = controller
+        .hasStoredGatewayPasswordForProfile(selectedProfileIndex);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1163,13 +1192,19 @@ class _SettingsPageState extends State<SettingsPage> {
         const SizedBox(height: 16),
         _buildSecureField(
           fieldKey: const ValueKey('gateway-shared-token-field'),
-          controller: _gatewayTokenController,
+          controller: gatewayTokenController,
           label: appText('共享 Token', 'Shared Token'),
           hasStoredValue: hasStoredGatewayToken,
-          fieldState: _gatewayTokenState,
-          onStateChanged: (value) => setState(() => _gatewayTokenState = value),
-          loadValue: controller.settingsController.loadGatewayToken,
-          onSubmitted: (value) async => controller.saveGatewayTokenDraft(value),
+          fieldState: gatewayTokenState,
+          onStateChanged: (value) =>
+              setState(() => _gatewayTokenStates[selectedProfileIndex] = value),
+          loadValue: () => controller.settingsController.loadGatewayToken(
+            profileIndex: selectedProfileIndex,
+          ),
+          onSubmitted: (value) async => controller.saveGatewayTokenDraft(
+            value,
+            profileIndex: selectedProfileIndex,
+          ),
           storedHelperText: appText(
             '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存/应用提交。',
             'Stored securely. Test directly or submit with local Save / Apply actions.',
@@ -1182,15 +1217,20 @@ class _SettingsPageState extends State<SettingsPage> {
         const SizedBox(height: 12),
         _buildSecureField(
           fieldKey: const ValueKey('gateway-password-field'),
-          controller: _gatewayPasswordController,
+          controller: gatewayPasswordController,
           label: appText('密码', 'Password'),
           hasStoredValue: hasStoredGatewayPassword,
-          fieldState: _gatewayPasswordState,
-          onStateChanged: (value) =>
-              setState(() => _gatewayPasswordState = value),
-          loadValue: controller.settingsController.loadGatewayPassword,
-          onSubmitted: (value) async =>
-              controller.saveGatewayPasswordDraft(value),
+          fieldState: gatewayPasswordState,
+          onStateChanged: (value) => setState(
+            () => _gatewayPasswordStates[selectedProfileIndex] = value,
+          ),
+          loadValue: () => controller.settingsController.loadGatewayPassword(
+            profileIndex: selectedProfileIndex,
+          ),
+          onSubmitted: (value) async => controller.saveGatewayPasswordDraft(
+            value,
+            profileIndex: selectedProfileIndex,
+          ),
           storedHelperText: appText(
             '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存/应用提交。',
             'Stored securely. Test directly or submit with local Save / Apply actions.',
@@ -2813,19 +2853,24 @@ XWorkmate Privacy Policy
   }
 
   Future<void> _captureVisibleSecretDrafts(AppController controller) async {
-    final gatewayToken = _secretOverride(
-      _gatewayTokenController,
-      _gatewayTokenState,
-    );
-    if (gatewayToken.isNotEmpty) {
-      controller.saveGatewayTokenDraft(gatewayToken);
-    }
-    final gatewayPassword = _secretOverride(
-      _gatewayPasswordController,
-      _gatewayPasswordState,
-    );
-    if (gatewayPassword.isNotEmpty) {
-      controller.saveGatewayPasswordDraft(gatewayPassword);
+    for (var index = 0; index < kGatewayProfileListLength; index += 1) {
+      final gatewayToken = _secretOverride(
+        _gatewayTokenControllers[index],
+        _gatewayTokenStates[index],
+      );
+      if (gatewayToken.isNotEmpty) {
+        controller.saveGatewayTokenDraft(gatewayToken, profileIndex: index);
+      }
+      final gatewayPassword = _secretOverride(
+        _gatewayPasswordControllers[index],
+        _gatewayPasswordStates[index],
+      );
+      if (gatewayPassword.isNotEmpty) {
+        controller.saveGatewayPasswordDraft(
+          gatewayPassword,
+          profileIndex: index,
+        );
+      }
     }
     final aiGatewayApiKey = _secretOverride(
       _aiGatewayApiKeyController,
@@ -2848,10 +2893,6 @@ XWorkmate Privacy Policy
   }
 
   void _resetSecureFieldUiAfterPersist(AppController controller) {
-    final hasStoredGatewayToken =
-        controller.settingsController.secureRefs['gateway_token'] != null;
-    final hasStoredGatewayPassword =
-        controller.settingsController.secureRefs['gateway_password'] != null;
     final hasStoredAiGatewayApiKey =
         controller.settingsController.secureRefs['ai_gateway_api_key'] != null;
     final hasStoredVaultToken =
@@ -2859,21 +2900,23 @@ XWorkmate Privacy Policy
     final hasStoredOllamaApiKey =
         controller.settingsController.secureRefs['ollama_cloud_api_key'] !=
         null;
-    _gatewayTokenState = const _SecretFieldUiState();
-    _gatewayPasswordState = const _SecretFieldUiState();
+    for (var index = 0; index < kGatewayProfileListLength; index += 1) {
+      _gatewayTokenStates[index] = const _SecretFieldUiState();
+      _gatewayPasswordStates[index] = const _SecretFieldUiState();
+      _primeSecureFieldController(
+        _gatewayTokenControllers[index],
+        hasStoredValue: controller.hasStoredGatewayTokenForProfile(index),
+        fieldState: _gatewayTokenStates[index],
+      );
+      _primeSecureFieldController(
+        _gatewayPasswordControllers[index],
+        hasStoredValue: controller.hasStoredGatewayPasswordForProfile(index),
+        fieldState: _gatewayPasswordStates[index],
+      );
+    }
     _aiGatewayApiKeyState = const _SecretFieldUiState();
     _vaultTokenState = const _SecretFieldUiState();
     _ollamaApiKeyState = const _SecretFieldUiState();
-    _primeSecureFieldController(
-      _gatewayTokenController,
-      hasStoredValue: hasStoredGatewayToken,
-      fieldState: _gatewayTokenState,
-    );
-    _primeSecureFieldController(
-      _gatewayPasswordController,
-      hasStoredValue: hasStoredGatewayPassword,
-      fieldState: _gatewayPasswordState,
-    );
     _primeSecureFieldController(
       _aiGatewayApiKeyController,
       hasStoredValue: hasStoredAiGatewayApiKey,
@@ -3176,21 +3219,35 @@ XWorkmate Privacy Policy
   ) async {
     final messenger = ScaffoldMessenger.of(context);
     final gatewayDraft = _buildGatewayDraftProfile(settings);
+    final selectedProfileIndex = _selectedGatewayProfileIndex.clamp(
+      0,
+      settings.gatewayProfiles.length - 1,
+    );
+    final gatewayTokenController =
+        _gatewayTokenControllers[selectedProfileIndex];
+    final gatewayPasswordController =
+        _gatewayPasswordControllers[selectedProfileIndex];
+    final gatewayTokenState = _gatewayTokenStates[selectedProfileIndex];
+    final gatewayPasswordState = _gatewayPasswordStates[selectedProfileIndex];
     final executionTarget = switch (gatewayDraft.mode) {
       RuntimeConnectionMode.local => AssistantExecutionTarget.local,
       RuntimeConnectionMode.remote => AssistantExecutionTarget.remote,
       RuntimeConnectionMode.unconfigured => AssistantExecutionTarget.remote,
     };
-    var token = _secretOverride(_gatewayTokenController, _gatewayTokenState);
+    var token = _secretOverride(gatewayTokenController, gatewayTokenState);
     var password = _secretOverride(
-      _gatewayPasswordController,
-      _gatewayPasswordState,
+      gatewayPasswordController,
+      gatewayPasswordState,
     );
     if (token.isEmpty) {
-      token = await controller.settingsController.loadGatewayToken();
+      token = await controller.settingsController.loadGatewayToken(
+        profileIndex: selectedProfileIndex,
+      );
     }
     if (password.isEmpty) {
-      password = await controller.settingsController.loadGatewayPassword();
+      password = await controller.settingsController.loadGatewayPassword(
+        profileIndex: selectedProfileIndex,
+      );
     }
     setState(() => _gatewayTesting = true);
     try {
