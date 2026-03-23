@@ -120,6 +120,7 @@ class GatewayRuntime extends ChangeNotifier {
 
   Future<void> connectProfile(
     GatewayConnectionProfile profile, {
+    int? profileIndex,
     String authTokenOverride = '',
     String authPasswordOverride = '',
   }) async {
@@ -130,8 +131,14 @@ class GatewayRuntime extends ChangeNotifier {
 
     final endpoint = _resolveEndpoint(profile);
     final setupPayload = decodeGatewaySetupCode(profile.setupCode);
-    final storedToken = (await _store.loadGatewayToken())?.trim() ?? '';
-    final storedPassword = (await _store.loadGatewayPassword())?.trim() ?? '';
+    final storedToken =
+        (await _store.loadGatewayToken(profileIndex: profileIndex))?.trim() ??
+        '';
+    final storedPassword =
+        (await _store.loadGatewayPassword(
+          profileIndex: profileIndex,
+        ))?.trim() ??
+        '';
     final explicitToken = authTokenOverride.trim();
     final explicitPassword = authPasswordOverride.trim();
     final sharedTokenSource = explicitToken.isNotEmpty

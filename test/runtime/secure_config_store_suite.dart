@@ -88,6 +88,69 @@ void main() {
   );
 
   test(
+    'SecureConfigStore keeps gateway secrets isolated per profile slot',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-config-store-profiles-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+      final databasePath = '${tempDirectory.path}/settings.sqlite3';
+      final store = SecureConfigStore(
+        databasePathResolver: () async => databasePath,
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+
+      await store.saveGatewayToken(
+        'local-token',
+        profileIndex: kGatewayLocalProfileIndex,
+      );
+      await store.saveGatewayToken(
+        'remote-token',
+        profileIndex: kGatewayRemoteProfileIndex,
+      );
+      await store.saveGatewayPassword(
+        'custom-password',
+        profileIndex: kGatewayCustomProfileStartIndex,
+      );
+
+      final secureRefs = await store.loadSecureRefs();
+
+      expect(
+        await store.loadGatewayToken(profileIndex: kGatewayLocalProfileIndex),
+        'local-token',
+      );
+      expect(
+        await store.loadGatewayToken(profileIndex: kGatewayRemoteProfileIndex),
+        'remote-token',
+      );
+      expect(
+        await store.loadGatewayPassword(
+          profileIndex: kGatewayCustomProfileStartIndex,
+        ),
+        'custom-password',
+      );
+      expect(
+        secureRefs['gateway_token_$kGatewayLocalProfileIndex'],
+        'local-token',
+      );
+      expect(
+        secureRefs['gateway_token_$kGatewayRemoteProfileIndex'],
+        'remote-token',
+      );
+      expect(
+        secureRefs['gateway_password_$kGatewayCustomProfileStartIndex'],
+        'custom-password',
+      );
+      expect(await store.loadGatewayToken(), 'remote-token');
+    },
+  );
+
+  test(
     'SecureConfigStore persists sqlite-backed settings across instances',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -191,20 +254,29 @@ void main() {
           await tempDirectory.delete(recursive: true);
         }
       });
-      final existingSecretsDirectory = Directory('${tempDirectory.path}/secrets');
+      final existingSecretsDirectory = Directory(
+        '${tempDirectory.path}/secrets',
+      );
       await existingSecretsDirectory.create(recursive: true);
       final explicitSettingsPath =
           '${tempDirectory.path}/settings/${SettingsStore.databaseFileName}';
 
       final store = SecureConfigStore(
         databasePathResolver: () async => explicitSettingsPath,
-        fallbackDirectoryPathResolver: () async => existingSecretsDirectory.path,
+        fallbackDirectoryPathResolver: () async =>
+            existingSecretsDirectory.path,
       );
 
       final snapshot = await store.loadSettingsSnapshot();
 
-      expect(snapshot.accountUsername, SettingsSnapshot.defaults().accountUsername);
-      expect(await Directory('${tempDirectory.path}/settings').exists(), isTrue);
+      expect(
+        snapshot.accountUsername,
+        SettingsSnapshot.defaults().accountUsername,
+      );
+      expect(
+        await Directory('${tempDirectory.path}/settings').exists(),
+        isTrue,
+      );
       expect(await File(explicitSettingsPath).exists(), isTrue);
     },
   );

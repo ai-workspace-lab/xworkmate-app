@@ -94,8 +94,9 @@ class AppController extends ChangeNotifier {
         (_isFlutterTestEnvironment
             ? const <String>[]
             : _defaultGatewayOnlySkillScanRoots);
-    _gatewayAcpClient =
-        GatewayAcpClient(endpointResolver: _resolveGatewayAcpEndpoint);
+    _gatewayAcpClient = GatewayAcpClient(
+      endpointResolver: _resolveGatewayAcpEndpoint,
+    );
     _singleAgentAppServerClient = DirectSingleAgentAppServerClient(
       endpointResolver: _resolveSingleAgentEndpoint,
     );
@@ -283,15 +284,15 @@ class AppController extends ChangeNotifier {
   AssistantPermissionLevel get assistantPermissionLevel =>
       settings.assistantPermissionLevel;
   bool get hasStoredGatewayCredential =>
-      _settingsController.secureRefs.containsKey('gateway_token') ||
-      _settingsController.secureRefs.containsKey('gateway_password') ||
+      hasStoredGatewayTokenForProfile(_activeGatewayProfileIndex) ||
+      hasStoredGatewayPasswordForProfile(_activeGatewayProfileIndex) ||
       _settingsController.secureRefs.containsKey(
         'gateway_device_token_operator',
       );
   bool get hasStoredGatewayToken =>
-      _settingsController.secureRefs.containsKey('gateway_token');
+      hasStoredGatewayTokenForProfile(_activeGatewayProfileIndex);
   String? get storedGatewayTokenMask =>
-      _settingsController.secureRefs['gateway_token'];
+      storedGatewayTokenMaskForProfile(_activeGatewayProfileIndex);
   String get aiGatewayUrl => settings.aiGateway.baseUrl.trim();
   bool get hasStoredAiGatewayApiKey =>
       _settingsController.secureRefs.containsKey('ai_gateway_api_key');
@@ -311,8 +312,6 @@ class AppController extends ChangeNotifier {
   bool get isMultiAgentRunPending => _multiAgentRunPending;
   bool _desktopPlatformBusy = false;
 
-  static const String _draftGatewayTokenKey = 'gateway_token';
-  static const String _draftGatewayPasswordKey = 'gateway_password';
   static const String _draftAiGatewayApiKeyKey = 'ai_gateway_api_key';
   static const String _draftVaultTokenKey = 'vault_token';
   static const String _draftOllamaApiKeyKey = 'ollama_cloud_api_key';
@@ -324,6 +323,26 @@ class AppController extends ChangeNotifier {
       aiGatewayUrl.isNotEmpty &&
       hasStoredAiGatewayApiKey &&
       resolvedAiGatewayModel.isNotEmpty;
+
+  int get _activeGatewayProfileIndex {
+    final target = currentAssistantExecutionTarget;
+    if (target == AssistantExecutionTarget.singleAgent) {
+      return kGatewayRemoteProfileIndex;
+    }
+    return _gatewayProfileIndexForExecutionTarget(target);
+  }
+
+  bool hasStoredGatewayTokenForProfile(int profileIndex) =>
+      _settingsController.hasStoredGatewayTokenForProfile(profileIndex);
+
+  bool hasStoredGatewayPasswordForProfile(int profileIndex) =>
+      _settingsController.hasStoredGatewayPasswordForProfile(profileIndex);
+
+  String? storedGatewayTokenMaskForProfile(int profileIndex) =>
+      _settingsController.storedGatewayTokenMaskForProfile(profileIndex);
+
+  String? storedGatewayPasswordMaskForProfile(int profileIndex) =>
+      _settingsController.storedGatewayPasswordMaskForProfile(profileIndex);
 
   List<SingleAgentProvider> get availableSingleAgentProviders =>
       (_availableSingleAgentProvidersOverride ??
@@ -1342,7 +1361,15 @@ class AppController extends ChangeNotifier {
     final resolvedPassword = password.trim().isNotEmpty
         ? password.trim()
         : (decoded?.password.trim() ?? '');
+    final resolvedProfileIndex = _gatewayProfileIndexForExecutionTarget(
+      _assistantExecutionTargetForMode(
+        _modeFromHost(
+          decoded?.host ?? settings.primaryRemoteGatewayProfile.host,
+        ),
+      ),
+    );
     await _settingsController.saveGatewaySecrets(
+      profileIndex: resolvedProfileIndex,
       token: resolvedToken,
       password: resolvedPassword,
     );
@@ -1378,6 +1405,7 @@ class AppController extends ChangeNotifier {
     );
     await _connectProfile(
       nextProfile,
+      profileIndex: resolvedProfileIndex,
       authTokenOverride: resolvedToken,
       authPasswordOverride: resolvedPassword,
     );
@@ -1392,7 +1420,10 @@ class AppController extends ChangeNotifier {
     String token = '',
     String password = '',
   }) async {
+    final nextTarget = _assistantExecutionTargetForMode(mode);
+    final nextProfileIndex = _gatewayProfileIndexForExecutionTarget(nextTarget);
     await _settingsController.saveGatewaySecrets(
+      profileIndex: nextProfileIndex,
       token: token.trim(),
       password: password.trim(),
     );
@@ -1403,7 +1434,6 @@ class AppController extends ChangeNotifier {
     final resolvedPort = mode == RuntimeConnectionMode.local && port <= 0
         ? 18789
         : port;
-    final nextTarget = _assistantExecutionTargetForMode(mode);
     final nextProfile = _gatewayProfileForAssistantExecutionTarget(nextTarget)
         .copyWith(
           mode: mode,
@@ -1429,6 +1459,7 @@ class AppController extends ChangeNotifier {
     );
     await _connectProfile(
       nextProfile,
+      profileIndex: nextProfileIndex,
       authTokenOverride: token.trim(),
       authPasswordOverride: password.trim(),
     );
@@ -1456,11 +1487,17 @@ class AppController extends ChangeNotifier {
     if (target == AssistantExecutionTarget.singleAgent) {
       return;
     }
-    await _connectProfile(_gatewayProfileForAssistantExecutionTarget(target));
+    await _connectProfile(
+      _gatewayProfileForAssistantExecutionTarget(target),
+      profileIndex: _gatewayProfileIndexForExecutionTarget(target),
+    );
   }
 
-  Future<void> clearStoredGatewayToken() async {
-    await _settingsController.clearGatewaySecrets(token: true);
+  Future<void> clearStoredGatewayToken({int? profileIndex}) async {
+    await _settingsController.clearGatewaySecrets(
+      profileIndex: profileIndex,
+      token: true,
+    );
   }
 
   Future<void> refreshGatewayHealth() async {
@@ -1808,7 +1845,10 @@ class AppController extends ChangeNotifier {
       resolvedTarget,
     );
     try {
-      await _connectProfile(targetProfile);
+      await _connectProfile(
+        targetProfile,
+        profileIndex: _gatewayProfileIndexForExecutionTarget(resolvedTarget),
+      );
     } catch (_) {
       // Keep the selected execution target even when the immediate reconnect
       // fails so the user can retry or adjust gateway settings manually.
@@ -2147,12 +2187,12 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void saveGatewayTokenDraft(String value) {
-    _saveSecretDraft(_draftGatewayTokenKey, value);
+  void saveGatewayTokenDraft(String value, {required int profileIndex}) {
+    _saveSecretDraft(_draftGatewayTokenKey(profileIndex), value);
   }
 
-  void saveGatewayPasswordDraft(String value) {
-    _saveSecretDraft(_draftGatewayPasswordKey, value);
+  void saveGatewayPasswordDraft(String value, {required int profileIndex}) {
+    _saveSecretDraft(_draftGatewayPasswordKey(profileIndex), value);
   }
 
   void saveAiGatewayApiKeyDraft(String value) {
@@ -2682,7 +2722,10 @@ class AppController extends ChangeNotifier {
           startupProfile.setupCode.trim().isNotEmpty;
       if (shouldAutoConnect) {
         try {
-          await _connectProfile(startupProfile);
+          await _connectProfile(
+            startupProfile,
+            profileIndex: _gatewayProfileIndexForExecutionTarget(startupTarget),
+          );
         } catch (_) {
           // Keep the shell usable when auto-connect fails.
         }
@@ -2711,11 +2754,13 @@ class AppController extends ChangeNotifier {
 
   Future<void> _connectProfile(
     GatewayConnectionProfile profile, {
+    int? profileIndex,
     String authTokenOverride = '',
     String authPasswordOverride = '',
   }) async {
     await _runtime.connectProfile(
       profile,
+      profileIndex: profileIndex,
       authTokenOverride: authTokenOverride,
       authPasswordOverride: authPasswordOverride,
     );
@@ -2755,6 +2800,9 @@ class AppController extends ChangeNotifier {
     SettingsSnapshot previous,
     SettingsSnapshot next,
   ) {
+    final hasGatewaySecretDraft = _draftSecretValues.keys.any(
+      (key) => _isGatewayDraftKey(key),
+    );
     final gatewayChanged =
         jsonEncode(
               previous.gatewayProfiles.map((item) => item.toJson()).toList(),
@@ -2763,8 +2811,7 @@ class AppController extends ChangeNotifier {
               next.gatewayProfiles.map((item) => item.toJson()).toList(),
             ) ||
         previous.assistantExecutionTarget != next.assistantExecutionTarget ||
-        _draftSecretValues.containsKey(_draftGatewayTokenKey) ||
-        _draftSecretValues.containsKey(_draftGatewayPasswordKey);
+        hasGatewaySecretDraft;
     final aiGatewayChanged =
         previous.aiGateway.toJson().toString() !=
             next.aiGateway.toJson().toString() ||
@@ -2775,13 +2822,18 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> _persistDraftSecrets() async {
-    final gatewayToken = _draftSecretValues[_draftGatewayTokenKey];
-    final gatewayPassword = _draftSecretValues[_draftGatewayPasswordKey];
-    if ((gatewayToken ?? '').isNotEmpty || (gatewayPassword ?? '').isNotEmpty) {
-      await _settingsController.saveGatewaySecrets(
-        token: gatewayToken ?? '',
-        password: gatewayPassword ?? '',
-      );
+    for (var index = 0; index < kGatewayProfileListLength; index += 1) {
+      final gatewayToken = _draftSecretValues[_draftGatewayTokenKey(index)];
+      final gatewayPassword =
+          _draftSecretValues[_draftGatewayPasswordKey(index)];
+      if ((gatewayToken ?? '').isNotEmpty ||
+          (gatewayPassword ?? '').isNotEmpty) {
+        await _settingsController.saveGatewaySecrets(
+          profileIndex: index,
+          token: gatewayToken ?? '',
+          password: gatewayPassword ?? '',
+        );
+      }
     }
     final aiGatewayApiKey = _draftSecretValues[_draftAiGatewayApiKeyKey];
     if ((aiGatewayApiKey ?? '').isNotEmpty) {
@@ -2797,6 +2849,15 @@ class AppController extends ChangeNotifier {
     }
     _draftSecretValues.clear();
   }
+
+  static String _draftGatewayTokenKey(int profileIndex) =>
+      'gateway_token_$profileIndex';
+
+  static String _draftGatewayPasswordKey(int profileIndex) =>
+      'gateway_password_$profileIndex';
+
+  static bool _isGatewayDraftKey(String key) =>
+      key.startsWith('gateway_token_') || key.startsWith('gateway_password_');
 
   Future<void> _persistSettingsSnapshot(SettingsSnapshot snapshot) async {
     final sanitized = _sanitizeFeatureFlagSettings(
@@ -4252,10 +4313,7 @@ class AppController extends ChangeNotifier {
       return appText('无法连接到 LLM API。', 'Unable to reach the LLM API.');
     }
     if (error is HandshakeException) {
-      return appText(
-        'LLM API TLS 握手失败。',
-        'LLM API TLS handshake failed.',
-      );
+      return appText('LLM API TLS 握手失败。', 'LLM API TLS handshake failed.');
     }
     if (error is TimeoutException) {
       return appText('LLM API 请求超时。', 'LLM API request timed out.');
@@ -4746,7 +4804,9 @@ class AppController extends ChangeNotifier {
       _sessionsController.currentSessionKey,
     );
     if (target == AssistantExecutionTarget.singleAgent) {
-      final remote = _gatewayProfileBaseUri(settings.primaryRemoteGatewayProfile);
+      final remote = _gatewayProfileBaseUri(
+        settings.primaryRemoteGatewayProfile,
+      );
       if (remote != null) {
         return remote;
       }
