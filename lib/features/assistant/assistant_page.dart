@@ -5,8 +5,11 @@ import 'dart:math' as math;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
+import 'package:path_provider/path_provider.dart';
+import 'package:super_clipboard/super_clipboard.dart';
 
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
@@ -29,6 +32,8 @@ const double _assistantHorizontalResizeHandleWidth = 6;
 const double _assistantHorizontalPaneGap = 2;
 const double _assistantVerticalResizeHandleHeight = 10;
 
+typedef AssistantClipboardImageReader = Future<XFile?> Function();
+
 class AssistantPage extends StatefulWidget {
   const AssistantPage({
     super.key,
@@ -37,6 +42,7 @@ class AssistantPage extends StatefulWidget {
     this.navigationPanelBuilder,
     this.showStandaloneTaskRail = true,
     this.unifiedPaneStartsCollapsed = false,
+    this.clipboardImageReader,
   });
 
   final AppController controller;
@@ -44,6 +50,7 @@ class AssistantPage extends StatefulWidget {
   final Widget Function(double contentWidth)? navigationPanelBuilder;
   final bool showStandaloneTaskRail;
   final bool unifiedPaneStartsCollapsed;
+  final AssistantClipboardImageReader? clipboardImageReader;
 
   @override
   State<AssistantPage> createState() => _AssistantPageState();
@@ -507,6 +514,13 @@ class _AssistantPageState extends State<AssistantPage> {
                 onOpenAiGatewaySettings: _openAiGatewaySettings,
                 onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
                 onPickAttachments: _pickAttachments,
+                onAddAttachment: (attachment) {
+                  setState(() {
+                    _attachments = [..._attachments, attachment];
+                  });
+                },
+                onPasteImageAttachment:
+                    widget.clipboardImageReader ?? _readClipboardImageAsXFile,
                 onComposerInputHeightChanged: _handleComposerInputHeightChanged,
                 onSend: _submitPrompt,
               ),
@@ -1645,6 +1659,8 @@ class _AssistantLowerPane extends StatelessWidget {
     required this.onOpenAiGatewaySettings,
     required this.onReconnectGateway,
     required this.onPickAttachments,
+    required this.onAddAttachment,
+    required this.onPasteImageAttachment,
     required this.onComposerInputHeightChanged,
     required this.onSend,
   });
@@ -1667,6 +1683,8 @@ class _AssistantLowerPane extends StatelessWidget {
   final VoidCallback onOpenAiGatewaySettings;
   final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
+  final ValueChanged<_ComposerAttachment> onAddAttachment;
+  final AssistantClipboardImageReader onPasteImageAttachment;
   final ValueChanged<double> onComposerInputHeightChanged;
   final Future<void> Function() onSend;
 
@@ -1695,6 +1713,8 @@ class _AssistantLowerPane extends StatelessWidget {
           onOpenAiGatewaySettings: onOpenAiGatewaySettings,
           onReconnectGateway: onReconnectGateway,
           onPickAttachments: onPickAttachments,
+          onAddAttachment: onAddAttachment,
+          onPasteImageAttachment: onPasteImageAttachment,
           onInputHeightChanged: onComposerInputHeightChanged,
           onSend: onSend,
         ),
@@ -2526,6 +2546,8 @@ class _ComposerBar extends StatefulWidget {
     required this.onOpenAiGatewaySettings,
     required this.onReconnectGateway,
     required this.onPickAttachments,
+    required this.onAddAttachment,
+    required this.onPasteImageAttachment,
     required this.onInputHeightChanged,
     required this.onSend,
   });
@@ -2548,6 +2570,8 @@ class _ComposerBar extends StatefulWidget {
   final VoidCallback onOpenAiGatewaySettings;
   final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
+  final ValueChanged<_ComposerAttachment> onAddAttachment;
+  final AssistantClipboardImageReader onPasteImageAttachment;
   final ValueChanged<double> onInputHeightChanged;
   final Future<void> Function() onSend;
 
@@ -2560,8 +2584,16 @@ class _ComposerBarState extends State<_ComposerBar> {
   static const double _defaultInputHeight =
       _assistantComposerDefaultInputHeight;
   static const double _maxInputHeight = 220;
+  static const Map<ShortcutActivator, Intent> _pasteShortcuts =
+      <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.keyV, meta: true):
+            AssistantPasteIntent(),
+        SingleActivator(LogicalKeyboardKey.keyV, control: true):
+            AssistantPasteIntent(),
+      };
 
   late double _inputHeight;
+  bool _handlingPasteShortcut = false;
 
   @override
   void initState() {
@@ -2587,6 +2619,65 @@ class _ComposerBarState extends State<_ComposerBar> {
       _inputHeight = nextHeight;
     });
     widget.onInputHeightChanged(_inputHeight);
+  }
+
+  Future<void> _handlePasteShortcut() async {
+    if (_handlingPasteShortcut) {
+      return;
+    }
+    _handlingPasteShortcut = true;
+    try {
+      if (widget.controller
+          .featuresFor(resolveUiFeaturePlatformFromContext(context))
+          .supportsFileAttachments) {
+        final imageFile = await widget.onPasteImageAttachment();
+        if (!mounted) {
+          return;
+        }
+        if (imageFile != null) {
+          widget.onAddAttachment(_ComposerAttachment.fromXFile(imageFile));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                appText(
+                  '已从剪贴板添加图片附件',
+                  'Added image from clipboard as attachment',
+                ),
+              ),
+            ),
+          );
+          return;
+        }
+      }
+
+      final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
+      final text = clipboardData?.text;
+      if (!mounted || text == null || text.isEmpty) {
+        return;
+      }
+      _insertTextAtSelection(text);
+    } finally {
+      _handlingPasteShortcut = false;
+    }
+  }
+
+  void _insertTextAtSelection(String text) {
+    final currentValue = widget.inputController.value;
+    final selection = currentValue.selection;
+    final textLength = currentValue.text.length;
+    final start = selection.isValid
+        ? math.min(selection.start, selection.end).clamp(0, textLength)
+        : textLength;
+    final end = selection.isValid
+        ? math.max(selection.start, selection.end).clamp(0, textLength)
+        : textLength;
+    final updatedText = currentValue.text.replaceRange(start, end, text);
+    final cursorOffset = start + text.length;
+    widget.inputController.value = currentValue.copyWith(
+      text: updatedText,
+      selection: TextSelection.collapsed(offset: cursorOffset),
+      composing: TextRange.empty,
+    );
   }
 
   @override
@@ -2805,35 +2896,48 @@ class _ComposerBarState extends State<_ComposerBar> {
           SizedBox(
             key: const Key('assistant-composer-input-area'),
             height: _inputHeight,
-            child: TextField(
-              controller: widget.inputController,
-              focusNode: widget.focusNode,
-              autofocus: true,
-              expands: true,
-              minLines: null,
-              maxLines: null,
-              textAlignVertical: TextAlignVertical.top,
-              decoration: InputDecoration(
-                isCollapsed: true,
-                filled: true,
-                fillColor: palette.chromeSurface,
-                contentPadding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: palette.chromeStroke),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color: palette.accent.withValues(alpha: 0.18),
+            child: Shortcuts(
+              shortcuts: _pasteShortcuts,
+              child: Actions(
+                actions: <Type, Action<Intent>>{
+                  AssistantPasteIntent: CallbackAction<AssistantPasteIntent>(
+                    onInvoke: (_) {
+                      unawaited(_handlePasteShortcut());
+                      return null;
+                    },
                   ),
-                ),
-                hintText: appText(
-                  '输入需求、补充上下文，XWorkmate 会沿用当前任务上下文持续处理。',
-                  'Describe the task or add context. XWorkmate keeps the current task context.',
+                },
+                child: TextField(
+                  controller: widget.inputController,
+                  focusNode: widget.focusNode,
+                  autofocus: true,
+                  expands: true,
+                  minLines: null,
+                  maxLines: null,
+                  textAlignVertical: TextAlignVertical.top,
+                  decoration: InputDecoration(
+                    isCollapsed: true,
+                    filled: true,
+                    fillColor: palette.chromeSurface,
+                    contentPadding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: palette.chromeStroke),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: palette.accent.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    hintText: appText(
+                      '输入需求、补充上下文，XWorkmate 会沿用当前任务上下文持续处理。',
+                      'Describe the task or add context. XWorkmate keeps the current task context.',
+                    ),
+                  ),
+                  onSubmitted: (_) => widget.onSend(),
                 ),
               ),
-              onSubmitted: (_) => widget.onSend(),
             ),
           ),
           _ComposerResizeHandle(
@@ -4565,4 +4669,106 @@ class _ComposerAttachment {
       mimeType: mimeType,
     );
   }
+}
+
+class AssistantPasteIntent extends Intent {
+  const AssistantPasteIntent();
+}
+
+Future<XFile?> _readClipboardImageAsXFile() async {
+  final clipboard = SystemClipboard.instance;
+  if (clipboard == null) {
+    return null;
+  }
+  final reader = await clipboard.read();
+  return await _readClipboardImageForFormat(
+        reader,
+        format: Formats.png,
+        extension: 'png',
+        mimeType: 'image/png',
+      ) ??
+      await _readClipboardImageForFormat(
+        reader,
+        format: Formats.jpeg,
+        extension: 'jpg',
+        mimeType: 'image/jpeg',
+      ) ??
+      await _readClipboardImageForFormat(
+        reader,
+        format: Formats.gif,
+        extension: 'gif',
+        mimeType: 'image/gif',
+      ) ??
+      await _readClipboardImageForFormat(
+        reader,
+        format: Formats.webp,
+        extension: 'webp',
+        mimeType: 'image/webp',
+      );
+}
+
+Future<XFile?> _readClipboardImageForFormat(
+  ClipboardReader reader, {
+  required FileFormat format,
+  required String extension,
+  required String mimeType,
+}) async {
+  if (!reader.canProvide(format)) {
+    return null;
+  }
+  final bytes = await _readClipboardFileBytes(reader, format);
+  if (bytes == null || bytes.isEmpty) {
+    return null;
+  }
+  final temporaryDirectory = await _resolveClipboardAttachmentTempDirectory();
+  final fileName =
+      'clipboard-image-${DateTime.now().microsecondsSinceEpoch}.$extension';
+  final file = File('${temporaryDirectory.path}/$fileName');
+  await file.writeAsBytes(bytes, flush: true);
+  return XFile(file.path, mimeType: mimeType, name: fileName);
+}
+
+Future<Uint8List?> _readClipboardFileBytes(
+  ClipboardReader reader,
+  FileFormat format,
+) {
+  final completer = Completer<Uint8List?>();
+  final progress = reader.getFile(
+    format,
+    (file) async {
+      try {
+        final bytes = await file.readAll();
+        if (!completer.isCompleted) {
+          completer.complete(bytes);
+        }
+      } catch (error, stackTrace) {
+        if (!completer.isCompleted) {
+          completer.completeError(error, stackTrace);
+        }
+      }
+    },
+    onError: (error) {
+      if (!completer.isCompleted) {
+        completer.completeError(error);
+      }
+    },
+  );
+  if (progress == null) {
+    return Future<Uint8List?>.value(null);
+  }
+  return completer.future;
+}
+
+Future<Directory> _resolveClipboardAttachmentTempDirectory() async {
+  Directory rootDirectory;
+  try {
+    rootDirectory = await getTemporaryDirectory();
+  } catch (_) {
+    rootDirectory = Directory.systemTemp;
+  }
+  final clipboardDirectory = Directory(
+    '${rootDirectory.path}/xworkmate-clipboard-attachments',
+  );
+  await clipboardDirectory.create(recursive: true);
+  return clipboardDirectory;
 }
