@@ -25,6 +25,9 @@ import '../../widgets/surface_card.dart';
 const double _assistantComposerDefaultInputHeight = 78;
 const double _assistantWorkspaceMinConversationHeight = 180;
 const double _assistantWorkspaceMinLowerPaneHeight = 124;
+const double _assistantHorizontalResizeHandleWidth = 6;
+const double _assistantHorizontalPaneGap = 2;
+const double _assistantVerticalResizeHandleHeight = 10;
 
 class AssistantPage extends StatefulWidget {
   const AssistantPage({
@@ -294,7 +297,7 @@ class _AssistantPageState extends State<AssistantPage> {
                     ),
                     if (!_sidePaneCollapsed)
                       SizedBox(
-                        width: 6,
+                        width: _assistantHorizontalResizeHandleWidth,
                         child: PaneResizeHandle(
                           axis: Axis.horizontal,
                           onDelta: (delta) {
@@ -306,7 +309,7 @@ class _AssistantPageState extends State<AssistantPage> {
                           },
                         ),
                       ),
-                    const SizedBox(width: 2),
+                    const SizedBox(width: _assistantHorizontalPaneGap),
                     Expanded(child: mainWorkspace),
                   ],
                 );
@@ -344,7 +347,7 @@ class _AssistantPageState extends State<AssistantPage> {
                     ),
                   ),
                   SizedBox(
-                    width: 6,
+                    width: _assistantHorizontalResizeHandleWidth,
                     child: PaneResizeHandle(
                       axis: Axis.horizontal,
                       onDelta: (delta) {
@@ -356,7 +359,7 @@ class _AssistantPageState extends State<AssistantPage> {
                       },
                     ),
                   ),
-                  const SizedBox(width: 2),
+                  const SizedBox(width: _assistantHorizontalPaneGap),
                   Expanded(child: mainWorkspace),
                 ],
               );
@@ -376,6 +379,10 @@ class _AssistantPageState extends State<AssistantPage> {
       builder: (context, constraints) {
         final baseComposerHeight = constraints.maxHeight >= 900 ? 180.0 : 152.0;
         final composerContentWidth = math.max(240.0, constraints.maxWidth - 32);
+        final availableWorkspaceHeight = math.max(
+          0.0,
+          constraints.maxHeight - _assistantVerticalResizeHandleHeight,
+        );
         final attachmentExtraHeight = _estimatedComposerWrapSectionHeight(
           itemCount: _attachments.length,
           availableWidth: composerContentWidth,
@@ -387,20 +394,20 @@ class _AssistantPageState extends State<AssistantPage> {
           averageChipWidth: 132,
         );
         final defaultComposerHeight = math.min(
-          math.max(0.0, constraints.maxHeight - 2),
+          availableWorkspaceHeight,
           baseComposerHeight +
               math.max(
-                0,
+                0.0,
                 _composerInputHeight - _assistantComposerDefaultInputHeight,
               ) +
               attachmentExtraHeight +
               selectedSkillExtraHeight,
         );
         final composerHeightUpperBound = math.min(
-          math.max(0.0, constraints.maxHeight - 2),
+          availableWorkspaceHeight,
           math.max(
             _assistantWorkspaceMinLowerPaneHeight,
-            constraints.maxHeight - _assistantWorkspaceMinConversationHeight,
+            availableWorkspaceHeight - _assistantWorkspaceMinConversationHeight,
           ),
         );
         final composerHeightLowerBound = math.min(
@@ -435,7 +442,7 @@ class _AssistantPageState extends State<AssistantPage> {
             ),
             SizedBox(
               key: const Key('assistant-workspace-resize-handle'),
-              height: 10,
+              height: _assistantVerticalResizeHandleHeight,
               child: PaneResizeHandle(
                 axis: Axis.vertical,
                 onDelta: (delta) {
@@ -1305,7 +1312,11 @@ class _AssistantPageState extends State<AssistantPage> {
 
   double _resolveMaxSidePaneWidth(double viewportWidth) {
     final maxWidthByViewport =
-        viewportWidth - _mainWorkspaceMinWidth - _sidePaneViewportPadding;
+        viewportWidth -
+        _mainWorkspaceMinWidth -
+        _sidePaneViewportPadding -
+        _assistantHorizontalResizeHandleWidth -
+        _assistantHorizontalPaneGap;
     return maxWidthByViewport
         .clamp(_sidePaneMinWidth, viewportWidth - _sidePaneViewportPadding)
         .toDouble();
