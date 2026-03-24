@@ -96,6 +96,12 @@ class AppController extends ChangeNotifier {
   bool get hasPendingSettingsApply => _pendingSettingsApply;
   String get settingsDraftStatusMessage => _settingsDraftStatusMessage;
   AppLanguage get appLanguage => _settings.appLanguage;
+  AssistantPermissionLevel get assistantPermissionLevel =>
+      _settings.assistantPermissionLevel;
+  List<WorkspaceDestination> get assistantNavigationDestinations =>
+      _settings.assistantNavigationDestinations
+          .where(capabilities.supportsDestination)
+          .toList(growable: false);
   GatewayConnectionSnapshot get connection => _relayClient.snapshot;
   bool get relayBusy => _relayBusy;
   bool get aiGatewayBusy => _aiGatewayBusy;
@@ -641,6 +647,27 @@ class AppController extends ChangeNotifier {
   void setSettingsTab(SettingsTab tab) {
     _settingsTab = _sanitizeSettingsTab(tab);
     notifyListeners();
+  }
+
+  Future<void> toggleAssistantNavigationDestination(
+    WorkspaceDestination destination,
+  ) async {
+    if (!kAssistantNavigationDestinationCandidates.contains(destination) ||
+        !capabilities.supportsDestination(destination)) {
+      return;
+    }
+    final current = assistantNavigationDestinations;
+    final next = current.contains(destination)
+        ? current.where((item) => item != destination).toList(growable: false)
+        : <WorkspaceDestination>[...current, destination];
+    _settings = _settings.copyWith(assistantNavigationDestinations: next);
+    if (_settingsDraftInitialized) {
+      _settingsDraft = settingsDraft.copyWith(
+        assistantNavigationDestinations: next,
+      );
+    }
+    notifyListeners();
+    await _persistSettings();
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -1829,9 +1856,15 @@ class AppController extends ChangeNotifier {
   }
 
   SettingsSnapshot _sanitizeSettings(SettingsSnapshot snapshot) {
+    final allowedDestinations = featuresFor(UiFeaturePlatform.web)
+        .allowedDestinations;
     final target = featuresFor(UiFeaturePlatform.web).sanitizeExecutionTarget(
       _sanitizeTarget(snapshot.assistantExecutionTarget),
     );
+    final assistantNavigationDestinations =
+        normalizeAssistantNavigationDestinations(
+          snapshot.assistantNavigationDestinations,
+        ).where(allowedDestinations.contains).toList(growable: false);
     final normalizedSessionBaseUrl =
         RemoteWebSessionRepository.normalizeBaseUrl(
           snapshot.webSessionPersistence.remoteBaseUrl,
@@ -1862,7 +1895,7 @@ class AppController extends ChangeNotifier {
       webSessionPersistence: snapshot.webSessionPersistence.copyWith(
         remoteBaseUrl: normalizedSessionBaseUrl,
       ),
-      assistantNavigationDestinations: const <WorkspaceDestination>[],
+      assistantNavigationDestinations: assistantNavigationDestinations,
     );
   }
 
