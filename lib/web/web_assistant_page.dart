@@ -44,6 +44,7 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
   AssistantPermissionLevel _permissionLevel =
       AssistantPermissionLevel.defaultAccess;
   bool _useMultiAgent = false;
+  bool _workspaceChromeCollapsed = false;
   bool _sidePaneCollapsed = false;
   double _sidePaneWidth = 344;
   double _composerHeight = 196;
@@ -64,7 +65,6 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final uiFeatures = controller.featuresFor(UiFeaturePlatform.web);
         final currentMessages = controller.chatMessages;
         final connectionState = controller.currentAssistantConnectionState;
 
@@ -99,8 +99,12 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
                 children: [
                   _AssistantWorkspaceChrome(
                     controller: controller,
-                    currentTarget: controller.assistantExecutionTarget,
-                    availableTargets: uiFeatures.availableExecutionTargets,
+                    collapsed: _workspaceChromeCollapsed,
+                    onToggleCollapsed: () {
+                      setState(() {
+                        _workspaceChromeCollapsed = !_workspaceChromeCollapsed;
+                      });
+                    },
                   ),
                   const SizedBox(height: 8),
                   Expanded(
@@ -193,6 +197,7 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
                             onRemoveAttachment: (index) {
                               setState(() => _attachments.removeAt(index));
                             },
+                            onOpenSessionSettings: _openSessionSettings,
                             onSubmit: _submitPrompt,
                           ),
                         ),
@@ -203,6 +208,30 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
               );
             },
           ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openSessionSettings() async {
+    if (!mounted) {
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return _AssistantSessionSettingsSheet(
+          controller: widget.controller,
+          thinkingLevel: _thinkingLevel,
+          permissionLevel: _permissionLevel,
+          onThinkingChanged: (value) {
+            setState(() => _thinkingLevel = value);
+          },
+          onPermissionChanged: (value) {
+            setState(() => _permissionLevel = value);
+          },
         );
       },
     );
@@ -410,77 +439,89 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
 class _AssistantWorkspaceChrome extends StatelessWidget {
   const _AssistantWorkspaceChrome({
     required this.controller,
-    required this.currentTarget,
-    required this.availableTargets,
+    required this.collapsed,
+    required this.onToggleCollapsed,
   });
 
   final AppController controller;
-  final AssistantExecutionTarget currentTarget;
-  final List<AssistantExecutionTarget> availableTargets;
+  final bool collapsed;
+  final VoidCallback onToggleCollapsed;
 
   @override
   Widget build(BuildContext context) {
     return SurfaceCard(
       tone: SurfaceCardTone.chrome,
       borderRadius: 10,
-      child: Row(
-        children: [
-          Expanded(
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                _ChromePill(
-                  icon: Icons.home_rounded,
-                  label: appText('主页', 'Home'),
-                ),
-                _ChromePill(
-                  label: WorkspaceDestination.assistant.label,
-                  emphasized: true,
-                ),
-              ],
-            ),
-          ),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FilledButton.icon(
-                onPressed: () => controller.createConversation(
-                  target: controller.assistantExecutionTarget,
-                ),
-                icon: const Icon(Icons.edit_square),
-                label: Text(appText('新对话', 'New conversation')),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        child: collapsed
+            ? Row(
+                children: [
+                  Expanded(
+                    child: _ChromePill(
+                      label: WorkspaceDestination.assistant.label,
+                      emphasized: true,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    key: const Key('assistant-workspace-chrome-toggle'),
+                    tooltip: appText('展开顶部导航', 'Expand top navigation'),
+                    onPressed: onToggleCollapsed,
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _ChromePill(
+                          icon: Icons.home_rounded,
+                          label: appText('主页', 'Home'),
+                        ),
+                        _ChromePill(
+                          label: WorkspaceDestination.assistant.label,
+                          emphasized: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: () => controller.createConversation(
+                          target: controller.assistantExecutionTarget,
+                        ),
+                        icon: const Icon(Icons.edit_square),
+                        label: Text(appText('新对话', 'New conversation')),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () =>
+                            controller.openSettings(tab: SettingsTab.gateway),
+                        icon: const Icon(Icons.tune_rounded),
+                        label: Text(
+                          appText('连接设置', 'Connection settings'),
+                        ),
+                      ),
+                      IconButton(
+                        key: const Key('assistant-workspace-chrome-toggle'),
+                        tooltip: appText('折叠顶部导航', 'Collapse top navigation'),
+                        onPressed: onToggleCollapsed,
+                        icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              OutlinedButton.icon(
-                onPressed: () =>
-                    controller.openSettings(tab: SettingsTab.gateway),
-                icon: const Icon(Icons.tune_rounded),
-                label: Text(appText('连接设置', 'Connection settings')),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: context.palette.surfacePrimary,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: context.palette.strokeSoft),
-                ),
-                child: _CompactDropdown<AssistantExecutionTarget>(
-                  key: const Key('assistant-top-target-button'),
-                  value: currentTarget,
-                  items: availableTargets,
-                  labelBuilder: _targetLabel,
-                  onChanged: (value) {
-                    if (value != null) {
-                      controller.setAssistantExecutionTarget(value);
-                    }
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -1309,6 +1350,7 @@ class _ConversationWorkspace extends StatelessWidget {
     required this.onToggleMultiAgent,
     required this.onAddAttachment,
     required this.onRemoveAttachment,
+    required this.onOpenSessionSettings,
     required this.onSubmit,
   });
 
@@ -1328,6 +1370,7 @@ class _ConversationWorkspace extends StatelessWidget {
   final ValueChanged<bool> onToggleMultiAgent;
   final Future<void> Function() onAddAttachment;
   final ValueChanged<int> onRemoveAttachment;
+  final Future<void> Function() onOpenSessionSettings;
   final Future<void> Function() onSubmit;
 
   @override
@@ -1336,7 +1379,6 @@ class _ConversationWorkspace extends StatelessWidget {
       builder: (context, constraints) {
         final palette = context.palette;
         final currentTarget = controller.assistantExecutionTarget;
-        final modelChoices = controller.assistantModelChoices;
         final connected = connectionState.ready;
         final maxComposerHeight = math.max(
           _webAssistantComposerMinHeight,
@@ -1381,97 +1423,6 @@ class _ConversationWorkspace extends StatelessWidget {
                         status: StatusInfo(
                           controller.assistantConnectionStatusLabel,
                           connected ? StatusTone.success : StatusTone.warning,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _HeaderDropdownShell(
-                        child: _CompactDropdown<AssistantExecutionTarget>(
-                          key: const Key('assistant-target-button'),
-                          value: currentTarget,
-                          items: controller
-                              .featuresFor(UiFeaturePlatform.web)
-                              .availableExecutionTargets,
-                          labelBuilder: _targetLabel,
-                          onChanged: (value) {
-                            if (value != null) {
-                              controller.setAssistantExecutionTarget(value);
-                            }
-                          },
-                        ),
-                      ),
-                      if (currentTarget == AssistantExecutionTarget.singleAgent)
-                        _HeaderDropdownShell(
-                          child: _CompactDropdown<SingleAgentProvider>(
-                            key: const Key(
-                              'assistant-single-agent-provider-button',
-                            ),
-                            value: controller.currentSingleAgentProvider,
-                            items: controller.singleAgentProviderOptions,
-                            labelBuilder: (item) => item.label,
-                            onChanged: (value) {
-                              if (value != null) {
-                                controller.setSingleAgentProvider(value);
-                              }
-                            },
-                          ),
-                        ),
-                      if (modelChoices.isNotEmpty)
-                        _HeaderDropdownShell(
-                          child: _CompactDropdown<String>(
-                            key: const Key('assistant-model-button'),
-                            value: controller.resolvedAssistantModel,
-                            items: modelChoices,
-                            labelBuilder: (item) => item,
-                            onChanged: (value) {
-                              if (value != null) {
-                                controller.selectAssistantModel(value);
-                              }
-                            },
-                          ),
-                        ),
-                      _HeaderDropdownShell(
-                        child: _CompactDropdown<AssistantMessageViewMode>(
-                          key: const Key('assistant-message-view-mode-button'),
-                          value: controller.currentAssistantMessageViewMode,
-                          items: AssistantMessageViewMode.values,
-                          labelBuilder: (item) => item.label,
-                          onChanged: (value) {
-                            if (value != null) {
-                              controller.setAssistantMessageViewMode(value);
-                            }
-                          },
-                        ),
-                      ),
-                      _HeaderDropdownShell(
-                        child: _CompactDropdown<String>(
-                          key: const Key('assistant-thinking-button'),
-                          value: thinkingLevel,
-                          items: const <String>['low', 'medium', 'high'],
-                          labelBuilder: _thinkingLabel,
-                          onChanged: (value) {
-                            if (value != null) {
-                              onThinkingChanged(value);
-                            }
-                          },
-                        ),
-                      ),
-                      _HeaderDropdownShell(
-                        child: _CompactDropdown<AssistantPermissionLevel>(
-                          key: const Key('assistant-permission-button'),
-                          value: permissionLevel,
-                          items: AssistantPermissionLevel.values,
-                          labelBuilder: (item) => item.label,
-                          onChanged: (value) {
-                            if (value != null) {
-                              onPermissionChanged(value);
-                            }
-                          },
                         ),
                       ),
                     ],
@@ -1636,6 +1587,14 @@ class _ConversationWorkspace extends StatelessWidget {
                       runSpacing: 10,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
+                        OutlinedButton.icon(
+                          key: const Key('assistant-session-settings-button'),
+                          onPressed: onOpenSessionSettings,
+                          icon: const Icon(Icons.tune_rounded),
+                          label: Text(
+                            appText('会话设置', 'Session settings'),
+                          ),
+                        ),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -1693,6 +1652,201 @@ class _ConversationWorkspace extends StatelessWidget {
               ),
             ),
           ],
+        );
+      },
+    );
+  }
+}
+
+class _AssistantSessionSettingsSheet extends StatefulWidget {
+  const _AssistantSessionSettingsSheet({
+    required this.controller,
+    required this.thinkingLevel,
+    required this.permissionLevel,
+    required this.onThinkingChanged,
+    required this.onPermissionChanged,
+  });
+
+  final AppController controller;
+  final String thinkingLevel;
+  final AssistantPermissionLevel permissionLevel;
+  final ValueChanged<String> onThinkingChanged;
+  final ValueChanged<AssistantPermissionLevel> onPermissionChanged;
+
+  @override
+  State<_AssistantSessionSettingsSheet> createState() =>
+      _AssistantSessionSettingsSheetState();
+}
+
+class _AssistantSessionSettingsSheetState
+    extends State<_AssistantSessionSettingsSheet> {
+  late String _thinkingLevel = widget.thinkingLevel;
+  late AssistantPermissionLevel _permissionLevel = widget.permissionLevel;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return AnimatedBuilder(
+      animation: widget.controller,
+      builder: (context, _) {
+        final controller = widget.controller;
+        final currentTarget = controller.assistantExecutionTarget;
+        final modelChoices = controller.assistantModelChoices;
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              0,
+              16,
+              MediaQuery.of(context).viewInsets.bottom + 16,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appText('会话设置', 'Session settings'),
+                    key: const Key('assistant-session-settings-sheet-title'),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    appText(
+                      '线程模式、渲染方式和执行参数统一放到底部对话框管理。',
+                      'Manage thread mode, rendering, and execution parameters from this bottom sheet.',
+                    ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: palette.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _SessionSettingField(
+                    label: appText('执行目标', 'Execution target'),
+                    child: _HeaderDropdownShell(
+                      child: _CompactDropdown<AssistantExecutionTarget>(
+                        key: const Key('assistant-target-button'),
+                        value: currentTarget,
+                        items: controller
+                            .featuresFor(UiFeaturePlatform.web)
+                            .availableExecutionTargets,
+                        labelBuilder: _targetLabel,
+                        onChanged: (value) {
+                          if (value != null) {
+                            controller.setAssistantExecutionTarget(value);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  if (currentTarget == AssistantExecutionTarget.singleAgent)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: _SessionSettingField(
+                        label: appText('Provider', 'Provider'),
+                        child: _HeaderDropdownShell(
+                          child: _CompactDropdown<SingleAgentProvider>(
+                            key: const Key(
+                              'assistant-single-agent-provider-button',
+                            ),
+                            value: controller.currentSingleAgentProvider,
+                            items: controller.singleAgentProviderOptions,
+                            labelBuilder: (item) => item.label,
+                            onChanged: (value) {
+                              if (value != null) {
+                                controller.setSingleAgentProvider(value);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (modelChoices.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: _SessionSettingField(
+                        label: appText('模型', 'Model'),
+                        child: _HeaderDropdownShell(
+                          child: _CompactDropdown<String>(
+                            key: const Key('assistant-model-button'),
+                            value: controller.resolvedAssistantModel,
+                            items: modelChoices,
+                            labelBuilder: (item) => item,
+                            onChanged: (value) {
+                              if (value != null) {
+                                controller.selectAssistantModel(value);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: _SessionSettingField(
+                      label: appText('消息视图', 'Message view'),
+                      child: _HeaderDropdownShell(
+                        child: _CompactDropdown<AssistantMessageViewMode>(
+                          key: const Key('assistant-message-view-mode-button'),
+                          value: controller.currentAssistantMessageViewMode,
+                          items: AssistantMessageViewMode.values,
+                          labelBuilder: (item) => item.label,
+                          onChanged: (value) {
+                            if (value != null) {
+                              controller.setAssistantMessageViewMode(value);
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: _SessionSettingField(
+                      label: appText('思考强度', 'Thinking level'),
+                      child: _HeaderDropdownShell(
+                        child: _CompactDropdown<String>(
+                          key: const Key('assistant-thinking-button'),
+                          value: _thinkingLevel,
+                          items: const <String>['low', 'medium', 'high'],
+                          labelBuilder: _thinkingLabel,
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _thinkingLevel = value);
+                              widget.onThinkingChanged(value);
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: _SessionSettingField(
+                      label: appText('权限', 'Permissions'),
+                      child: _HeaderDropdownShell(
+                        child: _CompactDropdown<AssistantPermissionLevel>(
+                          key: const Key('assistant-permission-button'),
+                          value: _permissionLevel,
+                          items: AssistantPermissionLevel.values,
+                          labelBuilder: (item) => item.label,
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _permissionLevel = value);
+                              widget.onPermissionChanged(value);
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         );
       },
     );
@@ -1923,6 +2077,30 @@ class _HeaderDropdownShell extends StatelessWidget {
         border: Border.all(color: context.palette.strokeSoft),
       ),
       child: child,
+    );
+  }
+}
+
+class _SessionSettingField extends StatelessWidget {
+  const _SessionSettingField({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 6),
+        child,
+      ],
     );
   }
 }
