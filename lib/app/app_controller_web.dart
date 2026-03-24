@@ -10,6 +10,7 @@ import '../web/web_ai_gateway_client.dart';
 import '../web/web_relay_gateway_client.dart';
 import '../web/web_session_repository.dart';
 import '../web/web_store.dart';
+import '../web/web_workspace_controllers.dart';
 import 'app_capabilities.dart';
 import 'ui_feature_manifest.dart';
 
@@ -72,12 +73,24 @@ class AppController extends ChangeNotifier {
   final Map<String, Future<void>> _threadTurnQueues = <String, Future<void>>{};
   final Map<String, String> _singleAgentRuntimeModelBySession =
       <String, String>{};
+  final WebTasksController _tasksController = WebTasksController();
   String _currentSessionKey = '';
   String? _lastAssistantError;
   String _webSessionApiTokenCache = '';
   String _webSessionClientId = '';
   String _sessionPersistenceStatusMessage = '';
   WebAcpCapabilities _acpCapabilities = const WebAcpCapabilities.empty();
+  List<GatewayAgentSummary> _relayAgents = const <GatewayAgentSummary>[];
+  List<GatewayInstanceSummary> _relayInstances =
+      const <GatewayInstanceSummary>[];
+  List<GatewayConnectorSummary> _relayConnectors =
+      const <GatewayConnectorSummary>[];
+  List<GatewayModelSummary> _relayModels = const <GatewayModelSummary>[];
+  List<GatewayCronJobSummary> _relayCronJobs =
+      const <GatewayCronJobSummary>[];
+  late final WebSkillsController _skillsController = WebSkillsController(
+    refreshVisibleSkills,
+  );
 
   UiFeatureManifest get uiFeatureManifest => _uiFeatureManifest;
   AppCapabilities get capabilities =>
@@ -114,6 +127,20 @@ class AppController extends ChangeNotifier {
   String get sessionPersistenceStatusMessage =>
       _sessionPersistenceStatusMessage;
   bool get supportsDesktopIntegration => false;
+  WebTasksController get tasksController => _tasksController;
+  WebSkillsController get skillsController => _skillsController;
+  List<GatewayAgentSummary> get agents => _relayAgents;
+  List<GatewayInstanceSummary> get instances => _relayInstances;
+  List<GatewayConnectorSummary> get connectors => _relayConnectors;
+  List<GatewayCronJobSummary> get cronJobs => _relayCronJobs;
+  String get selectedAgentId => '';
+  String get activeAgentName {
+    final current = _relayAgents.where((item) => item.name.trim().isNotEmpty);
+    if (current.isNotEmpty) {
+      return current.first.name;
+    }
+    return appText('助手', 'Assistant');
+  }
   bool get hasStoredGatewayToken =>
       hasStoredGatewayTokenForProfile(kGatewayRemoteProfileIndex) ||
       hasStoredGatewayTokenForProfile(kGatewayLocalProfileIndex);
@@ -311,6 +338,93 @@ class AppController extends ChangeNotifier {
       return assistantImportedSkillsForSession(_currentSessionKey).length;
     }
     return assistantImportedSkillsForSession(_currentSessionKey).length;
+  }
+
+  List<GatewaySkillSummary> get skills => assistantImportedSkillsForSession(
+    _currentSessionKey,
+  ).map(_gatewaySkillFromThreadEntry).toList(growable: false);
+
+  List<GatewayModelSummary> get models {
+    if (_relayModels.isNotEmpty &&
+        assistantExecutionTargetForSession(_currentSessionKey) !=
+            AssistantExecutionTarget.singleAgent) {
+      return _relayModels;
+    }
+    return aiGatewayConversationModelChoices
+        .map(
+          (item) => GatewayModelSummary(
+            id: item,
+            name: item,
+            provider: _settings.defaultProvider.trim().isEmpty
+                ? 'gateway'
+                : _settings.defaultProvider.trim(),
+            contextWindow: null,
+            maxOutputTokens: null,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  bool get currentSingleAgentNeedsAiGatewayConfiguration =>
+      currentSingleAgentUsesAiChatFallback && !canUseAiGatewayConversation;
+
+  List<SecretReferenceEntry> get secretReferences {
+    final entries = <SecretReferenceEntry>[
+      if (storedRelayTokenMaskForProfile(kGatewayLocalProfileIndex) != null)
+        SecretReferenceEntry(
+          name: 'gateway_token.local',
+          provider: 'Gateway',
+          module: 'Assistant',
+          maskedValue:
+              storedRelayTokenMaskForProfile(kGatewayLocalProfileIndex)!,
+          status: 'In Use',
+        ),
+      if (storedRelayPasswordMaskForProfile(kGatewayLocalProfileIndex) != null)
+        SecretReferenceEntry(
+          name: 'gateway_password.local',
+          provider: 'Gateway',
+          module: 'Assistant',
+          maskedValue:
+              storedRelayPasswordMaskForProfile(kGatewayLocalProfileIndex)!,
+          status: 'In Use',
+        ),
+      if (storedRelayTokenMaskForProfile(kGatewayRemoteProfileIndex) != null)
+        SecretReferenceEntry(
+          name: 'gateway_token.remote',
+          provider: 'Gateway',
+          module: 'Assistant',
+          maskedValue:
+              storedRelayTokenMaskForProfile(kGatewayRemoteProfileIndex)!,
+          status: 'In Use',
+        ),
+      if (storedRelayPasswordMaskForProfile(kGatewayRemoteProfileIndex) != null)
+        SecretReferenceEntry(
+          name: 'gateway_password.remote',
+          provider: 'Gateway',
+          module: 'Assistant',
+          maskedValue:
+              storedRelayPasswordMaskForProfile(kGatewayRemoteProfileIndex)!,
+          status: 'In Use',
+        ),
+      if (storedAiGatewayApiKeyMask != null)
+        SecretReferenceEntry(
+          name: _settings.aiGateway.apiKeyRef,
+          provider: 'LLM API',
+          module: 'Settings',
+          maskedValue: storedAiGatewayApiKeyMask!,
+          status: 'In Use',
+        ),
+      SecretReferenceEntry(
+        name: _settings.aiGateway.name,
+        provider: 'LLM API',
+        module: 'Settings',
+        maskedValue: _settings.aiGateway.baseUrl.trim().isEmpty
+            ? 'Not set'
+            : _settings.aiGateway.baseUrl.trim(),
+        status: _settings.aiGateway.syncState,
+      ),
+    ];
+    return entries;
   }
 
   List<GatewayChatMessage> get chatMessages {
@@ -586,6 +700,7 @@ class AppController extends ChangeNotifier {
       }
       _settingsDraft = _settings;
       _settingsDraftInitialized = true;
+      _recomputeDerivedWorkspaceState();
     } catch (error) {
       _bootstrapError = '$error';
     } finally {
@@ -646,6 +761,49 @@ class AppController extends ChangeNotifier {
 
   void setSettingsTab(SettingsTab tab) {
     _settingsTab = _sanitizeSettingsTab(tab);
+    notifyListeners();
+  }
+
+  List<DerivedTaskItem> taskItemsForTab(String tab) => switch (tab) {
+    'Queue' => _tasksController.queue,
+    'Running' => _tasksController.running,
+    'History' => _tasksController.history,
+    'Failed' => _tasksController.failed,
+    'Scheduled' => _tasksController.scheduled,
+    _ => _tasksController.queue,
+  };
+
+  Future<void> refreshSessions() async {
+    if (connection.status == RuntimeConnectionStatus.connected) {
+      await refreshRelaySessions();
+      await refreshRelayWorkspaceResources();
+      await refreshRelayHistory(sessionKey: _currentSessionKey);
+      await refreshRelaySkillsForSession(_currentSessionKey);
+    } else {
+      _recomputeDerivedWorkspaceState();
+      notifyListeners();
+    }
+  }
+
+  Future<void> refreshAgents() async {
+    await refreshRelayWorkspaceResources();
+  }
+
+  Future<void> refreshGatewayHealth() async {
+    if (connection.status != RuntimeConnectionStatus.connected) {
+      return;
+    }
+    await refreshRelayWorkspaceResources();
+  }
+
+  Future<void> refreshVisibleSkills(String? agentId) async {
+    final target = assistantExecutionTargetForSession(_currentSessionKey);
+    if (target == AssistantExecutionTarget.local ||
+        target == AssistantExecutionTarget.remote) {
+      await refreshRelaySkillsForSession(_currentSessionKey);
+      return;
+    }
+    _recomputeDerivedWorkspaceState();
     notifyListeners();
   }
 
@@ -858,6 +1016,7 @@ class AppController extends ChangeNotifier {
     _currentSessionKey = record.sessionKey;
     _lastAssistantError = null;
     _settings = _settings.copyWith(assistantLastSessionKey: record.sessionKey);
+    _recomputeDerivedWorkspaceState();
     await _persistSettings();
     await _persistThreads();
     notifyListeners();
@@ -1047,6 +1206,7 @@ class AppController extends ChangeNotifier {
         _currentSessionKey = newRecord.sessionKey;
       }
     }
+    _recomputeDerivedWorkspaceState();
     await _persistSettings();
     await _persistThreads();
     notifyListeners();
@@ -1161,6 +1321,7 @@ class AppController extends ChangeNotifier {
       _aiGatewayApiKeyCache = apiKey.trim();
       await _store.saveAiGatewayApiKey(_aiGatewayApiKeyCache);
       await _persistSettings();
+      _recomputeDerivedWorkspaceState();
     } catch (error) {
       _settings = _settings.copyWith(
         aiGateway: _settings.aiGateway.copyWith(
@@ -1169,6 +1330,7 @@ class AppController extends ChangeNotifier {
         ),
       );
       await _persistSettings();
+      _recomputeDerivedWorkspaceState();
       rethrow;
     } finally {
       _aiGatewayBusy = false;
@@ -1272,9 +1434,9 @@ class AppController extends ChangeNotifier {
         await _refreshAcpCapabilities(acpEndpoint);
       }
       await refreshRelaySessions();
-      await refreshRelaySkillsForSession(_currentSessionKey);
-      await refreshRelayModels();
+      await refreshRelayWorkspaceResources();
       await refreshRelayHistory(sessionKey: _currentSessionKey);
+      await refreshRelaySkillsForSession(_currentSessionKey);
     } finally {
       _relayBusy = false;
       notifyListeners();
@@ -1286,6 +1448,12 @@ class AppController extends ChangeNotifier {
     notifyListeners();
     try {
       await _relayClient.disconnect();
+      _relayAgents = const <GatewayAgentSummary>[];
+      _relayInstances = const <GatewayInstanceSummary>[];
+      _relayConnectors = const <GatewayConnectorSummary>[];
+      _relayModels = const <GatewayModelSummary>[];
+      _relayCronJobs = const <GatewayCronJobSummary>[];
+      _recomputeDerivedWorkspaceState();
     } finally {
       _relayBusy = false;
       notifyListeners();
@@ -1325,6 +1493,7 @@ class AppController extends ChangeNotifier {
       _threadRecords[sessionKey] = next;
     }
     await _persistThreads();
+    _recomputeDerivedWorkspaceState();
     notifyListeners();
   }
 
@@ -1333,6 +1502,7 @@ class AppController extends ChangeNotifier {
       return;
     }
     final models = await _relayClient.listModels();
+    _relayModels = models;
     final availableModels = models
         .map((item) => item.id.trim())
         .where((item) => item.isNotEmpty)
@@ -1352,6 +1522,36 @@ class AppController extends ChangeNotifier {
       ),
     );
     await _persistSettings();
+    _recomputeDerivedWorkspaceState();
+    notifyListeners();
+  }
+
+  Future<void> refreshRelayWorkspaceResources() async {
+    if (connection.status != RuntimeConnectionStatus.connected) {
+      return;
+    }
+    try {
+      _relayAgents = await _relayClient.listAgents();
+    } catch (_) {
+      _relayAgents = const <GatewayAgentSummary>[];
+    }
+    try {
+      _relayInstances = await _relayClient.listInstances();
+    } catch (_) {
+      _relayInstances = const <GatewayInstanceSummary>[];
+    }
+    try {
+      _relayConnectors = await _relayClient.listConnectors();
+    } catch (_) {
+      _relayConnectors = const <GatewayConnectorSummary>[];
+    }
+    try {
+      _relayCronJobs = await _relayClient.listCronJobs();
+    } catch (_) {
+      _relayCronJobs = const <GatewayCronJobSummary>[];
+    }
+    await refreshRelayModels();
+    _recomputeDerivedWorkspaceState();
     notifyListeners();
   }
 
@@ -1380,6 +1580,7 @@ class AppController extends ChangeNotifier {
     _threadRecords[resolvedKey] = next;
     _streamingTextBySession.remove(resolvedKey);
     await _persistThreads();
+    _recomputeDerivedWorkspaceState();
     notifyListeners();
   }
 
@@ -1419,6 +1620,7 @@ class AppController extends ChangeNotifier {
             const <String>[],
       );
       await _persistThreads();
+      _recomputeDerivedWorkspaceState();
       notifyListeners();
     } catch (_) {
       // Best effort: skill discovery should not block chat flows.
@@ -1838,6 +2040,41 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  void _recomputeDerivedWorkspaceState() {
+    final archivedKeys = _settings.assistantArchivedTaskKeys
+        .map(_normalizedSessionKey)
+        .toSet();
+    final visibleThreads = _threadRecords.values
+        .where((record) {
+          return !record.archived &&
+              !archivedKeys.contains(_normalizedSessionKey(record.sessionKey));
+        })
+        .toList(growable: false);
+    _tasksController.recompute(
+      threads: visibleThreads,
+      cronJobs: _relayCronJobs,
+      currentSessionKey: _currentSessionKey,
+      pendingSessionKeys: _pendingSessionKeys,
+    );
+  }
+
+  GatewaySkillSummary _gatewaySkillFromThreadEntry(
+    AssistantThreadSkillEntry item,
+  ) {
+    return GatewaySkillSummary(
+      name: item.label,
+      description: item.description,
+      source: item.source,
+      skillKey: item.key,
+      primaryEnv: null,
+      eligible: true,
+      disabled: false,
+      missingBins: const <String>[],
+      missingEnv: const <String>[],
+      missingConfig: const <String>[],
+    );
+  }
+
   @override
   void dispose() {
     unawaited(_relayEventsSubscription.cancel());
@@ -1971,6 +2208,7 @@ class AppController extends ChangeNotifier {
     );
     _pendingSessionKeys.remove(sessionKey);
     _streamingTextBySession.remove(sessionKey);
+    _recomputeDerivedWorkspaceState();
   }
 
   void _handleRelayEvent(GatewayPushEvent event) {
@@ -2083,6 +2321,7 @@ class AppController extends ChangeNotifier {
       gatewayEntryState: gatewayEntryState ?? existing.gatewayEntryState,
       clearGatewayEntryState: clearGatewayEntryState,
     );
+    _recomputeDerivedWorkspaceState();
   }
 
   Future<void> _applyAssistantExecutionTarget(

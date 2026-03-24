@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app.dart';
 
 void main() {
-  testWidgets('web shell exposes only assistant and settings surfaces', (
+  testWidgets('web shell aligns with app workspace layout and expanded pages', (
     WidgetTester tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -21,11 +21,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('助手'), findsWidgets);
-    expect(find.byKey(const Key('web-shell-nav-assistant')), findsNothing);
-    expect(find.byKey(const Key('web-shell-nav-settings')), findsNothing);
-    expect(find.byKey(const Key('web-shell-language-toggle')), findsNothing);
-    expect(find.byKey(const Key('web-shell-theme-toggle')), findsNothing);
-    expect(find.text('Tasks'), findsNothing);
     expect(find.byKey(const Key('assistant-task-rail')), findsOneWidget);
     expect(
       find.byKey(const Key('assistant-workspace-chrome-toggle')),
@@ -41,7 +36,7 @@ void main() {
       find.byKey(const Key('assistant-attachment-menu-button')),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('assistant-focus-panel-title')), findsNothing);
+    expect(find.text('连接设置'), findsNothing);
 
     await tester.tap(
       find.byKey(const Key('assistant-workspace-chrome-toggle')),
@@ -55,7 +50,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('连接设置'), findsOneWidget);
+    expect(find.text('连接设置'), findsNothing);
 
     await tester.tap(
       find.byKey(const Key('assistant-session-settings-button')),
@@ -93,40 +88,43 @@ void main() {
     );
     expect(
       find.byKey(const ValueKey<String>('assistant-focus-add-tasks')),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.byKey(const ValueKey<String>('assistant-focus-add-skills')),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.byKey(const ValueKey<String>('assistant-focus-add-nodes')),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.byKey(const ValueKey<String>('assistant-focus-add-secrets')),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.byKey(const ValueKey<String>('assistant-focus-add-aiGateway')),
-      findsNothing,
+      findsOneWidget,
     );
 
     await tester.tap(
-      find.byKey(const ValueKey<String>('assistant-focus-add-settings')),
+      find.byKey(const ValueKey<String>('assistant-focus-add-tasks')),
     );
     await tester.pumpAndSettle();
 
     expect(
-      find.byKey(const ValueKey<String>('assistant-focus-open-page-settings')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey<String>('assistant-focus-remove-settings')),
+      find.byKey(const ValueKey<String>('assistant-focus-open-page-tasks')),
       findsOneWidget,
     );
 
-    await tester.tap(find.text('连接设置'));
+    await tester.tap(
+      find.byKey(const ValueKey<String>('assistant-focus-open-page-tasks')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('任务工作台'), findsOneWidget);
+
+    await tester.tap(find.text('设置').last);
     await tester.pumpAndSettle();
 
     expect(find.text('设置'), findsWidgets);
@@ -134,6 +132,10 @@ void main() {
       find.byKey(const ValueKey('web-settings-search-field')),
       findsOneWidget,
     );
+
+    await tester.tap(find.text('集成'));
+    await tester.pumpAndSettle();
+
     expect(find.text('OpenClaw Gateway'), findsWidgets);
     expect(find.text('LLM 接入点'), findsWidgets);
     expect(find.text('ACP 外部接入'), findsWidgets);
