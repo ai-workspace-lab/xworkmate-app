@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -10,9 +11,17 @@ import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
 import '../widgets/desktop_workspace_scaffold.dart';
+import '../widgets/pane_resize_handle.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/surface_card.dart';
-import '../widgets/top_bar.dart';
+
+const double _webAssistantSideTabRailWidth = 46;
+const double _webAssistantSidePaneMinWidth = 304;
+const double _webAssistantSidePaneMaxWidth = 420;
+const double _webAssistantMainWorkspaceMinWidth = 700;
+const double _webAssistantComposerMinHeight = 164;
+const double _webAssistantConversationMinHeight = 200;
+const double _webAssistantResizeHandleSize = 10;
 
 class WebAssistantPage extends StatefulWidget {
   const WebAssistantPage({super.key, required this.controller});
@@ -22,6 +31,8 @@ class WebAssistantPage extends StatefulWidget {
   @override
   State<WebAssistantPage> createState() => _WebAssistantPageState();
 }
+
+enum _WebAssistantPane { tasks, quick }
 
 class _WebAssistantPageState extends State<WebAssistantPage> {
   final TextEditingController _inputController = TextEditingController();
@@ -33,6 +44,10 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
   AssistantPermissionLevel _permissionLevel =
       AssistantPermissionLevel.defaultAccess;
   bool _useMultiAgent = false;
+  bool _sidePaneCollapsed = false;
+  double _sidePaneWidth = 344;
+  double _composerHeight = 196;
+  _WebAssistantPane _activePane = _WebAssistantPane.tasks;
   final List<_WebComposerAttachment> _attachments = <_WebComposerAttachment>[];
 
   @override
@@ -50,153 +65,140 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
       animation: controller,
       builder: (context, _) {
         final uiFeatures = controller.featuresFor(UiFeaturePlatform.web);
-        final allSingle = controller.conversationsForTarget(
-          AssistantExecutionTarget.singleAgent,
-        );
-        final allLocal = controller.conversationsForTarget(
-          AssistantExecutionTarget.local,
-        );
-        final allRemote = controller.conversationsForTarget(
-          AssistantExecutionTarget.remote,
-        );
-        final single = _filterConversations(allSingle);
-        final local = _filterConversations(allLocal);
-        final remote = _filterConversations(allRemote);
-
-        final availableTargets = uiFeatures.availableExecutionTargets;
-        final currentTarget = controller.assistantExecutionTarget;
-        final connectionState = controller.currentAssistantConnectionState;
-        final connected = connectionState.ready;
-
         final currentMessages = controller.chatMessages;
+        final connectionState = controller.currentAssistantConnectionState;
+
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            _scrollController.jumpTo(
-              _scrollController.position.maxScrollExtent,
-            );
+          if (!mounted || !_scrollController.hasClients) {
+            return;
           }
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+          );
         });
 
-        final selectedSkillKeys = controller.assistantSelectedSkillKeysForSession(
-          controller.currentSessionKey,
-        );
-        final importedSkills = controller.assistantImportedSkillsForSession(
-          controller.currentSessionKey,
-        );
-
         return DesktopWorkspaceScaffold(
-          breadcrumbs: <AppBreadcrumbItem>[
-            AppBreadcrumbItem(
-              label: appText('主页', 'Home'),
-              icon: Icons.home_rounded,
-              onTap: controller.navigateHome,
-            ),
-            AppBreadcrumbItem(label: WorkspaceDestination.assistant.label),
-          ],
-          eyebrow: appText('Web Workspace', 'Web Workspace'),
-          title: appText('助手', 'Assistant'),
-          subtitle: appText(
-            'Web 助手保持任务线程会话隔离，支持 Single Agent / Local / Remote 三种模式。',
-            'Web Assistant keeps per-thread session isolation with Single Agent / Local / Remote modes.',
-          ),
-          toolbar: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              FilledButton.icon(
-                onPressed: () => controller.createConversation(
-                  target: controller.assistantExecutionTarget,
-                ),
-                icon: const Icon(Icons.edit_square),
-                label: Text(appText('新对话', 'New conversation')),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => controller.openSettings(tab: SettingsTab.gateway),
-                icon: const Icon(Icons.tune_rounded),
-                label: Text(appText('连接设置', 'Connection settings')),
-              ),
-              _TargetChip(
-                targets: availableTargets,
-                value: currentTarget,
-                onChanged: (value) {
-                  if (value != null) {
-                    controller.setAssistantExecutionTarget(value);
-                  }
-                },
-              ),
-            ],
-          ),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final vertical = constraints.maxWidth < 1080;
-              final rail = _ConversationRail(
-                controller: controller,
-                query: _query,
-                searchController: _searchController,
-                onQueryChanged: (value) {
-                  setState(() => _query = value.trim().toLowerCase());
-                },
-                onClearQuery: () {
-                  _searchController.clear();
-                  setState(() => _query = '');
-                },
-                showSingle: uiFeatures.supportsDirectAi,
-                showLocal: uiFeatures.supportsLocalGateway,
-                showRemote: uiFeatures.supportsRelayGateway,
-                single: single,
-                local: local,
-                remote: remote,
-                onRename: (sessionKey) => _renameConversation(sessionKey),
-                onArchive: (sessionKey) =>
-                    controller.saveAssistantTaskArchived(sessionKey, true),
+              final maxSidePaneWidth = math.min(
+                _webAssistantSidePaneMaxWidth,
+                math.max(
+                  _webAssistantSidePaneMinWidth,
+                  constraints.maxWidth - _webAssistantMainWorkspaceMinWidth,
+                ),
               );
-
-              final panel = _ConversationPanel(
-                controller: controller,
-                inputController: _inputController,
-                scrollController: _scrollController,
-                connected: connected,
-                currentMessages: currentMessages,
-                connectionState: connectionState,
-                thinkingLevel: _thinkingLevel,
-                permissionLevel: _permissionLevel,
-                useMultiAgent: _useMultiAgent,
-                importedSkills: importedSkills,
-                selectedSkillKeys: selectedSkillKeys,
-                attachments: _attachments,
-                onThinkingChanged: (value) {
-                  setState(() => _thinkingLevel = value);
-                },
-                onPermissionChanged: (value) {
-                  setState(() => _permissionLevel = value);
-                },
-                onToggleMultiAgent: (value) {
-                  setState(() => _useMultiAgent = value);
-                },
-                onAddAttachment: _pickAttachments,
-                onRemoveAttachment: (index) {
-                  setState(() {
-                    _attachments.removeAt(index);
-                  });
-                },
-                onSubmit: _submitPrompt,
+              final sidePaneWidth = _sidePaneWidth.clamp(
+                _webAssistantSidePaneMinWidth,
+                maxSidePaneWidth,
               );
+              final collapsedWidth = _webAssistantSideTabRailWidth;
 
-              if (vertical) {
-                return Column(
-                  children: [
-                    SizedBox(height: 320, child: rail),
-                    const SizedBox(height: 8),
-                    Expanded(child: panel),
-                  ],
-                );
-              }
-
-              return Row(
+              return Column(
                 children: [
-                  SizedBox(width: 340, child: rail),
-                  const SizedBox(width: 8),
-                  Expanded(child: panel),
+                  _AssistantWorkspaceChrome(
+                    controller: controller,
+                    currentTarget: controller.assistantExecutionTarget,
+                    availableTargets: uiFeatures.availableExecutionTargets,
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          width: _sidePaneCollapsed
+                              ? collapsedWidth
+                              : sidePaneWidth,
+                          child: _AssistantSidePane(
+                            collapsed: _sidePaneCollapsed,
+                            activePane: _activePane,
+                            controller: controller,
+                            query: _query,
+                            searchController: _searchController,
+                            permissionLevel: _permissionLevel,
+                            onQueryChanged: (value) {
+                              setState(
+                                () => _query = value.trim().toLowerCase(),
+                              );
+                            },
+                            onClearQuery: () {
+                              _searchController.clear();
+                              setState(() => _query = '');
+                            },
+                            onToggleCollapsed: () {
+                              setState(() {
+                                _sidePaneCollapsed = !_sidePaneCollapsed;
+                              });
+                            },
+                            onPaneChanged: (pane) {
+                              setState(() {
+                                _activePane = pane;
+                                _sidePaneCollapsed = false;
+                              });
+                            },
+                            onPermissionChanged: (value) {
+                              setState(() => _permissionLevel = value);
+                            },
+                            onRename: _renameConversation,
+                            onArchive: (sessionKey) => controller
+                                .saveAssistantTaskArchived(sessionKey, true),
+                            onOpenActions: _openConversationActions,
+                          ),
+                        ),
+                        if (!_sidePaneCollapsed)
+                          SizedBox(
+                            width: 8,
+                            child: PaneResizeHandle(
+                              axis: Axis.horizontal,
+                              onDelta: (delta) {
+                                setState(() {
+                                  _sidePaneWidth = (_sidePaneWidth + delta)
+                                      .clamp(
+                                        _webAssistantSidePaneMinWidth,
+                                        maxSidePaneWidth,
+                                      )
+                                      .toDouble();
+                                });
+                              },
+                            ),
+                          ),
+                        Expanded(
+                          child: _ConversationWorkspace(
+                            controller: controller,
+                            scrollController: _scrollController,
+                            inputController: _inputController,
+                            currentMessages: currentMessages,
+                            connectionState: connectionState,
+                            thinkingLevel: _thinkingLevel,
+                            permissionLevel: _permissionLevel,
+                            useMultiAgent: _useMultiAgent,
+                            attachments: _attachments,
+                            composerHeight: _composerHeight,
+                            onComposerHeightChanged: (value) {
+                              setState(() => _composerHeight = value);
+                            },
+                            onThinkingChanged: (value) {
+                              setState(() => _thinkingLevel = value);
+                            },
+                            onPermissionChanged: (value) {
+                              setState(() => _permissionLevel = value);
+                            },
+                            onToggleMultiAgent: (value) {
+                              setState(() => _useMultiAgent = value);
+                            },
+                            onAddAttachment: _pickAttachments,
+                            onRemoveAttachment: (index) {
+                              setState(() => _attachments.removeAt(index));
+                            },
+                            onSubmit: _submitPrompt,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               );
             },
@@ -206,18 +208,41 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
     );
   }
 
-  List<WebConversationSummary> _filterConversations(
-    List<WebConversationSummary> items,
-  ) {
-    if (_query.isEmpty) {
-      return items;
+  Future<void> _openConversationActions(String sessionKey) async {
+    final controller = widget.controller;
+    if (!mounted) {
+      return;
     }
-    return items
-        .where((item) {
-          final haystack = '${item.title}\n${item.preview}'.toLowerCase();
-          return haystack.contains(_query);
-        })
-        .toList(growable: false);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.drive_file_rename_outline_rounded),
+                title: Text(appText('重命名', 'Rename')),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _renameConversation(sessionKey);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.archive_outlined),
+                title: Text(appText('归档', 'Archive')),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await controller.saveAssistantTaskArchived(sessionKey, true);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _renameConversation(String sessionKey) async {
@@ -237,28 +262,58 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
         )
         .title;
     final renameController = TextEditingController(text: initial);
-    final value = await showDialog<String>(
+    final value = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
       builder: (context) {
-        return AlertDialog(
-          title: Text(appText('重命名任务线程', 'Rename task thread')),
-          content: TextField(
-            controller: renameController,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: appText('输入标题', 'Enter a title'),
-            ),
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            MediaQuery.of(context).viewInsets.bottom + 16,
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(appText('取消', 'Cancel')),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(renameController.text),
-              child: Text(appText('保存', 'Save')),
-            ),
-          ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                appText('重命名任务线程', 'Rename task thread'),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: renameController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: appText('输入标题', 'Enter a title'),
+                ),
+                onSubmitted: (value) => Navigator.of(context).pop(value),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text(appText('取消', 'Cancel')),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () =>
+                          Navigator.of(context).pop(renameController.text),
+                      child: Text(appText('保存', 'Save')),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         );
       },
     );
@@ -283,7 +338,15 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
         ),
         XTypeGroup(
           label: 'Documents',
-          extensions: <String>['txt', 'md', 'json', 'csv', 'pdf', 'yaml', 'yml'],
+          extensions: <String>[
+            'txt',
+            'md',
+            'json',
+            'csv',
+            'pdf',
+            'yaml',
+            'yml',
+          ],
         ),
       ],
     );
@@ -319,7 +382,9 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
         .assistantImportedSkillsForSession(controller.currentSessionKey)
         .where(
           (item) => controller
-              .assistantSelectedSkillKeysForSession(controller.currentSessionKey)
+              .assistantSelectedSkillKeysForSession(
+                controller.currentSessionKey,
+              )
               .contains(item.key),
         )
         .map((item) => item.label)
@@ -338,14 +403,248 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
       return;
     }
     _inputController.clear();
-    setState(() {
-      _attachments.clear();
-    });
+    setState(() => _attachments.clear());
   }
 }
 
-class _ConversationRail extends StatelessWidget {
-  const _ConversationRail({
+class _AssistantWorkspaceChrome extends StatelessWidget {
+  const _AssistantWorkspaceChrome({
+    required this.controller,
+    required this.currentTarget,
+    required this.availableTargets,
+  });
+
+  final AppController controller;
+  final AssistantExecutionTarget currentTarget;
+  final List<AssistantExecutionTarget> availableTargets;
+
+  @override
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      tone: SurfaceCardTone.chrome,
+      borderRadius: 10,
+      child: Row(
+        children: [
+          Expanded(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _ChromePill(
+                  icon: Icons.home_rounded,
+                  label: appText('主页', 'Home'),
+                ),
+                _ChromePill(
+                  label: WorkspaceDestination.assistant.label,
+                  emphasized: true,
+                ),
+              ],
+            ),
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: () => controller.createConversation(
+                  target: controller.assistantExecutionTarget,
+                ),
+                icon: const Icon(Icons.edit_square),
+                label: Text(appText('新对话', 'New conversation')),
+              ),
+              OutlinedButton.icon(
+                onPressed: () =>
+                    controller.openSettings(tab: SettingsTab.gateway),
+                icon: const Icon(Icons.tune_rounded),
+                label: Text(appText('连接设置', 'Connection settings')),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: context.palette.surfacePrimary,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: context.palette.strokeSoft),
+                ),
+                child: _CompactDropdown<AssistantExecutionTarget>(
+                  key: const Key('assistant-top-target-button'),
+                  value: currentTarget,
+                  items: availableTargets,
+                  labelBuilder: _targetLabel,
+                  onChanged: (value) {
+                    if (value != null) {
+                      controller.setAssistantExecutionTarget(value);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AssistantSidePane extends StatelessWidget {
+  const _AssistantSidePane({
+    required this.collapsed,
+    required this.activePane,
+    required this.controller,
+    required this.query,
+    required this.searchController,
+    required this.permissionLevel,
+    required this.onQueryChanged,
+    required this.onClearQuery,
+    required this.onToggleCollapsed,
+    required this.onPaneChanged,
+    required this.onPermissionChanged,
+    required this.onRename,
+    required this.onArchive,
+    required this.onOpenActions,
+  });
+
+  final bool collapsed;
+  final _WebAssistantPane activePane;
+  final AppController controller;
+  final String query;
+  final TextEditingController searchController;
+  final AssistantPermissionLevel permissionLevel;
+  final ValueChanged<String> onQueryChanged;
+  final VoidCallback onClearQuery;
+  final VoidCallback onToggleCollapsed;
+  final ValueChanged<_WebAssistantPane> onPaneChanged;
+  final ValueChanged<AssistantPermissionLevel> onPermissionChanged;
+  final ValueChanged<String> onRename;
+  final ValueChanged<String> onArchive;
+  final ValueChanged<String> onOpenActions;
+
+  @override
+  Widget build(BuildContext context) {
+    final single = controller.conversationsForTarget(
+      AssistantExecutionTarget.singleAgent,
+    );
+    final local = controller.conversationsForTarget(
+      AssistantExecutionTarget.local,
+    );
+    final remote = controller.conversationsForTarget(
+      AssistantExecutionTarget.remote,
+    );
+    final filteredSingle = _filterConversations(single, query);
+    final filteredLocal = _filterConversations(local, query);
+    final filteredRemote = _filterConversations(remote, query);
+    final palette = context.palette;
+
+    return Row(
+      children: [
+        Container(
+          key: const Key('assistant-side-pane'),
+          width: _webAssistantSideTabRailWidth,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                palette.chromeHighlight.withValues(alpha: 0.96),
+                palette.chromeSurface,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: palette.chromeStroke),
+            boxShadow: [palette.chromeShadowAmbient],
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 4),
+              _AssistantSideTabButton(
+                key: const Key('assistant-side-pane-tab-tasks'),
+                icon: Icons.checklist_rtl_rounded,
+                selected: activePane == _WebAssistantPane.tasks,
+                tooltip: appText('任务', 'Tasks'),
+                onTap: () => onPaneChanged(_WebAssistantPane.tasks),
+              ),
+              const SizedBox(height: 4),
+              _AssistantSideTabButton(
+                key: const Key('assistant-side-pane-tab-quick'),
+                icon: Icons.dashboard_customize_outlined,
+                selected: activePane == _WebAssistantPane.quick,
+                tooltip: appText('快捷面板', 'Quick panel'),
+                onTap: () => onPaneChanged(_WebAssistantPane.quick),
+              ),
+              const Spacer(),
+              IconButton(
+                key: const Key('assistant-side-pane-toggle'),
+                tooltip: collapsed
+                    ? appText('展开侧板', 'Expand side pane')
+                    : appText('收起侧板', 'Collapse side pane'),
+                onPressed: onToggleCollapsed,
+                style: IconButton.styleFrom(
+                  backgroundColor: palette.chromeSurface,
+                  foregroundColor: palette.textSecondary,
+                  side: BorderSide(color: palette.chromeStroke),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                icon: Icon(
+                  collapsed
+                      ? Icons.keyboard_double_arrow_right_rounded
+                      : Icons.keyboard_double_arrow_left_rounded,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
+          ),
+        ),
+        if (!collapsed) ...[
+          const SizedBox(width: 6),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: KeyedSubtree(
+                key: ValueKey<String>('assistant-side-pane-${activePane.name}'),
+                child: activePane == _WebAssistantPane.tasks
+                    ? _AssistantTaskPane(
+                        controller: controller,
+                        query: query,
+                        searchController: searchController,
+                        onQueryChanged: onQueryChanged,
+                        onClearQuery: onClearQuery,
+                        showSingle: controller
+                            .featuresFor(UiFeaturePlatform.web)
+                            .supportsDirectAi,
+                        showLocal: controller
+                            .featuresFor(UiFeaturePlatform.web)
+                            .supportsLocalGateway,
+                        showRemote: controller
+                            .featuresFor(UiFeaturePlatform.web)
+                            .supportsRelayGateway,
+                        single: filteredSingle,
+                        local: filteredLocal,
+                        remote: filteredRemote,
+                        onRename: onRename,
+                        onArchive: onArchive,
+                        onOpenActions: onOpenActions,
+                      )
+                    : _AssistantQuickPane(
+                        controller: controller,
+                        permissionLevel: permissionLevel,
+                        onPermissionChanged: onPermissionChanged,
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _AssistantTaskPane extends StatelessWidget {
+  const _AssistantTaskPane({
     required this.controller,
     required this.query,
     required this.searchController,
@@ -359,6 +658,7 @@ class _ConversationRail extends StatelessWidget {
     required this.remote,
     required this.onRename,
     required this.onArchive,
+    required this.onOpenActions,
   });
 
   final AppController controller;
@@ -374,21 +674,28 @@ class _ConversationRail extends StatelessWidget {
   final List<WebConversationSummary> remote;
   final ValueChanged<String> onRename;
   final ValueChanged<String> onArchive;
+  final ValueChanged<String> onOpenActions;
 
   @override
   Widget build(BuildContext context) {
+    final runningCount = controller.conversations
+        .where((item) => item.pending)
+        .length;
+    final threadCount = controller.conversations.length;
+    final skillCount = controller.currentAssistantSkillCount;
+
     return SurfaceCard(
+      key: const Key('assistant-task-rail'),
       borderRadius: 10,
       tone: SurfaceCardTone.chrome,
       child: Column(
-        key: const Key('assistant-task-rail'),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextField(
             controller: searchController,
             onChanged: onQueryChanged,
             decoration: InputDecoration(
-              hintText: appText('搜索任务线程', 'Search task threads'),
+              hintText: appText('搜索任务', 'Search tasks'),
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: query.isEmpty
                   ? null
@@ -398,13 +705,43 @@ class _ConversationRail extends StatelessWidget {
                     ),
             ),
           ),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: () => controller.createConversation(
+              target: controller.assistantExecutionTarget,
+            ),
+            icon: const Icon(Icons.edit_square),
+            label: Text(appText('新对话', 'New conversation')),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(42),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _MetaChip(
+                icon: Icons.play_circle_outline_rounded,
+                label: '${appText('运行中', 'Running')} $runningCount',
+              ),
+              _MetaChip(
+                icon: Icons.chat_bubble_outline_rounded,
+                label: '${appText('当前', 'Current')} $threadCount',
+              ),
+              _MetaChip(
+                icon: Icons.auto_awesome_rounded,
+                label: '${appText('技能', 'Skills')} $skillCount',
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           Expanded(
             child: ListView(
               children: [
                 if (showSingle)
                   _ConversationGroup(
-                    title: appText('Single Agent', 'Single Agent'),
+                    title: appText('单机智能体', 'Single Agent'),
                     icon: Icons.hub_rounded,
                     items: single,
                     emptyLabel: appText(
@@ -414,12 +751,13 @@ class _ConversationRail extends StatelessWidget {
                     onSelect: controller.switchConversation,
                     onRename: onRename,
                     onArchive: onArchive,
+                    onOpenActions: onOpenActions,
                   ),
                 if (showLocal) ...[
                   const SizedBox(height: 12),
                   _ConversationGroup(
-                    title: appText('Local Gateway', 'Local Gateway'),
-                    icon: Icons.lan_rounded,
+                    title: appText('本地 OpenClaw Gateway', 'Local Gateway'),
+                    icon: Icons.laptop_mac_rounded,
                     items: local,
                     emptyLabel: appText(
                       '还没有 Local Gateway 任务线程',
@@ -428,12 +766,13 @@ class _ConversationRail extends StatelessWidget {
                     onSelect: controller.switchConversation,
                     onRename: onRename,
                     onArchive: onArchive,
+                    onOpenActions: onOpenActions,
                   ),
                 ],
                 if (showRemote) ...[
                   const SizedBox(height: 12),
                   _ConversationGroup(
-                    title: appText('Remote Gateway', 'Remote Gateway'),
+                    title: appText('远程 OpenClaw Gateway', 'Remote Gateway'),
                     icon: Icons.cloud_outlined,
                     items: remote,
                     emptyLabel: appText(
@@ -443,8 +782,133 @@ class _ConversationRail extends StatelessWidget {
                     onSelect: controller.switchConversation,
                     onRename: onRename,
                     onArchive: onArchive,
+                    onOpenActions: onOpenActions,
                   ),
                 ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AssistantQuickPane extends StatelessWidget {
+  const _AssistantQuickPane({
+    required this.controller,
+    required this.permissionLevel,
+    required this.onPermissionChanged,
+  });
+
+  final AppController controller;
+  final AssistantPermissionLevel permissionLevel;
+  final ValueChanged<AssistantPermissionLevel> onPermissionChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      borderRadius: 10,
+      tone: SurfaceCardTone.chrome,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            appText('关注入口', 'Focused navigation'),
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            appText(
+              '这里放首页常用设置与运行态摘要；需要完整配置时再进入 Settings。',
+              'Use this rail for homepage settings and runtime summaries, then open full Settings when needed.',
+            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: context.palette.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _QuickInfoCard(
+            icon: WorkspaceDestination.settings.icon,
+            title: WorkspaceDestination.settings.label,
+            description: WorkspaceDestination.settings.description,
+            trailing: IconButton(
+              tooltip: appText('打开全页', 'Open full page'),
+              onPressed: () =>
+                  controller.openSettings(tab: SettingsTab.general),
+              icon: const Icon(Icons.open_in_new_rounded),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _QuickValueCard(
+            title: appText('语言', 'Language'),
+            subtitle: appText('当前界面语言', 'Current interface language'),
+            value: controller.appLanguage == AppLanguage.zh ? '中文' : 'English',
+          ),
+          const SizedBox(height: 10),
+          _QuickValueCard(
+            title: appText('主题', 'Theme'),
+            subtitle: appText('当前显示模式', 'Current display mode'),
+            value: switch (controller.themeMode) {
+              ThemeMode.dark => appText('深色', 'Dark'),
+              ThemeMode.system => appText('跟随系统', 'System'),
+              ThemeMode.light => appText('浅色', 'Light'),
+            },
+          ),
+          const SizedBox(height: 10),
+          _QuickValueCard(
+            title: appText('执行目标', 'Execution target'),
+            subtitle: appText('Assistant 默认运行位置', 'Assistant default target'),
+            value: _targetLabel(controller.assistantExecutionTarget),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: context.palette.surfacePrimary,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: context.palette.strokeSoft),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  appText('权限', 'Permissions'),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  appText(
+                    'Assistant 默认权限级别',
+                    'Assistant default permission level',
+                  ),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.palette.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: context.palette.surfaceSecondary,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: context.palette.strokeSoft),
+                  ),
+                  child: _CompactDropdown<AssistantPermissionLevel>(
+                    value: permissionLevel,
+                    items: AssistantPermissionLevel.values,
+                    labelBuilder: (item) => item.label,
+                    onChanged: (value) {
+                      if (value != null) {
+                        onPermissionChanged(value);
+                      }
+                    },
+                  ),
+                ),
               ],
             ),
           ),
@@ -463,6 +927,7 @@ class _ConversationGroup extends StatelessWidget {
     required this.onSelect,
     required this.onRename,
     required this.onArchive,
+    required this.onOpenActions,
   });
 
   final String title;
@@ -472,6 +937,7 @@ class _ConversationGroup extends StatelessWidget {
   final ValueChanged<String> onSelect;
   final ValueChanged<String> onRename;
   final ValueChanged<String> onArchive;
+  final ValueChanged<String> onOpenActions;
 
   @override
   Widget build(BuildContext context) {
@@ -485,9 +951,7 @@ class _ConversationGroup extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                '$title ${items.length}',
                 style: Theme.of(
                   context,
                 ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
@@ -511,54 +975,60 @@ class _ConversationGroup extends StatelessWidget {
               borderRadius: 10,
               padding: const EdgeInsets.all(12),
               color: item.current ? palette.accentMuted : null,
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Icon(
+                      item.pending
+                          ? Icons.play_circle_outline_rounded
+                          : Icons.check_circle_outline_rounded,
+                      size: 18,
+                      color: item.pending
+                          ? palette.accent
+                          : palette.success.withValues(alpha: 0.92),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
                           item.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
-                      ),
-                      IconButton(
-                        tooltip: appText('重命名', 'Rename'),
-                        onPressed: () => onRename(item.sessionKey),
-                        icon: const Icon(Icons.drive_file_rename_outline_rounded),
-                      ),
-                      IconButton(
-                        tooltip: appText('归档', 'Archive'),
-                        onPressed: () => onArchive(item.sessionKey),
-                        icon: const Icon(Icons.archive_outlined),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
+                        const SizedBox(height: 4),
+                        Text(
                           item.preview,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(color: palette.textSecondary),
                         ),
-                      ),
-                      if (item.pending)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 8, top: 2),
-                          child: SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        _relativeTimeLabel(item.updatedAtMs),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: palette.textMuted,
                         ),
+                      ),
+                      const SizedBox(height: 6),
+                      IconButton(
+                        tooltip: appText('更多操作', 'More actions'),
+                        onPressed: () => onOpenActions(item.sessionKey),
+                        icon: const Icon(Icons.more_horiz_rounded),
+                      ),
                     ],
                   ),
                 ],
@@ -571,20 +1041,19 @@ class _ConversationGroup extends StatelessWidget {
   }
 }
 
-class _ConversationPanel extends StatelessWidget {
-  const _ConversationPanel({
+class _ConversationWorkspace extends StatelessWidget {
+  const _ConversationWorkspace({
     required this.controller,
-    required this.inputController,
     required this.scrollController,
-    required this.connected,
+    required this.inputController,
     required this.currentMessages,
     required this.connectionState,
     required this.thinkingLevel,
     required this.permissionLevel,
     required this.useMultiAgent,
-    required this.importedSkills,
-    required this.selectedSkillKeys,
     required this.attachments,
+    required this.composerHeight,
+    required this.onComposerHeightChanged,
     required this.onThinkingChanged,
     required this.onPermissionChanged,
     required this.onToggleMultiAgent,
@@ -594,17 +1063,16 @@ class _ConversationPanel extends StatelessWidget {
   });
 
   final AppController controller;
-  final TextEditingController inputController;
   final ScrollController scrollController;
-  final bool connected;
+  final TextEditingController inputController;
   final List<GatewayChatMessage> currentMessages;
   final AssistantThreadConnectionState connectionState;
   final String thinkingLevel;
   final AssistantPermissionLevel permissionLevel;
   final bool useMultiAgent;
-  final List<AssistantThreadSkillEntry> importedSkills;
-  final List<String> selectedSkillKeys;
   final List<_WebComposerAttachment> attachments;
+  final double composerHeight;
+  final ValueChanged<double> onComposerHeightChanged;
   final ValueChanged<String> onThinkingChanged;
   final ValueChanged<AssistantPermissionLevel> onPermissionChanged;
   final ValueChanged<bool> onToggleMultiAgent;
@@ -614,298 +1082,423 @@ class _ConversationPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
-    final currentTarget = controller.assistantExecutionTarget;
-    final modelChoices = controller.assistantModelChoices;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final palette = context.palette;
+        final currentTarget = controller.assistantExecutionTarget;
+        final modelChoices = controller.assistantModelChoices;
+        final connected = connectionState.ready;
+        final maxComposerHeight = math.max(
+          _webAssistantComposerMinHeight,
+          constraints.maxHeight -
+              _webAssistantConversationMinHeight -
+              _webAssistantResizeHandleSize,
+        );
+        final resolvedComposerHeight = composerHeight.clamp(
+          _webAssistantComposerMinHeight,
+          maxComposerHeight,
+        );
 
-    return Column(
-      children: [
-        SurfaceCard(
-          borderRadius: 10,
-          tone: SurfaceCardTone.chrome,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        return Column(
+          children: [
+            SurfaceCard(
+              borderRadius: 10,
+              tone: SurfaceCardTone.chrome,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          controller.currentConversationTitle,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          controller.assistantConnectionTargetLabel,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: palette.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  StatusBadge(
-                    status: StatusInfo(
-                      controller.assistantConnectionStatusLabel,
-                      connected ? StatusTone.success : StatusTone.warning,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _CompactDropdown<AssistantExecutionTarget>(
-                    key: const Key('assistant-target-button'),
-                    value: currentTarget,
-                    items: controller
-                        .featuresFor(UiFeaturePlatform.web)
-                        .availableExecutionTargets,
-                    labelBuilder: _targetLabel,
-                    onChanged: (value) {
-                      if (value != null) {
-                        controller.setAssistantExecutionTarget(value);
-                      }
-                    },
-                  ),
-                  if (currentTarget == AssistantExecutionTarget.singleAgent)
-                    _CompactDropdown<SingleAgentProvider>(
-                      key: const Key('assistant-single-agent-provider-button'),
-                      value: controller.currentSingleAgentProvider,
-                      items: controller.singleAgentProviderOptions,
-                      labelBuilder: (item) => item.label,
-                      onChanged: (value) {
-                        if (value != null) {
-                          controller.setSingleAgentProvider(value);
-                        }
-                      },
-                    ),
-                  if (modelChoices.isNotEmpty)
-                    _CompactDropdown<String>(
-                      key: const Key('assistant-model-button'),
-                      value: controller.resolvedAssistantModel,
-                      items: modelChoices,
-                      labelBuilder: (item) => item,
-                      onChanged: (value) {
-                        if (value != null) {
-                          controller.selectAssistantModel(value);
-                        }
-                      },
-                    ),
-                  _CompactDropdown<AssistantMessageViewMode>(
-                    key: const Key('assistant-message-view-mode-button'),
-                    value: controller.currentAssistantMessageViewMode,
-                    items: AssistantMessageViewMode.values,
-                    labelBuilder: (item) => item.label,
-                    onChanged: (value) {
-                      if (value != null) {
-                        controller.setAssistantMessageViewMode(value);
-                      }
-                    },
-                  ),
-                  _CompactDropdown<String>(
-                    key: const Key('assistant-thinking-button'),
-                    value: thinkingLevel,
-                    items: const <String>['low', 'medium', 'high'],
-                    labelBuilder: _thinkingLabel,
-                    onChanged: (value) {
-                      if (value != null) {
-                        onThinkingChanged(value);
-                      }
-                    },
-                  ),
-                  _CompactDropdown<AssistantPermissionLevel>(
-                    key: const Key('assistant-permission-button'),
-                    value: permissionLevel,
-                    items: AssistantPermissionLevel.values,
-                    labelBuilder: (item) => item.label,
-                    onChanged: (value) {
-                      if (value != null) {
-                        onPermissionChanged(value);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        if (!connected)
-          SurfaceCard(
-            borderRadius: 10,
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline_rounded),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    currentTarget == AssistantExecutionTarget.singleAgent
-                        ? appText(
-                            '当前线程未就绪。请检查 Single Agent 配置，或切换到可连接的 Gateway 目标。',
-                            'This thread is not ready. Check Single Agent configuration, or switch to a connected gateway target.',
-                          )
-                        : appText(
-                            '当前线程目标网关未连接。请先在 Settings 中 Test / Save / Apply。',
-                            'The gateway target for this thread is offline. Use Test / Save / Apply in Settings first.',
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                FilledButton.tonal(
-                  onPressed: () => controller.openSettings(tab: SettingsTab.gateway),
-                  child: Text(appText('打开设置', 'Open settings')),
-                ),
-              ],
-            ),
-          ),
-        if (!connected) const SizedBox(height: 8),
-        Expanded(
-          child: SurfaceCard(
-            borderRadius: 10,
-            padding: EdgeInsets.zero,
-            tone: SurfaceCardTone.chrome,
-            child: Column(
-              children: [
-                if (importedSkills.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: importedSkills.map((skill) {
-                          final selected = selectedSkillKeys.contains(skill.key);
-                          return FilterChip(
-                            label: Text(skill.label),
-                            selected: selected,
-                            onSelected: (_) => controller.toggleAssistantSkillForSession(
-                              controller.currentSessionKey,
-                              skill.key,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              controller.currentConversationTitle,
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(fontWeight: FontWeight.w700),
                             ),
-                          );
-                        }).toList(growable: false),
+                            const SizedBox(height: 4),
+                            Text(
+                              controller.assistantConnectionTargetLabel,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: palette.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      StatusBadge(
+                        status: StatusInfo(
+                          controller.assistantConnectionStatusLabel,
+                          connected ? StatusTone.success : StatusTone.warning,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _HeaderDropdownShell(
+                        child: _CompactDropdown<AssistantExecutionTarget>(
+                          key: const Key('assistant-target-button'),
+                          value: currentTarget,
+                          items: controller
+                              .featuresFor(UiFeaturePlatform.web)
+                              .availableExecutionTargets,
+                          labelBuilder: _targetLabel,
+                          onChanged: (value) {
+                            if (value != null) {
+                              controller.setAssistantExecutionTarget(value);
+                            }
+                          },
+                        ),
+                      ),
+                      if (currentTarget == AssistantExecutionTarget.singleAgent)
+                        _HeaderDropdownShell(
+                          child: _CompactDropdown<SingleAgentProvider>(
+                            key: const Key(
+                              'assistant-single-agent-provider-button',
+                            ),
+                            value: controller.currentSingleAgentProvider,
+                            items: controller.singleAgentProviderOptions,
+                            labelBuilder: (item) => item.label,
+                            onChanged: (value) {
+                              if (value != null) {
+                                controller.setSingleAgentProvider(value);
+                              }
+                            },
+                          ),
+                        ),
+                      if (modelChoices.isNotEmpty)
+                        _HeaderDropdownShell(
+                          child: _CompactDropdown<String>(
+                            key: const Key('assistant-model-button'),
+                            value: controller.resolvedAssistantModel,
+                            items: modelChoices,
+                            labelBuilder: (item) => item,
+                            onChanged: (value) {
+                              if (value != null) {
+                                controller.selectAssistantModel(value);
+                              }
+                            },
+                          ),
+                        ),
+                      _HeaderDropdownShell(
+                        child: _CompactDropdown<AssistantMessageViewMode>(
+                          key: const Key('assistant-message-view-mode-button'),
+                          value: controller.currentAssistantMessageViewMode,
+                          items: AssistantMessageViewMode.values,
+                          labelBuilder: (item) => item.label,
+                          onChanged: (value) {
+                            if (value != null) {
+                              controller.setAssistantMessageViewMode(value);
+                            }
+                          },
+                        ),
+                      ),
+                      _HeaderDropdownShell(
+                        child: _CompactDropdown<String>(
+                          key: const Key('assistant-thinking-button'),
+                          value: thinkingLevel,
+                          items: const <String>['low', 'medium', 'high'],
+                          labelBuilder: _thinkingLabel,
+                          onChanged: (value) {
+                            if (value != null) {
+                              onThinkingChanged(value);
+                            }
+                          },
+                        ),
+                      ),
+                      _HeaderDropdownShell(
+                        child: _CompactDropdown<AssistantPermissionLevel>(
+                          key: const Key('assistant-permission-button'),
+                          value: permissionLevel,
+                          items: AssistantPermissionLevel.values,
+                          labelBuilder: (item) => item.label,
+                          onChanged: (value) {
+                            if (value != null) {
+                              onPermissionChanged(value);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (!connected)
+              SurfaceCard(
+                borderRadius: 10,
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        currentTarget == AssistantExecutionTarget.singleAgent
+                            ? appText(
+                                '当前线程未就绪。请检查 Single Agent 配置，或切换到可连接的 Gateway 目标。',
+                                'This thread is not ready. Check Single Agent configuration, or switch to a connected gateway target.',
+                              )
+                            : appText(
+                                '当前线程目标网关未连接。请先在 Settings 中 Test / Save / Apply。',
+                                'The gateway target for this thread is offline. Use Test / Save / Apply in Settings first.',
+                              ),
                       ),
                     ),
-                  ),
-                Expanded(
-                  child: ListView.builder(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: currentMessages.length,
-                    itemBuilder: (context, index) {
-                      final message = currentMessages[index];
-                      return _MessageBubble(message: message);
-                    },
-                  ),
+                    const SizedBox(width: 12),
+                    FilledButton.tonal(
+                      onPressed: () =>
+                          controller.openSettings(tab: SettingsTab.gateway),
+                      child: Text(appText('打开设置', 'Open settings')),
+                    ),
+                  ],
                 ),
-                Container(height: 1, color: palette.strokeSoft),
-                Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    children: [
-                      if (attachments.isNotEmpty)
-                        Align(
+              ),
+            if (!connected) const SizedBox(height: 8),
+            Expanded(
+              child: SurfaceCard(
+                borderRadius: 10,
+                padding: EdgeInsets.zero,
+                tone: SurfaceCardTone.chrome,
+                child: Column(
+                  children: [
+                    if (controller
+                        .assistantImportedSkillsForSession(
+                          controller.currentSessionKey,
+                        )
+                        .isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                        child: Align(
                           alignment: Alignment.centerLeft,
                           child: Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: [
-                              for (var index = 0; index < attachments.length; index++)
-                                InputChip(
-                                  avatar: Icon(attachments[index].icon, size: 16),
-                                  label: Text(attachments[index].name),
-                                  onDeleted: () => onRemoveAttachment(index),
-                                ),
-                            ],
+                            children: controller
+                                .assistantImportedSkillsForSession(
+                                  controller.currentSessionKey,
+                                )
+                                .map((skill) {
+                                  final selected = controller
+                                      .assistantSelectedSkillKeysForSession(
+                                        controller.currentSessionKey,
+                                      )
+                                      .contains(skill.key);
+                                  return FilterChip(
+                                    label: Text(skill.label),
+                                    selected: selected,
+                                    onSelected: (_) => controller
+                                        .toggleAssistantSkillForSession(
+                                          controller.currentSessionKey,
+                                          skill.key,
+                                        ),
+                                  );
+                                })
+                                .toList(growable: false),
                           ),
                         ),
-                      if (attachments.isNotEmpty) const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: inputController,
-                              minLines: 3,
-                              maxLines: 8,
-                              decoration: InputDecoration(
-                                hintText: appText(
-                                  '输入任务说明、上下文和期望输出',
-                                  'Describe the task, context, and expected output',
-                                ),
-                              ),
-                              onSubmitted: (_) {
-                                if (connected) {
-                                  onSubmit();
-                                }
+                      ),
+                    Expanded(
+                      child: currentMessages.isEmpty
+                          ? _ConversationEmptyState(controller: controller)
+                          : ListView.builder(
+                              controller: scrollController,
+                              padding: const EdgeInsets.all(16),
+                              itemCount: currentMessages.length,
+                              itemBuilder: (context, index) {
+                                return _MessageBubble(
+                                  message: currentMessages[index],
+                                );
                               },
                             ),
-                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(
+              height: _webAssistantResizeHandleSize,
+              child: PaneResizeHandle(
+                axis: Axis.vertical,
+                onDelta: (delta) {
+                  onComposerHeightChanged(
+                    (resolvedComposerHeight - delta)
+                        .clamp(
+                          _webAssistantComposerMinHeight,
+                          maxComposerHeight,
+                        )
+                        .toDouble(),
+                  );
+                },
+              ),
+            ),
+            SizedBox(
+              height: resolvedComposerHeight,
+              child: SurfaceCard(
+                borderRadius: 10,
+                tone: SurfaceCardTone.chrome,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (attachments.isNotEmpty) ...[
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (
+                            var index = 0;
+                            index < attachments.length;
+                            index++
+                          )
+                            InputChip(
+                              avatar: Icon(attachments[index].icon, size: 16),
+                              label: Text(attachments[index].name),
+                              onDeleted: () => onRemoveAttachment(index),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Row(
-                            children: [
-                              Checkbox(
-                                value: useMultiAgent,
-                                onChanged: (value) {
-                                  onToggleMultiAgent(value ?? false);
-                                },
-                              ),
-                              Text(appText('Multi-Agent', 'Multi-Agent')),
-                            ],
+                    ],
+                    Expanded(
+                      child: TextField(
+                        controller: inputController,
+                        minLines: null,
+                        maxLines: null,
+                        expands: true,
+                        decoration: InputDecoration(
+                          hintText: appText(
+                            '输入任务说明、补充上下文，XWorkmate 会沿用当前任务上下文持续处理。',
+                            'Describe the task and add context. XWorkmate keeps working in the current task context.',
                           ),
-                          const SizedBox(width: 8),
-                          IconButton(
+                          alignLabelWithHint: true,
+                        ),
+                        textAlignVertical: TextAlignVertical.top,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Checkbox(
+                              value: useMultiAgent,
+                              onChanged: (value) {
+                                onToggleMultiAgent(value ?? false);
+                              },
+                            ),
+                            Text(appText('Multi-Agent', 'Multi-Agent')),
+                          ],
+                        ),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: palette.surfacePrimary,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: palette.strokeSoft),
+                          ),
+                          child: IconButton(
                             key: const Key('assistant-attachment-menu-button'),
                             tooltip: appText('添加附件', 'Add attachment'),
                             onPressed: onAddAttachment,
                             icon: const Icon(Icons.attach_file_rounded),
                           ),
-                          Expanded(
-                            child: Text(
-                              controller.lastAssistantError?.trim().isNotEmpty == true
-                                  ? controller.lastAssistantError!.trim()
-                                  : appText(
-                                      '附件仅支持手动选择，单次总量上限 10MB。',
-                                      'Attachments are explicit user picks only, with a 10MB total limit per send.',
-                                    ),
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: palette.textSecondary,
-                              ),
+                        ),
+                        FilledButton.icon(
+                          onPressed: connected ? onSubmit : null,
+                          icon: controller.relayBusy || controller.acpBusy
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.arrow_upward_rounded),
+                          label: Text(appText('发送', 'Send')),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      controller.lastAssistantError?.trim().isNotEmpty == true
+                          ? controller.lastAssistantError!.trim()
+                          : appText(
+                              '附件仅支持手动选择，单次总量上限 10MB。',
+                              'Attachments are explicit user picks only, with a 10MB total limit per send.',
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          FilledButton.icon(
-                            onPressed: connected ? onSubmit : null,
-                            icon: controller.relayBusy || controller.acpBusy
-                                ? const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : const Icon(Icons.arrow_upward_rounded),
-                            label: Text(appText('发送', 'Send')),
-                          ),
-                        ],
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: palette.textSecondary,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ConversationEmptyState extends StatelessWidget {
+  const _ConversationEmptyState({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: palette.surfaceSecondary,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  color: palette.accent,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                appText('开始这个任务线程', 'Start this task thread'),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                appText(
+                  '保持当前线程模式与上下文，在底部 composer 中直接输入需求即可。',
+                  'Keep the current thread mode and context, then start from the composer below.',
+                ),
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -960,31 +1553,270 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-class _TargetChip extends StatelessWidget {
-  const _TargetChip({
-    required this.targets,
-    required this.value,
-    required this.onChanged,
+class _AssistantSideTabButton extends StatefulWidget {
+  const _AssistantSideTabButton({
+    super.key,
+    required this.icon,
+    required this.selected,
+    required this.tooltip,
+    required this.onTap,
   });
 
-  final List<AssistantExecutionTarget> targets;
-  final AssistantExecutionTarget value;
-  final ValueChanged<AssistantExecutionTarget?> onChanged;
+  final IconData icon;
+  final bool selected;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  State<_AssistantSideTabButton> createState() =>
+      _AssistantSideTabButtonState();
+}
+
+class _AssistantSideTabButtonState extends State<_AssistantSideTabButton> {
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonHideUnderline(
-      child: DropdownButton<AssistantExecutionTarget>(
-        value: value,
-        onChanged: onChanged,
-        items: targets
-            .map(
-              (target) => DropdownMenuItem<AssistantExecutionTarget>(
-                value: target,
-                child: Text(_targetLabel(target)),
+    final palette = context.palette;
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: widget.onTap,
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                gradient: widget.selected || _hovered
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          palette.chromeHighlight.withValues(
+                            alpha: widget.selected ? 0.96 : 0.84,
+                          ),
+                          palette.chromeSurfacePressed,
+                        ],
+                      )
+                    : null,
+                color: widget.selected || _hovered ? null : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: widget.selected
+                      ? palette.accent.withValues(alpha: 0.28)
+                      : Colors.transparent,
+                ),
               ),
-            )
-            .toList(growable: false),
+              child: Icon(
+                widget.icon,
+                size: 18,
+                color: widget.selected ? palette.accent : palette.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ChromePill extends StatelessWidget {
+  const _ChromePill({this.icon, required this.label, this.emphasized = false});
+
+  final IconData? icon;
+  final String label;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: emphasized ? palette.surfacePrimary : palette.surfaceSecondary,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: palette.strokeSoft),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[Icon(icon, size: 16), const SizedBox(width: 8)],
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: emphasized ? FontWeight.w700 : FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderDropdownShell extends StatelessWidget {
+  const _HeaderDropdownShell({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: context.palette.surfacePrimary,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: context.palette.strokeSoft),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: context.palette.surfacePrimary,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: context.palette.strokeSoft),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: context.palette.textSecondary),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickInfoCard extends StatelessWidget {
+  const _QuickInfoCard({
+    required this.icon,
+    required this.title,
+    required this.description,
+    this.trailing = const SizedBox.shrink(),
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final Widget trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: palette.surfacePrimary,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.strokeSoft),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: palette.surfaceSecondary,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, size: 18, color: palette.accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          trailing,
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickValueCard extends StatelessWidget {
+  const _QuickValueCard({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+  });
+
+  final String title;
+  final String subtitle;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: palette.surfacePrimary,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.strokeSoft),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
       ),
     );
   }
@@ -1068,6 +1900,38 @@ class _WebComposerAttachment {
   }
 }
 
+List<WebConversationSummary> _filterConversations(
+  List<WebConversationSummary> items,
+  String query,
+) {
+  if (query.trim().isEmpty) {
+    return items;
+  }
+  final normalized = query.trim().toLowerCase();
+  return items
+      .where((item) {
+        final haystack = '${item.title}\n${item.preview}'.toLowerCase();
+        return haystack.contains(normalized);
+      })
+      .toList(growable: false);
+}
+
+String _relativeTimeLabel(double updatedAtMs) {
+  final delta = DateTime.now().difference(
+    DateTime.fromMillisecondsSinceEpoch(updatedAtMs.round()),
+  );
+  if (delta.inMinutes < 1) {
+    return appText('刚刚', 'now');
+  }
+  if (delta.inHours < 1) {
+    return '${delta.inMinutes}m';
+  }
+  if (delta.inDays < 1) {
+    return '${delta.inHours}h';
+  }
+  return '${delta.inDays}d';
+}
+
 String _thinkingLabel(String level) {
   return switch (level) {
     'low' => appText('低', 'Low'),
@@ -1079,16 +1943,13 @@ String _thinkingLabel(String level) {
 
 String _targetLabel(AssistantExecutionTarget target) {
   return switch (target) {
-    AssistantExecutionTarget.singleAgent => appText(
-      'Single Agent',
-      'Single Agent',
-    ),
+    AssistantExecutionTarget.singleAgent => appText('单机智能体', 'Single Agent'),
     AssistantExecutionTarget.local => appText(
-      'Local Gateway',
+      '本地 OpenClaw Gateway',
       'Local Gateway',
     ),
     AssistantExecutionTarget.remote => appText(
-      'Remote Gateway',
+      '远程 OpenClaw Gateway',
       'Remote Gateway',
     ),
   };
