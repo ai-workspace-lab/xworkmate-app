@@ -133,6 +133,32 @@ class _SettingsPageState extends State<SettingsPage> {
     if (widget.navigationContext != _navigationContext) {
       _navigationContext = widget.navigationContext;
     }
+    _applyGatewayNavigationHints();
+  }
+
+  void _applyGatewayNavigationHints() {
+    final detail = _detail;
+    final navigationContext = _navigationContext;
+    if (detail != SettingsDetailPage.gatewayConnection ||
+        navigationContext == null) {
+      return;
+    }
+    final gatewayProfileIndex = navigationContext.gatewayProfileIndex;
+    if (gatewayProfileIndex == null) {
+      return;
+    }
+    _selectedGatewayProfileIndex = gatewayProfileIndex.clamp(
+      0,
+      kGatewayProfileListLength - 1,
+    );
+  }
+
+  bool _prefersGatewaySetupCodeForCurrentContext(BuildContext context) {
+    return resolveUiFeaturePlatformFromContext(context) ==
+            UiFeaturePlatform.mobile &&
+        _detail == SettingsDetailPage.gatewayConnection &&
+        _navigationContext?.prefersGatewaySetupCode == true &&
+        _selectedGatewayProfileIndex != kGatewayLocalProfileIndex;
   }
 
   @override
@@ -169,6 +195,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _tab = uiFeatures.sanitizeSettingsTab(controller.settingsTab);
         _detail = controller.settingsDetail;
         _navigationContext = controller.settingsNavigationContext;
+        _applyGatewayNavigationHints();
         final settings = controller.settingsDraft;
         final showingDetail = _detail != null;
         final showGlobalApplyBar =
@@ -1160,9 +1187,13 @@ class _SettingsPageState extends State<SettingsPage> {
       resolveUiFeaturePlatformFromContext(context),
     );
     final setupCodeFeatureEnabled = uiFeatures.supportsGatewaySetupCode;
+    final forceSetupCodeMode = _prefersGatewaySetupCodeForCurrentContext(
+      context,
+    );
     final useSetupCode = selectedProfileIndex == kGatewayLocalProfileIndex
         ? false
-        : setupCodeFeatureEnabled && gatewayProfile.useSetupCode;
+        : forceSetupCodeMode ||
+              (setupCodeFeatureEnabled && gatewayProfile.useSetupCode);
     final gatewayTls = gatewayMode == RuntimeConnectionMode.local
         ? false
         : gatewayProfile.tls;
@@ -1220,6 +1251,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         const SizedBox(height: 12),
         if (selectedProfileIndex != kGatewayLocalProfileIndex &&
+            !forceSetupCodeMode &&
             setupCodeFeatureEnabled) ...[
           SectionTabs(
             items: [appText('配置码', 'Setup Code'), appText('手动配置', 'Manual')],
@@ -1245,6 +1277,7 @@ class _SettingsPageState extends State<SettingsPage> {
           TextField(
             key: const ValueKey('gateway-setup-code-field'),
             controller: _gatewaySetupCodeController,
+            autofocus: forceSetupCodeMode,
             minLines: 4,
             maxLines: 6,
             decoration: InputDecoration(
@@ -3162,9 +3195,13 @@ XWorkmate Privacy Policy
       _selectedGatewayProfileIndex,
       current,
     );
+    final forceSetupCodeMode =
+        _navigationContext?.prefersGatewaySetupCode == true &&
+        _detail == SettingsDetailPage.gatewayConnection &&
+        _selectedGatewayProfileIndex != kGatewayLocalProfileIndex;
     final useSetupCode = mode == RuntimeConnectionMode.local
         ? false
-        : current.useSetupCode;
+        : forceSetupCodeMode || current.useSetupCode;
     final tls = mode == RuntimeConnectionMode.local ? false : current.tls;
     final parsedPort = int.tryParse(_gatewayPortController.text.trim());
     final decoded = useSetupCode

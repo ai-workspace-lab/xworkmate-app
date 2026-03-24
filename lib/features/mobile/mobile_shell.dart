@@ -11,6 +11,7 @@ import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/detail_drawer.dart';
+import 'mobile_gateway_pairing_guide_page.dart';
 
 enum MobileShellTab { assistant, tasks, workspace, secrets, settings }
 
@@ -152,6 +153,54 @@ class _MobileShellState extends State<MobileShell> {
         rootLabel: appText('移动端', 'Mobile'),
         destination: WorkspaceDestination.settings,
         sectionLabel: appText('集成', 'Integrations'),
+        gatewayProfileIndex: kGatewayRemoteProfileIndex,
+        prefersGatewaySetupCode: false,
+      ),
+    );
+  }
+
+  Future<void> _openGatewaySetupCodeEntry({String? prefilledSetupCode}) async {
+    final setupCode = prefilledSetupCode?.trim() ?? '';
+    if (setupCode.isNotEmpty) {
+      final current = widget
+          .controller
+          .settingsDraft
+          .gatewayProfiles[kGatewayRemoteProfileIndex];
+      await widget.controller.saveSettingsDraft(
+        widget.controller.settingsDraft.copyWithGatewayProfileAt(
+          kGatewayRemoteProfileIndex,
+          current.copyWith(useSetupCode: true, setupCode: setupCode),
+        ),
+      );
+    }
+    widget.controller.openSettings(
+      detail: SettingsDetailPage.gatewayConnection,
+      navigationContext: SettingsNavigationContext(
+        rootLabel: appText('移动端', 'Mobile'),
+        destination: WorkspaceDestination.settings,
+        sectionLabel: appText('集成', 'Integrations'),
+        gatewayProfileIndex: kGatewayRemoteProfileIndex,
+        prefersGatewaySetupCode: true,
+      ),
+    );
+  }
+
+  void _showPairingGuidePage() {
+    unawaited(_showPairingGuidePageFlow());
+  }
+
+  Future<void> _showPairingGuidePageFlow() async {
+    final supportsQrScan = Theme.of(context).platform == TargetPlatform.iOS;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => MobileGatewayPairingGuidePage(
+          supportsQrScan: supportsQrScan,
+          onManualInput: () => unawaited(_openGatewaySetupCodeEntry()),
+          onScannedSetupCode: (setupCode) async {
+            await _openGatewaySetupCodeEntry(prefilledSetupCode: setupCode);
+          },
+        ),
       ),
     );
   }
@@ -172,7 +221,7 @@ class _MobileShellState extends State<MobileShell> {
               Navigator.of(sheetContext).pop();
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) {
-                  _showConnectSheet();
+                  _showPairingGuidePage();
                 }
               });
             },
@@ -267,7 +316,7 @@ class _MobileShellState extends State<MobileShell> {
                       _MobileSafeStrip(
                         controller: widget.controller,
                         onOpenSafeSheet: _showMobileSafeSheet,
-                        onOpenGatewayConnect: _showConnectSheet,
+                        onOpenGatewayConnect: _showPairingGuidePage,
                       ),
                       const SizedBox(height: 10),
                       Expanded(
@@ -491,11 +540,11 @@ class _MobileSafeStrip extends StatelessWidget {
               else
                 FilledButton(
                   key: const ValueKey('mobile-safe-connect-button'),
-                  onPressed: handlePrimaryConnect,
+                  onPressed: () => unawaited(handlePrimaryConnect()),
                   child: Text(
                     controller.canQuickConnectGateway
                         ? appText('快速连接', 'Quick Connect')
-                        : appText('连接 Gateway', 'Connect Gateway'),
+                        : appText('配对网关', 'Pair Gateway'),
                   ),
                 ),
               if (hasPendingRun)
@@ -678,14 +727,11 @@ class _MobileSafeSheet extends StatelessWidget {
                                   key: const ValueKey(
                                     'mobile-safe-sheet-connect-button',
                                   ),
-                                  onPressed: handleConnect,
+                                  onPressed: () => unawaited(handleConnect()),
                                   child: Text(
                                     controller.canQuickConnectGateway
                                         ? appText('快速连接', 'Quick Connect')
-                                        : appText(
-                                            '打开集成设置',
-                                            'Open Integrations',
-                                          ),
+                                        : appText('配对网关', 'Pair Gateway'),
                                   ),
                                 ),
                               if (hasPendingRun)
