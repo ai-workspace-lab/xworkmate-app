@@ -270,7 +270,7 @@ mobile:
       description: Mobile Vault server integration section
       ui_surface: settings_page
     gateway_setup_code:
-      enabled: false
+      enabled: true
       release_tier: experimental
       build_modes: [debug, profile, release]
       description: Mobile gateway setup code editor
@@ -543,22 +543,22 @@ web:
       description: Web relay gateway assistant mode
       ui_surface: web_assistant_page
     file_attachments:
-      enabled: false
-      release_tier: experimental
-      build_modes: []
-      description: Web does not expose file attachments in assistant composer
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web file attachment action in assistant composer
       ui_surface: web_assistant_page
     multi_agent:
-      enabled: false
-      release_tier: experimental
-      build_modes: []
-      description: Web does not expose multi-agent assistant toggle
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web multi-agent toggle in assistant composer
       ui_surface: web_assistant_page
     local_gateway:
-      enabled: false
-      release_tier: experimental
-      build_modes: []
-      description: Web does not expose local gateway assistant mode
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web local gateway assistant mode
       ui_surface: web_assistant_page
     local_runtime:
       enabled: false
