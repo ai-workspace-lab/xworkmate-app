@@ -31,6 +31,10 @@ void main() {
       find.byKey(const Key('assistant-session-settings-button')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const Key('assistant-workspace-status-chip')),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('assistant-top-target-button')), findsNothing);
     expect(find.byKey(const Key('assistant-target-button')), findsNothing);
     expect(
