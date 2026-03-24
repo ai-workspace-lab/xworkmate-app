@@ -1754,8 +1754,6 @@ class _ConversationArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final theme = Theme.of(context);
-    final statusStyle = _pillStyleForStatus(context, currentTask.status);
 
     return SurfaceCard(
       borderRadius: 0,
@@ -1768,47 +1766,7 @@ class _ConversationArea extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        currentTask.title,
-                        key: const Key('assistant-conversation-title'),
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          _StatusPill(
-                            label: currentTask.draft
-                                ? appText('草稿任务', 'Draft task')
-                                : _taskStatusLabel(currentTask.status),
-                            backgroundColor: statusStyle.backgroundColor,
-                            textColor: statusStyle.foregroundColor,
-                          ),
-                          _MetaPill(
-                            label: currentTask.owner,
-                            icon: Icons.smart_toy_outlined,
-                          ),
-                          _MetaPill(
-                            label: currentTask.surface,
-                            icon: Icons.forum_outlined,
-                          ),
-                          _MetaPill(
-                            label: controller.currentSessionKey,
-                            icon: Icons.tag_rounded,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
+                const Spacer(),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

@@ -25,7 +25,7 @@ import '../test_support.dart';
 
 void main() {
   testWidgets(
-    'AssistantPage desktop shows thread rail and creates draft thread',
+    'AssistantPage desktop hides conversation header text and shows thread rail',
     (WidgetTester tester) async {
       final controller = await createTestController(tester);
 
@@ -36,19 +36,11 @@ void main() {
       );
 
       expect(find.byKey(const Key('assistant-task-rail')), findsOneWidget);
-
-      final titleBefore = tester.widget<Text>(
+      expect(
         find.byKey(const Key('assistant-conversation-title')),
+        findsNothing,
       );
-      expect(titleBefore.data, '默认任务');
-
-      await tester.tap(find.byKey(const Key('assistant-new-task-button')));
-      await tester.pumpAndSettle();
-
-      final titleAfter = tester.widget<Text>(
-        find.byKey(const Key('assistant-conversation-title')),
-      );
-      expect(titleAfter.data, '新对话');
+      expect(controller.currentSessionKey, 'main');
     },
   );
 
@@ -132,6 +124,8 @@ void main() {
     );
 
     expect(find.text('当前 0'), findsOneWidget);
+    controller.dispose();
+    await tester.pump();
   });
 
   testWidgets('AssistantPage lets users rename task titles', (
@@ -167,12 +161,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('研发任务'), findsWidgets);
-    expect(
-      tester
-          .widget<Text>(find.byKey(const Key('assistant-conversation-title')))
-          .data,
-      '研发任务',
-    );
     expect(controller.settings.assistantCustomTaskTitles['main'], '研发任务');
 
     await pumpPage(
@@ -362,7 +350,7 @@ void main() {
 
     expect(find.byKey(const Key('assistant-task-rail')), findsNothing);
     expect(
-      find.byKey(const Key('assistant-conversation-title')),
+      find.byKey(const Key('assistant-conversation-shell')),
       findsOneWidget,
     );
   });
