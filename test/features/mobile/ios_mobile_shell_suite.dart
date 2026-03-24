@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_shell.dart';
 import 'package:xworkmate/app/ui_feature_manifest.dart';
@@ -14,6 +15,34 @@ import 'package:xworkmate/theme/app_theme.dart';
 import '../../test_support.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  const mobileScannerChannel = MethodChannel(
+    'dev.steenbakker.mobile_scanner/scanner/method',
+  );
+
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(mobileScannerChannel, (call) async {
+          return switch (call.method) {
+            'state' => 1,
+            'request' => true,
+            'start' => <Object?, Object?>{
+              'textureId': 1,
+              'size': <Object?, Object?>{'width': 1080.0, 'height': 1920.0},
+              'numberOfCameras': 1,
+              'currentTorchMode': 0,
+            },
+            _ => null,
+          };
+        });
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(mobileScannerChannel, null);
+  });
+
   Future<void> pumpMobileShell(
     WidgetTester tester, {
     required Widget child,

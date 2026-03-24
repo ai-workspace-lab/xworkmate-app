@@ -270,7 +270,7 @@ mobile:
       description: Mobile Vault server integration section
       ui_surface: settings_page
     gateway_setup_code:
-      enabled: false
+      enabled: true
       release_tier: experimental
       build_modes: [debug, profile, release]
       description: Mobile gateway setup code editor
