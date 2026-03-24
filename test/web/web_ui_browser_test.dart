@@ -28,10 +28,51 @@ void main() {
     expect(find.text('Tasks'), findsNothing);
     expect(find.byKey(const Key('assistant-task-rail')), findsOneWidget);
     expect(
+      find.byKey(const Key('assistant-workspace-chrome-toggle')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('assistant-session-settings-button')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('assistant-top-target-button')), findsNothing);
+    expect(find.byKey(const Key('assistant-target-button')), findsNothing);
+    expect(
       find.byKey(const Key('assistant-attachment-menu-button')),
       findsOneWidget,
     );
     expect(find.byKey(const Key('assistant-focus-panel-title')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('assistant-workspace-chrome-toggle')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('连接设置'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('assistant-workspace-chrome-toggle')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('连接设置'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('assistant-session-settings-button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('assistant-session-settings-sheet-title')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('assistant-target-button')), findsOneWidget);
+    expect(
+      find.byKey(const Key('assistant-message-view-mode-button')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('assistant-thinking-button')), findsOneWidget);
+    expect(
+      find.byKey(const Key('assistant-permission-button')),
+      findsOneWidget,
+    );
+
+    await tester.tapAt(const Offset(24, 24));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('assistant-side-pane-tab-quick')));
     await tester.pumpAndSettle();
