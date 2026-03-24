@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:xworkmate/app/app.dart';
+import 'package:xworkmate/widgets/sidebar_navigation.dart';
 
 void main() {
   testWidgets('web shell aligns with app workspace layout and expanded pages', (
@@ -37,6 +38,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('连接设置'), findsNothing);
+    expect(find.byType(SidebarNavigation), findsNothing);
 
     await tester.tap(
       find.byKey(const Key('assistant-workspace-chrome-toggle')),
@@ -108,18 +110,27 @@ void main() {
     );
 
     await tester.tap(
-      find.byKey(const ValueKey<String>('assistant-focus-add-tasks')),
+      find.byKey(const ValueKey<String>('assistant-focus-add-settings')),
     );
     await tester.pumpAndSettle();
 
     expect(
-      find.byKey(const ValueKey<String>('assistant-focus-open-page-tasks')),
+      find.byKey(const ValueKey<String>('assistant-focus-open-page-settings')),
       findsOneWidget,
     );
 
     await tester.tap(
-      find.byKey(const ValueKey<String>('assistant-focus-open-page-tasks')),
+      find.byKey(const ValueKey<String>('assistant-focus-open-page-settings')),
     );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SidebarNavigation), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey<String>('sidebar-favorite-tasks')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('自动化'));
     await tester.pumpAndSettle();
 
     expect(find.text('任务工作台'), findsOneWidget);
