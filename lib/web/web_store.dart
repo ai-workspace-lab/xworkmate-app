@@ -10,8 +10,11 @@ class WebStore {
   static const settingsKey = 'xworkmate.web.settings.snapshot';
   static const threadsKey = 'xworkmate.web.assistant.threads';
   static const aiGatewayApiKeyKey = 'xworkmate.web.ai_gateway.api_key';
+  // Legacy remote-only keys (kept for migration fallback).
   static const relayTokenKey = 'xworkmate.web.relay.token';
   static const relayPasswordKey = 'xworkmate.web.relay.password';
+  static const relayTokenProfilePrefix = 'xworkmate.web.relay.token.';
+  static const relayPasswordProfilePrefix = 'xworkmate.web.relay.password.';
   static const relayDeviceIdentityKey = 'xworkmate.web.relay.device_identity';
   static const sessionClientIdKey = 'xworkmate.web.session.client_id';
   static const themeModeKey = 'xworkmate.web.theme_mode';
@@ -72,24 +75,50 @@ class WebStore {
     await _prefs!.setString(aiGatewayApiKeyKey, value.trim());
   }
 
-  Future<String> loadRelayToken() async {
+  Future<String> loadRelayToken({int? profileIndex}) async {
     await initialize();
-    return (_prefs!.getString(relayTokenKey) ?? '').trim();
+    final scopedKey = _relayTokenScopedKey(profileIndex);
+    final scoped = (_prefs!.getString(scopedKey) ?? '').trim();
+    if (scoped.isNotEmpty) {
+      return scoped;
+    }
+    // Backward compatibility: old builds persisted a single remote token.
+    if (profileIndex == null || profileIndex == kGatewayRemoteProfileIndex) {
+      return (_prefs!.getString(relayTokenKey) ?? '').trim();
+    }
+    return '';
   }
 
-  Future<void> saveRelayToken(String value) async {
+  Future<void> saveRelayToken(String value, {int? profileIndex}) async {
     await initialize();
-    await _prefs!.setString(relayTokenKey, value.trim());
+    final trimmed = value.trim();
+    await _prefs!.setString(_relayTokenScopedKey(profileIndex), trimmed);
+    if (profileIndex == null || profileIndex == kGatewayRemoteProfileIndex) {
+      await _prefs!.setString(relayTokenKey, trimmed);
+    }
   }
 
-  Future<String> loadRelayPassword() async {
+  Future<String> loadRelayPassword({int? profileIndex}) async {
     await initialize();
-    return (_prefs!.getString(relayPasswordKey) ?? '').trim();
+    final scopedKey = _relayPasswordScopedKey(profileIndex);
+    final scoped = (_prefs!.getString(scopedKey) ?? '').trim();
+    if (scoped.isNotEmpty) {
+      return scoped;
+    }
+    // Backward compatibility: old builds persisted a single remote password.
+    if (profileIndex == null || profileIndex == kGatewayRemoteProfileIndex) {
+      return (_prefs!.getString(relayPasswordKey) ?? '').trim();
+    }
+    return '';
   }
 
-  Future<void> saveRelayPassword(String value) async {
+  Future<void> saveRelayPassword(String value, {int? profileIndex}) async {
     await initialize();
-    await _prefs!.setString(relayPasswordKey, value.trim());
+    final trimmed = value.trim();
+    await _prefs!.setString(_relayPasswordScopedKey(profileIndex), trimmed);
+    if (profileIndex == null || profileIndex == kGatewayRemoteProfileIndex) {
+      await _prefs!.setString(relayPasswordKey, trimmed);
+    }
   }
 
   Future<String> loadOrCreateWebSessionClientId() async {
@@ -160,5 +189,15 @@ class WebStore {
       growable: false,
     ).join();
     return 'web-$timestamp-$suffix';
+  }
+
+  static String _relayTokenScopedKey(int? profileIndex) {
+    final resolved = profileIndex ?? kGatewayRemoteProfileIndex;
+    return '$relayTokenProfilePrefix$resolved';
+  }
+
+  static String _relayPasswordScopedKey(int? profileIndex) {
+    final resolved = profileIndex ?? kGatewayRemoteProfileIndex;
+    return '$relayPasswordProfilePrefix$resolved';
   }
 }
