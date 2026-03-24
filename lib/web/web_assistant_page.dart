@@ -12,7 +12,6 @@ import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
 import '../widgets/desktop_workspace_scaffold.dart';
 import '../widgets/pane_resize_handle.dart';
-import '../widgets/status_badge.dart';
 import '../widgets/surface_card.dart';
 import 'web_focus_panel.dart';
 
@@ -450,6 +449,7 @@ class _AssistantWorkspaceChrome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final connectionState = controller.currentAssistantConnectionState;
     return SurfaceCard(
       tone: SurfaceCardTone.chrome,
       borderRadius: 10,
@@ -463,15 +463,8 @@ class _AssistantWorkspaceChrome extends StatelessWidget {
                     controller: controller,
                     compact: true,
                   ),
-                  const SizedBox(width: 8),
-                  StatusBadge(
-                    status: StatusInfo(
-                      controller.assistantConnectionStatusLabel,
-                      controller.currentAssistantConnectionState.ready
-                          ? StatusTone.success
-                          : StatusTone.warning,
-                    ),
-                  ),
+                  const Spacer(),
+                  _ChromeConnectionChip(state: connectionState, compact: true),
                   const SizedBox(width: 8),
                   IconButton(
                     key: const Key('assistant-workspace-chrome-toggle'),
@@ -503,11 +496,11 @@ class _AssistantWorkspaceChrome extends StatelessWidget {
                           ],
                         ),
                       ),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
+                          _ChromeConnectionChip(state: connectionState),
+                          const SizedBox(width: 8),
                           IconButton(
                             key: const Key('assistant-workspace-chrome-toggle'),
                             tooltip: appText(
@@ -529,19 +522,75 @@ class _AssistantWorkspaceChrome extends StatelessWidget {
                           controller: controller,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      StatusBadge(
-                        status: StatusInfo(
-                          controller.assistantConnectionStatusLabel,
-                          controller.currentAssistantConnectionState.ready
-                              ? StatusTone.success
-                              : StatusTone.warning,
-                        ),
-                      ),
                     ],
                   ),
                 ],
               ),
+      ),
+    );
+  }
+}
+
+class _ChromeConnectionChip extends StatelessWidget {
+  const _ChromeConnectionChip({required this.state, this.compact = false});
+
+  final AssistantThreadConnectionState state;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    final tone = switch (state.status) {
+      RuntimeConnectionStatus.connected => (
+        palette.success.withValues(alpha: 0.14),
+        palette.success.withValues(alpha: 0.22),
+        palette.success,
+      ),
+      RuntimeConnectionStatus.connecting => (
+        palette.accentMuted.withValues(alpha: 0.86),
+        palette.accent.withValues(alpha: 0.18),
+        palette.accent,
+      ),
+      RuntimeConnectionStatus.error => (
+        palette.danger.withValues(alpha: 0.12),
+        palette.danger.withValues(alpha: 0.18),
+        palette.textSecondary,
+      ),
+      RuntimeConnectionStatus.offline => (
+        palette.warning.withValues(alpha: 0.12),
+        palette.warning.withValues(alpha: 0.18),
+        palette.textSecondary,
+      ),
+    };
+    final text = [
+      state.primaryLabel.trim(),
+      state.detailLabel.trim(),
+    ].where((item) => item.isNotEmpty).join(' · ');
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: compact ? 280 : 360),
+      child: Container(
+        key: const Key('assistant-workspace-status-chip'),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 10 : 12,
+          vertical: compact ? 6 : 7,
+        ),
+        decoration: BoxDecoration(
+          color: tone.$1,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: tone.$2),
+        ),
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: tone.$3,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.02,
+          ),
+        ),
       ),
     );
   }
