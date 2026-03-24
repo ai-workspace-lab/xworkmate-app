@@ -807,109 +807,359 @@ class _AssistantQuickPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final favorites = controller.assistantNavigationDestinations
+        .where((item) => item == WorkspaceDestination.settings)
+        .toList(growable: false);
+    final canAddSettings =
+        controller.capabilities.supportsDestination(
+          WorkspaceDestination.settings,
+        ) &&
+        !favorites.contains(WorkspaceDestination.settings);
+    final palette = context.palette;
+
     return SurfaceCard(
       borderRadius: 10,
       tone: SurfaceCardTone.chrome,
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 10, 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        appText('关注入口', 'Focused navigation'),
+                        key: const Key('assistant-focus-panel-title'),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        appText(
+                          '添加后的入口会直接出现在最左侧侧板。这里负责管理关注项和查看摘要，需要完整页面时再单独打开。',
+                          'Added entries appear directly in the far-left rail. Manage focused destinations and review summaries here, then open the full page only when needed.',
+                        ),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: palette.textSecondary,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (canAddSettings)
+                  Tooltip(
+                    message: appText('添加关注入口', 'Add focused destination'),
+                    child: InkWell(
+                      key: const Key('assistant-focus-add-menu'),
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () {
+                        controller.toggleAssistantNavigationDestination(
+                          WorkspaceDestination.settings,
+                        );
+                      },
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              palette.chromeHighlight.withValues(alpha: 0.94),
+                              palette.chromeSurfacePressed,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: palette.chromeStroke),
+                          boxShadow: [palette.chromeShadowLift],
+                        ),
+                        child: Icon(
+                          Icons.add_rounded,
+                          size: 18,
+                          color: palette.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: palette.strokeSoft),
+          Expanded(
+            child: favorites.isEmpty
+                ? _FocusedNavigationEmptyState(
+                    canAddSettings: canAddSettings,
+                    onAddSettings: () {
+                      controller.toggleAssistantNavigationDestination(
+                        WorkspaceDestination.settings,
+                      );
+                    },
+                  )
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                    children: [
+                      _FocusedSettingsCard(
+                        controller: controller,
+                        onOpenPage: () =>
+                            controller.openSettings(tab: SettingsTab.general),
+                        onRemoveFavorite: () {
+                          controller.toggleAssistantNavigationDestination(
+                            WorkspaceDestination.settings,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FocusedNavigationEmptyState extends StatelessWidget {
+  const _FocusedNavigationEmptyState({
+    required this.canAddSettings,
+    required this.onAddSettings,
+  });
+
+  final bool canAddSettings;
+  final VoidCallback onAddSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: palette.surfaceSecondary,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: palette.strokeSoft),
+          ),
+          child: Text(
+            appText(
+              '还没有关注入口。给功能菜单点星标，或从右上角添加一个入口，加入最左侧侧板。',
+              'No focused entries yet. Star a destination or add one from the top-right menu to place it in the far-left rail.',
+            ),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: palette.textSecondary,
+              height: 1.35,
+            ),
+          ),
+        ),
+        if (canAddSettings) ...[
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ActionChip(
+              key: const ValueKey<String>('assistant-focus-add-settings'),
+              avatar: const Icon(Icons.tune_rounded, size: 16),
+              label: Text(WorkspaceDestination.settings.label),
+              onPressed: onAddSettings,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _FocusedSettingsCard extends StatelessWidget {
+  const _FocusedSettingsCard({
+    required this.controller,
+    required this.onOpenPage,
+    required this.onRemoveFavorite,
+  });
+
+  final AppController controller;
+  final VoidCallback onOpenPage;
+  final VoidCallback onRemoveFavorite;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    final languageLabel = controller.appLanguage == AppLanguage.zh
+        ? appText('中文', 'Chinese')
+        : 'English';
+    final themeLabel = switch (controller.themeMode) {
+      ThemeMode.dark => appText('深色', 'Dark'),
+      ThemeMode.light => appText('浅色', 'Light'),
+      ThemeMode.system => appText('跟随系统', 'System'),
+    };
+
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.surfacePrimary,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.strokeSoft),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 10, 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: palette.surfaceSecondary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    WorkspaceDestination.settings.icon,
+                    size: 18,
+                    color: palette.accent,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        WorkspaceDestination.settings.label,
+                        key: const ValueKey<String>(
+                          'assistant-focus-active-title-settings',
+                        ),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        WorkspaceDestination.settings.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: palette.textSecondary,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  key: const ValueKey<String>('assistant-focus-open-page-settings'),
+                  tooltip: appText('打开全页', 'Open full page'),
+                  onPressed: onOpenPage,
+                  icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                ),
+                IconButton(
+                  key: const ValueKey<String>('assistant-focus-remove-settings'),
+                  tooltip: appText('取消关注', 'Remove from focused panel'),
+                  onPressed: onRemoveFavorite,
+                  icon: Icon(Icons.star_rounded, color: palette.accent),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: palette.strokeSoft),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+            child: Column(
+              children: [
+                _FocusedPreviewTile(
+                  title: appText('语言', 'Language'),
+                  subtitle: appText('当前界面语言', 'Current interface language'),
+                  trailing: languageLabel,
+                ),
+                const SizedBox(height: 8),
+                _FocusedPreviewTile(
+                  title: appText('主题', 'Theme'),
+                  subtitle: appText('当前显示模式', 'Current display mode'),
+                  trailing: themeLabel,
+                ),
+                const SizedBox(height: 8),
+                _FocusedPreviewTile(
+                  title: appText('执行目标', 'Execution target'),
+                  subtitle: appText(
+                    'Assistant 默认运行位置',
+                    'Default assistant execution target',
+                  ),
+                  trailing: controller.assistantExecutionTarget.label,
+                ),
+                const SizedBox(height: 8),
+                _FocusedPreviewTile(
+                  title: appText('权限', 'Permissions'),
+                  subtitle: appText(
+                    'Assistant 默认权限级别',
+                    'Default assistant permission level',
+                  ),
+                  trailing: controller.assistantPermissionLevel.label,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FocusedPreviewTile extends StatelessWidget {
+  const _FocusedPreviewTile({
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+  });
+
+  final String title;
+  final String subtitle;
+  final String trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: palette.surfaceSecondary,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.strokeSoft),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            appText('关注入口', 'Focused navigation'),
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
-            appText(
-              '这里放首页常用设置与运行态摘要；需要完整配置时再进入 Settings。',
-              'Use this rail for homepage settings and runtime summaries, then open full Settings when needed.',
-            ),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: context.palette.textSecondary,
+            subtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: palette.textSecondary,
+              height: 1.3,
             ),
           ),
-          const SizedBox(height: 12),
-          _QuickInfoCard(
-            icon: WorkspaceDestination.settings.icon,
-            title: WorkspaceDestination.settings.label,
-            description: WorkspaceDestination.settings.description,
-            trailing: IconButton(
-              tooltip: appText('打开全页', 'Open full page'),
-              onPressed: () =>
-                  controller.openSettings(tab: SettingsTab.general),
-              icon: const Icon(Icons.open_in_new_rounded),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _QuickValueCard(
-            title: appText('语言', 'Language'),
-            subtitle: appText('当前界面语言', 'Current interface language'),
-            value: controller.appLanguage == AppLanguage.zh ? '中文' : 'English',
-          ),
-          const SizedBox(height: 10),
-          _QuickValueCard(
-            title: appText('主题', 'Theme'),
-            subtitle: appText('当前显示模式', 'Current display mode'),
-            value: switch (controller.themeMode) {
-              ThemeMode.dark => appText('深色', 'Dark'),
-              ThemeMode.system => appText('跟随系统', 'System'),
-              ThemeMode.light => appText('浅色', 'Light'),
-            },
-          ),
-          const SizedBox(height: 10),
-          _QuickValueCard(
-            title: appText('执行目标', 'Execution target'),
-            subtitle: appText('Assistant 默认运行位置', 'Assistant default target'),
-            value: _targetLabel(controller.assistantExecutionTarget),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: context.palette.surfacePrimary,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: context.palette.strokeSoft),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  appText('权限', 'Permissions'),
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  appText(
-                    'Assistant 默认权限级别',
-                    'Assistant default permission level',
-                  ),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: context.palette.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: context.palette.surfaceSecondary,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: context.palette.strokeSoft),
-                  ),
-                  child: _CompactDropdown<AssistantPermissionLevel>(
-                    value: permissionLevel,
-                    items: AssistantPermissionLevel.values,
-                    labelBuilder: (item) => item.label,
-                    onChanged: (value) {
-                      if (value != null) {
-                        onPermissionChanged(value);
-                      }
-                    },
-                  ),
-                ),
-              ],
+          const SizedBox(height: 8),
+          Text(
+            trailing,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: palette.textPrimary,
             ),
           ),
         ],
@@ -1709,118 +1959,6 @@ class _MetaChip extends StatelessWidget {
   }
 }
 
-class _QuickInfoCard extends StatelessWidget {
-  const _QuickInfoCard({
-    required this.icon,
-    required this.title,
-    required this.description,
-    this.trailing = const SizedBox.shrink(),
-  });
-
-  final IconData icon;
-  final String title;
-  final String description;
-  final Widget trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: palette.surfacePrimary,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: palette.strokeSoft),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: palette.surfaceSecondary,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, size: 18, color: palette.accent),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          trailing,
-        ],
-      ),
-    );
-  }
-}
-
-class _QuickValueCard extends StatelessWidget {
-  const _QuickValueCard({
-    required this.title,
-    required this.subtitle,
-    required this.value,
-  });
-
-  final String title;
-  final String subtitle;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: palette.surfacePrimary,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: palette.strokeSoft),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _CompactDropdown<T> extends StatelessWidget {
   const _CompactDropdown({

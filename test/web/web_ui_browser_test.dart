@@ -21,12 +21,58 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('助手'), findsWidgets);
-    expect(find.byKey(const Key('web-shell-nav-assistant')), findsOneWidget);
-    expect(find.byKey(const Key('web-shell-nav-settings')), findsOneWidget);
+    expect(find.byKey(const Key('web-shell-nav-assistant')), findsNothing);
+    expect(find.byKey(const Key('web-shell-nav-settings')), findsNothing);
+    expect(find.byKey(const Key('web-shell-language-toggle')), findsNothing);
+    expect(find.byKey(const Key('web-shell-theme-toggle')), findsNothing);
     expect(find.text('Tasks'), findsNothing);
     expect(find.byKey(const Key('assistant-task-rail')), findsOneWidget);
     expect(
       find.byKey(const Key('assistant-attachment-menu-button')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('assistant-focus-panel-title')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('assistant-side-pane-tab-quick')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('assistant-focus-panel-title')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey<String>('assistant-focus-add-settings')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('assistant-focus-add-tasks')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('assistant-focus-add-skills')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('assistant-focus-add-nodes')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('assistant-focus-add-secrets')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('assistant-focus-add-aiGateway')),
+      findsNothing,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('assistant-focus-add-settings')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey<String>('assistant-focus-open-page-settings')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('assistant-focus-remove-settings')),
       findsOneWidget,
     );
 
