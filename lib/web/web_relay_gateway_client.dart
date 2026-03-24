@@ -37,7 +37,7 @@ class WebRelayGatewayClient {
   StreamSubscription<dynamic>? _subscription;
   int _requestCounter = 0;
   GatewayConnectionSnapshot _snapshot = GatewayConnectionSnapshot.initial(
-    mode: RuntimeConnectionMode.remote,
+    mode: RuntimeConnectionMode.unconfigured,
   );
 
   Stream<GatewayPushEvent> get events => _events.stream;
@@ -51,11 +51,14 @@ class WebRelayGatewayClient {
     required String authPassword,
   }) async {
     await disconnect();
+    final targetMode = profile.mode == RuntimeConnectionMode.local
+        ? RuntimeConnectionMode.local
+        : RuntimeConnectionMode.remote;
     final endpoint = _resolveEndpoint(profile);
     if (endpoint == null) {
       _snapshot =
           GatewayConnectionSnapshot.initial(
-            mode: RuntimeConnectionMode.remote,
+            mode: targetMode,
           ).copyWith(
             status: RuntimeConnectionStatus.error,
             statusText: 'Missing relay endpoint',
@@ -68,7 +71,7 @@ class WebRelayGatewayClient {
     final identity = await _identityManager.loadOrCreate(_store);
     _snapshot =
         GatewayConnectionSnapshot.initial(
-          mode: RuntimeConnectionMode.remote,
+          mode: targetMode,
         ).copyWith(
           status: RuntimeConnectionStatus.connecting,
           statusText: 'Connecting…',
@@ -136,6 +139,7 @@ class WebRelayGatewayClient {
     );
 
     try {
+      await channel.ready;
       final nonce = await challenge.future.timeout(
         const Duration(seconds: 5),
         onTimeout: () =>
@@ -159,6 +163,7 @@ class WebRelayGatewayClient {
       _snapshot = _snapshot.copyWith(
         status: RuntimeConnectionStatus.connected,
         statusText: 'Connected',
+        mode: targetMode,
         serverName: _stringValue(server['host']),
         remoteAddress: '${endpoint.host}:${endpoint.port}',
         mainSessionKey:
@@ -173,6 +178,7 @@ class WebRelayGatewayClient {
     } catch (error) {
       await disconnect();
       _snapshot = _snapshot.copyWith(
+        mode: targetMode,
         status: RuntimeConnectionStatus.error,
         statusText: 'Connection failed',
         lastError: error.toString(),
@@ -195,6 +201,13 @@ class WebRelayGatewayClient {
     _subscription = null;
     await _channel?.sink.close();
     _channel = null;
+    if (_snapshot.status != RuntimeConnectionStatus.offline) {
+      _snapshot = _snapshot.copyWith(
+        status: RuntimeConnectionStatus.offline,
+        statusText: 'Offline',
+        clearRemoteAddress: true,
+      );
+    }
   }
 
   Future<List<GatewaySessionSummary>> listSessions({int limit = 50}) async {
@@ -275,8 +288,15 @@ class WebRelayGatewayClient {
     required String sessionKey,
     required String message,
     required String thinking,
+    List<GatewayChatAttachmentPayload> attachments =
+        const <GatewayChatAttachmentPayload>[],
+    Map<String, dynamic> metadata = const <String, dynamic>{},
   }) async {
     final runId = _randomId();
+    final normalizedMetadata = <String, dynamic>{
+      for (final entry in metadata.entries)
+        if (entry.key.trim().isNotEmpty) entry.key: entry.value,
+    };
     final payload = _asMap(
       await request(
         'chat.send',
@@ -284,6 +304,11 @@ class WebRelayGatewayClient {
           'sessionKey': sessionKey,
           'message': message,
           'thinking': thinking,
+          if (attachments.isNotEmpty)
+            'attachments': attachments
+                .map((item) => item.toJson())
+                .toList(growable: false),
+          if (normalizedMetadata.isNotEmpty) 'metadata': normalizedMetadata,
           'timeoutMs': 30000,
           'idempotencyKey': runId,
         },

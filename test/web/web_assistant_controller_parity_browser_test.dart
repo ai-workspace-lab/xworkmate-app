@@ -1,0 +1,306 @@
+@TestOn('browser')
+library;
+
+import 'dart:async';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:xworkmate/app/app_controller_web.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/web/web_acp_client.dart';
+import 'package:xworkmate/web/web_relay_gateway_client.dart';
+import 'package:xworkmate/web/web_store.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('thread-scoped assistant context persists across reload on web', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
+    final fakeRelay = _FakeRelayGatewayClient(WebStore());
+    final fakeAcp = _FakeAcpClient();
+    final controller = AppController(
+      store: WebStore(),
+      relayClient: fakeRelay,
+      acpClient: fakeAcp,
+    );
+    await _waitForReady(controller);
+
+    await controller.saveRelayConfiguration(
+      profileIndex: kGatewayLocalProfileIndex,
+      host: '',
+      port: 18789,
+      tls: false,
+      token: '',
+      password: '',
+    );
+    await controller.saveRelayConfiguration(
+      profileIndex: kGatewayRemoteProfileIndex,
+      host: '',
+      port: 443,
+      tls: true,
+      token: '',
+      password: '',
+    );
+
+    final threadSingle = controller.currentSessionKey;
+    await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+    await controller.setAssistantMessageViewMode(AssistantMessageViewMode.raw);
+    await controller.selectAssistantModelForSession(threadSingle, 'single-model');
+    await controller.saveAssistantTaskTitle(threadSingle, 'Thread Single');
+
+    await controller.createConversation(target: AssistantExecutionTarget.local);
+    final threadLocal = controller.currentSessionKey;
+    await controller.setAssistantExecutionTarget(AssistantExecutionTarget.local);
+    await controller.selectAssistantModelForSession(threadLocal, 'local-model');
+    await controller.saveAssistantTaskTitle(threadLocal, 'Thread Local');
+
+    await controller.createConversation(target: AssistantExecutionTarget.remote);
+    final threadRemote = controller.currentSessionKey;
+    await controller.setAssistantExecutionTarget(AssistantExecutionTarget.remote);
+    await controller.setAssistantMessageViewMode(AssistantMessageViewMode.raw);
+    await controller.selectAssistantModelForSession(threadRemote, 'remote-model');
+    await controller.saveAssistantTaskTitle(threadRemote, 'Thread Remote');
+    await controller.saveAssistantTaskArchived(threadRemote, true);
+
+    expect(
+      controller.assistantExecutionTargetForSession(threadSingle),
+      AssistantExecutionTarget.singleAgent,
+    );
+    expect(
+      controller.singleAgentProviderForSession(threadSingle),
+      SingleAgentProvider.codex,
+    );
+    expect(
+      controller.assistantMessageViewModeForSession(threadSingle),
+      AssistantMessageViewMode.raw,
+    );
+    expect(controller.assistantModelForSession(threadSingle), 'single-model');
+
+    expect(controller.assistantModelForSession(threadLocal), 'local-model');
+
+    expect(
+      controller.isAssistantTaskArchived(threadRemote),
+      isTrue,
+    );
+    expect(
+      controller.conversations.where((item) => item.sessionKey == threadRemote),
+      isEmpty,
+    );
+
+    controller.dispose();
+
+    final reloaded = AppController(
+      store: WebStore(),
+      relayClient: _FakeRelayGatewayClient(WebStore()),
+      acpClient: fakeAcp,
+    );
+    await _waitForReady(reloaded);
+
+    expect(
+      reloaded.assistantExecutionTargetForSession(threadSingle),
+      AssistantExecutionTarget.singleAgent,
+    );
+    expect(
+      reloaded.singleAgentProviderForSession(threadSingle),
+      SingleAgentProvider.codex,
+    );
+    expect(
+      reloaded.assistantMessageViewModeForSession(threadSingle),
+      AssistantMessageViewMode.raw,
+    );
+    expect(reloaded.assistantModelForSession(threadSingle), 'single-model');
+    expect(reloaded.assistantModelForSession(threadLocal), 'local-model');
+    expect(reloaded.isAssistantTaskArchived(threadRemote), isTrue);
+
+    reloaded.dispose();
+  });
+
+  test('gateway Save does not connect but Apply connects current target profile',
+      () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
+    final fakeRelay = _FakeRelayGatewayClient(WebStore());
+    final controller = AppController(
+      store: WebStore(),
+      relayClient: fakeRelay,
+      acpClient: _FakeAcpClient(),
+    );
+    await _waitForReady(controller);
+
+    await controller.setAssistantExecutionTarget(AssistantExecutionTarget.remote);
+    fakeRelay.connectCalls = 0;
+
+    await controller.saveRelayConfiguration(
+      profileIndex: kGatewayRemoteProfileIndex,
+      host: 'remote.example.com',
+      port: 443,
+      tls: true,
+      token: 'remote-token',
+      password: '',
+    );
+    expect(fakeRelay.connectCalls, 0);
+
+    await controller.applyRelayConfiguration(
+      profileIndex: kGatewayRemoteProfileIndex,
+      host: 'remote.example.com',
+      port: 443,
+      tls: true,
+      token: 'remote-token',
+      password: '',
+    );
+
+    expect(fakeRelay.connectCalls, greaterThanOrEqualTo(1));
+    expect(fakeRelay.lastConnectMode, RuntimeConnectionMode.remote);
+
+    controller.dispose();
+  });
+}
+
+class _FakeRelayGatewayClient extends WebRelayGatewayClient {
+  _FakeRelayGatewayClient(
+    super.store, {
+    GatewayConnectionSnapshot? initialSnapshot,
+  }) : _snapshot =
+           initialSnapshot ??
+           GatewayConnectionSnapshot.initial(mode: RuntimeConnectionMode.remote);
+
+  final StreamController<GatewayPushEvent> _eventsController =
+      StreamController<GatewayPushEvent>.broadcast();
+  GatewayConnectionSnapshot _snapshot;
+
+  int connectCalls = 0;
+  RuntimeConnectionMode? lastConnectMode;
+
+  @override
+  Stream<GatewayPushEvent> get events => _eventsController.stream;
+
+  @override
+  GatewayConnectionSnapshot get snapshot => _snapshot;
+
+  @override
+  Future<void> connect({
+    required GatewayConnectionProfile profile,
+    required String authToken,
+    required String authPassword,
+  }) async {
+    connectCalls += 1;
+    lastConnectMode = profile.mode;
+    _snapshot = GatewayConnectionSnapshot.initial(mode: profile.mode).copyWith(
+      status: RuntimeConnectionStatus.connected,
+      statusText: 'Connected',
+      remoteAddress: '${profile.host}:${profile.port}',
+    );
+  }
+
+  @override
+  Future<void> disconnect() async {
+    _snapshot = _snapshot.copyWith(
+      status: RuntimeConnectionStatus.offline,
+      statusText: 'Offline',
+      clearRemoteAddress: true,
+    );
+  }
+
+  @override
+  Future<List<GatewaySessionSummary>> listSessions({int limit = 50}) async {
+    return const <GatewaySessionSummary>[];
+  }
+
+  @override
+  Future<List<GatewayChatMessage>> loadHistory(
+    String sessionKey, {
+    int limit = 120,
+  }) async {
+    return const <GatewayChatMessage>[];
+  }
+
+  @override
+  Future<String> sendChat({
+    required String sessionKey,
+    required String message,
+    required String thinking,
+    List<GatewayChatAttachmentPayload> attachments =
+        const <GatewayChatAttachmentPayload>[],
+    Map<String, dynamic> metadata = const <String, dynamic>{},
+  }) async {
+    return 'fake-run';
+  }
+
+  @override
+  Future<List<GatewayModelSummary>> listModels() async {
+    return const <GatewayModelSummary>[];
+  }
+
+  @override
+  Future<dynamic> request(
+    String method, {
+    Map<String, dynamic>? params,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    if (method == 'skills.status') {
+      return const <String, dynamic>{'skills': <dynamic>[]};
+    }
+    return const <String, dynamic>{};
+  }
+
+  @override
+  Future<void> dispose() async {
+    await _eventsController.close();
+  }
+}
+
+class _FakeAcpClient extends WebAcpClient {
+  @override
+  Future<WebAcpCapabilities> loadCapabilities({required Uri endpoint}) async {
+    return WebAcpCapabilities(
+      singleAgent: true,
+      multiAgent: true,
+      providers: <SingleAgentProvider>{
+        SingleAgentProvider.codex,
+        SingleAgentProvider.opencode,
+        SingleAgentProvider.claude,
+        SingleAgentProvider.gemini,
+      },
+      raw: <String, dynamic>{},
+    );
+  }
+
+  @override
+  Future<void> cancelSession({
+    required Uri endpoint,
+    required String sessionId,
+    required String threadId,
+  }) async {}
+
+  @override
+  Future<Map<String, dynamic>> request({
+    required Uri endpoint,
+    required String method,
+    required Map<String, dynamic> params,
+    void Function(Map<String, dynamic> notification)? onNotification,
+    Duration timeout = const Duration(seconds: 120),
+  }) async {
+    return <String, dynamic>{
+      'result': <String, dynamic>{
+        'output': 'ok',
+        'summary': 'ok',
+        'model': params['model']?.toString() ?? 'fake-model',
+      },
+    };
+  }
+}
+
+Future<void> _waitForReady(
+  AppController controller, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (controller.initializing) {
+    if (DateTime.now().isAfter(deadline)) {
+      fail('controller did not initialize before timeout');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
+}
