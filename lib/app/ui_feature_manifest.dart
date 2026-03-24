@@ -523,6 +523,36 @@ web:
       build_modes: [debug, profile, release]
       description: Web assistant destination
       ui_surface: web_shell
+    tasks:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web tasks destination
+      ui_surface: web_shell
+    skills:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web skills destination
+      ui_surface: web_shell
+    nodes:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web nodes destination
+      ui_surface: web_shell
+    secrets:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web secrets destination
+      ui_surface: web_shell
+    ai_gateway:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web LLM API destination
+      ui_surface: web_shell
     settings:
       enabled: true
       release_tier: stable
@@ -895,6 +925,11 @@ class UiFeatureAccess {
     },
     UiFeaturePlatform.web: <String, WorkspaceDestination>{
       UiFeatureKeys.navigationAssistant: WorkspaceDestination.assistant,
+      UiFeatureKeys.navigationTasks: WorkspaceDestination.tasks,
+      UiFeatureKeys.navigationSkills: WorkspaceDestination.skills,
+      UiFeatureKeys.navigationNodes: WorkspaceDestination.nodes,
+      UiFeatureKeys.navigationSecrets: WorkspaceDestination.secrets,
+      UiFeatureKeys.navigationAiGateway: WorkspaceDestination.aiGateway,
       UiFeatureKeys.navigationSettings: WorkspaceDestination.settings,
     },
   };
