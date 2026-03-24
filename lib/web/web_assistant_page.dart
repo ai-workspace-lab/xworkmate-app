@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../app/app_controller_web.dart';
@@ -24,7 +27,13 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
   final TextEditingController _inputController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
   String _query = '';
+  String _thinkingLevel = 'medium';
+  AssistantPermissionLevel _permissionLevel =
+      AssistantPermissionLevel.defaultAccess;
+  bool _useMultiAgent = false;
+  final List<_WebComposerAttachment> _attachments = <_WebComposerAttachment>[];
 
   @override
   void dispose() {
@@ -41,28 +50,25 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
       animation: controller,
       builder: (context, _) {
         final uiFeatures = controller.featuresFor(UiFeaturePlatform.web);
-        final allDirect = controller.conversationsForTarget(
+        final allSingle = controller.conversationsForTarget(
           AssistantExecutionTarget.singleAgent,
         );
-        final allRelay = controller.conversationsForTarget(
+        final allLocal = controller.conversationsForTarget(
+          AssistantExecutionTarget.local,
+        );
+        final allRemote = controller.conversationsForTarget(
           AssistantExecutionTarget.remote,
         );
-        final direct = _filterConversations(allDirect);
-        final relay = _filterConversations(allRelay);
-        final currentTarget = controller.assistantExecutionTarget;
-        final availableTargets = uiFeatures.availableExecutionTargets
-            .where(
-              (target) =>
-                  target == AssistantExecutionTarget.singleAgent ||
-                  target == AssistantExecutionTarget.remote,
-            )
-            .toList(growable: false);
-        final connected =
-            currentTarget == AssistantExecutionTarget.singleAgent
-            ? controller.canUseAiGatewayConversation
-            : controller.connection.status == RuntimeConnectionStatus.connected;
-        final currentMessages = controller.chatMessages;
+        final single = _filterConversations(allSingle);
+        final local = _filterConversations(allLocal);
+        final remote = _filterConversations(allRemote);
 
+        final availableTargets = uiFeatures.availableExecutionTargets;
+        final currentTarget = controller.assistantExecutionTarget;
+        final connectionState = controller.currentAssistantConnectionState;
+        final connected = connectionState.ready;
+
+        final currentMessages = controller.chatMessages;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_scrollController.hasClients) {
             _scrollController.jumpTo(
@@ -70,6 +76,13 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
             );
           }
         });
+
+        final selectedSkillKeys = controller.assistantSelectedSkillKeysForSession(
+          controller.currentSessionKey,
+        );
+        final importedSkills = controller.assistantImportedSkillsForSession(
+          controller.currentSessionKey,
+        );
 
         return DesktopWorkspaceScaffold(
           breadcrumbs: <AppBreadcrumbItem>[
@@ -83,8 +96,8 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
           eyebrow: appText('Web Workspace', 'Web Workspace'),
           title: appText('助手', 'Assistant'),
           subtitle: appText(
-            '单机智能体与 Relay Gateway 共用一个入口，左侧保留会话/任务历史。',
-            'Use one Assistant surface for Single Agent and Relay Gateway, with embedded conversation history on the left.',
+            'Web 助手保持任务线程会话隔离，支持 Single Agent / Local / Remote 三种模式。',
+            'Web Assistant keeps per-thread session isolation with Single Agent / Local / Remote modes.',
           ),
           toolbar: Wrap(
             spacing: 10,
@@ -98,8 +111,7 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
                 label: Text(appText('新对话', 'New conversation')),
               ),
               OutlinedButton.icon(
-                onPressed: () =>
-                    controller.openSettings(tab: SettingsTab.gateway),
+                onPressed: () => controller.openSettings(tab: SettingsTab.gateway),
                 icon: const Icon(Icons.tune_rounded),
                 label: Text(appText('连接设置', 'Connection settings')),
               ),
@@ -116,7 +128,7 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final vertical = constraints.maxWidth < 980;
+              final vertical = constraints.maxWidth < 1080;
               final rail = _ConversationRail(
                 controller: controller,
                 query: _query,
@@ -128,23 +140,52 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
                   _searchController.clear();
                   setState(() => _query = '');
                 },
-                showDirect: uiFeatures.supportsDirectAi,
-                showRelay: uiFeatures.supportsRelayGateway,
-                direct: direct,
-                relay: relay,
+                showSingle: uiFeatures.supportsDirectAi,
+                showLocal: uiFeatures.supportsLocalGateway,
+                showRemote: uiFeatures.supportsRelayGateway,
+                single: single,
+                local: local,
+                remote: remote,
+                onRename: (sessionKey) => _renameConversation(sessionKey),
+                onArchive: (sessionKey) =>
+                    controller.saveAssistantTaskArchived(sessionKey, true),
               );
+
               final panel = _ConversationPanel(
                 controller: controller,
                 inputController: _inputController,
                 scrollController: _scrollController,
                 connected: connected,
                 currentMessages: currentMessages,
+                connectionState: connectionState,
+                thinkingLevel: _thinkingLevel,
+                permissionLevel: _permissionLevel,
+                useMultiAgent: _useMultiAgent,
+                importedSkills: importedSkills,
+                selectedSkillKeys: selectedSkillKeys,
+                attachments: _attachments,
+                onThinkingChanged: (value) {
+                  setState(() => _thinkingLevel = value);
+                },
+                onPermissionChanged: (value) {
+                  setState(() => _permissionLevel = value);
+                },
+                onToggleMultiAgent: (value) {
+                  setState(() => _useMultiAgent = value);
+                },
+                onAddAttachment: _pickAttachments,
+                onRemoveAttachment: (index) {
+                  setState(() {
+                    _attachments.removeAt(index);
+                  });
+                },
+                onSubmit: _submitPrompt,
               );
 
               if (vertical) {
                 return Column(
                   children: [
-                    SizedBox(height: 300, child: rail),
+                    SizedBox(height: 320, child: rail),
                     const SizedBox(height: 8),
                     Expanded(child: panel),
                   ],
@@ -153,7 +194,7 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
 
               return Row(
                 children: [
-                  SizedBox(width: 320, child: rail),
+                  SizedBox(width: 340, child: rail),
                   const SizedBox(width: 8),
                   Expanded(child: panel),
                 ],
@@ -178,6 +219,129 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
         })
         .toList(growable: false);
   }
+
+  Future<void> _renameConversation(String sessionKey) async {
+    final controller = widget.controller;
+    final initial = controller.conversations
+        .firstWhere(
+          (item) => item.sessionKey == sessionKey,
+          orElse: () => WebConversationSummary(
+            sessionKey: sessionKey,
+            title: '',
+            preview: '',
+            updatedAtMs: 0,
+            executionTarget: AssistantExecutionTarget.singleAgent,
+            pending: false,
+            current: false,
+          ),
+        )
+        .title;
+    final renameController = TextEditingController(text: initial);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(appText('重命名任务线程', 'Rename task thread')),
+          content: TextField(
+            controller: renameController,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: appText('输入标题', 'Enter a title'),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(appText('取消', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(renameController.text),
+              child: Text(appText('保存', 'Save')),
+            ),
+          ],
+        );
+      },
+    );
+    renameController.dispose();
+    if (value == null) {
+      return;
+    }
+    await controller.saveAssistantTaskTitle(sessionKey, value);
+  }
+
+  Future<void> _pickAttachments() async {
+    final controller = widget.controller;
+    final uiFeatures = controller.featuresFor(UiFeaturePlatform.web);
+    if (!uiFeatures.supportsFileAttachments) {
+      return;
+    }
+    final files = await openFiles(
+      acceptedTypeGroups: const <XTypeGroup>[
+        XTypeGroup(
+          label: 'Images',
+          extensions: <String>['png', 'jpg', 'jpeg', 'gif', 'webp'],
+        ),
+        XTypeGroup(
+          label: 'Documents',
+          extensions: <String>['txt', 'md', 'json', 'csv', 'pdf', 'yaml', 'yml'],
+        ),
+      ],
+    );
+    if (!mounted || files.isEmpty) {
+      return;
+    }
+    setState(() {
+      _attachments.addAll(files.map(_WebComposerAttachment.fromXFile));
+    });
+  }
+
+  Future<void> _submitPrompt() async {
+    final controller = widget.controller;
+    final value = _inputController.text.trim();
+    if (value.isEmpty) {
+      return;
+    }
+
+    final payloads = <GatewayChatAttachmentPayload>[];
+    for (final attachment in _attachments) {
+      final bytes = await attachment.file.readAsBytes();
+      payloads.add(
+        GatewayChatAttachmentPayload(
+          type: attachment.mimeType.startsWith('image/') ? 'image' : 'file',
+          mimeType: attachment.mimeType,
+          fileName: attachment.name,
+          content: base64Encode(bytes),
+        ),
+      );
+    }
+
+    final selectedSkillLabels = controller
+        .assistantImportedSkillsForSession(controller.currentSessionKey)
+        .where(
+          (item) => controller
+              .assistantSelectedSkillKeysForSession(controller.currentSessionKey)
+              .contains(item.key),
+        )
+        .map((item) => item.label)
+        .where((item) => item.trim().isNotEmpty)
+        .toList(growable: false);
+
+    await controller.sendMessage(
+      value,
+      thinking: _thinkingLevel,
+      attachments: payloads,
+      selectedSkillLabels: selectedSkillLabels,
+      useMultiAgent: _useMultiAgent,
+    );
+
+    if (!mounted) {
+      return;
+    }
+    _inputController.clear();
+    setState(() {
+      _attachments.clear();
+    });
+  }
 }
 
 class _ConversationRail extends StatelessWidget {
@@ -187,10 +351,14 @@ class _ConversationRail extends StatelessWidget {
     required this.searchController,
     required this.onQueryChanged,
     required this.onClearQuery,
-    required this.showDirect,
-    required this.showRelay,
-    required this.direct,
-    required this.relay,
+    required this.showSingle,
+    required this.showLocal,
+    required this.showRemote,
+    required this.single,
+    required this.local,
+    required this.remote,
+    required this.onRename,
+    required this.onArchive,
   });
 
   final AppController controller;
@@ -198,10 +366,14 @@ class _ConversationRail extends StatelessWidget {
   final TextEditingController searchController;
   final ValueChanged<String> onQueryChanged;
   final VoidCallback onClearQuery;
-  final bool showDirect;
-  final bool showRelay;
-  final List<WebConversationSummary> direct;
-  final List<WebConversationSummary> relay;
+  final bool showSingle;
+  final bool showLocal;
+  final bool showRemote;
+  final List<WebConversationSummary> single;
+  final List<WebConversationSummary> local;
+  final List<WebConversationSummary> remote;
+  final ValueChanged<String> onRename;
+  final ValueChanged<String> onArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -216,7 +388,7 @@ class _ConversationRail extends StatelessWidget {
             controller: searchController,
             onChanged: onQueryChanged,
             decoration: InputDecoration(
-              hintText: appText('搜索会话', 'Search conversations'),
+              hintText: appText('搜索任务线程', 'Search task threads'),
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: query.isEmpty
                   ? null
@@ -230,32 +402,49 @@ class _ConversationRail extends StatelessWidget {
           Expanded(
             child: ListView(
               children: [
-                if (showDirect)
+                if (showSingle)
                   _ConversationGroup(
                     title: appText('Single Agent', 'Single Agent'),
                     icon: Icons.hub_rounded,
-                    items: direct,
+                    items: single,
                     emptyLabel: appText(
-                      '还没有单机智能体对话',
-                      'No Single Agent conversations yet',
+                      '还没有 Single Agent 任务线程',
+                      'No Single Agent task threads yet',
                     ),
                     onSelect: controller.switchConversation,
+                    onRename: onRename,
+                    onArchive: onArchive,
                   ),
-                if (showDirect && showRelay) const SizedBox(height: 12),
-                if (showRelay)
+                if (showLocal) ...[
+                  const SizedBox(height: 12),
                   _ConversationGroup(
-                    title: appText(
-                      'Relay OpenClaw Gateway',
-                      'Relay OpenClaw Gateway',
-                    ),
-                    icon: Icons.cloud_outlined,
-                    items: relay,
+                    title: appText('Local Gateway', 'Local Gateway'),
+                    icon: Icons.lan_rounded,
+                    items: local,
                     emptyLabel: appText(
-                      '还没有 Relay 对话',
-                      'No Relay conversations yet',
+                      '还没有 Local Gateway 任务线程',
+                      'No Local Gateway task threads yet',
                     ),
                     onSelect: controller.switchConversation,
+                    onRename: onRename,
+                    onArchive: onArchive,
                   ),
+                ],
+                if (showRemote) ...[
+                  const SizedBox(height: 12),
+                  _ConversationGroup(
+                    title: appText('Remote Gateway', 'Remote Gateway'),
+                    icon: Icons.cloud_outlined,
+                    items: remote,
+                    emptyLabel: appText(
+                      '还没有 Remote Gateway 任务线程',
+                      'No Remote Gateway task threads yet',
+                    ),
+                    onSelect: controller.switchConversation,
+                    onRename: onRename,
+                    onArchive: onArchive,
+                  ),
+                ],
               ],
             ),
           ),
@@ -272,6 +461,8 @@ class _ConversationGroup extends StatelessWidget {
     required this.items,
     required this.emptyLabel,
     required this.onSelect,
+    required this.onRename,
+    required this.onArchive,
   });
 
   final String title;
@@ -279,6 +470,8 @@ class _ConversationGroup extends StatelessWidget {
   final List<WebConversationSummary> items;
   final String emptyLabel;
   final ValueChanged<String> onSelect;
+  final ValueChanged<String> onRename;
+  final ValueChanged<String> onArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -318,40 +511,56 @@ class _ConversationGroup extends StatelessWidget {
               borderRadius: 10,
               padding: const EdgeInsets.all(12),
               color: item.current ? palette.accentMuted : null,
-              child: Row(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
                           item.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
+                      ),
+                      IconButton(
+                        tooltip: appText('重命名', 'Rename'),
+                        onPressed: () => onRename(item.sessionKey),
+                        icon: const Icon(Icons.drive_file_rename_outline_rounded),
+                      ),
+                      IconButton(
+                        tooltip: appText('归档', 'Archive'),
+                        onPressed: () => onArchive(item.sessionKey),
+                        icon: const Icon(Icons.archive_outlined),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
                           item.preview,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(color: palette.textSecondary),
                         ),
-                      ],
-                    ),
-                  ),
-                  if (item.pending)
-                    const Padding(
-                      padding: EdgeInsets.only(left: 8, top: 2),
-                      child: SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
                       ),
-                    ),
+                      if (item.pending)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 8, top: 2),
+                          child: SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -369,6 +578,19 @@ class _ConversationPanel extends StatelessWidget {
     required this.scrollController,
     required this.connected,
     required this.currentMessages,
+    required this.connectionState,
+    required this.thinkingLevel,
+    required this.permissionLevel,
+    required this.useMultiAgent,
+    required this.importedSkills,
+    required this.selectedSkillKeys,
+    required this.attachments,
+    required this.onThinkingChanged,
+    required this.onPermissionChanged,
+    required this.onToggleMultiAgent,
+    required this.onAddAttachment,
+    required this.onRemoveAttachment,
+    required this.onSubmit,
   });
 
   final AppController controller;
@@ -376,47 +598,140 @@ class _ConversationPanel extends StatelessWidget {
   final ScrollController scrollController;
   final bool connected;
   final List<GatewayChatMessage> currentMessages;
+  final AssistantThreadConnectionState connectionState;
+  final String thinkingLevel;
+  final AssistantPermissionLevel permissionLevel;
+  final bool useMultiAgent;
+  final List<AssistantThreadSkillEntry> importedSkills;
+  final List<String> selectedSkillKeys;
+  final List<_WebComposerAttachment> attachments;
+  final ValueChanged<String> onThinkingChanged;
+  final ValueChanged<AssistantPermissionLevel> onPermissionChanged;
+  final ValueChanged<bool> onToggleMultiAgent;
+  final Future<void> Function() onAddAttachment;
+  final ValueChanged<int> onRemoveAttachment;
+  final Future<void> Function() onSubmit;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final currentTarget = controller.assistantExecutionTarget;
-    final targetReady = currentTarget == AssistantExecutionTarget.singleAgent
-        ? controller.canUseAiGatewayConversation
-        : controller.connection.status == RuntimeConnectionStatus.connected;
+    final modelChoices = controller.assistantModelChoices;
 
     return Column(
       children: [
         SurfaceCard(
           borderRadius: 10,
           tone: SurfaceCardTone.chrome,
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      controller.currentConversationTitle,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          controller.currentConversationTitle,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          controller.assistantConnectionTargetLabel,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: palette.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      controller.assistantConnectionTargetLabel,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: palette.textSecondary,
-                      ),
+                  ),
+                  StatusBadge(
+                    status: StatusInfo(
+                      controller.assistantConnectionStatusLabel,
+                      connected ? StatusTone.success : StatusTone.warning,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              StatusBadge(
-                status: StatusInfo(
-                  controller.assistantConnectionStatusLabel,
-                  targetReady ? StatusTone.success : StatusTone.warning,
-                ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _CompactDropdown<AssistantExecutionTarget>(
+                    key: const Key('assistant-target-button'),
+                    value: currentTarget,
+                    items: controller
+                        .featuresFor(UiFeaturePlatform.web)
+                        .availableExecutionTargets,
+                    labelBuilder: _targetLabel,
+                    onChanged: (value) {
+                      if (value != null) {
+                        controller.setAssistantExecutionTarget(value);
+                      }
+                    },
+                  ),
+                  if (currentTarget == AssistantExecutionTarget.singleAgent)
+                    _CompactDropdown<SingleAgentProvider>(
+                      key: const Key('assistant-single-agent-provider-button'),
+                      value: controller.currentSingleAgentProvider,
+                      items: controller.singleAgentProviderOptions,
+                      labelBuilder: (item) => item.label,
+                      onChanged: (value) {
+                        if (value != null) {
+                          controller.setSingleAgentProvider(value);
+                        }
+                      },
+                    ),
+                  if (modelChoices.isNotEmpty)
+                    _CompactDropdown<String>(
+                      key: const Key('assistant-model-button'),
+                      value: controller.resolvedAssistantModel,
+                      items: modelChoices,
+                      labelBuilder: (item) => item,
+                      onChanged: (value) {
+                        if (value != null) {
+                          controller.selectAssistantModel(value);
+                        }
+                      },
+                    ),
+                  _CompactDropdown<AssistantMessageViewMode>(
+                    key: const Key('assistant-message-view-mode-button'),
+                    value: controller.currentAssistantMessageViewMode,
+                    items: AssistantMessageViewMode.values,
+                    labelBuilder: (item) => item.label,
+                    onChanged: (value) {
+                      if (value != null) {
+                        controller.setAssistantMessageViewMode(value);
+                      }
+                    },
+                  ),
+                  _CompactDropdown<String>(
+                    key: const Key('assistant-thinking-button'),
+                    value: thinkingLevel,
+                    items: const <String>['low', 'medium', 'high'],
+                    labelBuilder: _thinkingLabel,
+                    onChanged: (value) {
+                      if (value != null) {
+                        onThinkingChanged(value);
+                      }
+                    },
+                  ),
+                  _CompactDropdown<AssistantPermissionLevel>(
+                    key: const Key('assistant-permission-button'),
+                    value: permissionLevel,
+                    items: AssistantPermissionLevel.values,
+                    labelBuilder: (item) => item.label,
+                    onChanged: (value) {
+                      if (value != null) {
+                        onPermissionChanged(value);
+                      }
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -433,19 +748,18 @@ class _ConversationPanel extends StatelessWidget {
                   child: Text(
                     currentTarget == AssistantExecutionTarget.singleAgent
                         ? appText(
-                            '当前单机智能体配置还不完整，请先在 Settings 中保存 LLM API Endpoint、LLM API Token 和默认模型。',
-                            'Single Agent is not ready yet. Save the LLM API Endpoint, LLM API Token, and default model in Settings first.',
+                            '当前线程未就绪。请检查 Single Agent 配置，或切换到可连接的 Gateway 目标。',
+                            'This thread is not ready. Check Single Agent configuration, or switch to a connected gateway target.',
                           )
                         : appText(
-                            '当前 Relay Gateway 尚未连接，请先在 Settings 中保存配置并连接。',
-                            'Relay Gateway is offline. Save the relay config and connect from Settings first.',
+                            '当前线程目标网关未连接。请先在 Settings 中 Test / Save / Apply。',
+                            'The gateway target for this thread is offline. Use Test / Save / Apply in Settings first.',
                           ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 FilledButton.tonal(
-                  onPressed: () =>
-                      controller.openSettings(tab: SettingsTab.gateway),
+                  onPressed: () => controller.openSettings(tab: SettingsTab.gateway),
                   child: Text(appText('打开设置', 'Open settings')),
                 ),
               ],
@@ -459,6 +773,28 @@ class _ConversationPanel extends StatelessWidget {
             tone: SurfaceCardTone.chrome,
             child: Column(
               children: [
+                if (importedSkills.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: importedSkills.map((skill) {
+                          final selected = selectedSkillKeys.contains(skill.key);
+                          return FilterChip(
+                            label: Text(skill.label),
+                            selected: selected,
+                            onSelected: (_) => controller.toggleAssistantSkillForSession(
+                              controller.currentSessionKey,
+                              skill.key,
+                            ),
+                          );
+                        }).toList(growable: false),
+                      ),
+                    ),
+                  ),
                 Expanded(
                   child: ListView.builder(
                     controller: scrollController,
@@ -475,26 +811,40 @@ class _ConversationPanel extends StatelessWidget {
                   padding: const EdgeInsets.all(14),
                   child: Column(
                     children: [
+                      if (attachments.isNotEmpty)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (var index = 0; index < attachments.length; index++)
+                                InputChip(
+                                  avatar: Icon(attachments[index].icon, size: 16),
+                                  label: Text(attachments[index].name),
+                                  onDeleted: () => onRemoveAttachment(index),
+                                ),
+                            ],
+                          ),
+                        ),
+                      if (attachments.isNotEmpty) const SizedBox(height: 8),
                       Row(
                         children: [
                           Expanded(
                             child: TextField(
                               controller: inputController,
                               minLines: 3,
-                              maxLines: 6,
+                              maxLines: 8,
                               decoration: InputDecoration(
                                 hintText: appText(
-                                  '输入需求、补充上下文、继续追问',
-                                  'Describe the task, add context, or continue the conversation',
+                                  '输入任务说明、上下文和期望输出',
+                                  'Describe the task, context, and expected output',
                                 ),
                               ),
                               onSubmitted: (_) {
-                                if (!connected) {
-                                  return;
+                                if (connected) {
+                                  onSubmit();
                                 }
-                                final value = inputController.text;
-                                inputController.clear();
-                                controller.sendMessage(value);
                               },
                             ),
                           ),
@@ -503,43 +853,48 @@ class _ConversationPanel extends StatelessWidget {
                       const SizedBox(height: 10),
                       Row(
                         children: [
+                          Row(
+                            children: [
+                              Checkbox(
+                                value: useMultiAgent,
+                                onChanged: (value) {
+                                  onToggleMultiAgent(value ?? false);
+                                },
+                              ),
+                              Text(appText('Multi-Agent', 'Multi-Agent')),
+                            ],
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            key: const Key('assistant-attachment-menu-button'),
+                            tooltip: appText('添加附件', 'Add attachment'),
+                            onPressed: onAddAttachment,
+                            icon: const Icon(Icons.attach_file_rounded),
+                          ),
                           Expanded(
                             child: Text(
-                              currentTarget ==
-                                      AssistantExecutionTarget.singleAgent
-                                  ? appText(
-                                      'Web 端单机智能体只保留纯网络能力，不提供本地文件和 CLI。',
-                                      'Single Agent on web keeps network-only capabilities and does not expose local files or CLI.',
-                                    )
+                              controller.lastAssistantError?.trim().isNotEmpty == true
+                                  ? controller.lastAssistantError!.trim()
                                   : appText(
-                                      'Web 端 Relay 模式使用远程 OpenClaw Gateway，不区分 local / remote。',
-                                      'Relay mode on web uses the remote OpenClaw Gateway and does not expose local / remote splits.',
+                                      '附件仅支持手动选择，单次总量上限 10MB。',
+                                      'Attachments are explicit user picks only, with a 10MB total limit per send.',
                                     ),
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(color: palette.textSecondary),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: palette.textSecondary,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
                           FilledButton.icon(
-                            onPressed: connected
-                                ? () {
-                                    final value = inputController.text;
-                                    inputController.clear();
-                                    controller.sendMessage(value);
-                                  }
-                                : () => controller.openSettings(
-                                    tab: SettingsTab.gateway,
-                                  ),
-                            icon: Icon(
-                              connected
-                                  ? Icons.arrow_upward_rounded
-                                  : Icons.settings_rounded,
-                            ),
-                            label: Text(
-                              connected
-                                  ? appText('提交', 'Submit')
-                                  : appText('配置', 'Configure'),
-                            ),
+                            onPressed: connected ? onSubmit : null,
+                            icon: controller.relayBusy || controller.acpBusy
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.arrow_upward_rounded),
+                            label: Text(appText('发送', 'Send')),
                           ),
                         ],
                       ),
@@ -573,7 +928,7 @@ class _MessageBubble extends StatelessWidget {
     return Align(
       alignment: assistant ? Alignment.centerLeft : Alignment.centerRight,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
+        constraints: const BoxConstraints(maxWidth: 760),
         child: Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: DecoratedBox(
@@ -623,16 +978,103 @@ class _TargetChip extends StatelessWidget {
         value: value,
         onChanged: onChanged,
         items: targets
-            .map((target) {
-              return DropdownMenuItem<AssistantExecutionTarget>(
+            .map(
+              (target) => DropdownMenuItem<AssistantExecutionTarget>(
                 value: target,
                 child: Text(_targetLabel(target)),
-              );
-            })
+              ),
+            )
             .toList(growable: false),
       ),
     );
   }
+}
+
+class _CompactDropdown<T> extends StatelessWidget {
+  const _CompactDropdown({
+    super.key,
+    required this.value,
+    required this.items,
+    required this.labelBuilder,
+    required this.onChanged,
+  });
+
+  final T value;
+  final List<T> items;
+  final String Function(T item) labelBuilder;
+  final ValueChanged<T?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<T>(
+        value: items.contains(value) ? value : items.first,
+        onChanged: onChanged,
+        items: items
+            .map(
+              (item) => DropdownMenuItem<T>(
+                value: item,
+                child: Text(labelBuilder(item)),
+              ),
+            )
+            .toList(growable: false),
+      ),
+    );
+  }
+}
+
+class _WebComposerAttachment {
+  const _WebComposerAttachment({
+    required this.file,
+    required this.name,
+    required this.mimeType,
+    required this.icon,
+  });
+
+  final XFile file;
+  final String name;
+  final String mimeType;
+  final IconData icon;
+
+  factory _WebComposerAttachment.fromXFile(XFile file) {
+    final extension = file.name.split('.').last.toLowerCase();
+    final mimeType = file.mimeType?.trim().isNotEmpty == true
+        ? file.mimeType!.trim()
+        : switch (extension) {
+            'png' => 'image/png',
+            'jpg' || 'jpeg' => 'image/jpeg',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'json' => 'application/json',
+            'csv' => 'text/csv',
+            'txt' || 'log' || 'md' || 'yaml' || 'yml' => 'text/plain',
+            'pdf' => 'application/pdf',
+            _ => 'application/octet-stream',
+          };
+    final icon = mimeType.startsWith('image/')
+        ? Icons.image_outlined
+        : mimeType == 'application/pdf'
+        ? Icons.picture_as_pdf_outlined
+        : Icons.insert_drive_file_outlined;
+    return _WebComposerAttachment(
+      file: file,
+      name: file.name,
+      mimeType: mimeType,
+      icon: icon,
+    );
+  }
+}
+
+String _thinkingLabel(String level) {
+  return switch (level) {
+    'low' => appText('低', 'Low'),
+    'medium' => appText('中', 'Medium'),
+    'high' => appText('高', 'High'),
+    _ => level,
+  };
 }
 
 String _targetLabel(AssistantExecutionTarget target) {
@@ -641,10 +1083,13 @@ String _targetLabel(AssistantExecutionTarget target) {
       'Single Agent',
       'Single Agent',
     ),
-    AssistantExecutionTarget.remote => appText(
-      'Relay OpenClaw Gateway',
-      'Relay OpenClaw Gateway',
+    AssistantExecutionTarget.local => appText(
+      'Local Gateway',
+      'Local Gateway',
     ),
-    _ => '',
+    AssistantExecutionTarget.remote => appText(
+      'Remote Gateway',
+      'Remote Gateway',
+    ),
   };
 }

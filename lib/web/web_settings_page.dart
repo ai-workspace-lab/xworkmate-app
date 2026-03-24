@@ -26,16 +26,22 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
   late final TextEditingController _directBaseUrlController;
   late final TextEditingController _directProviderController;
   late final TextEditingController _directApiKeyController;
-  late final TextEditingController _relayHostController;
-  late final TextEditingController _relayPortController;
-  late final TextEditingController _relayTokenController;
-  late final TextEditingController _relayPasswordController;
+  late final TextEditingController _localHostController;
+  late final TextEditingController _localPortController;
+  late final TextEditingController _localTokenController;
+  late final TextEditingController _localPasswordController;
+  late final TextEditingController _remoteHostController;
+  late final TextEditingController _remotePortController;
+  late final TextEditingController _remoteTokenController;
+  late final TextEditingController _remotePasswordController;
   late final TextEditingController _sessionRemoteBaseUrlController;
   late final TextEditingController _sessionApiTokenController;
   late WebSessionPersistenceMode _sessionPersistenceMode;
+  bool _remoteTls = true;
 
   String _directMessage = '';
-  String _relayMessage = '';
+  String _localGatewayMessage = '';
+  String _remoteGatewayMessage = '';
   String _sessionPersistenceMessage = '';
 
   @override
@@ -45,10 +51,14 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     _directBaseUrlController = TextEditingController();
     _directProviderController = TextEditingController();
     _directApiKeyController = TextEditingController();
-    _relayHostController = TextEditingController();
-    _relayPortController = TextEditingController();
-    _relayTokenController = TextEditingController();
-    _relayPasswordController = TextEditingController();
+    _localHostController = TextEditingController();
+    _localPortController = TextEditingController();
+    _localTokenController = TextEditingController();
+    _localPasswordController = TextEditingController();
+    _remoteHostController = TextEditingController();
+    _remotePortController = TextEditingController();
+    _remoteTokenController = TextEditingController();
+    _remotePasswordController = TextEditingController();
     _sessionRemoteBaseUrlController = TextEditingController();
     _sessionApiTokenController = TextEditingController();
     _sessionPersistenceMode = widget.controller.webSessionPersistence.mode;
@@ -67,10 +77,14 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     _directBaseUrlController.dispose();
     _directProviderController.dispose();
     _directApiKeyController.dispose();
-    _relayHostController.dispose();
-    _relayPortController.dispose();
-    _relayTokenController.dispose();
-    _relayPasswordController.dispose();
+    _localHostController.dispose();
+    _localPortController.dispose();
+    _localTokenController.dispose();
+    _localPasswordController.dispose();
+    _remoteHostController.dispose();
+    _remotePortController.dispose();
+    _remoteTokenController.dispose();
+    _remotePasswordController.dispose();
     _sessionRemoteBaseUrlController.dispose();
     _sessionApiTokenController.dispose();
     super.dispose();
@@ -78,7 +92,8 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
 
   void _syncControllers() {
     final settings = widget.controller.settings;
-    final relayProfile = settings.primaryRemoteGatewayProfile;
+    final localProfile = settings.primaryLocalGatewayProfile;
+    final remoteProfile = settings.primaryRemoteGatewayProfile;
     _setIfDifferent(_directNameController, settings.aiGateway.name);
     _setIfDifferent(_directBaseUrlController, settings.aiGateway.baseUrl);
     _setIfDifferent(_directProviderController, settings.defaultProvider);
@@ -88,19 +103,46 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           ? ''
           : _directApiKeyController.text,
     );
-    _setIfDifferent(_relayHostController, relayProfile.host);
-    _setIfDifferent(_relayPortController, '${relayProfile.port}');
+    _setIfDifferent(_localHostController, localProfile.host);
+    _setIfDifferent(_localPortController, '${localProfile.port}');
+    _setIfDifferent(_remoteHostController, remoteProfile.host);
+    _setIfDifferent(_remotePortController, '${remoteProfile.port}');
+    _remoteTls = remoteProfile.tls;
     _setIfDifferent(
-      _relayTokenController,
-      widget.controller.storedRelayTokenMask == null
+      _localTokenController,
+      widget.controller.storedRelayTokenMaskForProfile(
+                kGatewayLocalProfileIndex,
+              ) ==
+              null
           ? ''
-          : _relayTokenController.text,
+          : _localTokenController.text,
     );
     _setIfDifferent(
-      _relayPasswordController,
-      widget.controller.storedRelayPasswordMask == null
+      _localPasswordController,
+      widget.controller.storedRelayPasswordMaskForProfile(
+                kGatewayLocalProfileIndex,
+              ) ==
+              null
           ? ''
-          : _relayPasswordController.text,
+          : _localPasswordController.text,
+    );
+    _setIfDifferent(
+      _remoteTokenController,
+      widget.controller.storedRelayTokenMaskForProfile(
+                kGatewayRemoteProfileIndex,
+              ) ==
+              null
+          ? ''
+          : _remoteTokenController.text,
+    );
+    _setIfDifferent(
+      _remotePasswordController,
+      widget.controller.storedRelayPasswordMaskForProfile(
+                kGatewayRemoteProfileIndex,
+              ) ==
+              null
+          ? ''
+          : _remotePasswordController.text,
     );
     _sessionPersistenceMode = settings.webSessionPersistence.mode;
     _setIfDifferent(
@@ -225,11 +267,6 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     final targets = controller
         .featuresFor(UiFeaturePlatform.web)
         .availableExecutionTargets
-        .where(
-          (target) =>
-              target == AssistantExecutionTarget.singleAgent ||
-              target == AssistantExecutionTarget.remote,
-        )
         .toList(growable: false);
     return [
       SurfaceCard(
@@ -271,7 +308,6 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     SettingsSnapshot settings,
   ) {
     final palette = context.palette;
-    final relayProfile = settings.primaryRemoteGatewayProfile;
     return [
       SurfaceCard(
         child: Row(
@@ -288,6 +324,217 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
             ),
           ],
         ),
+      ),
+      const SizedBox(height: 12),
+      SurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              appText('单机智能体', 'Single Agent'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _directNameController,
+              decoration: InputDecoration(labelText: appText('名称', 'Name')),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _directProviderController,
+              decoration: InputDecoration(
+                labelText: appText('Provider 标识', 'Provider label'),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _directBaseUrlController,
+              decoration: InputDecoration(
+                labelText: appText('LLM API Endpoint', 'LLM API Endpoint'),
+                hintText: 'https://api.example.com/v1',
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _directApiKeyController,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: appText('LLM API Token', 'LLM API Token'),
+                helperText: controller.storedAiGatewayApiKeyMask == null
+                    ? null
+                    : '${appText('已保存', 'Stored')}: ${controller.storedAiGatewayApiKeyMask}',
+              ),
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              initialValue: controller.resolvedAiGatewayModel.isEmpty
+                  ? null
+                  : controller.resolvedAiGatewayModel,
+              items: settings.aiGateway.availableModels
+                  .map(
+                    (item) => DropdownMenuItem<String>(
+                      value: item,
+                      child: Text(item),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: (value) {
+                if (value != null) {
+                  controller.selectDirectModel(value);
+                }
+              },
+              decoration: InputDecoration(
+                labelText: appText('默认模型', 'Default model'),
+                hintText: appText('先同步模型目录', 'Sync model catalog first'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                OutlinedButton(
+                  onPressed: controller.aiGatewayBusy
+                      ? null
+                      : () async {
+                          final result = await controller.testAiGatewayConnection(
+                            baseUrl: _directBaseUrlController.text,
+                            apiKey: _directApiKeyController.text,
+                          );
+                          if (!mounted) {
+                            return;
+                          }
+                          setState(() => _directMessage = result.message);
+                        },
+                  child: Text(appText('Test', 'Test')),
+                ),
+                FilledButton(
+                  onPressed: controller.aiGatewayBusy
+                      ? null
+                      : () async {
+                          await controller.saveAiGatewayConfiguration(
+                            name: _directNameController.text,
+                            baseUrl: _directBaseUrlController.text,
+                            provider: _directProviderController.text,
+                            apiKey: _directApiKeyController.text,
+                            defaultModel: controller.resolvedAiGatewayModel,
+                          );
+                          if (!mounted) {
+                            return;
+                          }
+                          setState(() {
+                            _directMessage = appText(
+                              '配置已保存，尚未同步模型目录。',
+                              'Configuration saved; model catalog not synced yet.',
+                            );
+                          });
+                        },
+                  child: Text(appText('Save', 'Save')),
+                ),
+                FilledButton.icon(
+                  onPressed: controller.aiGatewayBusy
+                      ? null
+                      : () async {
+                          await controller.saveAiGatewayConfiguration(
+                            name: _directNameController.text,
+                            baseUrl: _directBaseUrlController.text,
+                            provider: _directProviderController.text,
+                            apiKey: _directApiKeyController.text,
+                            defaultModel: controller.resolvedAiGatewayModel,
+                          );
+                          try {
+                            await controller.syncAiGatewayModels(
+                              name: _directNameController.text,
+                              baseUrl: _directBaseUrlController.text,
+                              provider: _directProviderController.text,
+                              apiKey: _directApiKeyController.text,
+                            );
+                            if (!mounted) {
+                              return;
+                            }
+                            setState(() {
+                              _directMessage =
+                                  controller.settings.aiGateway.syncMessage;
+                            });
+                          } catch (error) {
+                            if (!mounted) {
+                              return;
+                            }
+                            setState(() => _directMessage = '$error');
+                          }
+                        },
+                  icon: controller.aiGatewayBusy
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.play_circle_outline_rounded),
+                  label: Text(appText('Apply', 'Apply')),
+                ),
+              ],
+            ),
+            if (_directMessage.trim().isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                _directMessage,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+              ),
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 12),
+      _buildGatewayCard(
+        context,
+        controller: controller,
+        title: appText('Local Gateway', 'Local Gateway'),
+        executionTarget: AssistantExecutionTarget.local,
+        profileIndex: kGatewayLocalProfileIndex,
+        hostController: _localHostController,
+        portController: _localPortController,
+        tokenController: _localTokenController,
+        passwordController: _localPasswordController,
+        tokenMask: controller.storedRelayTokenMaskForProfile(
+          kGatewayLocalProfileIndex,
+        ),
+        passwordMask: controller.storedRelayPasswordMaskForProfile(
+          kGatewayLocalProfileIndex,
+        ),
+        tls: false,
+        onTlsChanged: null,
+        message: _localGatewayMessage,
+        onMessageChanged: (value) {
+          setState(() => _localGatewayMessage = value);
+        },
+      ),
+      const SizedBox(height: 12),
+      _buildGatewayCard(
+        context,
+        controller: controller,
+        title: appText('Remote Gateway', 'Remote Gateway'),
+        executionTarget: AssistantExecutionTarget.remote,
+        profileIndex: kGatewayRemoteProfileIndex,
+        hostController: _remoteHostController,
+        portController: _remotePortController,
+        tokenController: _remoteTokenController,
+        passwordController: _remotePasswordController,
+        tokenMask: controller.storedRelayTokenMaskForProfile(
+          kGatewayRemoteProfileIndex,
+        ),
+        passwordMask: controller.storedRelayPasswordMaskForProfile(
+          kGatewayRemoteProfileIndex,
+        ),
+        tls: _remoteTls,
+        onTlsChanged: (value) {
+          setState(() => _remoteTls = value);
+        },
+        message: _remoteGatewayMessage,
+        onMessageChanged: (value) {
+          setState(() => _remoteGatewayMessage = value);
+        },
       ),
       const SizedBox(height: 12),
       SurfaceCard(
@@ -376,7 +623,26 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
                           controller.sessionPersistenceStatusMessage;
                     });
                   },
-                  child: Text(appText('保存会话存储', 'Save session store')),
+                  child: Text(appText('Save', 'Save')),
+                ),
+                FilledButton.tonal(
+                  onPressed: () async {
+                    await controller.saveWebSessionPersistenceConfiguration(
+                      mode: _sessionPersistenceMode,
+                      remoteBaseUrl: _sessionRemoteBaseUrlController.text,
+                      apiToken: _sessionApiTokenController.text,
+                    );
+                    if (!mounted) {
+                      return;
+                    }
+                    setState(() {
+                      _sessionPersistenceMessage = appText(
+                        '会话存储配置已应用到当前浏览器会话。',
+                        'Session persistence settings are now applied to this browser session.',
+                      );
+                    });
+                  },
+                  child: Text(appText('Apply', 'Apply')),
                 ),
               ],
             ),
@@ -395,299 +661,233 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           ],
         ),
       ),
-      const SizedBox(height: 12),
-      SurfaceCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              appText('单机智能体', 'Single Agent'),
-              style: Theme.of(context).textTheme.titleMedium,
+    ];
+  }
+
+  Widget _buildGatewayCard(
+    BuildContext context, {
+    required AppController controller,
+    required String title,
+    required AssistantExecutionTarget executionTarget,
+    required int profileIndex,
+    required TextEditingController hostController,
+    required TextEditingController portController,
+    required TextEditingController tokenController,
+    required TextEditingController passwordController,
+    required String? tokenMask,
+    required String? passwordMask,
+    required bool tls,
+    required ValueChanged<bool>? onTlsChanged,
+    required String message,
+    required ValueChanged<String> onMessageChanged,
+  }) {
+    final expectedMode = executionTarget == AssistantExecutionTarget.local
+        ? RuntimeConnectionMode.local
+        : RuntimeConnectionMode.remote;
+    final matchesTarget = controller.connection.mode == expectedMode;
+    final status = matchesTarget
+        ? controller.connection.status.label
+        : RuntimeConnectionStatus.offline.label;
+    final endpoint = '${hostController.text.trim()}:${_parsePort(portController.text, fallback: 443)}';
+    final statusEndpoint = matchesTarget
+        ? (controller.connection.remoteAddress?.trim().isNotEmpty == true
+              ? controller.connection.remoteAddress!.trim()
+              : endpoint)
+        : endpoint;
+
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: hostController,
+            decoration: InputDecoration(
+              labelText: appText('主机或 URL', 'Host or URL'),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _directNameController,
-              decoration: InputDecoration(labelText: appText('名称', 'Name')),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _directProviderController,
-              decoration: InputDecoration(
-                labelText: appText('Provider 标识', 'Provider label'),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _directBaseUrlController,
-              decoration: InputDecoration(
-                labelText: appText('LLM API Endpoint', 'LLM API Endpoint'),
-                hintText: 'https://api.example.com/v1',
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _directApiKeyController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: appText('LLM API Token', 'LLM API Token'),
-                helperText: controller.storedAiGatewayApiKeyMask == null
-                    ? null
-                    : '${appText('已保存', 'Stored')}: ${controller.storedAiGatewayApiKeyMask}',
-              ),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: controller.resolvedAiGatewayModel.isEmpty
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: portController,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(labelText: appText('端口', 'Port')),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: tokenController,
+            obscureText: true,
+            decoration: InputDecoration(
+              labelText: appText('Gateway Token', 'Gateway token'),
+              helperText: tokenMask == null
                   ? null
-                  : controller.resolvedAiGatewayModel,
-              items: settings.aiGateway.availableModels
-                  .map(
-                    (item) => DropdownMenuItem<String>(
-                      value: item,
-                      child: Text(item),
-                    ),
-                  )
-                  .toList(growable: false),
-              onChanged: (value) {
-                if (value != null) {
-                  controller.selectDirectModel(value);
-                }
-              },
-              decoration: InputDecoration(
-                labelText: appText('默认模型', 'Default model'),
-                hintText: appText('先同步模型目录', 'Sync model catalog first'),
-              ),
+                  : '${appText('已保存', 'Stored')}: $tokenMask',
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                OutlinedButton(
-                  onPressed: controller.aiGatewayBusy
-                      ? null
-                      : () async {
-                          final result = await controller
-                              .testAiGatewayConnection(
-                                baseUrl: _directBaseUrlController.text,
-                                apiKey: _directApiKeyController.text,
-                              );
-                          if (!mounted) {
-                            return;
-                          }
-                          setState(() => _directMessage = result.message);
-                        },
-                  child: Text(appText('测试连接', 'Test connection')),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: passwordController,
+            obscureText: true,
+            decoration: InputDecoration(
+              labelText: appText('Gateway Password', 'Gateway password'),
+              helperText: passwordMask == null
+                  ? null
+                  : '${appText('已保存', 'Stored')}: $passwordMask',
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${appText('状态', 'Status')}: $status · $statusEndpoint',
                 ),
-                FilledButton.icon(
-                  onPressed: controller.aiGatewayBusy
-                      ? null
-                      : () async {
-                          await controller.saveAiGatewayConfiguration(
-                            name: _directNameController.text,
-                            baseUrl: _directBaseUrlController.text,
-                            provider: _directProviderController.text,
-                            apiKey: _directApiKeyController.text,
-                            defaultModel: controller.resolvedAiGatewayModel,
-                          );
-                          try {
-                            await controller.syncAiGatewayModels(
-                              name: _directNameController.text,
-                              baseUrl: _directBaseUrlController.text,
-                              provider: _directProviderController.text,
-                              apiKey: _directApiKeyController.text,
-                            );
-                            if (!mounted) {
-                              return;
-                            }
-                            setState(() {
-                              _directMessage =
-                                  controller.settings.aiGateway.syncMessage;
-                            });
-                          } catch (error) {
-                            if (!mounted) {
-                              return;
-                            }
-                            setState(() => _directMessage = '$error');
-                          }
-                        },
-                  icon: controller.aiGatewayBusy
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.check_circle_outline_rounded),
-                  label: Text(appText('保存/应用', 'Save / Apply')),
-                ),
-              ],
-            ),
-            if (_directMessage.trim().isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(
-                _directMessage,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
               ),
-            ],
-          ],
-        ),
-      ),
-      const SizedBox(height: 12),
-      SurfaceCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              appText('Relay OpenClaw Gateway', 'Relay OpenClaw Gateway'),
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _relayHostController,
-              decoration: InputDecoration(
-                labelText: appText('主机或 URL', 'Host or URL'),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _relayPortController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(labelText: appText('端口', 'Port')),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _relayTokenController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: appText('Relay Token', 'Relay token'),
-                helperText: controller.storedRelayTokenMask == null
-                    ? null
-                    : '${appText('已保存', 'Stored')}: ${controller.storedRelayTokenMask}',
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _relayPasswordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: appText('Relay Password', 'Relay password'),
-                helperText: controller.storedRelayPasswordMask == null
-                    ? null
-                    : '${appText('已保存', 'Stored')}: ${controller.storedRelayPasswordMask}',
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${appText('状态', 'Status')}: ${controller.connection.status.label} · ${controller.connection.remoteAddress ?? appText('未连接', 'Offline')}',
-                  ),
-                ),
-                Switch(
-                  value: relayProfile.tls,
-                  onChanged: (value) => controller.saveRelayConfiguration(
-                    host: _relayHostController.text,
-                    port: int.tryParse(_relayPortController.text.trim()) ?? 443,
-                    tls: value,
-                    token: _relayTokenController.text,
-                    password: _relayPasswordController.text,
-                  ),
-                ),
+              if (onTlsChanged != null) ...[
+                Switch(value: tls, onChanged: onTlsChanged),
                 Text(appText('TLS', 'TLS')),
               ],
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                FilledButton(
-                  onPressed: () => controller.saveRelayConfiguration(
-                    host: _relayHostController.text,
-                    port: int.tryParse(_relayPortController.text.trim()) ?? 443,
-                    tls: relayProfile.tls,
-                    token: _relayTokenController.text,
-                    password: _relayPasswordController.text,
-                  ),
-                  child: Text(appText('保存', 'Save')),
-                ),
-                OutlinedButton.icon(
-                  onPressed: controller.relayBusy
-                      ? null
-                      : () async {
-                          try {
-                            await controller.saveRelayConfiguration(
-                              host: _relayHostController.text,
-                              port:
-                                  int.tryParse(
-                                    _relayPortController.text.trim(),
-                                  ) ??
-                                  443,
-                              tls: relayProfile.tls,
-                              token: _relayTokenController.text,
-                              password: _relayPasswordController.text,
-                            );
-                            await controller.connectRelay();
-                            if (!mounted) {
-                              return;
-                            }
-                            setState(() {
-                              _relayMessage = appText(
-                                'Relay 已连接',
-                                'Relay connected',
-                              );
-                            });
-                          } catch (error) {
-                            if (!mounted) {
-                              return;
-                            }
-                            setState(() => _relayMessage = '$error');
-                          }
-                        },
-                  icon: controller.relayBusy
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.link_rounded),
-                  label: Text(appText('连接 Relay', 'Connect relay')),
-                ),
-                OutlinedButton(
-                  onPressed: controller.relayBusy
-                      ? null
-                      : () async {
-                          await controller.disconnectRelay();
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              OutlinedButton(
+                onPressed: controller.relayBusy
+                    ? null
+                    : () async {
+                        final profile = _gatewayProfileDraft(
+                          executionTarget: executionTarget,
+                          host: hostController.text,
+                          portText: portController.text,
+                          tls: tls,
+                        );
+                        final result = await controller.testGatewayConnectionDraft(
+                          profile: profile,
+                          executionTarget: executionTarget,
+                          tokenOverride: tokenController.text,
+                          passwordOverride: passwordController.text,
+                        );
+                        if (!mounted) {
+                          return;
+                        }
+                        onMessageChanged(
+                          '${result.state.toUpperCase()} · ${result.message}',
+                        );
+                      },
+                child: Text(appText('Test', 'Test')),
+              ),
+              FilledButton(
+                onPressed: controller.relayBusy
+                    ? null
+                    : () async {
+                        await controller.saveRelayConfiguration(
+                          profileIndex: profileIndex,
+                          host: hostController.text,
+                          port: _parsePort(portController.text, fallback: 443),
+                          tls: tls,
+                          token: tokenController.text,
+                          password: passwordController.text,
+                        );
+                        if (!mounted) {
+                          return;
+                        }
+                        onMessageChanged(
+                          appText(
+                            '配置已保存，尚未应用到当前线程连接。',
+                            'Configuration saved but not applied to active thread connections yet.',
+                          ),
+                        );
+                      },
+                child: Text(appText('Save', 'Save')),
+              ),
+              FilledButton.icon(
+                onPressed: controller.relayBusy
+                    ? null
+                    : () async {
+                        try {
+                          await controller.applyRelayConfiguration(
+                            profileIndex: profileIndex,
+                            host: hostController.text,
+                            port: _parsePort(portController.text, fallback: 443),
+                            tls: tls,
+                            token: tokenController.text,
+                            password: passwordController.text,
+                          );
                           if (!mounted) {
                             return;
                           }
-                          setState(() {
-                            _relayMessage = appText(
-                              'Relay 已断开',
-                              'Relay disconnected',
-                            );
-                          });
-                        },
-                  child: Text(appText('断开', 'Disconnect')),
-                ),
-              ],
-            ),
-            if (_relayMessage.trim().isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(
-                _relayMessage,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+                          onMessageChanged(
+                            appText(
+                              '配置已应用；当前线程目标匹配时将使用新连接。',
+                              'Configuration applied. Threads targeting this gateway now use the updated connection.',
+                            ),
+                          );
+                        } catch (error) {
+                          if (!mounted) {
+                            return;
+                          }
+                          onMessageChanged('$error');
+                        }
+                      },
+                icon: controller.relayBusy
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.play_circle_outline_rounded),
+                label: Text(appText('Apply', 'Apply')),
               ),
             ],
+          ),
+          if (message.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              message,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: context.palette.textSecondary),
+            ),
           ],
-        ),
+        ],
       ),
-    ];
+    );
+  }
+
+  GatewayConnectionProfile _gatewayProfileDraft({
+    required AssistantExecutionTarget executionTarget,
+    required String host,
+    required String portText,
+    required bool tls,
+  }) {
+    final mode = executionTarget == AssistantExecutionTarget.local
+        ? RuntimeConnectionMode.local
+        : RuntimeConnectionMode.remote;
+    final defaults = executionTarget == AssistantExecutionTarget.local
+        ? GatewayConnectionProfile.defaultsLocal()
+        : GatewayConnectionProfile.defaultsRemote();
+    return defaults.copyWith(
+      mode: mode,
+      host: host.trim(),
+      port: _parsePort(portText, fallback: defaults.port),
+      tls: mode == RuntimeConnectionMode.local ? false : tls,
+      useSetupCode: false,
+      setupCode: '',
+    );
+  }
+
+  int _parsePort(String value, {required int fallback}) {
+    final parsed = int.tryParse(value.trim());
+    if (parsed == null || parsed <= 0) {
+      return fallback;
+    }
+    return parsed;
   }
 
   List<Widget> _buildAppearance(
@@ -786,10 +986,13 @@ String _targetLabel(AssistantExecutionTarget target) {
       'Single Agent',
       'Single Agent',
     ),
-    AssistantExecutionTarget.remote => appText(
-      'Relay OpenClaw Gateway',
-      'Relay OpenClaw Gateway',
+    AssistantExecutionTarget.local => appText(
+      'Local Gateway',
+      'Local Gateway',
     ),
-    _ => '',
+    AssistantExecutionTarget.remote => appText(
+      'Remote Gateway',
+      'Remote Gateway',
+    ),
   };
 }
