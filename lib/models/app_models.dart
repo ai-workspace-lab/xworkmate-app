@@ -278,6 +278,8 @@ class SettingsNavigationContext {
     this.secretsTab,
     this.aiGatewayTab,
     this.settingsTab,
+    this.gatewayProfileIndex,
+    this.prefersGatewaySetupCode,
   });
 
   final String rootLabel;
@@ -287,6 +289,8 @@ class SettingsNavigationContext {
   final SecretsTab? secretsTab;
   final AiGatewayTab? aiGatewayTab;
   final SettingsTab? settingsTab;
+  final int? gatewayProfileIndex;
+  final bool? prefersGatewaySetupCode;
 }
 
 enum AccountTab { profile, workspace, sessions }

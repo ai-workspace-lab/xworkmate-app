@@ -21,12 +21,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('助手'), findsWidgets);
-    expect(find.text('设置'), findsWidgets);
+    expect(find.byKey(const Key('web-shell-nav-assistant')), findsOneWidget);
+    expect(find.byKey(const Key('web-shell-nav-settings')), findsOneWidget);
     expect(find.text('Tasks'), findsNothing);
     expect(find.byKey(const Key('assistant-task-rail')), findsOneWidget);
     expect(
       find.byKey(const Key('assistant-attachment-menu-button')),
-      findsNothing,
+      findsOneWidget,
     );
 
     await tester.tap(find.text('连接设置'));
@@ -34,5 +35,7 @@ void main() {
 
     expect(find.text('设置'), findsWidgets);
     expect(find.textContaining('浏览器本地存储'), findsOneWidget);
+    expect(find.textContaining('Local Gateway'), findsWidgets);
+    expect(find.textContaining('Remote Gateway'), findsWidgets);
   });
 }

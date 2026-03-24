@@ -30,6 +30,8 @@
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>XWorkmate uses your local network only when you explicitly connect to a user-configured OpenClaw Gateway on the same network.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>XWorkmate uses the camera only when you explicitly scan a gateway pairing QR code.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
