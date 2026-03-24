@@ -391,14 +391,17 @@ String _renderChangelog(GitSnapshot git) {
       '| Comparison Range | `${_escapeMarkdown(git.comparisonRangeLabel)}` |',
     )
     ..writeln()
-    ..writeln('## Recent Tags')
+    ..writeln('## Recent Releases')
     ..writeln()
-    ..writeln('| Tag | Date |')
-    ..writeln('| --- | --- |');
+    ..writeln('| Version | Date | Branch | Tag |')
+    ..writeln('| --- | --- | --- | --- |');
 
-  for (final tag in git.recentTags) {
+  for (final release in git.recentReleases) {
     buffer.writeln(
-      '| `${_escapeMarkdown(tag.name)}` | `${_escapeMarkdown(tag.date)}` |',
+      '| `${_escapeMarkdown(release.version)}` | '
+      '`${_escapeMarkdown(release.date)}` | '
+      '`${_escapeMarkdown(release.branch)}` | '
+      '`${_escapeMarkdown(release.tag)}` |',
     );
   }
 
@@ -633,6 +636,7 @@ class GitSnapshot {
     required this.generatedAt,
     required this.commits,
     required this.recentTags,
+    required this.recentReleases,
   });
 
   factory GitSnapshot.capture() {
@@ -643,7 +647,11 @@ class GitSnapshot {
     final headShort = _git(['rev-parse', '--short', 'HEAD']);
     final headLong = _git(['rev-parse', 'HEAD']);
     final headTags = _gitLines(['tag', '--points-at', 'HEAD']);
-    final recentTags = _gitTagRefs().take(5).toList(growable: false);
+    final allTags = _gitTagRefs();
+    final recentTags = allTags.take(5).toList(growable: false);
+    final recentReleases = _gitReleaseRefs(
+      allTags,
+    ).take(8).toList(growable: false);
     final latestTag = recentTags.isEmpty ? null : recentTags.first.name;
 
     String? previousTag;
@@ -683,6 +691,7 @@ class GitSnapshot {
       generatedAt: DateTime.now().toIso8601String(),
       commits: commits,
       recentTags: recentTags,
+      recentReleases: recentReleases,
     );
   }
 
@@ -696,6 +705,7 @@ class GitSnapshot {
   final String generatedAt;
   final List<GitCommit> commits;
   final List<GitTagRef> recentTags;
+  final List<GitReleaseRef> recentReleases;
 }
 
 class GitCommit {
@@ -717,6 +727,20 @@ class GitTagRef {
 
   final String name;
   final String date;
+}
+
+class GitReleaseRef {
+  const GitReleaseRef({
+    required this.version,
+    required this.date,
+    required this.branch,
+    required this.tag,
+  });
+
+  final String version;
+  final String date;
+  final String branch;
+  final String tag;
 }
 
 List<GitCommit> _gitCommitLog(String? comparisonRange) {
@@ -759,6 +783,86 @@ List<GitTagRef> _gitTagRefs() {
       .map((line) => line.split('\t'))
       .where((parts) => parts.length >= 2)
       .map((parts) => GitTagRef(name: parts[0], date: parts[1]))
+      .toList(growable: false);
+}
+
+List<GitReleaseRef> _gitReleaseRefs(List<GitTagRef> tags) {
+  final releases = <String, GitReleaseRef>{};
+
+  for (final tag in tags) {
+    final version = _normalizeReleaseVersion(tag.name);
+    if (version == null) {
+      continue;
+    }
+    releases[version] = GitReleaseRef(
+      version: version,
+      date: tag.date,
+      branch: _releaseBranchName(version),
+      tag: tag.name,
+    );
+  }
+
+  final branchLines = _gitLines(<String>[
+    'for-each-ref',
+    '--sort=-committerdate',
+    '--format=%(refname:short)%09%(committerdate:short)',
+    'refs/heads/release',
+  ], allowFailure: true);
+
+  for (final line in branchLines) {
+    final parts = line.split('\t');
+    if (parts.length < 2) {
+      continue;
+    }
+    final branch = parts[0];
+    final date = parts[1];
+    final version = _normalizeReleaseVersion(branch);
+    if (version == null) {
+      continue;
+    }
+    releases[version] = GitReleaseRef(
+      version: version,
+      date: releases[version]?.date ?? date,
+      branch: branch,
+      tag: releases[version]?.tag ?? '-',
+    );
+  }
+
+  final values = releases.values.toList(growable: false);
+  values.sort(
+    (left, right) => _compareReleaseVersions(right.version, left.version),
+  );
+  return values;
+}
+
+String? _normalizeReleaseVersion(String refName) {
+  final match = RegExp(r'^(?:release/)?(v\d+(?:\.\d+)*)$').firstMatch(refName);
+  return match?.group(1);
+}
+
+String _releaseBranchName(String version) => 'release/$version';
+
+int _compareReleaseVersions(String left, String right) {
+  final leftParts = _releaseVersionParts(left);
+  final rightParts = _releaseVersionParts(right);
+  final maxLength = leftParts.length > rightParts.length
+      ? leftParts.length
+      : rightParts.length;
+  for (var index = 0; index < maxLength; index += 1) {
+    final leftPart = index < leftParts.length ? leftParts[index] : 0;
+    final rightPart = index < rightParts.length ? rightParts[index] : 0;
+    if (leftPart != rightPart) {
+      return leftPart.compareTo(rightPart);
+    }
+  }
+  return 0;
+}
+
+List<int> _releaseVersionParts(String version) {
+  return version
+      .replaceFirst('v', '')
+      .split('.')
+      .map(int.parse)
       .toList(growable: false);
 }
 
