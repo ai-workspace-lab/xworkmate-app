@@ -400,6 +400,36 @@ web:
       build_modes: [debug, profile, release]
       description: Web assistant destination
       ui_surface: web_shell
+    tasks:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web tasks destination
+      ui_surface: web_shell
+    skills:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web skills destination
+      ui_surface: web_shell
+    nodes:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web nodes destination
+      ui_surface: web_shell
+    secrets:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web secrets destination
+      ui_surface: web_shell
+    ai_gateway:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web LLM API destination
+      ui_surface: web_shell
     settings:
       enabled: true
       release_tier: stable
