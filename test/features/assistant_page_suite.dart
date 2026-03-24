@@ -19,6 +19,7 @@ import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/theme/app_theme.dart';
+import 'package:xworkmate/widgets/pane_resize_handle.dart';
 
 import '../test_support.dart';
 
@@ -572,6 +573,74 @@ void main() {
     expect(shrunkComposerHeight, lessThan(initialComposerHeight));
     expect(expandedConversationHeight, greaterThan(initialConversationHeight));
   });
+
+  testWidgets(
+    'AssistantPage keeps all three panes tightly packed after resize',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
+
+      await pumpPage(
+        tester,
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+        platform: TargetPlatform.macOS,
+      );
+
+      final pageRect = tester.getRect(find.byType(AssistantPage));
+      final taskRail = find.byKey(const Key('assistant-task-rail'));
+      final horizontalHandle = find.byType(PaneResizeHandle).first;
+      final verticalHandle = find.byKey(
+        const Key('assistant-workspace-resize-handle'),
+      );
+      final conversationShell = find.byKey(
+        const Key('assistant-conversation-shell'),
+      );
+      final composerShell = find.byKey(const Key('assistant-composer-shell'));
+
+      await tester.drag(horizontalHandle, const Offset(360, 0));
+      await tester.pumpAndSettle();
+      await tester.drag(verticalHandle, const Offset(0, 260));
+      await tester.pumpAndSettle();
+
+      final taskRailRect = tester.getRect(taskRail);
+      final horizontalHandleRect = tester.getRect(horizontalHandle);
+      final conversationRect = tester.getRect(conversationShell);
+      final verticalHandleRect = tester.getRect(verticalHandle);
+      final composerRect = tester.getRect(composerShell);
+
+      expect(taskRailRect.left, moreOrLessEquals(pageRect.left, epsilon: 0.01));
+      expect(
+        taskRailRect.right,
+        moreOrLessEquals(horizontalHandleRect.left, epsilon: 0.01),
+      );
+      expect(
+        horizontalHandleRect.right,
+        moreOrLessEquals(conversationRect.left, epsilon: 2.01),
+      );
+      expect(
+        conversationRect.top,
+        moreOrLessEquals(pageRect.top, epsilon: 0.01),
+      );
+      expect(
+        conversationRect.bottom,
+        moreOrLessEquals(verticalHandleRect.top, epsilon: 0.01),
+      );
+      expect(
+        verticalHandleRect.bottom,
+        moreOrLessEquals(composerRect.top, epsilon: 0.01),
+      );
+      expect(
+        composerRect.bottom,
+        moreOrLessEquals(pageRect.bottom, epsilon: 0.01),
+      );
+      expect(
+        composerRect.right,
+        moreOrLessEquals(pageRect.right, epsilon: 0.01),
+      );
+      expect(conversationRect.width, greaterThan(620));
+      expect(conversationRect.height, greaterThanOrEqualTo(180));
+      expect(composerRect.height, greaterThanOrEqualTo(124));
+    },
+  );
 
   // Known flutter_tester host-exit hang in this widget scenario.
   testWidgets(
