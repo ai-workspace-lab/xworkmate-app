@@ -458,10 +458,17 @@ class _AssistantWorkspaceChrome extends StatelessWidget {
         child: collapsed
             ? Row(
                 children: [
-                  Expanded(
-                    child: _ChromePill(
-                      label: WorkspaceDestination.assistant.label,
-                      emphasized: true,
+                  _ChromeConversationSummary(
+                    controller: controller,
+                    compact: true,
+                  ),
+                  const SizedBox(width: 8),
+                  StatusBadge(
+                    status: StatusInfo(
+                      controller.assistantConnectionStatusLabel,
+                      controller.currentAssistantConnectionState.ready
+                          ? StatusTone.success
+                          : StatusTone.warning,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -473,50 +480,80 @@ class _AssistantWorkspaceChrome extends StatelessWidget {
                   ),
                 ],
               )
-            : Row(
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        _ChromePill(
-                          icon: Icons.home_rounded,
-                          label: appText('主页', 'Home'),
-                        ),
-                        _ChromePill(
-                          label: WorkspaceDestination.assistant.label,
-                          emphasized: true,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                  Row(
                     children: [
-                      FilledButton.icon(
-                        onPressed: () => controller.createConversation(
-                          target: controller.assistantExecutionTarget,
+                      Expanded(
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            _ChromePill(
+                              icon: Icons.home_rounded,
+                              label: appText('主页', 'Home'),
+                            ),
+                            _ChromePill(
+                              label: WorkspaceDestination.assistant.label,
+                              emphasized: true,
+                            ),
+                          ],
                         ),
-                        icon: const Icon(Icons.edit_square),
-                        label: Text(appText('新对话', 'New conversation')),
                       ),
-                      OutlinedButton.icon(
-                        onPressed: () =>
-                            controller.openSettings(tab: SettingsTab.gateway),
-                        icon: const Icon(Icons.tune_rounded),
-                        label: Text(
-                          appText('连接设置', 'Connection settings'),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: () => controller.createConversation(
+                              target: controller.assistantExecutionTarget,
+                            ),
+                            icon: const Icon(Icons.edit_square),
+                            label: Text(
+                              appText('新对话', 'New conversation'),
+                            ),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => controller.openSettings(
+                              tab: SettingsTab.gateway,
+                            ),
+                            icon: const Icon(Icons.tune_rounded),
+                            label: Text(
+                              appText('连接设置', 'Connection settings'),
+                            ),
+                          ),
+                          IconButton(
+                            key: const Key('assistant-workspace-chrome-toggle'),
+                            tooltip: appText(
+                              '折叠顶部导航',
+                              'Collapse top navigation',
+                            ),
+                            onPressed: onToggleCollapsed,
+                            icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ChromeConversationSummary(
+                          controller: controller,
                         ),
                       ),
-                      IconButton(
-                        key: const Key('assistant-workspace-chrome-toggle'),
-                        tooltip: appText('折叠顶部导航', 'Collapse top navigation'),
-                        onPressed: onToggleCollapsed,
-                        icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                      const SizedBox(width: 8),
+                      StatusBadge(
+                        status: StatusInfo(
+                          controller.assistantConnectionStatusLabel,
+                          controller.currentAssistantConnectionState.ready
+                              ? StatusTone.success
+                              : StatusTone.warning,
+                        ),
                       ),
                     ],
                   ),
@@ -1393,44 +1430,6 @@ class _ConversationWorkspace extends StatelessWidget {
 
         return Column(
           children: [
-            SurfaceCard(
-              borderRadius: 10,
-              tone: SurfaceCardTone.chrome,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              controller.currentConversationTitle,
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              controller.assistantConnectionTargetLabel,
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: palette.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                      StatusBadge(
-                        status: StatusInfo(
-                          controller.assistantConnectionStatusLabel,
-                          connected ? StatusTone.success : StatusTone.warning,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
             if (!connected)
               SurfaceCard(
                 borderRadius: 10,
@@ -1450,12 +1449,6 @@ class _ConversationWorkspace extends StatelessWidget {
                                 'The gateway target for this thread is offline. Use Test / Save / Apply in Settings first.',
                               ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    FilledButton.tonal(
-                      onPressed: () =>
-                          controller.openSettings(tab: SettingsTab.gateway),
-                      child: Text(appText('打开设置', 'Open settings')),
                     ),
                   ],
                 ),
@@ -1849,6 +1842,47 @@ class _AssistantSessionSettingsSheetState
           ),
         );
       },
+    );
+  }
+}
+
+class _ChromeConversationSummary extends StatelessWidget {
+  const _ChromeConversationSummary({
+    required this.controller,
+    this.compact = false,
+  });
+
+  final AppController controller;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          controller.currentConversationTitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: compact
+              ? Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                )
+              : Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          controller.assistantConnectionTargetLabel,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: palette.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 }
