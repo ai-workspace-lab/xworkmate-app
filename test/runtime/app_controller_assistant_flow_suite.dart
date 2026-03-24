@@ -86,6 +86,51 @@ void main() {
       );
     },
   );
+
+  test(
+    'AppController connects directly from a setup code and persists gateway auth',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final gateway = await _FakeGatewayServer.start();
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-setup-code-flow-',
+      );
+      addTearDown(() async {
+        await _deleteDirectoryWithRetry(tempDirectory);
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final controller = AppController(store: store);
+      addTearDown(() async {
+        controller.dispose();
+      });
+      addTearDown(gateway.close);
+
+      await _waitFor(() => !controller.initializing);
+
+      final setupCode = jsonEncode(<String, Object?>{
+        'url': 'ws://127.0.0.1:${gateway.port}',
+        'token': _FakeGatewayServer.sharedToken,
+      });
+
+      await controller.connectWithSetupCode(setupCode: setupCode);
+
+      expect(controller.connection.status, RuntimeConnectionStatus.connected);
+      expect(controller.connection.mode, RuntimeConnectionMode.local);
+      expect(gateway.connectAuthToken, _FakeGatewayServer.sharedToken);
+      expect(controller.settings.primaryLocalGatewayProfile.host, '127.0.0.1');
+      expect(controller.settings.primaryLocalGatewayProfile.port, gateway.port);
+      expect(
+        await controller.settingsController.loadGatewayToken(
+          profileIndex: kGatewayLocalProfileIndex,
+        ),
+        _FakeGatewayServer.sharedToken,
+      );
+    },
+  );
 }
 
 class _FakeGatewayServer {

@@ -94,4 +94,14 @@ void main() {
     await tester.pump();
     expect(find.textContaining('Android 扫码即将支持'), findsOneWidget);
   });
+
+  test('scan parser accepts json setup payload wrappers', () {
+    const payload =
+        '{"setupCode":"{\\"url\\":\\"wss://gateway.example.com\\",\\"token\\":\\"shared-token\\"}"}';
+
+    expect(
+      resolveGatewaySetupCodeFromScan(payload),
+      '{"url":"wss://gateway.example.com","token":"shared-token"}',
+    );
+  });
 }

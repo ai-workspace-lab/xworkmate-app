@@ -185,6 +185,64 @@ class _MobileShellState extends State<MobileShell> {
     );
   }
 
+  Future<void> _connectWithScannedSetupCode(String setupCode) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      await widget.controller.connectWithSetupCode(setupCode: setupCode);
+      if (!mounted) {
+        return;
+      }
+      _prefetchMobileSafeState();
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            appText(
+              '已写入配置码并开始连接 Gateway。',
+              'Setup code applied and Gateway connection started.',
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      if (widget.controller.connection.pairingRequired) {
+        messenger?.showSnackBar(
+          SnackBar(
+            content: Text(
+              appText(
+                '配置码有效，已向 Gateway 发起配对请求。请先在已授权设备上审批。',
+                'Setup code accepted. This device has requested pairing and now waits for approval.',
+              ),
+            ),
+          ),
+        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _showMobileSafeSheet();
+          }
+        });
+        return;
+      }
+      await _openGatewaySetupCodeEntry(prefilledSetupCode: setupCode);
+      if (!mounted) {
+        return;
+      }
+      final message = error.toString().trim();
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            appText(
+              '扫码成功，但自动连接失败。已为你填入配置码，请检查后重试。\n$message',
+              'QR captured, but automatic connect failed. The setup code has been prefilled for review.\n$message',
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
   void _showPairingGuidePage() {
     unawaited(_showPairingGuidePageFlow());
   }
@@ -198,7 +256,7 @@ class _MobileShellState extends State<MobileShell> {
           supportsQrScan: supportsQrScan,
           onManualInput: () => unawaited(_openGatewaySetupCodeEntry()),
           onScannedSetupCode: (setupCode) async {
-            await _openGatewaySetupCodeEntry(prefilledSetupCode: setupCode);
+            await _connectWithScannedSetupCode(setupCode);
           },
         ),
       ),
