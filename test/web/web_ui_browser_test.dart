@@ -43,17 +43,23 @@ void main() {
     );
     expect(find.byKey(const Key('assistant-focus-panel-title')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('assistant-workspace-chrome-toggle')));
+    await tester.tap(
+      find.byKey(const Key('assistant-workspace-chrome-toggle')),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('连接设置'), findsNothing);
 
-    await tester.tap(find.byKey(const Key('assistant-workspace-chrome-toggle')));
+    await tester.tap(
+      find.byKey(const Key('assistant-workspace-chrome-toggle')),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('连接设置'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('assistant-session-settings-button')));
+    await tester.tap(
+      find.byKey(const Key('assistant-session-settings-button')),
+    );
     await tester.pumpAndSettle();
 
     expect(
@@ -77,7 +83,10 @@ void main() {
     await tester.tap(find.byKey(const Key('assistant-side-pane-tab-quick')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('assistant-focus-panel-title')), findsOneWidget);
+    expect(
+      find.byKey(const Key('assistant-focus-panel-title')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey<String>('assistant-focus-add-settings')),
       findsOneWidget,
@@ -121,8 +130,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('设置'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('web-settings-search-field')),
+      findsOneWidget,
+    );
+    expect(find.text('OpenClaw Gateway'), findsWidgets);
+    expect(find.text('LLM 接入点'), findsWidgets);
+    expect(find.text('ACP 外部接入'), findsWidgets);
     expect(find.textContaining('浏览器本地存储'), findsOneWidget);
     expect(find.textContaining('Local Gateway'), findsWidgets);
     expect(find.textContaining('Remote Gateway'), findsWidgets);
+
+    await tester.tap(find.text('ACP 外部接入').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('设置提交流程'), findsOneWidget);
+    expect(find.text('Codex'), findsWidgets);
+    expect(find.text('OpenCode'), findsWidgets);
+    expect(find.text('Claude'), findsWidgets);
+    expect(find.text('Gemini'), findsWidgets);
   });
 }

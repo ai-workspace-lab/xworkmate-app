@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app/app_controller_web.dart';
@@ -21,6 +23,8 @@ class WebSettingsPage extends StatefulWidget {
   State<WebSettingsPage> createState() => _WebSettingsPageState();
 }
 
+enum _WebGatewaySettingsSubTab { gateway, llm, acp }
+
 class _WebSettingsPageState extends State<WebSettingsPage> {
   late final TextEditingController _directNameController;
   late final TextEditingController _directBaseUrlController;
@@ -36,8 +40,11 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
   late final TextEditingController _remotePasswordController;
   late final TextEditingController _sessionRemoteBaseUrlController;
   late final TextEditingController _sessionApiTokenController;
+  late final Map<SingleAgentProvider, TextEditingController>
+  _externalAcpEndpointControllers;
   late WebSessionPersistenceMode _sessionPersistenceMode;
   bool _remoteTls = true;
+  _WebGatewaySettingsSubTab _gatewaySubTab = _WebGatewaySettingsSubTab.gateway;
 
   String _directMessage = '';
   String _localGatewayMessage = '';
@@ -61,6 +68,11 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     _remotePasswordController = TextEditingController();
     _sessionRemoteBaseUrlController = TextEditingController();
     _sessionApiTokenController = TextEditingController();
+    _externalAcpEndpointControllers =
+        <SingleAgentProvider, TextEditingController>{
+          for (final provider in kBuiltinExternalAcpProviders)
+            provider: TextEditingController(),
+        };
     _sessionPersistenceMode = widget.controller.webSessionPersistence.mode;
     _syncControllers();
   }
@@ -87,6 +99,9 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     _remotePasswordController.dispose();
     _sessionRemoteBaseUrlController.dispose();
     _sessionApiTokenController.dispose();
+    for (final controller in _externalAcpEndpointControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -155,6 +170,12 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           ? ''
           : _sessionApiTokenController.text,
     );
+    for (final provider in kBuiltinExternalAcpProviders) {
+      _setIfDifferent(
+        _externalAcpEndpointControllers[provider]!,
+        settings.externalAcpEndpointForProvider(provider).endpoint,
+      );
+    }
   }
 
   @override
@@ -169,101 +190,159 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
         final currentTab = uiFeatures.sanitizeSettingsTab(
           controller.settingsTab,
         );
+        final showGlobalApplyBar =
+            currentTab != SettingsTab.gateway ||
+            _gatewaySubTab == _WebGatewaySettingsSubTab.acp;
         return DesktopWorkspaceScaffold(
-          breadcrumbs: <AppBreadcrumbItem>[
-            AppBreadcrumbItem(
-              label: appText('主页', 'Home'),
-              icon: Icons.home_rounded,
-              onTap: controller.navigateHome,
-            ),
-            AppBreadcrumbItem(
-              label: appText('设置', 'Settings'),
-              onTap: () => controller.openSettings(tab: currentTab),
-            ),
-            AppBreadcrumbItem(label: currentTab.label),
-          ],
-          eyebrow: appText('Web Preferences', 'Web Preferences'),
-          title: appText('设置', 'Settings'),
-          subtitle: appText(
-            'Web 版只保留单机智能体 / Relay Gateway、界面偏好和基础信息。',
-            'The web app keeps only Single Agent, Relay Gateway, appearance preferences, and basic product info.',
-          ),
-          toolbar: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              FilledButton.tonalIcon(
-                onPressed: () => controller.navigateHome(),
-                icon: const Icon(Icons.chat_bubble_outline_rounded),
-                label: Text(appText('回到助手', 'Back to assistant')),
-              ),
-              DropdownButtonHideUnderline(
-                child: DropdownButton<ThemeMode>(
-                  value: controller.themeMode,
-                  onChanged: (value) {
-                    if (value != null) {
-                      controller.setThemeMode(value);
-                    }
-                  },
-                  items: ThemeMode.values
-                      .map(
-                        (mode) => DropdownMenuItem<ThemeMode>(
-                          value: mode,
-                          child: Text(_themeLabel(mode)),
-                        ),
-                      )
-                      .toList(growable: false),
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: controller.toggleAppLanguage,
-                icon: const Icon(Icons.translate_rounded),
-                label: Text(
-                  controller.appLanguage == AppLanguage.zh ? '中文' : 'English',
-                ),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              SectionTabs(
-                items: availableTabs.map((item) => item.label).toList(),
-                value: currentTab.label,
-                onChanged: (label) {
-                  final tab = availableTabs.firstWhere(
-                    (item) => item.label == label,
-                  );
-                  controller.setSettingsTab(tab);
-                },
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: switch (currentTab) {
-                      SettingsTab.general => _buildGeneral(context, controller),
-                      SettingsTab.gateway => _buildGateway(
-                        context,
-                        controller,
-                        settings,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TopBar(
+                  breadcrumbs: <AppBreadcrumbItem>[
+                    AppBreadcrumbItem(
+                      label: appText('主页', 'Home'),
+                      icon: Icons.home_rounded,
+                      onTap: controller.navigateHome,
+                    ),
+                    AppBreadcrumbItem(
+                      label: appText('设置', 'Settings'),
+                      onTap: () => controller.openSettings(tab: currentTab),
+                    ),
+                    AppBreadcrumbItem(label: currentTab.label),
+                  ],
+                  title: appText('设置', 'Settings'),
+                  subtitle: appText(
+                    '配置 XWorkmate Web 工作区、网关默认项、界面与诊断选项',
+                    'Configure workspace, gateway defaults, appearance, and diagnostics for XWorkmate Web.',
+                  ),
+                  trailing: SizedBox(
+                    width: 260,
+                    child: TextField(
+                      key: const ValueKey('web-settings-search-field'),
+                      decoration: InputDecoration(
+                        hintText: appText('搜索设置', 'Search settings'),
+                        prefixIcon: const Icon(Icons.search_rounded),
                       ),
-                      SettingsTab.appearance => _buildAppearance(
-                        context,
-                        controller,
-                      ),
-                      _ => _buildAbout(context),
-                    },
+                    ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 24),
+                if (showGlobalApplyBar) ...[
+                  _buildGlobalApplyBar(context, controller),
+                  const SizedBox(height: 16),
+                ],
+                SectionTabs(
+                  items: availableTabs.map((item) => item.label).toList(),
+                  value: currentTab.label,
+                  onChanged: (label) {
+                    final tab = availableTabs.firstWhere(
+                      (item) => item.label == label,
+                    );
+                    controller.setSettingsTab(tab);
+                  },
+                ),
+                const SizedBox(height: 24),
+                ...switch (currentTab) {
+                  SettingsTab.general => _buildGeneral(
+                    context,
+                    controller,
+                    controller.settingsDraft,
+                  ),
+                  SettingsTab.gateway => _buildGateway(
+                    context,
+                    controller,
+                    settings,
+                  ),
+                  SettingsTab.appearance => _buildAppearance(
+                    context,
+                    controller,
+                  ),
+                  _ => _buildAbout(context),
+                },
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  List<Widget> _buildGeneral(BuildContext context, AppController controller) {
+  Widget _buildGlobalApplyBar(BuildContext context, AppController controller) {
+    final theme = Theme.of(context);
+    final hasDraft = controller.hasSettingsDraftChanges;
+    final hasPendingApply = controller.hasPendingSettingsApply;
+    final message = controller.settingsDraftStatusMessage;
+    return SurfaceCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  appText('设置提交流程', 'Settings Submission'),
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  message.isNotEmpty
+                      ? message
+                      : hasDraft
+                      ? appText(
+                          '当前存在未保存草稿。保存：仅保存配置，不立即生效。',
+                          'There are unsaved drafts. Save persists configuration only and does not apply it immediately.',
+                        )
+                      : hasPendingApply
+                      ? appText(
+                          '当前存在已保存但未应用的更改。应用：立即按当前配置生效。',
+                          'There are saved changes waiting to be applied. Apply makes the current configuration take effect immediately.',
+                        )
+                      : appText(
+                          '当前没有待提交更改。',
+                          'There are no pending settings changes.',
+                        ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              OutlinedButton(
+                key: const ValueKey('settings-global-save-button'),
+                onPressed:
+                    hasDraft || _gatewaySubTab == _WebGatewaySettingsSubTab.acp
+                    ? () => _handleTopLevelSave(controller)
+                    : null,
+                child: Text(appText('保存', 'Save')),
+              ),
+              FilledButton.tonal(
+                key: const ValueKey('settings-global-apply-button'),
+                onPressed:
+                    (hasDraft ||
+                        hasPendingApply ||
+                        _gatewaySubTab == _WebGatewaySettingsSubTab.acp)
+                    ? () => _handleTopLevelApply(controller)
+                    : null,
+                child: Text(appText('应用', 'Apply')),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildGeneral(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
     final targets = controller
         .featuresFor(UiFeaturePlatform.web)
         .availableExecutionTargets
@@ -274,12 +353,24 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
+              appText('通用', 'General'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              appText(
+                '这里维护 Web 默认执行目标与会话持久化摘要，结构与 App 设置页保持一致。',
+                'Maintain the default web execution target and session persistence summary here, aligned with the app settings layout.',
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
               appText('默认工作模式', 'Default work mode'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<AssistantExecutionTarget>(
-              initialValue: controller.assistantExecutionTarget,
+              initialValue: settings.assistantExecutionTarget,
               items: targets
                   .map((target) {
                     return DropdownMenuItem<AssistantExecutionTarget>(
@@ -290,7 +381,11 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
                   .toList(growable: false),
               onChanged: (value) {
                 if (value != null) {
-                  controller.setAssistantExecutionTarget(value);
+                  unawaited(
+                    controller.saveSettingsDraft(
+                      settings.copyWith(assistantExecutionTarget: value),
+                    ),
+                  );
                 }
               },
             ),
@@ -306,6 +401,49 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     BuildContext context,
     AppController controller,
     SettingsSnapshot settings,
+  ) {
+    return [
+      SectionTabs(
+        items: <String>[
+          'OpenClaw Gateway',
+          appText('LLM 接入点', 'LLM Endpoints'),
+          appText('ACP 外部接入', 'External ACP'),
+        ],
+        value: switch (_gatewaySubTab) {
+          _WebGatewaySettingsSubTab.gateway => 'OpenClaw Gateway',
+          _WebGatewaySettingsSubTab.llm => appText('LLM 接入点', 'LLM Endpoints'),
+          _WebGatewaySettingsSubTab.acp => appText('ACP 外部接入', 'External ACP'),
+        },
+        onChanged: (value) => setState(() {
+          _gatewaySubTab = switch (value) {
+            'OpenClaw Gateway' => _WebGatewaySettingsSubTab.gateway,
+            _ when value == appText('LLM 接入点', 'LLM Endpoints') =>
+              _WebGatewaySettingsSubTab.llm,
+            _ => _WebGatewaySettingsSubTab.acp,
+          };
+        }),
+      ),
+      const SizedBox(height: 16),
+      ...switch (_gatewaySubTab) {
+        _WebGatewaySettingsSubTab.gateway => _buildGatewayOverview(
+          context,
+          controller,
+        ),
+        _WebGatewaySettingsSubTab.llm => _buildLlmEndpointManager(
+          context,
+          controller,
+          settings,
+        ),
+        _WebGatewaySettingsSubTab.acp => <Widget>[
+          _buildExternalAcpEndpointManager(context, controller),
+        ],
+      },
+    ];
+  }
+
+  List<Widget> _buildGatewayOverview(
+    BuildContext context,
+    AppController controller,
   ) {
     final palette = context.palette;
     return [
@@ -325,168 +463,26 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           ],
         ),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 16),
       SurfaceCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              appText('单机智能体', 'Single Agent'),
-              style: Theme.of(context).textTheme.titleMedium,
+              'OpenClaw Gateway',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _directNameController,
-              decoration: InputDecoration(labelText: appText('名称', 'Name')),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _directProviderController,
-              decoration: InputDecoration(
-                labelText: appText('Provider 标识', 'Provider label'),
+            const SizedBox(height: 8),
+            Text(
+              appText(
+                '这里维护 Local / Remote Gateway 与浏览器会话持久化配置。保存：仅保存配置，不立即生效。应用：立即按当前配置生效。',
+                'Maintain Local / Remote Gateway and browser session persistence here. Save persists configuration only, while Apply makes it take effect immediately.',
               ),
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _directBaseUrlController,
-              decoration: InputDecoration(
-                labelText: appText('LLM API Endpoint', 'LLM API Endpoint'),
-                hintText: 'https://api.example.com/v1',
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _directApiKeyController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: appText('LLM API Token', 'LLM API Token'),
-                helperText: controller.storedAiGatewayApiKeyMask == null
-                    ? null
-                    : '${appText('已保存', 'Stored')}: ${controller.storedAiGatewayApiKeyMask}',
-              ),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: controller.resolvedAiGatewayModel.isEmpty
-                  ? null
-                  : controller.resolvedAiGatewayModel,
-              items: settings.aiGateway.availableModels
-                  .map(
-                    (item) => DropdownMenuItem<String>(
-                      value: item,
-                      child: Text(item),
-                    ),
-                  )
-                  .toList(growable: false),
-              onChanged: (value) {
-                if (value != null) {
-                  controller.selectDirectModel(value);
-                }
-              },
-              decoration: InputDecoration(
-                labelText: appText('默认模型', 'Default model'),
-                hintText: appText('先同步模型目录', 'Sync model catalog first'),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                OutlinedButton(
-                  onPressed: controller.aiGatewayBusy
-                      ? null
-                      : () async {
-                          final result = await controller.testAiGatewayConnection(
-                            baseUrl: _directBaseUrlController.text,
-                            apiKey: _directApiKeyController.text,
-                          );
-                          if (!mounted) {
-                            return;
-                          }
-                          setState(() => _directMessage = result.message);
-                        },
-                  child: Text(appText('Test', 'Test')),
-                ),
-                FilledButton(
-                  onPressed: controller.aiGatewayBusy
-                      ? null
-                      : () async {
-                          await controller.saveAiGatewayConfiguration(
-                            name: _directNameController.text,
-                            baseUrl: _directBaseUrlController.text,
-                            provider: _directProviderController.text,
-                            apiKey: _directApiKeyController.text,
-                            defaultModel: controller.resolvedAiGatewayModel,
-                          );
-                          if (!mounted) {
-                            return;
-                          }
-                          setState(() {
-                            _directMessage = appText(
-                              '配置已保存，尚未同步模型目录。',
-                              'Configuration saved; model catalog not synced yet.',
-                            );
-                          });
-                        },
-                  child: Text(appText('Save', 'Save')),
-                ),
-                FilledButton.icon(
-                  onPressed: controller.aiGatewayBusy
-                      ? null
-                      : () async {
-                          await controller.saveAiGatewayConfiguration(
-                            name: _directNameController.text,
-                            baseUrl: _directBaseUrlController.text,
-                            provider: _directProviderController.text,
-                            apiKey: _directApiKeyController.text,
-                            defaultModel: controller.resolvedAiGatewayModel,
-                          );
-                          try {
-                            await controller.syncAiGatewayModels(
-                              name: _directNameController.text,
-                              baseUrl: _directBaseUrlController.text,
-                              provider: _directProviderController.text,
-                              apiKey: _directApiKeyController.text,
-                            );
-                            if (!mounted) {
-                              return;
-                            }
-                            setState(() {
-                              _directMessage =
-                                  controller.settings.aiGateway.syncMessage;
-                            });
-                          } catch (error) {
-                            if (!mounted) {
-                              return;
-                            }
-                            setState(() => _directMessage = '$error');
-                          }
-                        },
-                  icon: controller.aiGatewayBusy
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.play_circle_outline_rounded),
-                  label: Text(appText('Apply', 'Apply')),
-                ),
-              ],
-            ),
-            if (_directMessage.trim().isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(
-                _directMessage,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
-              ),
-            ],
           ],
         ),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 16),
       _buildGatewayCard(
         context,
         controller: controller,
@@ -545,7 +541,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
               appText('会话持久化', 'Session persistence'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Text(
               appText(
                 '默认使用浏览器本地缓存保存 Assistant 会话。若要做 durable store，请配置一个 HTTPS Session API；该 API 可以由 PostgreSQL 等后端数据库承接，但浏览器不会直接连接数据库。',
@@ -664,6 +660,348 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     ];
   }
 
+  List<Widget> _buildLlmEndpointManager(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
+    final palette = context.palette;
+    return [
+      SurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              appText('LLM 接入点', 'LLM Endpoints'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              appText(
+                'Web 版保持与 App 一致的接入点结构，但当前仅开放主 LLM API 连接源。',
+                'Web keeps the same endpoint structure as the app, but currently exposes only the primary LLM API source.',
+              ),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                ChoiceChip(
+                  key: const ValueKey('web-settings-llm-primary-chip'),
+                  selected: true,
+                  avatar: const Icon(Icons.link_rounded, size: 18),
+                  label: Text(appText('主 LLM API', 'Primary LLM API')),
+                  onSelected: (_) {},
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appText('连接源详情', 'Source details'),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _directNameController,
+                    decoration: InputDecoration(
+                      labelText: appText('配置名称', 'Profile name'),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _directBaseUrlController,
+                    decoration: InputDecoration(
+                      labelText: appText(
+                        'LLM API Endpoint',
+                        'LLM API Endpoint',
+                      ),
+                      hintText: 'https://api.example.com/v1',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _directProviderController,
+                    decoration: InputDecoration(
+                      labelText: appText(
+                        'LLM API Token 引用',
+                        'LLM API token reference',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _directApiKeyController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: appText('LLM API Token', 'LLM API Token'),
+                      helperText: controller.storedAiGatewayApiKeyMask == null
+                          ? null
+                          : '${appText('已安全保存', 'Stored securely')}: ${controller.storedAiGatewayApiKeyMask}',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: controller.resolvedAiGatewayModel.isEmpty
+                        ? null
+                        : controller.resolvedAiGatewayModel,
+                    items: settings.aiGateway.availableModels
+                        .map(
+                          (item) => DropdownMenuItem<String>(
+                            value: item,
+                            child: Text(item),
+                          ),
+                        )
+                        .toList(growable: false),
+                    onChanged: (value) {
+                      if (value != null) {
+                        controller.selectDirectModel(value);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      labelText: appText('默认模型', 'Default model'),
+                      hintText: appText('先同步模型目录', 'Sync model catalog first'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      OutlinedButton(
+                        onPressed: controller.aiGatewayBusy
+                            ? null
+                            : () async {
+                                final result = await controller
+                                    .testAiGatewayConnection(
+                                      baseUrl: _directBaseUrlController.text,
+                                      apiKey: _directApiKeyController.text,
+                                    );
+                                if (!mounted) {
+                                  return;
+                                }
+                                setState(() => _directMessage = result.message);
+                              },
+                        child: Text(appText('测试连接', 'Test')),
+                      ),
+                      FilledButton(
+                        onPressed: controller.aiGatewayBusy
+                            ? null
+                            : () async {
+                                await controller.saveAiGatewayConfiguration(
+                                  name: _directNameController.text,
+                                  baseUrl: _directBaseUrlController.text,
+                                  provider: _directProviderController.text,
+                                  apiKey: _directApiKeyController.text,
+                                  defaultModel:
+                                      controller.resolvedAiGatewayModel,
+                                );
+                                if (!mounted) {
+                                  return;
+                                }
+                                setState(() {
+                                  _directMessage = appText(
+                                    '配置已保存，尚未同步模型目录。',
+                                    'Configuration saved; model catalog not synced yet.',
+                                  );
+                                });
+                              },
+                        child: Text(appText('保存', 'Save')),
+                      ),
+                      FilledButton.icon(
+                        onPressed: controller.aiGatewayBusy
+                            ? null
+                            : () async {
+                                await controller.saveAiGatewayConfiguration(
+                                  name: _directNameController.text,
+                                  baseUrl: _directBaseUrlController.text,
+                                  provider: _directProviderController.text,
+                                  apiKey: _directApiKeyController.text,
+                                  defaultModel:
+                                      controller.resolvedAiGatewayModel,
+                                );
+                                try {
+                                  await controller.syncAiGatewayModels(
+                                    name: _directNameController.text,
+                                    baseUrl: _directBaseUrlController.text,
+                                    provider: _directProviderController.text,
+                                    apiKey: _directApiKeyController.text,
+                                  );
+                                  if (!mounted) {
+                                    return;
+                                  }
+                                  setState(() {
+                                    _directMessage = controller
+                                        .settings
+                                        .aiGateway
+                                        .syncMessage;
+                                  });
+                                } catch (error) {
+                                  if (!mounted) {
+                                    return;
+                                  }
+                                  setState(() => _directMessage = '$error');
+                                }
+                              },
+                        icon: controller.aiGatewayBusy
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.play_circle_outline_rounded),
+                        label: Text(appText('应用', 'Apply')),
+                      ),
+                    ],
+                  ),
+                  if (_directMessage.trim().isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      _directMessage,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: palette.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  Widget _buildExternalAcpEndpointManager(
+    BuildContext context,
+    AppController controller,
+  ) {
+    final theme = Theme.of(context);
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            appText('外部 ACP Server Endpoint', 'External ACP Server Endpoints'),
+            style: theme.textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            appText(
+              '第一批内置 4 个 provider：Codex、OpenCode、Claude、Gemini。每个 provider 都可以自定义接入自己的 ACP Server Endpoint，协议支持 ws / wss / http / https。Gateway profile 与 ACP endpoint 分开存储，后续可在这个列表上扩展自定义 provider。',
+              'The first batch includes 4 built-in providers: Codex, OpenCode, Claude, and Gemini. Each provider can point to its own ACP server endpoint with ws / wss / http / https. Gateway profiles and ACP endpoints are stored separately, and this list is designed to extend to custom providers later.',
+            ),
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          ...kBuiltinExternalAcpProviders.map(
+            (provider) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildExternalAcpProviderCard(
+                context,
+                controller,
+                provider,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExternalAcpProviderCard(
+    BuildContext context,
+    AppController controller,
+    SingleAgentProvider provider,
+  ) {
+    final endpointController = _externalAcpEndpointControllers[provider]!;
+    final configured = endpointController.text.trim().isNotEmpty;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  provider.label,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              _StatusChip(
+                label: configured
+                    ? appText('已配置', 'Configured')
+                    : appText('未配置', 'Empty'),
+                tone: configured ? _StatusChipTone.ready : _StatusChipTone.idle,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: endpointController,
+            decoration: InputDecoration(
+              labelText: appText(
+                '${provider.label} ACP Endpoint',
+                '${provider.label} ACP Endpoint',
+              ),
+            ),
+            onChanged: (_) => _stageExternalAcpDraft(controller),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            appText(
+              '示例：ws://127.0.0.1:9001、wss://acp.example.com/rpc、http://127.0.0.1:8080、https://agent.example.com',
+              'Examples: ws://127.0.0.1:9001, wss://acp.example.com/rpc, http://127.0.0.1:8080, https://agent.example.com',
+            ),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleTopLevelSave(AppController controller) async {
+    _stageExternalAcpDraft(controller);
+    await controller.persistSettingsDraft();
+  }
+
+  Future<void> _handleTopLevelApply(AppController controller) async {
+    _stageExternalAcpDraft(controller);
+    await controller.applySettingsDraft();
+  }
+
+  void _stageExternalAcpDraft(AppController controller) {
+    var next = controller.settingsDraft;
+    for (final provider in kBuiltinExternalAcpProviders) {
+      final currentProfile = next.externalAcpEndpointForProvider(provider);
+      final endpoint = _externalAcpEndpointControllers[provider]!.text.trim();
+      next = next.copyWithExternalAcpEndpointForProvider(
+        provider,
+        currentProfile.copyWith(endpoint: endpoint),
+      );
+    }
+    if (next.toJsonString() == controller.settingsDraft.toJsonString()) {
+      return;
+    }
+    unawaited(controller.saveSettingsDraft(next));
+  }
+
   Widget _buildGatewayCard(
     BuildContext context, {
     required AppController controller,
@@ -688,7 +1026,8 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     final status = matchesTarget
         ? controller.connection.status.label
         : RuntimeConnectionStatus.offline.label;
-    final endpoint = '${hostController.text.trim()}:${_parsePort(portController.text, fallback: 443)}';
+    final endpoint =
+        '${hostController.text.trim()}:${_parsePort(portController.text, fallback: 443)}';
     final statusEndpoint = matchesTarget
         ? (controller.connection.remoteAddress?.trim().isNotEmpty == true
               ? controller.connection.remoteAddress!.trim()
@@ -699,10 +1038,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
           TextField(
             controller: hostController,
@@ -767,12 +1103,13 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
                           portText: portController.text,
                           tls: tls,
                         );
-                        final result = await controller.testGatewayConnectionDraft(
-                          profile: profile,
-                          executionTarget: executionTarget,
-                          tokenOverride: tokenController.text,
-                          passwordOverride: passwordController.text,
-                        );
+                        final result = await controller
+                            .testGatewayConnectionDraft(
+                              profile: profile,
+                              executionTarget: executionTarget,
+                              tokenOverride: tokenController.text,
+                              passwordOverride: passwordController.text,
+                            );
                         if (!mounted) {
                           return;
                         }
@@ -814,7 +1151,10 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
                           await controller.applyRelayConfiguration(
                             profileIndex: profileIndex,
                             host: hostController.text,
-                            port: _parsePort(portController.text, fallback: 443),
+                            port: _parsePort(
+                              portController.text,
+                              fallback: 443,
+                            ),
                             tls: tls,
                             token: tokenController.text,
                             password: passwordController.text,
@@ -850,9 +1190,9 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
             const SizedBox(height: 10),
             Text(
               message,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: context.palette.textSecondary),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: context.palette.textSecondary,
+              ),
             ),
           ],
         ],
@@ -986,13 +1326,47 @@ String _targetLabel(AssistantExecutionTarget target) {
       'Single Agent',
       'Single Agent',
     ),
-    AssistantExecutionTarget.local => appText(
-      'Local Gateway',
-      'Local Gateway',
-    ),
+    AssistantExecutionTarget.local => appText('Local Gateway', 'Local Gateway'),
     AssistantExecutionTarget.remote => appText(
       'Remote Gateway',
       'Remote Gateway',
     ),
   };
+}
+
+enum _StatusChipTone { idle, ready }
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.label, required this.tone});
+
+  final String label;
+  final _StatusChipTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final background = switch (tone) {
+      _StatusChipTone.idle => palette.surfaceSecondary,
+      _StatusChipTone.ready => palette.accent.withValues(alpha: 0.14),
+    };
+    final foreground = switch (tone) {
+      _StatusChipTone.idle => palette.textSecondary,
+      _StatusChipTone.ready => palette.accent,
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: foreground,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
 }
