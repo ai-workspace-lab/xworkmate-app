@@ -1,47 +1,119 @@
 import 'package:flutter/material.dart';
 
+import '../i18n/app_language.dart';
 import '../models/app_models.dart';
+import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 import '../web/web_assistant_page.dart';
 import '../web/web_settings_page.dart';
+import '../web/web_workspace_pages.dart';
+import '../widgets/pane_resize_handle.dart';
+import '../widgets/sidebar_navigation.dart';
 import 'app_controller_web.dart';
 
-class AppShell extends StatelessWidget {
+class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.controller});
 
   final AppController controller;
 
   @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
+  static const _sidebarMinWidth = 56.0;
+  static const _sidebarViewportPadding = 72.0;
+  static const _mainContentMinWidth = 760.0;
+
+  AppSidebarState _sidebarState = AppSidebarState.expanded;
+  double? _sidebarExpandedWidth;
+
+  double _clampSidebarWidth(double value, double viewportWidth) {
+    final responsiveMax =
+        (viewportWidth - _mainContentMinWidth - _sidebarViewportPadding).clamp(
+          _sidebarMinWidth,
+          viewportWidth - _sidebarViewportPadding,
+        );
+    return value.clamp(_sidebarMinWidth, responsiveMax).toDouble();
+  }
+
+  double _defaultSidebarWidth(AppLanguage language, double viewportWidth) {
+    final baseWidth = language == AppLanguage.zh
+        ? AppSizes.sidebarExpandedWidthZh
+        : AppSizes.sidebarExpandedWidthEn;
+    return _clampSidebarWidth(baseWidth, viewportWidth);
+  }
+
+  void _cycleSidebarState() {
+    setState(() {
+      _sidebarState = switch (_sidebarState) {
+        AppSidebarState.expanded => AppSidebarState.collapsed,
+        AppSidebarState.collapsed => AppSidebarState.hidden,
+        AppSidebarState.hidden => AppSidebarState.expanded,
+      };
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: controller,
+      animation: widget.controller,
       builder: (context, _) {
-        final availableDestinations =
-            <WorkspaceDestination>[
-                  WorkspaceDestination.assistant,
-                  WorkspaceDestination.settings,
-                ]
-                .where(controller.capabilities.supportsDestination)
-                .toList(growable: false);
+        final controller = widget.controller;
+        final availableDestinations = <WorkspaceDestination>[
+          WorkspaceDestination.assistant,
+          WorkspaceDestination.tasks,
+          WorkspaceDestination.skills,
+          WorkspaceDestination.nodes,
+          WorkspaceDestination.secrets,
+          WorkspaceDestination.aiGateway,
+          WorkspaceDestination.settings,
+        ].where(controller.capabilities.supportsDestination).toList(
+          growable: false,
+        );
         final currentDestination =
             availableDestinations.contains(controller.destination)
             ? controller.destination
             : (availableDestinations.isEmpty
                   ? WorkspaceDestination.assistant
                   : availableDestinations.first);
-
         return Scaffold(
           body: SafeArea(
             bottom: false,
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final mobile = constraints.maxWidth < 900;
-                if (mobile) {
+                final isMobile = constraints.maxWidth < 900;
+                final expandedSidebarWidth = _clampSidebarWidth(
+                  _sidebarExpandedWidth ??
+                      _defaultSidebarWidth(
+                        controller.appLanguage,
+                        constraints.maxWidth,
+                      ),
+                  constraints.maxWidth,
+                );
+
+                if (isMobile) {
+                  final mobileDestinations = <WorkspaceDestination>[
+                    WorkspaceDestination.assistant,
+                    WorkspaceDestination.tasks,
+                    WorkspaceDestination.skills,
+                    WorkspaceDestination.settings,
+                  ].where(controller.capabilities.supportsDestination).toList(
+                    growable: false,
+                  );
+                  final selectedIndex = mobileDestinations.contains(
+                    currentDestination,
+                  )
+                      ? mobileDestinations.indexOf(currentDestination)
+                      : 0;
                   return Column(
                     children: [
                       Expanded(
-                        child: _buildPage(
-                          controller,
-                          destination: currentDestination,
+                        child: _WebShellBody(
+                          child: _buildPage(
+                            controller,
+                            destination: currentDestination,
+                          ),
                         ),
                       ),
                       Padding(
@@ -49,15 +121,11 @@ class AppShell extends StatelessWidget {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(24),
                           child: NavigationBar(
-                            selectedIndex: availableDestinations.indexOf(
-                              currentDestination,
-                            ),
+                            selectedIndex: selectedIndex,
                             onDestinationSelected: (index) {
-                              controller.navigateTo(
-                                availableDestinations[index],
-                              );
+                              controller.navigateTo(mobileDestinations[index]);
                             },
-                            destinations: availableDestinations
+                            destinations: mobileDestinations
                                 .map(
                                   (destination) => NavigationDestination(
                                     icon: Icon(destination.icon),
@@ -72,9 +140,70 @@ class AppShell extends StatelessWidget {
                   );
                 }
 
-                return _buildPage(
-                  controller,
-                  destination: currentDestination,
+                return Row(
+                  children: [
+                    if (_sidebarState != AppSidebarState.hidden)
+                      SidebarNavigation(
+                        currentSection: currentDestination,
+                        sidebarState: _sidebarState,
+                        appLanguage: controller.appLanguage,
+                        themeMode: controller.themeMode,
+                        onSectionChanged: controller.navigateTo,
+                        onToggleLanguage: controller.toggleAppLanguage,
+                        onCycleSidebarState: _cycleSidebarState,
+                        onExpandFromCollapsed: () {
+                          setState(() {
+                            _sidebarState = AppSidebarState.expanded;
+                          });
+                        },
+                        onOpenAccount: () {},
+                        onOpenThemeToggle: () => controller.setThemeMode(
+                          controller.themeMode == ThemeMode.dark
+                              ? ThemeMode.light
+                              : ThemeMode.dark,
+                        ),
+                        accountName: controller.settings.accountUsername
+                                .trim()
+                                .isNotEmpty
+                            ? controller.settings.accountUsername
+                            : appText('Web 操作员', 'Web operator'),
+                        accountSubtitle: controller.settings.accountWorkspace
+                                .trim()
+                                .isNotEmpty
+                            ? controller.settings.accountWorkspace
+                            : appText('Web 工作区', 'Web workspace'),
+                        expandedWidthOverride:
+                            _sidebarState == AppSidebarState.expanded
+                            ? expandedSidebarWidth
+                            : null,
+                        favoriteDestinations: controller
+                            .assistantNavigationDestinations
+                            .toSet(),
+                        onToggleFavorite:
+                            controller.toggleAssistantNavigationDestination,
+                        availableDestinations: controller.capabilities.allowedDestinations,
+                      ),
+                    if (_sidebarState == AppSidebarState.expanded)
+                      PaneResizeHandle(
+                        axis: Axis.horizontal,
+                        onDelta: (delta) {
+                          setState(() {
+                            _sidebarExpandedWidth = _clampSidebarWidth(
+                              expandedSidebarWidth + delta,
+                              constraints.maxWidth,
+                            );
+                          });
+                        },
+                      ),
+                    Expanded(
+                      child: _WebShellBody(
+                        child: _buildPage(
+                          controller,
+                          destination: currentDestination,
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -89,8 +218,64 @@ class AppShell extends StatelessWidget {
     required WorkspaceDestination destination,
   }) {
     return switch (destination) {
+      WorkspaceDestination.tasks => WebTasksPage(controller: controller),
+      WorkspaceDestination.skills => WebSkillsPage(controller: controller),
+      WorkspaceDestination.nodes => WebNodesPage(controller: controller),
+      WorkspaceDestination.secrets => WebSecretsPage(controller: controller),
+      WorkspaceDestination.aiGateway => WebAiGatewayPage(controller: controller),
       WorkspaceDestination.settings => WebSettingsPage(controller: controller),
       _ => WebAssistantPage(controller: controller),
     };
+  }
+}
+
+class _WebShellBody extends StatelessWidget {
+  const _WebShellBody({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, right: 4),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              palette.chromeBackground,
+              palette.canvas,
+            ],
+            stops: const [0.0, 0.68],
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -180,
+              right: -80,
+              child: IgnorePointer(
+                child: Container(
+                  width: 420,
+                  height: 420,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        palette.chromeHighlight.withValues(alpha: 0.32),
+                        palette.chromeHighlight.withValues(alpha: 0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            child,
+          ],
+        ),
+      ),
+    );
   }
 }

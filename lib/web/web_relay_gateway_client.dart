@@ -337,6 +337,180 @@ class WebRelayGatewayClient {
         .toList(growable: false);
   }
 
+  Future<List<GatewayAgentSummary>> listAgents() async {
+    final payload = _asMap(
+      await request('agents.list', params: const <String, dynamic>{}),
+    );
+    return _asList(payload['agents'])
+        .map((item) {
+          final map = _asMap(item);
+          final identity = _asMap(map['identity']);
+          return GatewayAgentSummary(
+            id: _stringValue(map['id']) ?? 'unknown',
+            name:
+                _stringValue(map['name']) ??
+                _stringValue(identity['name']) ??
+                'Agent',
+            emoji: _stringValue(identity['emoji']) ?? '·',
+            theme: _stringValue(identity['theme']) ?? 'default',
+          );
+        })
+        .toList(growable: false);
+  }
+
+  Future<List<GatewayInstanceSummary>> listInstances() async {
+    final payload = await request(
+      'system-presence',
+      params: const <String, dynamic>{},
+    );
+    return _asList(payload)
+        .map((item) {
+          final map = _asMap(item);
+          return GatewayInstanceSummary(
+            id: _stringValue(map['id']) ?? _randomId(),
+            host: _stringValue(map['host']),
+            ip: _stringValue(map['ip']),
+            version: _stringValue(map['version']),
+            platform: _stringValue(map['platform']),
+            deviceFamily: _stringValue(map['deviceFamily']),
+            modelIdentifier: _stringValue(map['modelIdentifier']),
+            lastInputSeconds: _intValue(map['lastInputSeconds']),
+            mode: _stringValue(map['mode']),
+            reason: _stringValue(map['reason']),
+            text: _stringValue(map['text']) ?? '',
+            timestampMs:
+                _doubleValue(map['ts']) ??
+                DateTime.now().millisecondsSinceEpoch.toDouble(),
+          );
+        })
+        .toList(growable: false);
+  }
+
+  Future<List<GatewayConnectorSummary>> listConnectors() async {
+    final payload = _asMap(
+      await request(
+        'channels.status',
+        params: const <String, dynamic>{'probe': true, 'timeoutMs': 8000},
+        timeout: const Duration(seconds: 16),
+      ),
+    );
+    final channelMeta = <String, Map<String, dynamic>>{
+      for (final entry in _asList(payload['channelMeta']))
+        if (_stringValue(_asMap(entry)['id']) != null)
+          _stringValue(_asMap(entry)['id'])!: _asMap(entry),
+    };
+    final labels = _asMap(payload['channelLabels']);
+    final detailLabels = _asMap(payload['channelDetailLabels']);
+    final accounts = _asMap(payload['channelAccounts']);
+    final order = _stringList(payload['channelOrder']);
+    final summaries = <GatewayConnectorSummary>[];
+
+    for (final channelId in order) {
+      final channelAccounts = _asList(accounts[channelId]);
+      if (channelAccounts.isEmpty) {
+        final meta = channelMeta[channelId] ?? const <String, dynamic>{};
+        summaries.add(
+          GatewayConnectorSummary(
+            id: channelId,
+            label:
+                _stringValue(meta['label']) ??
+                _stringValue(labels[channelId]) ??
+                channelId,
+            detailLabel:
+                _stringValue(meta['detailLabel']) ??
+                _stringValue(detailLabels[channelId]) ??
+                channelId,
+            accountName: null,
+            configured: false,
+            enabled: false,
+            running: false,
+            connected: false,
+            status: 'idle',
+            lastError: null,
+            meta: const <String>[],
+          ),
+        );
+        continue;
+      }
+      for (final account in channelAccounts) {
+        final map = _asMap(account);
+        final configured = _boolValue(map['configured']) ?? false;
+        final enabled = _boolValue(map['enabled']) ?? configured;
+        final running = _boolValue(map['running']) ?? false;
+        final connected =
+            _boolValue(map['connected']) ?? _boolValue(map['linked']) ?? false;
+        final lastError = _stringValue(map['lastError']);
+        final status = lastError != null && lastError.trim().isNotEmpty
+            ? 'error'
+            : connected
+            ? 'connected'
+            : running
+            ? 'running'
+            : configured
+            ? 'configured'
+            : 'idle';
+        final mode = _stringValue(map['mode']);
+        final tokenSource = _stringValue(map['tokenSource']);
+        final baseUrl = _stringValue(map['baseUrl']);
+        summaries.add(
+          GatewayConnectorSummary(
+            id: channelId,
+            label:
+                _stringValue(channelMeta[channelId]?['label']) ??
+                _stringValue(labels[channelId]) ??
+                channelId,
+            detailLabel:
+                _stringValue(channelMeta[channelId]?['detailLabel']) ??
+                _stringValue(detailLabels[channelId]) ??
+                channelId,
+            accountName:
+                _stringValue(map['name']) ?? _stringValue(map['accountId']),
+            configured: configured,
+            enabled: enabled,
+            running: running,
+            connected: connected,
+            status: status,
+            lastError: lastError,
+            meta: [
+              ...?(mode == null ? null : <String>[mode]),
+              ...?(tokenSource == null ? null : <String>[tokenSource]),
+              ...?(baseUrl == null ? null : <String>[baseUrl]),
+            ],
+          ),
+        );
+      }
+    }
+    return summaries;
+  }
+
+  Future<List<GatewayCronJobSummary>> listCronJobs() async {
+    final payload = _asMap(
+      await request(
+        'cron.list',
+        params: const <String, dynamic>{'includeDisabled': true},
+        timeout: const Duration(seconds: 16),
+      ),
+    );
+    return _asList(payload['jobs'])
+        .map((item) {
+          final map = _asMap(item);
+          final state = _asMap(map['state']);
+          return GatewayCronJobSummary(
+            id: _stringValue(map['id']) ?? _randomId(),
+            name: _stringValue(map['name']) ?? 'Untitled job',
+            description: _stringValue(map['description']),
+            enabled: _boolValue(map['enabled']) ?? true,
+            agentId: _stringValue(map['agentId']),
+            scheduleLabel: _cronScheduleLabel(_asMap(map['schedule'])),
+            nextRunAtMs: _intValue(state['nextRunAtMs']),
+            lastRunAtMs: _intValue(state['lastRunAtMs']),
+            lastStatus: _stringValue(state['lastStatus']),
+            lastError: _stringValue(state['lastError']),
+          );
+        })
+        .toList(growable: false);
+  }
+
   Future<dynamic> request(
     String method, {
     Map<String, dynamic>? params,
@@ -746,6 +920,24 @@ String _extractMessageText(Map<String, dynamic> message) {
     }
   }
   return parts.join('\n').trim();
+}
+
+String _cronScheduleLabel(Map<String, dynamic> schedule) {
+  final type = _stringValue(schedule['type']) ?? 'cron';
+  final every = _intValue(schedule['every']);
+  final at = _stringValue(schedule['at']);
+  final weekdays = _stringList(schedule['weekdays']);
+  final parts = <String>[type];
+  if (every != null && every > 0) {
+    parts.add('every $every');
+  }
+  if (weekdays.isNotEmpty) {
+    parts.add(weekdays.join(','));
+  }
+  if (at != null && at.isNotEmpty) {
+    parts.add(at);
+  }
+  return parts.join(' · ');
 }
 
 String _randomId() {
