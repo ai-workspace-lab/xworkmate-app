@@ -459,11 +459,9 @@ class _AssistantWorkspaceChrome extends StatelessWidget {
         child: collapsed
             ? Row(
                 children: [
-                  _ChromeConversationSummary(
-                    controller: controller,
-                    compact: true,
+                  const Expanded(
+                    child: _ChromeNavigationPills(compact: true),
                   ),
-                  const Spacer(),
                   _ChromeConnectionChip(state: connectionState, compact: true),
                   const SizedBox(width: 8),
                   IconButton(
@@ -479,23 +477,7 @@ class _AssistantWorkspaceChrome extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Expanded(
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            _ChromePill(
-                              icon: Icons.home_rounded,
-                              label: appText('主页', 'Home'),
-                            ),
-                            _ChromePill(
-                              label: WorkspaceDestination.assistant.label,
-                              emphasized: true,
-                            ),
-                          ],
-                        ),
-                      ),
+                      const Expanded(child: _ChromeNavigationPills()),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -514,19 +496,36 @@ class _AssistantWorkspaceChrome extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ChromeConversationSummary(
-                          controller: controller,
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
       ),
+    );
+  }
+}
+
+class _ChromeNavigationPills extends StatelessWidget {
+  const _ChromeNavigationPills({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _ChromePill(
+          icon: Icons.home_rounded,
+          label: appText('主页', 'Home'),
+          compact: compact,
+        ),
+        _ChromePill(
+          label: WorkspaceDestination.assistant.label,
+          emphasized: true,
+          compact: compact,
+        ),
+      ],
     );
   }
 }
@@ -1521,47 +1520,6 @@ class _AssistantSessionSettingsSheetState
   }
 }
 
-class _ChromeConversationSummary extends StatelessWidget {
-  const _ChromeConversationSummary({
-    required this.controller,
-    this.compact = false,
-  });
-
-  final AppController controller;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          controller.currentConversationTitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: compact
-              ? Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                )
-              : Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          controller.assistantConnectionTargetLabel,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: palette.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _ConversationEmptyState extends StatelessWidget {
   const _ConversationEmptyState({required this.controller});
 
@@ -1739,17 +1697,26 @@ class _AssistantSideTabButtonState extends State<_AssistantSideTabButton> {
 }
 
 class _ChromePill extends StatelessWidget {
-  const _ChromePill({this.icon, required this.label, this.emphasized = false});
+  const _ChromePill({
+    this.icon,
+    required this.label,
+    this.emphasized = false,
+    this.compact = false,
+  });
 
   final IconData? icon;
   final String label;
   final bool emphasized;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 10 : 14,
+        vertical: compact ? 8 : 10,
+      ),
       decoration: BoxDecoration(
         color: emphasized ? palette.surfacePrimary : palette.surfaceSecondary,
         borderRadius: BorderRadius.circular(999),
