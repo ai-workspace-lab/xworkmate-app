@@ -3,7 +3,7 @@
 Date: 2026-03-24
 App: XWorkmate
 Platforms: iOS, macOS
-Related setting: `ITSAppUsesNonExemptEncryption = YES`
+Related setting: `ITSAppUsesNonExemptEncryption = NO`
 
 ## Purpose
 
@@ -11,10 +11,10 @@ This note is a practical drafting aid for App Store Connect export compliance an
 
 ## Recommended App Store Connect Position
 
-- The app should be treated as using encryption beyond a pure "Apple OS only" transport case.
-- The safer declaration path is:
+- The app should be treated as using standard encryption algorithms for transport, authentication, and credential protection.
+- The recommended declaration path is:
   - App uses standard encryption algorithms.
-  - `ITSAppUsesNonExemptEncryption` remains `YES`.
+  - `ITSAppUsesNonExemptEncryption` is `NO` (no non-exempt encryption declared in Info.plist).
 - If the app is distributed in France, the publisher should assume the France-specific encryption documentation path applies unless counsel or a qualified compliance reviewer confirms otherwise.
 
 ## Implementation Basis
@@ -87,4 +87,3 @@ This app uses standard cryptographic algorithms and secure transport protocols, 
 
 - [`ios/Runner/Info.plist`](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/ios/Runner/Info.plist)
 - [`macos/Runner/Info.plist`](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/macos/Runner/Info.plist)
-
