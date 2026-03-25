@@ -39,6 +39,12 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
 
+dependency_overrides:
+  # Use a local patch so Cargokit can recover from transient GitHub asset
+  # download failures during macOS packaging.
+  super_native_extensions:
+    path: third_party/super_native_extensions
+
 flutter:
   uses-material-design: true
   assets:
