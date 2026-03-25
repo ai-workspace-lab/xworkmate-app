@@ -121,12 +121,10 @@ class AppController extends ChangeNotifier {
     _tasksController = DerivedTasksController();
     _desktopPlatformService =
         desktopPlatformService ?? createDesktopPlatformService();
-    _singleAgentLocalSkillScanRoots =
+    _singleAgentLocalSkillScanRootOverrides =
         (singleAgentLocalSkillScanRoots ??
                 (_isFlutterTestEnvironment ? const <String>[] : null))
-            ?.map(_singleAgentSkillScanRootFromOverride)
-            .toList(growable: false) ??
-        _resolveDefaultSingleAgentSkillScanRoots();
+            ?.toList(growable: false);
     _gatewayAcpClient = GatewayAcpClient(
       endpointResolver: _resolveGatewayAcpEndpoint,
     );
@@ -169,7 +167,7 @@ class AppController extends ChangeNotifier {
   late final DevicesController _devicesController;
   late final DerivedTasksController _tasksController;
   late final DesktopPlatformService _desktopPlatformService;
-  late final List<_SingleAgentSkillScanRoot> _singleAgentLocalSkillScanRoots;
+  late final List<String>? _singleAgentLocalSkillScanRootOverrides;
   late final GatewayAcpClient _gatewayAcpClient;
   late final DirectSingleAgentAppServerClient _singleAgentAppServerClient;
   late final List<SingleAgentProvider>? _availableSingleAgentProvidersOverride;
@@ -233,6 +231,13 @@ class AppController extends ChangeNotifier {
   static bool get _isFlutterTestEnvironment =>
       Platform.environment.containsKey('FLUTTER_TEST');
   Future<void> _assistantThreadPersistQueue = Future<void>.value();
+
+  List<_SingleAgentSkillScanRoot> get _singleAgentLocalSkillScanRoots =>
+      (_singleAgentLocalSkillScanRootOverrides?.map(
+        _singleAgentSkillScanRootFromOverride,
+      ))
+          ?.toList(growable: false) ??
+      _resolveDefaultSingleAgentSkillScanRoots();
 
   WorkspaceDestination get destination => _destination;
   UiFeatureManifest get uiFeatureManifest => _uiFeatureManifest;
@@ -4128,7 +4133,24 @@ class AppController extends ChangeNotifier {
   }
 
   List<_SingleAgentSkillScanRoot> _resolveDefaultSingleAgentSkillScanRoots() {
-    return _defaultGatewayOnlySkillScanRoots.toList(growable: false);
+    return <_SingleAgentSkillScanRoot>[
+      ..._defaultGatewayOnlySkillScanRoots,
+      const _SingleAgentSkillScanRoot(
+        path: '.agents/skills',
+        source: 'agents',
+        scope: 'workspace',
+      ),
+      const _SingleAgentSkillScanRoot(
+        path: '.codex/skills',
+        source: 'codex',
+        scope: 'workspace',
+      ),
+      const _SingleAgentSkillScanRoot(
+        path: '.workbuddy/skills',
+        source: 'workbuddy',
+        scope: 'workspace',
+      ),
+    ];
   }
 
   _SingleAgentSkillScanRoot _singleAgentSkillScanRootFromOverride(
