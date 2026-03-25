@@ -12,7 +12,7 @@ This document is a practical filling guide for the App Store Connect encryption 
   - Select: `代替在 Apple 操作系统中使用或访问加密，或与这些操作同时使用的标准加密算法`
   - English meaning: standard cryptographic algorithms used in addition to or alongside Apple operating system encryption
 - `ITSAppUsesNonExemptEncryption`:
-  - Set to: `YES`
+  - Set to: `NO`
 - France distribution:
   - If France is included in sales regions, select: `是 / Yes`
 
@@ -102,4 +102,3 @@ This app uses standard cryptographic algorithms and secure transport protocols, 
   - [`lib/runtime/runtime_bootstrap.dart`](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/lib/runtime/runtime_bootstrap.dart)
   - [`lib/runtime/secure_config_store.dart`](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/lib/runtime/secure_config_store.dart)
   - [`lib/runtime/secret_store.dart`](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/lib/runtime/secret_store.dart)
-
