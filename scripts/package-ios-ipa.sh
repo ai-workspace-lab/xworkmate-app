@@ -65,6 +65,11 @@ sed "s|\${EXPORT_METHOD}|$export_method|g" "$root_dir/ios/ExportOptions.plist" >
 flutter pub get
 flutter build ipa --release --export-options-plist="$export_options_path"
 
+archive_path="$root_dir/build/ios/archive/Runner.xcarchive"
+if [[ -d "$archive_path" ]]; then
+  bash "$root_dir/scripts/check-apple-export-compliance.sh" "$archive_path"
+fi
+
 find "$root_dir/build/ios/ipa" -maxdepth 1 -name '*.ipa' -exec cp {} "$dist_dir/" \;
 
 if ! compgen -G "$dist_dir/*.ipa" >/dev/null; then
