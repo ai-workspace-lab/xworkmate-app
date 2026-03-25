@@ -425,7 +425,10 @@ class AssistantArtifactSidebarRevealButton extends StatelessWidget {
               ],
             ),
             borderRadius: BorderRadius.circular(AppRadius.sidebar),
-            border: Border.all(color: palette.chromeStroke),
+            border: Border.all(
+              color: palette.chromeStroke.withValues(alpha: 0.88),
+              width: 0.9,
+            ),
             boxShadow: [palette.chromeShadowAmbient],
           ),
           child: Icon(
