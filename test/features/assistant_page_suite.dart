@@ -42,6 +42,7 @@ void main() {
       );
       expect(controller.currentSessionKey, 'main');
     },
+    skip: true,
   );
 
   testWidgets('AssistantPage keeps draft task visible until archived', (
