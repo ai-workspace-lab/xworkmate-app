@@ -8,7 +8,7 @@ DART ?= dart
 DEVICE ?= macos
 APP_STORE_DART_DEFINE ?= --dart-define=XWORKMATE_APP_STORE=true
 
-.PHONY: help deps analyze test check format run build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs
+.PHONY: help deps analyze test check format run build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs check-export-compliance
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -38,9 +38,11 @@ build-linux: ## Build the Linux app in release mode
 
 build-macos: ## Build the macOS app in release mode
 	$(FLUTTER) build macos --release $(APP_STORE_DART_DEFINE)
+	bash scripts/check-apple-export-compliance.sh build/macos/Build/Products/Release/XWorkmate.app
 
 build-ios-sim: ## Build the iOS app for the simulator
 	$(FLUTTER) build ios --simulator $(APP_STORE_DART_DEFINE)
+	bash scripts/check-apple-export-compliance.sh build/ios/iphonesimulator/Runner.app
 
 build-go-core: ## Build the Go core helper
 	bash scripts/build-go-core.sh
@@ -64,6 +66,9 @@ install-mac: ## Package and install the macOS app into /Applications
 clean: ## Remove generated artifacts
 	$(FLUTTER) clean
 	rm -rf build dist
+
+check-export-compliance: ## Verify source and built Apple plist export-compliance flags
+	bash scripts/check-apple-export-compliance.sh
 
 # Rust FFI targets
 .PHONY: rust-build rust-build-release rust-build-debug rust-test ffi-copy ffi-generate
