@@ -4,7 +4,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BRIDGE_DIR="$ROOT_DIR/go/go_core"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/build/bin}"
-OUTPUT_PATH="${OUTPUT_PATH:-$OUTPUT_DIR/xworkmate-go-core}"
+OUTPUT_PATH_BASE="${OUTPUT_DIR}/xworkmate-go-core"
+
+if [[ "$(uname -s)" == *MINGW* || "$(uname -s)" == *MSYS* || "$(uname -s)" == *CYGWIN* ]]; then
+  OUTPUT_PATH="${OUTPUT_PATH:-${OUTPUT_PATH_BASE}.exe}"
+else
+  OUTPUT_PATH="${OUTPUT_PATH:-${OUTPUT_PATH_BASE}}"
+fi
 
 if [[ ! -f "$BRIDGE_DIR/go.mod" ]]; then
   echo "Missing go.mod in $BRIDGE_DIR" >&2
