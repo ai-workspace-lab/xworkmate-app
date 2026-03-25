@@ -2653,6 +2653,7 @@ class _ComposerBarState extends State<_ComposerBar> {
   late final TextEditingController _skillPickerSearchController;
   late final FocusNode _skillPickerSearchFocusNode;
   bool _handlingPasteShortcut = false;
+  bool _refreshingSingleAgentSkills = false;
   String _skillPickerQuery = '';
 
   @override
@@ -2661,6 +2662,7 @@ class _ComposerBarState extends State<_ComposerBar> {
     _inputHeight = _defaultInputHeight;
     _skillPickerSearchController = TextEditingController();
     _skillPickerSearchFocusNode = FocusNode();
+    widget.controller.addListener(_handleControllerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -2670,13 +2672,30 @@ class _ComposerBarState extends State<_ComposerBar> {
   }
 
   @override
+  void didUpdateWidget(covariant _ComposerBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) {
+      oldWidget.controller.removeListener(_handleControllerChanged);
+      widget.controller.addListener(_handleControllerChanged);
+    }
+  }
+
+  @override
   void dispose() {
+    widget.controller.removeListener(_handleControllerChanged);
     if (_skillPickerPortalController.isShowing) {
       _skillPickerPortalController.hide();
     }
     _skillPickerSearchController.dispose();
     _skillPickerSearchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _handleControllerChanged() {
+    if (!mounted || !_skillPickerPortalController.isShowing) {
+      return;
+    }
+    setState(() {});
   }
 
   void _resizeInput(double delta) {
@@ -2781,11 +2800,27 @@ class _ComposerBarState extends State<_ComposerBar> {
       _skillPickerSearchFocusNode.requestFocus();
     });
     if (widget.controller.isSingleAgentMode) {
-      unawaited(
-        widget.controller.refreshSingleAgentLocalSkillsForSession(
-          widget.controller.currentSessionKey,
-        ),
+      unawaited(_refreshSingleAgentSkills());
+    }
+  }
+
+  Future<void> _refreshSingleAgentSkills() async {
+    if (_refreshingSingleAgentSkills) {
+      return;
+    }
+    setState(() {
+      _refreshingSingleAgentSkills = true;
+    });
+    try {
+      await widget.controller.refreshSingleAgentLocalSkillsForSession(
+        widget.controller.currentSessionKey,
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _refreshingSingleAgentSkills = false;
+        });
+      }
     }
   }
 
@@ -2863,6 +2898,8 @@ class _ComposerBarState extends State<_ComposerBar> {
             searchFocusNode: _skillPickerSearchFocusNode,
             selectedSkillKeys: widget.selectedSkillKeys,
             filteredSkills: _filteredSkillOptions(),
+            isLoading: _refreshingSingleAgentSkills,
+            hasQuery: _skillPickerQuery.trim().isNotEmpty,
             onQueryChanged: (value) {
               setState(() {
                 _skillPickerQuery = value;
@@ -2964,9 +3001,8 @@ class _ComposerBarState extends State<_ComposerBar> {
                     .toList(),
                 child: _ComposerToolbarChip(
                   icon: executionTarget.icon,
-                  label: executionTarget.label,
+                  tooltip: _executionTargetTooltip(executionTarget),
                   showChevron: true,
-                  maxLabelWidth: 96,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
                     vertical: 6,
@@ -2998,10 +3034,11 @@ class _ComposerBarState extends State<_ComposerBar> {
                       )
                       .toList(),
                   child: _ComposerToolbarChip(
-                    icon: Icons.smart_toy_outlined,
-                    label: controller.currentSingleAgentProvider.label,
+                    icon: controller.currentSingleAgentProvider.icon,
+                    tooltip: _singleAgentProviderTooltip(
+                      controller.currentSingleAgentProvider,
+                    ),
                     showChevron: true,
-                    maxLabelWidth: 92,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
                       vertical: 6,
@@ -3015,9 +3052,8 @@ class _ComposerBarState extends State<_ComposerBar> {
                     ? _ComposerToolbarChip(
                         key: const Key('assistant-model-button'),
                         icon: Icons.bolt_rounded,
-                        label: widget.modelLabel,
+                        tooltip: _modelTooltip(widget.modelLabel),
                         showChevron: false,
-                        maxLabelWidth: 132,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
                           vertical: 6,
@@ -3043,9 +3079,8 @@ class _ComposerBarState extends State<_ComposerBar> {
                             .toList(),
                         child: _ComposerToolbarChip(
                           icon: Icons.bolt_rounded,
-                          label: widget.modelLabel,
+                          tooltip: _modelTooltip(widget.modelLabel),
                           showChevron: true,
-                          maxLabelWidth: 132,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
                             vertical: 6,
@@ -3099,11 +3134,10 @@ class _ComposerBarState extends State<_ComposerBar> {
                       padding: const EdgeInsets.only(left: 4),
                       child: _ComposerToolbarChip(
                         icon: Icons.hub_rounded,
-                        label: collab.config.usesAris
-                            ? appText('ARIS', 'ARIS')
-                            : appText('原生', 'Native'),
+                        tooltip: collab.config.usesAris
+                            ? appText('多智能体模式: ARIS', 'Multi-agent mode: ARIS')
+                            : appText('多智能体模式: 原生', 'Multi-agent mode: Native'),
                         showChevron: false,
-                        maxLabelWidth: 64,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 6,
@@ -3222,14 +3256,8 @@ class _ComposerBarState extends State<_ComposerBar> {
                             onTap: _toggleSkillPicker,
                             child: _ComposerToolbarChip(
                               icon: Icons.auto_awesome_rounded,
-                              label: selectedSkills.isEmpty
-                                  ? appText('技能', 'Skills')
-                                  : appText(
-                                      '已选技能 ${selectedSkills.length}',
-                                      'Skills ${selectedSkills.length}',
-                                    ),
+                              tooltip: _skillsTooltip(selectedSkills.length),
                               showChevron: true,
-                              maxLabelWidth: 132,
                             ),
                           ),
                         ),
@@ -3264,9 +3292,8 @@ class _ComposerBarState extends State<_ComposerBar> {
                             .toList(),
                         child: _ComposerToolbarChip(
                           icon: permissionLevel.icon,
-                          label: permissionLevel.label,
+                          tooltip: _permissionTooltip(permissionLevel),
                           showChevron: true,
-                          maxLabelWidth: 120,
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -3298,9 +3325,8 @@ class _ComposerBarState extends State<_ComposerBar> {
                                 .toList(),
                         child: _ComposerToolbarChip(
                           icon: Icons.psychology_alt_outlined,
-                          label: _assistantThinkingLabel(widget.thinkingLabel),
+                          tooltip: _thinkingTooltip(widget.thinkingLabel),
                           showChevron: true,
-                          maxLabelWidth: 96,
                         ),
                       ),
                     ],
@@ -3463,9 +3489,8 @@ class _ComposerToolbarChip extends StatefulWidget {
   const _ComposerToolbarChip({
     super.key,
     required this.icon,
-    required this.label,
+    required this.tooltip,
     required this.showChevron,
-    this.maxLabelWidth = 220,
     this.padding = const EdgeInsets.symmetric(
       horizontal: AppSpacing.xs,
       vertical: 6,
@@ -3473,9 +3498,8 @@ class _ComposerToolbarChip extends StatefulWidget {
   });
 
   final IconData icon;
-  final String label;
+  final String tooltip;
   final bool showChevron;
-  final double maxLabelWidth;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -3487,54 +3511,46 @@ class _ComposerToolbarChipState extends State<_ComposerToolbarChip> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final palette = context.palette;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Container(
-        padding: widget.padding,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              palette.chromeHighlight.withValues(alpha: _hovered ? 0.94 : 0.88),
-              _hovered ? palette.chromeSurfacePressed : palette.chromeSurface,
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Container(
+          padding: widget.padding,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                palette.chromeHighlight.withValues(
+                  alpha: _hovered ? 0.94 : 0.88,
+                ),
+                _hovered ? palette.chromeSurfacePressed : palette.chromeSurface,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(AppRadius.chip),
+            border: Border.all(color: palette.chromeStroke),
+            boxShadow: [
+              _hovered ? palette.chromeShadowLift : palette.chromeShadowAmbient,
             ],
           ),
-          borderRadius: BorderRadius.circular(AppRadius.chip),
-          border: Border.all(color: palette.chromeStroke),
-          boxShadow: [
-            _hovered ? palette.chromeShadowLift : palette.chromeShadowAmbient,
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(widget.icon, size: 13, color: palette.textMuted),
-            const SizedBox(width: 4),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: widget.maxLabelWidth),
-              child: Text(
-                widget.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.onSurface,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(widget.icon, size: 16, color: palette.textMuted),
+              if (widget.showChevron) ...[
+                const SizedBox(width: 1),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 14,
+                  color: palette.textMuted,
                 ),
-              ),
-            ),
-            if (widget.showChevron) ...[
-              const SizedBox(width: 2),
-              Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 14,
-                color: palette.textMuted,
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -3555,6 +3571,39 @@ extension on AssistantPermissionLevel {
     AssistantPermissionLevel.fullAccess => Icons.error_outline_rounded,
   };
 }
+
+extension on SingleAgentProvider {
+  IconData get icon => switch (this) {
+    SingleAgentProvider.auto => Icons.auto_awesome_outlined,
+    SingleAgentProvider.codex => Icons.adb_rounded,
+    SingleAgentProvider.opencode => Icons.code_rounded,
+    SingleAgentProvider.claude => Icons.psychology_alt_outlined,
+    SingleAgentProvider.gemini => Icons.diamond_outlined,
+  };
+}
+
+String _executionTargetTooltip(AssistantExecutionTarget target) =>
+    appText('任务对话模式: ${target.label}', 'Task dialog mode: ${target.label}');
+
+String _singleAgentProviderTooltip(SingleAgentProvider provider) => appText(
+  '单机智能体执行器: ${provider.label}',
+  'Single-agent provider: ${provider.label}',
+);
+
+String _modelTooltip(String modelLabel) =>
+    appText('模型: $modelLabel', 'Model: $modelLabel');
+
+String _skillsTooltip(int selectedCount) => selectedCount <= 0
+    ? appText('技能', 'Skills')
+    : appText('技能: 已选 $selectedCount 个', 'Skills: $selectedCount selected');
+
+String _permissionTooltip(AssistantPermissionLevel level) =>
+    appText('权限: ${level.label}', 'Permissions: ${level.label}');
+
+String _thinkingTooltip(String level) => appText(
+  '推理强度: ${_assistantThinkingLabel(level)}',
+  'Reasoning: ${_assistantThinkingLabel(level)}',
+);
 
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
@@ -4904,6 +4953,8 @@ class _SkillPickerPopover extends StatelessWidget {
     required this.searchFocusNode,
     required this.selectedSkillKeys,
     required this.filteredSkills,
+    required this.isLoading,
+    required this.hasQuery,
     required this.onQueryChanged,
     required this.onToggleSkill,
   });
@@ -4913,6 +4964,8 @@ class _SkillPickerPopover extends StatelessWidget {
   final FocusNode searchFocusNode;
   final List<String> selectedSkillKeys;
   final List<_ComposerSkillOption> filteredSkills;
+  final bool isLoading;
+  final bool hasQuery;
   final ValueChanged<String> onQueryChanged;
   final ValueChanged<String> onToggleSkill;
 
@@ -4974,12 +5027,35 @@ class _SkillPickerPopover extends StatelessWidget {
                     ? Center(
                         child: Padding(
                           padding: const EdgeInsets.all(24),
-                          child: Text(
-                            appText('没有匹配的技能。', 'No matching skills.'),
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: palette.textSecondary,
-                            ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isLoading) ...[
+                                SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: palette.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+                              Text(
+                                isLoading
+                                    ? appText('正在加载技能…', 'Loading skills…')
+                                    : hasQuery
+                                    ? appText('没有匹配的技能。', 'No matching skills.')
+                                    : appText(
+                                        '当前没有已加载技能。',
+                                        'No skills are loaded yet.',
+                                      ),
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: palette.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       )
