@@ -1,32 +1,43 @@
 ---
 name: xworkmate-worktree-task-mode
-description: Default XWorkmate task execution mode: create an isolated git worktree, use parallel lanes for bounded independent work, verify, merge to main, and clean up.
+description: Mandatory XWorkmate task execution mode: every task starts in an isolated git worktree, implementation is verified and committed there, then merged back into main and cleaned up.
 ---
 
 # XWorkmate Worktree Task Mode
 
-Use this skill as the default execution path for non-trivial work in this repository.
+Use this skill as the required execution path for work in this repository unless the user explicitly asks for a different flow.
 
 ## Goals
 
-- Keep the main checkout clean.
-- Isolate implementation in a temporary worktree created from `main`.
-- Use concurrent lanes only when the subtasks are genuinely independent.
-- Finish the lifecycle: verify, merge back to `main`, remove the temporary worktree.
+- Keep `main` clean at all times.
+- Start every task from a temporary worktree created from `main`.
+- Finish coding, verification, and commit(s) inside that worktree.
+- Return to `main`, merge the finished worktree branch, then remove the temporary worktree.
 
-## Default Flow
+## Required Flow
+
+Every task follows this sequence:
 
 1. Inspect the current repo state from the main checkout.
 2. Create a temporary branch and `git worktree` from `main`.
-3. Do the critical-path implementation locally in the worktree.
-4. If helpful, delegate bounded side work in parallel, but avoid blocking the main lane on exploratory tasks.
-5. Run the smallest relevant verification first, then broader checks when needed.
-6. Merge the finished branch back into `main`.
-7. Remove the temporary worktree and branch if they are no longer needed.
+3. Do all coding work inside the worktree.
+4. Run the required verification inside the worktree.
+5. Commit the task result inside the worktree.
+6. Return to the main checkout and switch to `main`.
+7. Merge the worktree branch into `main`.
+8. If the task completed successfully, remove the temporary worktree and delete the temporary branch.
 
 ## Guardrails
 
-- Do not use a worktree for tiny read-only or one-command tasks unless it materially helps.
-- Do not ask the user to re-confirm this mode on every task; it is the repo default.
-- Do not leave temporary worktrees behind after the task is complete unless the user explicitly wants that.
+- Do not skip the worktree step because the task seems small. The default is still to start in a worktree.
+- Do not ask the user to re-confirm this mode on each task.
+- Do not merge unverified work back into `main`.
+- Do not leave temporary worktrees behind after a successful task unless the user explicitly asks to keep them.
 - Preserve user changes and do not revert unrelated work.
+
+## Operational Notes
+
+- The worktree branch should be created from `main`, not from the current feature branch.
+- Verification should match the task scope, but it must happen before the final merge.
+- The final integration step is not complete until the worktree branch is merged into `main`.
+- Successful completion means the full lifecycle is closed: worktree created, changes implemented, verification run, commit created, merged into `main`, worktree cleaned up.
