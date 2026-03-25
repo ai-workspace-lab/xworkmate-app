@@ -2542,6 +2542,9 @@ class _ComposerBarState extends State<_ComposerBar> {
   static const double _defaultInputHeight =
       _assistantComposerDefaultInputHeight;
   static const double _maxInputHeight = 220;
+  static const double _skillPickerPreferredMaxHeight = 460;
+  static const double _skillPickerMinHeight = 220;
+  static const double _skillPickerVerticalGap = 8;
   static const Map<ShortcutActivator, Intent> _pasteShortcuts =
       <ShortcutActivator, Intent>{
         SingleActivator(LogicalKeyboardKey.keyV, meta: true):
@@ -2551,18 +2554,39 @@ class _ComposerBarState extends State<_ComposerBar> {
       };
 
   late double _inputHeight;
+  final GlobalKey _skillPickerTargetKey = GlobalKey(
+    debugLabel: 'assistant-skill-picker-target',
+  );
+  final LayerLink _skillPickerLayerLink = LayerLink();
+  final OverlayPortalController _skillPickerPortalController =
+      OverlayPortalController(debugLabel: 'assistant-skill-picker');
+  late final TextEditingController _skillPickerSearchController;
+  late final FocusNode _skillPickerSearchFocusNode;
   bool _handlingPasteShortcut = false;
+  String _skillPickerQuery = '';
 
   @override
   void initState() {
     super.initState();
     _inputHeight = _defaultInputHeight;
+    _skillPickerSearchController = TextEditingController();
+    _skillPickerSearchFocusNode = FocusNode();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
       widget.onInputHeightChanged(_inputHeight);
     });
+  }
+
+  @override
+  void dispose() {
+    if (_skillPickerPortalController.isShowing) {
+      _skillPickerPortalController.hide();
+    }
+    _skillPickerSearchController.dispose();
+    _skillPickerSearchFocusNode.dispose();
+    super.dispose();
   }
 
   void _resizeInput(double delta) {
@@ -2635,6 +2659,129 @@ class _ComposerBarState extends State<_ComposerBar> {
       text: updatedText,
       selection: TextSelection.collapsed(offset: cursorOffset),
       composing: TextRange.empty,
+    );
+  }
+
+  void _resetSkillPickerSearch() {
+    _skillPickerSearchController.clear();
+    _skillPickerQuery = '';
+  }
+
+  void _hideSkillPicker() {
+    if (_skillPickerPortalController.isShowing) {
+      _skillPickerPortalController.hide();
+    }
+    if (_skillPickerQuery.isNotEmpty ||
+        _skillPickerSearchController.text.isNotEmpty) {
+      setState(_resetSkillPickerSearch);
+    }
+  }
+
+  void _toggleSkillPicker() {
+    if (_skillPickerPortalController.isShowing) {
+      _hideSkillPicker();
+      return;
+    }
+    setState(_resetSkillPickerSearch);
+    _skillPickerPortalController.show();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_skillPickerPortalController.isShowing) {
+        return;
+      }
+      _skillPickerSearchFocusNode.requestFocus();
+    });
+    if (widget.controller.isSingleAgentMode) {
+      unawaited(
+        widget.controller.refreshSingleAgentLocalSkillsForSession(
+          widget.controller.currentSessionKey,
+        ),
+      );
+    }
+  }
+
+  List<_ComposerSkillOption> _activeSkillOptions() {
+    if (widget.controller.isSingleAgentMode) {
+      return widget.controller
+          .assistantImportedSkillsForSession(
+            widget.controller.currentSessionKey,
+          )
+          .map(_skillOptionFromThreadSkill)
+          .toList(growable: false);
+    }
+    return widget.availableSkills;
+  }
+
+  List<_ComposerSkillOption> _filteredSkillOptions() {
+    final normalizedQuery = _skillPickerQuery.trim().toLowerCase();
+    if (normalizedQuery.isEmpty) {
+      return _activeSkillOptions();
+    }
+    return _activeSkillOptions()
+        .where((skill) {
+          final haystack =
+              '${skill.label}\n${skill.description}\n${skill.sourceLabel}'
+                  .toLowerCase();
+          return haystack.contains(normalizedQuery);
+        })
+        .toList(growable: false);
+  }
+
+  Widget _buildSkillPickerOverlay(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final targetBox =
+        _skillPickerTargetKey.currentContext?.findRenderObject() as RenderBox?;
+    final targetOrigin = targetBox?.localToGlobal(Offset.zero);
+    final targetSize = targetBox?.size;
+    final availableBelow = targetOrigin == null || targetSize == null
+        ? _skillPickerPreferredMaxHeight
+        : mediaQuery.size.height -
+              mediaQuery.padding.bottom -
+              (targetOrigin.dy + targetSize.height) -
+              _skillPickerVerticalGap;
+    final availableAbove = targetOrigin == null
+        ? _skillPickerPreferredMaxHeight
+        : targetOrigin.dy - mediaQuery.padding.top - _skillPickerVerticalGap;
+    final openUpward =
+        availableBelow < _skillPickerMinHeight &&
+        availableAbove > availableBelow;
+    final constrainedHeight = math.max(
+      _skillPickerMinHeight,
+      openUpward ? availableAbove : availableBelow,
+    );
+    final maxHeight = math.min(
+      _skillPickerPreferredMaxHeight,
+      constrainedHeight,
+    );
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _hideSkillPicker,
+            child: const SizedBox.expand(),
+          ),
+        ),
+        CompositedTransformFollower(
+          link: _skillPickerLayerLink,
+          showWhenUnlinked: false,
+          targetAnchor: openUpward ? Alignment.topLeft : Alignment.bottomLeft,
+          followerAnchor: openUpward ? Alignment.bottomLeft : Alignment.topLeft,
+          offset: Offset(0, openUpward ? -_skillPickerVerticalGap : 8),
+          child: _SkillPickerPopover(
+            maxHeight: maxHeight,
+            searchController: _skillPickerSearchController,
+            searchFocusNode: _skillPickerSearchFocusNode,
+            selectedSkillKeys: widget.selectedSkillKeys,
+            filteredSkills: _filteredSkillOptions(),
+            onQueryChanged: (value) {
+              setState(() {
+                _skillPickerQuery = value;
+              });
+            },
+            onToggleSkill: (skillKey) => widget.onToggleSkill(skillKey),
+          ),
+        ),
+      ],
     );
   }
 
@@ -2973,20 +3120,28 @@ class _ComposerBarState extends State<_ComposerBar> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      InkWell(
-                        key: const Key('assistant-skill-picker-button'),
-                        borderRadius: BorderRadius.circular(AppRadius.chip),
-                        onTap: () => _showSkillPickerDialog(context),
-                        child: _ComposerToolbarChip(
-                          icon: Icons.auto_awesome_rounded,
-                          label: selectedSkills.isEmpty
-                              ? appText('技能', 'Skills')
-                              : appText(
-                                  '已选技能 ${selectedSkills.length}',
-                                  'Skills ${selectedSkills.length}',
-                                ),
-                          showChevron: true,
-                          maxLabelWidth: 132,
+                      CompositedTransformTarget(
+                        key: _skillPickerTargetKey,
+                        link: _skillPickerLayerLink,
+                        child: OverlayPortal(
+                          controller: _skillPickerPortalController,
+                          overlayChildBuilder: _buildSkillPickerOverlay,
+                          child: InkWell(
+                            key: const Key('assistant-skill-picker-button'),
+                            borderRadius: BorderRadius.circular(AppRadius.chip),
+                            onTap: _toggleSkillPicker,
+                            child: _ComposerToolbarChip(
+                              icon: Icons.auto_awesome_rounded,
+                              label: selectedSkills.isEmpty
+                                  ? appText('技能', 'Skills')
+                                  : appText(
+                                      '已选技能 ${selectedSkills.length}',
+                                      'Skills ${selectedSkills.length}',
+                                    ),
+                              showChevron: true,
+                              maxLabelWidth: 132,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -3118,109 +3273,6 @@ class _ComposerBarState extends State<_ComposerBar> {
         ],
       ),
     );
-  }
-
-  Future<void> _showSkillPickerDialog(BuildContext context) async {
-    if (widget.controller.isSingleAgentMode) {
-      await widget.controller.refreshSingleAgentLocalSkillsForSession(
-        widget.controller.currentSessionKey,
-      );
-      if (!context.mounted) {
-        return;
-      }
-    }
-    final searchController = TextEditingController();
-    String query = '';
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final filteredSkills = widget.availableSkills
-                .where((skill) {
-                  if (query.trim().isEmpty) {
-                    return true;
-                  }
-                  final haystack =
-                      '${skill.label}\n${skill.description}\n${skill.sourceLabel}'
-                          .toLowerCase();
-                  return haystack.contains(query.trim().toLowerCase());
-                })
-                .toList(growable: false);
-
-            return Dialog(
-              key: const Key('assistant-skill-picker-dialog'),
-              insetPadding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 32,
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: 560,
-                  maxHeight: 520,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                  child: Column(
-                    children: [
-                      TextField(
-                        key: const Key('assistant-skill-picker-search'),
-                        controller: searchController,
-                        autofocus: true,
-                        onChanged: (value) {
-                          setDialogState(() {
-                            query = value;
-                          });
-                        },
-                        decoration: InputDecoration(
-                          hintText: appText('搜索技能', 'Search skills'),
-                          prefixIcon: const Icon(Icons.search_rounded),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: filteredSkills.isEmpty
-                            ? Center(
-                                child: Text(
-                                  appText('没有匹配的技能。', 'No matching skills.'),
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: context.palette.textSecondary,
-                                      ),
-                                ),
-                              )
-                            : ListView.separated(
-                                itemCount: filteredSkills.length,
-                                separatorBuilder: (_, _) =>
-                                    const SizedBox(height: 8),
-                                itemBuilder: (context, index) {
-                                  final skill = filteredSkills[index];
-                                  final selected = widget.selectedSkillKeys
-                                      .contains(skill.key);
-                                  return _SkillPickerTile(
-                                    key: ValueKey<String>(
-                                      'assistant-skill-option-${skill.key}',
-                                    ),
-                                    option: skill,
-                                    selected: selected,
-                                    onTap: () {
-                                      widget.onToggleSkill(skill.key);
-                                      Navigator.of(dialogContext).pop();
-                                    },
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-    searchController.dispose();
   }
 }
 
@@ -4750,6 +4802,117 @@ class _ComposerSelectedSkillChip extends StatelessWidget {
       deleteIconColor: context.palette.textMuted,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.chip),
+      ),
+    );
+  }
+}
+
+class _SkillPickerPopover extends StatelessWidget {
+  const _SkillPickerPopover({
+    required this.maxHeight,
+    required this.searchController,
+    required this.searchFocusNode,
+    required this.selectedSkillKeys,
+    required this.filteredSkills,
+    required this.onQueryChanged,
+    required this.onToggleSkill,
+  });
+
+  final double maxHeight;
+  final TextEditingController searchController;
+  final FocusNode searchFocusNode;
+  final List<String> selectedSkillKeys;
+  final List<_ComposerSkillOption> filteredSkills;
+  final ValueChanged<String> onQueryChanged;
+  final ValueChanged<String> onToggleSkill;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    return Material(
+      key: const Key('assistant-skill-picker-popover'),
+      color: Colors.transparent,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minWidth: 360,
+          maxWidth: 480,
+          maxHeight: maxHeight,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: palette.surfacePrimary,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: palette.strokeSoft),
+            boxShadow: [
+              BoxShadow(
+                color: palette.shadow.withValues(alpha: 0.16),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                child: TextField(
+                  key: const Key('assistant-skill-picker-search'),
+                  controller: searchController,
+                  focusNode: searchFocusNode,
+                  autofocus: true,
+                  onChanged: onQueryChanged,
+                  decoration: InputDecoration(
+                    hintText: appText('搜索技能', 'Search skills'),
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: searchController.text.trim().isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: appText('清除', 'Clear'),
+                            onPressed: () {
+                              searchController.clear();
+                              onQueryChanged('');
+                            },
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                  ),
+                ),
+              ),
+              Container(height: 1, color: palette.strokeSoft),
+              Expanded(
+                child: filteredSkills.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            appText('没有匹配的技能。', 'No matching skills.'),
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: palette.textSecondary,
+                            ),
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                        itemCount: filteredSkills.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final skill = filteredSkills[index];
+                          return _SkillPickerTile(
+                            key: ValueKey<String>(
+                              'assistant-skill-option-${skill.key}',
+                            ),
+                            option: skill,
+                            selected: selectedSkillKeys.contains(skill.key),
+                            onTap: () => onToggleSkill(skill.key),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
