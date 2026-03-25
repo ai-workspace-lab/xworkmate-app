@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/i18n/app_language.dart';
 import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/theme/app_theme.dart';
+import 'package:xworkmate/widgets/app_brand_logo.dart';
 import 'package:xworkmate/widgets/sidebar_navigation.dart';
 
 void main() {
@@ -154,4 +155,35 @@ void main() {
       expect(selected, WorkspaceDestination.settings);
     },
   );
+
+  testWidgets('SidebarNavigation header uses chevron instead of brand logo', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: SidebarNavigation(
+            currentSection: WorkspaceDestination.assistant,
+            sidebarState: AppSidebarState.expanded,
+            appLanguage: AppLanguage.zh,
+            themeMode: ThemeMode.light,
+            onSectionChanged: (_) {},
+            onToggleLanguage: () {},
+            onCycleSidebarState: () {},
+            onExpandFromCollapsed: () {},
+            onOpenHome: () {},
+            onOpenAccount: () {},
+            onOpenThemeToggle: () {},
+            accountName: 'Tester',
+            accountSubtitle: 'Workspace',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
+    expect(find.byType(AppBrandLogo), findsNothing);
+  });
 }
