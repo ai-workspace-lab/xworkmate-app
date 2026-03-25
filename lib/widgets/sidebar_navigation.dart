@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'app_brand_logo.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
@@ -224,21 +223,64 @@ class SidebarHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = AppBrandLogo(
+    final content = _SidebarHeaderChevron(
       size: isCollapsed ? 36 : 28,
       borderRadius: isCollapsed ? 10 : 8,
     );
+    final alignedContent = Align(
+      alignment: Alignment.centerRight,
+      child: content,
+    );
 
     if (onTap == null) {
-      return content;
+      return alignedContent;
     }
 
     return Tooltip(
       message: appText('展开导航', 'Expand sidebar'),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.button),
-        onTap: onTap,
-        child: Padding(padding: EdgeInsets.zero, child: content),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.button),
+          onTap: onTap,
+          child: Padding(padding: EdgeInsets.zero, child: content),
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarHeaderChevron extends StatelessWidget {
+  const _SidebarHeaderChevron({required this.size, required this.borderRadius});
+
+  final double size;
+  final double borderRadius;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            palette.chromeHighlight.withValues(alpha: 0.9),
+            palette.chromeSurface,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(color: palette.chromeStroke),
+        boxShadow: [palette.chromeShadowAmbient],
+      ),
+      child: Center(
+        child: Icon(
+          Icons.chevron_right_rounded,
+          size: size * 0.72,
+          color: palette.textSecondary,
+        ),
       ),
     );
   }
