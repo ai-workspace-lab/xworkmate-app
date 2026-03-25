@@ -606,7 +606,7 @@ class _AssistantPageState extends State<AssistantPage> {
             if (_artifactPaneCollapsed)
               Positioned(
                 right: AppSpacing.sm,
-                top: math.max(AppSpacing.lg, (constraints.maxHeight - 56) / 2),
+                top: AppSpacing.lg,
                 child: AssistantArtifactSidebarRevealButton(
                   onTap: () {
                     setState(() {
