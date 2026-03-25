@@ -451,6 +451,60 @@ void main() {
       );
     },
   );
+
+  test(
+    'AppController resolves relative single-agent skill roots against workspace path',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-workspace-local-skills-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+
+      await _writeSkill(
+        Directory('${tempDirectory.path}/.codex/skills'),
+        'workspace-only',
+        skillName: 'Workspace Only Skill',
+        description: 'Repo-local skill should be discovered by default roots',
+      );
+
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.sqlite3',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(workspacePath: tempDirectory.path),
+      );
+
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        singleAgentLocalSkillScanRoots: const <String>['.codex/skills'],
+      );
+      addTearDown(controller.dispose);
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+
+      expect(
+        controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .map((item) => item.label),
+        contains('Workspace Only Skill'),
+      );
+    },
+  );
 }
 
 Future<void> _writeSkill(
