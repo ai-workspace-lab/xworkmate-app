@@ -401,6 +401,10 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
 class AssistantArtifactSidebarRevealButton extends StatelessWidget {
   const AssistantArtifactSidebarRevealButton({super.key, required this.onTap});
 
+  static const double _buttonWidth = 32;
+  static const double _buttonHeight = 36;
+  static const double _buttonRadius = 8;
+
   final VoidCallback onTap;
 
   @override
@@ -411,10 +415,10 @@ class AssistantArtifactSidebarRevealButton extends StatelessWidget {
       child: InkWell(
         key: const Key('assistant-artifact-pane-toggle'),
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.sidebar),
+        borderRadius: BorderRadius.circular(_buttonRadius),
         child: Container(
-          width: 44,
-          height: 56,
+          width: _buttonWidth,
+          height: _buttonHeight,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
@@ -424,7 +428,7 @@ class AssistantArtifactSidebarRevealButton extends StatelessWidget {
                 palette.chromeSurface,
               ],
             ),
-            borderRadius: BorderRadius.circular(AppRadius.sidebar),
+            borderRadius: BorderRadius.circular(_buttonRadius),
             border: Border.all(
               color: palette.chromeStroke.withValues(alpha: 0.88),
               width: 0.9,
