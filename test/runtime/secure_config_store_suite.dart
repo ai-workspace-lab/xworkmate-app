@@ -854,6 +854,45 @@ void main() {
       expect(decoded.assistantModelId, isEmpty);
       expect(decoded.singleAgentProvider, SingleAgentProvider.gemini);
       expect(decoded.gatewayEntryState, 'single-agent');
+      expect(decoded.workspaceRef, isEmpty);
+      expect(decoded.workspaceRefKind, WorkspaceRefKind.localPath);
+    },
+  );
+
+  test('AssistantThreadRecord round-trips workspaceRef fields', () {
+    const record = AssistantThreadRecord(
+      sessionKey: 'thread-1',
+      messages: <GatewayChatMessage>[],
+      updatedAtMs: 1700000000000,
+      title: 'Thread 1',
+      archived: false,
+      executionTarget: AssistantExecutionTarget.remote,
+      messageViewMode: AssistantMessageViewMode.rendered,
+      workspaceRef: 'object://thread/thread-1',
+      workspaceRefKind: WorkspaceRefKind.objectStore,
+    );
+
+    final decoded = AssistantThreadRecord.fromJson(record.toJson());
+
+    expect(decoded.workspaceRef, 'object://thread/thread-1');
+    expect(decoded.workspaceRefKind, WorkspaceRefKind.objectStore);
+  });
+
+  test(
+    'AssistantThreadRecord infers objectStore kind from legacy workspace ref',
+    () {
+      final decoded = AssistantThreadRecord.fromJson(<String, dynamic>{
+        'sessionKey': 'thread-legacy',
+        'messages': const <Object>[],
+        'updatedAtMs': 1700000000000,
+        'title': 'Legacy Object Thread',
+        'archived': false,
+        'executionTarget': 'remote',
+        'messageViewMode': 'rendered',
+        'workspaceRef': 'object://thread/thread-legacy',
+      });
+
+      expect(decoded.workspaceRefKind, WorkspaceRefKind.objectStore);
     },
   );
 

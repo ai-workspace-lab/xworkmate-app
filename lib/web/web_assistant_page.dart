@@ -10,6 +10,7 @@ import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
+import '../widgets/assistant_artifact_sidebar.dart';
 import '../widgets/desktop_workspace_scaffold.dart';
 import '../widgets/pane_resize_handle.dart';
 import '../widgets/surface_card.dart';
@@ -22,6 +23,8 @@ const double _webAssistantMainWorkspaceMinWidth = 700;
 const double _webAssistantComposerMinHeight = 164;
 const double _webAssistantConversationMinHeight = 200;
 const double _webAssistantResizeHandleSize = 10;
+const double _webAssistantArtifactPaneMinWidth = 280;
+const double _webAssistantArtifactPaneDefaultWidth = 360;
 
 class WebAssistantPage extends StatefulWidget {
   const WebAssistantPage({super.key, required this.controller});
@@ -47,6 +50,8 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
   bool _workspaceChromeCollapsed = false;
   bool _sidePaneCollapsed = false;
   double _sidePaneWidth = 344;
+  bool _artifactPaneCollapsed = true;
+  double _artifactPaneWidth = _webAssistantArtifactPaneDefaultWidth;
   double _composerHeight = 196;
   _WebAssistantPane _activePane = _WebAssistantPane.tasks;
   final List<_WebComposerAttachment> _attachments = <_WebComposerAttachment>[];
@@ -170,35 +175,38 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
                             ),
                           ),
                         Expanded(
-                          child: _ConversationWorkspace(
+                          child: _buildWorkspaceWithArtifacts(
                             controller: controller,
-                            scrollController: _scrollController,
-                            inputController: _inputController,
-                            currentMessages: currentMessages,
-                            connectionState: connectionState,
-                            thinkingLevel: _thinkingLevel,
-                            permissionLevel: _permissionLevel,
-                            useMultiAgent: _useMultiAgent,
-                            attachments: _attachments,
-                            composerHeight: _composerHeight,
-                            onComposerHeightChanged: (value) {
-                              setState(() => _composerHeight = value);
-                            },
-                            onThinkingChanged: (value) {
-                              setState(() => _thinkingLevel = value);
-                            },
-                            onPermissionChanged: (value) {
-                              setState(() => _permissionLevel = value);
-                            },
-                            onToggleMultiAgent: (value) {
-                              setState(() => _useMultiAgent = value);
-                            },
-                            onAddAttachment: _pickAttachments,
-                            onRemoveAttachment: (index) {
-                              setState(() => _attachments.removeAt(index));
-                            },
-                            onOpenSessionSettings: _openSessionSettings,
-                            onSubmit: _submitPrompt,
+                            child: _ConversationWorkspace(
+                              controller: controller,
+                              scrollController: _scrollController,
+                              inputController: _inputController,
+                              currentMessages: currentMessages,
+                              connectionState: connectionState,
+                              thinkingLevel: _thinkingLevel,
+                              permissionLevel: _permissionLevel,
+                              useMultiAgent: _useMultiAgent,
+                              attachments: _attachments,
+                              composerHeight: _composerHeight,
+                              onComposerHeightChanged: (value) {
+                                setState(() => _composerHeight = value);
+                              },
+                              onThinkingChanged: (value) {
+                                setState(() => _thinkingLevel = value);
+                              },
+                              onPermissionChanged: (value) {
+                                setState(() => _permissionLevel = value);
+                              },
+                              onToggleMultiAgent: (value) {
+                                setState(() => _useMultiAgent = value);
+                              },
+                              onAddAttachment: _pickAttachments,
+                              onRemoveAttachment: (index) {
+                                setState(() => _attachments.removeAt(index));
+                              },
+                              onOpenSessionSettings: _openSessionSettings,
+                              onSubmit: _submitPrompt,
+                            ),
                           ),
                         ),
                       ],
@@ -434,6 +442,91 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
     _inputController.clear();
     setState(() => _attachments.clear());
   }
+
+  Widget _buildWorkspaceWithArtifacts({
+    required AppController controller,
+    required Widget child,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxPaneWidth = math.min(
+          520.0,
+          math.max(
+            _webAssistantArtifactPaneMinWidth,
+            constraints.maxWidth * 0.48,
+          ),
+        );
+        final paneWidth = _artifactPaneWidth
+            .clamp(_webAssistantArtifactPaneMinWidth, maxPaneWidth)
+            .toDouble();
+        final workspace = Row(
+          children: [
+            Expanded(child: child),
+            if (!_artifactPaneCollapsed) ...[
+              SizedBox(
+                key: const Key('assistant-artifact-pane-resize-handle'),
+                width: 8,
+                child: PaneResizeHandle(
+                  axis: Axis.horizontal,
+                  onDelta: (delta) {
+                    setState(() {
+                      _artifactPaneWidth = (_artifactPaneWidth - delta)
+                          .clamp(
+                            _webAssistantArtifactPaneMinWidth,
+                            maxPaneWidth,
+                          )
+                          .toDouble();
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: paneWidth,
+                child: AssistantArtifactSidebar(
+                  sessionKey: controller.currentSessionKey,
+                  threadTitle: controller.currentConversationTitle,
+                  workspaceRef: controller.assistantWorkspaceRefForSession(
+                    controller.currentSessionKey,
+                  ),
+                  workspaceRefKind: controller
+                      .assistantWorkspaceRefKindForSession(
+                        controller.currentSessionKey,
+                      ),
+                  onCollapse: () {
+                    setState(() {
+                      _artifactPaneCollapsed = true;
+                    });
+                  },
+                  loadSnapshot: () =>
+                      controller.loadAssistantArtifactSnapshot(),
+                  loadPreview: (entry) =>
+                      controller.loadAssistantArtifactPreview(entry),
+                ),
+              ),
+            ],
+          ],
+        );
+        return Stack(
+          children: [
+            Positioned.fill(child: workspace),
+            if (_artifactPaneCollapsed)
+              Positioned(
+                right: 8,
+                top: math.max(12.0, (constraints.maxHeight - 56) / 2),
+                child: AssistantArtifactSidebarRevealButton(
+                  onTap: () {
+                    setState(() {
+                      _artifactPaneCollapsed = false;
+                    });
+                  },
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _AssistantWorkspaceChrome extends StatelessWidget {
@@ -459,9 +552,7 @@ class _AssistantWorkspaceChrome extends StatelessWidget {
         child: collapsed
             ? Row(
                 children: [
-                  const Expanded(
-                    child: _ChromeNavigationPills(compact: true),
-                  ),
+                  const Expanded(child: _ChromeNavigationPills(compact: true)),
                   _ChromeConnectionChip(state: connectionState, compact: true),
                   const SizedBox(width: 8),
                   IconButton(
@@ -1258,9 +1349,7 @@ class _ConversationWorkspace extends StatelessWidget {
                           key: const Key('assistant-session-settings-button'),
                           onPressed: onOpenSessionSettings,
                           icon: const Icon(Icons.tune_rounded),
-                          label: Text(
-                            appText('会话设置', 'Session settings'),
-                          ),
+                          label: Text(appText('会话设置', 'Session settings')),
                         ),
                         Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1812,7 +1901,6 @@ class _MetaChip extends StatelessWidget {
     );
   }
 }
-
 
 class _CompactDropdown<T> extends StatelessWidget {
   const _CompactDropdown({

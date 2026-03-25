@@ -224,6 +224,47 @@ void main() {
     );
   }, skip: true);
 
+  testWidgets('AssistantPage keeps the artifact pane collapsed until opened', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+      platform: TargetPlatform.macOS,
+    );
+
+    expect(find.byKey(const Key('assistant-artifact-pane')), findsNothing);
+    expect(
+      find.byKey(const Key('assistant-artifact-pane-toggle')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('assistant-artifact-pane-toggle')));
+    await _pumpForUiSync(tester);
+
+    expect(find.byKey(const Key('assistant-artifact-pane')), findsOneWidget);
+
+    final beforeWidth = tester
+        .getSize(find.byKey(const Key('assistant-artifact-pane')))
+        .width;
+    await tester.drag(
+      find.byKey(const Key('assistant-artifact-pane-resize-handle')),
+      const Offset(-120, 0),
+    );
+    await _pumpForUiSync(tester);
+    final afterWidth = tester
+        .getSize(find.byKey(const Key('assistant-artifact-pane')))
+        .width;
+    expect(afterWidth, greaterThan(beforeWidth));
+
+    await tester.tap(find.byKey(const Key('assistant-artifact-pane-collapse')));
+    await _pumpForUiSync(tester);
+
+    expect(find.byKey(const Key('assistant-artifact-pane')), findsNothing);
+  });
+
   testWidgets(
     'AssistantPage shows Single Agent provider selector on the right',
     (WidgetTester tester) async {},
