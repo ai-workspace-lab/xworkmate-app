@@ -513,7 +513,7 @@ class _WebAssistantPageState extends State<WebAssistantPage> {
             if (_artifactPaneCollapsed)
               Positioned(
                 right: 8,
-                top: math.max(12.0, (constraints.maxHeight - 56) / 2),
+                top: 12,
                 child: AssistantArtifactSidebarRevealButton(
                   onTap: () {
                     setState(() {
