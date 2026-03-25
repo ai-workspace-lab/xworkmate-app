@@ -228,6 +228,7 @@ class _AppShellState extends State<AppShell> {
                             onCycleSidebarState: controller.cycleSidebarState,
                             onExpandFromCollapsed: () => controller
                                 .setSidebarState(AppSidebarState.expanded),
+                            onOpenHome: controller.navigateHome,
                             onOpenAccount: () => controller.navigateTo(
                               WorkspaceDestination.account,
                             ),

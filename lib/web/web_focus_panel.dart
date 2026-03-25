@@ -5,6 +5,7 @@ import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
+import '../widgets/settings_focus_quick_actions.dart';
 import '../widgets/surface_card.dart';
 
 class WebAssistantFocusPanel extends StatefulWidget {
@@ -423,8 +424,7 @@ class _SkillsFocusPreview extends StatelessWidget {
         : controller.skills.take(4).toList(growable: false);
     if (items.isEmpty) {
       return _PreviewEmptyState(
-        message:
-            controller.isSingleAgentMode
+        message: controller.isSingleAgentMode
             ? (controller.currentSingleAgentNeedsAiGatewayConfiguration
                   ? appText(
                       '当前没有可用的外部 Agent ACP 端点，请先配置 LLM API fallback。',
@@ -583,10 +583,7 @@ class _ClawHubFocusPreview extends StatelessWidget {
           runSpacing: 8,
           children: [
             _FocusPill(
-              label: appText(
-                '已加载技能 $skillCount',
-                'Loaded skills $skillCount',
-              ),
+              label: appText('已加载技能 $skillCount', 'Loaded skills $skillCount'),
             ),
             _FocusPill(
               label: appText(
@@ -706,7 +703,25 @@ class _SettingsFocusPreview extends StatelessWidget {
     };
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        SettingsFocusQuickActions(
+          appLanguage: controller.appLanguage,
+          themeMode: controller.themeMode,
+          onToggleLanguage: controller.toggleAppLanguage,
+          onToggleTheme: () {
+            controller.setThemeMode(
+              controller.themeMode == ThemeMode.dark
+                  ? ThemeMode.light
+                  : ThemeMode.dark,
+            );
+          },
+          languageButtonKey: const Key(
+            'assistant-focus-settings-language-toggle',
+          ),
+          themeButtonKey: const Key('assistant-focus-settings-theme-toggle'),
+        ),
+        const SizedBox(height: 12),
         _FocusListTile(
           title: appText('语言', 'Language'),
           subtitle: appText('当前界面语言', 'Current interface language'),

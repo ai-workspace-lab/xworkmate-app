@@ -122,6 +122,14 @@ void main() {
       find.byKey(const ValueKey<String>('assistant-focus-open-page-settings')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const Key('assistant-focus-settings-language-toggle')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('assistant-focus-settings-theme-toggle')),
+      findsOneWidget,
+    );
 
     await tester.tap(
       find.byKey(const ValueKey<String>('assistant-focus-open-page-settings')),
