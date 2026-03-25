@@ -69,6 +69,9 @@ if [[ ! -d "$BUILD_APP_PATH" ]]; then
   exit 1
 fi
 
+echo "Validating export compliance metadata..."
+bash "$ROOT_DIR/scripts/check-apple-export-compliance.sh" "$BUILD_APP_PATH"
+
 rm -rf "$DIST_APP_PATH" "$DIST_DMG_PATH"
 ditto "$BUILD_APP_PATH" "$DIST_APP_PATH"
 mkdir -p "$HELPERS_DIR"
