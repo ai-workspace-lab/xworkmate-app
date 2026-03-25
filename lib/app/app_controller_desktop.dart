@@ -100,6 +100,7 @@ class AppController extends ChangeNotifier {
     UiFeatureManifest? uiFeatureManifest,
     List<String>? singleAgentLocalSkillScanRoots,
     List<SingleAgentProvider>? availableSingleAgentProvidersOverride,
+    ArisBundleRepository? arisBundleRepository,
     SingleAgentRunner? singleAgentRunner,
   }) {
     _store = store ?? SecureConfigStore();
@@ -152,7 +153,7 @@ class AppController extends ChangeNotifier {
     );
     _availableSingleAgentProvidersOverride =
         availableSingleAgentProvidersOverride;
-    _arisBundleRepository = ArisBundleRepository();
+    _arisBundleRepository = arisBundleRepository ?? ArisBundleRepository();
     _goCoreLocator = GoCoreLocator();
     _singleAgentRunner =
         singleAgentRunner ??
@@ -253,8 +254,7 @@ class AppController extends ChangeNotifier {
   List<_SingleAgentSkillScanRoot> get _singleAgentGlobalSkillScanRoots =>
       (_singleAgentLocalSkillScanRootOverrides?.map(
         _singleAgentGlobalSkillScanRootFromOverride,
-      ))
-          ?.toList(growable: false) ??
+      ))?.toList(growable: false) ??
       _defaultSingleAgentGlobalSkillScanRoots;
 
   WorkspaceDestination get destination => _destination;
@@ -1152,7 +1152,7 @@ class AppController extends ChangeNotifier {
     );
     final items = List<GatewayChatMessage>.from(
       isSingleAgentMode
-          ? (_gatewayHistoryCache[sessionKey] ?? const <GatewayChatMessage>[])
+          ? const <GatewayChatMessage>[]
           : _chatController.messages,
     );
     final threadItems = isSingleAgentMode
@@ -2147,9 +2147,7 @@ class AppController extends ChangeNotifier {
     _notifyIfActive();
   }
 
-  Future<void> refreshSingleAgentSkillsForSession(
-    String sessionKey,
-  ) async {
+  Future<void> refreshSingleAgentSkillsForSession(String sessionKey) async {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
     if (assistantExecutionTargetForSession(normalizedSessionKey) !=
         AssistantExecutionTarget.singleAgent) {
@@ -2168,7 +2166,10 @@ class AppController extends ChangeNotifier {
         singleAgentResolvedProviderForSession(normalizedSessionKey) ??
         currentSingleAgentResolvedProvider;
     if (provider == null) {
-      await _replaceSingleAgentThreadSkills(normalizedSessionKey, fallbackSkills);
+      await _replaceSingleAgentThreadSkills(
+        normalizedSessionKey,
+        fallbackSkills,
+      );
       return;
     }
     try {
@@ -4160,6 +4161,22 @@ class AppController extends ChangeNotifier {
     return _scanSingleAgentSkillEntries(_singleAgentGlobalSkillScanRoots);
   }
 
+  Future<List<AssistantThreadSkillEntry>>
+  _scanSingleAgentBundledSkillEntries() async {
+    try {
+      final bundle = await _arisBundleRepository.ensureReady();
+      final skillsRoot = Directory(bundle.resolve('skills'));
+      if (!await skillsRoot.exists()) {
+        return const <AssistantThreadSkillEntry>[];
+      }
+      return _scanSingleAgentSkillEntries(const <_SingleAgentSkillScanRoot>[
+        _SingleAgentSkillScanRoot(path: '', source: 'bundle', scope: 'bundle'),
+      ], workspaceRef: skillsRoot.path);
+    } catch (_) {
+      return const <AssistantThreadSkillEntry>[];
+    }
+  }
+
   Future<List<AssistantThreadSkillEntry>> _scanSingleAgentWorkspaceSkillEntries(
     String sessionKey,
   ) {
@@ -4340,7 +4357,10 @@ class AppController extends ChangeNotifier {
     if (!forceRescan && await _restoreSharedSingleAgentLocalSkillsCache()) {
       return;
     }
-    final availableSkills = await _scanSingleAgentGlobalSkillEntries();
+    final globalSkills = await _scanSingleAgentGlobalSkillEntries();
+    final availableSkills = globalSkills.isNotEmpty
+        ? globalSkills
+        : await _scanSingleAgentBundledSkillEntries();
     _singleAgentSharedImportedSkills = availableSkills;
     _singleAgentLocalSkillsHydrated = true;
     await _persistSharedSingleAgentLocalSkillsCache();
@@ -4366,9 +4386,8 @@ class AppController extends ChangeNotifier {
     _notifyIfActive();
   }
 
-  Future<List<AssistantThreadSkillEntry>> _singleAgentLocalFallbackSkillsForSession(
-    String sessionKey,
-  ) async {
+  Future<List<AssistantThreadSkillEntry>>
+  _singleAgentLocalFallbackSkillsForSession(String sessionKey) async {
     final workspaceSkills = await _scanSingleAgentWorkspaceSkillEntries(
       sessionKey,
     );
@@ -4425,6 +4444,11 @@ class AppController extends ChangeNotifier {
           )
           .where((item) => item.key.trim().isNotEmpty && item.label.isNotEmpty)
           .toList(growable: false);
+      if (skills.isEmpty) {
+        _singleAgentSharedImportedSkills = const <AssistantThreadSkillEntry>[];
+        _singleAgentLocalSkillsHydrated = false;
+        return false;
+      }
       _singleAgentSharedImportedSkills = skills;
       _singleAgentLocalSkillsHydrated = true;
       return true;
@@ -4435,16 +4459,16 @@ class AppController extends ChangeNotifier {
 
   Future<void> _persistSharedSingleAgentLocalSkillsCache() async {
     try {
-      await _store.saveSupportJson(_singleAgentLocalSkillsCacheRelativePath, <
-        String,
-        dynamic
-      >{
-        'schemaVersion': _singleAgentLocalSkillsCacheSchemaVersion,
-        'savedAtMs': DateTime.now().millisecondsSinceEpoch.toDouble(),
-        'skills': _singleAgentSharedImportedSkills
-            .map((item) => item.toJson())
-            .toList(growable: false),
-      });
+      await _store.saveSupportJson(
+        _singleAgentLocalSkillsCacheRelativePath,
+        <String, dynamic>{
+          'schemaVersion': _singleAgentLocalSkillsCacheSchemaVersion,
+          'savedAtMs': DateTime.now().millisecondsSinceEpoch.toDouble(),
+          'skills': _singleAgentSharedImportedSkills
+              .map((item) => item.toJson())
+              .toList(growable: false),
+        },
+      );
     } catch (_) {
       // Best effort only for local cache persistence.
     }
@@ -4485,8 +4509,7 @@ class AppController extends ChangeNotifier {
       scope: item['scope']?.toString().trim().isNotEmpty == true
           ? item['scope'].toString().trim()
           : 'session',
-      sourceLabel:
-          item['sourceLabel']?.toString().trim().isNotEmpty == true
+      sourceLabel: item['sourceLabel']?.toString().trim().isNotEmpty == true
           ? item['sourceLabel'].toString().trim()
           : (item['source']?.toString().trim().isNotEmpty == true
                 ? item['source'].toString().trim()
