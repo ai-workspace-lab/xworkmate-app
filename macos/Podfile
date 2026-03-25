@@ -38,5 +38,14 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_macos_build_settings(target)
+    next unless target.name == 'mobile_scanner'
+
+    target.build_configurations.each do |config|
+      other_cflags = config.build_settings['OTHER_CFLAGS'] || '$(inherited)'
+      unless other_cflags.include?('-Wno-ignored-attributes')
+        config.build_settings['OTHER_CFLAGS'] =
+          "#{other_cflags} -Wno-ignored-attributes"
+      end
+    end
   end
 end
