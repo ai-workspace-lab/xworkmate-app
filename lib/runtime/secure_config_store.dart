@@ -55,8 +55,24 @@ class SecureConfigStore {
     return _settingsStore.loadSettingsSnapshot();
   }
 
+  Future<SettingsSnapshot> reloadSettingsSnapshot() {
+    return _settingsStore.reloadSettingsSnapshot();
+  }
+
+  Future<SettingsSnapshotReloadResult> reloadSettingsSnapshotResult() {
+    return _settingsStore.reloadSettingsSnapshotResult();
+  }
+
   Future<void> saveSettingsSnapshot(SettingsSnapshot snapshot) {
     return _settingsStore.saveSettingsSnapshot(snapshot);
+  }
+
+  Future<List<File>> resolvedSettingsFiles() {
+    return _settingsStore.resolvedSettingsFiles();
+  }
+
+  Future<List<Directory>> resolvedSettingsWatchDirectories() {
+    return _settingsStore.resolvedSettingsWatchDirectories();
   }
 
   Future<List<AssistantThreadRecord>> loadAssistantThreadRecords() {

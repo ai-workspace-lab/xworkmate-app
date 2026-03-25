@@ -106,6 +106,17 @@ class AppController extends ChangeNotifier {
   SettingsSnapshot get settings => _settings;
   SettingsSnapshot get settingsDraft =>
       _settingsDraftInitialized ? _settingsDraft : _settings;
+  bool get supportsSkillDirectoryAuthorization => false;
+  List<AuthorizedSkillDirectory> get authorizedSkillDirectories =>
+      _settings.authorizedSkillDirectories;
+  List<String> get recommendedAuthorizedSkillDirectoryPaths => const <String>[
+    '/etc/skills',
+    '~/.agents/skills',
+    '~/.codex/skills',
+    '~/.workbuddy/skills',
+  ];
+  String get userHomeDirectory => '';
+  String get settingsYamlPath => '';
   bool get hasSettingsDraftChanges =>
       settingsDraft.toJsonString() != _settings.toJsonString() ||
       _draftSecretValues.isNotEmpty;
@@ -923,6 +934,29 @@ class AppController extends ChangeNotifier {
       '草稿已更新，点击顶部保存持久化。',
       'Draft updated. Use the top Save button to persist it.',
     );
+    notifyListeners();
+  }
+
+  Future<AuthorizedSkillDirectory?> authorizeSkillDirectory({
+    String suggestedPath = '',
+  }) async {
+    return null;
+  }
+
+  Future<void> saveAuthorizedSkillDirectories(
+    List<AuthorizedSkillDirectory> directories,
+  ) async {
+    _settings = _settings.copyWith(
+      authorizedSkillDirectories: normalizeAuthorizedSkillDirectories(
+        directories: directories,
+      ),
+    );
+    if (_settingsDraftInitialized) {
+      _settingsDraft = _settingsDraft.copyWith(
+        authorizedSkillDirectories: _settings.authorizedSkillDirectories,
+      );
+    }
+    await _persistSettings();
     notifyListeners();
   }
 

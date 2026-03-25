@@ -13,8 +13,14 @@ class SettingsController extends ChangeNotifier {
 
   final SecureConfigStore _store;
   bool _disposed = false;
+  final List<StreamSubscription<FileSystemEvent>> _settingsWatchSubscriptions =
+      <StreamSubscription<FileSystemEvent>>[];
+  Timer? _settingsReloadDebounce;
+  Timer? _settingsPollTimer;
 
   SettingsSnapshot _snapshot = SettingsSnapshot.defaults();
+  String _lastSnapshotJson = SettingsSnapshot.defaults().toJsonString();
+  String _lastSettingsFileStamp = '';
   Map<String, String> _secureRefs = const <String, String>{};
   List<SecretAuditEntry> _auditTrail = const <SecretAuditEntry>[];
   String _ollamaStatus = 'Idle';
@@ -39,12 +45,22 @@ class SettingsController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _settingsReloadDebounce?.cancel();
+    _settingsPollTimer?.cancel();
+    for (final subscription in _settingsWatchSubscriptions) {
+      unawaited(subscription.cancel());
+    }
+    _settingsWatchSubscriptions.clear();
     super.dispose();
   }
 
   Future<void> initialize() async {
     _snapshot = await _store.loadSettingsSnapshot();
+    _lastSnapshotJson = _snapshot.toJsonString();
     await _reloadDerivedState();
+    await _startSettingsWatcher();
+    await _refreshSettingsFileStamp();
+    _startSettingsPolling();
     notifyListeners();
   }
 
@@ -55,13 +71,17 @@ class SettingsController extends ChangeNotifier {
 
   Future<void> saveSnapshot(SettingsSnapshot snapshot) async {
     _snapshot = snapshot;
+    _lastSnapshotJson = _snapshot.toJsonString();
     await _store.saveSettingsSnapshot(snapshot);
+    await _refreshSettingsFileStamp();
     await _reloadDerivedState();
     notifyListeners();
   }
 
   Future<void> resetSnapshot(SettingsSnapshot snapshot) async {
     _snapshot = snapshot;
+    _lastSnapshotJson = _snapshot.toJsonString();
+    await _refreshSettingsFileStamp();
     await _reloadDerivedState();
     notifyListeners();
   }
@@ -789,6 +809,130 @@ class SettingsController extends ChangeNotifier {
       return base;
     }
     return '$base.$profileIndex';
+  }
+
+  Future<void> _startSettingsWatcher() async {
+    for (final subscription in _settingsWatchSubscriptions) {
+      await subscription.cancel();
+    }
+    _settingsWatchSubscriptions.clear();
+    final files = await _store.resolvedSettingsFiles();
+    final directories = await _store.resolvedSettingsWatchDirectories();
+    void scheduleReload() {
+      _settingsReloadDebounce?.cancel();
+      _settingsReloadDebounce = Timer(
+        const Duration(milliseconds: 160),
+        () => unawaited(_reloadSettingsFromDiskIfChanged()),
+      );
+    }
+
+    for (final file in files) {
+      try {
+        if (await file.exists()) {
+          _settingsWatchSubscriptions.add(
+            file.watch().listen((_) {
+              scheduleReload();
+            }),
+          );
+        }
+      } catch (_) {
+        // Best effort only. Directory watch below remains as a fallback.
+      }
+    }
+    for (final directory in directories) {
+      try {
+        if (!await directory.exists()) {
+          await directory.create(recursive: true);
+        }
+        _settingsWatchSubscriptions.add(
+          directory.watch().listen((_) {
+            scheduleReload();
+          }),
+        );
+      } catch (_) {
+        // Best effort only. Missing watch support should not block runtime.
+      }
+    }
+  }
+
+  Future<void> _reloadSettingsFromDiskIfChanged() async {
+    if (_disposed) {
+      return;
+    }
+    final nextStamp = await _resolveStableSettingsFileStamp();
+    if (nextStamp == _lastSettingsFileStamp) {
+      return;
+    }
+    final reload = await _store.reloadSettingsSnapshotResult();
+    if (!reload.applied) {
+      return;
+    }
+    _lastSettingsFileStamp = nextStamp;
+    final next = reload.snapshot;
+    final nextJson = next.toJsonString();
+    if (nextJson == _lastSnapshotJson) {
+      return;
+    }
+    _snapshot = next;
+    _lastSnapshotJson = nextJson;
+    await _reloadDerivedState();
+    notifyListeners();
+  }
+
+  void _startSettingsPolling() {
+    _settingsPollTimer?.cancel();
+    _settingsPollTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      unawaited(_pollSettingsFileChanges());
+    });
+  }
+
+  Future<void> _pollSettingsFileChanges() async {
+    if (_disposed) {
+      return;
+    }
+    final previousStamp = _lastSettingsFileStamp;
+    final nextStamp = await _computeSettingsFileStamp();
+    if (nextStamp == previousStamp) {
+      return;
+    }
+    await _reloadSettingsFromDiskIfChanged();
+  }
+
+  Future<void> _refreshSettingsFileStamp() async {
+    _lastSettingsFileStamp = await _computeSettingsFileStamp();
+  }
+
+  Future<String> _resolveStableSettingsFileStamp() async {
+    var current = await _computeSettingsFileStamp();
+    for (var attempt = 0; attempt < 4; attempt++) {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      final next = await _computeSettingsFileStamp();
+      if (next == current) {
+        return next;
+      }
+      current = next;
+    }
+    return current;
+  }
+
+  Future<String> _computeSettingsFileStamp() async {
+    final files = await _store.resolvedSettingsFiles();
+    final buffer = StringBuffer();
+    for (final file in files) {
+      buffer.write(file.path);
+      if (await file.exists()) {
+        final stat = await file.stat();
+        buffer
+          ..write(':')
+          ..write(stat.modified.millisecondsSinceEpoch)
+          ..write(':')
+          ..write(stat.size);
+      } else {
+        buffer.write(':missing');
+      }
+      buffer.write('|');
+    }
+    return buffer.toString();
   }
 }
 
