@@ -10,7 +10,6 @@ import '../runtime/assistant_artifacts.dart';
 import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
-import 'app_brand_logo.dart';
 import 'section_tabs.dart';
 import 'surface_card.dart';
 
@@ -429,9 +428,9 @@ class AssistantArtifactSidebarRevealButton extends StatelessWidget {
             border: Border.all(color: palette.chromeStroke),
             boxShadow: [palette.chromeShadowAmbient],
           ),
-          child: DoorLogoIcon(
-            side: DoorLogoSide.right,
-            size: 22,
+          child: Icon(
+            Icons.keyboard_double_arrow_left_rounded,
+            size: 20,
             color: palette.textPrimary,
           ),
         ),
