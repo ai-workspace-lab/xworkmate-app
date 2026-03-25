@@ -563,6 +563,16 @@ void main() {
         ),
       );
       await _pumpForUiSync(tester);
+      await tester.runAsync(() async {
+        await _waitForCondition(
+          () =>
+              controller
+                  .assistantImportedSkillsForSession(controller.currentSessionKey)
+                  .length ==
+              3,
+        );
+      });
+      await _pumpForUiSync(tester);
 
       await tester.tap(find.byKey(const Key('assistant-skill-picker-button')));
       await _pumpForUiSync(tester);
@@ -1171,6 +1181,7 @@ Future<AppController> _createControllerWithThreadRecords({
     enableSecureStorage: false,
     databasePathResolver: () async => '${tempDirectory.path}/settings.db',
     fallbackDirectoryPathResolver: () async => tempDirectory.path,
+    defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
   );
   addTearDown(() async {
     if (await tempDirectory.exists()) {
@@ -1206,6 +1217,7 @@ Future<AppController> _createControllerWithThreadRecords({
       ),
       assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
       defaultModel: 'qwen2.5-coder:latest',
+      workspacePath: tempDirectory.path,
     ),
   );
   await store.saveAssistantThreadRecords(records);
@@ -1249,6 +1261,16 @@ Future<void> _writeSkill(
 Future<void> _pumpForUiSync(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 200));
+}
+
+Future<void> _waitForCondition(bool Function() predicate) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 20));
+  while (!predicate()) {
+    if (DateTime.now().isAfter(deadline)) {
+      fail('Timed out waiting for condition');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
 }
 
 class _FakeGatewayRuntime extends GatewayRuntime {
