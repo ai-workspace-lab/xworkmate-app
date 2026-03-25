@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
+import '../runtime/assistant_artifacts.dart';
 import '../runtime/runtime_models.dart';
 import '../web/web_acp_client.dart';
 import '../web/web_ai_gateway_client.dart';
+import '../web/web_artifact_proxy_client.dart';
 import '../web/web_relay_gateway_client.dart';
 import '../web/web_session_repository.dart';
 import '../web/web_store.dart';
@@ -36,6 +38,7 @@ class AppController extends ChangeNotifier {
        _remoteSessionRepositoryBuilder =
            remoteSessionRepositoryBuilder ?? _defaultRemoteSessionRepository {
     _relayClient = relayClient ?? WebRelayGatewayClient(_store);
+    _artifactProxyClient = WebArtifactProxyClient(_relayClient);
     _relayEventsSubscription = _relayClient.events.listen(_handleRelayEvent);
     unawaited(_initialize());
   }
@@ -46,6 +49,7 @@ class AppController extends ChangeNotifier {
   final WebAcpClient _acpClient;
   final RemoteWebSessionRepositoryBuilder _remoteSessionRepositoryBuilder;
   late final WebRelayGatewayClient _relayClient;
+  late final WebArtifactProxyClient _artifactProxyClient;
   late final BrowserWebSessionRepository _browserSessionRepository =
       BrowserWebSessionRepository(_store);
 
@@ -214,6 +218,51 @@ class AppController extends ChangeNotifier {
   AssistantMessageViewMode get currentAssistantMessageViewMode =>
       assistantMessageViewModeForSession(_currentSessionKey);
 
+  String assistantWorkspaceRefForSession(String sessionKey) {
+    final normalizedSessionKey = _normalizedSessionKey(sessionKey);
+    final recordRef =
+        _threadRecords[normalizedSessionKey]?.workspaceRef.trim() ?? '';
+    if (recordRef.isNotEmpty) {
+      return recordRef;
+    }
+    return _defaultWorkspaceRefForSession(normalizedSessionKey);
+  }
+
+  WorkspaceRefKind assistantWorkspaceRefKindForSession(String sessionKey) {
+    final normalizedSessionKey = _normalizedSessionKey(sessionKey);
+    final record = _threadRecords[normalizedSessionKey];
+    if (record != null && record.workspaceRef.trim().isNotEmpty) {
+      return record.workspaceRefKind;
+    }
+    return WorkspaceRefKind.objectStore;
+  }
+
+  Future<AssistantArtifactSnapshot> loadAssistantArtifactSnapshot({
+    String? sessionKey,
+  }) {
+    final resolvedSessionKey = _normalizedSessionKey(
+      sessionKey ?? _currentSessionKey,
+    );
+    return _artifactProxyClient.loadSnapshot(
+      sessionKey: resolvedSessionKey,
+      workspaceRef: assistantWorkspaceRefForSession(resolvedSessionKey),
+      workspaceRefKind: assistantWorkspaceRefKindForSession(resolvedSessionKey),
+    );
+  }
+
+  Future<AssistantArtifactPreview> loadAssistantArtifactPreview(
+    AssistantArtifactEntry entry, {
+    String? sessionKey,
+  }) {
+    final resolvedSessionKey = _normalizedSessionKey(
+      sessionKey ?? _currentSessionKey,
+    );
+    return _artifactProxyClient.loadPreview(
+      sessionKey: resolvedSessionKey,
+      entry: entry,
+    );
+  }
+
   SingleAgentProvider singleAgentProviderForSession(String sessionKey) {
     final normalizedSessionKey = _normalizedSessionKey(sessionKey);
     return _threadRecords[normalizedSessionKey]?.singleAgentProvider ??
@@ -337,6 +386,30 @@ class AppController extends ChangeNotifier {
       return assistantImportedSkillsForSession(_currentSessionKey).length;
     }
     return assistantImportedSkillsForSession(_currentSessionKey).length;
+  }
+
+  String _defaultWorkspaceRefForSession(String sessionKey) {
+    final normalizedSessionKey = _normalizedSessionKey(sessionKey);
+    return 'object://thread/$normalizedSessionKey';
+  }
+
+  void _syncThreadWorkspaceRef(String sessionKey) {
+    final normalizedSessionKey = _normalizedSessionKey(sessionKey);
+    final nextWorkspaceRef = _defaultWorkspaceRefForSession(
+      normalizedSessionKey,
+    );
+    final existing = _threadRecords[normalizedSessionKey];
+    if (existing != null &&
+        existing.workspaceRef == nextWorkspaceRef &&
+        existing.workspaceRefKind == WorkspaceRefKind.objectStore) {
+      return;
+    }
+    _upsertThreadRecord(
+      normalizedSessionKey,
+      workspaceRef: nextWorkspaceRef,
+      workspaceRefKind: WorkspaceRefKind.objectStore,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
   }
 
   List<GatewaySkillSummary> get skills => assistantImportedSkillsForSession(
@@ -997,21 +1070,25 @@ class AppController extends ChangeNotifier {
         assistantExecutionTargetForSession(_currentSessionKey);
     final inheritedRecord =
         _threadRecords[_normalizedSessionKey(_currentSessionKey)];
-    final record =
-        _newRecord(
-          target: inheritedTarget,
-          title: appText('新对话', 'New conversation'),
-        ).copyWith(
-          messageViewMode:
-              inheritedRecord?.messageViewMode ??
-              AssistantMessageViewMode.rendered,
-          singleAgentProvider:
-              inheritedRecord?.singleAgentProvider ?? SingleAgentProvider.auto,
-          assistantModelId: inheritedRecord?.assistantModelId ?? '',
-          importedSkills: inheritedRecord?.importedSkills ?? const [],
-          selectedSkillKeys: inheritedRecord?.selectedSkillKeys ?? const [],
-          gatewayEntryState: _gatewayEntryStateForTarget(inheritedTarget),
-        );
+    final baseRecord = _newRecord(
+      target: inheritedTarget,
+      title: appText('新对话', 'New conversation'),
+    );
+    final record = baseRecord.copyWith(
+      messageViewMode:
+          inheritedRecord?.messageViewMode ?? AssistantMessageViewMode.rendered,
+      singleAgentProvider:
+          inheritedRecord?.singleAgentProvider ?? SingleAgentProvider.auto,
+      assistantModelId: inheritedRecord?.assistantModelId ?? '',
+      importedSkills: inheritedRecord?.importedSkills ?? const [],
+      selectedSkillKeys: inheritedRecord?.selectedSkillKeys ?? const [],
+      gatewayEntryState: _gatewayEntryStateForTarget(inheritedTarget),
+      workspaceRef: inheritedRecord?.workspaceRef.trim().isNotEmpty == true
+          ? inheritedRecord!.workspaceRef
+          : _defaultWorkspaceRefForSession(baseRecord.sessionKey),
+      workspaceRefKind:
+          inheritedRecord?.workspaceRefKind ?? WorkspaceRefKind.objectStore,
+    );
     _threadRecords[record.sessionKey] = record;
     _currentSessionKey = record.sessionKey;
     _lastAssistantError = null;
@@ -1040,6 +1117,7 @@ class AppController extends ChangeNotifier {
     _settings = _settings.copyWith(
       assistantLastSessionKey: normalizedSessionKey,
     );
+    _syncThreadWorkspaceRef(normalizedSessionKey);
     await _persistSettings();
     notifyListeners();
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
@@ -1071,6 +1149,8 @@ class AppController extends ChangeNotifier {
       executionTarget: resolvedTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       gatewayEntryState: _gatewayEntryStateForTarget(resolvedTarget),
+      workspaceRef: _defaultWorkspaceRefForSession(sessionKey),
+      workspaceRefKind: WorkspaceRefKind.objectStore,
     );
     _settings = _settings.copyWith(assistantExecutionTarget: resolvedTarget);
     await _persistSettings();
@@ -1515,6 +1595,11 @@ class AppController extends ChangeNotifier {
             existing?.singleAgentProvider ?? SingleAgentProvider.auto,
         gatewayEntryState:
             existing?.gatewayEntryState ?? _gatewayEntryStateForTarget(target),
+        workspaceRef: existing?.workspaceRef.trim().isNotEmpty == true
+            ? existing!.workspaceRef
+            : _defaultWorkspaceRefForSession(sessionKey),
+        workspaceRefKind:
+            existing?.workspaceRefKind ?? WorkspaceRefKind.objectStore,
       );
       _threadRecords[sessionKey] = next;
     }
@@ -1757,6 +1842,7 @@ class AppController extends ChangeNotifier {
     if (trimmed.isEmpty) {
       return;
     }
+    _syncThreadWorkspaceRef(_currentSessionKey);
     const maxAttachmentBytes = 10 * 1024 * 1024;
     final totalAttachmentBytes = attachments.fold<int>(
       0,
@@ -2265,6 +2351,12 @@ class AppController extends ChangeNotifier {
       title: record.title.trim().isEmpty
           ? appText('新对话', 'New conversation')
           : record.title.trim(),
+      workspaceRef: record.workspaceRef.trim().isEmpty
+          ? _defaultWorkspaceRefForSession(record.sessionKey)
+          : record.workspaceRef.trim(),
+      workspaceRefKind: record.workspaceRef.trim().isEmpty
+          ? WorkspaceRefKind.objectStore
+          : record.workspaceRefKind,
     );
   }
 
@@ -2296,6 +2388,8 @@ class AppController extends ChangeNotifier {
       archived: false,
       executionTarget: target,
       messageViewMode: AssistantMessageViewMode.rendered,
+      workspaceRef: 'object://thread/$prefix:$timestamp',
+      workspaceRefKind: WorkspaceRefKind.objectStore,
     );
   }
 
@@ -2425,6 +2519,8 @@ class AppController extends ChangeNotifier {
     SingleAgentProvider? singleAgentProvider,
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
+    String? workspaceRef,
+    WorkspaceRefKind? workspaceRefKind,
   }) {
     final key = _normalizedSessionKey(sessionKey);
     final resolvedTarget =
@@ -2445,6 +2541,8 @@ class AppController extends ChangeNotifier {
       singleAgentProvider: singleAgentProvider ?? existing.singleAgentProvider,
       gatewayEntryState: gatewayEntryState ?? existing.gatewayEntryState,
       clearGatewayEntryState: clearGatewayEntryState,
+      workspaceRef: workspaceRef ?? existing.workspaceRef,
+      workspaceRefKind: workspaceRefKind ?? existing.workspaceRefKind,
     );
     _recomputeDerivedWorkspaceState();
   }
