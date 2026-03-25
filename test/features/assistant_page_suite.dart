@@ -267,6 +267,36 @@ void main() {
   });
 
   testWidgets(
+    'AssistantPage keeps the collapsed artifact toggle clear of top toolbar controls',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
+
+      await pumpPage(
+        tester,
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+        platform: TargetPlatform.macOS,
+      );
+
+      final toggle = find.byKey(const Key('assistant-artifact-pane-toggle'));
+      final viewMode = find.byKey(
+        const Key('assistant-message-view-mode-button'),
+      );
+      final connectionChip = find.byKey(const Key('assistant-connection-chip'));
+
+      expect(toggle, findsOneWidget);
+      expect(viewMode, findsOneWidget);
+      expect(connectionChip, findsOneWidget);
+
+      final toggleRect = tester.getRect(toggle);
+      final viewModeRect = tester.getRect(viewMode);
+      final connectionRect = tester.getRect(connectionChip);
+
+      expect(toggleRect.overlaps(viewModeRect), isFalse);
+      expect(toggleRect.overlaps(connectionRect), isFalse);
+    },
+  );
+
+  testWidgets(
     'AssistantPage shows Single Agent provider selector on the right',
     (WidgetTester tester) async {},
     skip: true,
@@ -567,7 +597,9 @@ void main() {
         await _waitForCondition(
           () =>
               controller
-                  .assistantImportedSkillsForSession(controller.currentSessionKey)
+                  .assistantImportedSkillsForSession(
+                    controller.currentSessionKey,
+                  )
                   .length ==
               3,
         );

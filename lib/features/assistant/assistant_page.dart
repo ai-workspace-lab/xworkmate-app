@@ -34,6 +34,7 @@ const double _assistantHorizontalPaneGap = 2;
 const double _assistantVerticalResizeHandleHeight = 10;
 const double _assistantArtifactPaneMinWidth = 280;
 const double _assistantArtifactPaneDefaultWidth = 360;
+const double _assistantCollapsedArtifactToggleClearance = 56;
 
 typedef AssistantClipboardImageReader = Future<XFile?> Function();
 
@@ -446,6 +447,9 @@ class _AssistantPageState extends State<AssistantPage> {
                   currentTask: currentTask,
                   items: timelineItems,
                   messageViewMode: controller.currentAssistantMessageViewMode,
+                  topTrailingInset: _artifactPaneCollapsed
+                      ? _assistantCollapsedArtifactToggleClearance
+                      : 0,
                   scrollController: _conversationController,
                   onOpenDetail: widget.onOpenDetail,
                   onFocusComposer: _focusComposer,
@@ -605,8 +609,8 @@ class _AssistantPageState extends State<AssistantPage> {
             Positioned.fill(child: panel),
             if (_artifactPaneCollapsed)
               Positioned(
-                right: AppSpacing.sm,
-                top: AppSpacing.lg,
+                right: 0,
+                top: 0,
                 child: AssistantArtifactSidebarRevealButton(
                   onTap: () {
                     setState(() {
@@ -1819,6 +1823,7 @@ class _ConversationArea extends StatelessWidget {
     required this.currentTask,
     required this.items,
     required this.messageViewMode,
+    required this.topTrailingInset,
     required this.scrollController,
     required this.onOpenDetail,
     required this.onFocusComposer,
@@ -1832,6 +1837,7 @@ class _ConversationArea extends StatelessWidget {
   final _AssistantTaskEntry currentTask;
   final List<_TimelineItem> items;
   final AssistantMessageViewMode messageViewMode;
+  final double topTrailingInset;
   final ScrollController scrollController;
   final ValueChanged<DetailPanelData> onOpenDetail;
   final VoidCallback onFocusComposer;
@@ -1852,7 +1858,7 @@ class _ConversationArea extends StatelessWidget {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+            padding: EdgeInsets.fromLTRB(10, 8, 10 + topTrailingInset, 8),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
