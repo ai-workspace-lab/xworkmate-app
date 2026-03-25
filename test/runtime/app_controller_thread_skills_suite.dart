@@ -349,6 +349,108 @@ void main() {
       );
     },
   );
+
+  test(
+    'AppController persists shared local skills cache and restores it on restart',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-single-agent-skills-cache-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final agentsRoot = Directory('${tempDirectory.path}/agents-skills');
+      final codexRoot = Directory('${tempDirectory.path}/codex-skills');
+      await _writeSkill(
+        agentsRoot,
+        'browser',
+        skillName: 'Browser',
+        description: 'Browser tasks',
+      );
+      await _writeSkill(
+        codexRoot,
+        'ppt',
+        skillName: 'PPT',
+        description: 'Presentation tasks',
+      );
+
+      SecureConfigStore createStore() {
+        return SecureConfigStore(
+          enableSecureStorage: false,
+          databasePathResolver: () async =>
+              '${tempDirectory.path}/settings.sqlite3',
+          fallbackDirectoryPathResolver: () async => tempDirectory.path,
+          defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
+        );
+      }
+
+      final firstStore = createStore();
+      final controller = AppController(
+        store: firstStore,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        singleAgentLocalSkillScanRoots: <String>[
+          agentsRoot.path,
+          codexRoot.path,
+        ],
+      );
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      expect(
+        controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .map((item) => item.label),
+        containsAll(const <String>['Browser', 'PPT']),
+      );
+
+      final cacheFile = await firstStore.supportFile(
+        'cache/single-agent-local-skills.json',
+      );
+      expect(cacheFile, isNotNull);
+      await _waitFor(() => cacheFile != null && cacheFile.existsSync());
+      controller.dispose();
+
+      if (await agentsRoot.exists()) {
+        await agentsRoot.delete(recursive: true);
+      }
+      if (await codexRoot.exists()) {
+        await codexRoot.delete(recursive: true);
+      }
+
+      final restoredController = AppController(
+        store: createStore(),
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        singleAgentLocalSkillScanRoots: <String>[
+          agentsRoot.path,
+          codexRoot.path,
+        ],
+      );
+      addTearDown(restoredController.dispose);
+      await _waitFor(() => !restoredController.initializing);
+      await restoredController.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+
+      expect(
+        restoredController
+            .assistantImportedSkillsForSession(
+              restoredController.currentSessionKey,
+            )
+            .map((item) => item.label),
+        containsAll(const <String>['Browser', 'PPT']),
+      );
+    },
+  );
 }
 
 Future<void> _writeSkill(
