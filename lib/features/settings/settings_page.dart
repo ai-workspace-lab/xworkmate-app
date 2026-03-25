@@ -13,6 +13,7 @@ import '../../runtime/gateway_runtime.dart';
 import '../../runtime/runtime_controllers.dart';
 import '../../runtime/runtime_models.dart';
 import 'codex_integration_card.dart';
+import 'skill_directory_authorization_card.dart';
 import '../../widgets/section_tabs.dart';
 import '../../widgets/surface_card.dart';
 import '../../widgets/top_bar.dart';
@@ -825,6 +826,10 @@ class _SettingsPageState extends State<SettingsPage> {
       _GatewayIntegrationSubTab.gateway => 'OpenClaw Gateway',
       _GatewayIntegrationSubTab.llm => appText('LLM 接入点', 'LLM Endpoints'),
       _GatewayIntegrationSubTab.acp => appText('ACP 外部接入', 'External ACP'),
+      _GatewayIntegrationSubTab.skills => appText(
+        'SKILLS 目录授权',
+        'SKILLS Directory Authorization',
+      ),
     };
     return [
       SectionTabs(
@@ -832,6 +837,7 @@ class _SettingsPageState extends State<SettingsPage> {
           'OpenClaw Gateway',
           appText('LLM 接入点', 'LLM Endpoints'),
           appText('ACP 外部接入', 'External ACP'),
+          appText('SKILLS 目录授权', 'SKILLS Directory Authorization'),
         ],
         value: tabLabel,
         onChanged: (value) => setState(() {
@@ -839,7 +845,9 @@ class _SettingsPageState extends State<SettingsPage> {
             'OpenClaw Gateway' => _GatewayIntegrationSubTab.gateway,
             _ when value == appText('LLM 接入点', 'LLM Endpoints') =>
               _GatewayIntegrationSubTab.llm,
-            _ => _GatewayIntegrationSubTab.acp,
+            _ when value == appText('ACP 外部接入', 'External ACP') =>
+              _GatewayIntegrationSubTab.acp,
+            _ => _GatewayIntegrationSubTab.skills,
           };
         }),
       ),
@@ -881,6 +889,9 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
         _GatewayIntegrationSubTab.acp => <Widget>[
           _buildExternalAcpEndpointManager(context, controller, settings),
+        ],
+        _GatewayIntegrationSubTab.skills => <Widget>[
+          SkillDirectoryAuthorizationCard(controller: controller),
         ],
       },
     ];
@@ -4762,7 +4773,7 @@ class _WorkflowStep extends StatelessWidget {
   }
 }
 
-enum _GatewayIntegrationSubTab { gateway, llm, acp }
+enum _GatewayIntegrationSubTab { gateway, llm, acp, skills }
 
 enum _LlmEndpointSlot { aiGateway, ollamaLocal, ollamaCloud }
 

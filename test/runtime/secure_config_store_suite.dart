@@ -827,6 +827,26 @@ void main() {
     expect(decoded.assistantLastSessionKey, 'draft:session-1');
   });
 
+  test('SettingsSnapshot encodes and decodes authorizedSkillDirectories', () {
+    final snapshot = SettingsSnapshot.defaults().copyWith(
+      authorizedSkillDirectories: const <AuthorizedSkillDirectory>[
+        AuthorizedSkillDirectory(path: '/etc/skills'),
+        AuthorizedSkillDirectory(
+          path: '/Users/test/.codex/skills',
+          bookmark: 'bookmark-data',
+        ),
+      ],
+    );
+
+    final decoded = SettingsSnapshot.fromJsonString(snapshot.toJsonString());
+
+    expect(
+      decoded.authorizedSkillDirectories.map((item) => item.path),
+      const <String>['/Users/test/.codex/skills', '/etc/skills'],
+    );
+    expect(decoded.authorizedSkillDirectories.first.bookmark, 'bookmark-data');
+  });
+
   test(
     'AssistantThreadRecord keeps compatibility with legacy json payloads',
     () {

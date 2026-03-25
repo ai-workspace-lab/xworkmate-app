@@ -137,6 +137,76 @@ void main() {
   );
 
   test(
+    'AppController hot reloads authorized skill directories from settings.yaml',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-skill-directory-hot-reload-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final agentsRoot = Directory('${tempDirectory.path}/agents-skills');
+      await _writeSkill(
+        agentsRoot,
+        'browser',
+        skillName: 'Browser',
+        description: 'Browser tasks',
+      );
+
+      final store = await _createStore(tempDirectory.path);
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+      );
+      addTearDown(controller.dispose);
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      expect(
+        controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .where((skill) => skill.label == 'Browser'),
+        isEmpty,
+      );
+
+      final updatedSnapshot =
+          _singleAgentTestSettings(workspacePath: tempDirectory.path).copyWith(
+            authorizedSkillDirectories: <AuthorizedSkillDirectory>[
+              AuthorizedSkillDirectory(path: agentsRoot.path),
+            ],
+          );
+      final settingsFile = File('${tempDirectory.path}/config/settings.yaml');
+      await settingsFile.writeAsString(
+        encodeYamlDocument(updatedSnapshot.toJson()),
+        flush: true,
+      );
+
+      await _waitFor(
+        () => controller.authorizedSkillDirectories
+            .map((item) => item.path)
+            .contains(agentsRoot.path),
+      );
+      await _waitFor(
+        () => controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .any((skill) => skill.label == 'Browser'),
+      );
+      expect(
+        controller.authorizedSkillDirectories.map((item) => item.path),
+        <String>[agentsRoot.path],
+      );
+    },
+  );
+
+  test(
     'AppController keeps thread-bound skills isolated and restores them after restart',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -266,15 +336,21 @@ void main() {
       );
 
       expect(
-        controller.assistantSelectedSkillsForSession(taskA).map((skill) => skill.label),
+        controller
+            .assistantSelectedSkillsForSession(taskA)
+            .map((skill) => skill.label),
         const <String>['PPT'],
       );
       expect(
-        controller.assistantSelectedSkillsForSession(taskB).map((skill) => skill.label),
+        controller
+            .assistantSelectedSkillsForSession(taskB)
+            .map((skill) => skill.label),
         const <String>['WordX'],
       );
       expect(
-        controller.assistantSelectedSkillsForSession(taskC).map((skill) => skill.label),
+        controller
+            .assistantSelectedSkillsForSession(taskC)
+            .map((skill) => skill.label),
         const <String>['Browser'],
       );
 
@@ -286,7 +362,9 @@ void main() {
       await restoredController.switchSession(taskA);
       await _waitFor(
         () =>
-            restoredController.assistantImportedSkillsForSession(taskA).length ==
+            restoredController
+                .assistantImportedSkillsForSession(taskA)
+                .length ==
             4,
       );
       expect(
@@ -298,7 +376,9 @@ void main() {
       await restoredController.switchSession(taskB);
       await _waitFor(
         () =>
-            restoredController.assistantImportedSkillsForSession(taskB).length ==
+            restoredController
+                .assistantImportedSkillsForSession(taskB)
+                .length ==
             4,
       );
       expect(
@@ -310,7 +390,9 @@ void main() {
       await restoredController.switchSession(taskC);
       await _waitFor(
         () =>
-            restoredController.assistantImportedSkillsForSession(taskC).length ==
+            restoredController
+                .assistantImportedSkillsForSession(taskC)
+                .length ==
             4,
       );
       expect(
@@ -457,7 +539,8 @@ void main() {
       );
       final store = SecureConfigStore(
         enableSecureStorage: false,
-        databasePathResolver: () async => '${tempDirectory.path}/settings.sqlite3',
+        databasePathResolver: () async =>
+            '${tempDirectory.path}/settings.sqlite3',
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
         defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
       );
@@ -491,10 +574,9 @@ void main() {
       addTearDown(controller.dispose);
       await _waitFor(() => !controller.initializing);
       await _waitFor(
-        () =>
-            controller
-                .assistantImportedSkillsForSession(controller.currentSessionKey)
-                .any((item) => item.label == 'Workspace Only Skill'),
+        () => controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .any((item) => item.label == 'Workspace Only Skill'),
       );
 
       expect(
@@ -549,7 +631,8 @@ void main() {
 
       final store = SecureConfigStore(
         enableSecureStorage: false,
-        databasePathResolver: () async => '${tempDirectory.path}/settings.sqlite3',
+        databasePathResolver: () async =>
+            '${tempDirectory.path}/settings.sqlite3',
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
         defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
       );
@@ -635,7 +718,8 @@ void main() {
 
       final store = SecureConfigStore(
         enableSecureStorage: false,
-        databasePathResolver: () async => '${tempDirectory.path}/settings.sqlite3',
+        databasePathResolver: () async =>
+            '${tempDirectory.path}/settings.sqlite3',
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
         defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
       );
@@ -667,10 +751,9 @@ void main() {
       addTearDown(controller.dispose);
       await _waitFor(() => !controller.initializing);
       await _waitFor(
-        () =>
-            controller
-                .assistantImportedSkillsForSession(controller.currentSessionKey)
-                .isNotEmpty,
+        () => controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .isNotEmpty,
       );
 
       final sharedSkill = controller
@@ -698,7 +781,8 @@ void main() {
 
       final store = SecureConfigStore(
         enableSecureStorage: false,
-        databasePathResolver: () async => '${tempDirectory.path}/settings.sqlite3',
+        databasePathResolver: () async =>
+            '${tempDirectory.path}/settings.sqlite3',
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
         defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
       );
@@ -732,14 +816,15 @@ void main() {
       addTearDown(controller.dispose);
       await _waitFor(() => !controller.initializing);
       await _waitFor(
-        () =>
-            controller.assistantImportedSkillsForSession(
-              controller.currentSessionKey,
-            ).isEmpty,
+        () => controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .isEmpty,
       );
 
       expect(
-        controller.assistantImportedSkillsForSession(controller.currentSessionKey),
+        controller.assistantImportedSkillsForSession(
+          controller.currentSessionKey,
+        ),
         isEmpty,
       );
     },

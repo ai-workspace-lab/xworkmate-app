@@ -236,6 +236,65 @@ List<ExternalAcpEndpointProfile> replaceExternalAcpEndpointForProvider(
   return normalizeExternalAcpEndpoints(profiles: next);
 }
 
+String normalizeAuthorizedSkillDirectoryPath(String path) {
+  final trimmed = path.trim();
+  if (trimmed.length <= 1) {
+    return trimmed;
+  }
+  return trimmed.replaceFirst(RegExp(r'[\\/]+$'), '');
+}
+
+class AuthorizedSkillDirectory {
+  const AuthorizedSkillDirectory({required this.path, this.bookmark = ''});
+
+  final String path;
+  final String bookmark;
+
+  AuthorizedSkillDirectory copyWith({String? path, String? bookmark}) {
+    return AuthorizedSkillDirectory(
+      path: normalizeAuthorizedSkillDirectoryPath(path ?? this.path),
+      bookmark: bookmark ?? this.bookmark,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'path': path,
+      if (bookmark.trim().isNotEmpty) 'bookmark': bookmark,
+    };
+  }
+
+  factory AuthorizedSkillDirectory.fromJson(Map<String, dynamic> json) {
+    return AuthorizedSkillDirectory(
+      path: normalizeAuthorizedSkillDirectoryPath(
+        json['path']?.toString() ?? '',
+      ),
+      bookmark: json['bookmark']?.toString().trim() ?? '',
+    );
+  }
+}
+
+List<AuthorizedSkillDirectory> normalizeAuthorizedSkillDirectories({
+  Iterable<AuthorizedSkillDirectory>? directories,
+}) {
+  final incoming =
+      directories?.toList(growable: false) ??
+      const <AuthorizedSkillDirectory>[];
+  final normalized = <AuthorizedSkillDirectory>[];
+  final seen = <String>{};
+  for (final item in incoming) {
+    final path = normalizeAuthorizedSkillDirectoryPath(item.path);
+    if (path.isEmpty || !seen.add(path)) {
+      continue;
+    }
+    normalized.add(
+      AuthorizedSkillDirectory(path: path, bookmark: item.bookmark.trim()),
+    );
+  }
+  normalized.sort((left, right) => left.path.compareTo(right.path));
+  return List<AuthorizedSkillDirectory>.unmodifiable(normalized);
+}
+
 class AssistantThreadConnectionState {
   const AssistantThreadConnectionState({
     required this.executionTarget,
@@ -1306,6 +1365,7 @@ class SettingsSnapshot {
     required this.defaultProvider,
     required this.gatewayProfiles,
     required this.externalAcpEndpoints,
+    required this.authorizedSkillDirectories,
     required this.ollamaLocal,
     required this.ollamaCloud,
     required this.vault,
@@ -1341,6 +1401,7 @@ class SettingsSnapshot {
   final String defaultProvider;
   final List<GatewayConnectionProfile> gatewayProfiles;
   final List<ExternalAcpEndpointProfile> externalAcpEndpoints;
+  final List<AuthorizedSkillDirectory> authorizedSkillDirectories;
   final OllamaLocalConfig ollamaLocal;
   final OllamaCloudConfig ollamaCloud;
   final VaultConfig vault;
@@ -1377,6 +1438,7 @@ class SettingsSnapshot {
       defaultProvider: 'gateway',
       gatewayProfiles: normalizeGatewayProfiles(),
       externalAcpEndpoints: normalizeExternalAcpEndpoints(),
+      authorizedSkillDirectories: normalizeAuthorizedSkillDirectories(),
       ollamaLocal: OllamaLocalConfig.defaults(),
       ollamaCloud: OllamaCloudConfig.defaults(),
       vault: VaultConfig.defaults(),
@@ -1414,6 +1476,7 @@ class SettingsSnapshot {
     String? defaultProvider,
     List<GatewayConnectionProfile>? gatewayProfiles,
     List<ExternalAcpEndpointProfile>? externalAcpEndpoints,
+    List<AuthorizedSkillDirectory>? authorizedSkillDirectories,
     OllamaLocalConfig? ollamaLocal,
     OllamaCloudConfig? ollamaCloud,
     VaultConfig? vault,
@@ -1441,6 +1504,12 @@ class SettingsSnapshot {
     final resolvedExternalAcpEndpoints = externalAcpEndpoints != null
         ? normalizeExternalAcpEndpoints(profiles: externalAcpEndpoints)
         : this.externalAcpEndpoints;
+    final resolvedAuthorizedSkillDirectories =
+        authorizedSkillDirectories != null
+        ? normalizeAuthorizedSkillDirectories(
+            directories: authorizedSkillDirectories,
+          )
+        : this.authorizedSkillDirectories;
     return SettingsSnapshot(
       appLanguage: appLanguage ?? this.appLanguage,
       appActive: appActive ?? this.appActive,
@@ -1455,6 +1524,7 @@ class SettingsSnapshot {
       defaultProvider: defaultProvider ?? this.defaultProvider,
       gatewayProfiles: resolvedGatewayProfiles,
       externalAcpEndpoints: resolvedExternalAcpEndpoints,
+      authorizedSkillDirectories: resolvedAuthorizedSkillDirectories,
       ollamaLocal: ollamaLocal ?? this.ollamaLocal,
       ollamaCloud: ollamaCloud ?? this.ollamaCloud,
       vault: vault ?? this.vault,
@@ -1503,6 +1573,9 @@ class SettingsSnapshot {
           .map((item) => item.toJson())
           .toList(growable: false),
       'externalAcpEndpoints': externalAcpEndpoints
+          .map((item) => item.toJson())
+          .toList(growable: false),
+      'authorizedSkillDirectories': authorizedSkillDirectories
           .map((item) => item.toJson())
           .toList(growable: false),
       'ollamaLocal': ollamaLocal.toJson(),
@@ -1593,6 +1666,16 @@ class SettingsSnapshot {
             ),
           ),
     );
+    final authorizedSkillDirectories = normalizeAuthorizedSkillDirectories(
+      directories:
+          ((json['authorizedSkillDirectories'] as List?) ?? const <Object>[])
+              .whereType<Map>()
+              .map(
+                (item) => AuthorizedSkillDirectory.fromJson(
+                  item.cast<String, dynamic>(),
+                ),
+              ),
+    );
     return SettingsSnapshot(
       appLanguage: AppLanguageCopy.fromJsonValue(
         json['appLanguage'] as String?,
@@ -1622,6 +1705,7 @@ class SettingsSnapshot {
           SettingsSnapshot.defaults().defaultProvider,
       gatewayProfiles: gatewayProfiles,
       externalAcpEndpoints: externalAcpEndpoints,
+      authorizedSkillDirectories: authorizedSkillDirectories,
       ollamaLocal: OllamaLocalConfig.fromJson(
         (json['ollamaLocal'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),

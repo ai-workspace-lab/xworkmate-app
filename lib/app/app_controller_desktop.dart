@@ -31,6 +31,7 @@ import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/single_agent_runner.dart';
+import '../runtime/skill_directory_access.dart';
 
 enum CodexCooperationState { notStarted, bridgeOnly, registered }
 
@@ -39,11 +40,13 @@ class _SingleAgentSkillScanRoot {
     required this.path,
     required this.source,
     required this.scope,
+    this.bookmark = '',
   });
 
   final String path;
   final String source;
   final String scope;
+  final String bookmark;
 }
 
 const String _singleAgentLocalSkillsCacheRelativePath =
@@ -98,6 +101,7 @@ class AppController extends ChangeNotifier {
     RuntimeCoordinator? runtimeCoordinator,
     DesktopPlatformService? desktopPlatformService,
     UiFeatureManifest? uiFeatureManifest,
+    SkillDirectoryAccessService? skillDirectoryAccessService,
     List<String>? singleAgentLocalSkillScanRoots,
     List<SingleAgentProvider>? availableSingleAgentProvidersOverride,
     ArisBundleRepository? arisBundleRepository,
@@ -141,10 +145,10 @@ class AppController extends ChangeNotifier {
     _tasksController = DerivedTasksController();
     _desktopPlatformService =
         desktopPlatformService ?? createDesktopPlatformService();
-    _singleAgentLocalSkillScanRootOverrides =
-        (singleAgentLocalSkillScanRoots ??
-                (_isFlutterTestEnvironment ? const <String>[] : null))
-            ?.toList(growable: false);
+    _skillDirectoryAccessService =
+        skillDirectoryAccessService ?? createSkillDirectoryAccessService();
+    _singleAgentLocalSkillScanRootOverrides = singleAgentLocalSkillScanRoots
+        ?.toList(growable: false);
     _gatewayAcpClient = GatewayAcpClient(
       endpointResolver: _resolveGatewayAcpEndpoint,
     );
@@ -187,6 +191,7 @@ class AppController extends ChangeNotifier {
   late final DevicesController _devicesController;
   late final DerivedTasksController _tasksController;
   late final DesktopPlatformService _desktopPlatformService;
+  late final SkillDirectoryAccessService _skillDirectoryAccessService;
   late final List<String>? _singleAgentLocalSkillScanRootOverrides;
   late final GatewayAcpClient _gatewayAcpClient;
   late final DirectSingleAgentAppServerClient _singleAgentAppServerClient;
@@ -247,15 +252,17 @@ class AppController extends ChangeNotifier {
   String? _bootstrapError;
   StreamSubscription<GatewayPushEvent>? _runtimeEventsSubscription;
   bool _disposed = false;
-  static bool get _isFlutterTestEnvironment =>
-      Platform.environment.containsKey('FLUTTER_TEST');
+  SettingsSnapshot _lastObservedSettingsSnapshot = SettingsSnapshot.defaults();
   Future<void> _assistantThreadPersistQueue = Future<void>.value();
+  Future<void> _settingsObservationQueue = Future<void>.value();
 
   List<_SingleAgentSkillScanRoot> get _singleAgentGlobalSkillScanRoots =>
       (_singleAgentLocalSkillScanRootOverrides?.map(
         _singleAgentGlobalSkillScanRootFromOverride,
       ))?.toList(growable: false) ??
-      _defaultSingleAgentGlobalSkillScanRoots;
+      settings.authorizedSkillDirectories
+          .map(_singleAgentGlobalSkillScanRootFromAuthorizedDirectory)
+          .toList(growable: false);
 
   WorkspaceDestination get destination => _destination;
   UiFeatureManifest get uiFeatureManifest => _uiFeatureManifest;
@@ -317,6 +324,16 @@ class AppController extends ChangeNotifier {
   SettingsSnapshot get settings => _settingsController.snapshot;
   SettingsSnapshot get settingsDraft =>
       _settingsDraftInitialized ? _settingsDraft : settings;
+  bool get supportsSkillDirectoryAuthorization =>
+      _skillDirectoryAccessService.isSupported;
+  List<AuthorizedSkillDirectory> get authorizedSkillDirectories =>
+      settings.authorizedSkillDirectories;
+  List<String> get recommendedAuthorizedSkillDirectoryPaths =>
+      _defaultSingleAgentGlobalSkillScanRoots
+          .map((item) => item.path)
+          .toList(growable: false);
+  String get userHomeDirectory => Platform.environment['HOME']?.trim() ?? '';
+  String get settingsYamlPath => defaultUserSettingsFilePath() ?? '';
   bool get hasSettingsDraftChanges =>
       settingsDraft.toJsonString() != settings.toJsonString() ||
       _draftSecretValues.isNotEmpty;
@@ -2605,6 +2622,62 @@ class AppController extends ChangeNotifier {
     );
   }
 
+  Future<AuthorizedSkillDirectory?> authorizeSkillDirectory({
+    String suggestedPath = '',
+  }) {
+    return _skillDirectoryAccessService.authorizeDirectory(
+      suggestedPath: suggestedPath,
+    );
+  }
+
+  Future<void> saveAuthorizedSkillDirectories(
+    List<AuthorizedSkillDirectory> directories,
+  ) async {
+    if (_disposed) {
+      return;
+    }
+    final previous = settings;
+    final previousDraft = _settingsDraft;
+    final hadDraftChanges = hasSettingsDraftChanges;
+    final draftInitialized = _settingsDraftInitialized;
+    final pendingSettingsApply = _pendingSettingsApply;
+    final pendingGatewayApply = _pendingGatewayApply;
+    final pendingAiGatewayApply = _pendingAiGatewayApply;
+    await _persistSettingsSnapshot(
+      previous.copyWith(
+        authorizedSkillDirectories: normalizeAuthorizedSkillDirectories(
+          directories: directories,
+        ),
+      ),
+    );
+    if (_disposed) {
+      return;
+    }
+    await _applyPersistedSettingsSideEffects(
+      previous: previous,
+      current: settings,
+      refreshAfterSave: false,
+    );
+    _lastAppliedSettings = settings;
+    if (draftInitialized && hadDraftChanges) {
+      _settingsDraft = previousDraft.copyWith(
+        authorizedSkillDirectories: settings.authorizedSkillDirectories,
+      );
+      _settingsDraftInitialized = true;
+      _pendingSettingsApply = pendingSettingsApply;
+      _pendingGatewayApply = pendingGatewayApply;
+      _pendingAiGatewayApply = pendingAiGatewayApply;
+    } else {
+      _settingsDraft = settings;
+      _settingsDraftInitialized = true;
+      _pendingSettingsApply = false;
+      _pendingGatewayApply = false;
+      _pendingAiGatewayApply = false;
+      _settingsDraftStatusMessage = '';
+    }
+    notifyListeners();
+  }
+
   Future<void> toggleAssistantNavigationDestination(
     WorkspaceDestination destination,
   ) async {
@@ -2892,6 +2965,7 @@ class AppController extends ChangeNotifier {
           return;
         }
       }
+      _lastObservedSettingsSnapshot = settings;
       _modelsController.restoreFromSettings(settings.aiGateway);
       _multiAgentOrchestrator.updateConfig(settings.multiAgent);
       setActiveAppLanguage(settings.appLanguage);
@@ -2947,6 +3021,7 @@ class AppController extends ChangeNotifier {
       }
       _settingsDraft = settings;
       _lastAppliedSettings = settings;
+      _lastObservedSettingsSnapshot = settings;
       _settingsDraftInitialized = true;
       _settingsDraftStatusMessage = '';
     } catch (error) {
@@ -3069,12 +3144,29 @@ class AppController extends ChangeNotifier {
   static bool _isGatewayDraftKey(String key) =>
       key.startsWith('gateway_token_') || key.startsWith('gateway_password_');
 
+  bool _authorizedSkillDirectoriesChanged(
+    SettingsSnapshot previous,
+    SettingsSnapshot current,
+  ) {
+    return jsonEncode(
+          previous.authorizedSkillDirectories
+              .map((item) => item.toJson())
+              .toList(growable: false),
+        ) !=
+        jsonEncode(
+          current.authorizedSkillDirectories
+              .map((item) => item.toJson())
+              .toList(growable: false),
+        );
+  }
+
   Future<void> _persistSettingsSnapshot(SettingsSnapshot snapshot) async {
     final sanitized = _sanitizeFeatureFlagSettings(
       _sanitizeMultiAgentSettings(
         _sanitizeOllamaCloudSettings(_sanitizeCodeAgentSettings(snapshot)),
       ),
     );
+    _lastObservedSettingsSnapshot = sanitized;
     await _settingsController.saveSnapshot(sanitized);
     _settingsDraft = sanitized;
     _settingsDraftInitialized = true;
@@ -3112,6 +3204,16 @@ class AppController extends ChangeNotifier {
       await _desktopPlatformService.setLaunchAtLogin(current.launchAtLogin);
       if (_disposed) {
         return;
+      }
+    }
+    if (_authorizedSkillDirectoriesChanged(previous, current)) {
+      await _refreshSharedSingleAgentLocalSkillsCache(forceRescan: true);
+      if (_disposed) {
+        return;
+      }
+      if (assistantExecutionTargetForSession(currentSessionKey) ==
+          AssistantExecutionTarget.singleAgent) {
+        await refreshSingleAgentSkillsForSession(currentSessionKey);
       }
     }
     if (refreshAfterSave) {
@@ -4122,34 +4224,53 @@ class AppController extends ChangeNotifier {
   }) async {
     final dedupedByName = <String, AssistantThreadSkillEntry>{};
     for (final rootSpec in roots) {
-      final resolvedRootPath = _resolveSingleAgentSkillRootPath(
+      var resolvedRootPath = _resolveSingleAgentSkillRootPath(
         rootSpec.path,
         workspaceRef: workspaceRef,
       );
       if (resolvedRootPath.isEmpty) {
         continue;
       }
-      final root = Directory(resolvedRootPath);
-      if (!await root.exists()) {
-        continue;
-      }
-      await for (final entity in root.list(
-        recursive: true,
-        followLinks: false,
-      )) {
-        if (entity is! File || entity.uri.pathSegments.last != 'SKILL.md') {
+      SkillDirectoryAccessHandle? accessHandle;
+      try {
+        if (rootSpec.bookmark.trim().isNotEmpty) {
+          accessHandle = await _skillDirectoryAccessService.openDirectory(
+            AuthorizedSkillDirectory(
+              path: resolvedRootPath,
+              bookmark: rootSpec.bookmark,
+            ),
+          );
+          if (accessHandle == null) {
+            continue;
+          }
+          resolvedRootPath = normalizeAuthorizedSkillDirectoryPath(
+            accessHandle.path,
+          );
+        }
+        final root = Directory(resolvedRootPath);
+        if (!await root.exists()) {
           continue;
         }
-        final entry = await _skillEntryFromFile(
-          entity,
-          rootSpec,
-          resolvedRootPath,
-        );
-        final normalizedName = entry.label.trim().toLowerCase();
-        if (normalizedName.isEmpty) {
-          continue;
+        await for (final entity in root.list(
+          recursive: true,
+          followLinks: false,
+        )) {
+          if (entity is! File || entity.uri.pathSegments.last != 'SKILL.md') {
+            continue;
+          }
+          final entry = await _skillEntryFromFile(
+            entity,
+            rootSpec,
+            resolvedRootPath,
+          );
+          final normalizedName = entry.label.trim().toLowerCase();
+          if (normalizedName.isEmpty) {
+            continue;
+          }
+          dedupedByName[normalizedName] = entry;
         }
-        dedupedByName[normalizedName] = entry;
+      } finally {
+        await accessHandle?.close();
       }
     }
     final entries = dedupedByName.values.toList(growable: false);
@@ -4195,6 +4316,22 @@ class AppController extends ChangeNotifier {
       path: normalizedPath,
       source: _sourceForSkillRootPath(lowered),
       scope: normalizedPath.startsWith('/etc/') ? 'system' : 'user',
+    );
+  }
+
+  _SingleAgentSkillScanRoot
+  _singleAgentGlobalSkillScanRootFromAuthorizedDirectory(
+    AuthorizedSkillDirectory directory,
+  ) {
+    final normalizedPath = normalizeAuthorizedSkillDirectoryPath(
+      directory.path,
+    );
+    final lowered = normalizedPath.toLowerCase();
+    return _SingleAgentSkillScanRoot(
+      path: normalizedPath,
+      source: _sourceForSkillRootPath(lowered),
+      scope: normalizedPath.startsWith('/etc/') ? 'system' : 'user',
+      bookmark: directory.bookmark,
     );
   }
 
@@ -5223,7 +5360,7 @@ class AppController extends ChangeNotifier {
 
   void _attachChildListeners() {
     _runtimeCoordinator.addListener(_relayChildChange);
-    _settingsController.addListener(_relayChildChange);
+    _settingsController.addListener(_handleSettingsControllerChange);
     _agentsController.addListener(_relayChildChange);
     _sessionsController.addListener(_relayChildChange);
     _chatController.addListener(_relayChildChange);
@@ -5239,7 +5376,7 @@ class AppController extends ChangeNotifier {
 
   void _detachChildListeners() {
     _runtimeCoordinator.removeListener(_relayChildChange);
-    _settingsController.removeListener(_relayChildChange);
+    _settingsController.removeListener(_handleSettingsControllerChange);
     _agentsController.removeListener(_relayChildChange);
     _sessionsController.removeListener(_relayChildChange);
     _chatController.removeListener(_relayChildChange);
@@ -5251,6 +5388,66 @@ class AppController extends ChangeNotifier {
     _devicesController.removeListener(_relayChildChange);
     _tasksController.removeListener(_relayChildChange);
     _multiAgentOrchestrator.removeListener(_relayChildChange);
+  }
+
+  void _handleSettingsControllerChange() {
+    final previous = _lastObservedSettingsSnapshot;
+    final current = settings;
+    final previousJson = previous.toJsonString();
+    final currentJson = current.toJsonString();
+    if (currentJson == previousJson) {
+      _notifyIfActive();
+      return;
+    }
+    final hadDraftChanges =
+        _settingsDraftInitialized &&
+        (_settingsDraft.toJsonString() != previousJson ||
+            _draftSecretValues.isNotEmpty);
+    if (!_settingsDraftInitialized || !hadDraftChanges) {
+      _settingsDraft = current;
+      _settingsDraftInitialized = true;
+      _settingsDraftStatusMessage = '';
+    }
+    _lastObservedSettingsSnapshot = current;
+    _settingsObservationQueue = _settingsObservationQueue
+        .then((_) async {
+          await _handleObservedSettingsChange(
+            previous: previous,
+            current: current,
+          );
+        })
+        .catchError((_) {});
+    _notifyIfActive();
+  }
+
+  Future<void> _handleObservedSettingsChange({
+    required SettingsSnapshot previous,
+    required SettingsSnapshot current,
+  }) async {
+    if (_disposed) {
+      return;
+    }
+    setActiveAppLanguage(current.appLanguage);
+    _multiAgentOrchestrator.updateConfig(current.multiAgent);
+    if (previous.codexCliPath != current.codexCliPath ||
+        previous.codeAgentRuntimeMode != current.codeAgentRuntimeMode) {
+      await _refreshResolvedCodexCliPath();
+      _registerCodexExternalProvider();
+      if (_disposed) {
+        return;
+      }
+    }
+    if (_authorizedSkillDirectoriesChanged(previous, current)) {
+      await _refreshSharedSingleAgentLocalSkillsCache(forceRescan: true);
+      if (_disposed) {
+        return;
+      }
+      if (assistantExecutionTargetForSession(currentSessionKey) ==
+          AssistantExecutionTarget.singleAgent) {
+        await refreshSingleAgentSkillsForSession(currentSessionKey);
+      }
+    }
+    _notifyIfActive();
   }
 
   void _relayChildChange() {
