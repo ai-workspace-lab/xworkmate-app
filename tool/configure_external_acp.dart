@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:yaml/yaml.dart';
 
+const String _macosBundleIdentifier = 'plus.svc.xworkmate';
+
 const Map<String, String> _providerLabels = <String, String>{
   'codex': 'Codex',
   'opencode': 'OpenCode',
@@ -16,15 +18,6 @@ const Map<String, String> _defaultEndpoints = <String, String>{
   'gemini': 'ws://127.0.0.1:9012',
 };
 
-const Map<String, String> _defaultLaunchCommands = <String, String>{
-  'codex': 'codex app-server --listen ws://127.0.0.1:9001',
-  'opencode': 'opencode serve --port 4096',
-  'claude':
-      'npx -y supergateway --stdio "mcp-bridge" --outputTransport ws --port 9011 --messagePath /',
-  'gemini':
-      'npx -y supergateway --stdio "uvx gemini-bridge" --outputTransport ws --port 9012 --messagePath /',
-};
-
 void main(List<String> args) async {
   final options = _CliOptions.parse(args);
   if (options.showHelp) {
@@ -37,6 +30,7 @@ void main(List<String> args) async {
       _defaultSettingsFile(
         environment: Platform.environment,
         operatingSystem: Platform.operatingSystem,
+        scope: options.settingsScope,
       );
   final resolvedEndpoints = <String, String>{
     for (final entry in _defaultEndpoints.entries)
@@ -49,6 +43,7 @@ void main(List<String> args) async {
         settingsFile: settingsFile,
         endpoints: resolvedEndpoints,
         modeLabel: 'print-only',
+        settingsScope: options.settingsScope,
       ),
     );
     return;
@@ -82,6 +77,7 @@ void main(List<String> args) async {
       settingsFile: settingsFile,
       endpoints: resolvedEndpoints,
       modeLabel: 'applied',
+      settingsScope: options.settingsScope,
     ),
   );
 }
@@ -94,10 +90,11 @@ Usage:
 
 Commands:
   apply    Update XWorkmate settings.yaml externalAcpEndpoints.
-  print    Print the resolved endpoint plan and suggested launch commands.
+  print    Print the resolved endpoint plan.
 
 Options:
   --settings-file <path>     Override settings.yaml path.
+  --settings-scope <scope>   macOS only: auto | sandbox | user.
   --codex-endpoint <url>     Default: ${_defaultEndpoints['codex']}
   --opencode-endpoint <url>  Default: ${_defaultEndpoints['opencode']}
   --claude-endpoint <url>    Default: ${_defaultEndpoints['claude']}
@@ -113,11 +110,11 @@ Options:
 Notes:
   - This tool only updates the externalAcpEndpoints block and preserves all
     other settings keys.
-  - App Store-safe usage means running this tool outside the shipped app bundle
-    and keeping Codex/OpenCode/Supergateway/MCP bridge binaries outside the
-    bundle as user-managed prerequisites.
-  - Default macOS settings path:
-    ~/Library/Application Support/xworkmate/config/settings.yaml
+  - This is a pre-config tool. Starting external providers is out of scope.
+  - App Store-safe usage means running this tool outside the shipped app bundle.
+  - macOS path selection with --settings-scope auto:
+    ~/Library/Containers/$_macosBundleIdentifier/Data/Library/Application Support/xworkmate/config/settings.yaml
+    falls back to ~/Library/Application Support/xworkmate/config/settings.yaml
   - Default Linux settings path:
     ~/.config/xworkmate/config/settings.yaml
 ''';
@@ -127,32 +124,36 @@ String _renderPlan({
   required File settingsFile,
   required Map<String, String> endpoints,
   required String modeLabel,
+  required _SettingsScope settingsScope,
 }) {
   final buffer = StringBuffer()
     ..writeln()
     ..writeln('Settings file: ${settingsFile.path}')
     ..writeln('Mode: $modeLabel')
+    ..writeln('Settings scope: ${settingsScope.name}')
     ..writeln('Provider endpoint plan:');
 
   for (final provider in _providerLabels.keys) {
     buffer.writeln('- ${_providerLabels[provider]}: ${endpoints[provider]}');
-    buffer.writeln('  launch: ${_defaultLaunchCommands[provider]}');
   }
 
   buffer
     ..writeln()
-    ..writeln('Bridge notes:')
+    ..writeln('Scope notes:')
     ..writeln(
-      '- Codex is configured for native app-server WebSocket on port 9001.',
+      '- This tool configures endpoint slots only. Provider launch and bridge orchestration stay external to the app.',
     )
     ..writeln(
-      '- OpenCode is configured to the native HTTP server on port 4096.',
+      '- On macOS, auto scope prefers the App Sandbox container after the app has launched at least once.',
     )
     ..writeln(
-      '- Claude and Gemini are assigned local bridge slots; see docs/howto/external-acp-bridge-config.md for install and compatibility notes.',
+      '- App Store alignment: no external runtime binary is bundled or auto-started by this tool.',
     )
     ..writeln(
-      '- App Store alignment: all bridge binaries stay outside the app bundle and must be started manually after install.',
+      '- Claude and Gemini remain plain endpoint slots; this tool no longer prescribes any third-party bridge package.',
+    )
+    ..writeln(
+      '- Codex and OpenCode defaults are retained as local endpoint examples.',
     );
   return buffer.toString();
 }
@@ -227,12 +228,25 @@ Future<Map<String, dynamic>> _readExistingSettings(File settingsFile) async {
 File _defaultSettingsFile({
   required Map<String, String> environment,
   required String operatingSystem,
+  required _SettingsScope scope,
 }) {
   final home = environment['HOME']?.trim() ?? '';
   if (operatingSystem == 'macos' && home.isNotEmpty) {
-    return File(
+    final sandboxContainer = Directory(
+      '$home/Library/Containers/$_macosBundleIdentifier',
+    );
+    final sandboxed = File(
+      '${sandboxContainer.path}/Data/Library/Application Support/xworkmate/config/settings.yaml',
+    );
+    final userScoped = File(
       '$home/Library/Application Support/xworkmate/config/settings.yaml',
     );
+    return switch (scope) {
+      _SettingsScope.sandbox => sandboxed,
+      _SettingsScope.user => userScoped,
+      _SettingsScope.auto =>
+        sandboxContainer.existsSync() ? sandboxed : userScoped,
+    };
   }
   if (operatingSystem == 'linux' && home.isNotEmpty) {
     final xdgConfigHome = environment['XDG_CONFIG_HOME']?.trim() ?? '';
@@ -257,6 +271,8 @@ File _defaultSettingsFile({
 
 enum _Command { apply, printPlan }
 
+enum _SettingsScope { auto, sandbox, user }
+
 class _CliOptions {
   const _CliOptions({
     required this.command,
@@ -264,6 +280,7 @@ class _CliOptions {
     required this.dryRun,
     required this.backup,
     required this.settingsFile,
+    required this.settingsScope,
     required this.endpoints,
     required this.enableProviders,
   });
@@ -273,6 +290,7 @@ class _CliOptions {
   final bool dryRun;
   final bool backup;
   final File? settingsFile;
+  final _SettingsScope settingsScope;
   final Map<String, String> endpoints;
   final Map<String, bool> enableProviders;
 
@@ -284,6 +302,7 @@ class _CliOptions {
         dryRun: false,
         backup: true,
         settingsFile: null,
+        settingsScope: _SettingsScope.auto,
         endpoints: const <String, String>{},
         enableProviders: const <String, bool>{},
       );
@@ -305,6 +324,7 @@ class _CliOptions {
     var dryRun = false;
     var backup = true;
     File? settingsFile;
+    var settingsScope = _SettingsScope.auto;
     final endpoints = <String, String>{};
     final enableProviders = <String, bool>{};
 
@@ -321,6 +341,7 @@ class _CliOptions {
           dryRun: dryRun,
           backup: backup,
           settingsFile: settingsFile,
+          settingsScope: settingsScope,
           endpoints: endpoints,
           enableProviders: enableProviders,
         );
@@ -356,6 +377,13 @@ class _CliOptions {
         case '--settings-file':
           settingsFile = File(value);
           break;
+        case '--settings-scope':
+          settingsScope = switch (value.trim().toLowerCase()) {
+            'sandbox' => _SettingsScope.sandbox,
+            'user' => _SettingsScope.user,
+            _ => _SettingsScope.auto,
+          };
+          break;
         case '--codex-endpoint':
           endpoints['codex'] = value;
           break;
@@ -380,6 +408,7 @@ class _CliOptions {
       dryRun: dryRun,
       backup: backup,
       settingsFile: settingsFile,
+      settingsScope: settingsScope,
       endpoints: endpoints,
       enableProviders: enableProviders,
     );
