@@ -46,6 +46,9 @@ class _SingleAgentSkillScanRoot {
   final String scope;
 }
 
+const String _singleAgentLocalSkillsCacheRelativePath =
+    'cache/single-agent-local-skills.json';
+
 class AppController extends ChangeNotifier {
   static const List<_SingleAgentSkillScanRoot>
   _defaultGatewayOnlySkillScanRoots = <_SingleAgentSkillScanRoot>[
@@ -193,6 +196,7 @@ class AppController extends ChangeNotifier {
       DesktopThreadArtifactService();
   List<AssistantThreadSkillEntry> _singleAgentSharedImportedSkills =
       const <AssistantThreadSkillEntry>[];
+  bool _singleAgentLocalSkillsHydrated = false;
   final Map<String, HttpClient> _aiGatewayStreamingClients =
       <String, HttpClient>{};
   final Set<String> _aiGatewayPendingSessionKeys = <String>{};
@@ -481,7 +485,9 @@ class AppController extends ChangeNotifier {
       if (imported.isNotEmpty) {
         return imported;
       }
-      return _singleAgentSharedImportedSkills;
+      if (_singleAgentLocalSkillsHydrated) {
+        return _singleAgentSharedImportedSkills;
+      }
     }
     return imported;
   }
@@ -1814,7 +1820,7 @@ class AppController extends ChangeNotifier {
       persistDefaultSelection: false,
     );
     if (nextTarget == AssistantExecutionTarget.singleAgent) {
-      await refreshSingleAgentLocalSkillsForSession(nextSessionKey);
+      await refreshSingleAgentSkillsForSession(nextSessionKey);
     }
     _recomputeTasks();
   }
@@ -1921,7 +1927,7 @@ class AppController extends ChangeNotifier {
       persistDefaultSelection: true,
     );
     if (resolvedTarget == AssistantExecutionTarget.singleAgent) {
-      await refreshSingleAgentLocalSkillsForSession(
+      await refreshSingleAgentSkillsForSession(
         _sessionsController.currentSessionKey,
       );
     }
@@ -1948,7 +1954,7 @@ class AppController extends ChangeNotifier {
     _notifyIfActive();
     if (assistantExecutionTargetForSession(sessionKey) ==
         AssistantExecutionTarget.singleAgent) {
-      await refreshSingleAgentLocalSkillsForSession(sessionKey);
+      await refreshSingleAgentSkillsForSession(sessionKey);
     }
     unawaited(refreshMultiAgentMounts(sync: settings.multiAgent.autoSync));
   }
@@ -2129,7 +2135,7 @@ class AppController extends ChangeNotifier {
     _notifyIfActive();
   }
 
-  Future<void> refreshSingleAgentLocalSkillsForSession(
+  Future<void> refreshSingleAgentSkillsForSession(
     String sessionKey,
   ) async {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
@@ -2137,35 +2143,71 @@ class AppController extends ChangeNotifier {
         AssistantExecutionTarget.singleAgent) {
       return;
     }
-
-    final availableSkills = await _scanSingleAgentLocalSkillEntries();
-    _singleAgentSharedImportedSkills = availableSkills;
-    final importedKeys = availableSkills.map((item) => item.key).toSet();
-    final refreshTargets = <String>{
-      normalizedSessionKey,
-      for (final entry in _assistantThreadRecords.entries)
-        if (assistantExecutionTargetForSession(entry.key) ==
-            AssistantExecutionTarget.singleAgent)
-          entry.key,
-    };
-    final refreshedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
-    for (final targetSessionKey in refreshTargets) {
-      final existingSelected =
-          _assistantThreadRecords[targetSessionKey]?.selectedSkillKeys ??
-          const <String>[];
-      final nextSelected = existingSelected
-          .where(importedKeys.contains)
-          .toList(growable: false);
-      _upsertAssistantThreadRecord(
-        targetSessionKey,
-        importedSkills: availableSkills,
-        selectedSkillKeys: nextSelected,
-        updatedAtMs: targetSessionKey == normalizedSessionKey
-            ? refreshedAtMs
-            : _assistantThreadRecords[targetSessionKey]?.updatedAtMs,
+    await ensureSharedSingleAgentLocalSkillsLoaded();
+    final previousImported =
+        _assistantThreadRecords[normalizedSessionKey]?.importedSkills ??
+        const <AssistantThreadSkillEntry>[];
+    final provider =
+        singleAgentResolvedProviderForSession(normalizedSessionKey) ??
+        currentSingleAgentResolvedProvider;
+    if (provider == null) {
+      await _replaceSingleAgentThreadSkills(
+        normalizedSessionKey,
+        _singleAgentSharedImportedSkills,
       );
+      return;
     }
-    _notifyIfActive();
+    try {
+      await _refreshAcpCapabilities();
+      final response = await _gatewayAcpClient.request(
+        method: 'skills.status',
+        params: <String, dynamic>{
+          'sessionId': normalizedSessionKey,
+          'threadId': normalizedSessionKey,
+          'mode': 'single-agent',
+          'provider': provider.providerId,
+        },
+      );
+      final result = asMap(response['result']);
+      final payload = result.isNotEmpty ? result : response;
+      final skills = asList(payload['skills'])
+          .map(asMap)
+          .map((item) => _singleAgentSkillEntryFromAcp(item, provider))
+          .where((item) => item.key.isNotEmpty && item.label.isNotEmpty)
+          .toList(growable: false);
+      await _replaceSingleAgentThreadSkills(
+        normalizedSessionKey,
+        skills.isNotEmpty ? skills : _singleAgentSharedImportedSkills,
+      );
+    } on GatewayAcpException catch (error) {
+      if (_unsupportedAcpSkillsStatus(error)) {
+        await _replaceSingleAgentThreadSkills(
+          normalizedSessionKey,
+          _singleAgentSharedImportedSkills,
+        );
+        return;
+      }
+      if (previousImported.isEmpty) {
+        await _replaceSingleAgentThreadSkills(
+          normalizedSessionKey,
+          _singleAgentSharedImportedSkills,
+        );
+      }
+    } catch (_) {
+      if (previousImported.isEmpty) {
+        await _replaceSingleAgentThreadSkills(
+          normalizedSessionKey,
+          _singleAgentSharedImportedSkills,
+        );
+      }
+    }
+  }
+
+  Future<void> refreshSingleAgentLocalSkillsForSession(
+    String sessionKey,
+  ) async {
+    await _refreshSharedSingleAgentLocalSkillsCache(forceRescan: true);
+    await refreshSingleAgentSkillsForSession(sessionKey);
   }
 
   Future<void> toggleAssistantSkillForSession(
@@ -2776,6 +2818,7 @@ class AppController extends ChangeNotifier {
       return;
     }
     _disposed = true;
+    unawaited(_persistSharedSingleAgentLocalSkillsCache());
     _runtimeEventsSubscription?.cancel();
     _detachChildListeners();
     _runtimeCoordinator.dispose();
@@ -2801,6 +2844,7 @@ class AppController extends ChangeNotifier {
     try {
       await _settingsController.initialize();
       _restoreAssistantThreads(await _store.loadAssistantThreadRecords());
+      await _restoreSharedSingleAgentLocalSkillsCache();
       if (_disposed) {
         return;
       }
@@ -2861,7 +2905,7 @@ class AppController extends ChangeNotifier {
       await _restoreInitialAssistantSessionSelection();
       await _ensureActiveAssistantThread();
       if (isSingleAgentMode) {
-        await refreshSingleAgentLocalSkillsForSession(currentSessionKey);
+        await refreshSingleAgentSkillsForSession(currentSessionKey);
       }
       _runtimeEventsSubscription = _runtimeCoordinator.gateway.events.listen(
         _handleRuntimeEvent,
@@ -3078,7 +3122,7 @@ class AppController extends ChangeNotifier {
       persistDefaultSelection: false,
     );
     if (target == AssistantExecutionTarget.singleAgent) {
-      await refreshSingleAgentLocalSkillsForSession(sessionKey);
+      await refreshSingleAgentSkillsForSession(sessionKey);
     }
     _recomputeTasks();
     _notifyIfActive();
@@ -4210,6 +4254,7 @@ class AppController extends ChangeNotifier {
     _assistantThreadRecords.clear();
     _assistantThreadMessages.clear();
     _singleAgentSharedImportedSkills = const <AssistantThreadSkillEntry>[];
+    _singleAgentLocalSkillsHydrated = false;
     final archivedKeys = settings.assistantArchivedTaskKeys
         .map(_normalizedAssistantSessionKey)
         .toSet();
@@ -4259,13 +4304,128 @@ class AppController extends ChangeNotifier {
           normalizedRecord.messages,
         );
       }
-      if ((normalizedRecord.executionTarget ??
-                  settings.assistantExecutionTarget) ==
-              AssistantExecutionTarget.singleAgent &&
-          normalizedRecord.importedSkills.isNotEmpty) {
-        _singleAgentSharedImportedSkills = normalizedRecord.importedSkills;
-      }
     }
+  }
+
+  Future<void> ensureSharedSingleAgentLocalSkillsLoaded() async {
+    if (_singleAgentLocalSkillsHydrated) {
+      return;
+    }
+    await _refreshSharedSingleAgentLocalSkillsCache(forceRescan: false);
+  }
+
+  Future<void> _refreshSharedSingleAgentLocalSkillsCache({
+    required bool forceRescan,
+  }) async {
+    if (!forceRescan && _singleAgentLocalSkillsHydrated) {
+      return;
+    }
+    if (!forceRescan && await _restoreSharedSingleAgentLocalSkillsCache()) {
+      return;
+    }
+    final availableSkills = await _scanSingleAgentLocalSkillEntries();
+    _singleAgentSharedImportedSkills = availableSkills;
+    _singleAgentLocalSkillsHydrated = true;
+    await _persistSharedSingleAgentLocalSkillsCache();
+  }
+
+  Future<bool> _restoreSharedSingleAgentLocalSkillsCache() async {
+    try {
+      final payload = await _store.loadSupportJson(
+        _singleAgentLocalSkillsCacheRelativePath,
+      );
+      if (payload == null) {
+        return false;
+      }
+      final skills = asList(payload['skills'])
+          .map(asMap)
+          .map(
+            (item) => AssistantThreadSkillEntry.fromJson(
+              item.cast<String, dynamic>(),
+            ),
+          )
+          .where((item) => item.key.trim().isNotEmpty && item.label.isNotEmpty)
+          .toList(growable: false);
+      _singleAgentSharedImportedSkills = skills;
+      _singleAgentLocalSkillsHydrated = true;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _persistSharedSingleAgentLocalSkillsCache() async {
+    if (_singleAgentSharedImportedSkills.isEmpty) {
+      return;
+    }
+    try {
+      await _store.saveSupportJson(_singleAgentLocalSkillsCacheRelativePath, <
+        String,
+        dynamic
+      >{
+        'savedAtMs': DateTime.now().millisecondsSinceEpoch.toDouble(),
+        'skills': _singleAgentSharedImportedSkills
+            .map((item) => item.toJson())
+            .toList(growable: false),
+      });
+    } catch (_) {
+      // Best effort only for local cache persistence.
+    }
+  }
+
+  Future<void> _replaceSingleAgentThreadSkills(
+    String sessionKey,
+    List<AssistantThreadSkillEntry> importedSkills,
+  ) async {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final importedKeys = importedSkills.map((item) => item.key).toSet();
+    final nextSelected =
+        (_assistantThreadRecords[normalizedSessionKey]?.selectedSkillKeys ??
+                const <String>[])
+            .where(importedKeys.contains)
+            .toList(growable: false);
+    _upsertAssistantThreadRecord(
+      normalizedSessionKey,
+      importedSkills: importedSkills,
+      selectedSkillKeys: nextSelected,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    _notifyIfActive();
+  }
+
+  AssistantThreadSkillEntry _singleAgentSkillEntryFromAcp(
+    Map<String, dynamic> item,
+    SingleAgentProvider provider,
+  ) {
+    return AssistantThreadSkillEntry(
+      key: item['skillKey']?.toString().trim().isNotEmpty == true
+          ? item['skillKey'].toString().trim()
+          : (item['name']?.toString().trim() ?? ''),
+      label: item['name']?.toString().trim() ?? '',
+      description: item['description']?.toString().trim() ?? '',
+      source: item['source']?.toString().trim() ?? provider.providerId,
+      sourcePath: item['path']?.toString().trim() ?? '',
+      scope: item['scope']?.toString().trim().isNotEmpty == true
+          ? item['scope'].toString().trim()
+          : 'session',
+      sourceLabel:
+          item['sourceLabel']?.toString().trim().isNotEmpty == true
+          ? item['sourceLabel'].toString().trim()
+          : (item['source']?.toString().trim().isNotEmpty == true
+                ? item['source'].toString().trim()
+                : provider.label),
+    );
+  }
+
+  bool _unsupportedAcpSkillsStatus(GatewayAcpException error) {
+    final code = (error.code ?? '').trim();
+    if (code == '-32601' || code == 'METHOD_NOT_FOUND') {
+      return true;
+    }
+    final message = error.toString().toLowerCase();
+    return message.contains('unknown method') ||
+        message.contains('method not found') ||
+        message.contains('skills.status');
   }
 
   void _upsertAssistantThreadRecord(

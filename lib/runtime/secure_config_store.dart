@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 export 'file_store_support.dart';
 export 'secret_store.dart';
 export 'settings_store.dart';
@@ -21,6 +24,7 @@ class SecureConfigStore {
       secretRootPathResolver: fallbackDirectoryPathResolver,
       supportRootPathResolver: defaultSupportDirectoryPathResolver,
     );
+    _layoutResolver = layoutResolver;
     _secretStore = SecretStore(
       fallbackDirectoryPathResolver: fallbackDirectoryPathResolver,
       databasePathResolver: databasePathResolver,
@@ -40,6 +44,7 @@ class SecureConfigStore {
 
   late final SecretStore _secretStore;
   late final SettingsStore _settingsStore;
+  late final StoreLayoutResolver _layoutResolver;
 
   Future<void> initialize() async {
     await _secretStore.initialize();
@@ -72,6 +77,36 @@ class SecureConfigStore {
 
   Future<void> appendAudit(SecretAuditEntry entry) {
     return _settingsStore.appendAudit(entry);
+  }
+
+  Future<Map<String, dynamic>?> loadSupportJson(String relativePath) async {
+    final file = await supportFile(relativePath);
+    if (file == null || !await file.exists()) {
+      return null;
+    }
+    final raw = await file.readAsString();
+    final decoded = jsonDecode(raw);
+    return decoded is Map<String, dynamic> ? decoded : null;
+  }
+
+  Future<void> saveSupportJson(
+    String relativePath,
+    Map<String, dynamic> payload,
+  ) async {
+    final file = await supportFile(relativePath);
+    if (file == null) {
+      return;
+    }
+    await atomicWriteString(file, jsonEncode(payload), ownerOnly: true);
+  }
+
+  Future<File?> supportFile(String relativePath) async {
+    final normalized = relativePath.trim();
+    if (normalized.isEmpty) {
+      return null;
+    }
+    final layout = await _layoutResolver.resolve();
+    return File('${layout.rootDirectory.path}/$normalized');
   }
 
   Future<Map<String, String>> loadSecureRefs() {
