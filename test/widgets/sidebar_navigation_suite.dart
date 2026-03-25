@@ -25,6 +25,7 @@ void main() {
             onToggleLanguage: () {},
             onCycleSidebarState: () {},
             onExpandFromCollapsed: () {},
+            onOpenHome: () {},
             onOpenAccount: () {},
             onOpenThemeToggle: () {},
             accountName: 'Tester',
@@ -64,6 +65,7 @@ void main() {
             onToggleLanguage: () => languageToggled++,
             onCycleSidebarState: () => sidebarCycled++,
             onExpandFromCollapsed: () {},
+            onOpenHome: () {},
             onOpenAccount: () => accountOpened++,
             onOpenThemeToggle: () => themeToggled++,
             accountName: 'Tester',
@@ -111,4 +113,45 @@ void main() {
     await tester.pumpAndSettle();
     expect(accountOpened, 1);
   });
+
+  testWidgets(
+    'SidebarNavigation shows app home shortcut copy on settings page',
+    (WidgetTester tester) async {
+      var selected = WorkspaceDestination.settings;
+      var homeOpened = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: SidebarNavigation(
+              currentSection: selected,
+              sidebarState: AppSidebarState.expanded,
+              appLanguage: AppLanguage.zh,
+              themeMode: ThemeMode.light,
+              onSectionChanged: (value) => selected = value,
+              onToggleLanguage: () {},
+              onCycleSidebarState: () {},
+              onExpandFromCollapsed: () {},
+              onOpenHome: () => homeOpened++,
+              onOpenAccount: () {},
+              onOpenThemeToggle: () {},
+              accountName: 'Tester',
+              accountSubtitle: 'Workspace',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('回到 APP首页'), findsOneWidget);
+      expect(find.text('新对话'), findsNothing);
+
+      await tester.tap(find.text('回到 APP首页'));
+      await tester.pumpAndSettle();
+
+      expect(homeOpened, 1);
+      expect(selected, WorkspaceDestination.settings);
+    },
+  );
 }

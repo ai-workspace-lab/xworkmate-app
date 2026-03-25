@@ -60,17 +60,18 @@ class _AppShellState extends State<AppShell> {
       animation: widget.controller,
       builder: (context, _) {
         final controller = widget.controller;
-        final availableDestinations = <WorkspaceDestination>[
-          WorkspaceDestination.assistant,
-          WorkspaceDestination.tasks,
-          WorkspaceDestination.skills,
-          WorkspaceDestination.nodes,
-          WorkspaceDestination.secrets,
-          WorkspaceDestination.aiGateway,
-          WorkspaceDestination.settings,
-        ].where(controller.capabilities.supportsDestination).toList(
-          growable: false,
-        );
+        final availableDestinations =
+            <WorkspaceDestination>[
+                  WorkspaceDestination.assistant,
+                  WorkspaceDestination.tasks,
+                  WorkspaceDestination.skills,
+                  WorkspaceDestination.nodes,
+                  WorkspaceDestination.secrets,
+                  WorkspaceDestination.aiGateway,
+                  WorkspaceDestination.settings,
+                ]
+                .where(controller.capabilities.supportsDestination)
+                .toList(growable: false);
         final currentDestination =
             availableDestinations.contains(controller.destination)
             ? controller.destination
@@ -95,17 +96,17 @@ class _AppShellState extends State<AppShell> {
                 );
 
                 if (isMobile) {
-                  final mobileDestinations = <WorkspaceDestination>[
-                    WorkspaceDestination.assistant,
-                    WorkspaceDestination.tasks,
-                    WorkspaceDestination.skills,
-                    WorkspaceDestination.settings,
-                  ].where(controller.capabilities.supportsDestination).toList(
-                    growable: false,
-                  );
-                  final selectedIndex = mobileDestinations.contains(
-                    currentDestination,
-                  )
+                  final mobileDestinations =
+                      <WorkspaceDestination>[
+                            WorkspaceDestination.assistant,
+                            WorkspaceDestination.tasks,
+                            WorkspaceDestination.skills,
+                            WorkspaceDestination.settings,
+                          ]
+                          .where(controller.capabilities.supportsDestination)
+                          .toList(growable: false);
+                  final selectedIndex =
+                      mobileDestinations.contains(currentDestination)
                       ? mobileDestinations.indexOf(currentDestination)
                       : 0;
                   return Column(
@@ -159,18 +160,21 @@ class _AppShellState extends State<AppShell> {
                             _sidebarState = AppSidebarState.expanded;
                           });
                         },
+                        onOpenHome: controller.navigateHome,
                         onOpenAccount: () {},
                         onOpenThemeToggle: () => controller.setThemeMode(
                           controller.themeMode == ThemeMode.dark
                               ? ThemeMode.light
                               : ThemeMode.dark,
                         ),
-                        accountName: controller.settings.accountUsername
+                        accountName:
+                            controller.settings.accountUsername
                                 .trim()
                                 .isNotEmpty
                             ? controller.settings.accountUsername
                             : appText('Web 操作员', 'Web operator'),
-                        accountSubtitle: controller.settings.accountWorkspace
+                        accountSubtitle:
+                            controller.settings.accountWorkspace
                                 .trim()
                                 .isNotEmpty
                             ? controller.settings.accountWorkspace
@@ -184,7 +188,8 @@ class _AppShellState extends State<AppShell> {
                             .toSet(),
                         onToggleFavorite:
                             controller.toggleAssistantNavigationDestination,
-                        availableDestinations: controller.capabilities.allowedDestinations,
+                        availableDestinations:
+                            controller.capabilities.allowedDestinations,
                       ),
                     if (showWorkspaceSidebar &&
                         _sidebarState == AppSidebarState.expanded)
@@ -226,7 +231,9 @@ class _AppShellState extends State<AppShell> {
       WorkspaceDestination.skills => WebSkillsPage(controller: controller),
       WorkspaceDestination.nodes => WebNodesPage(controller: controller),
       WorkspaceDestination.secrets => WebSecretsPage(controller: controller),
-      WorkspaceDestination.aiGateway => WebAiGatewayPage(controller: controller),
+      WorkspaceDestination.aiGateway => WebAiGatewayPage(
+        controller: controller,
+      ),
       WorkspaceDestination.settings => WebSettingsPage(controller: controller),
       _ => WebAssistantPage(controller: controller),
     };
@@ -248,10 +255,7 @@ class _WebShellBody extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              palette.chromeBackground,
-              palette.canvas,
-            ],
+            colors: [palette.chromeBackground, palette.canvas],
             stops: const [0.0, 0.68],
           ),
         ),
