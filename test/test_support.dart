@@ -29,7 +29,6 @@ Future<AppController> createTestController(
   WidgetTester tester, {
   DesktopPlatformService? desktopPlatformService,
   UiFeatureManifest? uiFeatureManifest,
-  List<String>? singleAgentLocalSkillScanRoots,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   final testRoot =
@@ -42,7 +41,6 @@ Future<AppController> createTestController(
     ),
     desktopPlatformService: desktopPlatformService,
     uiFeatureManifest: uiFeatureManifest,
-    singleAgentLocalSkillScanRoots: singleAgentLocalSkillScanRoots,
   );
   addTearDown(controller.dispose);
   await tester.pump(const Duration(milliseconds: 100));
