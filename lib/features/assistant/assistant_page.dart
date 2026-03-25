@@ -21,6 +21,7 @@ import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/assistant_focus_panel.dart';
+import '../../widgets/assistant_artifact_sidebar.dart';
 import '../../widgets/desktop_workspace_scaffold.dart';
 import '../../widgets/pane_resize_handle.dart';
 import '../../widgets/surface_card.dart';
@@ -31,6 +32,8 @@ const double _assistantWorkspaceMinLowerPaneHeight = 124;
 const double _assistantHorizontalResizeHandleWidth = 6;
 const double _assistantHorizontalPaneGap = 2;
 const double _assistantVerticalResizeHandleHeight = 10;
+const double _assistantArtifactPaneMinWidth = 280;
+const double _assistantArtifactPaneDefaultWidth = 360;
 
 typedef AssistantClipboardImageReader = Future<XFile?> Function();
 
@@ -85,6 +88,8 @@ class _AssistantPageState extends State<AssistantPage> {
   List<String> _lastSubmittedAttachments = const <String>[];
   double _composerInputHeight = _assistantComposerDefaultInputHeight;
   double _workspaceLowerPaneHeightAdjustment = 0;
+  bool _artifactPaneCollapsed = true;
+  double _artifactPaneWidth = _assistantArtifactPaneDefaultWidth;
 
   @override
   void initState() {
@@ -162,8 +167,13 @@ class _AssistantPageState extends State<AssistantPage> {
                 timelineItems: timelineItems,
                 currentTask: currentTask,
               );
+              final workspaceWithArtifacts = _buildWorkspaceWithArtifacts(
+                controller: controller,
+                currentTask: currentTask,
+                child: mainWorkspace,
+              );
               if (!showThreadRail && !showUnifiedSidePane) {
-                return mainWorkspace;
+                return workspaceWithArtifacts;
               }
 
               final maxThreadRailWidth = _resolveMaxSidePaneWidth(
@@ -317,7 +327,7 @@ class _AssistantPageState extends State<AssistantPage> {
                         ),
                       ),
                     const SizedBox(width: _assistantHorizontalPaneGap),
-                    Expanded(child: mainWorkspace),
+                    Expanded(child: workspaceWithArtifacts),
                   ],
                 );
               }
@@ -367,7 +377,7 @@ class _AssistantPageState extends State<AssistantPage> {
                     ),
                   ),
                   const SizedBox(width: _assistantHorizontalPaneGap),
-                  Expanded(child: mainWorkspace),
+                  Expanded(child: workspaceWithArtifacts),
                 ],
               );
             },
@@ -525,6 +535,86 @@ class _AssistantPageState extends State<AssistantPage> {
                 onSend: _submitPrompt,
               ),
             ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildWorkspaceWithArtifacts({
+    required AppController controller,
+    required _AssistantTaskEntry currentTask,
+    required Widget child,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxPaneWidth = math.min(
+          560.0,
+          math.max(_assistantArtifactPaneMinWidth, constraints.maxWidth * 0.48),
+        );
+        final paneWidth = _artifactPaneWidth
+            .clamp(_assistantArtifactPaneMinWidth, maxPaneWidth)
+            .toDouble();
+        final panel = Row(
+          children: [
+            Expanded(child: child),
+            if (!_artifactPaneCollapsed) ...[
+              SizedBox(
+                key: const Key('assistant-artifact-pane-resize-handle'),
+                width: _assistantHorizontalResizeHandleWidth,
+                child: PaneResizeHandle(
+                  axis: Axis.horizontal,
+                  onDelta: (delta) {
+                    setState(() {
+                      _artifactPaneWidth = (_artifactPaneWidth - delta)
+                          .clamp(_assistantArtifactPaneMinWidth, maxPaneWidth)
+                          .toDouble();
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: _assistantHorizontalPaneGap),
+              SizedBox(
+                width: paneWidth,
+                child: AssistantArtifactSidebar(
+                  sessionKey: controller.currentSessionKey,
+                  threadTitle: currentTask.title,
+                  workspaceRef: controller.assistantWorkspaceRefForSession(
+                    controller.currentSessionKey,
+                  ),
+                  workspaceRefKind: controller
+                      .assistantWorkspaceRefKindForSession(
+                        controller.currentSessionKey,
+                      ),
+                  onCollapse: () {
+                    setState(() {
+                      _artifactPaneCollapsed = true;
+                    });
+                  },
+                  loadSnapshot: () =>
+                      controller.loadAssistantArtifactSnapshot(),
+                  loadPreview: (entry) =>
+                      controller.loadAssistantArtifactPreview(entry),
+                ),
+              ),
+            ],
+          ],
+        );
+        return Stack(
+          children: [
+            Positioned.fill(child: panel),
+            if (_artifactPaneCollapsed)
+              Positioned(
+                right: AppSpacing.sm,
+                top: math.max(AppSpacing.lg, (constraints.maxHeight - 56) / 2),
+                child: AssistantArtifactSidebarRevealButton(
+                  onTap: () {
+                    setState(() {
+                      _artifactPaneCollapsed = false;
+                    });
+                  },
+                ),
+              ),
           ],
         );
       },

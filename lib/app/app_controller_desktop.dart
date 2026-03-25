@@ -25,6 +25,8 @@ import '../runtime/gateway_acp_client.dart';
 import '../runtime/codex_runtime.dart';
 import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
+import '../runtime/assistant_artifacts.dart';
+import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
@@ -187,6 +189,8 @@ class AppController extends ChangeNotifier {
       <String, String>{};
   final Map<String, String> _singleAgentRuntimeModelBySession =
       <String, String>{};
+  final DesktopThreadArtifactService _threadArtifactService =
+      DesktopThreadArtifactService();
   List<AssistantThreadSkillEntry> _singleAgentSharedImportedSkills =
       const <AssistantThreadSkillEntry>[];
   final Map<String, HttpClient> _aiGatewayStreamingClients =
@@ -542,6 +546,54 @@ class AppController extends ChangeNotifier {
       return recordModel;
     }
     return _resolvedAssistantModelForTarget(target);
+  }
+
+  String assistantWorkspaceRefForSession(String sessionKey) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final recordRef =
+        _assistantThreadRecords[normalizedSessionKey]?.workspaceRef.trim() ??
+        '';
+    if (recordRef.isNotEmpty) {
+      return recordRef;
+    }
+    return _defaultWorkspaceRefForSession(normalizedSessionKey);
+  }
+
+  WorkspaceRefKind assistantWorkspaceRefKindForSession(String sessionKey) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final record = _assistantThreadRecords[normalizedSessionKey];
+    if (record != null && record.workspaceRef.trim().isNotEmpty) {
+      return record.workspaceRefKind;
+    }
+    return _defaultWorkspaceRefKindForTarget(
+      assistantExecutionTargetForSession(normalizedSessionKey),
+    );
+  }
+
+  Future<AssistantArtifactSnapshot> loadAssistantArtifactSnapshot({
+    String? sessionKey,
+  }) {
+    final resolvedSessionKey = _normalizedAssistantSessionKey(
+      sessionKey ?? currentSessionKey,
+    );
+    return _threadArtifactService.loadSnapshot(
+      workspaceRef: assistantWorkspaceRefForSession(resolvedSessionKey),
+      workspaceRefKind: assistantWorkspaceRefKindForSession(resolvedSessionKey),
+    );
+  }
+
+  Future<AssistantArtifactPreview> loadAssistantArtifactPreview(
+    AssistantArtifactEntry entry, {
+    String? sessionKey,
+  }) {
+    final resolvedSessionKey = _normalizedAssistantSessionKey(
+      sessionKey ?? currentSessionKey,
+    );
+    return _threadArtifactService.loadPreview(
+      entry: entry,
+      workspaceRef: assistantWorkspaceRefForSession(resolvedSessionKey),
+      workspaceRefKind: assistantWorkspaceRefKindForSession(resolvedSessionKey),
+    );
   }
 
   SingleAgentProvider singleAgentProviderForSession(String sessionKey) {
@@ -1139,6 +1191,55 @@ class AppController extends ChangeNotifier {
         AssistantMessageViewMode.rendered;
   }
 
+  String _defaultWorkspaceRefForSession(String sessionKey) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final target = assistantExecutionTargetForSession(normalizedSessionKey);
+    return switch (target) {
+      AssistantExecutionTarget.remote => settings.remoteProjectRoot.trim(),
+      AssistantExecutionTarget.local ||
+      AssistantExecutionTarget.singleAgent => settings.workspacePath.trim(),
+    };
+  }
+
+  WorkspaceRefKind _defaultWorkspaceRefKindForTarget(
+    AssistantExecutionTarget target,
+  ) {
+    return switch (target) {
+      AssistantExecutionTarget.remote => WorkspaceRefKind.remotePath,
+      AssistantExecutionTarget.local ||
+      AssistantExecutionTarget.singleAgent => WorkspaceRefKind.localPath,
+    };
+  }
+
+  void _syncAssistantWorkspaceRefForSession(
+    String sessionKey, {
+    AssistantExecutionTarget? executionTarget,
+  }) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final resolvedTarget =
+        executionTarget ??
+        assistantExecutionTargetForSession(normalizedSessionKey);
+    final nextWorkspaceRef = _defaultWorkspaceRefForSession(
+      normalizedSessionKey,
+    );
+    final nextWorkspaceRefKind = _defaultWorkspaceRefKindForTarget(
+      resolvedTarget,
+    );
+    final existing = _assistantThreadRecords[normalizedSessionKey];
+    if (existing != null &&
+        existing.workspaceRef == nextWorkspaceRef &&
+        existing.workspaceRefKind == nextWorkspaceRefKind) {
+      return;
+    }
+    _upsertAssistantThreadRecord(
+      normalizedSessionKey,
+      executionTarget: resolvedTarget,
+      workspaceRef: nextWorkspaceRef,
+      workspaceRefKind: nextWorkspaceRefKind,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+  }
+
   List<GatewaySessionSummary> _assistantSessions() {
     final archivedKeys = settings.assistantArchivedTaskKeys
         .map(_normalizedAssistantSessionKey)
@@ -1704,6 +1805,8 @@ class AppController extends ChangeNotifier {
       executionTarget: nextTarget,
       messageViewMode: nextViewMode,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      workspaceRef: _defaultWorkspaceRefForSession(nextSessionKey),
+      workspaceRefKind: _defaultWorkspaceRefKindForTarget(nextTarget),
     );
     await _applyAssistantExecutionTarget(
       nextTarget,
@@ -1725,6 +1828,7 @@ class AppController extends ChangeNotifier {
         const <CollaborationAttachment>[],
     List<String> selectedSkillLabels = const <String>[],
   }) async {
+    _syncAssistantWorkspaceRefForSession(_sessionsController.currentSessionKey);
     if (isSingleAgentMode) {
       await _sendSingleAgentMessage(
         message,
@@ -1802,6 +1906,12 @@ class AppController extends ChangeNotifier {
       _sessionsController.currentSessionKey,
       executionTarget: resolvedTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      workspaceRef: switch (resolvedTarget) {
+        AssistantExecutionTarget.remote => settings.remoteProjectRoot.trim(),
+        AssistantExecutionTarget.local ||
+        AssistantExecutionTarget.singleAgent => settings.workspacePath.trim(),
+      },
+      workspaceRefKind: _defaultWorkspaceRefKindForTarget(resolvedTarget),
     );
     _recomputeTasks();
     _notifyIfActive();
@@ -1994,18 +2104,25 @@ class AppController extends ChangeNotifier {
     SingleAgentProvider? singleAgentProvider,
   }) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final resolvedTarget =
+        executionTarget ??
+        assistantExecutionTargetForSession(currentSessionKey);
     _upsertAssistantThreadRecord(
       normalizedSessionKey,
       title: title.trim(),
-      executionTarget:
-          executionTarget ??
-          assistantExecutionTargetForSession(currentSessionKey),
+      executionTarget: resolvedTarget,
       messageViewMode:
           messageViewMode ??
           assistantMessageViewModeForSession(currentSessionKey),
       singleAgentProvider:
           singleAgentProvider ??
           singleAgentProviderForSession(currentSessionKey),
+      workspaceRef: switch (resolvedTarget) {
+        AssistantExecutionTarget.remote => settings.remoteProjectRoot.trim(),
+        AssistantExecutionTarget.local ||
+        AssistantExecutionTarget.singleAgent => settings.workspacePath.trim(),
+      },
+      workspaceRefKind: _defaultWorkspaceRefKindForTarget(resolvedTarget),
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     unawaited(_persistAssistantLastSessionKey(normalizedSessionKey));
@@ -4127,6 +4244,14 @@ class AppController extends ChangeNotifier {
                 record.executionTarget ?? settings.assistantExecutionTarget,
               )
             : record.gatewayEntryState,
+        workspaceRef: record.workspaceRef.trim().isEmpty
+            ? _defaultWorkspaceRefForSession(sessionKey)
+            : record.workspaceRef.trim(),
+        workspaceRefKind: record.workspaceRef.trim().isEmpty
+            ? _defaultWorkspaceRefKindForTarget(
+                record.executionTarget ?? settings.assistantExecutionTarget,
+              )
+            : record.workspaceRefKind,
       );
       _assistantThreadRecords[sessionKey] = normalizedRecord;
       if (normalizedRecord.messages.isNotEmpty) {
@@ -4156,6 +4281,8 @@ class AppController extends ChangeNotifier {
     String? assistantModelId,
     SingleAgentProvider? singleAgentProvider,
     String? gatewayEntryState,
+    String? workspaceRef,
+    WorkspaceRefKind? workspaceRefKind,
   }) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
     final existing = _assistantThreadRecords[normalizedSessionKey];
@@ -4208,6 +4335,11 @@ class AppController extends ChangeNotifier {
           gatewayEntryState ??
           existing?.gatewayEntryState ??
           _gatewayEntryStateForTarget(nextExecutionTarget),
+      workspaceRef: workspaceRef ?? existing?.workspaceRef ?? '',
+      workspaceRefKind:
+          workspaceRefKind ??
+          existing?.workspaceRefKind ??
+          _defaultWorkspaceRefKindForTarget(nextExecutionTarget),
     );
     _assistantThreadRecords[normalizedSessionKey] = nextRecord;
     if (messages != null) {

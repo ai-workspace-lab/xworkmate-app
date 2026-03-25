@@ -282,6 +282,17 @@ extension AssistantMessageViewModeCopy on AssistantMessageViewMode {
   }
 }
 
+enum WorkspaceRefKind { localPath, remotePath, objectStore }
+
+extension WorkspaceRefKindCopy on WorkspaceRefKind {
+  static WorkspaceRefKind fromJsonValue(String? value) {
+    return WorkspaceRefKind.values.firstWhere(
+      (item) => item.name == value,
+      orElse: () => WorkspaceRefKind.localPath,
+    );
+  }
+}
+
 enum AssistantPermissionLevel { defaultAccess, fullAccess }
 
 extension AssistantPermissionLevelCopy on AssistantPermissionLevel {
@@ -2187,6 +2198,8 @@ class AssistantThreadRecord {
     this.assistantModelId = '',
     this.singleAgentProvider = SingleAgentProvider.auto,
     this.gatewayEntryState,
+    this.workspaceRef = '',
+    this.workspaceRefKind = WorkspaceRefKind.localPath,
   });
 
   final String sessionKey;
@@ -2201,6 +2214,8 @@ class AssistantThreadRecord {
   final String assistantModelId;
   final SingleAgentProvider singleAgentProvider;
   final String? gatewayEntryState;
+  final String workspaceRef;
+  final WorkspaceRefKind workspaceRefKind;
 
   AssistantThreadRecord copyWith({
     String? sessionKey,
@@ -2217,6 +2232,8 @@ class AssistantThreadRecord {
     SingleAgentProvider? singleAgentProvider,
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
+    String? workspaceRef,
+    WorkspaceRefKind? workspaceRefKind,
   }) {
     return AssistantThreadRecord(
       sessionKey: sessionKey ?? this.sessionKey,
@@ -2235,6 +2252,8 @@ class AssistantThreadRecord {
       gatewayEntryState: clearGatewayEntryState
           ? null
           : (gatewayEntryState ?? this.gatewayEntryState),
+      workspaceRef: workspaceRef ?? this.workspaceRef,
+      workspaceRefKind: workspaceRefKind ?? this.workspaceRefKind,
     );
   }
 
@@ -2254,6 +2273,8 @@ class AssistantThreadRecord {
       'assistantModelId': assistantModelId,
       'singleAgentProvider': singleAgentProvider.providerId,
       'gatewayEntryState': gatewayEntryState,
+      'workspaceRef': workspaceRef,
+      'workspaceRefKind': workspaceRefKind.name,
     };
   }
 
@@ -2321,9 +2342,34 @@ class AssistantThreadRecord {
       return normalized;
     }
 
+    WorkspaceRefKind normalizeWorkspaceRefKind(
+      Object? value, {
+      required AssistantExecutionTarget? executionTarget,
+      required String workspaceRef,
+    }) {
+      final raw = value?.toString().trim();
+      if (raw != null && raw.isNotEmpty) {
+        return WorkspaceRefKindCopy.fromJsonValue(raw);
+      }
+      if (workspaceRef.startsWith('object://')) {
+        return WorkspaceRefKind.objectStore;
+      }
+      if (executionTarget == AssistantExecutionTarget.remote) {
+        return WorkspaceRefKind.remotePath;
+      }
+      return WorkspaceRefKind.localPath;
+    }
+
     // Keep tolerating legacy payloads that still contain discoveredSkills,
     // but do not map the retired field back into the runtime model.
     normalizeSkillEntries(json['discoveredSkills']);
+
+    final executionTarget = json['executionTarget'] == null
+        ? null
+        : AssistantExecutionTargetCopy.fromJsonValue(
+            json['executionTarget']?.toString(),
+          );
+    final workspaceRef = json['workspaceRef']?.toString() ?? '';
 
     return AssistantThreadRecord(
       sessionKey: json['sessionKey']?.toString() ?? '',
@@ -2331,11 +2377,7 @@ class AssistantThreadRecord {
       updatedAtMs: asDouble(json['updatedAtMs']),
       title: json['title']?.toString() ?? '',
       archived: json['archived'] as bool? ?? false,
-      executionTarget: json['executionTarget'] == null
-          ? null
-          : AssistantExecutionTargetCopy.fromJsonValue(
-              json['executionTarget']?.toString(),
-            ),
+      executionTarget: executionTarget,
       messageViewMode: AssistantMessageViewModeCopy.fromJsonValue(
         json['messageViewMode']?.toString(),
       ),
@@ -2346,6 +2388,12 @@ class AssistantThreadRecord {
         json['singleAgentProvider']?.toString(),
       ),
       gatewayEntryState: normalizeGatewayEntryState(json['gatewayEntryState']),
+      workspaceRef: workspaceRef,
+      workspaceRefKind: normalizeWorkspaceRefKind(
+        json['workspaceRefKind'],
+        executionTarget: executionTarget,
+        workspaceRef: workspaceRef,
+      ),
     );
   }
 }

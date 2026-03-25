@@ -92,6 +92,14 @@ void main() {
         AssistantExecutionTarget.singleAgent,
       );
       expect(
+        controller.assistantWorkspaceRefForSession(threadSingle),
+        'object://thread/$threadSingle',
+      );
+      expect(
+        controller.assistantWorkspaceRefKindForSession(threadSingle),
+        WorkspaceRefKind.objectStore,
+      );
+      expect(
         controller.singleAgentProviderForSession(threadSingle),
         SingleAgentProvider.codex,
       );
@@ -102,6 +110,14 @@ void main() {
       expect(controller.assistantModelForSession(threadSingle), 'single-model');
 
       expect(controller.assistantModelForSession(threadLocal), 'local-model');
+      expect(
+        controller.assistantWorkspaceRefForSession(threadLocal),
+        'object://thread/$threadLocal',
+      );
+      expect(
+        controller.assistantWorkspaceRefKindForSession(threadLocal),
+        WorkspaceRefKind.objectStore,
+      );
 
       expect(controller.isAssistantTaskArchived(threadRemote), isTrue);
       expect(
@@ -125,6 +141,14 @@ void main() {
         AssistantExecutionTarget.singleAgent,
       );
       expect(
+        reloaded.assistantWorkspaceRefForSession(threadSingle),
+        'object://thread/$threadSingle',
+      );
+      expect(
+        reloaded.assistantWorkspaceRefKindForSession(threadSingle),
+        WorkspaceRefKind.objectStore,
+      );
+      expect(
         reloaded.singleAgentProviderForSession(threadSingle),
         SingleAgentProvider.codex,
       );
@@ -134,6 +158,14 @@ void main() {
       );
       expect(reloaded.assistantModelForSession(threadSingle), 'single-model');
       expect(reloaded.assistantModelForSession(threadLocal), 'local-model');
+      expect(
+        reloaded.assistantWorkspaceRefForSession(threadRemote),
+        'object://thread/$threadRemote',
+      );
+      expect(
+        reloaded.assistantWorkspaceRefKindForSession(threadRemote),
+        WorkspaceRefKind.objectStore,
+      );
       expect(reloaded.isAssistantTaskArchived(threadRemote), isTrue);
 
       reloaded.dispose();
