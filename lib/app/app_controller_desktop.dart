@@ -4107,29 +4107,46 @@ class AppController extends ChangeNotifier {
   Future<List<AssistantThreadSkillEntry>>
   _scanSingleAgentLocalSkillEntries() async {
     final dedupedByName = <String, AssistantThreadSkillEntry>{};
+    final dedupedPriorityByName = <String, int>{};
     for (final rootSpec in _singleAgentLocalSkillScanRoots) {
-      final root = Directory(_resolveSingleAgentSkillRootPath(rootSpec.path));
-      if (!await root.exists()) {
-        continue;
-      }
-      await for (final entity in root.list(
-        recursive: true,
-        followLinks: false,
+      final rootPriority = _singleAgentSkillRootPriority(rootSpec);
+      for (final resolvedRootPath in _resolveSingleAgentSkillRootPaths(
+        rootSpec.path,
       )) {
-        if (entity is! File || entity.uri.pathSegments.last != 'SKILL.md') {
+        final root = Directory(resolvedRootPath);
+        if (!await root.exists()) {
           continue;
         }
-        final entry = await _skillEntryFromFile(entity, rootSpec);
-        final normalizedName = entry.label.trim().toLowerCase();
-        if (normalizedName.isEmpty) {
-          continue;
+        await for (final entity in root.list(
+          recursive: true,
+          followLinks: false,
+        )) {
+          if (entity is! File || entity.uri.pathSegments.last != 'SKILL.md') {
+            continue;
+          }
+          final entry = await _skillEntryFromFile(entity, rootSpec);
+          final normalizedName = entry.label.trim().toLowerCase();
+          if (normalizedName.isEmpty) {
+            continue;
+          }
+          final existingPriority = dedupedPriorityByName[normalizedName];
+          if (existingPriority == null || rootPriority >= existingPriority) {
+            dedupedByName[normalizedName] = entry;
+            dedupedPriorityByName[normalizedName] = rootPriority;
+          }
         }
-        dedupedByName[normalizedName] = entry;
       }
     }
     final entries = dedupedByName.values.toList(growable: false);
     entries.sort((left, right) => left.label.compareTo(right.label));
     return entries;
+  }
+
+  int _singleAgentSkillRootPriority(_SingleAgentSkillScanRoot root) {
+    return switch (root.scope) {
+      'workspace' => 0,
+      _ => 1,
+    };
   }
 
   List<_SingleAgentSkillScanRoot> _resolveDefaultSingleAgentSkillScanRoots() {
@@ -4156,25 +4173,29 @@ class AppController extends ChangeNotifier {
   _SingleAgentSkillScanRoot _singleAgentSkillScanRootFromOverride(
     String rawPath,
   ) {
-    final normalizedPath = rawPath.trim();
+    final normalizedPath = rawPath.trim().replaceFirst(RegExp(r'^\./'), '');
     final lowered = normalizedPath.toLowerCase();
-    final workspacePath = settings.workspacePath.trim();
-    final normalizedWorkspace = workspacePath.endsWith('/')
-        ? workspacePath
-        : '$workspacePath/';
+    final workspaceBases = _singleAgentRelativeSkillRootBasePaths();
     final inferredWorkspace =
         lowered.contains('/workspace/.agents/') ||
         lowered.contains('/workspace/.claude/') ||
-        lowered.contains('/workspace/.codex/');
+        lowered.contains('/workspace/.codex/') ||
+        lowered.contains('/workspace/.workbuddy/');
+    final explicitWorkspaceRoot =
+        lowered.startsWith('.agents/') ||
+        lowered.startsWith('.claude/') ||
+        lowered.startsWith('.codex/') ||
+        lowered.startsWith('.workbuddy/');
+    final scopedToWorkspace = workspaceBases.any((basePath) {
+      final normalizedBase = basePath.endsWith('/')
+          ? basePath
+          : '$basePath/';
+      return normalizedPath == basePath ||
+          normalizedPath.startsWith(normalizedBase);
+    });
     final scope = normalizedPath.startsWith('/etc/')
         ? 'system'
-        : (workspacePath.isNotEmpty &&
-                  (normalizedPath == workspacePath ||
-                      normalizedPath.startsWith(normalizedWorkspace)) ||
-              inferredWorkspace ||
-              lowered.startsWith('.agents/') ||
-              lowered.startsWith('.claude/') ||
-              lowered.startsWith('.codex/'))
+        : (scopedToWorkspace || inferredWorkspace || explicitWorkspaceRoot)
         ? 'workspace'
         : 'user';
     return _SingleAgentSkillScanRoot(
@@ -4184,24 +4205,48 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  String _resolveSingleAgentSkillRootPath(String rawPath) {
-    final trimmed = rawPath.trim();
+  List<String> _resolveSingleAgentSkillRootPaths(String rawPath) {
+    final trimmed = rawPath.trim().replaceFirst(RegExp(r'^\./'), '');
     if (trimmed.isEmpty) {
-      return trimmed;
+      return const <String>[];
     }
     if (trimmed.startsWith('/')) {
-      return trimmed;
+      return <String>[trimmed];
     }
     if (trimmed.startsWith('~/')) {
       final home = Platform.environment['HOME']?.trim() ?? '';
-      return home.isEmpty ? trimmed : '$home/${trimmed.substring(2)}';
+      return <String>[home.isEmpty ? trimmed : '$home/${trimmed.substring(2)}'];
     }
-    final workspacePath = settings.workspacePath.trim();
-    if (workspacePath.isNotEmpty) {
-      return '$workspacePath/$trimmed';
+    return _singleAgentRelativeSkillRootBasePaths()
+        .map((basePath) => '$basePath/$trimmed')
+        .toList(growable: false);
+  }
+
+  List<String> _singleAgentRelativeSkillRootBasePaths() {
+    final paths = <String>[];
+    final seen = <String>{};
+
+    void addCandidate(String rawPath) {
+      final trimmed = rawPath.trim();
+      if (trimmed.isEmpty) {
+        return;
+      }
+      final normalized = trimmed.endsWith('/')
+          ? trimmed.substring(0, trimmed.length - 1)
+          : trimmed;
+      if (normalized.isEmpty || !seen.add(normalized)) {
+        return;
+      }
+      paths.add(normalized);
     }
-    final home = Platform.environment['HOME']?.trim() ?? '';
-    return home.isEmpty ? trimmed : '$home/$trimmed';
+
+    addCandidate(settings.workspacePath);
+    try {
+      addCandidate(Directory.current.path);
+    } catch (_) {
+      // Best effort only for current workspace fallback discovery.
+    }
+    return paths;
   }
 
   String _sourceForSkillRootPath(String path) {
@@ -4248,7 +4293,10 @@ class AppController extends ChangeNotifier {
                     .where((item) => item.isNotEmpty)
                     .last)
             .trim();
-    final rootPath = _resolveSingleAgentSkillRootPath(root.path);
+    final rootPath = _resolveBestSingleAgentSkillRootPath(
+      directory.path,
+      root.path,
+    );
     final relativeSource = directory.path.startsWith(rootPath)
         ? directory.path
               .substring(rootPath.length)
@@ -4270,6 +4318,20 @@ class AppController extends ChangeNotifier {
           ? sourceLabel
           : '$sourceLabel · $relativeSource',
     );
+  }
+
+  String _resolveBestSingleAgentSkillRootPath(
+    String targetPath,
+    String rawRootPath,
+  ) {
+    final candidates = _resolveSingleAgentSkillRootPaths(rawRootPath)
+      ..sort((left, right) => right.length.compareTo(left.length));
+    for (final candidate in candidates) {
+      if (targetPath.startsWith(candidate)) {
+        return candidate;
+      }
+    }
+    return candidates.isNotEmpty ? candidates.first : rawRootPath.trim();
   }
 
   void _restoreAssistantThreads(List<AssistantThreadRecord> records) {
