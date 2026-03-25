@@ -38,7 +38,7 @@ class SingleAgentRunRequest {
   final String workingDirectory;
   final String gatewayToken;
   final List<CollaborationAttachment> attachments;
-  final List<String> selectedSkills;
+  final List<AssistantThreadSkillEntry> selectedSkills;
   final String aiGatewayBaseUrl;
   final String aiGatewayApiKey;
   final MultiAgentConfig config;
@@ -158,6 +158,7 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
           model: request.model,
           workingDirectory: request.workingDirectory,
           gatewayToken: request.gatewayToken,
+          selectedSkills: request.selectedSkills,
           onOutput: request.onOutput,
         ),
       );

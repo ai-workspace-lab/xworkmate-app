@@ -53,18 +53,71 @@ void main() {
       expect(result.success, isTrue);
       expect(result.output, 'hello world from app server');
       expect(result.resolvedModel, 'codex-sonnet');
-      expect(
-        server.lastTurnInput,
-        <Object?>[
-          <String, dynamic>{'type': 'text', 'text': 'hello world'},
-        ],
-      );
+      expect(server.lastTurnInput, <Object?>[
+        <String, dynamic>{'type': 'text', 'text': 'hello world'},
+      ]);
       expect(deltas.join(), 'hello world from app server');
       expect(
         server.methods,
         containsAll(<String>['initialize', 'thread/start', 'turn/start']),
       );
       expect(server.authorizationHeaders, contains('Bearer token-1'));
+    });
+
+    test('sends selected skills as structured app-server inputs', () async {
+      final server = await _FakeAppServer.start();
+      addTearDown(server.close);
+
+      final client = DirectSingleAgentAppServerClient(
+        endpointResolver: (_) => server.baseHttpUri,
+      );
+      addTearDown(client.dispose);
+
+      final result = await client.run(
+        DirectSingleAgentRunRequest(
+          sessionId: 'session-skills',
+          provider: SingleAgentProvider.codex,
+          prompt: 'use the selected skills',
+          model: 'gpt-4.1',
+          workingDirectory: '/tmp',
+          gatewayToken: '',
+          selectedSkills: const <AssistantThreadSkillEntry>[
+            AssistantThreadSkillEntry(
+              key: '/tmp/ppt',
+              label: 'PPT',
+              description: 'Slides',
+              source: 'codex',
+              sourcePath: '/tmp/ppt/SKILL.md',
+              scope: 'user',
+              sourceLabel: 'codex · user · ppt',
+            ),
+            AssistantThreadSkillEntry(
+              key: '/tmp/browser',
+              label: 'Browser Automation',
+              description: 'Browser',
+              source: 'agents',
+              sourcePath: '/tmp/browser/SKILL.md',
+              scope: 'user',
+              sourceLabel: 'agents · user · browser',
+            ),
+          ],
+        ),
+      );
+
+      expect(result.success, isTrue);
+      expect(server.lastTurnInput, <Object?>[
+        <String, dynamic>{'type': 'text', 'text': 'use the selected skills'},
+        <String, dynamic>{
+          'type': 'skill',
+          'name': 'PPT',
+          'path': '/tmp/ppt/SKILL.md',
+        },
+        <String, dynamic>{
+          'type': 'skill',
+          'name': 'Browser Automation',
+          'path': '/tmp/browser/SKILL.md',
+        },
+      ]);
     });
 
     test('interrupts active turns on abort', () async {
@@ -280,7 +333,8 @@ class _FakeAppServer {
                 'id': id,
                 'error': <String, dynamic>{
                   'code': -32600,
-                  'message': 'Invalid request: invalid type: expected a sequence',
+                  'message':
+                      'Invalid request: invalid type: expected a sequence',
                 },
               }),
             );
@@ -398,7 +452,10 @@ Map<String, dynamic> _asMap(Object? value) {
 }
 
 extension on DirectSingleAgentRunRequest {
-  DirectSingleAgentRunRequest copyWith({void Function(String text)? onOutput}) {
+  DirectSingleAgentRunRequest copyWith({
+    void Function(String text)? onOutput,
+    List<AssistantThreadSkillEntry>? selectedSkills,
+  }) {
     return DirectSingleAgentRunRequest(
       sessionId: sessionId,
       provider: provider,
@@ -406,6 +463,7 @@ extension on DirectSingleAgentRunRequest {
       model: model,
       workingDirectory: workingDirectory,
       gatewayToken: gatewayToken,
+      selectedSkills: selectedSkills ?? this.selectedSkills,
       onOutput: onOutput ?? this.onOutput,
     );
   }
