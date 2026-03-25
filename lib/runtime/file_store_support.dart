@@ -13,6 +13,49 @@ void debugOverridePersistentSupportRoot(String? path) {
       : normalizeStoreDirectoryPath(trimmed);
 }
 
+String? defaultUserSettingsRootPath({
+  Map<String, String>? environment,
+  String? operatingSystem,
+}) {
+  final env = environment ?? Platform.environment;
+  final os = operatingSystem ?? Platform.operatingSystem;
+  final home = env['HOME']?.trim() ?? '';
+  if (home.isEmpty) {
+    return null;
+  }
+  if (os == 'macos') {
+    return '$home/Library/Application Support/xworkmate';
+  }
+  if (os == 'linux') {
+    final xdgConfigHome = env['XDG_CONFIG_HOME']?.trim() ?? '';
+    if (xdgConfigHome.isNotEmpty) {
+      return '$xdgConfigHome/xworkmate';
+    }
+    return '$home/.config/xworkmate';
+  }
+  if (os == 'windows') {
+    final appData = env['APPDATA']?.trim() ?? '';
+    if (appData.isNotEmpty) {
+      return '$appData\\xworkmate';
+    }
+  }
+  return '$home/.xworkmate';
+}
+
+String? defaultUserSettingsFilePath({
+  Map<String, String>? environment,
+  String? operatingSystem,
+}) {
+  final root = defaultUserSettingsRootPath(
+    environment: environment,
+    operatingSystem: operatingSystem,
+  );
+  if ((root ?? '').isEmpty) {
+    return null;
+  }
+  return '$root/config/settings.yaml';
+}
+
 enum PersistentStoreScope { settings, tasks, secrets, audit }
 
 class PersistentWriteFailure {
@@ -133,32 +176,17 @@ class StoreLayoutResolver {
     if (override != null && override.isNotEmpty) {
       return override;
     }
+    if (Platform.isMacOS) {
+      final macUserRoot = defaultUserSettingsRootPath();
+      if ((macUserRoot ?? '').isNotEmpty) {
+        return macUserRoot;
+      }
+    }
     try {
       final supportDirectory = await getApplicationSupportDirectory();
       return '${supportDirectory.path}/xworkmate';
     } catch (_) {
-      final home = Platform.environment['HOME']?.trim() ?? '';
-      if (home.isEmpty) {
-        return null;
-      }
-      if (Platform.isMacOS) {
-        return '$home/Library/Application Support/xworkmate';
-      }
-      if (Platform.isLinux) {
-        final xdgConfigHome =
-            Platform.environment['XDG_CONFIG_HOME']?.trim() ?? '';
-        if (xdgConfigHome.isNotEmpty) {
-          return '$xdgConfigHome/xworkmate';
-        }
-        return '$home/.config/xworkmate';
-      }
-      if (Platform.isWindows) {
-        final appData = Platform.environment['APPDATA']?.trim() ?? '';
-        if (appData.isNotEmpty) {
-          return '$appData\\xworkmate';
-        }
-      }
-      return '$home/.xworkmate';
+      return defaultUserSettingsRootPath();
     }
   }
 
