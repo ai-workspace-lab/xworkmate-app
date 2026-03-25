@@ -453,25 +453,36 @@ void main() {
   );
 
   test(
-    'AppController resolves relative single-agent skill roots against workspace path',
+    'AppController uses settings.workspacePath as fallback for relative single-agent skill roots',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
         'xworkmate-workspace-local-skills-',
       );
+      final currentWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-empty-current-workspace-',
+      );
+      final originalCurrentDirectory = Directory.current;
       addTearDown(() async {
+        Directory.current = originalCurrentDirectory;
         if (await tempDirectory.exists()) {
           try {
             await tempDirectory.delete(recursive: true);
           } catch (_) {}
         }
+        if (await currentWorkspace.exists()) {
+          try {
+            await currentWorkspace.delete(recursive: true);
+          } catch (_) {}
+        }
       });
+      Directory.current = currentWorkspace.path;
 
       await _writeSkill(
         Directory('${tempDirectory.path}/.codex/skills'),
         'workspace-only',
         skillName: 'Workspace Only Skill',
-        description: 'Repo-local skill should be discovered by default roots',
+        description: 'Default workspace fallback should be discovered',
       );
 
       final store = SecureConfigStore(
@@ -502,6 +513,202 @@ void main() {
             .assistantImportedSkillsForSession(controller.currentSessionKey)
             .map((item) => item.label),
         contains('Workspace Only Skill'),
+      );
+    },
+  );
+
+  test(
+    'AppController keeps high-priority user roots ahead of workspace fallbacks',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-priority-relative-skills-',
+      );
+      final currentWorkspace = Directory('${tempDirectory.path}/workspace');
+      await currentWorkspace.create(recursive: true);
+      final workbuddyRoot = Directory('${tempDirectory.path}/workbuddy-skills');
+      await _writeSkill(
+        workbuddyRoot,
+        'shared-skill',
+        skillName: 'Shared Skill',
+        description: 'High-priority user root wins',
+      );
+      await _writeSkill(
+        Directory('${currentWorkspace.path}/.codex/skills'),
+        'shared-skill',
+        skillName: 'Shared Skill',
+        description: 'Workspace fallback should not override user roots',
+      );
+
+      final originalCurrentDirectory = Directory.current;
+      addTearDown(() async {
+        Directory.current = originalCurrentDirectory;
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      Directory.current = currentWorkspace.path;
+
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.sqlite3',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(workspacePath: currentWorkspace.path),
+      );
+
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        singleAgentLocalSkillScanRoots: <String>[
+          workbuddyRoot.path,
+          '.codex/skills',
+        ],
+      );
+      addTearDown(controller.dispose);
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+
+      final sharedSkill = controller
+          .assistantImportedSkillsForSession(controller.currentSessionKey)
+          .firstWhere((item) => item.label == 'Shared Skill');
+      expect(sharedSkill.description, 'High-priority user root wins');
+      expect(sharedSkill.source, 'workbuddy');
+    },
+  );
+
+  test(
+    'AppController prefers current workspace roots over settings.workspacePath fallback',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-current-workspace-skills-',
+      );
+      final defaultWorkspace = Directory(
+        '${tempDirectory.path}/default-workspace',
+      );
+      final currentWorkspace = Directory(
+        '${tempDirectory.path}/current-workspace',
+      );
+      await currentWorkspace.create(recursive: true);
+      await _writeSkill(
+        Directory('${defaultWorkspace.path}/.codex/skills'),
+        'shared-skill',
+        skillName: 'Shared Skill',
+        description: 'Default workspace fallback',
+      );
+      await _writeSkill(
+        Directory('${currentWorkspace.path}/.codex/skills'),
+        'shared-skill',
+        skillName: 'Shared Skill',
+        description: 'Current workspace wins',
+      );
+
+      final originalCurrentDirectory = Directory.current;
+      addTearDown(() async {
+        Directory.current = originalCurrentDirectory;
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      Directory.current = currentWorkspace.path;
+
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.sqlite3',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          workspacePath: defaultWorkspace.path,
+        ),
+      );
+
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        singleAgentLocalSkillScanRoots: const <String>['.codex/skills'],
+      );
+      addTearDown(controller.dispose);
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+
+      final sharedSkill = controller
+          .assistantImportedSkillsForSession(controller.currentSessionKey)
+          .firstWhere((item) => item.label == 'Shared Skill');
+      expect(sharedSkill.description, 'Current workspace wins');
+    },
+  );
+
+  test(
+    'AppController can return empty skills when relative roots have no matching workspace roots',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-empty-relative-skills-',
+      );
+      final emptyWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-empty-relative-current-workspace-',
+      );
+      final originalCurrentDirectory = Directory.current;
+      addTearDown(() async {
+        Directory.current = originalCurrentDirectory;
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+        if (await emptyWorkspace.exists()) {
+          try {
+            await emptyWorkspace.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      Directory.current = emptyWorkspace.path;
+
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.sqlite3',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          workspacePath: '',
+        ),
+      );
+
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        singleAgentLocalSkillScanRoots: const <String>['.codex/skills'],
+      );
+      addTearDown(controller.dispose);
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+
+      expect(
+        controller.assistantImportedSkillsForSession(controller.currentSessionKey),
+        isEmpty,
       );
     },
   );
