@@ -11,6 +11,7 @@ include: package:flutter_lints/flutter.yaml
 
 analyzer:
   exclude:
+    - third_party/super_native_extensions/**
     - third_party/**/example/**
     - third_party/**/test/**
     - third_party/**/analysis_options.yaml
