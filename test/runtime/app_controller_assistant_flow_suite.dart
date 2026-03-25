@@ -131,6 +131,62 @@ void main() {
       );
     },
   );
+
+  test(
+    'AppController hides gateway transcript after switching the thread to single-agent',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final gateway = await _FakeGatewayServer.start();
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-single-agent-history-hide-',
+      );
+      addTearDown(() async {
+        await _deleteDirectoryWithRetry(tempDirectory);
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final controller = AppController(store: store);
+      addTearDown(controller.dispose);
+      addTearDown(gateway.close);
+
+      await _waitFor(() => !controller.initializing);
+
+      await controller.connectManual(
+        host: '127.0.0.1',
+        port: gateway.port,
+        tls: false,
+        mode: RuntimeConnectionMode.local,
+        token: _FakeGatewayServer.sharedToken,
+      );
+      await controller.selectAgent('main');
+      await controller.sendChatMessage('请只回复一行：XWORKMATE_OK', thinking: 'low');
+      await _waitFor(
+        () => controller.chatMessages.any(
+          (message) =>
+              message.role == 'assistant' &&
+              message.text.contains('XWORKMATE_OK'),
+        ),
+      );
+
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+
+      expect(
+        controller.assistantExecutionTarget,
+        AssistantExecutionTarget.singleAgent,
+      );
+      expect(
+        controller.chatMessages.any(
+          (message) => message.text.contains('XWORKMATE_OK'),
+        ),
+        isFalse,
+      );
+    },
+  );
 }
 
 class _FakeGatewayServer {
