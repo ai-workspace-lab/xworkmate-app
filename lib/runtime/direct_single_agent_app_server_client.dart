@@ -53,6 +53,7 @@ class DirectSingleAgentRunRequest {
     required this.model,
     required this.workingDirectory,
     required this.gatewayToken,
+    this.selectedSkills = const <AssistantThreadSkillEntry>[],
     this.onOutput,
   });
 
@@ -62,6 +63,7 @@ class DirectSingleAgentRunRequest {
   final String model;
   final String workingDirectory;
   final String gatewayToken;
+  final List<AssistantThreadSkillEntry> selectedSkills;
   final void Function(String text)? onOutput;
 }
 
@@ -250,17 +252,20 @@ class DirectSingleAgentAppServerClient {
       );
 
       try {
+        final input = <Map<String, dynamic>>[
+          <String, dynamic>{'type': 'text', 'text': request.prompt},
+          for (final skill in request.selectedSkills)
+            if (skill.label.trim().isNotEmpty &&
+                skill.sourcePath.trim().isNotEmpty)
+              <String, dynamic>{
+                'type': 'skill',
+                'name': skill.label.trim(),
+                'path': skill.sourcePath.trim(),
+              },
+        ];
         final started = await connection.request(
           'turn/start',
-          params: <String, dynamic>{
-            'threadId': threadId,
-            'input': <Map<String, dynamic>>[
-              <String, dynamic>{
-                'type': 'text',
-                'text': request.prompt,
-              },
-            ],
-          },
+          params: <String, dynamic>{'threadId': threadId, 'input': input},
         );
         resolvedModel = _extractModel(started) ?? resolvedModel;
         return await completion.future.timeout(
