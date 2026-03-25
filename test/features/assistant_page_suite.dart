@@ -708,6 +708,94 @@ void main() {
     expect(find.text('渲染'), findsOneWidget);
   });
 
+  testWidgets(
+    'AssistantPage keeps attached files and execution context collapsed by default',
+    (WidgetTester tester) async {
+      final controller = await _createControllerWithThreadRecords(
+        records: const <AssistantThreadRecord>[
+          AssistantThreadRecord(
+            sessionKey: 'main',
+            title: '研发任务',
+            archived: false,
+            executionTarget: AssistantExecutionTarget.singleAgent,
+            messageViewMode: AssistantMessageViewMode.raw,
+            updatedAtMs: 1700000000000,
+            messages: <GatewayChatMessage>[
+              GatewayChatMessage(
+                id: 'user-1',
+                role: 'user',
+                text:
+                    'Attached files:\n'
+                    '- clipboard-image-1.png\n\n'
+                    'Execution context:\n'
+                    '- target: single-agent\n'
+                    '- provider: codex\n'
+                    '- workspace_root: /opt/data/workspace\n'
+                    '- permission: full-access\n\n'
+                    '结合项目代码制作一份用户手册',
+                timestampMs: 1700000000000,
+                toolCallId: null,
+                toolName: null,
+                stopReason: null,
+                pending: false,
+                error: false,
+              ),
+            ],
+          ),
+        ],
+        useFakeGatewayRuntime: true,
+      );
+      addTearDown(controller.dispose);
+
+      await pumpPage(
+        tester,
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+      );
+
+      expect(find.text('结合项目代码制作一份用户手册'), findsOneWidget);
+      expect(
+        find.byKey(const Key('assistant-user-meta-attachments-toggle')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('assistant-user-meta-context-toggle')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('assistant-user-meta-attachments-block')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('assistant-user-meta-context-block')),
+        findsNothing,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('assistant-user-meta-attachments-toggle')),
+      );
+      await _pumpForUiSync(tester);
+
+      expect(
+        find.byKey(const Key('assistant-user-meta-attachments-block')),
+        findsOneWidget,
+      );
+      expect(find.text('Attached files:'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const Key('assistant-user-meta-context-toggle')),
+      );
+      await _pumpForUiSync(tester);
+
+      expect(
+        find.byKey(const Key('assistant-user-meta-context-block')),
+        findsOneWidget,
+      );
+      expect(find.text('Execution context:'), findsOneWidget);
+    },
+    // Known flutter_tester host-exit hang in this widget scenario.
+    skip: true,
+  );
+
   // Known flutter_tester host-exit hang in this widget scenario.
   testWidgets('AssistantPage toggles Markdown Rendered and RAW per thread', (
     WidgetTester tester,
