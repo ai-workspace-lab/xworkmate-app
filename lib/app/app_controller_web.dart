@@ -86,8 +86,7 @@ class AppController extends ChangeNotifier {
   List<GatewayConnectorSummary> _relayConnectors =
       const <GatewayConnectorSummary>[];
   List<GatewayModelSummary> _relayModels = const <GatewayModelSummary>[];
-  List<GatewayCronJobSummary> _relayCronJobs =
-      const <GatewayCronJobSummary>[];
+  List<GatewayCronJobSummary> _relayCronJobs = const <GatewayCronJobSummary>[];
   late final WebSkillsController _skillsController = WebSkillsController(
     refreshVisibleSkills,
   );
@@ -111,10 +110,10 @@ class AppController extends ChangeNotifier {
   AppLanguage get appLanguage => _settings.appLanguage;
   AssistantPermissionLevel get assistantPermissionLevel =>
       _settings.assistantPermissionLevel;
-  List<WorkspaceDestination> get assistantNavigationDestinations =>
-      _settings.assistantNavigationDestinations
-          .where(capabilities.supportsDestination)
-          .toList(growable: false);
+  List<WorkspaceDestination> get assistantNavigationDestinations => _settings
+      .assistantNavigationDestinations
+      .where(capabilities.supportsDestination)
+      .toList(growable: false);
   GatewayConnectionSnapshot get connection => _relayClient.snapshot;
   bool get relayBusy => _relayBusy;
   bool get aiGatewayBusy => _aiGatewayBusy;
@@ -141,17 +140,16 @@ class AppController extends ChangeNotifier {
     }
     return appText('助手', 'Assistant');
   }
+
   bool get hasStoredGatewayToken =>
       hasStoredGatewayTokenForProfile(kGatewayRemoteProfileIndex) ||
       hasStoredGatewayTokenForProfile(kGatewayLocalProfileIndex);
   bool get hasStoredAiGatewayApiKey => storedAiGatewayApiKeyMask != null;
   String? get storedGatewayTokenMask => storedRelayTokenMask;
-  String? storedRelayTokenMaskForProfile(int profileIndex) => WebStore.maskValue(
-    (_relayTokenByProfile[profileIndex] ?? '').trim(),
-  );
-  String? storedRelayPasswordMaskForProfile(int profileIndex) => WebStore.maskValue(
-    (_relayPasswordByProfile[profileIndex] ?? '').trim(),
-  );
+  String? storedRelayTokenMaskForProfile(int profileIndex) =>
+      WebStore.maskValue((_relayTokenByProfile[profileIndex] ?? '').trim());
+  String? storedRelayPasswordMaskForProfile(int profileIndex) =>
+      WebStore.maskValue((_relayPasswordByProfile[profileIndex] ?? '').trim());
   bool hasStoredGatewayTokenForProfile(int profileIndex) =>
       ((_relayTokenByProfile[profileIndex] ?? '').trim().isNotEmpty);
   bool hasStoredGatewayPasswordForProfile(int profileIndex) =>
@@ -284,7 +282,8 @@ class AppController extends ChangeNotifier {
     return _settings.defaultModel.trim();
   }
 
-  String get resolvedAssistantModel => assistantModelForSession(_currentSessionKey);
+  String get resolvedAssistantModel =>
+      assistantModelForSession(_currentSessionKey);
 
   List<String> assistantModelChoicesForSession(String sessionKey) {
     final target = assistantExecutionTargetForSession(sessionKey);
@@ -375,8 +374,9 @@ class AppController extends ChangeNotifier {
           name: 'gateway_token.local',
           provider: 'Gateway',
           module: 'Assistant',
-          maskedValue:
-              storedRelayTokenMaskForProfile(kGatewayLocalProfileIndex)!,
+          maskedValue: storedRelayTokenMaskForProfile(
+            kGatewayLocalProfileIndex,
+          )!,
           status: 'In Use',
         ),
       if (storedRelayPasswordMaskForProfile(kGatewayLocalProfileIndex) != null)
@@ -384,8 +384,9 @@ class AppController extends ChangeNotifier {
           name: 'gateway_password.local',
           provider: 'Gateway',
           module: 'Assistant',
-          maskedValue:
-              storedRelayPasswordMaskForProfile(kGatewayLocalProfileIndex)!,
+          maskedValue: storedRelayPasswordMaskForProfile(
+            kGatewayLocalProfileIndex,
+          )!,
           status: 'In Use',
         ),
       if (storedRelayTokenMaskForProfile(kGatewayRemoteProfileIndex) != null)
@@ -393,8 +394,9 @@ class AppController extends ChangeNotifier {
           name: 'gateway_token.remote',
           provider: 'Gateway',
           module: 'Assistant',
-          maskedValue:
-              storedRelayTokenMaskForProfile(kGatewayRemoteProfileIndex)!,
+          maskedValue: storedRelayTokenMaskForProfile(
+            kGatewayRemoteProfileIndex,
+          )!,
           status: 'In Use',
         ),
       if (storedRelayPasswordMaskForProfile(kGatewayRemoteProfileIndex) != null)
@@ -402,8 +404,9 @@ class AppController extends ChangeNotifier {
           name: 'gateway_password.remote',
           provider: 'Gateway',
           module: 'Assistant',
-          maskedValue:
-              storedRelayPasswordMaskForProfile(kGatewayRemoteProfileIndex)!,
+          maskedValue: storedRelayPasswordMaskForProfile(
+            kGatewayRemoteProfileIndex,
+          )!,
           status: 'In Use',
         ),
       if (storedAiGatewayApiKeyMask != null)
@@ -457,7 +460,9 @@ class AppController extends ChangeNotifier {
             .where(
               (record) =>
                   !record.archived &&
-                  !archivedKeys.contains(_normalizedSessionKey(record.sessionKey)),
+                  !archivedKeys.contains(
+                    _normalizedSessionKey(record.sessionKey),
+                  ),
             )
             .map(
               (record) => WebConversationSummary(
@@ -595,16 +600,18 @@ class AppController extends ChangeNotifier {
         : _gatewayAddressLabel(profile);
     return AssistantThreadConnectionState(
       executionTarget: target,
-      status: matchesTarget ? connection.status : RuntimeConnectionStatus.offline,
-      primaryLabel: (matchesTarget
-              ? connection.status
-              : RuntimeConnectionStatus.offline)
-          .label,
+      status: matchesTarget
+          ? connection.status
+          : RuntimeConnectionStatus.offline,
+      primaryLabel:
+          (matchesTarget ? connection.status : RuntimeConnectionStatus.offline)
+              .label,
       detailLabel: detail.isEmpty
           ? appText('Relay 未连接', 'Relay offline')
           : detail,
       ready:
-          matchesTarget && connection.status == RuntimeConnectionStatus.connected,
+          matchesTarget &&
+          connection.status == RuntimeConnectionStatus.connected,
       pairingRequired: false,
       gatewayTokenMissing: false,
       lastError: null,
@@ -803,8 +810,7 @@ class AppController extends ChangeNotifier {
       await refreshRelaySkillsForSession(_currentSessionKey);
       return;
     }
-    _recomputeDerivedWorkspaceState();
-    notifyListeners();
+    await _refreshSingleAgentSkillsForSession(_currentSessionKey);
   }
 
   Future<void> toggleAssistantNavigationDestination(
@@ -922,18 +928,11 @@ class AppController extends ChangeNotifier {
       );
       return (
         state: 'connected',
-        message: appText(
-          '连接测试成功。',
-          'Connection test succeeded.',
-        ),
+        message: appText('连接测试成功。', 'Connection test succeeded.'),
         endpoint: endpoint,
       );
     } catch (error) {
-      return (
-        state: 'error',
-        message: error.toString(),
-        endpoint: endpoint,
-      );
+      return (state: 'error', message: error.toString(), endpoint: endpoint);
     } finally {
       await client.dispose();
     }
@@ -996,22 +995,23 @@ class AppController extends ChangeNotifier {
     final inheritedTarget =
         _sanitizeTarget(target) ??
         assistantExecutionTargetForSession(_currentSessionKey);
-    final inheritedRecord = _threadRecords[_normalizedSessionKey(
-      _currentSessionKey,
-    )];
-    final record = _newRecord(
-      target: inheritedTarget,
-      title: appText('新对话', 'New conversation'),
-    ).copyWith(
-      messageViewMode:
-          inheritedRecord?.messageViewMode ?? AssistantMessageViewMode.rendered,
-      singleAgentProvider:
-          inheritedRecord?.singleAgentProvider ?? SingleAgentProvider.auto,
-      assistantModelId: inheritedRecord?.assistantModelId ?? '',
-      importedSkills: inheritedRecord?.importedSkills ?? const [],
-      selectedSkillKeys: inheritedRecord?.selectedSkillKeys ?? const [],
-      gatewayEntryState: _gatewayEntryStateForTarget(inheritedTarget),
-    );
+    final inheritedRecord =
+        _threadRecords[_normalizedSessionKey(_currentSessionKey)];
+    final record =
+        _newRecord(
+          target: inheritedTarget,
+          title: appText('新对话', 'New conversation'),
+        ).copyWith(
+          messageViewMode:
+              inheritedRecord?.messageViewMode ??
+              AssistantMessageViewMode.rendered,
+          singleAgentProvider:
+              inheritedRecord?.singleAgentProvider ?? SingleAgentProvider.auto,
+          assistantModelId: inheritedRecord?.assistantModelId ?? '',
+          importedSkills: inheritedRecord?.importedSkills ?? const [],
+          selectedSkillKeys: inheritedRecord?.selectedSkillKeys ?? const [],
+          gatewayEntryState: _gatewayEntryStateForTarget(inheritedTarget),
+        );
     _threadRecords[record.sessionKey] = record;
     _currentSessionKey = record.sessionKey;
     _lastAssistantError = null;
@@ -1037,7 +1037,9 @@ class AppController extends ChangeNotifier {
     }
     _currentSessionKey = normalizedSessionKey;
     _lastAssistantError = null;
-    _settings = _settings.copyWith(assistantLastSessionKey: normalizedSessionKey);
+    _settings = _settings.copyWith(
+      assistantLastSessionKey: normalizedSessionKey,
+    );
     await _persistSettings();
     notifyListeners();
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
@@ -1046,6 +1048,10 @@ class AppController extends ChangeNotifier {
       sessionKey: normalizedSessionKey,
       persistDefaultSelection: false,
     );
+    if (target == AssistantExecutionTarget.singleAgent) {
+      await _refreshSingleAgentSkillsForSession(normalizedSessionKey);
+      return;
+    }
     if (target == AssistantExecutionTarget.local ||
         target == AssistantExecutionTarget.remote) {
       await refreshRelayHistory(sessionKey: normalizedSessionKey);
@@ -1057,7 +1063,8 @@ class AppController extends ChangeNotifier {
     AssistantExecutionTarget target,
   ) async {
     final resolvedTarget =
-        _sanitizeTarget(target) ?? assistantExecutionTargetForSession(_currentSessionKey);
+        _sanitizeTarget(target) ??
+        assistantExecutionTargetForSession(_currentSessionKey);
     final sessionKey = _normalizedSessionKey(_currentSessionKey);
     _upsertThreadRecord(
       sessionKey,
@@ -1074,7 +1081,9 @@ class AppController extends ChangeNotifier {
       sessionKey: sessionKey,
       persistDefaultSelection: true,
     );
-    if (resolvedTarget == AssistantExecutionTarget.local ||
+    if (resolvedTarget == AssistantExecutionTarget.singleAgent) {
+      await _refreshSingleAgentSkillsForSession(sessionKey);
+    } else if (resolvedTarget == AssistantExecutionTarget.local ||
         resolvedTarget == AssistantExecutionTarget.remote) {
       await refreshRelaySkillsForSession(sessionKey);
     }
@@ -1097,6 +1106,10 @@ class AppController extends ChangeNotifier {
     );
     await _persistThreads();
     notifyListeners();
+    if (assistantExecutionTargetForSession(sessionKey) ==
+        AssistantExecutionTarget.singleAgent) {
+      await _refreshSingleAgentSkillsForSession(sessionKey);
+    }
   }
 
   Future<void> setAssistantMessageViewMode(
@@ -1146,7 +1159,9 @@ class AppController extends ChangeNotifier {
       return;
     }
     final trimmedTitle = title.trim();
-    final nextTitles = Map<String, String>.from(_settings.assistantCustomTaskTitles);
+    final nextTitles = Map<String, String>.from(
+      _settings.assistantCustomTaskTitles,
+    );
     if (trimmedTitle.isEmpty) {
       nextTitles.remove(normalizedSessionKey);
     } else {
@@ -1170,7 +1185,10 @@ class AppController extends ChangeNotifier {
     return _threadRecords[normalizedSessionKey]?.archived ?? false;
   }
 
-  Future<void> saveAssistantTaskArchived(String sessionKey, bool archived) async {
+  Future<void> saveAssistantTaskArchived(
+    String sessionKey,
+    bool archived,
+  ) async {
     final normalizedSessionKey = _normalizedSessionKey(sessionKey);
     if (!_threadRecords.containsKey(normalizedSessionKey)) {
       return;
@@ -1193,7 +1211,10 @@ class AppController extends ChangeNotifier {
     );
     if (archived && _currentSessionKey == normalizedSessionKey) {
       final fallback = _threadRecords.values
-          .where((record) => !record.archived && record.sessionKey != normalizedSessionKey)
+          .where(
+            (record) =>
+                !record.archived && record.sessionKey != normalizedSessionKey,
+          )
           .toList(growable: false);
       if (fallback.isNotEmpty) {
         _currentSessionKey = fallback.first.sessionKey;
@@ -1227,8 +1248,9 @@ class AppController extends ChangeNotifier {
     if (!importedKeys.contains(normalizedSkillKey)) {
       return;
     }
-    final selected = assistantSelectedSkillKeysForSession(normalizedSessionKey)
-        .toSet();
+    final selected = assistantSelectedSkillKeysForSession(
+      normalizedSessionKey,
+    ).toSet();
     if (!selected.add(normalizedSkillKey)) {
       selected.remove(normalizedSkillKey);
     }
@@ -1396,7 +1418,9 @@ class AppController extends ChangeNotifier {
       token: token,
       password: password,
     );
-    final currentTarget = assistantExecutionTargetForSession(_currentSessionKey);
+    final currentTarget = assistantExecutionTargetForSession(
+      _currentSessionKey,
+    );
     final currentProfileIndex = _profileIndexForTarget(currentTarget);
     if (currentProfileIndex == profileIndex) {
       await connectRelay(target: currentTarget);
@@ -1410,7 +1434,9 @@ class AppController extends ChangeNotifier {
       final resolvedTarget =
           _sanitizeTarget(target) ??
           (() {
-            final current = assistantExecutionTargetForSession(_currentSessionKey);
+            final current = assistantExecutionTargetForSession(
+              _currentSessionKey,
+            );
             return current == AssistantExecutionTarget.local ||
                     current == AssistantExecutionTarget.remote
                 ? current
@@ -1598,8 +1624,7 @@ class AppController extends ChangeNotifier {
           .map(_castMap)
           .map(
             (item) => AssistantThreadSkillEntry(
-              key:
-                  item['skillKey']?.toString().trim().isNotEmpty == true
+              key: item['skillKey']?.toString().trim().isNotEmpty == true
                   ? item['skillKey'].toString().trim()
                   : (item['name']?.toString().trim() ?? ''),
               label: item['name']?.toString().trim() ?? '',
@@ -1612,12 +1637,17 @@ class AppController extends ChangeNotifier {
           )
           .where((entry) => entry.key.isNotEmpty && entry.label.isNotEmpty)
           .toList(growable: false);
+      final importedKeys = skills.map((item) => item.key).toSet();
+      final nextSelected =
+          (_threadRecords[normalizedSessionKey]?.selectedSkillKeys ??
+                  const <String>[])
+              .where(importedKeys.contains)
+              .toList(growable: false);
       _upsertThreadRecord(
         normalizedSessionKey,
         importedSkills: skills,
-        selectedSkillKeys:
-            _threadRecords[normalizedSessionKey]?.selectedSkillKeys ??
-            const <String>[],
+        selectedSkillKeys: nextSelected,
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       );
       await _persistThreads();
       _recomputeDerivedWorkspaceState();
@@ -1625,6 +1655,94 @@ class AppController extends ChangeNotifier {
     } catch (_) {
       // Best effort: skill discovery should not block chat flows.
     }
+  }
+
+  Future<void> _refreshSingleAgentSkillsForSession(String sessionKey) async {
+    final normalizedSessionKey = _normalizedSessionKey(sessionKey);
+    if (assistantExecutionTargetForSession(normalizedSessionKey) !=
+        AssistantExecutionTarget.singleAgent) {
+      return;
+    }
+    final endpoint = _acpEndpointForTarget(AssistantExecutionTarget.remote);
+    if (endpoint == null) {
+      await _replaceThreadSkillsForSession(
+        normalizedSessionKey,
+        const <AssistantThreadSkillEntry>[],
+      );
+      return;
+    }
+    final provider = singleAgentProviderForSession(normalizedSessionKey);
+    try {
+      await _refreshAcpCapabilities(endpoint);
+      final response = await _acpClient.request(
+        endpoint: endpoint,
+        method: 'skills.status',
+        params: <String, dynamic>{
+          'sessionId': normalizedSessionKey,
+          'threadId': normalizedSessionKey,
+          'mode': 'single-agent',
+          'provider': provider.providerId,
+        },
+      );
+      final result = _castMap(response['result']);
+      final payload = result.isNotEmpty ? result : response;
+      final skills = (payload['skills'] as List<dynamic>? ?? const <dynamic>[])
+          .map(_castMap)
+          .map(
+            (item) => AssistantThreadSkillEntry(
+              key: item['skillKey']?.toString().trim().isNotEmpty == true
+                  ? item['skillKey'].toString().trim()
+                  : (item['name']?.toString().trim() ?? ''),
+              label: item['name']?.toString().trim() ?? '',
+              description: item['description']?.toString().trim() ?? '',
+              source: item['source']?.toString().trim() ?? provider.providerId,
+              sourcePath: item['path']?.toString().trim() ?? '',
+              scope: item['scope']?.toString().trim().isNotEmpty == true
+                  ? item['scope'].toString().trim()
+                  : 'session',
+              sourceLabel:
+                  item['sourceLabel']?.toString().trim().isNotEmpty == true
+                  ? item['sourceLabel'].toString().trim()
+                  : (item['source']?.toString().trim().isNotEmpty == true
+                        ? item['source'].toString().trim()
+                        : provider.label),
+            ),
+          )
+          .where((entry) => entry.key.isNotEmpty && entry.label.isNotEmpty)
+          .toList(growable: false);
+      await _replaceThreadSkillsForSession(normalizedSessionKey, skills);
+    } on WebAcpException catch (error) {
+      if (_unsupportedAcpSkillsStatus(error)) {
+        await _replaceThreadSkillsForSession(
+          normalizedSessionKey,
+          const <AssistantThreadSkillEntry>[],
+        );
+      }
+    } catch (_) {
+      // Keep current skills when transient ACP failures happen.
+    }
+  }
+
+  Future<void> _replaceThreadSkillsForSession(
+    String sessionKey,
+    List<AssistantThreadSkillEntry> importedSkills,
+  ) async {
+    final normalizedSessionKey = _normalizedSessionKey(sessionKey);
+    final importedKeys = importedSkills.map((item) => item.key).toSet();
+    final nextSelected =
+        (_threadRecords[normalizedSessionKey]?.selectedSkillKeys ??
+                const <String>[])
+            .where(importedKeys.contains)
+            .toList(growable: false);
+    _upsertThreadRecord(
+      normalizedSessionKey,
+      importedSkills: importedSkills,
+      selectedSkillKeys: nextSelected,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    await _persistThreads();
+    _recomputeDerivedWorkspaceState();
+    notifyListeners();
   }
 
   Future<void> sendMessage(
@@ -1830,7 +1948,8 @@ class AppController extends ChangeNotifier {
                 },
               )
               .toList(growable: false),
-          if (inlineAttachments.isNotEmpty) 'inlineAttachments': inlineAttachments,
+          if (inlineAttachments.isNotEmpty)
+            'inlineAttachments': inlineAttachments,
           'aiGatewayBaseUrl': _settings.aiGateway.baseUrl.trim(),
           'aiGatewayApiKey': _aiGatewayApiKeyCache.trim(),
         };
@@ -2000,7 +2119,8 @@ class AppController extends ChangeNotifier {
                 },
               )
               .toList(growable: false),
-          if (inlineAttachments.isNotEmpty) 'inlineAttachments': inlineAttachments,
+          if (inlineAttachments.isNotEmpty)
+            'inlineAttachments': inlineAttachments,
         },
         hasInlineAttachments: inlineAttachments.isNotEmpty,
         onNotification: (notification) {
@@ -2019,8 +2139,7 @@ class AppController extends ChangeNotifier {
         },
       );
       final result = _castMap(response['result']);
-      output =
-          result['output']?.toString().trim().isNotEmpty == true
+      output = result['output']?.toString().trim().isNotEmpty == true
           ? result['output'].toString().trim()
           : streamed.trim();
       _singleAgentRuntimeModelBySession[sessionKey] =
@@ -2093,8 +2212,9 @@ class AppController extends ChangeNotifier {
   }
 
   SettingsSnapshot _sanitizeSettings(SettingsSnapshot snapshot) {
-    final allowedDestinations = featuresFor(UiFeaturePlatform.web)
-        .allowedDestinations;
+    final allowedDestinations = featuresFor(
+      UiFeaturePlatform.web,
+    ).allowedDestinations;
     final target = featuresFor(UiFeaturePlatform.web).sanitizeExecutionTarget(
       _sanitizeTarget(snapshot.assistantExecutionTarget),
     );
@@ -2234,7 +2354,11 @@ class AppController extends ChangeNotifier {
     if (state == 'final' || state == 'aborted' || state == 'error') {
       _pendingSessionKeys.remove(sessionKey);
       if (state == 'error' && text.isNotEmpty) {
-        _appendAssistantMessage(sessionKey: sessionKey, text: text, error: true);
+        _appendAssistantMessage(
+          sessionKey: sessionKey,
+          text: text,
+          error: true,
+        );
       }
       _clearStreamingText(sessionKey);
       unawaited(refreshRelaySessions());
@@ -2304,7 +2428,8 @@ class AppController extends ChangeNotifier {
   }) {
     final key = _normalizedSessionKey(sessionKey);
     final resolvedTarget =
-        _sanitizeTarget(executionTarget) ?? assistantExecutionTargetForSession(key);
+        _sanitizeTarget(executionTarget) ??
+        assistantExecutionTargetForSession(key);
     final existing = _threadRecords[key] ?? _newRecord(target: resolvedTarget);
     _threadRecords[key] = existing.copyWith(
       sessionKey: key,
@@ -2403,12 +2528,7 @@ class AppController extends ChangeNotifier {
     }
     final buffer = StringBuffer(prompt.trim());
     buffer.write('\n\n');
-    buffer.writeln(
-      appText(
-        '附件（仅供本轮参考）：',
-        'Attachments (for this turn only):',
-      ),
-    );
+    buffer.writeln(appText('附件（仅供本轮参考）：', 'Attachments (for this turn only):'));
     for (final item in attachments) {
       final name = item.fileName.trim().isEmpty ? 'attachment' : item.fileName;
       final mime = item.mimeType.trim().isEmpty
@@ -2438,7 +2558,9 @@ class AppController extends ChangeNotifier {
     final scheme = uri.scheme.trim().isEmpty
         ? (profile.tls ? 'https' : 'http')
         : uri.scheme.trim().toLowerCase();
-    final resolvedPort = uri.hasPort ? uri.port : (scheme == 'https' ? 443 : 80);
+    final resolvedPort = uri.hasPort
+        ? uri.port
+        : (scheme == 'https' ? 443 : 80);
     return uri.replace(
       scheme: scheme,
       port: resolvedPort,
@@ -2505,6 +2627,17 @@ class AppController extends ChangeNotifier {
         message.contains('invalid params');
   }
 
+  bool _unsupportedAcpSkillsStatus(WebAcpException error) {
+    final code = (error.code ?? '').trim();
+    if (code == '-32601' || code == 'METHOD_NOT_FOUND') {
+      return true;
+    }
+    final message = error.toString().toLowerCase();
+    return message.contains('unknown method') ||
+        message.contains('method not found') ||
+        message.contains('skills.status');
+  }
+
   int _base64Size(String base64) {
     final normalized = base64.trim().split(',').last.trim();
     if (normalized.isEmpty) {
@@ -2520,11 +2653,15 @@ class AppController extends ChangeNotifier {
     Map<String, dynamic> notification, {
     required String sessionKey,
   }) {
-    final method = notification['method']?.toString().trim().toLowerCase() ?? '';
+    final method =
+        notification['method']?.toString().trim().toLowerCase() ?? '';
     final params = _castMap(notification['params']);
-    final payload = params.isNotEmpty ? params : _castMap(notification['payload']);
+    final payload = params.isNotEmpty
+        ? params
+        : _castMap(notification['payload']);
     final event = payload['event']?.toString().trim().toLowerCase() ?? method;
-    final type = payload['type']?.toString().trim().toLowerCase() ??
+    final type =
+        payload['type']?.toString().trim().toLowerCase() ??
         payload['state']?.toString().trim().toLowerCase() ??
         event;
     final payloadSession = _normalizedSessionKey(
@@ -2537,11 +2674,11 @@ class AppController extends ChangeNotifier {
       return null;
     }
     final messageMap = _castMap(payload['message']);
-    final messageText =
-        _extractMessageText(messageMap).trim().isNotEmpty
+    final messageText = _extractMessageText(messageMap).trim().isNotEmpty
         ? _extractMessageText(messageMap).trim()
         : payload['message']?.toString().trim() ?? '';
-    final text = payload['delta']?.toString() ??
+    final text =
+        payload['delta']?.toString() ??
         payload['text']?.toString() ??
         payload['outputDelta']?.toString() ??
         '';
