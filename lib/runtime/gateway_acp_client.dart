@@ -264,6 +264,20 @@ class GatewayAcpClient {
     );
   }
 
+  Future<Map<String, dynamic>> request({
+    required String method,
+    required Map<String, dynamic> params,
+  }) async {
+    return _requestWithFallback(
+      _GatewayAcpRpcRequest(
+        id: _nextRequestId(method),
+        method: method,
+        params: params,
+      ),
+      onNotification: (_) {},
+    );
+  }
+
   Future<void> dispose() async {}
 
   Future<Map<String, dynamic>> _requestWithFallback(
