@@ -5,6 +5,7 @@ import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
+import 'chrome_quick_action_buttons.dart';
 
 class SidebarNavigation extends StatelessWidget {
   const SidebarNavigation({
@@ -19,6 +20,7 @@ class SidebarNavigation extends StatelessWidget {
     required this.onExpandFromCollapsed,
     required this.onOpenAccount,
     required this.onOpenThemeToggle,
+    this.onOpenHome,
     required this.accountName,
     required this.accountSubtitle,
     this.onOpenOnlineWorkspace,
@@ -40,6 +42,7 @@ class SidebarNavigation extends StatelessWidget {
   final VoidCallback onExpandFromCollapsed;
   final VoidCallback onOpenAccount;
   final VoidCallback onOpenThemeToggle;
+  final VoidCallback? onOpenHome;
   final String accountName;
   final String accountSubtitle;
   final VoidCallback? onOpenOnlineWorkspace;
@@ -129,6 +132,7 @@ class SidebarNavigation extends StatelessWidget {
                               emphasis: _SidebarItemEmphasis.primary,
                               favoriteDestinations: favoriteDestinations,
                               onToggleFavorite: onToggleFavorite,
+                              onOpenHome: onOpenHome,
                               onSectionChanged: onSectionChanged,
                             ),
                           if (primarySections.isNotEmpty &&
@@ -143,6 +147,7 @@ class SidebarNavigation extends StatelessWidget {
                               emphasis: _SidebarItemEmphasis.secondary,
                               favoriteDestinations: favoriteDestinations,
                               onToggleFavorite: onToggleFavorite,
+                              onOpenHome: onOpenHome,
                               onSectionChanged: onSectionChanged,
                             ),
                         ],
@@ -158,6 +163,7 @@ class SidebarNavigation extends StatelessWidget {
                       emphasis: _SidebarItemEmphasis.secondary,
                       favoriteDestinations: favoriteDestinations,
                       onToggleFavorite: onToggleFavorite,
+                      onOpenHome: onOpenHome,
                       onSectionChanged: onSectionChanged,
                     ),
                   if (toolSections.isNotEmpty) const SizedBox(height: 6),
@@ -247,6 +253,7 @@ class _SidebarSectionGroup extends StatelessWidget {
     required this.emphasis,
     required this.favoriteDestinations,
     this.onToggleFavorite,
+    this.onOpenHome,
     required this.onSectionChanged,
   });
 
@@ -257,6 +264,7 @@ class _SidebarSectionGroup extends StatelessWidget {
   final _SidebarItemEmphasis emphasis;
   final Set<WorkspaceDestination> favoriteDestinations;
   final Future<void> Function(WorkspaceDestination section)? onToggleFavorite;
+  final VoidCallback? onOpenHome;
   final ValueChanged<WorkspaceDestination> onSectionChanged;
 
   @override
@@ -279,8 +287,11 @@ class _SidebarSectionGroup extends StatelessWidget {
             ),
           ),
         ],
-        ...sections.map(
-          (section) => Padding(
+        ...sections.map((section) {
+          final useHomeShortcut =
+              currentSection == WorkspaceDestination.settings &&
+              section == WorkspaceDestination.assistant;
+          return Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
             child: _SidebarNavItem(
               section: section,
@@ -292,15 +303,20 @@ class _SidebarSectionGroup extends StatelessWidget {
                   !collapsed &&
                   onToggleFavorite != null &&
                   kAssistantNavigationDestinationCandidates.contains(section),
+              labelOverride: useHomeShortcut
+                  ? appText('回到 APP首页', 'Back to app home')
+                  : null,
               onToggleFavorite: onToggleFavorite == null
                   ? null
                   : () async {
                       await onToggleFavorite!(section);
                     },
-              onTap: () => onSectionChanged(section),
+              onTap: useHomeShortcut && onOpenHome != null
+                  ? onOpenHome!
+                  : () => onSectionChanged(section),
             ),
-          ),
-        ),
+          );
+        }),
       ],
     );
   }
@@ -314,6 +330,7 @@ class _SidebarNavItem extends StatefulWidget {
     required this.emphasis,
     required this.favorite,
     required this.showFavoriteToggle,
+    this.labelOverride,
     this.onToggleFavorite,
     required this.onTap,
   });
@@ -324,6 +341,7 @@ class _SidebarNavItem extends StatefulWidget {
   final _SidebarItemEmphasis emphasis;
   final bool favorite;
   final bool showFavoriteToggle;
+  final String? labelOverride;
   final Future<void> Function()? onToggleFavorite;
   final VoidCallback onTap;
 
@@ -338,6 +356,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final theme = Theme.of(context);
+    final label = widget.labelOverride ?? _sectionLabel(widget.section);
     final isPrimary = widget.emphasis == _SidebarItemEmphasis.primary;
     final background = widget.selected
         ? palette.surfacePrimary
@@ -351,7 +370,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
     final radius = AppRadius.button;
 
     return Tooltip(
-      message: widget.collapsed ? _sectionLabel(widget.section) : '',
+      message: widget.collapsed ? label : '',
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
@@ -413,7 +432,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              _sectionLabel(widget.section),
+                              label,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style:
@@ -551,9 +570,7 @@ class SidebarFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final themeToggleTooltip = themeMode == ThemeMode.dark
-        ? appText('切换浅色', 'Switch to light')
-        : appText('切换深色', 'Switch to dark');
+    final themeToggleTooltip = chromeThemeToggleTooltip(themeMode);
 
     if (isCollapsed) {
       return Column(
@@ -564,25 +581,21 @@ class SidebarFooter extends StatelessWidget {
             color: palette.chromeStroke.withValues(alpha: 0.9),
           ),
           const SizedBox(height: 6),
-          _SidebarLanguageButton(
+          ChromeLanguageActionButton(
             appLanguage: appLanguage,
             compact: true,
             tooltip: appText('切换语言', 'Toggle language'),
             onPressed: onToggleLanguage,
           ),
           const SizedBox(height: 6),
-          _SidebarActionButton(
-            icon: themeMode == ThemeMode.dark
-                ? Icons.dark_mode_rounded
-                : themeMode == ThemeMode.light
-                ? Icons.light_mode_rounded
-                : Icons.brightness_auto_rounded,
+          ChromeIconActionButton(
+            icon: chromeThemeToggleIcon(themeMode),
             tooltip: themeToggleTooltip,
             onPressed: onOpenThemeToggle,
           ),
           const SizedBox(height: AppSpacing.xs),
           if (showCollapseControl) ...[
-            _SidebarActionButton(
+            ChromeIconActionButton(
               icon: _sidebarStateIcon(sidebarState),
               tooltip: _sidebarStateLabel(sidebarState),
               onPressed: onCycleSidebarState,
@@ -590,7 +603,7 @@ class SidebarFooter extends StatelessWidget {
             const SizedBox(height: 6),
           ],
           if (showSettingsButton) ...[
-            _SidebarActionButton(
+            ChromeIconActionButton(
               icon: Icons.tune_rounded,
               tooltip: appText('设置', 'Settings'),
               onPressed: onOpenSettings,
@@ -598,7 +611,7 @@ class SidebarFooter extends StatelessWidget {
             const SizedBox(height: 6),
           ],
           if (onOpenOnlineWorkspace != null) ...[
-            _SidebarActionButton(
+            ChromeIconActionButton(
               icon: Icons.open_in_new_rounded,
               tooltip: appText('打开在线版', 'Open online workspace'),
               onPressed: onOpenOnlineWorkspace!,
@@ -642,7 +655,7 @@ class SidebarFooter extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: _SidebarLanguageButton(
+              child: ChromeLanguageActionButton(
                 appLanguage: appLanguage,
                 compact: false,
                 tooltip: appText('切换语言', 'Toggle language'),
@@ -650,18 +663,14 @@ class SidebarFooter extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.xs),
-            _SidebarActionButton(
-              icon: themeMode == ThemeMode.dark
-                  ? Icons.dark_mode_rounded
-                  : themeMode == ThemeMode.light
-                  ? Icons.light_mode_rounded
-                  : Icons.brightness_auto_rounded,
+            ChromeIconActionButton(
+              icon: chromeThemeToggleIcon(themeMode),
               tooltip: themeToggleTooltip,
               onPressed: onOpenThemeToggle,
             ),
             const SizedBox(width: AppSpacing.xs),
             if (showCollapseControl)
-              _SidebarActionButton(
+              ChromeIconActionButton(
                 icon: _sidebarStateIcon(sidebarState),
                 tooltip: _sidebarStateLabel(sidebarState),
                 onPressed: onCycleSidebarState,
@@ -700,79 +709,6 @@ class SidebarFooter extends StatelessWidget {
 }
 
 enum _SidebarItemEmphasis { primary, secondary }
-
-class _SidebarActionButton extends StatefulWidget {
-  const _SidebarActionButton({
-    required this.icon,
-    this.tooltip,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String? tooltip;
-  final VoidCallback onPressed;
-
-  @override
-  State<_SidebarActionButton> createState() => _SidebarActionButtonState();
-}
-
-class _SidebarActionButtonState extends State<_SidebarActionButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final resolvedBackground = _hovered
-        ? palette.chromeSurfacePressed
-        : palette.chromeSurface;
-
-    return Tooltip(
-      message: widget.tooltip ?? '',
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                palette.chromeHighlight.withValues(
-                  alpha: _hovered ? 0.94 : 0.88,
-                ),
-                resolvedBackground,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(AppRadius.button),
-            border: Border.all(color: palette.chromeStroke),
-            boxShadow: [
-              _hovered ? palette.chromeShadowLift : palette.chromeShadowAmbient,
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(AppRadius.button),
-              onTap: widget.onPressed,
-              child: Container(
-                height: AppSizes.sidebarItemHeight,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-                child: Center(
-                  child: Icon(
-                    widget.icon,
-                    size: AppSizes.sidebarIconSize,
-                    color: palette.textSecondary,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _SidebarAccountTile extends StatefulWidget {
   const _SidebarAccountTile({
@@ -895,79 +831,6 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
                     ],
                   ],
                 ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SidebarLanguageButton extends StatefulWidget {
-  const _SidebarLanguageButton({
-    required this.appLanguage,
-    required this.compact,
-    required this.tooltip,
-    required this.onPressed,
-  });
-
-  final AppLanguage appLanguage;
-  final bool compact;
-  final String tooltip;
-  final VoidCallback onPressed;
-
-  @override
-  State<_SidebarLanguageButton> createState() => _SidebarLanguageButtonState();
-}
-
-class _SidebarLanguageButtonState extends State<_SidebarLanguageButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final size = widget.compact ? AppSizes.sidebarItemHeight : 44.0;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Tooltip(
-        message: widget.tooltip,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.button),
-          onTap: widget.onPressed,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            width: size,
-            height: size,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  palette.chromeHighlight.withValues(
-                    alpha: _hovered ? 0.94 : 0.88,
-                  ),
-                  _hovered
-                      ? palette.chromeSurfacePressed
-                      : palette.chromeSurface,
-                ],
-              ),
-              borderRadius: BorderRadius.circular(AppRadius.button),
-              border: Border.all(color: palette.chromeStroke),
-              boxShadow: [
-                _hovered
-                    ? palette.chromeShadowLift
-                    : palette.chromeShadowAmbient,
-              ],
-            ),
-            child: Text(
-              widget.appLanguage.compactLabel,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: palette.textPrimary,
-                fontWeight: FontWeight.w600,
               ),
             ),
           ),
