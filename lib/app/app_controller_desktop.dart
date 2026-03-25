@@ -30,6 +30,7 @@ import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
+import '../runtime/platform_environment.dart';
 import '../runtime/single_agent_runner.dart';
 import '../runtime/skill_directory_access.dart';
 
@@ -266,6 +267,7 @@ class AppController extends ChangeNotifier {
   String? _bootstrapError;
   StreamSubscription<GatewayPushEvent>? _runtimeEventsSubscription;
   bool _disposed = false;
+  String _resolvedUserHomeDirectory = resolveUserHomeDirectory();
   SettingsSnapshot _lastObservedSettingsSnapshot = SettingsSnapshot.defaults();
   Future<void> _assistantThreadPersistQueue = Future<void>.value();
   Future<void> _settingsObservationQueue = Future<void>.value();
@@ -276,6 +278,8 @@ class AppController extends ChangeNotifier {
           _singleAgentSharedSkillScanRootFromOverride,
         ))?.toList(growable: false) ??
         _defaultSingleAgentGlobalSkillScanRoots;
+    final requiresAuthorizedSharedRoots =
+        _skillDirectoryAccessService.requiresAuthorizedSharedRoots;
     final authorizedByPath = <String, AuthorizedSkillDirectory>{
       for (final directory in settings.authorizedSkillDirectories)
         normalizeAuthorizedSkillDirectoryPath(directory.path): directory,
@@ -288,11 +292,16 @@ class AppController extends ChangeNotifier {
         continue;
       }
       final authorizedDirectory = authorizedByPath.remove(resolvedPath);
-      resolvedRoots.add(
-        root.copyWith(bookmark: authorizedDirectory?.bookmark ?? ''),
-      );
+      final bookmark = authorizedDirectory?.bookmark.trim() ?? '';
+      if (requiresAuthorizedSharedRoots && bookmark.isEmpty) {
+        continue;
+      }
+      resolvedRoots.add(root.copyWith(bookmark: bookmark));
     }
     for (final directory in authorizedByPath.values) {
+      if (requiresAuthorizedSharedRoots && directory.bookmark.trim().isEmpty) {
+        continue;
+      }
       resolvedRoots.add(
         _singleAgentSharedSkillScanRootFromAuthorizedDirectory(directory),
       );
@@ -368,7 +377,7 @@ class AppController extends ChangeNotifier {
       _defaultSingleAgentGlobalSkillScanRoots
           .map((item) => item.path)
           .toList(growable: false);
-  String get userHomeDirectory => Platform.environment['HOME']?.trim() ?? '';
+  String get userHomeDirectory => _resolvedUserHomeDirectory;
   String get settingsYamlPath => defaultUserSettingsFilePath() ?? '';
   bool get hasSettingsDraftChanges =>
       settingsDraft.toJsonString() != settings.toJsonString() ||
@@ -2964,6 +2973,8 @@ class AppController extends ChangeNotifier {
 
   Future<void> _initialize() async {
     try {
+      _resolvedUserHomeDirectory = await _skillDirectoryAccessService
+          .resolveUserHomeDirectory();
       await _settingsController.initialize();
       _restoreAssistantThreads(await _store.loadAssistantThreadRecords());
       await _restoreSharedSingleAgentLocalSkillsCache();
@@ -4342,7 +4353,8 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  _SingleAgentSkillScanRoot _singleAgentSharedSkillScanRootFromAuthorizedDirectory(
+  _SingleAgentSkillScanRoot
+  _singleAgentSharedSkillScanRootFromAuthorizedDirectory(
     AuthorizedSkillDirectory directory,
   ) {
     final normalizedPath = normalizeAuthorizedSkillDirectoryPath(
@@ -4369,7 +4381,7 @@ class AppController extends ChangeNotifier {
       return trimmed;
     }
     if (trimmed.startsWith('~/')) {
-      final home = Platform.environment['HOME']?.trim() ?? '';
+      final home = _resolvedUserHomeDirectory.trim();
       return home.isEmpty ? trimmed : '$home/${trimmed.substring(2)}';
     }
     final normalizedWorkspace = workspaceRef.trim();

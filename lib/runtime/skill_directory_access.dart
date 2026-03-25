@@ -4,10 +4,13 @@ import 'dart:io';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 
+import 'platform_environment.dart';
 import 'runtime_models.dart';
 
 abstract class SkillDirectoryAccessService {
   bool get isSupported;
+  bool get requiresAuthorizedSharedRoots;
+  Future<String> resolveUserHomeDirectory();
 
   Future<AuthorizedSkillDirectory?> authorizeDirectory({
     String suggestedPath = '',
@@ -49,6 +52,14 @@ class UnsupportedSkillDirectoryAccessService
   bool get isSupported => false;
 
   @override
+  bool get requiresAuthorizedSharedRoots => false;
+
+  @override
+  Future<String> resolveUserHomeDirectory() async {
+    return _fallbackUserHomeDirectory();
+  }
+
+  @override
   Future<AuthorizedSkillDirectory?> authorizeDirectory({
     String suggestedPath = '',
   }) async {
@@ -67,6 +78,14 @@ class FileSelectorSkillDirectoryAccessService
     implements SkillDirectoryAccessService {
   @override
   bool get isSupported => true;
+
+  @override
+  bool get requiresAuthorizedSharedRoots => false;
+
+  @override
+  Future<String> resolveUserHomeDirectory() async {
+    return _fallbackUserHomeDirectory();
+  }
 
   @override
   Future<AuthorizedSkillDirectory?> authorizeDirectory({
@@ -104,31 +123,53 @@ class MacOsSkillDirectoryAccessService implements SkillDirectoryAccessService {
   static const MethodChannel _channel = MethodChannel(
     'plus.svc.xworkmate/skill_directory_access',
   );
+  final FileSelectorSkillDirectoryAccessService _fallbackService =
+      FileSelectorSkillDirectoryAccessService();
 
   @override
   bool get isSupported => true;
 
   @override
+  bool get requiresAuthorizedSharedRoots => true;
+
+  @override
+  Future<String> resolveUserHomeDirectory() async {
+    try {
+      final response = await _channel.invokeMethod<String>(
+        'resolveUserHomeDirectory',
+      );
+      final trimmed = response?.trim() ?? '';
+      return trimmed.isEmpty ? _fallbackUserHomeDirectory() : trimmed;
+    } on MissingPluginException {
+      return _fallbackUserHomeDirectory();
+    }
+  }
+
+  @override
   Future<AuthorizedSkillDirectory?> authorizeDirectory({
     String suggestedPath = '',
   }) async {
-    final response = await _channel.invokeMapMethod<String, dynamic>(
-      'authorizeDirectory',
-      <String, dynamic>{'suggestedPath': suggestedPath},
-    );
-    if (response == null) {
-      return null;
+    try {
+      final response = await _channel.invokeMapMethod<String, dynamic>(
+        'authorizeDirectory',
+        <String, dynamic>{'suggestedPath': suggestedPath},
+      );
+      if (response == null) {
+        return null;
+      }
+      final normalized = normalizeAuthorizedSkillDirectoryPath(
+        response['path']?.toString() ?? '',
+      );
+      if (normalized.isEmpty) {
+        return null;
+      }
+      return AuthorizedSkillDirectory(
+        path: normalized,
+        bookmark: response['bookmark']?.toString().trim() ?? '',
+      );
+    } on MissingPluginException {
+      return _fallbackService.authorizeDirectory(suggestedPath: suggestedPath);
     }
-    final normalized = normalizeAuthorizedSkillDirectoryPath(
-      response['path']?.toString() ?? '',
-    );
-    if (normalized.isEmpty) {
-      return null;
-    }
-    return AuthorizedSkillDirectory(
-      path: normalized,
-      bookmark: response['bookmark']?.toString().trim() ?? '',
-    );
   }
 
   @override
@@ -149,35 +190,43 @@ class MacOsSkillDirectoryAccessService implements SkillDirectoryAccessService {
         onClose: () async {},
       );
     }
-    final response = await _channel.invokeMapMethod<String, dynamic>(
-      'startDirectoryAccess',
-      <String, dynamic>{'bookmark': bookmark},
-    );
-    if (response == null) {
-      return null;
+    try {
+      final response = await _channel.invokeMapMethod<String, dynamic>(
+        'startDirectoryAccess',
+        <String, dynamic>{'bookmark': bookmark},
+      );
+      if (response == null) {
+        return null;
+      }
+      final accessId = response['accessId']?.toString().trim() ?? '';
+      final resolvedPath = normalizeAuthorizedSkillDirectoryPath(
+        response['path']?.toString() ?? normalizedPath,
+      );
+      if (accessId.isEmpty || resolvedPath.isEmpty) {
+        return null;
+      }
+      final refreshedBookmark =
+          response['bookmark']?.toString().trim().isNotEmpty == true
+          ? response['bookmark'].toString().trim()
+          : directory.bookmark;
+      return SkillDirectoryAccessHandle(
+        path: resolvedPath,
+        refreshedBookmark: refreshedBookmark,
+        onClose: () async {
+          await _channel.invokeMethod<void>(
+            'stopDirectoryAccess',
+            <String, dynamic>{'accessId': accessId},
+          );
+        },
+      );
+    } on MissingPluginException {
+      return _fallbackService.openDirectory(directory);
     }
-    final accessId = response['accessId']?.toString().trim() ?? '';
-    final resolvedPath = normalizeAuthorizedSkillDirectoryPath(
-      response['path']?.toString() ?? normalizedPath,
-    );
-    if (accessId.isEmpty || resolvedPath.isEmpty) {
-      return null;
-    }
-    final refreshedBookmark =
-        response['bookmark']?.toString().trim().isNotEmpty == true
-        ? response['bookmark'].toString().trim()
-        : directory.bookmark;
-    return SkillDirectoryAccessHandle(
-      path: resolvedPath,
-      refreshedBookmark: refreshedBookmark,
-      onClose: () async {
-        await _channel.invokeMethod<void>(
-          'stopDirectoryAccess',
-          <String, dynamic>{'accessId': accessId},
-        );
-      },
-    );
   }
+}
+
+String _fallbackUserHomeDirectory() {
+  return resolveUserHomeDirectory();
 }
 
 String _initialDirectoryForSuggestion(String suggestedPath) {

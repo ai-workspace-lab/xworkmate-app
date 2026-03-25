@@ -1,10 +1,13 @@
 import Cocoa
+import Darwin
 import FlutterMacOS
 
 @main
 class AppDelegate: FlutterAppDelegate {
   private let skillDirectoryChannelName = "plus.svc.xworkmate/skill_directory_access"
   private var directoryAccessSessions: [String: URL] = [:]
+  private var skillDirectoryChannel: FlutterMethodChannel?
+  private var skillDirectoryMessengerId: ObjectIdentifier?
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
     super.applicationDidFinishLaunching(notification)
@@ -12,13 +15,7 @@ class AppDelegate: FlutterAppDelegate {
     guard let controller = mainFlutterWindow?.contentViewController as? FlutterViewController else {
       return
     }
-    let channel = FlutterMethodChannel(
-      name: skillDirectoryChannelName,
-      binaryMessenger: controller.engine.binaryMessenger
-    )
-    channel.setMethodCallHandler { [weak self] call, result in
-      self?.handleSkillDirectoryCall(call, result: result)
-    }
+    registerSkillDirectoryChannel(for: controller)
   }
 
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -37,8 +34,27 @@ class AppDelegate: FlutterAppDelegate {
     super.applicationWillTerminate(notification)
   }
 
+  func registerSkillDirectoryChannel(for controller: FlutterViewController) {
+    let messengerObject = controller.engine.binaryMessenger as AnyObject
+    let messengerId = ObjectIdentifier(messengerObject)
+    if skillDirectoryMessengerId == messengerId {
+      return
+    }
+    let channel = FlutterMethodChannel(
+      name: skillDirectoryChannelName,
+      binaryMessenger: controller.engine.binaryMessenger
+    )
+    channel.setMethodCallHandler { [weak self] call, result in
+      self?.handleSkillDirectoryCall(call, result: result)
+    }
+    skillDirectoryChannel = channel
+    skillDirectoryMessengerId = messengerId
+  }
+
   private func handleSkillDirectoryCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
+    case "resolveUserHomeDirectory":
+      result(resolveUserHomeDirectoryPath())
     case "authorizeDirectory":
       authorizeDirectory(call, result: result)
     case "startDirectoryAccess":
@@ -170,10 +186,10 @@ class AppDelegate: FlutterAppDelegate {
   private func initialDirectoryURL(for suggestedPath: String) -> URL? {
     let trimmed = suggestedPath.trimmingCharacters(in: .whitespacesAndNewlines)
     if trimmed.isEmpty {
-      return FileManager.default.homeDirectoryForCurrentUser
+      return URL(fileURLWithPath: resolveUserHomeDirectoryPath(), isDirectory: true)
     }
 
-    var candidate = URL(fileURLWithPath: (trimmed as NSString).expandingTildeInPath)
+    var candidate = URL(fileURLWithPath: expandUserPath(trimmed))
     var isDirectory: ObjCBool = false
     while true {
       if FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory) {
@@ -185,6 +201,21 @@ class AppDelegate: FlutterAppDelegate {
       }
       candidate = parent
     }
-    return FileManager.default.homeDirectoryForCurrentUser
+    return URL(fileURLWithPath: resolveUserHomeDirectoryPath(), isDirectory: true)
+  }
+
+  private func expandUserPath(_ path: String) -> String {
+    guard path.hasPrefix("~/") else {
+      return path
+    }
+    let relative = String(path.dropFirst(2))
+    return (resolveUserHomeDirectoryPath() as NSString).appendingPathComponent(relative)
+  }
+
+  private func resolveUserHomeDirectoryPath() -> String {
+    if let directoryPointer = getpwuid(getuid())?.pointee.pw_dir {
+      return String(cString: directoryPointer)
+    }
+    return FileManager.default.homeDirectoryForCurrentUser.path
   }
 }

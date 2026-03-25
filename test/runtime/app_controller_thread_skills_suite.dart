@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
+import 'package:xworkmate/runtime/skill_directory_access.dart';
 
 void main() {
   test(
@@ -203,6 +204,240 @@ void main() {
       expect(
         controller.authorizedSkillDirectories.map((item) => item.path),
         <String>[agentsRoot.path],
+      );
+    },
+  );
+
+  test(
+    'AppController resolves preset shared roots against the access service home directory',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-skill-directory-home-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final userHome = Directory('${tempDirectory.path}/real-home');
+      final agentsRoot = Directory('${userHome.path}/.agents/skills');
+      await _writeSkill(
+        agentsRoot,
+        'browser',
+        skillName: 'Browser',
+        description: 'Browser tasks',
+      );
+
+      final controller = AppController(
+        store: await _createStore(tempDirectory.path),
+        skillDirectoryAccessService: _FakeSkillDirectoryAccessService(
+          userHomeDirectory: userHome.path,
+        ),
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        singleAgentSharedSkillScanRootOverrides: const <String>[
+          '~/.agents/skills',
+        ],
+      );
+      addTearDown(controller.dispose);
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      await _waitFor(
+        () => controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .any((item) => item.label == 'Browser'),
+      );
+
+      expect(controller.userHomeDirectory, userHome.path);
+      expect(
+        controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .map((item) => item.label),
+        contains('Browser'),
+      );
+    },
+  );
+
+  test(
+    'AppController skips preset shared roots without bookmarks when the access service requires authorization',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-skill-directory-macos-preset-unauthorized-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final userHome = Directory('${tempDirectory.path}/real-home');
+      final agentsRoot = Directory('${userHome.path}/.agents/skills');
+      await _writeSkill(
+        agentsRoot,
+        'browser',
+        skillName: 'Browser',
+        description: 'Browser tasks',
+      );
+
+      final controller = AppController(
+        store: await _createStore(tempDirectory.path),
+        skillDirectoryAccessService: _FakeSkillDirectoryAccessService(
+          userHomeDirectory: userHome.path,
+          requiresAuthorizedSharedRoots: true,
+        ),
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        singleAgentSharedSkillScanRootOverrides: const <String>[
+          '~/.agents/skills',
+        ],
+      );
+      addTearDown(controller.dispose);
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(
+        controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .where((item) => item.label == 'Browser'),
+        isEmpty,
+      );
+    },
+  );
+
+  test(
+    'AppController scans preset shared roots with bookmarks when the access service requires authorization',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-skill-directory-macos-preset-authorized-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final userHome = Directory('${tempDirectory.path}/real-home');
+      final agentsRoot = Directory('${userHome.path}/.agents/skills');
+      await _writeSkill(
+        agentsRoot,
+        'browser',
+        skillName: 'Browser',
+        description: 'Browser tasks',
+      );
+
+      final store = await _createStore(tempDirectory.path);
+      await store.saveSettingsSnapshot(
+        _singleAgentTestSettings(workspacePath: tempDirectory.path).copyWith(
+          authorizedSkillDirectories: <AuthorizedSkillDirectory>[
+            AuthorizedSkillDirectory(
+              path: agentsRoot.path,
+              bookmark: 'bookmark-1',
+            ),
+          ],
+        ),
+      );
+      final controller = AppController(
+        store: store,
+        skillDirectoryAccessService: _FakeSkillDirectoryAccessService(
+          userHomeDirectory: userHome.path,
+          requiresAuthorizedSharedRoots: true,
+        ),
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        singleAgentSharedSkillScanRootOverrides: const <String>[
+          '~/.agents/skills',
+        ],
+      );
+      addTearDown(controller.dispose);
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      await _waitFor(
+        () => controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .any((item) => item.label == 'Browser'),
+      );
+
+      expect(
+        controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .map((item) => item.label),
+        contains('Browser'),
+      );
+    },
+  );
+
+  test(
+    'AppController skips custom shared directories without bookmarks when the access service requires authorization',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-skill-directory-macos-custom-unauthorized-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final customRoot = Directory(
+        '${tempDirectory.path}/custom-shared-skills',
+      );
+      await _writeSkill(
+        customRoot,
+        'browser',
+        skillName: 'Browser',
+        description: 'Browser tasks',
+      );
+
+      final store = await _createStore(tempDirectory.path);
+      await store.saveSettingsSnapshot(
+        _singleAgentTestSettings(workspacePath: tempDirectory.path).copyWith(
+          authorizedSkillDirectories: <AuthorizedSkillDirectory>[
+            AuthorizedSkillDirectory(path: customRoot.path),
+          ],
+        ),
+      );
+      final controller = AppController(
+        store: store,
+        skillDirectoryAccessService: _FakeSkillDirectoryAccessService(
+          userHomeDirectory: tempDirectory.path,
+          requiresAuthorizedSharedRoots: true,
+        ),
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        singleAgentSharedSkillScanRootOverrides: const <String>[],
+      );
+      addTearDown(controller.dispose);
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(
+        controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .where((item) => item.label == 'Browser'),
+        isEmpty,
       );
     },
   );
@@ -780,4 +1015,45 @@ SettingsSnapshot _singleAgentTestSettings({required String workspacePath}) {
     assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
     workspacePath: workspacePath,
   );
+}
+
+class _FakeSkillDirectoryAccessService implements SkillDirectoryAccessService {
+  _FakeSkillDirectoryAccessService({
+    required this.userHomeDirectory,
+    this.requiresAuthorizedSharedRoots = false,
+  });
+
+  final String userHomeDirectory;
+  @override
+  final bool requiresAuthorizedSharedRoots;
+
+  @override
+  bool get isSupported => true;
+
+  @override
+  Future<String> resolveUserHomeDirectory() async {
+    return userHomeDirectory;
+  }
+
+  @override
+  Future<AuthorizedSkillDirectory?> authorizeDirectory({
+    String suggestedPath = '',
+  }) async {
+    final normalized = normalizeAuthorizedSkillDirectoryPath(suggestedPath);
+    if (normalized.isEmpty) {
+      return null;
+    }
+    return AuthorizedSkillDirectory(path: normalized);
+  }
+
+  @override
+  Future<SkillDirectoryAccessHandle?> openDirectory(
+    AuthorizedSkillDirectory directory,
+  ) async {
+    final normalized = normalizeAuthorizedSkillDirectoryPath(directory.path);
+    if (normalized.isEmpty) {
+      return null;
+    }
+    return SkillDirectoryAccessHandle(path: normalized, onClose: () async {});
+  }
 }
