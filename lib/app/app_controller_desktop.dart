@@ -48,28 +48,13 @@ class AppController extends ChangeNotifier {
   static const List<_SingleAgentSkillScanRoot>
   _defaultGatewayOnlySkillScanRoots = <_SingleAgentSkillScanRoot>[
     _SingleAgentSkillScanRoot(
-      path: '.agents/skills',
-      source: 'agents',
-      scope: 'workspace',
-    ),
-    _SingleAgentSkillScanRoot(
-      path: '.claude/skills',
-      source: 'claude',
-      scope: 'workspace',
-    ),
-    _SingleAgentSkillScanRoot(
-      path: '.codex/skills',
-      source: 'codex',
-      scope: 'workspace',
+      path: '/etc/skills',
+      source: 'system',
+      scope: 'system',
     ),
     _SingleAgentSkillScanRoot(
       path: '~/.agents/skills',
       source: 'agents',
-      scope: 'user',
-    ),
-    _SingleAgentSkillScanRoot(
-      path: '~/.claude/skills',
-      source: 'claude',
       scope: 'user',
     ),
     _SingleAgentSkillScanRoot(
@@ -78,14 +63,9 @@ class AppController extends ChangeNotifier {
       scope: 'user',
     ),
     _SingleAgentSkillScanRoot(
-      path: '~/.config/opencode/skills',
-      source: 'opencode',
+      path: '~/.workbuddy/skills',
+      source: 'workbuddy',
       scope: 'user',
-    ),
-    _SingleAgentSkillScanRoot(
-      path: '/etc/codex/skills',
-      source: 'codex',
-      scope: 'system',
     ),
   ];
 
@@ -207,6 +187,8 @@ class AppController extends ChangeNotifier {
       <String, String>{};
   final Map<String, String> _singleAgentRuntimeModelBySession =
       <String, String>{};
+  List<AssistantThreadSkillEntry> _singleAgentSharedImportedSkills =
+      const <AssistantThreadSkillEntry>[];
   final Map<String, HttpClient> _aiGatewayStreamingClients =
       <String, HttpClient>{};
   final Set<String> _aiGatewayPendingSessionKeys = <String>{};
@@ -487,8 +469,17 @@ class AppController extends ChangeNotifier {
     String sessionKey,
   ) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    return _assistantThreadRecords[normalizedSessionKey]?.importedSkills ??
+    final imported =
+        _assistantThreadRecords[normalizedSessionKey]?.importedSkills ??
         const <AssistantThreadSkillEntry>[];
+    if (assistantExecutionTargetForSession(normalizedSessionKey) ==
+        AssistantExecutionTarget.singleAgent) {
+      if (imported.isNotEmpty) {
+        return imported;
+      }
+      return _singleAgentSharedImportedSkills;
+    }
+    return imported;
   }
 
   int assistantSkillCountForSession(String sessionKey) {
@@ -514,6 +505,17 @@ class AppController extends ChangeNotifier {
     return selected
         .where((item) => importedKeys.contains(item))
         .toList(growable: false);
+  }
+
+  List<AssistantThreadSkillEntry> assistantSelectedSkillsForSession(
+    String sessionKey,
+  ) {
+    final selectedKeys = assistantSelectedSkillKeysForSession(
+      sessionKey,
+    ).toSet();
+    return assistantImportedSkillsForSession(
+      sessionKey,
+    ).where((item) => selectedKeys.contains(item.key)).toList(growable: false);
   }
 
   String assistantModelForSession(String sessionKey) {
@@ -1729,7 +1731,6 @@ class AppController extends ChangeNotifier {
         thinking: thinking,
         attachments: attachments,
         localAttachments: localAttachments,
-        selectedSkillLabels: selectedSkillLabels,
       );
       await _flushAssistantThreadPersistence();
       _recomputeTasks();
@@ -2020,24 +2021,33 @@ class AppController extends ChangeNotifier {
       return;
     }
 
-    final availableSkills = await _scanSingleAgentLocalSkillEntries(
-      allowedSources: _singleAgentAllowedSkillSourcesForSession(
-        normalizedSessionKey,
-      ),
-    );
+    final availableSkills = await _scanSingleAgentLocalSkillEntries();
+    _singleAgentSharedImportedSkills = availableSkills;
     final importedKeys = availableSkills.map((item) => item.key).toSet();
-    final existingSelected =
-        _assistantThreadRecords[normalizedSessionKey]?.selectedSkillKeys ??
-        const <String>[];
-    final nextSelected = existingSelected
-        .where(importedKeys.contains)
-        .toList(growable: false);
-    _upsertAssistantThreadRecord(
+    final refreshTargets = <String>{
       normalizedSessionKey,
-      importedSkills: availableSkills,
-      selectedSkillKeys: nextSelected,
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
+      for (final entry in _assistantThreadRecords.entries)
+        if (assistantExecutionTargetForSession(entry.key) ==
+            AssistantExecutionTarget.singleAgent)
+          entry.key,
+    };
+    final refreshedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+    for (final targetSessionKey in refreshTargets) {
+      final existingSelected =
+          _assistantThreadRecords[targetSessionKey]?.selectedSkillKeys ??
+          const <String>[];
+      final nextSelected = existingSelected
+          .where(importedKeys.contains)
+          .toList(growable: false);
+      _upsertAssistantThreadRecord(
+        targetSessionKey,
+        importedSkills: availableSkills,
+        selectedSkillKeys: nextSelected,
+        updatedAtMs: targetSessionKey == normalizedSessionKey
+            ? refreshedAtMs
+            : _assistantThreadRecords[targetSessionKey]?.updatedAtMs,
+      );
+    }
     _notifyIfActive();
   }
 
@@ -3145,7 +3155,6 @@ class AppController extends ChangeNotifier {
     required String thinking,
     required List<GatewayChatAttachmentPayload> attachments,
     required List<CollaborationAttachment> localAttachments,
-    required List<String> selectedSkillLabels,
   }) async {
     final sessionKey = _normalizedAssistantSessionKey(
       _sessionsController.currentSessionKey,
@@ -3176,6 +3185,7 @@ class AppController extends ChangeNotifier {
 
       try {
         final selection = singleAgentProviderForSession(sessionKey);
+        final selectedSkills = assistantSelectedSkillsForSession(sessionKey);
         final gatewayToken = await settingsController.loadGatewayToken();
         final resolution = await _singleAgentRunner.resolveProvider(
           selection: selection,
@@ -3258,7 +3268,7 @@ class AppController extends ChangeNotifier {
             workingDirectory:
                 _resolveCodexWorkingDirectory() ?? Directory.current.path,
             attachments: localAttachments,
-            selectedSkills: selectedSkillLabels,
+            selectedSkills: selectedSkills,
             aiGatewayBaseUrl: aiGatewayUrl,
             aiGatewayApiKey: await loadAiGatewayApiKey(),
             config: settings.multiAgent,
@@ -3928,37 +3938,10 @@ class AppController extends ChangeNotifier {
     return target.promptValue;
   }
 
-  Set<String>? _singleAgentAllowedSkillSourcesForSession(String sessionKey) {
-    final provider = singleAgentProviderForSession(sessionKey);
-    return _singleAgentAllowedSkillSourcesForProvider(provider);
-  }
-
-  Set<String>? _singleAgentAllowedSkillSourcesForProvider(
-    SingleAgentProvider provider,
-  ) {
-    return switch (provider) {
-      SingleAgentProvider.auto => null,
-      SingleAgentProvider.codex => const <String>{'codex', 'agents'},
-      SingleAgentProvider.claude => const <String>{'claude', 'agents'},
-      SingleAgentProvider.opencode => const <String>{'opencode', 'agents'},
-      SingleAgentProvider.gemini => const <String>{'agents'},
-    };
-  }
-
-  Future<List<AssistantThreadSkillEntry>> _scanSingleAgentLocalSkillEntries({
-    Set<String>? allowedSources,
-  }) async {
-    final entries = <AssistantThreadSkillEntry>[];
-    final seenNames = <String>{};
-    final normalizedAllowedSources = allowedSources
-        ?.map((item) => item.trim().toLowerCase())
-        .where((item) => item.isNotEmpty)
-        .toSet();
+  Future<List<AssistantThreadSkillEntry>>
+  _scanSingleAgentLocalSkillEntries() async {
+    final dedupedByName = <String, AssistantThreadSkillEntry>{};
     for (final rootSpec in _singleAgentLocalSkillScanRoots) {
-      if (normalizedAllowedSources != null &&
-          !normalizedAllowedSources.contains(rootSpec.source)) {
-        continue;
-      }
       final root = Directory(_resolveSingleAgentSkillRootPath(rootSpec.path));
       if (!await root.exists()) {
         continue;
@@ -3972,26 +3955,19 @@ class AppController extends ChangeNotifier {
         }
         final entry = await _skillEntryFromFile(entity, rootSpec);
         final normalizedName = entry.label.trim().toLowerCase();
-        if (normalizedName.isEmpty || !seenNames.add(normalizedName)) {
+        if (normalizedName.isEmpty) {
           continue;
         }
-        entries.add(entry);
+        dedupedByName[normalizedName] = entry;
       }
     }
+    final entries = dedupedByName.values.toList(growable: false);
     entries.sort((left, right) => left.label.compareTo(right.label));
     return entries;
   }
 
   List<_SingleAgentSkillScanRoot> _resolveDefaultSingleAgentSkillScanRoots() {
-    final workspacePath = settings.workspacePath.trim();
-    return _defaultGatewayOnlySkillScanRoots
-        .where((item) {
-          if (item.scope != 'workspace') {
-            return true;
-          }
-          return workspacePath.isNotEmpty;
-        })
-        .toList(growable: false);
+    return _defaultGatewayOnlySkillScanRoots.toList(growable: false);
   }
 
   _SingleAgentSkillScanRoot _singleAgentSkillScanRootFromOverride(
@@ -4046,6 +4022,12 @@ class AppController extends ChangeNotifier {
   }
 
   String _sourceForSkillRootPath(String path) {
+    if (path.startsWith('/etc/skills')) {
+      return 'system';
+    }
+    if (_pathContainsSourceToken(path, 'workbuddy')) {
+      return 'workbuddy';
+    }
     if (_pathContainsSourceToken(path, 'opencode')) {
       return 'opencode';
     }
@@ -4089,13 +4071,17 @@ class AppController extends ChangeNotifier {
               .substring(rootPath.length)
               .replaceFirst(RegExp(r'^/'), '')
         : directory.path;
-    final sourceLabel = '${root.source} · ${root.scope}';
+    final sourceSegments = <String>[
+      root.source,
+      if (root.scope != root.source) root.scope,
+    ].where((item) => item.trim().isNotEmpty).toList(growable: false);
+    final sourceLabel = sourceSegments.join(' · ');
     return AssistantThreadSkillEntry(
       key: directory.path,
       label: label,
       description: (descriptionMatch?.group(1) ?? '').trim(),
       source: root.source,
-      sourcePath: directory.path,
+      sourcePath: file.path,
       scope: root.scope,
       sourceLabel: relativeSource.isEmpty
           ? sourceLabel
@@ -4106,6 +4092,7 @@ class AppController extends ChangeNotifier {
   void _restoreAssistantThreads(List<AssistantThreadRecord> records) {
     _assistantThreadRecords.clear();
     _assistantThreadMessages.clear();
+    _singleAgentSharedImportedSkills = const <AssistantThreadSkillEntry>[];
     final archivedKeys = settings.assistantArchivedTaskKeys
         .map(_normalizedAssistantSessionKey)
         .toSet();
@@ -4146,6 +4133,12 @@ class AppController extends ChangeNotifier {
         _assistantThreadMessages[sessionKey] = List<GatewayChatMessage>.from(
           normalizedRecord.messages,
         );
+      }
+      if ((normalizedRecord.executionTarget ??
+                  settings.assistantExecutionTarget) ==
+              AssistantExecutionTarget.singleAgent &&
+          normalizedRecord.importedSkills.isNotEmpty) {
+        _singleAgentSharedImportedSkills = normalizedRecord.importedSkills;
       }
     }
   }
