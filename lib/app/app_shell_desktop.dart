@@ -8,6 +8,7 @@ import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
 import '../widgets/detail_drawer.dart';
 import '../widgets/pane_resize_handle.dart';
+import '../widgets/app_brand_logo.dart';
 import '../widgets/sidebar_navigation.dart';
 import 'app_controller.dart';
 import 'workspace_page_registry.dart';
@@ -469,8 +470,8 @@ class _SidebarRevealRailState extends State<_SidebarRevealRail> {
               boxShadow: _hovered ? [palette.chromeShadowLift] : const [],
             ),
             child: _hovered
-                ? Icon(
-                    Icons.keyboard_double_arrow_right_rounded,
+                ? DoorLogoIcon(
+                    side: DoorLogoSide.left,
                     size: 16,
                     color: palette.textMuted,
                   )
