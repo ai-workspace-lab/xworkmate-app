@@ -296,6 +296,34 @@ void main() {
     },
   );
 
+  testWidgets('AssistantPage uses a compact collapsed artifact toggle', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+      platform: TargetPlatform.macOS,
+    );
+
+    final toggle = find.byKey(const Key('assistant-artifact-pane-toggle'));
+    final decoratedBody = find.descendant(
+      of: toggle,
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Container && widget.decoration is BoxDecoration,
+      ),
+    );
+
+    expect(toggle, findsOneWidget);
+    expect(tester.getSize(toggle), const Size(32, 36));
+
+    final body = tester.widget<Container>(decoratedBody);
+    final decoration = body.decoration! as BoxDecoration;
+
+    expect(decoration.borderRadius, BorderRadius.circular(8));
+  });
+
   testWidgets(
     'AssistantPage shows Single Agent provider selector on the right',
     (WidgetTester tester) async {},
