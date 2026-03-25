@@ -450,6 +450,218 @@ void main() {
     expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
   });
 
+  testWidgets(
+    'AssistantPage shows a persistent skill popover in single-agent mode and keeps thread selections isolated',
+    (WidgetTester tester) async {
+      late final Directory tempDirectory;
+      late final AppController controller;
+      await tester.runAsync(() async {
+        tempDirectory = await Directory.systemTemp.createTemp(
+          'xworkmate-assistant-skills-ui-',
+        );
+        final agentsRoot = Directory('${tempDirectory.path}/agents-skills');
+        final codexRoot = Directory('${tempDirectory.path}/codex-skills');
+        final workbuddyRoot = Directory(
+          '${tempDirectory.path}/workbuddy-skills',
+        );
+        await _writeSkill(
+          agentsRoot,
+          'browser',
+          skillName: 'Browser Automation',
+          description: 'Browse websites',
+        );
+        await _writeSkill(
+          codexRoot,
+          'ppt',
+          skillName: 'PPT',
+          description: 'Presentation skill',
+        );
+        await _writeSkill(
+          workbuddyRoot,
+          'wordx',
+          skillName: 'WordX',
+          description: 'Document skill',
+        );
+
+        controller = await _createControllerWithThreadRecords(
+          records: const <AssistantThreadRecord>[],
+          useFakeGatewayRuntime: true,
+          singleAgentLocalSkillScanRoots: <String>[
+            agentsRoot.path,
+            codexRoot.path,
+            workbuddyRoot.path,
+          ],
+        );
+      });
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      addTearDown(controller.dispose);
+
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1600, 1000);
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('zh'),
+          supportedLocales: const [Locale('zh'), Locale('en')],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          home: Scaffold(
+            body: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+          ),
+        ),
+      );
+      await _pumpForUiSync(tester);
+
+      await tester.tap(find.byKey(const Key('assistant-skill-picker-button')));
+      await _pumpForUiSync(tester);
+
+      expect(
+        find.byKey(const Key('assistant-skill-picker-popover')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('assistant-skill-picker-dialog')),
+        findsNothing,
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('assistant-skill-picker-search')),
+        'browser',
+      );
+      await _pumpForUiSync(tester);
+      expect(find.text('Browser Automation'), findsOneWidget);
+      expect(find.text('PPT'), findsNothing);
+
+      final browserSkill = controller
+          .assistantImportedSkillsForSession(controller.currentSessionKey)
+          .firstWhere((skill) => skill.label == 'Browser Automation');
+      final pptSkill = controller
+          .assistantImportedSkillsForSession(controller.currentSessionKey)
+          .firstWhere((skill) => skill.label == 'PPT');
+      final wordxSkill = controller
+          .assistantImportedSkillsForSession(controller.currentSessionKey)
+          .firstWhere((skill) => skill.label == 'WordX');
+
+      await tester.tap(
+        find.byKey(
+          ValueKey<String>('assistant-skill-option-${browserSkill.key}'),
+        ),
+      );
+      await _pumpForUiSync(tester);
+      expect(
+        find.byKey(const Key('assistant-skill-picker-popover')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          ValueKey<String>('assistant-selected-skill-${browserSkill.key}'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('assistant-skill-picker-search')),
+        '',
+      );
+      await _pumpForUiSync(tester);
+      await tester.tap(
+        find.byKey(ValueKey<String>('assistant-skill-option-${pptSkill.key}')),
+      );
+      await _pumpForUiSync(tester);
+      expect(
+        find.byKey(const Key('assistant-skill-picker-popover')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          ValueKey<String>('assistant-selected-skill-${pptSkill.key}'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tapAt(const Offset(24, 24));
+      await _pumpForUiSync(tester);
+      expect(
+        find.byKey(const Key('assistant-skill-picker-popover')),
+        findsNothing,
+      );
+
+      controller.initializeAssistantThreadContext(
+        'draft:task-b',
+        title: 'Task B',
+        executionTarget: AssistantExecutionTarget.singleAgent,
+        messageViewMode: AssistantMessageViewMode.rendered,
+      );
+      await tester.runAsync(() async {
+        await controller.switchSession('draft:task-b');
+      });
+      await _pumpForUiSync(tester);
+
+      expect(
+        find.byKey(
+          ValueKey<String>('assistant-selected-skill-${browserSkill.key}'),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.byKey(
+          ValueKey<String>('assistant-selected-skill-${pptSkill.key}'),
+        ),
+        findsNothing,
+      );
+
+      await tester.tap(find.byKey(const Key('assistant-skill-picker-button')));
+      await _pumpForUiSync(tester);
+      await tester.tap(
+        find.byKey(
+          ValueKey<String>('assistant-skill-option-${wordxSkill.key}'),
+        ),
+      );
+      await _pumpForUiSync(tester);
+
+      expect(
+        find.byKey(
+          ValueKey<String>('assistant-selected-skill-${wordxSkill.key}'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.runAsync(() async {
+        await controller.switchSession('main');
+      });
+      await _pumpForUiSync(tester);
+
+      expect(
+        find.byKey(
+          ValueKey<String>('assistant-selected-skill-${browserSkill.key}'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          ValueKey<String>('assistant-selected-skill-${pptSkill.key}'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          ValueKey<String>('assistant-selected-skill-${wordxSkill.key}'),
+        ),
+        findsNothing,
+      );
+    },
+  );
+
   testWidgets('AssistantPage hides gated attachment and multi-agent actions', (
     WidgetTester tester,
   ) async {
@@ -904,6 +1116,7 @@ void main() {
 }
 
 Future<AppController> _createControllerWithThreadRecords({
+  WidgetTester? tester,
   required List<AssistantThreadRecord> records,
   bool useFakeGatewayRuntime = false,
   List<String>? singleAgentLocalSkillScanRoots,
@@ -917,9 +1130,34 @@ Future<AppController> _createControllerWithThreadRecords({
     databasePathResolver: () async => '${tempDirectory.path}/settings.db',
     fallbackDirectoryPathResolver: () async => tempDirectory.path,
   );
+  addTearDown(() async {
+    if (await tempDirectory.exists()) {
+      try {
+        await tempDirectory.delete(recursive: true);
+      } catch (_) {}
+    }
+  });
+  final defaults = SettingsSnapshot.defaults();
   await store.saveSettingsSnapshot(
-    SettingsSnapshot.defaults().copyWith(
-      aiGateway: SettingsSnapshot.defaults().aiGateway.copyWith(
+    defaults.copyWith(
+      gatewayProfiles: replaceGatewayProfileAt(
+        replaceGatewayProfileAt(
+          defaults.gatewayProfiles,
+          kGatewayLocalProfileIndex,
+          defaults.primaryLocalGatewayProfile.copyWith(
+            host: '127.0.0.1',
+            port: 9,
+            tls: false,
+          ),
+        ),
+        kGatewayRemoteProfileIndex,
+        defaults.primaryRemoteGatewayProfile.copyWith(
+          host: '127.0.0.1',
+          port: 9,
+          tls: false,
+        ),
+      ),
+      aiGateway: defaults.aiGateway.copyWith(
         baseUrl: 'http://127.0.0.1:11434/v1',
         availableModels: const <String>['qwen2.5-coder:latest'],
         selectedModels: const <String>['qwen2.5-coder:latest'],
@@ -939,14 +1177,31 @@ Future<AppController> _createControllerWithThreadRecords({
         : null,
     singleAgentLocalSkillScanRoots: singleAgentLocalSkillScanRoots,
   );
-  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  final stopwatch = Stopwatch()..start();
   while (controller.initializing) {
-    if (DateTime.now().isAfter(deadline)) {
+    if (stopwatch.elapsed > const Duration(seconds: 10)) {
       fail('controller did not finish initializing before timeout');
     }
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+    if (tester != null) {
+      await tester.pump(const Duration(milliseconds: 20));
+    } else {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
   }
   return controller;
+}
+
+Future<void> _writeSkill(
+  Directory root,
+  String folderName, {
+  required String skillName,
+  required String description,
+}) async {
+  final directory = Directory('${root.path}/$folderName');
+  await directory.create(recursive: true);
+  await File(
+    '${directory.path}/SKILL.md',
+  ).writeAsString('---\nname: $skillName\ndescription: $description\n---\n');
 }
 
 Future<void> _pumpForUiSync(WidgetTester tester) async {

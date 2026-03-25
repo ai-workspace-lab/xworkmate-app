@@ -11,11 +11,11 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   test(
-    'AppController maps Single Agent skills by provider with agents as common source',
+    'AppController shares single-agent skills across providers and applies root precedence',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-thread-skills-',
+        'xworkmate-single-agent-shared-skills-',
       );
       addTearDown(() async {
         if (await tempDirectory.exists()) {
@@ -24,41 +24,39 @@ void main() {
           } catch (_) {}
         }
       });
-      final workspaceCodexRoot = Directory(
-        '${tempDirectory.path}/workspace/.codex/skills',
-      );
-      final userCodexRoot = Directory(
-        '${tempDirectory.path}/user-codex-skills',
-      );
-      final userClaudeRoot = Directory(
-        '${tempDirectory.path}/user-claude-skills',
-      );
-      final userAgentsRoot = Directory(
-        '${tempDirectory.path}/user-agents-skills',
+      final systemRoot = Directory('${tempDirectory.path}/etc-skills');
+      final agentsRoot = Directory('${tempDirectory.path}/agents-skills');
+      final codexRoot = Directory('${tempDirectory.path}/codex-skills');
+      final workbuddyRoot = Directory('${tempDirectory.path}/workbuddy-skills');
+      await _writeSkill(
+        systemRoot,
+        'analysis',
+        skillName: 'Analysis',
+        description: 'System version should be overridden',
       );
       await _writeSkill(
-        workspaceCodexRoot,
-        'idea-discovery',
-        skillName: 'Idea Discovery',
-        description: 'Workspace skill wins',
+        agentsRoot,
+        'browser',
+        skillName: 'Browser Automation',
+        description: 'Shared browser skill',
       );
       await _writeSkill(
-        userCodexRoot,
-        'idea-discovery',
-        skillName: 'Idea Discovery',
-        description: 'User skill should be overridden',
+        codexRoot,
+        'ppt',
+        skillName: 'PPT',
+        description: 'Presentation skill',
       );
       await _writeSkill(
-        userClaudeRoot,
-        'incident-review',
-        skillName: 'Incident Review',
-        description: 'Review incidents',
+        workbuddyRoot,
+        'analysis',
+        skillName: 'Analysis',
+        description: 'WorkBuddy version wins',
       );
       await _writeSkill(
-        userAgentsRoot,
-        'shared-utilities',
-        skillName: 'Shared Utilities',
-        description: 'Common utilities',
+        workbuddyRoot,
+        'cicd-audit',
+        skillName: 'CICD Audit',
+        description: 'Pipeline audit skill',
       );
 
       final controller = AppController(
@@ -73,10 +71,10 @@ void main() {
           SingleAgentProvider.claude,
         ],
         singleAgentLocalSkillScanRoots: <String>[
-          '${tempDirectory.path}/workspace/.codex/skills',
-          userCodexRoot.path,
-          userClaudeRoot.path,
-          userAgentsRoot.path,
+          systemRoot.path,
+          agentsRoot.path,
+          codexRoot.path,
+          workbuddyRoot.path,
         ],
       );
       addTearDown(controller.dispose);
@@ -85,213 +83,272 @@ void main() {
         AssistantExecutionTarget.singleAgent,
       );
       await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+      final firstSessionKey = controller.currentSessionKey;
+
+      expect(
+        controller.assistantImportedSkillsForSession(firstSessionKey),
+        hasLength(4),
+      );
       expect(
         controller
-            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .assistantImportedSkillsForSession(firstSessionKey)
             .map((skill) => skill.label),
-        containsAll(const <String>['Idea Discovery', 'Shared Utilities']),
+        containsAll(const <String>[
+          'Analysis',
+          'Browser Automation',
+          'PPT',
+          'CICD Audit',
+        ]),
       );
-      expect(
-        controller
-            .assistantImportedSkillsForSession(controller.currentSessionKey)
-            .map((skill) => skill.label),
-        isNot(contains('Incident Review')),
-      );
-      expect(
-        controller.assistantImportedSkillsForSession(
-          controller.currentSessionKey,
-        ),
-        hasLength(2),
-      );
-      expect(
-        controller
-            .assistantImportedSkillsForSession(controller.currentSessionKey)
-            .firstWhere((skill) => skill.label == 'Idea Discovery')
-            .description,
-        'Workspace skill wins',
-      );
-      expect(
-        controller
-            .assistantImportedSkillsForSession(controller.currentSessionKey)
-            .firstWhere((skill) => skill.label == 'Idea Discovery')
-            .scope,
-        'workspace',
-      );
-      expect(
-        controller
-            .assistantImportedSkillsForSession(controller.currentSessionKey)
-            .firstWhere((skill) => skill.label == 'Shared Utilities')
-            .source,
-        'agents',
-      );
+      final analysisSkill = controller
+          .assistantImportedSkillsForSession(firstSessionKey)
+          .firstWhere((skill) => skill.label == 'Analysis');
+      expect(analysisSkill.description, 'WorkBuddy version wins');
+      expect(analysisSkill.source, 'workbuddy');
+      expect(analysisSkill.scope, 'user');
+
       await controller.toggleAssistantSkillForSession(
-        controller.currentSessionKey,
+        firstSessionKey,
         controller
-            .assistantImportedSkillsForSession(controller.currentSessionKey)
-            .firstWhere((skill) => skill.label == 'Idea Discovery')
+            .assistantImportedSkillsForSession(firstSessionKey)
+            .firstWhere((skill) => skill.label == 'PPT')
             .key,
       );
       expect(
-        controller.assistantSelectedSkillKeysForSession(
-          controller.currentSessionKey,
-        ),
-        hasLength(1),
+        controller
+            .assistantSelectedSkillsForSession(firstSessionKey)
+            .map((skill) => skill.label),
+        const <String>['PPT'],
       );
 
       await controller.setSingleAgentProvider(SingleAgentProvider.claude);
       expect(
-        controller
-            .assistantImportedSkillsForSession(controller.currentSessionKey)
-            .map((skill) => skill.label),
-        containsAll(const <String>['Incident Review', 'Shared Utilities']),
-      );
-      expect(
-        controller.assistantSelectedSkillKeysForSession(
-          controller.currentSessionKey,
-        ),
-        isEmpty,
+        controller.assistantImportedSkillsForSession(firstSessionKey),
+        hasLength(4),
       );
       expect(
         controller
-            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .assistantImportedSkillsForSession(firstSessionKey)
             .map((skill) => skill.label),
-        isNot(contains('Idea Discovery')),
+        containsAll(const <String>[
+          'Analysis',
+          'Browser Automation',
+          'PPT',
+          'CICD Audit',
+        ]),
+      );
+      expect(
+        controller
+            .assistantSelectedSkillsForSession(firstSessionKey)
+            .map((skill) => skill.label),
+        const <String>['PPT'],
       );
 
       await controller.setSingleAgentProvider(SingleAgentProvider.auto);
       expect(
-        controller
-            .assistantImportedSkillsForSession(controller.currentSessionKey)
-            .map((skill) => skill.label),
-        containsAll(const <String>[
-          'Idea Discovery',
-          'Incident Review',
-          'Shared Utilities',
-        ]),
+        controller.assistantImportedSkillsForSession(firstSessionKey),
+        hasLength(4),
       );
-
       expect(
-        controller.assistantSelectedSkillKeysForSession(
-          controller.currentSessionKey,
-        ),
-        isEmpty,
+        controller
+            .assistantSelectedSkillsForSession(firstSessionKey)
+            .map((skill) => skill.label),
+        const <String>['PPT'],
       );
     },
   );
 
-  test('AppController keeps thread-bound skills isolated per thread', () async {
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    final tempDirectory = await Directory.systemTemp.createTemp(
-      'xworkmate-thread-isolation-',
-    );
-    addTearDown(() async {
-      if (await tempDirectory.exists()) {
-        try {
-          await tempDirectory.delete(recursive: true);
-        } catch (_) {}
+  test(
+    'AppController keeps thread-bound skills isolated and restores them after restart',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-isolation-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final agentsRoot = Directory('${tempDirectory.path}/agents-skills');
+      final codexRoot = Directory('${tempDirectory.path}/codex-skills');
+      final workbuddyRoot = Directory('${tempDirectory.path}/workbuddy-skills');
+      await _writeSkill(
+        agentsRoot,
+        'browser',
+        skillName: 'Browser',
+        description: 'Browser tasks',
+      );
+      await _writeSkill(
+        codexRoot,
+        'ppt',
+        skillName: 'PPT',
+        description: 'Presentation tasks',
+      );
+      await _writeSkill(
+        workbuddyRoot,
+        'wordx',
+        skillName: 'WordX',
+        description: 'Document tasks',
+      );
+      await _writeSkill(
+        workbuddyRoot,
+        'cicd-audit',
+        skillName: 'CICD Audit',
+        description: 'Pipeline tasks',
+      );
+
+      SecureConfigStore createStore() {
+        return SecureConfigStore(
+          enableSecureStorage: false,
+          databasePathResolver: () async =>
+              '${tempDirectory.path}/settings.sqlite3',
+          fallbackDirectoryPathResolver: () async => tempDirectory.path,
+        );
       }
-    });
-    final codexRoot = Directory('${tempDirectory.path}/codex-skills');
-    final claudeRoot = Directory('${tempDirectory.path}/claude-skills');
-    final agentsRoot = Directory('${tempDirectory.path}/agents-skills');
-    await _writeSkill(
-      codexRoot,
-      'analysis',
-      skillName: 'Analysis',
-      description: 'Analyze tasks',
-    );
-    await _writeSkill(
-      claudeRoot,
-      'review',
-      skillName: 'Review',
-      description: 'Review tasks',
-    );
-    await _writeSkill(
-      agentsRoot,
-      'shared',
-      skillName: 'Shared',
-      description: 'Shared tasks',
-    );
 
-    final controller = AppController(
-      store: SecureConfigStore(
-        enableSecureStorage: false,
-        databasePathResolver: () async =>
-            '${tempDirectory.path}/settings.sqlite3',
-        fallbackDirectoryPathResolver: () async => tempDirectory.path,
-      ),
-      availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-        SingleAgentProvider.codex,
-        SingleAgentProvider.claude,
-      ],
-      singleAgentLocalSkillScanRoots: <String>[
-        codexRoot.path,
-        claudeRoot.path,
-        agentsRoot.path,
-      ],
-    );
-    addTearDown(controller.dispose);
-    await _waitFor(() => !controller.initializing);
-    await controller.setAssistantExecutionTarget(
-      AssistantExecutionTarget.singleAgent,
-    );
-    await controller.setSingleAgentProvider(SingleAgentProvider.codex);
-    final firstSessionKey = controller.currentSessionKey;
-    expect(
-      controller.assistantImportedSkillsForSession(firstSessionKey),
-      hasLength(2),
-    );
-    await controller.toggleAssistantSkillForSession(
-      firstSessionKey,
-      controller
-          .assistantImportedSkillsForSession(firstSessionKey)
-          .firstWhere((skill) => skill.label == 'Analysis')
-          .key,
-    );
+      AppController createController() {
+        return AppController(
+          store: createStore(),
+          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+            SingleAgentProvider.claude,
+          ],
+          singleAgentLocalSkillScanRoots: <String>[
+            agentsRoot.path,
+            codexRoot.path,
+            workbuddyRoot.path,
+          ],
+        );
+      }
 
-    controller.initializeAssistantThreadContext(
-      'draft:thread-2',
-      title: 'Thread 2',
-      executionTarget: AssistantExecutionTarget.singleAgent,
-      messageViewMode: AssistantMessageViewMode.rendered,
-      singleAgentProvider: SingleAgentProvider.claude,
-    );
-    await controller.switchSession('draft:thread-2');
-    expect(
-      controller
-          .assistantImportedSkillsForSession(controller.currentSessionKey)
-          .map((skill) => skill.label),
-      containsAll(const <String>['Review', 'Shared']),
-    );
-    expect(
-      controller.assistantImportedSkillsForSession(
-        controller.currentSessionKey,
-      ),
-      hasLength(2),
-    );
-    expect(
-      controller.assistantSelectedSkillKeysForSession(
-        controller.currentSessionKey,
-      ),
-      isEmpty,
-    );
-    await controller.switchSession(firstSessionKey);
+      final controller = createController();
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      final taskA = controller.currentSessionKey;
+      expect(controller.assistantImportedSkillsForSession(taskA), hasLength(4));
+      await controller.toggleAssistantSkillForSession(
+        taskA,
+        controller
+            .assistantImportedSkillsForSession(taskA)
+            .firstWhere((skill) => skill.label == 'PPT')
+            .key,
+      );
 
-    expect(
-      controller.assistantImportedSkillsForSession(firstSessionKey),
-      hasLength(2),
-    );
-    expect(
-      controller
-          .assistantImportedSkillsForSession(firstSessionKey)
-          .map((skill) => skill.label),
-      containsAll(const <String>['Analysis', 'Shared']),
-    );
-    expect(
-      controller.assistantSelectedSkillKeysForSession(firstSessionKey),
-      hasLength(1),
-    );
-  });
+      controller.initializeAssistantThreadContext(
+        'draft:task-b',
+        title: 'Task B',
+        executionTarget: AssistantExecutionTarget.singleAgent,
+        messageViewMode: AssistantMessageViewMode.rendered,
+        singleAgentProvider: SingleAgentProvider.claude,
+      );
+      await controller.switchSession('draft:task-b');
+      final taskB = controller.currentSessionKey;
+      await controller.toggleAssistantSkillForSession(
+        taskB,
+        controller
+            .assistantImportedSkillsForSession(taskB)
+            .firstWhere((skill) => skill.label == 'WordX')
+            .key,
+      );
+
+      controller.initializeAssistantThreadContext(
+        'draft:task-c',
+        title: 'Task C',
+        executionTarget: AssistantExecutionTarget.singleAgent,
+        messageViewMode: AssistantMessageViewMode.rendered,
+      );
+      await controller.switchSession('draft:task-c');
+      final taskC = controller.currentSessionKey;
+      await controller.toggleAssistantSkillForSession(
+        taskC,
+        controller
+            .assistantImportedSkillsForSession(taskC)
+            .firstWhere((skill) => skill.label == 'Browser')
+            .key,
+      );
+
+      controller.initializeAssistantThreadContext(
+        'draft:task-d',
+        title: 'Task D',
+        executionTarget: AssistantExecutionTarget.singleAgent,
+        messageViewMode: AssistantMessageViewMode.rendered,
+      );
+      await controller.switchSession('draft:task-d');
+      final taskD = controller.currentSessionKey;
+      await controller.toggleAssistantSkillForSession(
+        taskD,
+        controller
+            .assistantImportedSkillsForSession(taskD)
+            .firstWhere((skill) => skill.label == 'CICD Audit')
+            .key,
+      );
+
+      expect(
+        controller
+            .assistantSelectedSkillsForSession(taskA)
+            .map((skill) => skill.label),
+        const <String>['PPT'],
+      );
+      expect(
+        controller
+            .assistantSelectedSkillsForSession(taskB)
+            .map((skill) => skill.label),
+        const <String>['WordX'],
+      );
+      expect(
+        controller
+            .assistantSelectedSkillsForSession(taskC)
+            .map((skill) => skill.label),
+        const <String>['Browser'],
+      );
+      expect(
+        controller
+            .assistantSelectedSkillsForSession(taskD)
+            .map((skill) => skill.label),
+        const <String>['CICD Audit'],
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      controller.dispose();
+
+      final restoredController = createController();
+      addTearDown(restoredController.dispose);
+      await _waitFor(() => !restoredController.initializing);
+      await restoredController.switchSession(taskA);
+      expect(
+        restoredController
+            .assistantSelectedSkillsForSession(taskA)
+            .map((skill) => skill.label),
+        const <String>['PPT'],
+      );
+      await restoredController.switchSession(taskB);
+      expect(
+        restoredController
+            .assistantSelectedSkillsForSession(taskB)
+            .map((skill) => skill.label),
+        const <String>['WordX'],
+      );
+      await restoredController.switchSession(taskC);
+      expect(
+        restoredController
+            .assistantSelectedSkillsForSession(taskC)
+            .map((skill) => skill.label),
+        const <String>['Browser'],
+      );
+      await restoredController.switchSession(taskD);
+      expect(
+        restoredController
+            .assistantSelectedSkillsForSession(taskD)
+            .map((skill) => skill.label),
+        const <String>['CICD Audit'],
+      );
+    },
+  );
 }
 
 Future<void> _writeSkill(
