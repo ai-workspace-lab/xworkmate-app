@@ -34,46 +34,7 @@ import '../runtime/single_agent_runner.dart';
 
 enum CodexCooperationState { notStarted, bridgeOnly, registered }
 
-class _SingleAgentSkillScanRoot {
-  const _SingleAgentSkillScanRoot({
-    required this.path,
-    required this.source,
-    required this.scope,
-  });
-
-  final String path;
-  final String source;
-  final String scope;
-}
-
-const String _singleAgentLocalSkillsCacheRelativePath =
-    'cache/single-agent-local-skills.json';
-
 class AppController extends ChangeNotifier {
-  static const List<_SingleAgentSkillScanRoot>
-  _defaultGatewayOnlySkillScanRoots = <_SingleAgentSkillScanRoot>[
-    _SingleAgentSkillScanRoot(
-      path: '/etc/skills',
-      source: 'system',
-      scope: 'system',
-    ),
-    _SingleAgentSkillScanRoot(
-      path: '~/.agents/skills',
-      source: 'agents',
-      scope: 'user',
-    ),
-    _SingleAgentSkillScanRoot(
-      path: '~/.codex/skills',
-      source: 'codex',
-      scope: 'user',
-    ),
-    _SingleAgentSkillScanRoot(
-      path: '~/.workbuddy/skills',
-      source: 'workbuddy',
-      scope: 'user',
-    ),
-  ];
-
   AppController({
     SecureConfigStore? store,
     RuntimeCoordinator? runtimeCoordinator,
@@ -121,10 +82,6 @@ class AppController extends ChangeNotifier {
     _tasksController = DerivedTasksController();
     _desktopPlatformService =
         desktopPlatformService ?? createDesktopPlatformService();
-    _singleAgentLocalSkillScanRootOverrides =
-        (singleAgentLocalSkillScanRoots ??
-                (_isFlutterTestEnvironment ? const <String>[] : null))
-            ?.toList(growable: false);
     _gatewayAcpClient = GatewayAcpClient(
       endpointResolver: _resolveGatewayAcpEndpoint,
     );
@@ -167,7 +124,6 @@ class AppController extends ChangeNotifier {
   late final DevicesController _devicesController;
   late final DerivedTasksController _tasksController;
   late final DesktopPlatformService _desktopPlatformService;
-  late final List<String>? _singleAgentLocalSkillScanRootOverrides;
   late final GatewayAcpClient _gatewayAcpClient;
   late final DirectSingleAgentAppServerClient _singleAgentAppServerClient;
   late final List<SingleAgentProvider>? _availableSingleAgentProvidersOverride;
@@ -192,9 +148,6 @@ class AppController extends ChangeNotifier {
       <String, String>{};
   final DesktopThreadArtifactService _threadArtifactService =
       DesktopThreadArtifactService();
-  List<AssistantThreadSkillEntry> _singleAgentSharedImportedSkills =
-      const <AssistantThreadSkillEntry>[];
-  bool _singleAgentLocalSkillsHydrated = false;
   final Map<String, HttpClient> _aiGatewayStreamingClients =
       <String, HttpClient>{};
   final Set<String> _aiGatewayPendingSessionKeys = <String>{};
@@ -227,17 +180,7 @@ class AppController extends ChangeNotifier {
   String? _bootstrapError;
   StreamSubscription<GatewayPushEvent>? _runtimeEventsSubscription;
   bool _disposed = false;
-
-  static bool get _isFlutterTestEnvironment =>
-      Platform.environment.containsKey('FLUTTER_TEST');
   Future<void> _assistantThreadPersistQueue = Future<void>.value();
-
-  List<_SingleAgentSkillScanRoot> get _singleAgentLocalSkillScanRoots =>
-      (_singleAgentLocalSkillScanRootOverrides?.map(
-        _singleAgentSkillScanRootFromOverride,
-      ))
-          ?.toList(growable: false) ??
-      _resolveDefaultSingleAgentSkillScanRoots();
 
   WorkspaceDestination get destination => _destination;
   UiFeatureManifest get uiFeatureManifest => _uiFeatureManifest;
@@ -482,19 +425,8 @@ class AppController extends ChangeNotifier {
     String sessionKey,
   ) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    final imported =
-        _assistantThreadRecords[normalizedSessionKey]?.importedSkills ??
+    return _assistantThreadRecords[normalizedSessionKey]?.importedSkills ??
         const <AssistantThreadSkillEntry>[];
-    if (assistantExecutionTargetForSession(normalizedSessionKey) ==
-        AssistantExecutionTarget.singleAgent) {
-      if (imported.isNotEmpty) {
-        return imported;
-      }
-      if (_singleAgentLocalSkillsHydrated) {
-        return _singleAgentSharedImportedSkills;
-      }
-    }
-    return imported;
   }
 
   int assistantSkillCountForSession(String sessionKey) {
@@ -2148,18 +2080,15 @@ class AppController extends ChangeNotifier {
         AssistantExecutionTarget.singleAgent) {
       return;
     }
-    await ensureSharedSingleAgentLocalSkillsLoaded();
     final previousImported =
         _assistantThreadRecords[normalizedSessionKey]?.importedSkills ??
         const <AssistantThreadSkillEntry>[];
+    const emptySkills = <AssistantThreadSkillEntry>[];
     final provider =
         singleAgentResolvedProviderForSession(normalizedSessionKey) ??
         currentSingleAgentResolvedProvider;
     if (provider == null) {
-      await _replaceSingleAgentThreadSkills(
-        normalizedSessionKey,
-        _singleAgentSharedImportedSkills,
-      );
+      await _replaceSingleAgentThreadSkills(normalizedSessionKey, emptySkills);
       return;
     }
     try {
@@ -2182,28 +2111,19 @@ class AppController extends ChangeNotifier {
           .toList(growable: false);
       await _replaceSingleAgentThreadSkills(
         normalizedSessionKey,
-        skills.isNotEmpty ? skills : _singleAgentSharedImportedSkills,
+        skills.isNotEmpty ? skills : emptySkills,
       );
     } on GatewayAcpException catch (error) {
       if (_unsupportedAcpSkillsStatus(error)) {
-        await _replaceSingleAgentThreadSkills(
-          normalizedSessionKey,
-          _singleAgentSharedImportedSkills,
-        );
+        await _replaceSingleAgentThreadSkills(normalizedSessionKey, emptySkills);
         return;
       }
       if (previousImported.isEmpty) {
-        await _replaceSingleAgentThreadSkills(
-          normalizedSessionKey,
-          _singleAgentSharedImportedSkills,
-        );
+        await _replaceSingleAgentThreadSkills(normalizedSessionKey, emptySkills);
       }
     } catch (_) {
       if (previousImported.isEmpty) {
-        await _replaceSingleAgentThreadSkills(
-          normalizedSessionKey,
-          _singleAgentSharedImportedSkills,
-        );
+        await _replaceSingleAgentThreadSkills(normalizedSessionKey, emptySkills);
       }
     }
   }
@@ -2211,7 +2131,6 @@ class AppController extends ChangeNotifier {
   Future<void> refreshSingleAgentLocalSkillsForSession(
     String sessionKey,
   ) async {
-    await _refreshSharedSingleAgentLocalSkillsCache(forceRescan: true);
     await refreshSingleAgentSkillsForSession(sessionKey);
   }
 
@@ -2823,7 +2742,6 @@ class AppController extends ChangeNotifier {
       return;
     }
     _disposed = true;
-    unawaited(_persistSharedSingleAgentLocalSkillsCache());
     _runtimeEventsSubscription?.cancel();
     _detachChildListeners();
     _runtimeCoordinator.dispose();
@@ -2849,7 +2767,6 @@ class AppController extends ChangeNotifier {
     try {
       await _settingsController.initialize();
       _restoreAssistantThreads(await _store.loadAssistantThreadRecords());
-      await _restoreSharedSingleAgentLocalSkillsCache();
       if (_disposed) {
         return;
       }
@@ -4104,241 +4021,9 @@ class AppController extends ChangeNotifier {
     return target.promptValue;
   }
 
-  Future<List<AssistantThreadSkillEntry>>
-  _scanSingleAgentLocalSkillEntries() async {
-    final dedupedByName = <String, AssistantThreadSkillEntry>{};
-    final dedupedPriorityByName = <String, int>{};
-    for (final rootSpec in _singleAgentLocalSkillScanRoots) {
-      final rootPriority = _singleAgentSkillRootPriority(rootSpec);
-      for (final resolvedRootPath in _resolveSingleAgentSkillRootPaths(
-        rootSpec.path,
-      )) {
-        final root = Directory(resolvedRootPath);
-        if (!await root.exists()) {
-          continue;
-        }
-        await for (final entity in root.list(
-          recursive: true,
-          followLinks: false,
-        )) {
-          if (entity is! File || entity.uri.pathSegments.last != 'SKILL.md') {
-            continue;
-          }
-          final entry = await _skillEntryFromFile(entity, rootSpec);
-          final normalizedName = entry.label.trim().toLowerCase();
-          if (normalizedName.isEmpty) {
-            continue;
-          }
-          final existingPriority = dedupedPriorityByName[normalizedName];
-          if (existingPriority == null || rootPriority >= existingPriority) {
-            dedupedByName[normalizedName] = entry;
-            dedupedPriorityByName[normalizedName] = rootPriority;
-          }
-        }
-      }
-    }
-    final entries = dedupedByName.values.toList(growable: false);
-    entries.sort((left, right) => left.label.compareTo(right.label));
-    return entries;
-  }
-
-  int _singleAgentSkillRootPriority(_SingleAgentSkillScanRoot root) {
-    return switch (root.scope) {
-      'workspace' => 0,
-      _ => 1,
-    };
-  }
-
-  List<_SingleAgentSkillScanRoot> _resolveDefaultSingleAgentSkillScanRoots() {
-    return <_SingleAgentSkillScanRoot>[
-      ..._defaultGatewayOnlySkillScanRoots,
-      const _SingleAgentSkillScanRoot(
-        path: '.agents/skills',
-        source: 'agents',
-        scope: 'workspace',
-      ),
-      const _SingleAgentSkillScanRoot(
-        path: '.codex/skills',
-        source: 'codex',
-        scope: 'workspace',
-      ),
-      const _SingleAgentSkillScanRoot(
-        path: '.workbuddy/skills',
-        source: 'workbuddy',
-        scope: 'workspace',
-      ),
-    ];
-  }
-
-  _SingleAgentSkillScanRoot _singleAgentSkillScanRootFromOverride(
-    String rawPath,
-  ) {
-    final normalizedPath = rawPath.trim().replaceFirst(RegExp(r'^\./'), '');
-    final lowered = normalizedPath.toLowerCase();
-    final workspaceBases = _singleAgentRelativeSkillRootBasePaths();
-    final inferredWorkspace =
-        lowered.contains('/workspace/.agents/') ||
-        lowered.contains('/workspace/.claude/') ||
-        lowered.contains('/workspace/.codex/') ||
-        lowered.contains('/workspace/.workbuddy/');
-    final explicitWorkspaceRoot =
-        lowered.startsWith('.agents/') ||
-        lowered.startsWith('.claude/') ||
-        lowered.startsWith('.codex/') ||
-        lowered.startsWith('.workbuddy/');
-    final scopedToWorkspace = workspaceBases.any((basePath) {
-      final normalizedBase = basePath.endsWith('/')
-          ? basePath
-          : '$basePath/';
-      return normalizedPath == basePath ||
-          normalizedPath.startsWith(normalizedBase);
-    });
-    final scope = normalizedPath.startsWith('/etc/')
-        ? 'system'
-        : (scopedToWorkspace || inferredWorkspace || explicitWorkspaceRoot)
-        ? 'workspace'
-        : 'user';
-    return _SingleAgentSkillScanRoot(
-      path: normalizedPath,
-      source: _sourceForSkillRootPath(lowered),
-      scope: scope,
-    );
-  }
-
-  List<String> _resolveSingleAgentSkillRootPaths(String rawPath) {
-    final trimmed = rawPath.trim().replaceFirst(RegExp(r'^\./'), '');
-    if (trimmed.isEmpty) {
-      return const <String>[];
-    }
-    if (trimmed.startsWith('/')) {
-      return <String>[trimmed];
-    }
-    if (trimmed.startsWith('~/')) {
-      final home = Platform.environment['HOME']?.trim() ?? '';
-      return <String>[home.isEmpty ? trimmed : '$home/${trimmed.substring(2)}'];
-    }
-    return _singleAgentRelativeSkillRootBasePaths()
-        .map((basePath) => '$basePath/$trimmed')
-        .toList(growable: false);
-  }
-
-  List<String> _singleAgentRelativeSkillRootBasePaths() {
-    final paths = <String>[];
-    final seen = <String>{};
-
-    void addCandidate(String rawPath) {
-      final trimmed = rawPath.trim();
-      if (trimmed.isEmpty) {
-        return;
-      }
-      final normalized = trimmed.endsWith('/')
-          ? trimmed.substring(0, trimmed.length - 1)
-          : trimmed;
-      if (normalized.isEmpty || !seen.add(normalized)) {
-        return;
-      }
-      paths.add(normalized);
-    }
-
-    addCandidate(settings.workspacePath);
-    try {
-      addCandidate(Directory.current.path);
-    } catch (_) {
-      // Best effort only for current workspace fallback discovery.
-    }
-    return paths;
-  }
-
-  String _sourceForSkillRootPath(String path) {
-    if (path.startsWith('/etc/skills')) {
-      return 'system';
-    }
-    if (_pathContainsSourceToken(path, 'workbuddy')) {
-      return 'workbuddy';
-    }
-    if (_pathContainsSourceToken(path, 'opencode')) {
-      return 'opencode';
-    }
-    if (_pathContainsSourceToken(path, 'claude')) {
-      return 'claude';
-    }
-    if (_pathContainsSourceToken(path, 'agents')) {
-      return 'agents';
-    }
-    return 'codex';
-  }
-
-  bool _pathContainsSourceToken(String path, String token) {
-    final pattern = RegExp('(^|[./_-])$token([./_-]|\$)');
-    return pattern.hasMatch(path);
-  }
-
-  Future<AssistantThreadSkillEntry> _skillEntryFromFile(
-    File file,
-    _SingleAgentSkillScanRoot root,
-  ) async {
-    final content = await file.readAsString();
-    final nameMatch = RegExp(
-      "^name:\\s*[\"']?(.+?)[\"']?\\s*\$",
-      multiLine: true,
-    ).firstMatch(content);
-    final descriptionMatch = RegExp(
-      "^description:\\s*[\"']?(.+?)[\"']?\\s*\$",
-      multiLine: true,
-    ).firstMatch(content);
-    final directory = file.parent;
-    final label =
-        (nameMatch?.group(1) ??
-                directory.uri.pathSegments
-                    .where((item) => item.isNotEmpty)
-                    .last)
-            .trim();
-    final rootPath = _resolveBestSingleAgentSkillRootPath(
-      directory.path,
-      root.path,
-    );
-    final relativeSource = directory.path.startsWith(rootPath)
-        ? directory.path
-              .substring(rootPath.length)
-              .replaceFirst(RegExp(r'^/'), '')
-        : directory.path;
-    final sourceSegments = <String>[
-      root.source,
-      if (root.scope != root.source) root.scope,
-    ].where((item) => item.trim().isNotEmpty).toList(growable: false);
-    final sourceLabel = sourceSegments.join(' · ');
-    return AssistantThreadSkillEntry(
-      key: directory.path,
-      label: label,
-      description: (descriptionMatch?.group(1) ?? '').trim(),
-      source: root.source,
-      sourcePath: file.path,
-      scope: root.scope,
-      sourceLabel: relativeSource.isEmpty
-          ? sourceLabel
-          : '$sourceLabel · $relativeSource',
-    );
-  }
-
-  String _resolveBestSingleAgentSkillRootPath(
-    String targetPath,
-    String rawRootPath,
-  ) {
-    final candidates = _resolveSingleAgentSkillRootPaths(rawRootPath)
-      ..sort((left, right) => right.length.compareTo(left.length));
-    for (final candidate in candidates) {
-      if (targetPath.startsWith(candidate)) {
-        return candidate;
-      }
-    }
-    return candidates.isNotEmpty ? candidates.first : rawRootPath.trim();
-  }
-
   void _restoreAssistantThreads(List<AssistantThreadRecord> records) {
     _assistantThreadRecords.clear();
     _assistantThreadMessages.clear();
-    _singleAgentSharedImportedSkills = const <AssistantThreadSkillEntry>[];
-    _singleAgentLocalSkillsHydrated = false;
     final archivedKeys = settings.assistantArchivedTaskKeys
         .map(_normalizedAssistantSessionKey)
         .toSet();
@@ -4388,72 +4073,6 @@ class AppController extends ChangeNotifier {
           normalizedRecord.messages,
         );
       }
-    }
-  }
-
-  Future<void> ensureSharedSingleAgentLocalSkillsLoaded() async {
-    if (_singleAgentLocalSkillsHydrated) {
-      return;
-    }
-    await _refreshSharedSingleAgentLocalSkillsCache(forceRescan: false);
-  }
-
-  Future<void> _refreshSharedSingleAgentLocalSkillsCache({
-    required bool forceRescan,
-  }) async {
-    if (!forceRescan && _singleAgentLocalSkillsHydrated) {
-      return;
-    }
-    if (!forceRescan && await _restoreSharedSingleAgentLocalSkillsCache()) {
-      return;
-    }
-    final availableSkills = await _scanSingleAgentLocalSkillEntries();
-    _singleAgentSharedImportedSkills = availableSkills;
-    _singleAgentLocalSkillsHydrated = true;
-    await _persistSharedSingleAgentLocalSkillsCache();
-  }
-
-  Future<bool> _restoreSharedSingleAgentLocalSkillsCache() async {
-    try {
-      final payload = await _store.loadSupportJson(
-        _singleAgentLocalSkillsCacheRelativePath,
-      );
-      if (payload == null) {
-        return false;
-      }
-      final skills = asList(payload['skills'])
-          .map(asMap)
-          .map(
-            (item) => AssistantThreadSkillEntry.fromJson(
-              item.cast<String, dynamic>(),
-            ),
-          )
-          .where((item) => item.key.trim().isNotEmpty && item.label.isNotEmpty)
-          .toList(growable: false);
-      _singleAgentSharedImportedSkills = skills;
-      _singleAgentLocalSkillsHydrated = true;
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<void> _persistSharedSingleAgentLocalSkillsCache() async {
-    if (_singleAgentSharedImportedSkills.isEmpty) {
-      return;
-    }
-    try {
-      await _store.saveSupportJson(_singleAgentLocalSkillsCacheRelativePath, <
-        String,
-        dynamic
-      >{
-        'savedAtMs': DateTime.now().millisecondsSinceEpoch.toDouble(),
-        'skills': _singleAgentSharedImportedSkills
-            .map((item) => item.toJson())
-            .toList(growable: false),
-      });
-    } catch (_) {
-      // Best effort only for local cache persistence.
     }
   }
 
