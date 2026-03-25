@@ -616,7 +616,8 @@ class AppController extends ChangeNotifier {
 
   String singleAgentRuntimeModelForSession(String sessionKey) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    return _singleAgentRuntimeModelBySession[normalizedSessionKey]?.trim() ?? '';
+    return _singleAgentRuntimeModelBySession[normalizedSessionKey]?.trim() ??
+        '';
   }
 
   String get currentSingleAgentRuntimeModel =>
@@ -624,7 +625,9 @@ class AppController extends ChangeNotifier {
 
   String singleAgentModelDisplayLabelForSession(String sessionKey) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    final runtimeModel = singleAgentRuntimeModelForSession(normalizedSessionKey);
+    final runtimeModel = singleAgentRuntimeModelForSession(
+      normalizedSessionKey,
+    );
     if (runtimeModel.isNotEmpty) {
       return runtimeModel;
     }
@@ -2017,10 +2020,22 @@ class AppController extends ChangeNotifier {
       return;
     }
 
-    final availableSkills = await _scanSingleAgentLocalSkillEntries();
+    final availableSkills = await _scanSingleAgentLocalSkillEntries(
+      allowedSources: _singleAgentAllowedSkillSourcesForSession(
+        normalizedSessionKey,
+      ),
+    );
+    final importedKeys = availableSkills.map((item) => item.key).toSet();
+    final existingSelected =
+        _assistantThreadRecords[normalizedSessionKey]?.selectedSkillKeys ??
+        const <String>[];
+    final nextSelected = existingSelected
+        .where(importedKeys.contains)
+        .toList(growable: false);
     _upsertAssistantThreadRecord(
       normalizedSessionKey,
       importedSkills: availableSkills,
+      selectedSkillKeys: nextSelected,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     _notifyIfActive();
@@ -3913,11 +3928,37 @@ class AppController extends ChangeNotifier {
     return target.promptValue;
   }
 
-  Future<List<AssistantThreadSkillEntry>>
-  _scanSingleAgentLocalSkillEntries() async {
+  Set<String>? _singleAgentAllowedSkillSourcesForSession(String sessionKey) {
+    final provider = singleAgentProviderForSession(sessionKey);
+    return _singleAgentAllowedSkillSourcesForProvider(provider);
+  }
+
+  Set<String>? _singleAgentAllowedSkillSourcesForProvider(
+    SingleAgentProvider provider,
+  ) {
+    return switch (provider) {
+      SingleAgentProvider.auto => null,
+      SingleAgentProvider.codex => const <String>{'codex', 'agents'},
+      SingleAgentProvider.claude => const <String>{'claude', 'agents'},
+      SingleAgentProvider.opencode => const <String>{'opencode', 'agents'},
+      SingleAgentProvider.gemini => const <String>{'agents'},
+    };
+  }
+
+  Future<List<AssistantThreadSkillEntry>> _scanSingleAgentLocalSkillEntries({
+    Set<String>? allowedSources,
+  }) async {
     final entries = <AssistantThreadSkillEntry>[];
     final seenNames = <String>{};
+    final normalizedAllowedSources = allowedSources
+        ?.map((item) => item.trim().toLowerCase())
+        .where((item) => item.isNotEmpty)
+        .toSet();
     for (final rootSpec in _singleAgentLocalSkillScanRoots) {
+      if (normalizedAllowedSources != null &&
+          !normalizedAllowedSources.contains(rootSpec.source)) {
+        continue;
+      }
       final root = Directory(_resolveSingleAgentSkillRootPath(rootSpec.path));
       if (!await root.exists()) {
         continue;
@@ -4005,16 +4046,21 @@ class AppController extends ChangeNotifier {
   }
 
   String _sourceForSkillRootPath(String path) {
-    if (path.contains('opencode')) {
+    if (_pathContainsSourceToken(path, 'opencode')) {
       return 'opencode';
     }
-    if (path.contains('.claude/') || path.contains('/claude/')) {
+    if (_pathContainsSourceToken(path, 'claude')) {
       return 'claude';
     }
-    if (path.contains('.agents/') || path.contains('/agents/')) {
+    if (_pathContainsSourceToken(path, 'agents')) {
       return 'agents';
     }
     return 'codex';
+  }
+
+  bool _pathContainsSourceToken(String path, String token) {
+    final pattern = RegExp('(^|[./_-])$token([./_-]|\$)');
+    return pattern.hasMatch(path);
   }
 
   Future<AssistantThreadSkillEntry> _skillEntryFromFile(

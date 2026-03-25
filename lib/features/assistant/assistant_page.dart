@@ -2773,6 +2773,50 @@ class _ComposerBarState extends State<_ComposerBar> {
                 ),
                 const SizedBox(width: 4),
               ],
+              if (widget.showModelControl) ...[
+                widget.modelOptions.isEmpty
+                    ? _ComposerToolbarChip(
+                        key: const Key('assistant-model-button'),
+                        icon: Icons.bolt_rounded,
+                        label: widget.modelLabel,
+                        showChevron: false,
+                        maxLabelWidth: 132,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                      )
+                    : PopupMenuButton<String>(
+                        key: const Key('assistant-model-button'),
+                        tooltip: appText('模型', 'Model'),
+                        onSelected: widget.onModelChanged,
+                        itemBuilder: (context) => widget.modelOptions
+                            .map(
+                              (value) => PopupMenuItem<String>(
+                                value: value,
+                                child: Row(
+                                  children: [
+                                    Expanded(child: Text(value)),
+                                    if (value == widget.modelLabel)
+                                      const Icon(Icons.check_rounded, size: 18),
+                                  ],
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        child: _ComposerToolbarChip(
+                          icon: Icons.bolt_rounded,
+                          label: widget.modelLabel,
+                          showChevron: true,
+                          maxLabelWidth: 132,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                        ),
+                      ),
+                const SizedBox(width: 4),
+              ],
               if (uiFeatures.supportsMultiAgent) ...[
                 Tooltip(
                   message: appText(
@@ -2980,45 +3024,6 @@ class _ComposerBarState extends State<_ComposerBar> {
                           maxLabelWidth: 120,
                         ),
                       ),
-                      if (widget.showModelControl) ...[
-                        const SizedBox(width: 6),
-                        widget.modelOptions.isEmpty
-                            ? _ComposerToolbarChip(
-                                key: const Key('assistant-model-button'),
-                                icon: Icons.bolt_rounded,
-                                label: widget.modelLabel,
-                                showChevron: false,
-                                maxLabelWidth: 140,
-                              )
-                            : PopupMenuButton<String>(
-                                key: const Key('assistant-model-button'),
-                                tooltip: appText('模型', 'Model'),
-                                onSelected: widget.onModelChanged,
-                                itemBuilder: (context) => widget.modelOptions
-                                    .map(
-                                      (value) => PopupMenuItem<String>(
-                                        value: value,
-                                        child: Row(
-                                          children: [
-                                            Expanded(child: Text(value)),
-                                            if (value == widget.modelLabel)
-                                              const Icon(
-                                                Icons.check_rounded,
-                                                size: 18,
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                                child: _ComposerToolbarChip(
-                                  icon: Icons.bolt_rounded,
-                                  label: widget.modelLabel,
-                                  showChevron: true,
-                                  maxLabelWidth: 140,
-                                ),
-                              ),
-                      ],
                       const SizedBox(width: 6),
                       PopupMenuButton<String>(
                         key: const Key('assistant-thinking-button'),
