@@ -9,7 +9,6 @@ import 'runtime_models.dart';
 
 abstract class SkillDirectoryAccessService {
   bool get isSupported;
-  bool get requiresAuthorizedSharedRoots;
   Future<String> resolveUserHomeDirectory();
 
   Future<List<AuthorizedSkillDirectory>> authorizeDirectories({
@@ -62,9 +61,6 @@ class UnsupportedSkillDirectoryAccessService
   bool get isSupported => false;
 
   @override
-  bool get requiresAuthorizedSharedRoots => false;
-
-  @override
   Future<String> resolveUserHomeDirectory() async {
     return _fallbackUserHomeDirectory();
   }
@@ -95,9 +91,6 @@ class FileSelectorSkillDirectoryAccessService
     implements SkillDirectoryAccessService {
   @override
   bool get isSupported => true;
-
-  @override
-  bool get requiresAuthorizedSharedRoots => false;
 
   @override
   Future<String> resolveUserHomeDirectory() async {
@@ -167,9 +160,6 @@ class MacOsSkillDirectoryAccessService implements SkillDirectoryAccessService {
 
   @override
   bool get isSupported => true;
-
-  @override
-  bool get requiresAuthorizedSharedRoots => true;
 
   @override
   Future<String> resolveUserHomeDirectory() async {

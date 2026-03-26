@@ -53,8 +53,8 @@ class _SkillDirectoryAuthorizationCardState
           const SizedBox(height: 8),
           Text(
             appText(
-              '预设扫描目录固定为 /etc/skills 和 ~/.agents/skills；其他目录可批量添加为自定义目录。只有在这里显式授权的目录才会被扫描为单机智能体 skills，设置中心修改会写入 settings.yaml。',
-              'Preset scan roots are fixed to /etc/skills and ~/.agents/skills. Other locations can be added in batches as custom directories. Only directories explicitly granted here are scanned as single-agent skills, and Settings Center writes changes back to settings.yaml.',
+              '预设扫描目录固定为 /etc/skills 和 ~/.agents/skills；其他目录可批量添加为自定义目录扩展扫描列表。设置中心修改会写入 settings.yaml。',
+              'Preset scan roots are fixed to /etc/skills and ~/.agents/skills. Other locations can be added in batches as custom directories to extend the scan list. Settings Center writes changes back to settings.yaml.',
             ),
             style: theme.textTheme.bodyMedium,
           ),

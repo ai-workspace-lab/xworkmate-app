@@ -666,7 +666,8 @@ void main() {
             ManagedSkillEntry(
               key: 'calm_compact_workspace_system',
               label: 'Calm Compact Workspace System',
-              source: '/Users/test/.codex/skills/calm_compact_workspace_system',
+              source:
+                  '/Users/test/.agents/skills/calm_compact_workspace_system',
               selected: true,
             ),
           ],
@@ -744,7 +745,7 @@ void main() {
               label: 'Imported Skill',
               description: 'confirmed import',
               sourcePath: '/tmp/imported-skill',
-              sourceLabel: 'workbuddy/imported',
+              sourceLabel: 'custom/imported',
             ),
           ],
           selectedSkillKeys: <String>['/tmp/imported-skill'],
@@ -832,7 +833,7 @@ void main() {
       authorizedSkillDirectories: const <AuthorizedSkillDirectory>[
         AuthorizedSkillDirectory(path: '/etc/skills'),
         AuthorizedSkillDirectory(
-          path: '/Users/test/.codex/skills',
+          path: '/Users/test/.agents/skills',
           bookmark: 'bookmark-data',
         ),
       ],
@@ -842,7 +843,7 @@ void main() {
 
     expect(
       decoded.authorizedSkillDirectories.map((item) => item.path),
-      const <String>['/Users/test/.codex/skills', '/etc/skills'],
+      const <String>['/Users/test/.agents/skills', '/etc/skills'],
     );
     expect(decoded.authorizedSkillDirectories.first.bookmark, 'bookmark-data');
   });
