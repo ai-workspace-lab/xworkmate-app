@@ -55,8 +55,8 @@ class _SkillDirectoryAuthorizationCardState
           const SizedBox(height: 8),
           Text(
             appText(
-              '预设目录支持直接按路径加入；也可以把终端输出里的路径直接贴进来批量导入。系统目录选择器保留在同行旁侧，作为可选授权方式。设置中心修改会写入 settings.yaml。',
-              'Preset roots can be added directly by path, and terminal output paths can be pasted for batch import. The system directory picker remains available as an optional side action. Settings Center writes changes back to settings.yaml.',
+              '预设目录支持直接按路径加入；也可以把终端输出里的目录或单个技能包路径直接贴进来批量导入。系统目录选择器保留在同行旁侧，作为可选授权方式。设置中心修改会写入 settings.yaml。',
+              'Preset roots can be added directly by path, and terminal output containing directories or single skill package paths can be pasted for batch import. The system directory picker remains available as an optional side action. Settings Center writes changes back to settings.yaml.',
             ),
             style: theme.textTheme.bodyMedium,
           ),
@@ -382,8 +382,8 @@ class _SkillDirectoryAuthorizationCardState
       setState(() {
         _statusMessage = null;
         _errorMessage = appText(
-          '没有识别到可用目录路径。请每行提供一个以 / 或 ~/ 开头的目录。',
-          'No usable directory paths were detected. Provide one directory per line starting with / or ~/.',
+          '没有识别到可用路径。请每行提供一个以 / 或 ~/ 开头的目录、技能包目录，或 SKILL.md 文件路径。',
+          'No usable paths were detected. Provide one directory, skill package directory, or SKILL.md path per line starting with / or ~/.',
         );
       });
       return;
@@ -404,8 +404,8 @@ class _SkillDirectoryAuthorizationCardState
       setState(() {
         _busy = false;
         _statusMessage = appText(
-          '已同步 ${paths.length} 个目录到 settings.yaml；如 macOS 仍无法读取，可再使用目录向导补授权。',
-          'Synced ${paths.length} directories to settings.yaml. If macOS still cannot read one, use the picker flow to grant access.',
+          '已同步 ${paths.length} 个路径到 settings.yaml；如 macOS 仍无法读取，可再使用目录向导补授权。',
+          'Synced ${paths.length} paths to settings.yaml. If macOS still cannot read one, use the picker flow to grant access.',
         );
       });
     } catch (error) {
@@ -645,8 +645,8 @@ class _SkillDirectoryAuthorizationDialogState
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 hintText: appText(
-                  '一行一个目录，或直接粘贴命令输出\n~/.agents/skills\n~/.codex/skills\n/Users/shenlan/.workbuddy/skills',
-                  'One directory per line, or paste command output\n~/.agents/skills\n~/.codex/skills\n/Users/shenlan/.workbuddy/skills',
+                  '一行一个目录或技能包路径，也可直接粘贴命令输出\n~/.agents/skills\n~/.codex/skills\n/Users/shenlan/workspaces/demo/skills/docx\n/Users/shenlan/workspaces/demo/skills/docx/SKILL.md',
+                  'One directory or skill package path per line, or paste command output\n~/.agents/skills\n~/.codex/skills\n/Users/shenlan/workspaces/demo/skills/docx\n/Users/shenlan/workspaces/demo/skills/docx/SKILL.md',
                 ),
               ),
             ),
