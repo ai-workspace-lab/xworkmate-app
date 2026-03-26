@@ -14,7 +14,7 @@ SecureConfigStore createIsolatedTestStore({bool enableSecureStorage = true}) {
   final testRoot = Directory.systemTemp.createTempSync('xworkmate-store-test-');
   addTearDown(() async {
     if (await testRoot.exists()) {
-      await testRoot.delete(recursive: true);
+      await _deleteDirectoryWithRetry(testRoot);
     }
   });
   return SecureConfigStore(
@@ -23,6 +23,23 @@ SecureConfigStore createIsolatedTestStore({bool enableSecureStorage = true}) {
         '${testRoot.path}/${SettingsStore.databaseFileName}',
     fallbackDirectoryPathResolver: () async => testRoot.path,
   );
+}
+
+Future<void> _deleteDirectoryWithRetry(Directory directory) async {
+  for (var attempt = 0; attempt < 5; attempt += 1) {
+    if (!await directory.exists()) {
+      return;
+    }
+    try {
+      await directory.delete(recursive: true);
+      return;
+    } on FileSystemException {
+      if (attempt == 4) {
+        rethrow;
+      }
+      await Future<void>.delayed(Duration(milliseconds: 80 * (attempt + 1)));
+    }
+  }
 }
 
 Future<AppController> createTestController(
