@@ -914,8 +914,8 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 8),
           Text(
             appText(
-              '预设保留 Codex、OpenCode；其余 provider 从这个 ACP 列表动态扩展。每条记录都可自定义显示名称、标志和 ACP Server Endpoint，协议支持 ws / wss / http / https。',
-              'Codex and OpenCode stay as presets. Additional providers are driven directly from this ACP list. Each entry can define its own display name, badge, and ACP server endpoint with ws / wss / http / https.',
+              '预设保留 Codex、OpenCode；其余 provider 通过“自定义添加更多”扩展。每条记录可自定义显示名称和 ACP Server Endpoint，协议支持 ws / wss / http / https。',
+              'Codex and OpenCode stay as presets. Add more custom providers as needed. Each entry can define its own display name and ACP server endpoint with ws / wss / http / https.',
             ),
             style: theme.textTheme.bodyMedium,
           ),
@@ -929,7 +929,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 _appendExternalAcpProvider(settings),
               ),
               icon: const Icon(Icons.add_rounded),
-              label: Text(appText('添加自定义 Provider', 'Add custom provider')),
+              label: Text(appText('自定义添加更多', 'Add more custom providers')),
             ),
           ),
           const SizedBox(height: 16),
@@ -970,17 +970,9 @@ class _SettingsPageState extends State<SettingsPage> {
           Row(
             children: [
               Expanded(
-                child: Row(
-                  children: [
-                    _ExternalAcpProviderBadge(provider: provider),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        provider.label,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  provider.label,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
               if (!profile.isPreset) ...[
@@ -1021,17 +1013,6 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           _EditableField(
-            label: appText('标志', 'Badge'),
-            value: profile.badge,
-            onSubmitted: (value) => _saveSettings(
-              controller,
-              settings.copyWithExternalAcpEndpointForProvider(
-                provider,
-                profile.copyWith(badge: value),
-              ),
-            ),
-          ),
-          _EditableField(
             label: appText('ACP Endpoint', 'ACP Endpoint'),
             value: endpoint,
             onSubmitted: (value) => _saveSettings(
@@ -1068,8 +1049,8 @@ class _SettingsPageState extends State<SettingsPage> {
         ...settings.externalAcpEndpoints,
         ExternalAcpEndpointProfile(
           providerKey: providerKey(),
-          label: appText('自定义 Provider $suffix', 'Custom Provider $suffix'),
-          badge: '$suffix',
+          label: appText('自定义添加更多 $suffix', 'Custom Add More $suffix'),
+          badge: '',
           endpoint: '',
           enabled: true,
         ),
@@ -4447,37 +4428,6 @@ class _EditableFieldState extends State<_EditableField> {
         decoration: InputDecoration(labelText: widget.label),
         onChanged: widget.onSubmitted,
         onFieldSubmitted: widget.onSubmitted,
-      ),
-    );
-  }
-}
-
-class _ExternalAcpProviderBadge extends StatelessWidget {
-  const _ExternalAcpProviderBadge({required this.provider});
-
-  final SingleAgentProvider provider;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final display = provider.badge.trim().isEmpty
-        ? provider.label
-        : provider.badge;
-    final text = display.length <= 2 ? display : display.substring(0, 2);
-    return Container(
-      width: 28,
-      height: 28,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        text,
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: theme.colorScheme.onPrimaryContainer,
-          fontWeight: FontWeight.w700,
-        ),
       ),
     );
   }

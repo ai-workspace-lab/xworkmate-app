@@ -309,7 +309,10 @@ void main() {
       find.byKey(const ValueKey('external-acp-provider-add-button')),
       findsOneWidget,
     );
+    expect(find.text('自定义添加更多'), findsOneWidget);
     expect(find.textContaining('ws://127.0.0.1:9001'), findsWidgets);
+    expect(find.text('标志'), findsNothing);
+    expect(find.text('Badge'), findsNothing);
     expect(
       find.byKey(const ValueKey('settings-global-save-button')),
       findsOneWidget,
