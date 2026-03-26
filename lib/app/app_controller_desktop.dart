@@ -1190,10 +1190,18 @@ class AppController extends ChangeNotifier {
       _settingsController.buildSecretReferences();
   List<SecretAuditEntry> get secretAuditTrail => _settingsController.auditTrail;
   List<RuntimeLogEntry> get runtimeLogs => _runtime.logs;
-  List<WorkspaceDestination> get assistantNavigationDestinations =>
+  List<AssistantFocusEntry> get assistantNavigationDestinations =>
       normalizeAssistantNavigationDestinations(
         settings.assistantNavigationDestinations,
-      ).where(capabilities.supportsDestination).toList(growable: false);
+      ).where(supportsAssistantFocusEntry).toList(growable: false);
+
+  bool supportsAssistantFocusEntry(AssistantFocusEntry entry) {
+    final destination = entry.destination;
+    if (destination != null) {
+      return capabilities.supportsDestination(destination);
+    }
+    return capabilities.supportsDestination(WorkspaceDestination.settings);
+  }
 
   List<GatewayChatMessage> get chatMessages {
     final sessionKey = _normalizedAssistantSessionKey(
@@ -2704,18 +2712,18 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> toggleAssistantNavigationDestination(
-    WorkspaceDestination destination,
+    AssistantFocusEntry destination,
   ) async {
     if (!kAssistantNavigationDestinationCandidates.contains(destination)) {
       return;
     }
-    if (!capabilities.supportsDestination(destination)) {
+    if (!supportsAssistantFocusEntry(destination)) {
       return;
     }
     final current = assistantNavigationDestinations;
     final next = current.contains(destination)
         ? current.where((item) => item != destination).toList(growable: false)
-        : <WorkspaceDestination>[...current, destination];
+        : <AssistantFocusEntry>[...current, destination];
     await saveSettings(
       settings.copyWith(assistantNavigationDestinations: next),
       refreshAfterSave: false,
@@ -3366,7 +3374,13 @@ class AppController extends ChangeNotifier {
     final features = featuresFor(_hostUiFeaturePlatform);
     final allowedNavigation = normalizeAssistantNavigationDestinations(
       snapshot.assistantNavigationDestinations,
-    ).where(features.allowedDestinations.contains).toList(growable: false);
+    ).where((entry) {
+      final destination = entry.destination;
+      if (destination != null) {
+        return features.allowedDestinations.contains(destination);
+      }
+      return features.allowedDestinations.contains(WorkspaceDestination.settings);
+    }).toList(growable: false);
     final sanitizedExecutionTarget = features.sanitizeExecutionTarget(
       snapshot.assistantExecutionTarget,
     );

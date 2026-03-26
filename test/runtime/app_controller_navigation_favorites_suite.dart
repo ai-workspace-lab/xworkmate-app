@@ -22,11 +22,11 @@ void main() {
 
       await controller.saveSettings(
         controller.settings.copyWith(
-          assistantNavigationDestinations: const <WorkspaceDestination>[
-            WorkspaceDestination.tasks,
-            WorkspaceDestination.skills,
-            WorkspaceDestination.tasks,
-            WorkspaceDestination.aiGateway,
+          assistantNavigationDestinations: const <AssistantFocusEntry>[
+            AssistantFocusEntry.tasks,
+            AssistantFocusEntry.skills,
+            AssistantFocusEntry.tasks,
+            AssistantFocusEntry.aiGateway,
           ],
         ),
         refreshAfterSave: false,
@@ -34,10 +34,10 @@ void main() {
 
       expect(
         controller.assistantNavigationDestinations,
-        const <WorkspaceDestination>[
-          WorkspaceDestination.tasks,
-          WorkspaceDestination.skills,
-          WorkspaceDestination.aiGateway,
+        const <AssistantFocusEntry>[
+          AssistantFocusEntry.tasks,
+          AssistantFocusEntry.skills,
+          AssistantFocusEntry.aiGateway,
         ],
       );
     },
@@ -52,30 +52,30 @@ void main() {
 
     await controller.saveSettings(
       controller.settings.copyWith(
-        assistantNavigationDestinations: const <WorkspaceDestination>[
-          WorkspaceDestination.skills,
+        assistantNavigationDestinations: const <AssistantFocusEntry>[
+          AssistantFocusEntry.skills,
         ],
       ),
       refreshAfterSave: false,
     );
 
     await controller.toggleAssistantNavigationDestination(
-      WorkspaceDestination.aiGateway,
+      AssistantFocusEntry.aiGateway,
     );
     expect(
       controller.assistantNavigationDestinations,
-      const <WorkspaceDestination>[
-        WorkspaceDestination.skills,
-        WorkspaceDestination.aiGateway,
+      const <AssistantFocusEntry>[
+        AssistantFocusEntry.skills,
+        AssistantFocusEntry.aiGateway,
       ],
     );
 
     await controller.toggleAssistantNavigationDestination(
-      WorkspaceDestination.skills,
+      AssistantFocusEntry.skills,
     );
     expect(
       controller.assistantNavigationDestinations,
-      const <WorkspaceDestination>[WorkspaceDestination.aiGateway],
+      const <AssistantFocusEntry>[AssistantFocusEntry.aiGateway],
     );
   });
 }

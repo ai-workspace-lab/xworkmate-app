@@ -71,11 +71,11 @@ void main() {
             onOpenThemeToggle: () => themeToggled++,
             accountName: 'Tester',
             accountSubtitle: 'Workspace',
-            favoriteDestinations: const <WorkspaceDestination>{
-              WorkspaceDestination.skills,
+            favoriteDestinations: const <AssistantFocusEntry>{
+              AssistantFocusEntry.skills,
             },
             onToggleFavorite: (value) async {
-              if (value == WorkspaceDestination.skills) {
+              if (value == AssistantFocusEntry.skills) {
                 favoriteToggled++;
               }
             },
@@ -113,6 +113,55 @@ void main() {
     await tester.tap(find.text('Tester'));
     await tester.pumpAndSettle();
     expect(accountOpened, 1);
+  });
+
+  testWidgets('SidebarNavigation toggles footer quick action favorites', (
+    WidgetTester tester,
+  ) async {
+    final toggled = <AssistantFocusEntry>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: SidebarNavigation(
+            currentSection: WorkspaceDestination.assistant,
+            sidebarState: AppSidebarState.expanded,
+            appLanguage: AppLanguage.zh,
+            themeMode: ThemeMode.light,
+            onSectionChanged: (_) {},
+            onToggleLanguage: () {},
+            onCycleSidebarState: () {},
+            onExpandFromCollapsed: () {},
+            onOpenHome: () {},
+            onOpenAccount: () {},
+            onOpenThemeToggle: () {},
+            accountName: 'Tester',
+            accountSubtitle: 'Workspace',
+            favoriteDestinations: const <AssistantFocusEntry>{
+              AssistantFocusEntry.language,
+            },
+            onToggleFavorite: (value) async => toggled.add(value),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('sidebar-favorite-language')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('sidebar-favorite-theme')));
+    await tester.pumpAndSettle();
+
+    expect(
+      toggled,
+      const <AssistantFocusEntry>[
+        AssistantFocusEntry.language,
+        AssistantFocusEntry.theme,
+      ],
+    );
   });
 
   testWidgets(

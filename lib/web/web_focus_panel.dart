@@ -5,6 +5,7 @@ import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
+import '../widgets/chrome_quick_action_buttons.dart';
 import '../widgets/settings_focus_quick_actions.dart';
 import '../widgets/surface_card.dart';
 
@@ -27,7 +28,7 @@ class WebAssistantFocusDestinationCard extends StatelessWidget {
   });
 
   final AppController controller;
-  final WorkspaceDestination destination;
+  final AssistantFocusEntry destination;
   final VoidCallback onOpenPage;
   final Future<void> Function() onRemoveFavorite;
 
@@ -49,7 +50,7 @@ class _AssistantFocusPanelState extends State<WebAssistantFocusPanel> {
     final palette = context.palette;
     final favorites = widget.controller.assistantNavigationDestinations;
     final available = kAssistantNavigationDestinationCandidates
-        .where(widget.controller.capabilities.supportsDestination)
+        .where(widget.controller.supportsAssistantFocusEntry)
         .where((item) => !favorites.contains(item))
         .toList(growable: false);
 
@@ -90,13 +91,13 @@ class _AssistantFocusPanelState extends State<WebAssistantFocusPanel> {
                   ),
                 ),
                 if (available.isNotEmpty)
-                  PopupMenuButton<WorkspaceDestination>(
+                  PopupMenuButton<AssistantFocusEntry>(
                     key: const Key('assistant-focus-add-menu'),
                     tooltip: appText('添加关注入口', 'Add focused destination'),
                     onSelected: _addFavorite,
                     itemBuilder: (context) => available
                         .map(
-                          (destination) => PopupMenuItem<WorkspaceDestination>(
+                          (destination) => PopupMenuItem<AssistantFocusEntry>(
                             value: destination,
                             child: Row(
                               children: [
@@ -154,8 +155,9 @@ class _AssistantFocusPanelState extends State<WebAssistantFocusPanel> {
                       return WebAssistantFocusDestinationCard(
                         controller: widget.controller,
                         destination: destination,
-                        onOpenPage: () =>
-                            widget.controller.navigateTo(destination),
+                        onOpenPage: () => widget.controller.navigateTo(
+                          destination.destination ?? WorkspaceDestination.settings,
+                        ),
                         onRemoveFavorite: () => _removeFavorite(destination),
                       );
                     },
@@ -166,14 +168,14 @@ class _AssistantFocusPanelState extends State<WebAssistantFocusPanel> {
     );
   }
 
-  Future<void> _addFavorite(WorkspaceDestination destination) async {
+  Future<void> _addFavorite(AssistantFocusEntry destination) async {
     await widget.controller.toggleAssistantNavigationDestination(destination);
     if (mounted) {
       setState(() {});
     }
   }
 
-  Future<void> _removeFavorite(WorkspaceDestination destination) async {
+  Future<void> _removeFavorite(AssistantFocusEntry destination) async {
     await widget.controller.toggleAssistantNavigationDestination(destination);
     if (mounted) {
       setState(() {});
@@ -190,7 +192,7 @@ class _AssistantFocusWorkbench extends StatelessWidget {
   });
 
   final AppController controller;
-  final WorkspaceDestination destination;
+  final AssistantFocusEntry destination;
   final VoidCallback onOpenPage;
   final Future<void> Function() onRemoveFavorite;
 
@@ -294,35 +296,38 @@ class _AssistantFocusPreview extends StatelessWidget {
   });
 
   final AppController controller;
-  final WorkspaceDestination destination;
+  final AssistantFocusEntry destination;
 
   @override
   Widget build(BuildContext context) {
     return switch (destination) {
-      WorkspaceDestination.tasks => _TasksFocusPreview(controller: controller),
-      WorkspaceDestination.skills => _SkillsFocusPreview(
+      AssistantFocusEntry.tasks => _TasksFocusPreview(controller: controller),
+      AssistantFocusEntry.skills => _SkillsFocusPreview(
         controller: controller,
       ),
-      WorkspaceDestination.nodes => _NodesFocusPreview(controller: controller),
-      WorkspaceDestination.agents => _AgentsFocusPreview(
+      AssistantFocusEntry.nodes => _NodesFocusPreview(controller: controller),
+      AssistantFocusEntry.agents => _AgentsFocusPreview(
         controller: controller,
       ),
-      WorkspaceDestination.mcpServer => _McpFocusPreview(
+      AssistantFocusEntry.mcpServer => _McpFocusPreview(
         controller: controller,
       ),
-      WorkspaceDestination.clawHub => _ClawHubFocusPreview(
+      AssistantFocusEntry.clawHub => _ClawHubFocusPreview(
         controller: controller,
       ),
-      WorkspaceDestination.secrets => _SecretsFocusPreview(
+      AssistantFocusEntry.secrets => _SecretsFocusPreview(
         controller: controller,
       ),
-      WorkspaceDestination.aiGateway => _AiGatewayFocusPreview(
+      AssistantFocusEntry.aiGateway => _AiGatewayFocusPreview(
         controller: controller,
       ),
-      WorkspaceDestination.settings => _SettingsFocusPreview(
+      AssistantFocusEntry.settings => _SettingsFocusPreview(
         controller: controller,
       ),
-      _ => const SizedBox.shrink(),
+      AssistantFocusEntry.language => _LanguageFocusPreview(
+        controller: controller,
+      ),
+      AssistantFocusEntry.theme => _ThemeFocusPreview(controller: controller),
     };
   }
 }
@@ -756,6 +761,83 @@ class _SettingsFocusPreview extends StatelessWidget {
   }
 }
 
+class _LanguageFocusPreview extends StatelessWidget {
+  const _LanguageFocusPreview({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentLabel = controller.appLanguage == AppLanguage.zh
+        ? appText('中文', 'Chinese')
+        : 'English';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ChromeLanguageActionButton(
+          key: const Key('assistant-focus-language-toggle'),
+          appLanguage: controller.appLanguage,
+          compact: false,
+          tooltip: appText('切换语言', 'Toggle language'),
+          onPressed: controller.toggleAppLanguage,
+        ),
+        const SizedBox(height: 12),
+        _FocusListTile(
+          title: appText('当前语言', 'Current language'),
+          subtitle: appText(
+            '点击上方按钮即可在中英文界面之间切换。',
+            'Use the button above to switch between Chinese and English.',
+          ),
+          trailing: currentLabel,
+        ),
+      ],
+    );
+  }
+}
+
+class _ThemeFocusPreview extends StatelessWidget {
+  const _ThemeFocusPreview({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final themeLabel = switch (controller.themeMode) {
+      ThemeMode.dark => appText('深色', 'Dark'),
+      ThemeMode.light => appText('浅色', 'Light'),
+      ThemeMode.system => appText('跟随系统', 'System'),
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ChromeIconActionButton(
+          key: const Key('assistant-focus-theme-toggle'),
+          icon: chromeThemeToggleIcon(controller.themeMode),
+          tooltip: chromeThemeToggleTooltip(controller.themeMode),
+          onPressed: () {
+            controller.setThemeMode(
+              controller.themeMode == ThemeMode.dark
+                  ? ThemeMode.light
+                  : ThemeMode.dark,
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        _FocusListTile(
+          title: appText('当前主题', 'Current theme'),
+          subtitle: appText(
+            '点击上方按钮即可切换亮度模式。',
+            'Use the button above to switch appearance mode.',
+          ),
+          trailing: themeLabel,
+        ),
+      ],
+    );
+  }
+}
+
 class _FocusListTile extends StatelessWidget {
   const _FocusListTile({
     required this.title,
@@ -880,8 +962,8 @@ class _AssistantFocusEmptyState extends StatelessWidget {
   });
 
   final String message;
-  final List<WorkspaceDestination> available;
-  final Future<void> Function(WorkspaceDestination destination) onAdd;
+  final List<AssistantFocusEntry> available;
+  final Future<void> Function(AssistantFocusEntry destination) onAdd;
 
   @override
   Widget build(BuildContext context) {

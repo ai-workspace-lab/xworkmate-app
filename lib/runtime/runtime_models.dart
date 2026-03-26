@@ -1612,7 +1612,7 @@ class SettingsSnapshot {
   final LinuxDesktopConfig linuxDesktop;
   final AssistantExecutionTarget assistantExecutionTarget;
   final AssistantPermissionLevel assistantPermissionLevel;
-  final List<WorkspaceDestination> assistantNavigationDestinations;
+  final List<AssistantFocusEntry> assistantNavigationDestinations;
   final Map<String, String> assistantCustomTaskTitles;
   final List<String> assistantArchivedTaskKeys;
   final String assistantLastSessionKey;
@@ -1687,7 +1687,7 @@ class SettingsSnapshot {
     LinuxDesktopConfig? linuxDesktop,
     AssistantExecutionTarget? assistantExecutionTarget,
     AssistantPermissionLevel? assistantPermissionLevel,
-    List<WorkspaceDestination>? assistantNavigationDestinations,
+    List<AssistantFocusEntry>? assistantNavigationDestinations,
     Map<String, String>? assistantCustomTaskTitles,
     List<String>? assistantArchivedTaskKeys,
     String? assistantLastSessionKey,
@@ -1837,10 +1837,11 @@ class SettingsSnapshot {
         ? normalizeAssistantNavigationDestinations(
             rawAssistantNavigationDestinations
                 .map(
-                  (item) =>
-                      WorkspaceDestinationCopy.fromJsonValue(item?.toString()),
+                  (item) => AssistantFocusEntryCopy.fromJsonValue(
+                    item?.toString(),
+                  ),
                 )
-                .whereType<WorkspaceDestination>(),
+                .whereType<AssistantFocusEntry>(),
           )
         : kAssistantNavigationDestinationDefaults;
     final gatewayProfiles = normalizeGatewayProfiles(
