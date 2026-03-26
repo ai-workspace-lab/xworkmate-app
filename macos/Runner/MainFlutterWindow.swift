@@ -9,7 +9,7 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
-    (NSApp.delegate as? AppDelegate)?.registerSkillDirectoryChannel(
+    (NSApp.delegate as? AppDelegate)?.registerApplicationChannels(
       for: flutterViewController
     )
 

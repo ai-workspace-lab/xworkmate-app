@@ -135,6 +135,7 @@ class AppController extends ChangeNotifier {
     }
     return capabilities.supportsDestination(WorkspaceDestination.settings);
   }
+
   GatewayConnectionSnapshot get connection => _relayClient.snapshot;
   bool get relayBusy => _relayBusy;
   bool get aiGatewayBusy => _aiGatewayBusy;
@@ -2172,6 +2173,14 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  Future<void> prepareForExit() async {
+    try {
+      await abortRun();
+    } catch (_) {
+      // Web and placeholder desktop hooks only need a best-effort cancel.
+    }
+  }
+
   Future<void> selectDirectModel(String model) async {
     final trimmed = model.trim();
     if (trimmed.isEmpty) {
@@ -2348,14 +2357,18 @@ class AppController extends ChangeNotifier {
     );
     final assistantNavigationDestinations =
         normalizeAssistantNavigationDestinations(
-          snapshot.assistantNavigationDestinations,
-        ).where((entry) {
-          final destination = entry.destination;
-          if (destination != null) {
-            return allowedDestinations.contains(destination);
-          }
-          return allowedDestinations.contains(WorkspaceDestination.settings);
-        }).toList(growable: false);
+              snapshot.assistantNavigationDestinations,
+            )
+            .where((entry) {
+              final destination = entry.destination;
+              if (destination != null) {
+                return allowedDestinations.contains(destination);
+              }
+              return allowedDestinations.contains(
+                WorkspaceDestination.settings,
+              );
+            })
+            .toList(growable: false);
     final normalizedSessionBaseUrl =
         RemoteWebSessionRepository.normalizeBaseUrl(
           snapshot.webSessionPersistence.remoteBaseUrl,

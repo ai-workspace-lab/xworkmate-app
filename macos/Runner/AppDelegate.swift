@@ -3,26 +3,74 @@ import Darwin
 import FlutterMacOS
 
 @main
-class AppDelegate: FlutterAppDelegate {
+class AppDelegate: FlutterAppDelegate, NSWindowDelegate {
+  private let appLifecycleChannelName = "plus.svc.xworkmate/app_lifecycle"
   private let skillDirectoryChannelName = "plus.svc.xworkmate/skill_directory_access"
   private var directoryAccessSessions: [String: URL] = [:]
+  private var appLifecycleChannel: FlutterMethodChannel?
+  private var appLifecycleMessengerId: ObjectIdentifier?
   private var skillDirectoryChannel: FlutterMethodChannel?
   private var skillDirectoryMessengerId: ObjectIdentifier?
+  private var statusItem: NSStatusItem?
+  private var terminationInFlight = false
+  private var terminationTimeoutWorkItem: DispatchWorkItem?
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
     super.applicationDidFinishLaunching(notification)
 
+    mainFlutterWindow?.delegate = self
+
     guard let controller = mainFlutterWindow?.contentViewController as? FlutterViewController else {
+      setUpStatusItem()
       return
     }
-    registerSkillDirectoryChannel(for: controller)
+    registerApplicationChannels(for: controller)
+    setUpStatusItem()
   }
 
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-    return true
+    return false
   }
 
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+    return true
+  }
+
+  override func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    guard !terminationInFlight else {
+      return .terminateLater
+    }
+    guard let channel = appLifecycleChannel else {
+      return .terminateNow
+    }
+
+    terminationInFlight = true
+    var hasReplied = false
+    let finishTermination: () -> Void = { [weak self] in
+      guard let self else {
+        return
+      }
+      guard !hasReplied else {
+        return
+      }
+      hasReplied = true
+      self.terminationTimeoutWorkItem?.cancel()
+      self.terminationTimeoutWorkItem = nil
+      self.terminationInFlight = false
+      sender.reply(toApplicationShouldTerminate: true)
+    }
+
+    let timeoutWorkItem = DispatchWorkItem(block: finishTermination)
+    terminationTimeoutWorkItem = timeoutWorkItem
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: timeoutWorkItem)
+    channel.invokeMethod("prepareForExit", arguments: nil) { _ in
+      finishTermination()
+    }
+    return .terminateLater
+  }
+
+  override func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+    showMainWindow()
     return true
   }
 
@@ -32,6 +80,11 @@ class AppDelegate: FlutterAppDelegate {
     }
     directoryAccessSessions.removeAll()
     super.applicationWillTerminate(notification)
+  }
+
+  func registerApplicationChannels(for controller: FlutterViewController) {
+    registerAppLifecycleChannel(for: controller)
+    registerSkillDirectoryChannel(for: controller)
   }
 
   func registerSkillDirectoryChannel(for controller: FlutterViewController) {
@@ -49,6 +102,90 @@ class AppDelegate: FlutterAppDelegate {
     }
     skillDirectoryChannel = channel
     skillDirectoryMessengerId = messengerId
+  }
+
+  func registerAppLifecycleChannel(for controller: FlutterViewController) {
+    let messengerObject = controller.engine.binaryMessenger as AnyObject
+    let messengerId = ObjectIdentifier(messengerObject)
+    if appLifecycleMessengerId == messengerId {
+      return
+    }
+    appLifecycleChannel = FlutterMethodChannel(
+      name: appLifecycleChannelName,
+      binaryMessenger: controller.engine.binaryMessenger
+    )
+    appLifecycleMessengerId = messengerId
+  }
+
+  private func setUpStatusItem() {
+    guard statusItem == nil else {
+      return
+    }
+
+    let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    if let button = item.button {
+      if #available(macOS 11.0, *) {
+        if let image = NSImage(
+          systemSymbolName: "cpu",
+          accessibilityDescription: "XWorkmate"
+        ) {
+          image.isTemplate = true
+          button.image = image
+        } else {
+          button.title = "XW"
+        }
+      } else {
+        button.title = "XW"
+      }
+      button.toolTip = "XWorkmate"
+    }
+
+    let menu = NSMenu()
+    let showItem = NSMenuItem(
+      title: "显示主窗口",
+      action: #selector(showMainWindowAction(_:)),
+      keyEquivalent: ""
+    )
+    showItem.target = self
+    menu.addItem(showItem)
+
+    let quitItem = NSMenuItem(
+      title: "退出并暂停任务",
+      action: #selector(quitAndPauseTasksAction(_:)),
+      keyEquivalent: ""
+    )
+    quitItem.target = self
+    menu.addItem(quitItem)
+
+    item.menu = menu
+    statusItem = item
+  }
+
+  @objc private func showMainWindowAction(_ sender: Any?) {
+    showMainWindow()
+  }
+
+  @objc private func quitAndPauseTasksAction(_ sender: Any?) {
+    NSApp.terminate(sender)
+  }
+
+  func windowShouldClose(_ sender: NSWindow) -> Bool {
+    sender.orderOut(nil)
+    NSApp.hide(nil)
+    return false
+  }
+
+  private func showMainWindow() {
+    guard let window = mainFlutterWindow else {
+      return
+    }
+    NSApp.unhide(nil)
+    if window.isMiniaturized {
+      window.deminiaturize(nil)
+    }
+    window.makeKeyAndOrderFront(nil)
+    window.orderFrontRegardless()
+    NSApp.activate(ignoringOtherApps: true)
   }
 
   private func handleSkillDirectoryCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

@@ -2045,6 +2045,15 @@ class AppController extends ChangeNotifier {
     await _chatController.abortRun();
   }
 
+  Future<void> prepareForExit() async {
+    try {
+      await abortRun();
+    } catch (_) {
+      // Best effort only. Native termination still proceeds.
+    }
+    await _flushAssistantThreadPersistence();
+  }
+
   Future<void> setAssistantExecutionTarget(
     AssistantExecutionTarget target,
   ) async {
