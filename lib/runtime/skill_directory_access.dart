@@ -12,6 +12,16 @@ abstract class SkillDirectoryAccessService {
   bool get requiresAuthorizedSharedRoots;
   Future<String> resolveUserHomeDirectory();
 
+  Future<List<AuthorizedSkillDirectory>> authorizeDirectories({
+    List<String> suggestedPaths = const <String>[],
+  }) async {
+    final suggestedPath = suggestedPaths.isNotEmpty ? suggestedPaths.first : '';
+    final granted = await authorizeDirectory(suggestedPath: suggestedPath);
+    return granted == null
+        ? const <AuthorizedSkillDirectory>[]
+        : <AuthorizedSkillDirectory>[granted];
+  }
+
   Future<AuthorizedSkillDirectory?> authorizeDirectory({
     String suggestedPath = '',
   });
@@ -60,6 +70,13 @@ class UnsupportedSkillDirectoryAccessService
   }
 
   @override
+  Future<List<AuthorizedSkillDirectory>> authorizeDirectories({
+    List<String> suggestedPaths = const <String>[],
+  }) async {
+    return const <AuthorizedSkillDirectory>[];
+  }
+
+  @override
   Future<AuthorizedSkillDirectory?> authorizeDirectory({
     String suggestedPath = '',
   }) async {
@@ -85,6 +102,28 @@ class FileSelectorSkillDirectoryAccessService
   @override
   Future<String> resolveUserHomeDirectory() async {
     return _fallbackUserHomeDirectory();
+  }
+
+  @override
+  Future<List<AuthorizedSkillDirectory>> authorizeDirectories({
+    List<String> suggestedPaths = const <String>[],
+  }) async {
+    final initialDirectory = _initialDirectoryForSuggestion(
+      suggestedPaths.isNotEmpty ? suggestedPaths.first : '',
+    );
+    final directoryPaths = await getDirectoryPaths(
+      initialDirectory: initialDirectory.isEmpty ? null : initialDirectory,
+    );
+    return normalizeAuthorizedSkillDirectories(
+      directories: directoryPaths
+          .whereType<String>()
+          .map(
+            (path) => AuthorizedSkillDirectory(
+              path: normalizeAuthorizedSkillDirectoryPath(path),
+            ),
+          )
+          .where((directory) => directory.path.isNotEmpty),
+    );
   }
 
   @override
@@ -142,6 +181,38 @@ class MacOsSkillDirectoryAccessService implements SkillDirectoryAccessService {
       return trimmed.isEmpty ? _fallbackUserHomeDirectory() : trimmed;
     } on MissingPluginException {
       return _fallbackUserHomeDirectory();
+    }
+  }
+
+  @override
+  Future<List<AuthorizedSkillDirectory>> authorizeDirectories({
+    List<String> suggestedPaths = const <String>[],
+  }) async {
+    try {
+      final response = await _channel.invokeMethod<List<dynamic>>(
+        'authorizeDirectories',
+        <String, dynamic>{'suggestedPaths': suggestedPaths},
+      );
+      if (response == null) {
+        return const <AuthorizedSkillDirectory>[];
+      }
+      return normalizeAuthorizedSkillDirectories(
+        directories: response
+            .whereType<Map<Object?, Object?>>()
+            .map(
+              (item) => AuthorizedSkillDirectory(
+                path: normalizeAuthorizedSkillDirectoryPath(
+                  item['path']?.toString() ?? '',
+                ),
+                bookmark: item['bookmark']?.toString().trim() ?? '',
+              ),
+            )
+            .where((directory) => directory.path.isNotEmpty),
+      );
+    } on MissingPluginException {
+      return _fallbackService.authorizeDirectories(
+        suggestedPaths: suggestedPaths,
+      );
     }
   }
 

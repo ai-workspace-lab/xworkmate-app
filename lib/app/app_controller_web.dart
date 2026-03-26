@@ -112,8 +112,6 @@ class AppController extends ChangeNotifier {
   List<String> get recommendedAuthorizedSkillDirectoryPaths => const <String>[
     '/etc/skills',
     '~/.agents/skills',
-    '~/.codex/skills',
-    '~/.workbuddy/skills',
   ];
   String get userHomeDirectory => '';
   String get settingsYamlPath => '';
@@ -941,6 +939,12 @@ class AppController extends ChangeNotifier {
     String suggestedPath = '',
   }) async {
     return null;
+  }
+
+  Future<List<AuthorizedSkillDirectory>> authorizeSkillDirectories({
+    List<String> suggestedPaths = const <String>[],
+  }) async {
+    return const <AuthorizedSkillDirectory>[];
   }
 
   Future<void> saveAuthorizedSkillDirectories(

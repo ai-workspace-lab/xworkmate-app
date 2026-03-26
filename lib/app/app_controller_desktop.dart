@@ -81,32 +81,12 @@ class AppController extends ChangeNotifier {
       source: 'agents',
       scope: 'user',
     ),
-    _SingleAgentSkillScanRoot(
-      path: '~/.codex/skills',
-      source: 'codex',
-      scope: 'user',
-    ),
-    _SingleAgentSkillScanRoot(
-      path: '~/.workbuddy/skills',
-      source: 'workbuddy',
-      scope: 'user',
-    ),
   ];
   static const List<_SingleAgentSkillScanRoot>
   _defaultSingleAgentWorkspaceSkillScanRoots = <_SingleAgentSkillScanRoot>[
     _SingleAgentSkillScanRoot(
-      path: '.agents/skills',
-      source: 'agents',
-      scope: 'workspace',
-    ),
-    _SingleAgentSkillScanRoot(
-      path: '.codex/skills',
-      source: 'codex',
-      scope: 'workspace',
-    ),
-    _SingleAgentSkillScanRoot(
-      path: '.workbuddy/skills',
-      source: 'workbuddy',
+      path: 'skills',
+      source: 'workspace',
       scope: 'workspace',
     ),
   ];
@@ -2218,17 +2198,14 @@ class AppController extends ChangeNotifier {
     final previousImported =
         _assistantThreadRecords[normalizedSessionKey]?.importedSkills ??
         const <AssistantThreadSkillEntry>[];
-    final fallbackSkills = await _singleAgentLocalFallbackSkillsForSession(
+    final localSkills = await _singleAgentLocalFallbackSkillsForSession(
       normalizedSessionKey,
     );
     final provider =
         singleAgentResolvedProviderForSession(normalizedSessionKey) ??
         currentSingleAgentResolvedProvider;
     if (provider == null) {
-      await _replaceSingleAgentThreadSkills(
-        normalizedSessionKey,
-        fallbackSkills,
-      );
+      await _replaceSingleAgentThreadSkills(normalizedSessionKey, localSkills);
       return;
     }
     try {
@@ -2251,27 +2228,29 @@ class AppController extends ChangeNotifier {
           .toList(growable: false);
       await _replaceSingleAgentThreadSkills(
         normalizedSessionKey,
-        skills.isNotEmpty ? skills : fallbackSkills,
+        _mergeSingleAgentSkillEntries(
+          groups: <List<AssistantThreadSkillEntry>>[localSkills, skills],
+        ),
       );
     } on GatewayAcpException catch (error) {
       if (_unsupportedAcpSkillsStatus(error)) {
         await _replaceSingleAgentThreadSkills(
           normalizedSessionKey,
-          fallbackSkills,
+          localSkills,
         );
         return;
       }
-      if (previousImported.isEmpty) {
+      if (localSkills.isNotEmpty || previousImported.isEmpty) {
         await _replaceSingleAgentThreadSkills(
           normalizedSessionKey,
-          fallbackSkills,
+          localSkills,
         );
       }
     } catch (_) {
-      if (previousImported.isEmpty) {
+      if (localSkills.isNotEmpty || previousImported.isEmpty) {
         await _replaceSingleAgentThreadSkills(
           normalizedSessionKey,
-          fallbackSkills,
+          localSkills,
         );
       }
     }
@@ -2669,6 +2648,14 @@ class AppController extends ChangeNotifier {
   }) {
     return _skillDirectoryAccessService.authorizeDirectory(
       suggestedPath: suggestedPath,
+    );
+  }
+
+  Future<List<AuthorizedSkillDirectory>> authorizeSkillDirectories({
+    List<String> suggestedPaths = const <String>[],
+  }) {
+    return _skillDirectoryAccessService.authorizeDirectories(
+      suggestedPaths: suggestedPaths,
     );
   }
 
@@ -4577,30 +4564,26 @@ class AppController extends ChangeNotifier {
     final workspaceSkills = await _scanSingleAgentWorkspaceSkillEntries(
       sessionKey,
     );
-    return _mergeSingleAgentLocalSkills(
-      globalSkills: _singleAgentSharedImportedSkills,
-      workspaceSkills: workspaceSkills,
+    return _mergeSingleAgentSkillEntries(
+      groups: <List<AssistantThreadSkillEntry>>[
+        _singleAgentSharedImportedSkills,
+        workspaceSkills,
+      ],
     );
   }
 
-  List<AssistantThreadSkillEntry> _mergeSingleAgentLocalSkills({
-    required List<AssistantThreadSkillEntry> globalSkills,
-    required List<AssistantThreadSkillEntry> workspaceSkills,
+  List<AssistantThreadSkillEntry> _mergeSingleAgentSkillEntries({
+    required List<List<AssistantThreadSkillEntry>> groups,
   }) {
     final merged = <String, AssistantThreadSkillEntry>{};
-    for (final skill in globalSkills) {
-      final normalizedName = skill.label.trim().toLowerCase();
-      if (normalizedName.isEmpty) {
-        continue;
+    for (final group in groups) {
+      for (final skill in group) {
+        final normalizedName = skill.label.trim().toLowerCase();
+        if (normalizedName.isEmpty || merged.containsKey(normalizedName)) {
+          continue;
+        }
+        merged[normalizedName] = skill;
       }
-      merged[normalizedName] = skill;
-    }
-    for (final skill in workspaceSkills) {
-      final normalizedName = skill.label.trim().toLowerCase();
-      if (normalizedName.isEmpty || merged.containsKey(normalizedName)) {
-        continue;
-      }
-      merged[normalizedName] = skill;
     }
     final entries = merged.values.toList(growable: false);
     entries.sort((left, right) => left.label.compareTo(right.label));

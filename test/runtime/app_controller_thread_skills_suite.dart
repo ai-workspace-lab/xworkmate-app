@@ -656,7 +656,7 @@ void main() {
       });
       final workspaceRoot = Directory('${tempDirectory.path}/workspace');
       await _writeSkill(
-        Directory('${workspaceRoot.path}/.codex/skills'),
+        Directory('${workspaceRoot.path}/skills'),
         'workspace-only',
         skillName: 'Workspace Only Skill',
         description: 'Repo-local fallback',
@@ -741,16 +741,16 @@ void main() {
         description: 'Only from global',
       );
       await _writeSkill(
-        Directory('${workspaceRoot.path}/.codex/skills'),
+        Directory('${workspaceRoot.path}/skills'),
         'shared-skill',
         skillName: 'Shared Skill',
         description: 'Repo-local should not override',
       );
       await _writeSkill(
-        Directory('${workspaceRoot.path}/.codex/skills'),
+        Directory('${workspaceRoot.path}/skills'),
         'workspace-only',
         skillName: 'Workspace Only',
-        description: 'Only from repo-local',
+        description: 'Only from workspace',
       );
 
       final store = SecureConfigStore(
@@ -813,7 +813,7 @@ void main() {
   );
 
   test(
-    'AppController scans repo-local skills directories in fixed order and skips missing roots',
+    'AppController scans repo-local skills from workspace skills directory only',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -828,16 +828,16 @@ void main() {
       });
       final workspaceRoot = Directory('${tempDirectory.path}/workspace');
       await _writeSkill(
-        Directory('${workspaceRoot.path}/.agents/skills'),
+        Directory('${workspaceRoot.path}/skills'),
         'shared-skill',
         skillName: 'Shared Skill',
-        description: 'Agents version',
+        description: 'Workspace version wins',
       );
       await _writeSkill(
         Directory('${workspaceRoot.path}/.codex/skills'),
-        'shared-skill',
-        skillName: 'Shared Skill',
-        description: 'Codex version wins',
+        'legacy-only',
+        skillName: 'Legacy Only',
+        description: 'Deprecated workspace root should be ignored',
       );
 
       final store = SecureConfigStore(
@@ -883,8 +883,14 @@ void main() {
       final sharedSkill = controller
           .assistantImportedSkillsForSession(controller.currentSessionKey)
           .firstWhere((item) => item.label == 'Shared Skill');
-      expect(sharedSkill.description, 'Codex version wins');
-      expect(sharedSkill.source, 'codex');
+      expect(sharedSkill.description, 'Workspace version wins');
+      expect(sharedSkill.source, 'workspace');
+      expect(
+        controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .where((item) => item.label == 'Legacy Only'),
+        isEmpty,
+      );
     },
   );
 
@@ -1033,6 +1039,13 @@ class _FakeSkillDirectoryAccessService implements SkillDirectoryAccessService {
   @override
   Future<String> resolveUserHomeDirectory() async {
     return userHomeDirectory;
+  }
+
+  @override
+  Future<List<AuthorizedSkillDirectory>> authorizeDirectories({
+    List<String> suggestedPaths = const <String>[],
+  }) async {
+    return const <AuthorizedSkillDirectory>[];
   }
 
   @override

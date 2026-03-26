@@ -57,6 +57,8 @@ class AppDelegate: FlutterAppDelegate {
       result(resolveUserHomeDirectoryPath())
     case "authorizeDirectory":
       authorizeDirectory(call, result: result)
+    case "authorizeDirectories":
+      authorizeDirectories(call, result: result)
     case "startDirectoryAccess":
       startDirectoryAccess(call, result: result)
     case "stopDirectoryAccess":
@@ -70,36 +72,19 @@ class AppDelegate: FlutterAppDelegate {
     let arguments = call.arguments as? [String: Any]
     let suggestedPath = (arguments?["suggestedPath"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 
-    let panel = NSOpenPanel()
-    panel.title = "授权技能目录"
-    panel.message = "请选择要授予 XWorkmate 只读访问权限的技能目录。"
-    panel.prompt = "授权"
-    panel.canChooseDirectories = true
-    panel.canChooseFiles = false
-    panel.allowsMultipleSelection = false
-    panel.canCreateDirectories = false
-    panel.resolvesAliases = true
-    panel.showsHiddenFiles = true
-    if let initialURL = initialDirectoryURL(for: suggestedPath) {
-      panel.directoryURL = initialURL
-    }
-
+    let panel = buildAuthorizationPanel(
+      title: "授权技能目录",
+      message: "请选择要授予 XWorkmate 只读访问权限的技能目录。",
+      allowsMultipleSelection: false,
+      suggestedPath: suggestedPath
+    )
     guard panel.runModal() == .OK, let selectedURL = panel.url else {
       result(nil)
       return
     }
 
     do {
-      let resolvedURL = selectedURL.standardizedFileURL
-      let bookmarkData = try resolvedURL.bookmarkData(
-        options: [.withSecurityScope],
-        includingResourceValuesForKeys: nil,
-        relativeTo: nil
-      )
-      result([
-        "path": resolvedURL.path,
-        "bookmark": bookmarkData.base64EncodedString(),
-      ])
+      result(try authorizationPayload(for: selectedURL))
     } catch {
       result(
         FlutterError(
@@ -109,6 +94,71 @@ class AppDelegate: FlutterAppDelegate {
         )
       )
     }
+  }
+
+  private func authorizeDirectories(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    let arguments = call.arguments as? [String: Any]
+    let suggestedPaths = (arguments?["suggestedPaths"] as? [String] ?? [])
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+    let panel = buildAuthorizationPanel(
+      title: "批量授权技能目录",
+      message: "请选择要授予 XWorkmate 只读访问权限的一个或多个技能目录。",
+      allowsMultipleSelection: true,
+      suggestedPath: suggestedPaths.first ?? ""
+    )
+    guard panel.runModal() == .OK else {
+      result([])
+      return
+    }
+
+    do {
+      let payload = try panel.urls.map(authorizationPayload(for:))
+      result(payload)
+    } catch {
+      result(
+        FlutterError(
+          code: "bookmark_create_failed",
+          message: error.localizedDescription,
+          details: nil
+        )
+      )
+    }
+  }
+
+  private func buildAuthorizationPanel(
+    title: String,
+    message: String,
+    allowsMultipleSelection: Bool,
+    suggestedPath: String
+  ) -> NSOpenPanel {
+    let panel = NSOpenPanel()
+    panel.title = title
+    panel.message = message
+    panel.prompt = "授权"
+    panel.canChooseDirectories = true
+    panel.canChooseFiles = false
+    panel.allowsMultipleSelection = allowsMultipleSelection
+    panel.canCreateDirectories = false
+    panel.resolvesAliases = true
+    panel.showsHiddenFiles = true
+    if let initialURL = initialDirectoryURL(for: suggestedPath) {
+      panel.directoryURL = initialURL
+    }
+    return panel
+  }
+
+  private func authorizationPayload(for selectedURL: URL) throws -> [String: Any] {
+    let resolvedURL = selectedURL.standardizedFileURL
+    let bookmarkData = try resolvedURL.bookmarkData(
+      options: [.withSecurityScope],
+      includingResourceValuesForKeys: nil,
+      relativeTo: nil
+    )
+    return [
+      "path": resolvedURL.path,
+      "bookmark": bookmarkData.base64EncodedString(),
+    ]
   }
 
   private func startDirectoryAccess(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
