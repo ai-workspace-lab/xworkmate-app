@@ -77,7 +77,7 @@ class _AssistantPageState extends State<AssistantPage> {
   String _threadQuery = '';
   bool _sidePaneCollapsed = false;
   _AssistantSidePane _activeSidePane = _AssistantSidePane.tasks;
-  WorkspaceDestination? _activeFocusedDestination;
+  AssistantFocusEntry? _activeFocusedDestination;
   final Map<String, _AssistantTaskSeed> _taskSeeds =
       <String, _AssistantTaskSeed>{};
   final Set<String> _archivedTaskKeys = <String>{};
@@ -250,7 +250,8 @@ class _AssistantPageState extends State<AssistantPage> {
                                   controller: controller,
                                   destination: activeFocusedDestination,
                                   onOpenPage: () => controller.navigateTo(
-                                    activeFocusedDestination,
+                                    activeFocusedDestination.destination ??
+                                        WorkspaceDestination.settings,
                                   ),
                                   onRemoveFavorite: () async {
                                     await controller
@@ -1405,8 +1406,8 @@ class _AssistantPageState extends State<AssistantPage> {
     return 'draft:$selectedAgentId:$stamp';
   }
 
-  WorkspaceDestination? _resolveFocusedDestination(
-    List<WorkspaceDestination> favorites,
+  AssistantFocusEntry? _resolveFocusedDestination(
+    List<AssistantFocusEntry> favorites,
   ) {
     if (favorites.isEmpty) {
       return null;
@@ -1482,14 +1483,14 @@ class _AssistantUnifiedSidePane extends StatelessWidget {
   });
 
   final _AssistantSidePane activePane;
-  final WorkspaceDestination? activeFocusedDestination;
+  final AssistantFocusEntry? activeFocusedDestination;
   final bool collapsed;
-  final List<WorkspaceDestination> favoriteDestinations;
+  final List<AssistantFocusEntry> favoriteDestinations;
   final Widget taskPanel;
   final Widget navigationPanel;
   final Widget? focusedPanel;
   final ValueChanged<_AssistantSidePane> onSelectPane;
-  final ValueChanged<WorkspaceDestination> onSelectFocusedDestination;
+  final ValueChanged<AssistantFocusEntry> onSelectFocusedDestination;
   final VoidCallback onToggleCollapsed;
 
   @override
@@ -1548,11 +1549,11 @@ class _AssistantSideTabRail extends StatelessWidget {
   });
 
   final _AssistantSidePane activePane;
-  final WorkspaceDestination? activeFocusedDestination;
+  final AssistantFocusEntry? activeFocusedDestination;
   final bool collapsed;
-  final List<WorkspaceDestination> favoriteDestinations;
+  final List<AssistantFocusEntry> favoriteDestinations;
   final ValueChanged<_AssistantSidePane> onSelectPane;
-  final ValueChanged<WorkspaceDestination> onSelectFocusedDestination;
+  final ValueChanged<AssistantFocusEntry> onSelectFocusedDestination;
   final VoidCallback onToggleCollapsed;
 
   @override

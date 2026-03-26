@@ -24,11 +24,19 @@ class ChromeIconActionButton extends StatefulWidget {
     required this.icon,
     this.tooltip,
     required this.onPressed,
+    this.favorite = false,
+    this.showFavoriteToggle = false,
+    this.favoriteButtonKey,
+    this.onToggleFavorite,
   });
 
   final IconData icon;
   final String? tooltip;
   final VoidCallback onPressed;
+  final bool favorite;
+  final bool showFavoriteToggle;
+  final Key? favoriteButtonKey;
+  final Future<void> Function()? onToggleFavorite;
 
   @override
   State<ChromeIconActionButton> createState() => _ChromeIconActionButtonState();
@@ -44,7 +52,7 @@ class _ChromeIconActionButtonState extends State<ChromeIconActionButton> {
         ? palette.chromeSurfacePressed
         : palette.chromeSurface;
 
-    return Tooltip(
+    final button = Tooltip(
       message: widget.tooltip ?? '',
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
@@ -89,6 +97,14 @@ class _ChromeIconActionButtonState extends State<ChromeIconActionButton> {
         ),
       ),
     );
+
+    return _ChromeQuickActionFavoriteFrame(
+      favorite: widget.favorite,
+      showFavoriteToggle: widget.showFavoriteToggle,
+      favoriteButtonKey: widget.favoriteButtonKey,
+      onToggleFavorite: widget.onToggleFavorite,
+      child: button,
+    );
   }
 }
 
@@ -99,12 +115,20 @@ class ChromeLanguageActionButton extends StatefulWidget {
     required this.compact,
     required this.tooltip,
     required this.onPressed,
+    this.favorite = false,
+    this.showFavoriteToggle = false,
+    this.favoriteButtonKey,
+    this.onToggleFavorite,
   });
 
   final AppLanguage appLanguage;
   final bool compact;
   final String tooltip;
   final VoidCallback onPressed;
+  final bool favorite;
+  final bool showFavoriteToggle;
+  final Key? favoriteButtonKey;
+  final Future<void> Function()? onToggleFavorite;
 
   @override
   State<ChromeLanguageActionButton> createState() =>
@@ -120,7 +144,7 @@ class _ChromeLanguageActionButtonState
     final palette = context.palette;
     final size = widget.compact ? AppSizes.sidebarItemHeight : 44.0;
 
-    return MouseRegion(
+    final button = MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: Tooltip(
@@ -164,6 +188,76 @@ class _ChromeLanguageActionButtonState
           ),
         ),
       ),
+    );
+
+    return _ChromeQuickActionFavoriteFrame(
+      favorite: widget.favorite,
+      showFavoriteToggle: widget.showFavoriteToggle,
+      favoriteButtonKey: widget.favoriteButtonKey,
+      onToggleFavorite: widget.onToggleFavorite,
+      child: button,
+    );
+  }
+}
+
+class _ChromeQuickActionFavoriteFrame extends StatelessWidget {
+  const _ChromeQuickActionFavoriteFrame({
+    required this.favorite,
+    required this.showFavoriteToggle,
+    required this.child,
+    this.favoriteButtonKey,
+    this.onToggleFavorite,
+  });
+
+  final bool favorite;
+  final bool showFavoriteToggle;
+  final Widget child;
+  final Key? favoriteButtonKey;
+  final Future<void> Function()? onToggleFavorite;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!showFavoriteToggle) {
+      return child;
+    }
+    final palette = context.palette;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        Positioned(
+          top: -4,
+          right: -4,
+          child: Tooltip(
+            message: favorite
+                ? appText('取消关注', 'Remove from focused panel')
+                : appText('加入关注', 'Add to focused panel'),
+            child: Material(
+              color: palette.surfacePrimary,
+              shape: const CircleBorder(),
+              child: InkWell(
+                key: favoriteButtonKey,
+                customBorder: const CircleBorder(),
+                onTap: () {
+                  onToggleFavorite?.call();
+                },
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: Icon(
+                    favorite
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded,
+                    size: 14,
+                    color: favorite ? palette.accent : palette.textMuted,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

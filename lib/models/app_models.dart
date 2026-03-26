@@ -105,28 +105,172 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
   }
 }
 
-const List<WorkspaceDestination> kAssistantNavigationDestinationDefaults =
-    <WorkspaceDestination>[];
+enum AssistantFocusEntry {
+  tasks,
+  skills,
+  nodes,
+  agents,
+  mcpServer,
+  clawHub,
+  secrets,
+  aiGateway,
+  settings,
+  language,
+  theme,
+}
 
-const List<WorkspaceDestination> kAssistantNavigationDestinationCandidates =
-    <WorkspaceDestination>[
-      WorkspaceDestination.tasks,
-      WorkspaceDestination.skills,
-      WorkspaceDestination.nodes,
-      WorkspaceDestination.agents,
-      WorkspaceDestination.mcpServer,
-      WorkspaceDestination.clawHub,
-      WorkspaceDestination.secrets,
-      WorkspaceDestination.aiGateway,
-      WorkspaceDestination.settings,
+extension AssistantFocusEntryCopy on AssistantFocusEntry {
+  String get label => switch (this) {
+    AssistantFocusEntry.tasks => appText('任务', 'Tasks'),
+    AssistantFocusEntry.skills => appText('技能', 'Skills'),
+    AssistantFocusEntry.nodes => appText('节点', 'Nodes'),
+    AssistantFocusEntry.agents => appText('代理', 'Agents'),
+    AssistantFocusEntry.mcpServer => 'MCP Hub',
+    AssistantFocusEntry.clawHub => 'ClawHub',
+    AssistantFocusEntry.secrets => appText('密钥', 'Secrets'),
+    AssistantFocusEntry.aiGateway => 'LLM API',
+    AssistantFocusEntry.settings => appText('设置', 'Settings'),
+    AssistantFocusEntry.language => appText('语言', 'Language'),
+    AssistantFocusEntry.theme => appText('主题/亮度', 'Theme / Brightness'),
+  };
+
+  IconData get icon => switch (this) {
+    AssistantFocusEntry.tasks => Icons.layers_rounded,
+    AssistantFocusEntry.skills => Icons.auto_awesome_rounded,
+    AssistantFocusEntry.nodes => Icons.developer_board_rounded,
+    AssistantFocusEntry.agents => Icons.hub_rounded,
+    AssistantFocusEntry.mcpServer => Icons.dns_rounded,
+    AssistantFocusEntry.clawHub => Icons.extension_rounded,
+    AssistantFocusEntry.secrets => Icons.key_rounded,
+    AssistantFocusEntry.aiGateway => Icons.smart_toy_rounded,
+    AssistantFocusEntry.settings => Icons.tune_rounded,
+    AssistantFocusEntry.language => Icons.translate_rounded,
+    AssistantFocusEntry.theme => Icons.brightness_6_rounded,
+  };
+
+  String get description => switch (this) {
+    AssistantFocusEntry.tasks => appText(
+      '任务队列、运行态、失败项和调度历史的统一视图。',
+      'Unified view for queue, running, failed, and history.',
+    ),
+    AssistantFocusEntry.skills => appText(
+      '管理技能包与能力扩展，浏览和安装 ClawHub 技能。',
+      'Manage skill packages and extensions, browse and install from ClawHub.',
+    ),
+    AssistantFocusEntry.nodes => appText(
+      '管理边缘节点与实例，监控运行状态与负载。',
+      'Manage edge nodes and instances, monitor status and load.',
+    ),
+    AssistantFocusEntry.agents => appText(
+      '管理代理实例，配置行为与能力。',
+      'Manage agent instances, configure behaviors and capabilities.',
+    ),
+    AssistantFocusEntry.mcpServer => appText(
+      '管理 MCP Hub 连接与工具配置。',
+      'Manage MCP Hub connections and tool configurations.',
+    ),
+    AssistantFocusEntry.clawHub => appText(
+      '浏览和安装技能包、代理模板与连接器。',
+      'Browse and install skill packages, agent templates and connectors.',
+    ),
+    AssistantFocusEntry.secrets => appText(
+      '密钥与 Vault 配置统一收口到设置中心。',
+      'Secrets and Vault configuration now live in the Settings center.',
+    ),
+    AssistantFocusEntry.aiGateway => appText(
+      'LLM API 配置统一收口到设置中心。',
+      'LLM API configuration now lives in the Settings center.',
+    ),
+    AssistantFocusEntry.settings => appText(
+      '全局配置中心，只负责系统设置与诊断，不承担业务模块入口。',
+      'Global settings and diagnostics, separated from business modules.',
+    ),
+    AssistantFocusEntry.language => appText(
+      '快速切换中英文界面语言，无需先进入设置页。',
+      'Switch the interface language quickly without opening Settings first.',
+    ),
+    AssistantFocusEntry.theme => appText(
+      '快速切换浅色/深色亮度模式，方便在当前上下文立即调整外观。',
+      'Switch light and dark appearance modes directly from the current context.',
+    ),
+  };
+
+  WorkspaceDestination? get destination => switch (this) {
+    AssistantFocusEntry.tasks => WorkspaceDestination.tasks,
+    AssistantFocusEntry.skills => WorkspaceDestination.skills,
+    AssistantFocusEntry.nodes => WorkspaceDestination.nodes,
+    AssistantFocusEntry.agents => WorkspaceDestination.agents,
+    AssistantFocusEntry.mcpServer => WorkspaceDestination.mcpServer,
+    AssistantFocusEntry.clawHub => WorkspaceDestination.clawHub,
+    AssistantFocusEntry.secrets => WorkspaceDestination.secrets,
+    AssistantFocusEntry.aiGateway => WorkspaceDestination.aiGateway,
+    AssistantFocusEntry.settings => WorkspaceDestination.settings,
+    AssistantFocusEntry.language => null,
+    AssistantFocusEntry.theme => null,
+  };
+
+  bool get opensSettingsPage =>
+      this == AssistantFocusEntry.language ||
+      this == AssistantFocusEntry.theme ||
+      this == AssistantFocusEntry.settings;
+
+  static AssistantFocusEntry? fromJsonValue(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return null;
+    }
+    for (final item in AssistantFocusEntry.values) {
+      if (item.name == value.trim()) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  static AssistantFocusEntry fromDestination(WorkspaceDestination destination) {
+    return switch (destination) {
+      WorkspaceDestination.tasks => AssistantFocusEntry.tasks,
+      WorkspaceDestination.skills => AssistantFocusEntry.skills,
+      WorkspaceDestination.nodes => AssistantFocusEntry.nodes,
+      WorkspaceDestination.agents => AssistantFocusEntry.agents,
+      WorkspaceDestination.mcpServer => AssistantFocusEntry.mcpServer,
+      WorkspaceDestination.clawHub => AssistantFocusEntry.clawHub,
+      WorkspaceDestination.secrets => AssistantFocusEntry.secrets,
+      WorkspaceDestination.aiGateway => AssistantFocusEntry.aiGateway,
+      WorkspaceDestination.settings => AssistantFocusEntry.settings,
+      WorkspaceDestination.assistant || WorkspaceDestination.account =>
+        throw ArgumentError.value(
+          destination,
+          'destination',
+          'Focused assistant entries only support pinnable workspace targets.',
+        ),
+    };
+  }
+}
+
+const List<AssistantFocusEntry> kAssistantNavigationDestinationDefaults =
+    <AssistantFocusEntry>[];
+
+const List<AssistantFocusEntry> kAssistantNavigationDestinationCandidates =
+    <AssistantFocusEntry>[
+      AssistantFocusEntry.tasks,
+      AssistantFocusEntry.skills,
+      AssistantFocusEntry.nodes,
+      AssistantFocusEntry.agents,
+      AssistantFocusEntry.mcpServer,
+      AssistantFocusEntry.clawHub,
+      AssistantFocusEntry.secrets,
+      AssistantFocusEntry.aiGateway,
+      AssistantFocusEntry.settings,
+      AssistantFocusEntry.language,
+      AssistantFocusEntry.theme,
     ];
 
-List<WorkspaceDestination> normalizeAssistantNavigationDestinations(
-  Iterable<WorkspaceDestination> destinations,
+List<AssistantFocusEntry> normalizeAssistantNavigationDestinations(
+  Iterable<AssistantFocusEntry> destinations,
 ) {
   final allowed = kAssistantNavigationDestinationCandidates.toSet();
-  final seen = <WorkspaceDestination>{};
-  final normalized = <WorkspaceDestination>[];
+  final seen = <AssistantFocusEntry>{};
+  final normalized = <AssistantFocusEntry>[];
   for (final destination in destinations) {
     if (!allowed.contains(destination) || !seen.add(destination)) {
       continue;
