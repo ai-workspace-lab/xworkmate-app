@@ -914,8 +914,8 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 8),
           Text(
             appText(
-              '预设保留 Codex、OpenCode；其余 provider 通过“自定义添加更多”扩展。每条记录可自定义显示名称和 ACP Server Endpoint，协议支持 ws / wss / http / https。',
-              'Codex and OpenCode stay as presets. Add more custom providers as needed. Each entry can define its own display name and ACP server endpoint with ws / wss / http / https.',
+              '这里仅保留 Codex、OpenCode 预设接入。历史上的 Claude / Gemini 预配置会迁移为自定义 ACP Server Endpoint。你可以继续添加多个自定义 Endpoint，协议支持 ws / wss / http / https。',
+              'Only Codex and OpenCode stay as preset integrations here. Legacy Claude and Gemini entries are migrated into custom ACP server endpoints. You can add multiple custom endpoints with ws / wss / http / https.',
             ),
             style: theme.textTheme.bodyMedium,
           ),
@@ -929,7 +929,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 _appendExternalAcpProvider(settings),
               ),
               icon: const Icon(Icons.add_rounded),
-              label: Text(appText('自定义添加更多', 'Add more custom providers')),
+              label: Text(
+                appText(
+                  '添加自定义 ACP Server Endpoint',
+                  'Add custom ACP server endpoint',
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -1013,7 +1018,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           _EditableField(
-            label: appText('ACP Endpoint', 'ACP Endpoint'),
+            label: appText('ACP Server Endpoint', 'ACP Server Endpoint'),
             value: endpoint,
             onSubmitted: (value) => _saveSettings(
               controller,
@@ -1049,7 +1054,10 @@ class _SettingsPageState extends State<SettingsPage> {
         ...settings.externalAcpEndpoints,
         ExternalAcpEndpointProfile(
           providerKey: providerKey(),
-          label: appText('自定义添加更多 $suffix', 'Custom Add More $suffix'),
+          label: appText(
+            '自定义 ACP Endpoint $suffix',
+            'Custom ACP Endpoint $suffix',
+          ),
           badge: '',
           endpoint: '',
           enabled: true,

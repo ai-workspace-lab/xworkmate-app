@@ -1,8 +1,0 @@
-developer_instructions = """
-For this repository, the default execution mode is worktree-first and concurrency-friendly.
-
-- For non-trivial implementation or debugging tasks, start from `main`, create a temporary git worktree, and do the task in that isolated worktree.
-- When tasks have independent side work, split them into concurrent lanes while keeping the main agent on the critical path.
-- When the task is complete, verify the change, merge back to `main`, and clean up the temporary worktree.
-- Do not repeatedly ask the user to re-enable this workflow for this repository unless they explicitly override it.
-"""
