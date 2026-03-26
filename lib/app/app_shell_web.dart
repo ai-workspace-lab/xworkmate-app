@@ -251,38 +251,8 @@ class _WebShellBody extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 4, right: 4),
       child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [palette.chromeBackground, palette.canvas],
-            stops: const [0.0, 0.68],
-          ),
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              top: -180,
-              right: -80,
-              child: IgnorePointer(
-                child: Container(
-                  width: 420,
-                  height: 420,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        palette.chromeHighlight.withValues(alpha: 0.32),
-                        palette.chromeHighlight.withValues(alpha: 0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            child,
-          ],
-        ),
+        decoration: BoxDecoration(color: palette.canvas),
+        child: child,
       ),
     );
   }
