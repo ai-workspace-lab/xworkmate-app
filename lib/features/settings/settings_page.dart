@@ -914,20 +914,33 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 8),
           Text(
             appText(
-              '第一批内置 4 个 provider：Codex、OpenCode、Claude、Gemini。每个 provider 都可以自定义接入自己的 ACP Server Endpoint，协议支持 ws / wss / http / https。Gateway profile 与 ACP endpoint 分开存储，后续可在这个列表上扩展自定义 provider。',
-              'The first batch includes 4 built-in providers: Codex, OpenCode, Claude, and Gemini. Each provider can point to its own ACP server endpoint with ws / wss / http / https. Gateway profiles and ACP endpoints are stored separately, and this list is designed to extend to custom providers later.',
+              '预设保留 Codex、OpenCode；其余 provider 从这个 ACP 列表动态扩展。每条记录都可自定义显示名称、标志和 ACP Server Endpoint，协议支持 ws / wss / http / https。',
+              'Codex and OpenCode stay as presets. Additional providers are driven directly from this ACP list. Each entry can define its own display name, badge, and ACP server endpoint with ws / wss / http / https.',
             ),
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),
-          ...kBuiltinExternalAcpProviders.map(
-            (provider) => Padding(
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              key: const ValueKey('external-acp-provider-add-button'),
+              onPressed: () => _saveSettings(
+                controller,
+                _appendExternalAcpProvider(settings),
+              ),
+              icon: const Icon(Icons.add_rounded),
+              label: Text(appText('添加自定义 Provider', 'Add custom provider')),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...settings.externalAcpEndpoints.map(
+            (profile) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: _buildExternalAcpProviderCard(
                 context,
                 controller,
                 settings,
-                provider,
+                profile,
               ),
             ),
           ),
@@ -940,9 +953,9 @@ class _SettingsPageState extends State<SettingsPage> {
     BuildContext context,
     AppController controller,
     SettingsSnapshot settings,
-    SingleAgentProvider provider,
+    ExternalAcpEndpointProfile profile,
   ) {
-    final profile = settings.externalAcpEndpointForProvider(provider);
+    final provider = profile.toProvider();
     final endpoint = profile.endpoint.trim();
     final configured = endpoint.isNotEmpty;
     return Container(
@@ -957,11 +970,36 @@ class _SettingsPageState extends State<SettingsPage> {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  provider.label,
-                  style: Theme.of(context).textTheme.titleMedium,
+                child: Row(
+                  children: [
+                    _ExternalAcpProviderBadge(provider: provider),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        provider.label,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              if (!profile.isPreset) ...[
+                IconButton(
+                  tooltip: appText('删除 Provider', 'Remove provider'),
+                  onPressed: () => _saveSettings(
+                    controller,
+                    settings.copyWith(
+                      externalAcpEndpoints: settings.externalAcpEndpoints
+                          .where(
+                            (item) => item.providerKey != profile.providerKey,
+                          )
+                          .toList(growable: false),
+                    ),
+                  ),
+                  icon: const Icon(Icons.delete_outline_rounded),
+                ),
+                const SizedBox(width: 4),
+              ],
               _StatusChip(
                 label: configured
                     ? appText('已配置', 'Configured')
@@ -972,10 +1010,29 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 12),
           _EditableField(
-            label: appText(
-              '${provider.label} ACP Endpoint',
-              '${provider.label} ACP Endpoint',
+            label: appText('显示名称', 'Display name'),
+            value: profile.label,
+            onSubmitted: (value) => _saveSettings(
+              controller,
+              settings.copyWithExternalAcpEndpointForProvider(
+                provider,
+                profile.copyWith(label: value),
+              ),
             ),
+          ),
+          _EditableField(
+            label: appText('标志', 'Badge'),
+            value: profile.badge,
+            onSubmitted: (value) => _saveSettings(
+              controller,
+              settings.copyWithExternalAcpEndpointForProvider(
+                provider,
+                profile.copyWith(badge: value),
+              ),
+            ),
+          ),
+          _EditableField(
+            label: appText('ACP Endpoint', 'ACP Endpoint'),
             value: endpoint,
             onSubmitted: (value) => _saveSettings(
               controller,
@@ -994,6 +1051,29 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  SettingsSnapshot _appendExternalAcpProvider(SettingsSnapshot settings) {
+    var suffix = settings.externalAcpEndpoints.length + 1;
+    String providerKey() => 'custom-agent-$suffix';
+    final existingKeys = settings.externalAcpEndpoints
+        .map((item) => item.providerKey)
+        .toSet();
+    while (existingKeys.contains(providerKey())) {
+      suffix += 1;
+    }
+    return settings.copyWith(
+      externalAcpEndpoints: <ExternalAcpEndpointProfile>[
+        ...settings.externalAcpEndpoints,
+        ExternalAcpEndpointProfile(
+          providerKey: providerKey(),
+          label: appText('自定义 Provider $suffix', 'Custom Provider $suffix'),
+          badge: '$suffix',
+          endpoint: '',
+          enabled: true,
+        ),
+      ],
     );
   }
 
@@ -4367,6 +4447,37 @@ class _EditableFieldState extends State<_EditableField> {
         decoration: InputDecoration(labelText: widget.label),
         onChanged: widget.onSubmitted,
         onFieldSubmitted: widget.onSubmitted,
+      ),
+    );
+  }
+}
+
+class _ExternalAcpProviderBadge extends StatelessWidget {
+  const _ExternalAcpProviderBadge({required this.provider});
+
+  final SingleAgentProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final display = provider.badge.trim().isEmpty
+        ? provider.label
+        : provider.badge;
+    final text = display.length <= 2 ? display : display.substring(0, 2);
+    return Container(
+      width: 28,
+      height: 28,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: theme.colorScheme.onPrimaryContainer,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
