@@ -28,7 +28,7 @@ import '../../widgets/surface_card.dart';
 
 const double _assistantComposerDefaultInputHeight = 78;
 const double _assistantWorkspaceMinConversationHeight = 180;
-const double _assistantWorkspaceMinLowerPaneHeight = 124;
+const double _assistantWorkspaceMinLowerPaneHeight = 176;
 const double _assistantHorizontalResizeHandleWidth = 6;
 const double _assistantHorizontalPaneGap = 2;
 const double _assistantVerticalResizeHandleHeight = 10;
@@ -36,6 +36,8 @@ const double _assistantArtifactPaneMinWidth = 280;
 const double _assistantArtifactPaneDefaultWidth = 360;
 const double _assistantCollapsedArtifactToggleClearance = 56;
 const double _assistantComposerSafeAreaGap = 8;
+const double _assistantComposerBaseHeightCompact = 192;
+const double _assistantComposerBaseHeightTall = 216;
 
 typedef AssistantClipboardImageReader = Future<XFile?> Function();
 
@@ -406,7 +408,9 @@ class _AssistantPageState extends State<AssistantPage> {
         final composerBottomSpacing = composerBottomInset > 0
             ? composerBottomInset + _assistantComposerSafeAreaGap
             : _assistantComposerSafeAreaGap;
-        final baseComposerHeight = constraints.maxHeight >= 900 ? 180.0 : 152.0;
+        final baseComposerHeight = constraints.maxHeight >= 900
+            ? _assistantComposerBaseHeightTall
+            : _assistantComposerBaseHeightCompact;
         final composerContentWidth = math.max(240.0, constraints.maxWidth - 32);
         final availableWorkspaceHeight = math.max(
           0.0,
@@ -3674,6 +3678,7 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = context.palette;
+    final showLabel = !(alignRight && label == appText('你', 'You'));
     final backgroundColor = switch (tone) {
       _BubbleTone.user => palette.surfaceSecondary,
       _BubbleTone.agent => palette.surfaceTertiary.withValues(alpha: 0.78),
@@ -3699,14 +3704,16 @@ class _MessageBubble extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: labelColor,
-                  fontWeight: FontWeight.w600,
+              if (showLabel) ...[
+                Text(
+                  label,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: labelColor,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
+                const SizedBox(height: 4),
+              ],
               _MessageBubbleBody(
                 text: text.isEmpty ? appText('暂无内容。', 'No content yet.') : text,
                 renderMarkdown:
@@ -3740,6 +3747,7 @@ class _MessageBubbleBody extends StatefulWidget {
 class _MessageBubbleBodyState extends State<_MessageBubbleBody> {
   bool _attachmentsExpanded = false;
   bool _executionContextExpanded = false;
+  bool _hovered = false;
 
   @override
   void didUpdateWidget(covariant _MessageBubbleBody oldWidget) {
@@ -3754,6 +3762,10 @@ class _MessageBubbleBodyState extends State<_MessageBubbleBody> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = context.palette;
+    final messageBodyStyle = theme.textTheme.bodyMedium?.copyWith(
+      color: theme.colorScheme.onSurface,
+      height: 1.5,
+    );
     if (!widget.renderMarkdown) {
       final parsed = _PromptDebugSnapshot.fromMessage(widget.text);
       final canCompactMetadata =
@@ -3761,13 +3773,7 @@ class _MessageBubbleBodyState extends State<_MessageBubbleBody> {
           (parsed.attachmentsBlock != null ||
               parsed.executionContextBlock != null);
       if (!canCompactMetadata) {
-        return SelectableText(
-          widget.text,
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: theme.colorScheme.onSurface,
-            height: 1.45,
-          ),
-        );
+        return SelectableText(widget.text, style: messageBodyStyle);
       }
 
       final bodyText = parsed.bodyText.trim().isEmpty
@@ -3777,52 +3783,47 @@ class _MessageBubbleBodyState extends State<_MessageBubbleBody> {
           _attachmentsExpanded && parsed.attachmentsBlock != null;
       final showExecutionContext =
           _executionContextExpanded && parsed.executionContextBlock != null;
-
-      return Column(
+      final content = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SelectableText(
-            bodyText,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurface,
-              height: 1.45,
+          SelectableText(bodyText, style: messageBodyStyle),
+          if (_hovered || showAttachments || showExecutionContext) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                if (parsed.attachmentsBlock != null)
+                  _MessageMetaToggleButton(
+                    key: const Key('assistant-user-meta-attachments-toggle'),
+                    icon: Icons.attach_file_rounded,
+                    expanded: _attachmentsExpanded,
+                    tooltip: _attachmentsExpanded
+                        ? appText('折叠附件信息', 'Collapse attached files')
+                        : appText('展开附件信息', 'Expand attached files'),
+                    onTap: () {
+                      setState(() {
+                        _attachmentsExpanded = !_attachmentsExpanded;
+                      });
+                    },
+                  ),
+                if (parsed.executionContextBlock != null)
+                  _MessageMetaToggleButton(
+                    key: const Key('assistant-user-meta-context-toggle'),
+                    icon: Icons.tune_rounded,
+                    expanded: _executionContextExpanded,
+                    tooltip: _executionContextExpanded
+                        ? appText('折叠执行上下文', 'Collapse execution context')
+                        : appText('展开执行上下文', 'Expand execution context'),
+                    onTap: () {
+                      setState(() {
+                        _executionContextExpanded = !_executionContextExpanded;
+                      });
+                    },
+                  ),
+              ],
             ),
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 4,
-            runSpacing: 4,
-            children: [
-              if (parsed.attachmentsBlock != null)
-                _MessageMetaToggleButton(
-                  key: const Key('assistant-user-meta-attachments-toggle'),
-                  icon: Icons.attach_file_rounded,
-                  expanded: _attachmentsExpanded,
-                  tooltip: _attachmentsExpanded
-                      ? appText('折叠附件信息', 'Collapse attached files')
-                      : appText('展开附件信息', 'Expand attached files'),
-                  onTap: () {
-                    setState(() {
-                      _attachmentsExpanded = !_attachmentsExpanded;
-                    });
-                  },
-                ),
-              if (parsed.executionContextBlock != null)
-                _MessageMetaToggleButton(
-                  key: const Key('assistant-user-meta-context-toggle'),
-                  icon: Icons.tune_rounded,
-                  expanded: _executionContextExpanded,
-                  tooltip: _executionContextExpanded
-                      ? appText('折叠执行上下文', 'Collapse execution context')
-                      : appText('展开执行上下文', 'Expand execution context'),
-                  onTap: () {
-                    setState(() {
-                      _executionContextExpanded = !_executionContextExpanded;
-                    });
-                  },
-                ),
-            ],
-          ),
+          ],
           if (showAttachments) ...[
             const SizedBox(height: 6),
             _MessageMetaBlock(
@@ -3839,13 +3840,16 @@ class _MessageBubbleBodyState extends State<_MessageBubbleBody> {
           ],
         ],
       );
+
+      return MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: content,
+      );
     }
 
     final styleSheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
-      p: theme.textTheme.bodyLarge?.copyWith(
-        color: theme.colorScheme.onSurface,
-        height: 1.55,
-      ),
+      p: messageBodyStyle?.copyWith(height: 1.55),
       h1: theme.textTheme.headlineSmall?.copyWith(
         fontWeight: FontWeight.w600,
         color: palette.textPrimary,
@@ -4044,7 +4048,7 @@ class _MessageMetaBlock extends StatelessWidget {
   }
 }
 
-class _TaskStatusCard extends StatelessWidget {
+class _TaskStatusCard extends StatefulWidget {
   const _TaskStatusCard({
     required this.title,
     required this.status,
@@ -4062,17 +4066,18 @@ class _TaskStatusCard extends StatelessWidget {
   final String sessionKey;
 
   @override
+  State<_TaskStatusCard> createState() => _TaskStatusCardState();
+}
+
+class _TaskStatusCardState extends State<_TaskStatusCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = context.palette;
-    final normalizedStatus = _normalizedTaskStatus(status);
+    final normalizedStatus = _normalizedTaskStatus(widget.status);
     final statusStyle = _pillStyleForStatus(context, normalizedStatus);
-    final icon = switch (normalizedStatus) {
-      'queued' => Icons.schedule_send_rounded,
-      'running' => Icons.play_circle_outline_rounded,
-      'failed' => Icons.error_outline_rounded,
-      _ => Icons.task_alt_rounded,
-    };
     final hint = switch (normalizedStatus) {
       'queued' => appText('排队等待执行', 'Waiting in queue'),
       'running' => appText('正在执行中', 'Working now'),
@@ -4084,89 +4089,117 @@ class _TaskStatusCard extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 760),
-        child: Material(
-          color: palette.surfacePrimary,
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppRadius.card),
-              color: palette.surfaceSecondary.withValues(alpha: 0.82),
-              border: Border.all(color: palette.strokeSoft),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: statusStyle.backgroundColor,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        icon,
-                        size: 14,
-                        color: statusStyle.foregroundColor,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(title, style: theme.textTheme.titleMedium),
-                          const SizedBox(height: 2),
-                          Text(summary, style: theme.textTheme.bodySmall),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    _StatusPill(
-                      label: _taskStatusLabel(status),
-                      backgroundColor: statusStyle.backgroundColor,
-                      textColor: statusStyle.foregroundColor,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  width: double.infinity,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            color: palette.surfaceSecondary.withValues(alpha: 0.72),
+            border: Border.all(color: palette.strokeSoft),
+          ),
+          child: Column(
+            children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                onTap: () => setState(() => _expanded = !_expanded),
+                child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
+                    horizontal: 10,
+                    vertical: 8,
                   ),
-                  decoration: BoxDecoration(
-                    color: palette.surfaceSecondary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Wrap(
-                    spacing: 10,
-                    runSpacing: 4,
+                  child: Row(
                     children: [
-                      Text(detail, style: theme.textTheme.bodySmall),
-                      Text(
-                        owner,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface,
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: statusStyle.foregroundColor,
+                          shape: BoxShape.circle,
                         ),
                       ),
-                      Text(sessionKey, style: theme.textTheme.bodySmall),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          widget.summary,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: palette.textSecondary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _StatusPill(
+                        label: _taskStatusLabel(widget.status),
+                        backgroundColor: statusStyle.backgroundColor,
+                        textColor: statusStyle.foregroundColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _expanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: palette.textMuted,
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  hint,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: palette.textMuted,
-                  ),
+              ),
+              ClipRect(
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 160),
+                  curve: Curves.easeOutCubic,
+                  child: _expanded
+                      ? Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.sm,
+                            0,
+                            AppSpacing.sm,
+                            AppSpacing.xs,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Divider(height: 1, color: palette.strokeSoft),
+                              const SizedBox(height: 6),
+                              Text(
+                                widget.title,
+                                style: theme.textTheme.titleSmall,
+                              ),
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 4,
+                                children: [
+                                  Text(
+                                    widget.detail,
+                                    style: theme.textTheme.bodySmall,
+                                  ),
+                                  Text(
+                                    widget.owner,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  Text(
+                                    widget.sessionKey,
+                                    style: theme.textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                hint,
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: palette.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : const SizedBox.shrink(),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

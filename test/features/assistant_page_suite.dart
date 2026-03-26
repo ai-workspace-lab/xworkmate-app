@@ -3,6 +3,7 @@ library;
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -1183,11 +1184,11 @@ void main() {
       expect(find.text('code-quality-gate'), findsNothing);
       expect(
         find.byKey(const Key('assistant-user-meta-attachments-toggle')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const Key('assistant-user-meta-context-toggle')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const Key('assistant-user-meta-attachments-block')),
@@ -1196,6 +1197,22 @@ void main() {
       expect(
         find.byKey(const Key('assistant-user-meta-context-block')),
         findsNothing,
+      );
+
+      final hoverGesture = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+      );
+      await hoverGesture.addPointer();
+      await hoverGesture.moveTo(tester.getCenter(find.text('结合项目代码制作一份用户手册')));
+      await _pumpForUiSync(tester);
+
+      expect(
+        find.byKey(const Key('assistant-user-meta-attachments-toggle')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('assistant-user-meta-context-toggle')),
+        findsOneWidget,
       );
 
       await tester.tap(
