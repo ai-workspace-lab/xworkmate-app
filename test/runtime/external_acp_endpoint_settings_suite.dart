@@ -6,15 +6,15 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   group('External ACP endpoint settings', () {
-    test('defaults expose the first batch of built-in providers', () {
+    test('defaults expose the preset providers', () {
       final snapshot = SettingsSnapshot.defaults();
 
       expect(
         snapshot.externalAcpEndpoints
-            .take(4)
+            .take(2)
             .map((item) => item.providerKey)
             .toList(growable: false),
-        const <String>['codex', 'opencode', 'claude', 'gemini'],
+        const <String>['codex', 'opencode'],
       );
     });
 
@@ -31,6 +31,7 @@ void main() {
             const ExternalAcpEndpointProfile(
               providerKey: 'custom-lab',
               label: 'Custom Lab',
+              badge: 'CL',
               endpoint: 'wss://lab.example.com/acp',
               enabled: true,
             ),

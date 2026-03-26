@@ -3030,6 +3030,8 @@ class _ComposerBarState extends State<_ComposerBar> {
                           value: value,
                           child: Row(
                             children: [
+                              _SingleAgentProviderBadge(provider: value),
+                              const SizedBox(width: 10),
                               Expanded(child: Text(value.label)),
                               if (value ==
                                   controller.currentSingleAgentProvider)
@@ -3040,7 +3042,9 @@ class _ComposerBarState extends State<_ComposerBar> {
                       )
                       .toList(),
                   child: _ComposerToolbarChip(
-                    icon: controller.currentSingleAgentProvider.icon,
+                    leading: _SingleAgentProviderBadge(
+                      provider: controller.currentSingleAgentProvider,
+                    ),
                     tooltip: _singleAgentProviderTooltip(
                       controller.currentSingleAgentProvider,
                     ),
@@ -3494,7 +3498,8 @@ class _ComposerIconButtonState extends State<_ComposerIconButton> {
 class _ComposerToolbarChip extends StatefulWidget {
   const _ComposerToolbarChip({
     super.key,
-    required this.icon,
+    this.icon,
+    this.leading,
     required this.tooltip,
     required this.showChevron,
     this.padding = const EdgeInsets.symmetric(
@@ -3503,7 +3508,8 @@ class _ComposerToolbarChip extends StatefulWidget {
     ),
   });
 
-  final IconData icon;
+  final IconData? icon;
+  final Widget? leading;
   final String tooltip;
   final bool showChevron;
   final EdgeInsetsGeometry padding;
@@ -3546,7 +3552,8 @@ class _ComposerToolbarChipState extends State<_ComposerToolbarChip> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(widget.icon, size: 16, color: palette.textMuted),
+              widget.leading ??
+                  Icon(widget.icon, size: 16, color: palette.textMuted),
               if (widget.showChevron) ...[
                 const SizedBox(width: 1),
                 Icon(
@@ -3578,14 +3585,49 @@ extension on AssistantPermissionLevel {
   };
 }
 
-extension on SingleAgentProvider {
-  IconData get icon => switch (this) {
-    SingleAgentProvider.auto => Icons.auto_awesome_outlined,
-    SingleAgentProvider.codex => Icons.adb_rounded,
-    SingleAgentProvider.opencode => Icons.code_rounded,
-    SingleAgentProvider.claude => Icons.psychology_alt_outlined,
-    SingleAgentProvider.gemini => Icons.diamond_outlined,
-  };
+class _SingleAgentProviderBadge extends StatelessWidget {
+  const _SingleAgentProviderBadge({required this.provider});
+
+  final SingleAgentProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final candidate = provider.badge.trim().isEmpty
+        ? provider.label
+        : provider.badge;
+    final display = candidate.length <= 2
+        ? candidate
+        : candidate.substring(0, 2);
+    final isAuto = provider == SingleAgentProvider.auto;
+    return Container(
+      width: 18,
+      height: 18,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: isAuto
+            ? palette.accent.withValues(alpha: 0.16)
+            : palette.chromeSurfacePressed,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: isAuto
+              ? palette.accent.withValues(alpha: 0.4)
+              : palette.chromeStroke,
+        ),
+      ),
+      child: Text(
+        display,
+        maxLines: 1,
+        overflow: TextOverflow.clip,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: palette.textMuted,
+          fontWeight: FontWeight.w700,
+          fontSize: 9,
+          height: 1,
+        ),
+      ),
+    );
+  }
 }
 
 String _executionTargetTooltip(AssistantExecutionTarget target) =>

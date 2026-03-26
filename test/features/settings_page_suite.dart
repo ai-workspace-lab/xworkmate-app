@@ -301,10 +301,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('外部 ACP Server Endpoint'), findsOneWidget);
-    expect(find.text('Codex'), findsOneWidget);
-    expect(find.text('OpenCode'), findsOneWidget);
-    expect(find.text('Claude'), findsOneWidget);
-    expect(find.text('Gemini'), findsOneWidget);
+    expect(find.text('Codex'), findsWidgets);
+    expect(find.text('OpenCode'), findsWidgets);
+    expect(find.text('Claude'), findsNothing);
+    expect(find.text('Gemini'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('external-acp-provider-add-button')),
+      findsOneWidget,
+    );
     expect(find.textContaining('ws://127.0.0.1:9001'), findsWidgets);
     expect(
       find.byKey(const ValueKey('settings-global-save-button')),

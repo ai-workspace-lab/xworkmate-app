@@ -266,6 +266,23 @@ void main() {
         token: '',
         password: '',
       );
+      await controller.saveSettingsDraft(
+        controller.settingsDraft.copyWith(
+          externalAcpEndpoints: normalizeExternalAcpEndpoints(
+            profiles: <ExternalAcpEndpointProfile>[
+              ...controller.settingsDraft.externalAcpEndpoints,
+              const ExternalAcpEndpointProfile(
+                providerKey: 'claude',
+                label: 'Claude',
+                badge: 'Cl',
+                endpoint: 'wss://claude.example.com/acp',
+                enabled: true,
+              ),
+            ],
+          ),
+        ),
+      );
+      await controller.applySettingsDraft();
 
       await controller.setSingleAgentProvider(SingleAgentProvider.codex);
       expect(

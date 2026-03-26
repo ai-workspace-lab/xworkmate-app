@@ -658,6 +658,7 @@ class _FakeSingleAgentRunner implements SingleAgentRunner {
   @override
   Future<SingleAgentProviderResolution> resolveProvider({
     required SingleAgentProvider selection,
+    required List<SingleAgentProvider> availableProviders,
     required String configuredCodexCliPath,
     required String gatewayToken,
   }) async {
