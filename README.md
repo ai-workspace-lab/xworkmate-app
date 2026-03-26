@@ -1,87 +1,50 @@
 # XWorkmate
 
-XWorkmate is an AI workspace shell built with Flutter.
-`v0.5` ships persistent assistant task threads, optional ARIS-powered multi-agent collaboration, and a bundled Go core runtime that travels with the macOS app.
+XWorkmate is a Flutter-based AI workspace shell for running assistant threads, local or remote gateway tasks, and multi-agent collaboration in one app.
 
-## v0.5 Highlights
+## Project
 
-- Assistant 任务线程支持流式回复、继续追问和手动归档，不再是一问一答即结束。
-- 任务列表按 `单机智能体 / 本地 OpenClaw Gateway / 远程 OpenClaw Gateway` 分组显示。
-- Multi-Agent 协作支持 `Architect / Engineer / Tester`，并可切换 `Native / ARIS` 框架。
-- ARIS `skills/` 直接随 App 内置，`llm-chat` 与 `claude-review` 统一由 Go core 驱动。
-- `Ollama Cloud` 设置、ARIS helper bundling、macOS DMG 打包与安装链路已打通。
+XWorkmate combines a desktop-first Flutter app, persistent assistant task threads, and optional multi-agent orchestration.
+It is designed for users who want a single workspace for AI chat, gateway-backed execution, and packaged local tooling across macOS, web, and other client surfaces.
 
-## Current Scope
-
-### Shipping in v0.5
-- Single Agent streaming assistant threads
-- OpenClaw local/remote task threads with persistent context
-- Multi-Agent orchestration with optional ARIS preset
-- Bundled ARIS skills, Go core helper, `llm-chat` reviewer, and `claude-review`
-- Ollama Cloud settings, task grouping, and macOS packaged delivery
-- Flutter Web shell with `Assistant` + `Settings` only, supporting `Single Agent` and `Relay OpenClaw Gateway`
-
-### Not Yet Implemented
-- Built-in Codex runtime through Rust FFI
-- Distributed/headless remote worker orchestration
-- Generic external Code Agent provider chooser / scheduler UI beyond current role-based settings
-- Expanded task CRUD beyond the current assistant-thread-first workflow
-- Expanded memory APIs beyond `memory/sync`
-
-## Feature Planning
-
-- Source of truth: [config/feature_flags.yaml](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/config/feature_flags.yaml)
-- UI feature matrix: [docs/planning/xworkmate-ui-feature-matrix.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/planning/xworkmate-ui-feature-matrix.md)
-- Release roadmap: [docs/planning/xworkmate-ui-feature-roadmap.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/planning/xworkmate-ui-feature-roadmap.md)
-- Release notes: [docs/releases/xworkmate-release-notes.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/releases/xworkmate-release-notes.md)
-- Changelog: [docs/releases/xworkmate-changelog.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/releases/xworkmate-changelog.md)
-- Render command: `make render-release-docs`
-
-## Known Issues
-
-- ARIS local-first collaboration still depends on a reachable local Ollama endpoint for the strongest offline workflow.
-- Cloud CLI roles still degrade to locally available executors when Gemini / Claude / Codex are not installed.
-- Manual validation is still recommended for full end-to-end multi-agent runs that touch external CLIs.
-
-## Development
+## TL;DR
 
 ```bash
+flutter pub get
 flutter analyze
 flutter test
-flutter test --platform chrome test/widget_test.dart test/web
 flutter run -d macos
 ```
 
-## Flutter Web
+## Downloads
 
-Web keeps the Assistant-first entry flow, but only exposes:
+| Desktop | iOS | Android |
+| --- | --- | --- |
+| [![macOS](https://img.shields.io/badge/macOS-Latest%20Release-24292F?style=for-the-badge&logo=apple)](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) | [![iOS](https://img.shields.io/badge/iOS-Latest%20Release-0A84FF?style=for-the-badge&logo=apple)](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) | [![Android](https://img.shields.io/badge/Android-Latest%20Release-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) |
+| [![Windows](https://img.shields.io/badge/Windows-Latest%20Release-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) | [![TestFlight](https://img.shields.io/badge/TestFlight-Latest%20Release-147EFB?style=for-the-badge&logo=apple)](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) | [![Google Play](https://img.shields.io/badge/Google%20Play-Latest%20Release-00C853?style=for-the-badge&logo=googleplay&logoColor=white)](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) |
 
-- `Assistant`
-- `Settings`
-- `Single Agent`
-- `Relay OpenClaw Gateway`
+All download buttons currently point to the latest GitHub release page.
 
-Web does not expose local CLI, workspace file access, native runtime orchestration, or desktop-only diagnostics.
+## Snapshots
 
-Build the root-site bundle with:
+### Desktop
 
-```bash
-flutter build web --release --base-href /
-```
+![XWorkmate Desktop](./images/Desktop-APP.png)
 
-Deployment notes for `https://xworkmate.svc.plus/` are in [docs/web-deployment.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/web-deployment.md).
+### Mobile
 
-## macOS Packaging
+![XWorkmate Mobile](./images/mobile-app.PNG)
 
-```bash
-make package-mac
-make install-mac
-```
+### Web
 
-## Vendor Repositories
+![XWorkmate Web](./images/web-online-services.png)
 
-`vendor/codex` is tracked as a git submodule for future built-in code agent integration.
+## Learn More
 
-```bash
-git submodule update --init --recursive
-```
+- [Release Notes](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/releases/xworkmate-release-notes.md)
+- [Changelog](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/releases/xworkmate-changelog.md)
+- [Feature Matrix](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/planning/xworkmate-ui-feature-matrix.md)
+- [Roadmap](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/planning/xworkmate-ui-feature-roadmap.md)
+- [Gateway Dev Runbook](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/runbooks/gateway-dev-runbook.md)
+- [Web Deployment](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/web-deployment.md)
+- [Security Rules](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/security/secure-development-rules.md)
