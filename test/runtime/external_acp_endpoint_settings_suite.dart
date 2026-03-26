@@ -62,5 +62,40 @@ void main() {
         isTrue,
       );
     });
+
+    test('legacy claude and gemini entries migrate into custom endpoints', () {
+      final normalized = normalizeExternalAcpEndpoints(
+        profiles: const <ExternalAcpEndpointProfile>[
+          ExternalAcpEndpointProfile(
+            providerKey: 'claude',
+            label: 'Claude',
+            badge: 'Cl',
+            endpoint: 'ws://127.0.0.1:9011',
+            enabled: true,
+          ),
+          ExternalAcpEndpointProfile(
+            providerKey: 'gemini',
+            label: 'Gemini',
+            badge: 'G',
+            endpoint: 'ws://127.0.0.1:9012',
+            enabled: true,
+          ),
+        ],
+      );
+
+      expect(
+        normalized.take(2).map((item) => item.providerKey).toList(),
+        const <String>['codex', 'opencode'],
+      );
+      expect(
+        normalized
+            .where((item) => item.providerKey.startsWith('custom-agent-'))
+            .map((item) => item.label)
+            .toList(growable: false),
+        const <String>['Claude', 'Gemini'],
+      );
+      expect(normalized.any((item) => item.providerKey == 'claude'), isFalse);
+      expect(normalized.any((item) => item.providerKey == 'gemini'), isFalse);
+    });
   });
 }

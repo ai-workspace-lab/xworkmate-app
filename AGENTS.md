@@ -1,8 +1,8 @@
 ## Skills
 
-- Use `xworkmate-secure-development` for any change that touches gateway auth, `.env`, secure storage, tokens, passwords, TLS, file upload, native entitlements, packaging, or release-sensitive settings.
 - Use `xworkmate-acceptance` before claiming build, packaging, installation, or release readiness for this repo.
-- For non-trivial implementation work, default to the repo skill `xworkmate-worktree-task-mode` and follow its worktree-first execution flow without asking the user to restate that preference each time.
+- For any change that touches gateway auth, `.env`, secure storage, tokens, passwords, TLS, file upload, native entitlements, packaging, or release-sensitive settings, follow the security rules in this file and [docs/security/secure-development-rules.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/security/secure-development-rules.md).
+- For non-trivial implementation work, default to the worktree-first execution flow in this file without asking the user to restate that preference each time.
 
 ## Default Task Mode
 
