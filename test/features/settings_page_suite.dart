@@ -309,7 +309,7 @@ void main() {
       find.byKey(const ValueKey('external-acp-provider-add-button')),
       findsOneWidget,
     );
-    expect(find.text('添加自定义 ACP Server Endpoint'), findsOneWidget);
+    expect(find.text('添加更多自定义配置'), findsOneWidget);
     expect(find.textContaining('ws://127.0.0.1:9001'), findsWidgets);
     expect(find.text('标志'), findsNothing);
     expect(find.text('Badge'), findsNothing);
@@ -321,6 +321,44 @@ void main() {
       find.byKey(const ValueKey('settings-global-apply-button')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('SettingsPage ACP wizard adds a custom provider card', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
+
+    await tester.tap(find.text('集成'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ACP 外部接入').first);
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('external-acp-provider-add-button')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('external-acp-wizard-name-field')),
+      'Lab Agent',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('external-acp-wizard-endpoint-field')),
+      'wss://lab.example.com/acp',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('external-acp-wizard-confirm-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Lab Agent'), findsWidgets);
+    expect(find.text('wss://lab.example.com/acp'), findsWidgets);
   });
 
   testWidgets('SettingsPage skills authorization tab keeps only preset roots', (

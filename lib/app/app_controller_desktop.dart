@@ -959,7 +959,8 @@ class AppController extends ChangeNotifier {
             threadId: sessionKey,
             prompt: composedPrompt,
             workingDirectory:
-                _resolveCodexWorkingDirectory() ?? Directory.current.path,
+                _assistantWorkingDirectoryForSession(sessionKey) ??
+                Directory.current.path,
             attachments: attachments,
             selectedSkills: selectedSkillLabels,
             aiGatewayBaseUrl: aiGatewayUrl,
@@ -1301,8 +1302,14 @@ class AppController extends ChangeNotifier {
       resolvedTarget,
     );
     final existing = _assistantThreadRecords[normalizedSessionKey];
+    final existingWorkspaceRef = existing?.workspaceRef.trim() ?? '';
     if (existing != null &&
-        existing.workspaceRef == nextWorkspaceRef &&
+        existingWorkspaceRef.isNotEmpty &&
+        existing.workspaceRefKind == nextWorkspaceRefKind) {
+      return;
+    }
+    if (existing != null &&
+        existingWorkspaceRef == nextWorkspaceRef &&
         existing.workspaceRefKind == nextWorkspaceRefKind) {
       return;
     }
@@ -1880,8 +1887,10 @@ class AppController extends ChangeNotifier {
       executionTarget: nextTarget,
       messageViewMode: nextViewMode,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      workspaceRef: _defaultWorkspaceRefForSession(nextSessionKey),
-      workspaceRefKind: _defaultWorkspaceRefKindForTarget(nextTarget),
+    );
+    _syncAssistantWorkspaceRefForSession(
+      nextSessionKey,
+      executionTarget: nextTarget,
     );
     await _applyAssistantExecutionTarget(
       nextTarget,
@@ -1981,12 +1990,10 @@ class AppController extends ChangeNotifier {
       _sessionsController.currentSessionKey,
       executionTarget: resolvedTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      workspaceRef: switch (resolvedTarget) {
-        AssistantExecutionTarget.remote => settings.remoteProjectRoot.trim(),
-        AssistantExecutionTarget.local ||
-        AssistantExecutionTarget.singleAgent => settings.workspacePath.trim(),
-      },
-      workspaceRefKind: _defaultWorkspaceRefKindForTarget(resolvedTarget),
+    );
+    _syncAssistantWorkspaceRefForSession(
+      _sessionsController.currentSessionKey,
+      executionTarget: resolvedTarget,
     );
     _recomputeTasks();
     _notifyIfActive();
@@ -3588,7 +3595,8 @@ class AppController extends ChangeNotifier {
             model: assistantModelForSession(sessionKey),
             gatewayToken: gatewayToken,
             workingDirectory:
-                _resolveCodexWorkingDirectory() ?? Directory.current.path,
+                _resolveLocalAssistantWorkingDirectoryForSession(sessionKey) ??
+                Directory.current.path,
             attachments: localAttachments,
             selectedSkills: selectedSkills,
             aiGatewayBaseUrl: aiGatewayUrl,
@@ -5299,9 +5307,21 @@ class AppController extends ChangeNotifier {
         .toList(growable: false);
   }
 
-  String? _resolveCodexWorkingDirectory() {
-    final candidate = settings.workspacePath.trim();
+  String? _assistantWorkingDirectoryForSession(String sessionKey) {
+    final candidate = assistantWorkspaceRefForSession(sessionKey).trim();
     if (candidate.isEmpty) {
+      return null;
+    }
+    return candidate;
+  }
+
+  String? _resolveLocalAssistantWorkingDirectoryForSession(String sessionKey) {
+    if (assistantWorkspaceRefKindForSession(sessionKey) !=
+        WorkspaceRefKind.localPath) {
+      return null;
+    }
+    final candidate = _assistantWorkingDirectoryForSession(sessionKey);
+    if (candidate == null) {
       return null;
     }
     final directory = Directory(candidate);

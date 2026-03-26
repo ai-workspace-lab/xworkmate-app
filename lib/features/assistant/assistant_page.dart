@@ -35,6 +35,7 @@ const double _assistantVerticalResizeHandleHeight = 10;
 const double _assistantArtifactPaneMinWidth = 280;
 const double _assistantArtifactPaneDefaultWidth = 360;
 const double _assistantCollapsedArtifactToggleClearance = 56;
+const double _assistantComposerSafeAreaGap = 8;
 
 typedef AssistantClipboardImageReader = Future<XFile?> Function();
 
@@ -396,6 +397,14 @@ class _AssistantPageState extends State<AssistantPage> {
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final mediaQuery = MediaQuery.of(context);
+        final composerBottomInset = math.max(
+          mediaQuery.viewPadding.bottom,
+          mediaQuery.viewInsets.bottom,
+        );
+        final composerBottomSpacing = composerBottomInset > 0
+            ? composerBottomInset + _assistantComposerSafeAreaGap
+            : _assistantComposerSafeAreaGap;
         final baseComposerHeight = constraints.maxHeight >= 900 ? 180.0 : 152.0;
         final composerContentWidth = math.max(240.0, constraints.maxWidth - 32);
         final availableWorkspaceHeight = math.max(
@@ -420,17 +429,18 @@ class _AssistantPageState extends State<AssistantPage> {
                 _composerInputHeight - _assistantComposerDefaultInputHeight,
               ) +
               attachmentExtraHeight +
-              selectedSkillExtraHeight,
+              selectedSkillExtraHeight +
+              composerBottomSpacing,
         );
         final composerHeightUpperBound = math.min(
           availableWorkspaceHeight,
           math.max(
-            _assistantWorkspaceMinLowerPaneHeight,
+            _assistantWorkspaceMinLowerPaneHeight + composerBottomSpacing,
             availableWorkspaceHeight - _assistantWorkspaceMinConversationHeight,
           ),
         );
         final composerHeightLowerBound = math.min(
-          _assistantWorkspaceMinLowerPaneHeight,
+          _assistantWorkspaceMinLowerPaneHeight + composerBottomSpacing,
           composerHeightUpperBound,
         );
         final composerHeight =
@@ -448,6 +458,7 @@ class _AssistantPageState extends State<AssistantPage> {
                   currentTask: currentTask,
                   items: timelineItems,
                   messageViewMode: controller.currentAssistantMessageViewMode,
+                  bottomContentInset: composerBottomSpacing,
                   topTrailingInset: _artifactPaneCollapsed
                       ? _assistantCollapsedArtifactToggleClearance
                       : 0,
@@ -485,6 +496,7 @@ class _AssistantPageState extends State<AssistantPage> {
               key: const Key('assistant-composer-shell'),
               height: composerHeight,
               child: _AssistantLowerPane(
+                bottomContentInset: composerBottomSpacing,
                 inputController: _inputController,
                 focusNode: _composerFocusNode,
                 thinkingLabel: _thinkingLabel,
@@ -790,7 +802,11 @@ class _AssistantPageState extends State<AssistantPage> {
       await controller.selectAgent(autoAgent.id);
     }
 
-    final attachmentNames = _attachments
+    final submittedAttachments = List<_ComposerAttachment>.from(
+      _attachments,
+      growable: false,
+    );
+    final attachmentNames = submittedAttachments
         .map((item) => item.name)
         .toList(growable: false);
     final selectedSkillLabels = _resolveSelectedSkillLabels(controller);
@@ -813,6 +829,7 @@ class _AssistantPageState extends State<AssistantPage> {
       _lastAutoAgentLabel =
           autoAgent?.name ?? _conversationOwnerLabel(controller);
       _lastSubmittedAttachments = attachmentNames;
+      _attachments = const <_ComposerAttachment>[];
       _touchTaskSeed(
         sessionKey: controller.currentSessionKey,
         title:
@@ -831,31 +848,12 @@ class _AssistantPageState extends State<AssistantPage> {
         draft: controller.currentSessionKey.trim().startsWith('draft:'),
       );
     });
+    _inputController.clear();
 
-    if (uiFeatures.supportsMultiAgent &&
-        controller.settings.multiAgent.enabled) {
-      final collaborationAttachments = _attachments
-          .map(
-            (item) => CollaborationAttachment(
-              name: item.name,
-              description: item.mimeType,
-              path: item.path,
-            ),
-          )
-          .toList(growable: false);
-      await controller.runMultiAgentCollaboration(
-        rawPrompt: rawPrompt,
-        composedPrompt: prompt,
-        attachments: collaborationAttachments,
-        selectedSkillLabels: selectedSkillLabels,
-      );
-    } else {
-      final attachmentPayloads = await _buildAttachmentPayloads(_attachments);
-      await controller.sendChatMessage(
-        prompt,
-        thinking: _thinkingLabel,
-        attachments: attachmentPayloads,
-        localAttachments: _attachments
+    try {
+      if (uiFeatures.supportsMultiAgent &&
+          controller.settings.multiAgent.enabled) {
+        final collaborationAttachments = submittedAttachments
             .map(
               (item) => CollaborationAttachment(
                 name: item.name,
@@ -863,18 +861,50 @@ class _AssistantPageState extends State<AssistantPage> {
                 path: item.path,
               ),
             )
-            .toList(growable: false),
-        selectedSkillLabels: selectedSkillLabels,
-      );
+            .toList(growable: false);
+        await controller.runMultiAgentCollaboration(
+          rawPrompt: rawPrompt,
+          composedPrompt: prompt,
+          attachments: collaborationAttachments,
+          selectedSkillLabels: selectedSkillLabels,
+        );
+      } else {
+        final attachmentPayloads = await _buildAttachmentPayloads(
+          submittedAttachments,
+        );
+        await controller.sendChatMessage(
+          prompt,
+          thinking: _thinkingLabel,
+          attachments: attachmentPayloads,
+          localAttachments: submittedAttachments
+              .map(
+                (item) => CollaborationAttachment(
+                  name: item.name,
+                  description: item.mimeType,
+                  path: item.path,
+                ),
+              )
+              .toList(growable: false),
+          selectedSkillLabels: selectedSkillLabels,
+        );
+      }
+    } catch (_) {
+      if (!mounted) {
+        rethrow;
+      }
+      if (_inputController.text.trim().isEmpty) {
+        _inputController.value = TextEditingValue(
+          text: rawPrompt,
+          selection: TextSelection.collapsed(offset: rawPrompt.length),
+        );
+      }
+      if (_attachments.isEmpty && submittedAttachments.isNotEmpty) {
+        setState(() {
+          _attachments = submittedAttachments;
+        });
+      }
+      rethrow;
     }
-
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _attachments = const <_ComposerAttachment>[];
-    });
-    _inputController.clear();
   }
 
   Future<List<GatewayChatAttachmentPayload>> _buildAttachmentPayloads(
@@ -1736,6 +1766,7 @@ class _AssistantSideTabButtonState extends State<_AssistantSideTabButton> {
 
 class _AssistantLowerPane extends StatelessWidget {
   const _AssistantLowerPane({
+    required this.bottomContentInset,
     required this.controller,
     required this.inputController,
     required this.focusNode,
@@ -1760,6 +1791,7 @@ class _AssistantLowerPane extends StatelessWidget {
     required this.onSend,
   });
 
+  final double bottomContentInset;
   final AppController controller;
   final TextEditingController inputController;
   final FocusNode focusNode;
@@ -1789,29 +1821,32 @@ class _AssistantLowerPane extends StatelessWidget {
       alignment: Alignment.bottomCenter,
       child: SingleChildScrollView(
         physics: const ClampingScrollPhysics(),
-        child: _ComposerBar(
-          controller: controller,
-          inputController: inputController,
-          focusNode: focusNode,
-          thinkingLabel: thinkingLabel,
-          showModelControl: showModelControl,
-          modelLabel: modelLabel,
-          modelOptions: modelOptions,
-          attachments: attachments,
-          availableSkills: availableSkills,
-          selectedSkillKeys: selectedSkillKeys,
-          onRemoveAttachment: onRemoveAttachment,
-          onToggleSkill: onToggleSkill,
-          onThinkingChanged: onThinkingChanged,
-          onModelChanged: onModelChanged,
-          onOpenGateway: onOpenGateway,
-          onOpenAiGatewaySettings: onOpenAiGatewaySettings,
-          onReconnectGateway: onReconnectGateway,
-          onPickAttachments: onPickAttachments,
-          onAddAttachment: onAddAttachment,
-          onPasteImageAttachment: onPasteImageAttachment,
-          onInputHeightChanged: onComposerInputHeightChanged,
-          onSend: onSend,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: bottomContentInset),
+          child: _ComposerBar(
+            controller: controller,
+            inputController: inputController,
+            focusNode: focusNode,
+            thinkingLabel: thinkingLabel,
+            showModelControl: showModelControl,
+            modelLabel: modelLabel,
+            modelOptions: modelOptions,
+            attachments: attachments,
+            availableSkills: availableSkills,
+            selectedSkillKeys: selectedSkillKeys,
+            onRemoveAttachment: onRemoveAttachment,
+            onToggleSkill: onToggleSkill,
+            onThinkingChanged: onThinkingChanged,
+            onModelChanged: onModelChanged,
+            onOpenGateway: onOpenGateway,
+            onOpenAiGatewaySettings: onOpenAiGatewaySettings,
+            onReconnectGateway: onReconnectGateway,
+            onPickAttachments: onPickAttachments,
+            onAddAttachment: onAddAttachment,
+            onPasteImageAttachment: onPasteImageAttachment,
+            onInputHeightChanged: onComposerInputHeightChanged,
+            onSend: onSend,
+          ),
         ),
       ),
     );
@@ -1824,6 +1859,7 @@ class _ConversationArea extends StatelessWidget {
     required this.currentTask,
     required this.items,
     required this.messageViewMode,
+    required this.bottomContentInset,
     required this.topTrailingInset,
     required this.scrollController,
     required this.onOpenDetail,
@@ -1838,6 +1874,7 @@ class _ConversationArea extends StatelessWidget {
   final _AssistantTaskEntry currentTask;
   final List<_TimelineItem> items;
   final AssistantMessageViewMode messageViewMode;
+  final double bottomContentInset;
   final double topTrailingInset;
   final ScrollController scrollController;
   final ValueChanged<DetailPanelData> onOpenDetail;
@@ -1892,7 +1929,12 @@ class _ConversationArea extends StatelessWidget {
                     )
                   : ListView.separated(
                       controller: scrollController,
-                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                      padding: EdgeInsets.fromLTRB(
+                        10,
+                        8,
+                        10,
+                        8 + bottomContentInset,
+                      ),
                       physics: const BouncingScrollPhysics(),
                       itemCount: items.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 6),

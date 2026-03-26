@@ -1,6 +1,7 @@
 @TestOn('vm')
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
+import 'package:xworkmate/runtime/multi_agent_orchestrator.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
@@ -494,6 +496,52 @@ void main() {
     },
   );
 
+  testWidgets(
+    'AssistantPage keeps composer controls above the safe bottom inset',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
+      const safeBottomInset = 36.0;
+
+      await pumpPage(
+        tester,
+        child: Builder(
+          builder: (context) {
+            final mediaQuery = MediaQuery.of(context);
+            return MediaQuery(
+              data: mediaQuery.copyWith(
+                padding: mediaQuery.padding.copyWith(bottom: safeBottomInset),
+                viewPadding: mediaQuery.viewPadding.copyWith(
+                  bottom: safeBottomInset,
+                ),
+              ),
+              child: AssistantPage(
+                controller: controller,
+                onOpenDetail: (_) {},
+              ),
+            );
+          },
+        ),
+      );
+
+      final pageRect = tester.getRect(find.byType(AssistantPage));
+      final composerShell = find.byKey(const Key('assistant-composer-shell'));
+      final submitButton = find.byKey(const Key('assistant-submit-button'));
+
+      expect(composerShell, findsOneWidget);
+      expect(submitButton, findsOneWidget);
+      expect(
+        tester.getRect(composerShell).bottom,
+        moreOrLessEquals(pageRect.bottom, epsilon: 0.01),
+      );
+      expect(
+        tester.getRect(submitButton).bottom,
+        lessThanOrEqualTo(
+          tester.getRect(composerShell).bottom - safeBottomInset,
+        ),
+      );
+    },
+  );
+
   testWidgets('AssistantPage keeps a minimal composer action menu', (
     WidgetTester tester,
   ) async {
@@ -549,6 +597,58 @@ void main() {
     expect(find.text('本地 OpenClaw Gateway'), findsWidgets);
     expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
   });
+
+  testWidgets(
+    'AssistantPage clears submitted composer text before send completes',
+    (WidgetTester tester) async {
+      late final _PendingSendAppController controller;
+      final sendGate = Completer<void>();
+      await tester.runAsync(() async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        final store = createIsolatedTestStore(enableSecureStorage: false);
+        controller = _PendingSendAppController(
+          store: store,
+          sendGate: sendGate,
+        );
+        final stopwatch = Stopwatch()..start();
+        while (controller.initializing) {
+          if (stopwatch.elapsed > const Duration(seconds: 10)) {
+            fail('controller did not finish initializing before timeout');
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+      });
+      addTearDown(() async {
+        if (!sendGate.isCompleted) {
+          sendGate.complete();
+        }
+      });
+      addTearDown(controller.dispose);
+
+      await pumpPage(
+        tester,
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+        platform: TargetPlatform.macOS,
+      );
+
+      final composerInput = find.descendant(
+        of: find.byKey(const Key('assistant-composer-input-area')),
+        matching: find.byType(TextField),
+      );
+      expect(composerInput, findsOneWidget);
+
+      await tester.enterText(composerInput, '分析一下这个 bug');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      expect(controller.sendCallCount, 1);
+      expect(controller.lastSentMessage, isNotEmpty);
+      expect(tester.widget<TextField>(composerInput).controller?.text, isEmpty);
+
+      sendGate.complete();
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets(
     'AssistantPage shows a persistent skill popover in single-agent mode and keeps thread selections isolated',
@@ -1338,6 +1438,38 @@ Future<void> _waitForCondition(bool Function() predicate) async {
       fail('Timed out waiting for condition');
     }
     await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
+}
+
+class _PendingSendAppController extends AppController {
+  _PendingSendAppController({
+    required SecureConfigStore store,
+    required this.sendGate,
+  }) : super(
+         store: store,
+         runtimeCoordinator: RuntimeCoordinator(
+           gateway: _FakeGatewayRuntime(store: store),
+           codex: _FakeCodexRuntime(),
+         ),
+       );
+
+  final Completer<void> sendGate;
+  int sendCallCount = 0;
+  String lastSentMessage = '';
+
+  @override
+  Future<void> sendChatMessage(
+    String message, {
+    String thinking = 'off',
+    List<GatewayChatAttachmentPayload> attachments =
+        const <GatewayChatAttachmentPayload>[],
+    List<CollaborationAttachment> localAttachments =
+        const <CollaborationAttachment>[],
+    List<String> selectedSkillLabels = const <String>[],
+  }) async {
+    sendCallCount += 1;
+    lastSentMessage = message;
+    await sendGate.future;
   }
 }
 
