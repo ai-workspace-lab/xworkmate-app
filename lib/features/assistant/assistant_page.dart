@@ -5026,15 +5026,18 @@ class _ComposerSelectedSkillChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InputChip(
-      avatar: Icon(option.icon, size: 16, color: context.palette.accent),
-      label: Text(option.label),
-      onDeleted: onDeleted,
-      side: BorderSide.none,
-      backgroundColor: context.palette.surfaceSecondary,
-      deleteIconColor: context.palette.textMuted,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.chip),
+    return Tooltip(
+      message: _skillOptionTooltip(option),
+      child: InputChip(
+        avatar: Icon(option.icon, size: 16, color: context.palette.accent),
+        label: Text(option.label),
+        onDeleted: onDeleted,
+        side: BorderSide.none,
+        backgroundColor: context.palette.surfaceSecondary,
+        deleteIconColor: context.palette.textMuted,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+        ),
       ),
     );
   }
@@ -5195,68 +5198,53 @@ class _SkillPickerTile extends StatelessWidget {
     final theme = Theme.of(context);
     final palette = context.palette;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          decoration: BoxDecoration(
-            color: selected ? palette.surfaceSecondary : palette.surfacePrimary,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: palette.shadow.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Icon(option.icon, size: 20, color: palette.accent),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      option.label,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      option.description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: palette.textSecondary,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
+    return Tooltip(
+      message: _skillOptionTooltip(option),
+      waitDuration: const Duration(milliseconds: 250),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: selected
+                  ? palette.surfaceSecondary
+                  : palette.surfacePrimary,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: palette.shadow.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                option.sourceLabel,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: palette.textMuted,
-                ),
-              ),
-              if (selected) ...[
-                const SizedBox(width: 8),
-                Icon(Icons.check_rounded, size: 18, color: palette.accent),
               ],
-            ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    option.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+String _skillOptionTooltip(_ComposerSkillOption option) {
+  final sourceLabel = option.sourceLabel.trim();
+  return sourceLabel.isEmpty ? option.label : sourceLabel;
 }
 
 class _ComposerAttachment {
