@@ -1272,9 +1272,73 @@ class AppController extends ChangeNotifier {
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
     return switch (target) {
       AssistantExecutionTarget.remote => settings.remoteProjectRoot.trim(),
-      AssistantExecutionTarget.local ||
-      AssistantExecutionTarget.singleAgent => settings.workspacePath.trim(),
+      AssistantExecutionTarget.local || AssistantExecutionTarget.singleAgent =>
+        _defaultLocalWorkspaceRefForSession(normalizedSessionKey),
     };
+  }
+
+  String _defaultLocalWorkspaceRefForSession(String sessionKey) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final baseWorkspace = settings.workspacePath.trim();
+    if (baseWorkspace.isEmpty || normalizedSessionKey == 'main') {
+      return baseWorkspace;
+    }
+    final threadWorkspace =
+        '${_trimTrailingPathSeparator(baseWorkspace)}/.xworkmate/threads/${_threadWorkspaceDirectoryName(normalizedSessionKey)}';
+    _ensureLocalWorkspaceDirectory(threadWorkspace);
+    return threadWorkspace;
+  }
+
+  String _threadWorkspaceDirectoryName(String sessionKey) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final sanitized = normalizedSessionKey
+        .replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '-')
+        .replaceAll(RegExp(r'-{2,}'), '-')
+        .replaceAll(RegExp(r'^[-.]+|[-.]+$'), '');
+    return sanitized.isEmpty ? 'thread' : sanitized;
+  }
+
+  String _trimTrailingPathSeparator(String path) {
+    if (path.endsWith('/') && path.length > 1) {
+      return path.substring(0, path.length - 1);
+    }
+    return path;
+  }
+
+  void _ensureLocalWorkspaceDirectory(String path) {
+    final normalizedPath = path.trim();
+    if (normalizedPath.isEmpty) {
+      return;
+    }
+    try {
+      Directory(normalizedPath).createSync(recursive: true);
+    } catch (_) {
+      // Best effort only. The caller can still decide whether to use fallback behavior.
+    }
+  }
+
+  bool _usesLegacySharedWorkspaceRef(
+    String sessionKey, {
+    AssistantExecutionTarget? executionTarget,
+    String? workspaceRef,
+    WorkspaceRefKind? workspaceRefKind,
+  }) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    if (normalizedSessionKey == 'main') {
+      return false;
+    }
+    final resolvedTarget =
+        executionTarget ??
+        assistantExecutionTargetForSession(normalizedSessionKey);
+    if (resolvedTarget == AssistantExecutionTarget.remote) {
+      return false;
+    }
+    final normalizedRef = workspaceRef?.trim() ?? '';
+    if (normalizedRef.isEmpty) {
+      return false;
+    }
+    return workspaceRefKind == WorkspaceRefKind.localPath &&
+        normalizedRef == settings.workspacePath.trim();
   }
 
   WorkspaceRefKind _defaultWorkspaceRefKindForTarget(
@@ -1305,7 +1369,13 @@ class AppController extends ChangeNotifier {
     final existingWorkspaceRef = existing?.workspaceRef.trim() ?? '';
     if (existing != null &&
         existingWorkspaceRef.isNotEmpty &&
-        existing.workspaceRefKind == nextWorkspaceRefKind) {
+        existing.workspaceRefKind == nextWorkspaceRefKind &&
+        !_usesLegacySharedWorkspaceRef(
+          normalizedSessionKey,
+          executionTarget: resolvedTarget,
+          workspaceRef: existingWorkspaceRef,
+          workspaceRefKind: existing.workspaceRefKind,
+        )) {
       return;
     }
     if (existing != null &&
@@ -2201,11 +2271,7 @@ class AppController extends ChangeNotifier {
       singleAgentProvider:
           singleAgentProvider ??
           singleAgentProviderForSession(currentSessionKey),
-      workspaceRef: switch (resolvedTarget) {
-        AssistantExecutionTarget.remote => settings.remoteProjectRoot.trim(),
-        AssistantExecutionTarget.local ||
-        AssistantExecutionTarget.singleAgent => settings.workspacePath.trim(),
-      },
+      workspaceRef: _defaultWorkspaceRefForSession(normalizedSessionKey),
       workspaceRefKind: _defaultWorkspaceRefKindForTarget(resolvedTarget),
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
@@ -3379,15 +3445,20 @@ class AppController extends ChangeNotifier {
 
   SettingsSnapshot _sanitizeFeatureFlagSettings(SettingsSnapshot snapshot) {
     final features = featuresFor(_hostUiFeaturePlatform);
-    final allowedNavigation = normalizeAssistantNavigationDestinations(
-      snapshot.assistantNavigationDestinations,
-    ).where((entry) {
-      final destination = entry.destination;
-      if (destination != null) {
-        return features.allowedDestinations.contains(destination);
-      }
-      return features.allowedDestinations.contains(WorkspaceDestination.settings);
-    }).toList(growable: false);
+    final allowedNavigation =
+        normalizeAssistantNavigationDestinations(
+              snapshot.assistantNavigationDestinations,
+            )
+            .where((entry) {
+              final destination = entry.destination;
+              if (destination != null) {
+                return features.allowedDestinations.contains(destination);
+              }
+              return features.allowedDestinations.contains(
+                WorkspaceDestination.settings,
+              );
+            })
+            .toList(growable: false);
     final sanitizedExecutionTarget = features.sanitizeExecutionTarget(
       snapshot.assistantExecutionTarget,
     );
@@ -4522,6 +4593,15 @@ class AppController extends ChangeNotifier {
         continue;
       }
       final titleFromSettings = assistantCustomTaskTitle(sessionKey);
+      final shouldMigrateWorkspaceRef =
+          record.workspaceRef.trim().isEmpty ||
+          _usesLegacySharedWorkspaceRef(
+            sessionKey,
+            executionTarget:
+                record.executionTarget ?? settings.assistantExecutionTarget,
+            workspaceRef: record.workspaceRef,
+            workspaceRefKind: record.workspaceRefKind,
+          );
       final normalizedRecord = record.copyWith(
         sessionKey: sessionKey,
         title: titleFromSettings.isEmpty
@@ -4547,10 +4627,10 @@ class AppController extends ChangeNotifier {
                 record.executionTarget ?? settings.assistantExecutionTarget,
               )
             : record.gatewayEntryState,
-        workspaceRef: record.workspaceRef.trim().isEmpty
+        workspaceRef: shouldMigrateWorkspaceRef
             ? _defaultWorkspaceRefForSession(sessionKey)
             : record.workspaceRef.trim(),
-        workspaceRefKind: record.workspaceRef.trim().isEmpty
+        workspaceRefKind: shouldMigrateWorkspaceRef
             ? _defaultWorkspaceRefKindForTarget(
                 record.executionTarget ?? settings.assistantExecutionTarget,
               )
@@ -4824,7 +4904,10 @@ class AppController extends ChangeNotifier {
           gatewayEntryState ??
           existing?.gatewayEntryState ??
           _gatewayEntryStateForTarget(nextExecutionTarget),
-      workspaceRef: workspaceRef ?? existing?.workspaceRef ?? '',
+      workspaceRef:
+          workspaceRef ??
+          existing?.workspaceRef ??
+          _defaultWorkspaceRefForSession(normalizedSessionKey),
       workspaceRefKind:
           workspaceRefKind ??
           existing?.workspaceRefKind ??
