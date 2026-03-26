@@ -2,6 +2,8 @@
 library;
 
 import 'dart:io';
+import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,8 +29,8 @@ void main() {
       });
       final systemRoot = Directory('${tempDirectory.path}/etc-skills');
       final agentsRoot = Directory('${tempDirectory.path}/agents-skills');
-      final codexRoot = Directory('${tempDirectory.path}/codex-skills');
-      final workbuddyRoot = Directory('${tempDirectory.path}/workbuddy-skills');
+      final customRootA = Directory('${tempDirectory.path}/custom-skills-a');
+      final customRootB = Directory('${tempDirectory.path}/custom-skills-b');
       await _writeSkill(
         systemRoot,
         'analysis',
@@ -42,19 +44,19 @@ void main() {
         description: 'Shared browser skill',
       );
       await _writeSkill(
-        codexRoot,
+        customRootA,
         'ppt',
         skillName: 'PPT',
         description: 'Presentation skill',
       );
       await _writeSkill(
-        workbuddyRoot,
+        customRootB,
         'analysis',
         skillName: 'Analysis',
-        description: 'WorkBuddy version wins',
+        description: 'Custom version wins',
       );
       await _writeSkill(
-        workbuddyRoot,
+        customRootB,
         'cicd-audit',
         skillName: 'CICD Audit',
         description: 'Pipeline audit skill',
@@ -69,8 +71,8 @@ void main() {
         singleAgentSharedSkillScanRootOverrides: <String>[
           systemRoot.path,
           agentsRoot.path,
-          codexRoot.path,
-          workbuddyRoot.path,
+          customRootA.path,
+          customRootB.path,
         ],
       );
       addTearDown(controller.dispose);
@@ -102,8 +104,8 @@ void main() {
       final analysisSkill = controller
           .assistantImportedSkillsForSession(firstSessionKey)
           .firstWhere((skill) => skill.label == 'Analysis');
-      expect(analysisSkill.description, 'WorkBuddy version wins');
-      expect(analysisSkill.source, 'workbuddy');
+      expect(analysisSkill.description, 'Custom version wins');
+      expect(analysisSkill.source, 'custom');
       expect(analysisSkill.scope, 'user');
 
       await controller.toggleAssistantSkillForSession(
@@ -265,184 +267,6 @@ void main() {
   );
 
   test(
-    'AppController skips preset shared roots without bookmarks when the access service requires authorization',
-    () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-skill-directory-macos-preset-unauthorized-',
-      );
-      addTearDown(() async {
-        if (await tempDirectory.exists()) {
-          try {
-            await tempDirectory.delete(recursive: true);
-          } catch (_) {}
-        }
-      });
-      final userHome = Directory('${tempDirectory.path}/real-home');
-      final agentsRoot = Directory('${userHome.path}/.agents/skills');
-      await _writeSkill(
-        agentsRoot,
-        'browser',
-        skillName: 'Browser',
-        description: 'Browser tasks',
-      );
-
-      final controller = AppController(
-        store: await _createStore(tempDirectory.path),
-        skillDirectoryAccessService: _FakeSkillDirectoryAccessService(
-          userHomeDirectory: userHome.path,
-          requiresAuthorizedSharedRoots: true,
-        ),
-        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
-        ],
-        singleAgentSharedSkillScanRootOverrides: const <String>[
-          '~/.agents/skills',
-        ],
-      );
-      addTearDown(controller.dispose);
-      await _waitFor(() => !controller.initializing);
-      await controller.setAssistantExecutionTarget(
-        AssistantExecutionTarget.singleAgent,
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-
-      expect(
-        controller
-            .assistantImportedSkillsForSession(controller.currentSessionKey)
-            .where((item) => item.label == 'Browser'),
-        isEmpty,
-      );
-    },
-  );
-
-  test(
-    'AppController scans preset shared roots with bookmarks when the access service requires authorization',
-    () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-skill-directory-macos-preset-authorized-',
-      );
-      addTearDown(() async {
-        if (await tempDirectory.exists()) {
-          try {
-            await tempDirectory.delete(recursive: true);
-          } catch (_) {}
-        }
-      });
-      final userHome = Directory('${tempDirectory.path}/real-home');
-      final agentsRoot = Directory('${userHome.path}/.agents/skills');
-      await _writeSkill(
-        agentsRoot,
-        'browser',
-        skillName: 'Browser',
-        description: 'Browser tasks',
-      );
-
-      final store = await _createStore(tempDirectory.path);
-      await store.saveSettingsSnapshot(
-        _singleAgentTestSettings(workspacePath: tempDirectory.path).copyWith(
-          authorizedSkillDirectories: <AuthorizedSkillDirectory>[
-            AuthorizedSkillDirectory(
-              path: agentsRoot.path,
-              bookmark: 'bookmark-1',
-            ),
-          ],
-        ),
-      );
-      final controller = AppController(
-        store: store,
-        skillDirectoryAccessService: _FakeSkillDirectoryAccessService(
-          userHomeDirectory: userHome.path,
-          requiresAuthorizedSharedRoots: true,
-        ),
-        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
-        ],
-        singleAgentSharedSkillScanRootOverrides: const <String>[
-          '~/.agents/skills',
-        ],
-      );
-      addTearDown(controller.dispose);
-      await _waitFor(() => !controller.initializing);
-      await controller.setAssistantExecutionTarget(
-        AssistantExecutionTarget.singleAgent,
-      );
-      await _waitFor(
-        () => controller
-            .assistantImportedSkillsForSession(controller.currentSessionKey)
-            .any((item) => item.label == 'Browser'),
-      );
-
-      expect(
-        controller
-            .assistantImportedSkillsForSession(controller.currentSessionKey)
-            .map((item) => item.label),
-        contains('Browser'),
-      );
-    },
-  );
-
-  test(
-    'AppController skips custom shared directories without bookmarks when the access service requires authorization',
-    () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-skill-directory-macos-custom-unauthorized-',
-      );
-      addTearDown(() async {
-        if (await tempDirectory.exists()) {
-          try {
-            await tempDirectory.delete(recursive: true);
-          } catch (_) {}
-        }
-      });
-      final customRoot = Directory(
-        '${tempDirectory.path}/custom-shared-skills',
-      );
-      await _writeSkill(
-        customRoot,
-        'browser',
-        skillName: 'Browser',
-        description: 'Browser tasks',
-      );
-
-      final store = await _createStore(tempDirectory.path);
-      await store.saveSettingsSnapshot(
-        _singleAgentTestSettings(workspacePath: tempDirectory.path).copyWith(
-          authorizedSkillDirectories: <AuthorizedSkillDirectory>[
-            AuthorizedSkillDirectory(path: customRoot.path),
-          ],
-        ),
-      );
-      final controller = AppController(
-        store: store,
-        skillDirectoryAccessService: _FakeSkillDirectoryAccessService(
-          userHomeDirectory: tempDirectory.path,
-          requiresAuthorizedSharedRoots: true,
-        ),
-        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
-        ],
-        singleAgentSharedSkillScanRootOverrides: const <String>[],
-      );
-      addTearDown(controller.dispose);
-      await _waitFor(() => !controller.initializing);
-      await controller.setAssistantExecutionTarget(
-        AssistantExecutionTarget.singleAgent,
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-
-      expect(
-        controller
-            .assistantImportedSkillsForSession(controller.currentSessionKey)
-            .where((item) => item.label == 'Browser'),
-        isEmpty,
-      );
-    },
-  );
-
-  test(
     'AppController keeps thread-bound skills isolated and restores them after restart',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -457,8 +281,8 @@ void main() {
         }
       });
       final agentsRoot = Directory('${tempDirectory.path}/agents-skills');
-      final codexRoot = Directory('${tempDirectory.path}/codex-skills');
-      final workbuddyRoot = Directory('${tempDirectory.path}/workbuddy-skills');
+      final customRootA = Directory('${tempDirectory.path}/custom-skills-a');
+      final customRootB = Directory('${tempDirectory.path}/custom-skills-b');
       await _writeSkill(
         agentsRoot,
         'browser',
@@ -466,19 +290,19 @@ void main() {
         description: 'Browser tasks',
       );
       await _writeSkill(
-        codexRoot,
+        customRootA,
         'ppt',
         skillName: 'PPT',
         description: 'Presentation tasks',
       );
       await _writeSkill(
-        workbuddyRoot,
+        customRootB,
         'wordx',
         skillName: 'WordX',
         description: 'Document tasks',
       );
       await _writeSkill(
-        workbuddyRoot,
+        customRootB,
         'cicd-audit',
         skillName: 'CICD Audit',
         description: 'Pipeline tasks',
@@ -497,8 +321,8 @@ void main() {
           ],
           singleAgentSharedSkillScanRootOverrides: <String>[
             agentsRoot.path,
-            codexRoot.path,
-            workbuddyRoot.path,
+            customRootA.path,
+            customRootB.path,
           ],
         );
       }
@@ -726,16 +550,18 @@ void main() {
           } catch (_) {}
         }
       });
-      final workbuddyRoot = Directory('${tempDirectory.path}/workbuddy-skills');
+      final customRoot = Directory(
+        '${tempDirectory.path}/custom-shared-skills',
+      );
       final workspaceRoot = Directory('${tempDirectory.path}/workspace');
       await _writeSkill(
-        workbuddyRoot,
+        customRoot,
         'shared-skill',
         skillName: 'Shared Skill',
         description: 'Global wins',
       );
       await _writeSkill(
-        workbuddyRoot,
+        customRoot,
         'global-only',
         skillName: 'Global Only',
         description: 'Only from global',
@@ -783,7 +609,7 @@ void main() {
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
         ],
-        singleAgentSharedSkillScanRootOverrides: <String>[workbuddyRoot.path],
+        singleAgentSharedSkillScanRootOverrides: <String>[customRoot.path],
       );
       addTearDown(controller.dispose);
       await _waitFor(() => !controller.initializing);
@@ -895,6 +721,223 @@ void main() {
   );
 
   test(
+    'AppController merges ACP skills after shared roots and workspace skills',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-acp-skill-merge-',
+      );
+      final acpServer = await _AcpSkillsStatusServer.start(
+        skills: const <Map<String, dynamic>>[
+          <String, dynamic>{
+            'skillKey': 'acp-shared',
+            'name': 'Shared Skill',
+            'description': 'ACP should not override shared',
+            'source': 'acp',
+          },
+          <String, dynamic>{
+            'skillKey': 'acp-workspace',
+            'name': 'Workspace Skill',
+            'description': 'ACP should not override workspace',
+            'source': 'acp',
+          },
+          <String, dynamic>{
+            'skillKey': 'acp-only',
+            'name': 'ACP Only',
+            'description': 'Only from ACP',
+            'source': 'acp',
+          },
+        ],
+      );
+      addTearDown(acpServer.close);
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+
+      final customRoot = Directory(
+        '${tempDirectory.path}/custom-shared-skills',
+      );
+      final workspaceRoot = Directory('${tempDirectory.path}/workspace');
+      await _writeSkill(
+        customRoot,
+        'shared-skill',
+        skillName: 'Shared Skill',
+        description: 'Shared root wins',
+      );
+      await _writeSkill(
+        Directory('${workspaceRoot.path}/skills'),
+        'workspace-skill',
+        skillName: 'Workspace Skill',
+        description: 'Workspace wins',
+      );
+
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async =>
+            '${tempDirectory.path}/settings.sqlite3',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+        defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        _singleAgentTestSettings(
+          workspacePath: tempDirectory.path,
+          gatewayPort: acpServer.port,
+        ),
+      );
+      await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
+        AssistantThreadRecord(
+          sessionKey: 'main',
+          messages: const <GatewayChatMessage>[],
+          updatedAtMs: 1,
+          title: '',
+          archived: false,
+          executionTarget: AssistantExecutionTarget.singleAgent,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          workspaceRef: workspaceRoot.path,
+          workspaceRefKind: WorkspaceRefKind.localPath,
+        ),
+      ]);
+
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        singleAgentSharedSkillScanRootOverrides: <String>[customRoot.path],
+      );
+      addTearDown(controller.dispose);
+      await _waitFor(() => !controller.initializing);
+      await _waitFor(
+        () => controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .any((item) => item.label == 'ACP Only'),
+      );
+
+      final importedSkills = controller.assistantImportedSkillsForSession(
+        controller.currentSessionKey,
+      );
+      expect(
+        importedSkills.map((item) => item.label),
+        containsAll(const <String>[
+          'Shared Skill',
+          'Workspace Skill',
+          'ACP Only',
+        ]),
+      );
+      expect(
+        importedSkills.firstWhere((item) => item.label == 'Shared Skill'),
+        isA<AssistantThreadSkillEntry>()
+            .having(
+              (item) => item.description,
+              'description',
+              'Shared root wins',
+            )
+            .having((item) => item.source, 'source', 'custom'),
+      );
+      expect(
+        importedSkills.firstWhere((item) => item.label == 'Workspace Skill'),
+        isA<AssistantThreadSkillEntry>()
+            .having((item) => item.description, 'description', 'Workspace wins')
+            .having((item) => item.source, 'source', 'workspace'),
+      );
+      expect(
+        importedSkills.firstWhere((item) => item.label == 'ACP Only'),
+        isA<AssistantThreadSkillEntry>()
+            .having((item) => item.description, 'description', 'Only from ACP')
+            .having((item) => item.source, 'source', 'acp'),
+      );
+    },
+  );
+
+  test(
+    'AppController clears stale ACP-only skills when ACP refresh fails',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-acp-skill-error-',
+      );
+      final acpServer = await _AcpSkillsStatusServer.start(
+        skills: const <Map<String, dynamic>>[
+          <String, dynamic>{
+            'skillKey': 'acp-only',
+            'name': 'ACP Only',
+            'description': 'Only from ACP',
+            'source': 'acp',
+          },
+        ],
+      );
+      addTearDown(acpServer.close);
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+
+      final customRoot = Directory(
+        '${tempDirectory.path}/custom-shared-skills',
+      );
+      await _writeSkill(
+        customRoot,
+        'local-only',
+        skillName: 'Local Only',
+        description: 'Only from local scan',
+      );
+
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async =>
+            '${tempDirectory.path}/settings.sqlite3',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+        defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        _singleAgentTestSettings(
+          workspacePath: tempDirectory.path,
+          gatewayPort: acpServer.port,
+        ),
+      );
+
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        singleAgentSharedSkillScanRootOverrides: <String>[customRoot.path],
+      );
+      addTearDown(controller.dispose);
+      await _waitFor(() => !controller.initializing);
+      await _waitFor(
+        () => controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .any((item) => item.label == 'ACP Only'),
+      );
+
+      acpServer.skillsError = <String, dynamic>{
+        'code': -32001,
+        'message': 'skills refresh failed',
+      };
+      await controller.refreshSingleAgentSkillsForSession(
+        controller.currentSessionKey,
+      );
+
+      final importedSkills = controller.assistantImportedSkillsForSession(
+        controller.currentSessionKey,
+      );
+      expect(importedSkills.map((item) => item.label), const <String>[
+        'Local Only',
+      ]);
+    },
+  );
+
+  test(
     'AppController can return empty skills when neither public nor repo-local roots exist',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -998,7 +1041,10 @@ Future<SecureConfigStore> _createStore(String rootPath) async {
   return store;
 }
 
-SettingsSnapshot _singleAgentTestSettings({required String workspacePath}) {
+SettingsSnapshot _singleAgentTestSettings({
+  required String workspacePath,
+  int gatewayPort = 9,
+}) {
   final defaults = SettingsSnapshot.defaults();
   return defaults.copyWith(
     gatewayProfiles: replaceGatewayProfileAt(
@@ -1007,14 +1053,14 @@ SettingsSnapshot _singleAgentTestSettings({required String workspacePath}) {
         kGatewayLocalProfileIndex,
         defaults.primaryLocalGatewayProfile.copyWith(
           host: '127.0.0.1',
-          port: 9,
+          port: gatewayPort,
           tls: false,
         ),
       ),
       kGatewayRemoteProfileIndex,
       defaults.primaryRemoteGatewayProfile.copyWith(
         host: '127.0.0.1',
-        port: 9,
+        port: gatewayPort,
         tls: false,
       ),
     ),
@@ -1024,14 +1070,9 @@ SettingsSnapshot _singleAgentTestSettings({required String workspacePath}) {
 }
 
 class _FakeSkillDirectoryAccessService implements SkillDirectoryAccessService {
-  _FakeSkillDirectoryAccessService({
-    required this.userHomeDirectory,
-    this.requiresAuthorizedSharedRoots = false,
-  });
+  _FakeSkillDirectoryAccessService({required this.userHomeDirectory});
 
   final String userHomeDirectory;
-  @override
-  final bool requiresAuthorizedSharedRoots;
 
   @override
   bool get isSupported => true;
@@ -1068,5 +1109,107 @@ class _FakeSkillDirectoryAccessService implements SkillDirectoryAccessService {
       return null;
     }
     return SkillDirectoryAccessHandle(path: normalized, onClose: () async {});
+  }
+}
+
+class _AcpSkillsStatusServer {
+  _AcpSkillsStatusServer._(this._server, {required this.skills});
+
+  final HttpServer _server;
+  List<Map<String, dynamic>> skills;
+  Map<String, dynamic>? skillsError;
+
+  int get port => _server.port;
+
+  static Future<_AcpSkillsStatusServer> start({
+    required List<Map<String, dynamic>> skills,
+  }) async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final fake = _AcpSkillsStatusServer._(
+      server,
+      skills: skills.map((item) => Map<String, dynamic>.from(item)).toList(),
+    );
+    unawaited(fake._listen());
+    return fake;
+  }
+
+  Future<void> close() async {
+    await _server.close(force: true);
+  }
+
+  Future<void> _listen() async {
+    await for (final request in _server) {
+      if (request.uri.path == '/acp/rpc' && request.method == 'POST') {
+        await _handleRpc(request);
+        continue;
+      }
+      request.response.statusCode = HttpStatus.notFound;
+      await request.response.close();
+    }
+  }
+
+  Future<void> _handleRpc(HttpRequest request) async {
+    final body = await utf8.decodeStream(request);
+    final envelope = jsonDecode(body) as Map<String, dynamic>;
+    final id = envelope['id'];
+    final method = envelope['method']?.toString().trim() ?? '';
+
+    request.response.headers.set(
+      HttpHeaders.contentTypeHeader,
+      'text/event-stream',
+    );
+    request.response.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+
+    switch (method) {
+      case 'acp.capabilities':
+        await _writeSse(request, <String, dynamic>{
+          'jsonrpc': '2.0',
+          'id': id,
+          'result': <String, dynamic>{
+            'singleAgent': true,
+            'multiAgent': true,
+            'providers': const <String>['codex'],
+            'capabilities': <String, dynamic>{
+              'single_agent': true,
+              'multi_agent': true,
+              'providers': const <String>['codex'],
+            },
+          },
+        });
+        return;
+      case 'skills.status':
+        if (skillsError != null) {
+          await _writeSse(request, <String, dynamic>{
+            'jsonrpc': '2.0',
+            'id': id,
+            'error': skillsError,
+          });
+          return;
+        }
+        await _writeSse(request, <String, dynamic>{
+          'jsonrpc': '2.0',
+          'id': id,
+          'result': <String, dynamic>{'skills': skills},
+        });
+        return;
+      default:
+        await _writeSse(request, <String, dynamic>{
+          'jsonrpc': '2.0',
+          'id': id,
+          'error': <String, dynamic>{
+            'code': -32601,
+            'message': 'unknown method: $method',
+          },
+        });
+    }
+  }
+
+  Future<void> _writeSse(
+    HttpRequest request,
+    Map<String, dynamic> payload,
+  ) async {
+    request.response.write('data: ${jsonEncode(payload)}\n\n');
+    await request.response.flush();
+    await request.response.close();
   }
 }

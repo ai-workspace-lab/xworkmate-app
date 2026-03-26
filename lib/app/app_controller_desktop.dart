@@ -66,7 +66,7 @@ class _SingleAgentSkillScanRoot {
 
 const String _singleAgentLocalSkillsCacheRelativePath =
     'cache/single-agent-local-skills.json';
-const int _singleAgentLocalSkillsCacheSchemaVersion = 3;
+const int _singleAgentLocalSkillsCacheSchemaVersion = 4;
 
 class AppController extends ChangeNotifier {
   static const List<_SingleAgentSkillScanRoot>
@@ -258,8 +258,6 @@ class AppController extends ChangeNotifier {
           _singleAgentSharedSkillScanRootFromOverride,
         ))?.toList(growable: false) ??
         _defaultSingleAgentGlobalSkillScanRoots;
-    final requiresAuthorizedSharedRoots =
-        _skillDirectoryAccessService.requiresAuthorizedSharedRoots;
     final authorizedByPath = <String, AuthorizedSkillDirectory>{
       for (final directory in settings.authorizedSkillDirectories)
         normalizeAuthorizedSkillDirectoryPath(directory.path): directory,
@@ -273,15 +271,9 @@ class AppController extends ChangeNotifier {
       }
       final authorizedDirectory = authorizedByPath.remove(resolvedPath);
       final bookmark = authorizedDirectory?.bookmark.trim() ?? '';
-      if (requiresAuthorizedSharedRoots && bookmark.isEmpty) {
-        continue;
-      }
       resolvedRoots.add(root.copyWith(bookmark: bookmark));
     }
     for (final directory in authorizedByPath.values) {
-      if (requiresAuthorizedSharedRoots && directory.bookmark.trim().isEmpty) {
-        continue;
-      }
       resolvedRoots.add(
         _singleAgentSharedSkillScanRootFromAuthorizedDirectory(directory),
       );
@@ -2195,10 +2187,7 @@ class AppController extends ChangeNotifier {
         AssistantExecutionTarget.singleAgent) {
       return;
     }
-    final previousImported =
-        _assistantThreadRecords[normalizedSessionKey]?.importedSkills ??
-        const <AssistantThreadSkillEntry>[];
-    final localSkills = await _singleAgentLocalFallbackSkillsForSession(
+    final localSkills = await _singleAgentLocalSkillsForSession(
       normalizedSessionKey,
     );
     final provider =
@@ -2240,19 +2229,9 @@ class AppController extends ChangeNotifier {
         );
         return;
       }
-      if (localSkills.isNotEmpty || previousImported.isEmpty) {
-        await _replaceSingleAgentThreadSkills(
-          normalizedSessionKey,
-          localSkills,
-        );
-      }
+      await _replaceSingleAgentThreadSkills(normalizedSessionKey, localSkills);
     } catch (_) {
-      if (localSkills.isNotEmpty || previousImported.isEmpty) {
-        await _replaceSingleAgentThreadSkills(
-          normalizedSessionKey,
-          localSkills,
-        );
-      }
+      await _replaceSingleAgentThreadSkills(normalizedSessionKey, localSkills);
     }
   }
 
@@ -4300,6 +4279,8 @@ class AppController extends ChangeNotifier {
           }
           dedupedByName[normalizedName] = entry;
         }
+      } catch (_) {
+        continue;
       } finally {
         await accessHandle?.close();
       }
@@ -4382,27 +4363,13 @@ class AppController extends ChangeNotifier {
   }
 
   String _sourceForSkillRootPath(String path) {
-    if (path.startsWith('/etc/skills')) {
+    if (path == '/etc/skills' || path.startsWith('/etc/skills/')) {
       return 'system';
     }
-    if (_pathContainsSourceToken(path, 'workbuddy')) {
-      return 'workbuddy';
-    }
-    if (_pathContainsSourceToken(path, 'opencode')) {
-      return 'opencode';
-    }
-    if (_pathContainsSourceToken(path, 'claude')) {
-      return 'claude';
-    }
-    if (_pathContainsSourceToken(path, 'agents')) {
+    if (path == '~/.agents/skills' || path.endsWith('/.agents/skills')) {
       return 'agents';
     }
-    return 'codex';
-  }
-
-  bool _pathContainsSourceToken(String path, String token) {
-    final pattern = RegExp('(^|[./_-])$token([./_-]|\$)');
-    return pattern.hasMatch(path);
+    return 'custom';
   }
 
   Future<AssistantThreadSkillEntry> _skillEntryFromFile(
@@ -4559,8 +4526,9 @@ class AppController extends ChangeNotifier {
     _notifyIfActive();
   }
 
-  Future<List<AssistantThreadSkillEntry>>
-  _singleAgentLocalFallbackSkillsForSession(String sessionKey) async {
+  Future<List<AssistantThreadSkillEntry>> _singleAgentLocalSkillsForSession(
+    String sessionKey,
+  ) async {
     final workspaceSkills = await _scanSingleAgentWorkspaceSkillEntries(
       sessionKey,
     );
