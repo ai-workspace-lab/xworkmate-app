@@ -53,8 +53,8 @@ class _SkillDirectoryAuthorizationCardState
           const SizedBox(height: 8),
           Text(
             appText(
-              '只有在这里显式授权的目录才会被扫描为单机智能体 skills。设置中心修改会写入 settings.yaml；外部直接改 settings.yaml 也会热加载回 UI 与技能缓存。',
-              'Only directories explicitly granted here are scanned as single-agent skills. Settings Center changes write back to settings.yaml, and external settings.yaml edits hot-reload into the UI and skill cache.',
+              '预设扫描目录固定为 /etc/skills 和 ~/.agents/skills；其他目录可批量添加为自定义目录。只有在这里显式授权的目录才会被扫描为单机智能体 skills，设置中心修改会写入 settings.yaml。',
+              'Preset scan roots are fixed to /etc/skills and ~/.agents/skills. Other locations can be added in batches as custom directories. Only directories explicitly granted here are scanned as single-agent skills, and Settings Center writes changes back to settings.yaml.',
             ),
             style: theme.textTheme.bodyMedium,
           ),
@@ -121,7 +121,7 @@ class _SkillDirectoryAuthorizationCardState
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.tonalIcon(
-                onPressed: _busy ? null : () => _authorizeDirectory(),
+                onPressed: _busy ? null : _authorizeDirectories,
                 icon: _busy
                     ? const SizedBox(
                         width: 16,
@@ -129,7 +129,7 @@ class _SkillDirectoryAuthorizationCardState
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.create_new_folder_outlined),
-                label: Text(appText('添加自定义目录', 'Add Custom Directory')),
+                label: Text(appText('批量添加自定义目录', 'Add Custom Directories')),
               ),
             ),
           ],
@@ -261,18 +261,9 @@ class _SkillDirectoryAuthorizationCardState
         });
         return;
       }
-      final next = normalizeAuthorizedSkillDirectories(
-        directories: <AuthorizedSkillDirectory>[
-          ...widget.controller.authorizedSkillDirectories.where(
-            (item) => !_matchesResolvedPath(
-              item.path,
-              granted.path,
-              homeDirectory: widget.controller.userHomeDirectory,
-            ),
-          ),
-          granted,
-        ],
-      );
+      final next = _mergedAuthorizedDirectories(<AuthorizedSkillDirectory>[
+        granted,
+      ]);
       await widget.controller.saveAuthorizedSkillDirectories(next);
       if (!mounted) {
         return;
@@ -282,6 +273,51 @@ class _SkillDirectoryAuthorizationCardState
         _statusMessage = appText(
           '目录已授权并同步到 settings.yaml。',
           'Directory authorized and synced to settings.yaml.',
+        );
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _errorMessage = error.toString();
+      });
+    }
+  }
+
+  Future<void> _authorizeDirectories() async {
+    setState(() {
+      _busy = true;
+      _statusMessage = null;
+      _errorMessage = null;
+    });
+    try {
+      final granted = await widget.controller.authorizeSkillDirectories();
+      if (granted.isEmpty) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _busy = false;
+          _statusMessage = appText(
+            '已取消目录授权。',
+            'Directory authorization canceled.',
+          );
+        });
+        return;
+      }
+      await widget.controller.saveAuthorizedSkillDirectories(
+        _mergedAuthorizedDirectories(granted),
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _statusMessage = appText(
+          '已授权 ${granted.length} 个目录并同步到 settings.yaml。',
+          'Authorized ${granted.length} directories and synced them to settings.yaml.',
         );
       });
     } catch (error) {
@@ -331,6 +367,26 @@ class _SkillDirectoryAuthorizationCardState
         _errorMessage = error.toString();
       });
     }
+  }
+
+  List<AuthorizedSkillDirectory> _mergedAuthorizedDirectories(
+    List<AuthorizedSkillDirectory> granted,
+  ) {
+    final homeDirectory = widget.controller.userHomeDirectory;
+    final existing = widget.controller.authorizedSkillDirectories
+        .where(
+          (item) => !granted.any(
+            (entry) => _matchesResolvedPath(
+              item.path,
+              entry.path,
+              homeDirectory: homeDirectory,
+            ),
+          ),
+        )
+        .toList(growable: false);
+    return normalizeAuthorizedSkillDirectories(
+      directories: <AuthorizedSkillDirectory>[...existing, ...granted],
+    );
   }
 
   String _resolvePathForDisplay(String path, {required String homeDirectory}) {

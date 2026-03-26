@@ -3,11 +3,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/features/settings/settings_page.dart';
 import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/runtime/skill_directory_access.dart';
 
 import '../test_support.dart';
 
@@ -65,6 +67,73 @@ class _DesktopServiceStub implements DesktopPlatformService {
 
   @override
   void dispose() {}
+}
+
+Future<AppController> _createControllerWithSkillAccessService(
+  WidgetTester tester,
+  SkillDirectoryAccessService skillDirectoryAccessService,
+) async {
+  final controller = AppController(
+    store: createIsolatedTestStore(enableSecureStorage: false),
+    skillDirectoryAccessService: skillDirectoryAccessService,
+  );
+  addTearDown(controller.dispose);
+  await tester.pump(const Duration(milliseconds: 100));
+  await tester.pumpAndSettle();
+  return controller;
+}
+
+class _FakeSkillDirectoryAccessService implements SkillDirectoryAccessService {
+  _FakeSkillDirectoryAccessService({
+    required this.userHomeDirectory,
+    this.multiDirectoryResponse = const <AuthorizedSkillDirectory>[],
+  });
+
+  final String userHomeDirectory;
+  final List<AuthorizedSkillDirectory> multiDirectoryResponse;
+
+  @override
+  bool get isSupported => true;
+
+  @override
+  bool get requiresAuthorizedSharedRoots => false;
+
+  @override
+  Future<String> resolveUserHomeDirectory() async {
+    return userHomeDirectory;
+  }
+
+  @override
+  Future<List<AuthorizedSkillDirectory>> authorizeDirectories({
+    List<String> suggestedPaths = const <String>[],
+  }) async {
+    return multiDirectoryResponse;
+  }
+
+  @override
+  Future<AuthorizedSkillDirectory?> authorizeDirectory({
+    String suggestedPath = '',
+  }) async {
+    final normalized = normalizeAuthorizedSkillDirectoryPath(suggestedPath);
+    if (normalized.isEmpty) {
+      return null;
+    }
+    return AuthorizedSkillDirectory(
+      path: normalized,
+      bookmark: 'bookmark-${normalized.hashCode}',
+    );
+  }
+
+  @override
+  Future<SkillDirectoryAccessHandle?> openDirectory(
+    AuthorizedSkillDirectory directory,
+  ) async {
+    final normalized = normalizeAuthorizedSkillDirectoryPath(directory.path);
+    if (normalized.isEmpty) {
+      return null;
+    }
+    return SkillDirectoryAccessHandle(path: normalized, onClose: () async {});
+  }
 }
 
 void main() {
@@ -248,6 +317,81 @@ void main() {
       find.byKey(const ValueKey('settings-global-apply-button')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('SettingsPage skills authorization tab keeps only preset roots', (
+    WidgetTester tester,
+  ) async {
+    final controller = await _createControllerWithSkillAccessService(
+      tester,
+      _FakeSkillDirectoryAccessService(userHomeDirectory: '/Users/tester'),
+    );
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
+
+    await tester.tap(find.text('集成'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SKILLS 目录授权'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('/etc/skills'), findsWidgets);
+    expect(find.text('~/.agents/skills'), findsOneWidget);
+    expect(find.text('/Users/tester/.agents/skills'), findsOneWidget);
+    expect(find.text('~/.codex/skills'), findsNothing);
+    expect(find.text('~/.workbuddy/skills'), findsNothing);
+  });
+
+  testWidgets('SettingsPage can batch add custom skills directories', (
+    WidgetTester tester,
+  ) async {
+    final controller = await _createControllerWithSkillAccessService(
+      tester,
+      _FakeSkillDirectoryAccessService(
+        userHomeDirectory: '/Users/tester',
+        multiDirectoryResponse: const <AuthorizedSkillDirectory>[
+          AuthorizedSkillDirectory(
+            path: '/Users/tester/custom-a',
+            bookmark: 'bookmark-a',
+          ),
+          AuthorizedSkillDirectory(
+            path: '/Users/tester/custom-b',
+            bookmark: 'bookmark-b',
+          ),
+        ],
+      ),
+    );
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
+
+    await tester.tap(find.text('集成'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SKILLS 目录授权'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('批量添加自定义目录'));
+    await tester.pump();
+    for (var attempt = 0;
+        attempt < 10 && controller.authorizedSkillDirectories.length < 2;
+        attempt += 1) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    expect(
+      controller.authorizedSkillDirectories.map((item) => item.path),
+      containsAll(const <String>[
+        '/Users/tester/custom-a',
+        '/Users/tester/custom-b',
+      ]),
+    );
+    expect(find.text('custom-a'), findsOneWidget);
+    expect(find.text('custom-b'), findsOneWidget);
   });
 
   testWidgets('SettingsPage gateway sections can collapse individually', (
