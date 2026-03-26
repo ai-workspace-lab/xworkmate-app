@@ -914,8 +914,8 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 8),
           Text(
             appText(
-              '这里仅保留 Codex、OpenCode 预设接入。历史上的 Claude / Gemini 预配置会迁移为自定义 ACP Server Endpoint。你可以继续添加多个自定义 Endpoint，协议支持 ws / wss / http / https。',
-              'Only Codex and OpenCode stay as preset integrations here. Legacy Claude and Gemini entries are migrated into custom ACP server endpoints. You can add multiple custom endpoints with ws / wss / http / https.',
+              '这里保留 Codex、OpenCode 作为内建接入。更多 Provider 请通过向导新增自定义 ACP Server Endpoint；历史上真正配置过的 Claude / Gemini 会迁移为自定义条目，空白旧预设会自动清理。',
+              'Codex and OpenCode stay here as built-in integrations. Add more providers through the custom ACP endpoint wizard; configured legacy Claude and Gemini entries are migrated into custom entries, while empty legacy presets are cleaned up automatically.',
             ),
             style: theme.textTheme.bodyMedium,
           ),
@@ -924,16 +924,14 @@ class _SettingsPageState extends State<SettingsPage> {
             alignment: Alignment.centerLeft,
             child: FilledButton.tonalIcon(
               key: const ValueKey('external-acp-provider-add-button'),
-              onPressed: () => _saveSettings(
+              onPressed: () => _showAddExternalAcpProviderWizard(
+                context,
                 controller,
-                _appendExternalAcpProvider(settings),
+                settings,
               ),
               icon: const Icon(Icons.add_rounded),
               label: Text(
-                appText(
-                  '添加自定义 ACP Server Endpoint',
-                  'Add custom ACP server endpoint',
-                ),
+                appText('添加更多自定义配置', 'Add more custom configurations'),
               ),
             ),
           ),
@@ -1040,30 +1038,147 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  SettingsSnapshot _appendExternalAcpProvider(SettingsSnapshot settings) {
-    var suffix = settings.externalAcpEndpoints.length + 1;
-    String providerKey() => 'custom-agent-$suffix';
-    final existingKeys = settings.externalAcpEndpoints
-        .map((item) => item.providerKey)
-        .toSet();
-    while (existingKeys.contains(providerKey())) {
-      suffix += 1;
-    }
-    return settings.copyWith(
-      externalAcpEndpoints: <ExternalAcpEndpointProfile>[
-        ...settings.externalAcpEndpoints,
-        ExternalAcpEndpointProfile(
-          providerKey: providerKey(),
-          label: appText(
-            '自定义 ACP Endpoint $suffix',
-            'Custom ACP Endpoint $suffix',
-          ),
-          badge: '',
-          endpoint: '',
-          enabled: true,
+  Future<void> _showAddExternalAcpProviderWizard(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+  ) async {
+    final nameController = TextEditingController();
+    final endpointController = TextEditingController();
+    var attemptedSubmit = false;
+    try {
+      final profile = await showDialog<ExternalAcpEndpointProfile>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              final name = nameController.text.trim();
+              final endpoint = endpointController.text.trim();
+              final endpointValid =
+                  endpoint.isEmpty || isSupportedExternalAcpEndpoint(endpoint);
+              final canSubmit =
+                  name.isNotEmpty && endpoint.isNotEmpty && endpointValid;
+              return AlertDialog(
+                title: Text(
+                  appText('添加自定义 ACP Endpoint', 'Add custom ACP endpoint'),
+                ),
+                content: SizedBox(
+                  width: 420,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        appText(
+                          '通过向导新增更多外部 Agent Provider。先填写显示名称，再输入可访问的 ACP Server Endpoint。',
+                          'Use this wizard to add more external agent providers. Start with a display name, then enter a reachable ACP server endpoint.',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        appText('步骤 1 · 显示名称', 'Step 1 · Display name'),
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        key: const ValueKey('external-acp-wizard-name-field'),
+                        controller: nameController,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: appText(
+                            '例如：Claude Sonnet / Lab Agent',
+                            'For example: Claude Sonnet / Lab Agent',
+                          ),
+                        ),
+                        onChanged: (_) => setDialogState(() {}),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        appText(
+                          '步骤 2 · ACP Server Endpoint',
+                          'Step 2 · ACP Server Endpoint',
+                        ),
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        key: const ValueKey(
+                          'external-acp-wizard-endpoint-field',
+                        ),
+                        controller: endpointController,
+                        decoration: InputDecoration(
+                          hintText: 'ws://127.0.0.1:9001',
+                          errorText: attemptedSubmit && endpoint.isEmpty
+                              ? appText(
+                                  '请输入 ACP Server Endpoint。',
+                                  'Enter an ACP server endpoint.',
+                                )
+                              : attemptedSubmit && !endpointValid
+                              ? appText(
+                                  '仅支持 ws / wss / http / https。',
+                                  'Only ws / wss / http / https are supported.',
+                                )
+                              : null,
+                        ),
+                        onChanged: (_) => setDialogState(() {}),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        appText(
+                          '支持协议：ws、wss、http、https。新增后会出现在下方列表，并和助手页的 provider 菜单保持一致。',
+                          'Supported schemes: ws, wss, http, https. The new entry appears in the list below and stays aligned with the assistant provider menu.',
+                        ),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: Text(appText('取消', 'Cancel')),
+                  ),
+                  FilledButton(
+                    key: const ValueKey('external-acp-wizard-confirm-button'),
+                    onPressed: canSubmit
+                        ? () {
+                            Navigator.of(dialogContext).pop(
+                              buildCustomExternalAcpEndpointProfile(
+                                settings.externalAcpEndpoints,
+                                label: name,
+                                endpoint: endpoint,
+                              ),
+                            );
+                          }
+                        : () {
+                            setDialogState(() {
+                              attemptedSubmit = true;
+                            });
+                          },
+                    child: Text(appText('添加', 'Add')),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+      if (profile == null) {
+        return;
+      }
+      await _saveSettings(
+        controller,
+        settings.copyWith(
+          externalAcpEndpoints: <ExternalAcpEndpointProfile>[
+            ...settings.externalAcpEndpoints,
+            profile,
+          ],
         ),
-      ],
-    );
+      );
+    } finally {
+      nameController.dispose();
+      endpointController.dispose();
+    }
   }
 
   Widget _buildLlmEndpointManager(

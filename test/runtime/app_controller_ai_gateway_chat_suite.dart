@@ -548,6 +548,88 @@ void main() {
       );
     },
   );
+
+  test(
+    'AppController uses the recorded thread workspace for Single Agent runs',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-single-agent-thread-cwd-',
+      );
+      final defaultWorkspace = Directory(
+        '${tempDirectory.path}/default-workspace',
+      );
+      final threadWorkspace = Directory(
+        '${tempDirectory.path}/thread-workspace',
+      );
+      await defaultWorkspace.create(recursive: true);
+      await threadWorkspace.create(recursive: true);
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          workspacePath: defaultWorkspace.path,
+          assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
+        ),
+      );
+      await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
+        AssistantThreadRecord(
+          sessionKey: 'main',
+          messages: const <GatewayChatMessage>[],
+          updatedAtMs: 1,
+          title: 'Main',
+          archived: false,
+          executionTarget: AssistantExecutionTarget.singleAgent,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          workspaceRef: threadWorkspace.path,
+          workspaceRefKind: WorkspaceRefKind.localPath,
+        ),
+      ]);
+
+      final runner = _FakeSingleAgentRunner(
+        resolvedProvider: SingleAgentProvider.codex,
+        result: const SingleAgentRunResult(
+          provider: SingleAgentProvider.codex,
+          output: 'THREAD_OK',
+          success: true,
+          errorMessage: '',
+          shouldFallbackToAiChat: false,
+        ),
+      );
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: _FakeGatewayRuntime(store: store),
+          codex: _FakeCodexRuntime(),
+        ),
+        singleAgentRunner: runner,
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      await controller.sendChatMessage('检查当前线程目录', thinking: 'low');
+
+      expect(runner.runCalls, 1);
+      expect(runner.lastRequest?.workingDirectory, threadWorkspace.path);
+      expect(
+        controller.assistantWorkspaceRefForSession('main'),
+        threadWorkspace.path,
+      );
+    },
+  );
 }
 
 class _FakeGatewayRuntime extends GatewayRuntime {

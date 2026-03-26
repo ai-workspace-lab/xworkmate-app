@@ -1,10 +1,13 @@
 @TestOn('vm')
 library;
 
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/runtime/secure_config_store.dart';
 
 import '../test_support.dart';
 
@@ -69,6 +72,97 @@ void main() {
       expect(
         controller.assistantWorkspaceRefKindForSession(draftKey),
         WorkspaceRefKind.localPath,
+      );
+    },
+  );
+
+  test(
+    'AppController preserves recorded workspace refs when switching threads',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-workspace-ref-',
+      );
+      final mainWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-main-thread-',
+      );
+      final taskWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-task-thread-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+        if (await mainWorkspace.exists()) {
+          await mainWorkspace.delete(recursive: true);
+        }
+        if (await taskWorkspace.exists()) {
+          await taskWorkspace.delete(recursive: true);
+        }
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
+        AssistantThreadRecord(
+          sessionKey: 'main',
+          messages: const <GatewayChatMessage>[],
+          updatedAtMs: 1,
+          title: 'Main',
+          archived: false,
+          executionTarget: AssistantExecutionTarget.singleAgent,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          workspaceRef: mainWorkspace.path,
+          workspaceRefKind: WorkspaceRefKind.localPath,
+        ),
+        AssistantThreadRecord(
+          sessionKey: 'draft:artifact-thread',
+          messages: const <GatewayChatMessage>[],
+          updatedAtMs: 2,
+          title: 'Artifact Thread',
+          archived: false,
+          executionTarget: AssistantExecutionTarget.singleAgent,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          workspaceRef: taskWorkspace.path,
+          workspaceRefKind: WorkspaceRefKind.localPath,
+        ),
+      ]);
+
+      final controller = AppController(store: store);
+      addTearDown(controller.dispose);
+
+      final deadline = DateTime.now().add(const Duration(seconds: 5));
+      while (controller.initializing) {
+        if (DateTime.now().isAfter(deadline)) {
+          fail('controller did not initialize in time');
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+
+      expect(
+        controller.assistantWorkspaceRefForSession('main'),
+        mainWorkspace.path,
+      );
+      expect(
+        controller.assistantWorkspaceRefForSession('draft:artifact-thread'),
+        taskWorkspace.path,
+      );
+
+      await controller.switchSession('draft:artifact-thread');
+      expect(
+        controller.assistantWorkspaceRefForSession('draft:artifact-thread'),
+        taskWorkspace.path,
+      );
+
+      await controller.switchSession('main');
+      expect(
+        controller.assistantWorkspaceRefForSession('main'),
+        mainWorkspace.path,
       );
     },
   );

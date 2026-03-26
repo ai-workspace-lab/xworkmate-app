@@ -134,6 +134,23 @@ String _singleAgentProviderFallbackBadge({
   return stripped.substring(0, length).toUpperCase();
 }
 
+const Set<String> kSupportedExternalAcpEndpointSchemes = <String>{
+  'ws',
+  'wss',
+  'http',
+  'https',
+};
+
+bool isSupportedExternalAcpEndpoint(String endpoint) {
+  final trimmed = endpoint.trim();
+  if (trimmed.isEmpty) {
+    return false;
+  }
+  final uri = Uri.tryParse(trimmed);
+  final scheme = uri?.scheme.trim().toLowerCase() ?? '';
+  return kSupportedExternalAcpEndpointSchemes.contains(scheme);
+}
+
 class SingleAgentProvider {
   const SingleAgentProvider({
     required this.providerId,
@@ -391,6 +408,9 @@ List<ExternalAcpEndpointProfile> normalizeExternalAcpEndpoints({
       continue;
     }
     if (kLegacyExternalAcpProviderIds.contains(key)) {
+      if (item.endpoint.trim().isEmpty) {
+        continue;
+      }
       migratedCustomProfiles.add(item.copyWith(providerKey: nextCustomKey()));
       continue;
     }
@@ -428,6 +448,38 @@ List<ExternalAcpEndpointProfile> replaceExternalAcpEndpointForProvider(
     next[index] = resolved;
   }
   return normalizeExternalAcpEndpoints(profiles: next);
+}
+
+ExternalAcpEndpointProfile buildCustomExternalAcpEndpointProfile(
+  Iterable<ExternalAcpEndpointProfile> profiles, {
+  required String label,
+  required String endpoint,
+}) {
+  final normalizedProfiles = normalizeExternalAcpEndpoints(profiles: profiles);
+  var suffix = normalizedProfiles.length + 1;
+
+  String providerKey() => 'custom-agent-$suffix';
+
+  final existingKeys = normalizedProfiles
+      .map((item) => item.providerKey)
+      .toSet();
+  while (existingKeys.contains(providerKey())) {
+    suffix += 1;
+  }
+
+  final normalizedLabel = label.trim().isEmpty
+      ? 'Custom ACP Endpoint $suffix'
+      : label.trim();
+  return ExternalAcpEndpointProfile(
+    providerKey: providerKey(),
+    label: normalizedLabel,
+    badge: _singleAgentProviderFallbackBadge(
+      providerId: providerKey(),
+      label: normalizedLabel,
+    ),
+    endpoint: endpoint.trim(),
+    enabled: true,
+  );
 }
 
 String normalizeAuthorizedSkillDirectoryPath(String path) {
