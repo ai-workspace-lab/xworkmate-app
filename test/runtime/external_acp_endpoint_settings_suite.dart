@@ -131,6 +131,32 @@ void main() {
       },
     );
 
+    test('empty migrated claude and gemini placeholders are dropped', () {
+      final normalized = normalizeExternalAcpEndpoints(
+        profiles: const <ExternalAcpEndpointProfile>[
+          ExternalAcpEndpointProfile(
+            providerKey: 'custom-agent-3',
+            label: 'Claude',
+            badge: 'Cl',
+            endpoint: '',
+            enabled: true,
+          ),
+          ExternalAcpEndpointProfile(
+            providerKey: 'custom-agent-4',
+            label: 'Gemini',
+            badge: 'G',
+            endpoint: '',
+            enabled: true,
+          ),
+        ],
+      );
+
+      expect(
+        normalized.map((item) => item.providerKey).toList(growable: false),
+        const <String>['codex', 'opencode'],
+      );
+    });
+
     test(
       'custom endpoint builder validates sequential keys and label fallback',
       () {
