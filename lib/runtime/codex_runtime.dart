@@ -748,11 +748,15 @@ class CodexRuntime extends ChangeNotifier {
   Future<List<Map<String, dynamic>>> listModels({
     bool includeHidden = false,
   }) async {
-    final result = await request(
-      'model/list',
-      params: {'includeHidden': includeHidden},
-    );
-    return (result['models'] as List).cast<Map<String, dynamic>>();
+    try {
+      final result = await request(
+        'model/list',
+        params: {'includeHidden': includeHidden},
+      );
+      return _decodeModelListResponse(result);
+    } catch (error) {
+      throw _normalizeModelListError(error);
+    }
   }
 
   /// List available skills.
@@ -768,20 +772,43 @@ class CodexRuntime extends ChangeNotifier {
 
   /// Stop Codex process.
   Future<void> stop() async {
+    final process = _process;
+    if (process == null) {
+      _process = null;
+      _isInitialized = false;
+      _state = CodexConnectionState.disconnected;
+      _pendingRequests.clear();
+      notifyListeners();
+      return;
+    }
+
+    try {
+      await process.stdin.close();
+    } catch (_) {
+      // Ignore broken pipes or already-closed stdin.
+    }
+
     await _stdoutSubscription?.cancel();
     _stdoutSubscription = null;
 
     await _stderrSubscription?.cancel();
     _stderrSubscription = null;
 
-    _process?.kill(ProcessSignal.sigterm);
-    await _process?.exitCode.timeout(
-      const Duration(seconds: 5),
-      onTimeout: () {
-        _process?.kill(ProcessSignal.sigkill);
-        return -1;
-      },
-    );
+    try {
+      await process.exitCode.timeout(const Duration(seconds: 2));
+    } on TimeoutException {
+      process.kill(ProcessSignal.sigterm);
+      try {
+        await process.exitCode.timeout(const Duration(seconds: 3));
+      } on TimeoutException {
+        process.kill(ProcessSignal.sigkill);
+        try {
+          await process.exitCode.timeout(const Duration(seconds: 1));
+        } on TimeoutException {
+          // Give up after escalating to SIGKILL.
+        }
+      }
+    }
 
     _process = null;
     _isInitialized = false;
@@ -796,6 +823,75 @@ class CodexRuntime extends ChangeNotifier {
     _events.close();
     super.dispose();
   }
+
+  @visibleForTesting
+  static List<Map<String, dynamic>> decodeModelListResponseForTest(
+    Map<String, dynamic> result,
+  ) => _decodeModelListResponse(result);
+
+  @visibleForTesting
+  static Object normalizeModelListErrorForTest(Object error) =>
+      _normalizeModelListError(error);
+}
+
+List<Map<String, dynamic>> _decodeModelListResponse(Map<String, dynamic> result) {
+  final rawModels = <Object?>[
+    ...switch (result['models']) {
+      final List<Object?> items => items,
+      _ => const <Object?>[],
+    },
+    if (switch (result['models']) {
+      final List<Object?> items => items.isEmpty,
+      _ => true,
+    })
+      ...switch (result['data']) {
+        final List<Object?> items => items,
+        _ => const <Object?>[],
+      },
+  ];
+  final seen = <String>{};
+  final items = <Map<String, dynamic>>[];
+  for (final item in rawModels) {
+    if (item is! Map) {
+      continue;
+    }
+    final model = item.cast<String, dynamic>();
+    final rawId = model['id'] ?? model['name'];
+    final id = rawId is String ? rawId.trim() : '';
+    if (id.isEmpty || !seen.add(id)) {
+      continue;
+    }
+    items.add(model);
+  }
+  return items;
+}
+
+Object _normalizeModelListError(Object error) {
+  if (error is TimeoutException) {
+    return TimeoutException('Codex model refresh timed out');
+  }
+  if (error is CodexRpcError) {
+    final message = error.message.trim();
+    final lower = message.toLowerCase();
+    if (lower.contains('cloudflare') || lower.contains('403 forbidden')) {
+      return CodexRpcError(
+        code: error.code,
+        message: 'Codex model refresh blocked by Cloudflare (403)',
+        data: error.data,
+      );
+    }
+    if (lower.contains('timeout waiting for child process to exit')) {
+      return TimeoutException('Codex model refresh timed out waiting for child process exit');
+    }
+    if (lower.contains('missing field `models`')) {
+      return CodexRpcError(
+        code: error.code,
+        message: 'Codex model list payload used an unsupported schema',
+        data: error.data,
+      );
+    }
+  }
+  return error;
 }
 
 class CodexLaunchConfiguration {
