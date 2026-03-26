@@ -178,5 +178,8 @@ void main() {
       find.byKey(const ValueKey('web-external-acp-provider-add-button')),
       findsOneWidget,
     );
+    expect(find.text('自定义添加更多'), findsOneWidget);
+    expect(find.text('标志'), findsNothing);
+    expect(find.text('Badge'), findsNothing);
   });
 }
