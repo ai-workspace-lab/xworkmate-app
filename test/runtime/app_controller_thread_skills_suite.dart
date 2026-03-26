@@ -211,6 +211,61 @@ void main() {
   );
 
   test(
+    'AppController scans skills inside symlinked directories under shared roots',
+    () async {
+      if (Platform.isWindows) {
+        return;
+      }
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-skill-directory-symlink-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final sharedRoot = Directory('${tempDirectory.path}/shared-root');
+      final actualSkillRoot = Directory('${tempDirectory.path}/actual-skills');
+      await sharedRoot.create(recursive: true);
+      await _writeSkill(
+        actualSkillRoot,
+        'linked-browser',
+        skillName: 'Linked Browser',
+        description: 'Loaded through a symlinked directory',
+      );
+      await Link('${sharedRoot.path}/linked-pack').create(actualSkillRoot.path);
+
+      final controller = AppController(
+        store: await _createStore(tempDirectory.path),
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        singleAgentSharedSkillScanRootOverrides: <String>[sharedRoot.path],
+      );
+      addTearDown(controller.dispose);
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      await _waitFor(
+        () => controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .any((skill) => skill.label == 'Linked Browser'),
+      );
+
+      final linkedSkill = controller
+          .assistantImportedSkillsForSession(controller.currentSessionKey)
+          .firstWhere((skill) => skill.label == 'Linked Browser');
+      expect(linkedSkill.description, 'Loaded through a symlinked directory');
+      expect(linkedSkill.source, 'custom');
+      expect(linkedSkill.sourceLabel, contains('linked-pack/linked-browser'));
+    },
+  );
+
+  test(
     'AppController resolves preset shared roots against the access service home directory',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
