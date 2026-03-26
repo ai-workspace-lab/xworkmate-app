@@ -4274,13 +4274,8 @@ class AppController extends ChangeNotifier {
         if (!await root.exists()) {
           continue;
         }
-        await for (final entity in root.list(
-          recursive: true,
-          followLinks: false,
-        )) {
-          if (entity is! File || entity.uri.pathSegments.last != 'SKILL.md') {
-            continue;
-          }
+        final skillFiles = await _collectSkillFilesFromDirectory(root);
+        for (final entity in skillFiles) {
           final entry = await _skillEntryFromFile(
             entity,
             rootSpec,
@@ -4301,6 +4296,57 @@ class AppController extends ChangeNotifier {
     final entries = dedupedByName.values.toList(growable: false);
     entries.sort((left, right) => left.label.compareTo(right.label));
     return entries;
+  }
+
+  Future<List<File>> _collectSkillFilesFromDirectory(Directory root) async {
+    final skillFiles = <File>[];
+    final visitedDirectories = <String>{};
+
+    Future<void> visitDirectory(Directory directory) async {
+      final directoryKey = await _directoryScanKey(directory);
+      if (!visitedDirectories.add(directoryKey)) {
+        return;
+      }
+      await for (final entity in directory.list(followLinks: false)) {
+        if (entity is File) {
+          if (entity.uri.pathSegments.last == 'SKILL.md') {
+            skillFiles.add(entity);
+          }
+          continue;
+        }
+        if (entity is Directory) {
+          await visitDirectory(entity);
+          continue;
+        }
+        if (entity is! Link) {
+          continue;
+        }
+        final resolvedType = await FileSystemEntity.type(
+          entity.path,
+          followLinks: true,
+        );
+        if (resolvedType == FileSystemEntityType.file) {
+          if (entity.uri.pathSegments.last == 'SKILL.md') {
+            skillFiles.add(File(entity.path));
+          }
+          continue;
+        }
+        if (resolvedType == FileSystemEntityType.directory) {
+          await visitDirectory(Directory(entity.path));
+        }
+      }
+    }
+
+    await visitDirectory(root);
+    return skillFiles;
+  }
+
+  Future<String> _directoryScanKey(Directory directory) async {
+    try {
+      return await directory.resolveSymbolicLinks();
+    } catch (_) {
+      return directory.absolute.path;
+    }
   }
 
   Future<List<AssistantThreadSkillEntry>> _scanSingleAgentSharedSkillEntries() {
