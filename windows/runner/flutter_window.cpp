@@ -25,6 +25,7 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  RegisterDesktopLifecycleHooks();
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -37,6 +38,11 @@ bool FlutterWindow::OnCreate() {
   flutter_controller_->ForceRedraw();
 
   return true;
+}
+
+void FlutterWindow::RegisterDesktopLifecycleHooks() {
+  (void)flutter_controller_;
+  // Reserved for future Windows tray and close-to-background integration.
 }
 
 void FlutterWindow::OnDestroy() {

@@ -21,6 +21,13 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
 }
 
+static void my_application_register_app_lifecycle_hooks(MyApplication* self,
+                                                        FlView* view) {
+  (void)self;
+  (void)view;
+  // Reserved for future GNOME/KDE tray and close-to-background integration.
+}
+
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
@@ -79,6 +86,7 @@ static void my_application_activate(GApplication* application) {
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
   self->desktop_platform_channel =
       desktop_platform_channel_new(self, window, view);
+  my_application_register_app_lifecycle_hooks(self, view);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter/services.dart';
 
 import '../i18n/app_language.dart';
 import '../theme/app_theme.dart';
@@ -18,6 +20,10 @@ class XWorkmateApp extends StatefulWidget {
 }
 
 class _XWorkmateAppState extends State<XWorkmateApp> {
+  static const MethodChannel _appLifecycleChannel = MethodChannel(
+    'plus.svc.xworkmate/app_lifecycle',
+  );
+
   late final AppController _controller;
 
   @override
@@ -26,12 +32,46 @@ class _XWorkmateAppState extends State<XWorkmateApp> {
     _controller = AppController(
       uiFeatureManifest: widget.featureManifest ?? UiFeatureManifest.fallback(),
     );
+    if (_supportsDesktopLifecycleChannel) {
+      _appLifecycleChannel.setMethodCallHandler(_handleAppLifecycleCall);
+    }
   }
 
   @override
   void dispose() {
+    if (_supportsDesktopLifecycleChannel) {
+      _appLifecycleChannel.setMethodCallHandler(null);
+    }
     _controller.dispose();
     super.dispose();
+  }
+
+  bool get _supportsDesktopLifecycleChannel {
+    if (kIsWeb) {
+      return false;
+    }
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+      case TargetPlatform.linux:
+        return true;
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+      case TargetPlatform.fuchsia:
+        return false;
+    }
+  }
+
+  Future<Object?> _handleAppLifecycleCall(MethodCall call) async {
+    switch (call.method) {
+      case 'prepareForExit':
+        await _controller.prepareForExit();
+        return null;
+      default:
+        throw MissingPluginException(
+          'Unhandled app lifecycle method: ${call.method}',
+        );
+    }
   }
 
   @override
