@@ -262,6 +262,8 @@ const List<SingleAgentProvider> kKnownSingleAgentProviders =
       SingleAgentProvider.gemini,
     ];
 
+const Set<String> kLegacyExternalAcpProviderIds = <String>{'claude', 'gemini'};
+
 class ExternalAcpEndpointProfile {
   const ExternalAcpEndpointProfile({
     required this.providerKey,
@@ -369,9 +371,27 @@ List<ExternalAcpEndpointProfile> normalizeExternalAcpEndpoints({
   final incoming =
       profiles?.toList(growable: false) ?? const <ExternalAcpEndpointProfile>[];
   final byKey = <String, ExternalAcpEndpointProfile>{};
+  final migratedCustomProfiles = <ExternalAcpEndpointProfile>[];
+  var customSuffix = 1;
+
+  String nextCustomKey() {
+    while (true) {
+      final key = 'custom-agent-$customSuffix';
+      customSuffix += 1;
+      if (!byKey.containsKey(key) &&
+          !migratedCustomProfiles.any((item) => item.providerKey == key)) {
+        return key;
+      }
+    }
+  }
+
   for (final item in incoming) {
     final key = item.providerKey.trim().toLowerCase();
     if (key.isEmpty || byKey.containsKey(key)) {
+      continue;
+    }
+    if (kLegacyExternalAcpProviderIds.contains(key)) {
+      migratedCustomProfiles.add(item.copyWith(providerKey: nextCustomKey()));
       continue;
     }
     byKey[key] = item.copyWith(providerKey: key);
@@ -381,6 +401,7 @@ List<ExternalAcpEndpointProfile> normalizeExternalAcpEndpoints({
     for (final provider in kBuiltinExternalAcpProviders)
       byKey.remove(provider.providerId) ??
           ExternalAcpEndpointProfile.defaultsForProvider(provider),
+    ...migratedCustomProfiles,
     ...byKey.values,
   ];
   return List<ExternalAcpEndpointProfile>.unmodifiable(normalized);
