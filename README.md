@@ -18,26 +18,21 @@ flutter run -d macos
 
 ## Downloads
 
-| Desktop | iOS | Android |
-| --- | --- | --- |
-| [![macOS](https://img.shields.io/badge/macOS-Latest%20Release-24292F?style=for-the-badge&logo=apple)](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) | [![iOS](https://img.shields.io/badge/iOS-Latest%20Release-0A84FF?style=for-the-badge&logo=apple)](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) | [![Android](https://img.shields.io/badge/Android-Latest%20Release-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) |
-| [![Windows](https://img.shields.io/badge/Windows-Latest%20Release-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) | [![TestFlight](https://img.shields.io/badge/TestFlight-Latest%20Release-147EFB?style=for-the-badge&logo=apple)](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) | [![Google Play](https://img.shields.io/badge/Google%20Play-Latest%20Release-00C853?style=for-the-badge&logo=googleplay&logoColor=white)](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) |
+| Platform | Download |
+| --- | --- |
+| macOS | [Latest Release](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) |
+| Windows | [Latest Release](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) |
+| Linux | [Latest Release](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) |
+| iOS | [Latest Release](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) |
+| Android | [Latest Release](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) |
 
 All download buttons currently point to the latest GitHub release page.
 
 ## Snapshots
 
-### Desktop
-
-![XWorkmate Desktop](./images/Desktop-APP.png)
-
-### Mobile
-
-![XWorkmate Mobile](./images/mobile-app.PNG)
-
-### Web
-
-![XWorkmate Web](./images/web-online-services.png)
+| Mobile | Desktop | Web |
+| --- | --- | --- |
+| ![XWorkmate Mobile](./images/mobile-app.PNG) | ![XWorkmate Desktop](./images/Desktop-APP.png) | ![XWorkmate Web](./images/web-online-services.png) |
 
 ## Learn More
 
