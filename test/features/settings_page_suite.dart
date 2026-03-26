@@ -342,11 +342,12 @@ void main() {
     await tester.tap(find.text('SKILLS 目录授权'));
     await tester.pumpAndSettle();
 
-    expect(find.text('/etc/skills'), findsWidgets);
     expect(find.text('~/.agents/skills'), findsOneWidget);
     expect(find.text('/Users/tester/.agents/skills'), findsOneWidget);
-    expect(find.text('~/.codex/skills'), findsNothing);
-    expect(find.text('~/.workbuddy/skills'), findsNothing);
+    expect(find.text('~/.codex/skills'), findsOneWidget);
+    expect(find.text('/Users/tester/.codex/skills'), findsOneWidget);
+    expect(find.text('~/.workbuddy/skills'), findsOneWidget);
+    expect(find.text('/Users/tester/.workbuddy/skills'), findsOneWidget);
   });
 
   testWidgets('SettingsPage can batch add custom skills directories', (
@@ -379,7 +380,22 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('SKILLS 目录授权'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('批量添加自定义目录'));
+    await tester.tap(
+      find.byKey(const ValueKey('skill-directory-batch-add-button')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('skill-directory-path-input')),
+      '''
+paths:
+  - /Users/tester/custom-a
+  - "/Users/tester/custom-b"
+''',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('skill-directory-direct-add-button')),
+    );
     await tester.pump();
     for (
       var attempt = 0;
@@ -398,6 +414,59 @@ void main() {
     );
     expect(find.text('custom-a'), findsOneWidget);
     expect(find.text('custom-b'), findsOneWidget);
+  });
+
+  testWidgets('SettingsPage skills authorization dialog can use picker flow', (
+    WidgetTester tester,
+  ) async {
+    final controller = await _createControllerWithSkillAccessService(
+      tester,
+      _FakeSkillDirectoryAccessService(
+        userHomeDirectory: '/Users/tester',
+        multiDirectoryResponse: const <AuthorizedSkillDirectory>[
+          AuthorizedSkillDirectory(
+            path: '/Users/tester/custom-picker',
+            bookmark: 'bookmark-picker',
+          ),
+        ],
+      ),
+    );
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
+
+    await tester.tap(find.text('集成'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SKILLS 目录授权'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('skill-directory-batch-add-button')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('skill-directory-path-input')),
+      '/Users/tester/custom-picker',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('skill-directory-picker-button')),
+    );
+    await tester.pump();
+    for (
+      var attempt = 0;
+      attempt < 10 && controller.authorizedSkillDirectories.isEmpty;
+      attempt += 1
+    ) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    expect(
+      controller.authorizedSkillDirectories.map((item) => item.path),
+      contains('/Users/tester/custom-picker'),
+    );
   });
 
   testWidgets('SettingsPage gateway sections can collapse individually', (

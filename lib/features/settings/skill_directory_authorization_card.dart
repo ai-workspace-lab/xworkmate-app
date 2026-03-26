@@ -6,6 +6,8 @@ import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../widgets/surface_card.dart';
 
+enum _SkillDirectoryAuthorizationMode { direct, picker }
+
 class SkillDirectoryAuthorizationCard extends StatefulWidget {
   const SkillDirectoryAuthorizationCard({super.key, required this.controller});
 
@@ -53,8 +55,8 @@ class _SkillDirectoryAuthorizationCardState
           const SizedBox(height: 8),
           Text(
             appText(
-              '预设扫描目录固定为 /etc/skills 和 ~/.agents/skills；其他目录可批量添加为自定义目录扩展扫描列表。设置中心修改会写入 settings.yaml。',
-              'Preset scan roots are fixed to /etc/skills and ~/.agents/skills. Other locations can be added in batches as custom directories to extend the scan list. Settings Center writes changes back to settings.yaml.',
+              '预设目录支持直接按路径加入；也可以把终端输出里的路径直接贴进来批量导入。系统目录选择器保留在同行旁侧，作为可选授权方式。设置中心修改会写入 settings.yaml。',
+              'Preset roots can be added directly by path, and terminal output paths can be pasted for batch import. The system directory picker remains available as an optional side action. Settings Center writes changes back to settings.yaml.',
             ),
             style: theme.textTheme.bodyMedium,
           ),
@@ -91,7 +93,13 @@ class _SkillDirectoryAuthorizationCardState
                   presetPath,
                   homeDirectory: homeDirectory,
                 ),
-                onAuthorize: () => _authorizeDirectory(
+                onDirectAuthorize: () => _saveDirectoriesFromPaths(<String>[
+                  _resolvePathForDisplay(
+                    presetPath,
+                    homeDirectory: homeDirectory,
+                  ),
+                ]),
+                onPickerAuthorize: () => _authorizeDirectory(
                   suggestedPath: _resolvePathForDisplay(
                     presetPath,
                     homeDirectory: homeDirectory,
@@ -112,7 +120,9 @@ class _SkillDirectoryAuthorizationCardState
                   title: _displayNameForPath(directory.path),
                   subtitle: directory.path,
                   directory: directory,
-                  onAuthorize: () =>
+                  onDirectAuthorize: () =>
+                      _saveDirectoriesFromPaths(<String>[directory.path]),
+                  onPickerAuthorize: () =>
                       _authorizeDirectory(suggestedPath: directory.path),
                 ),
                 const SizedBox(height: 10),
@@ -121,14 +131,15 @@ class _SkillDirectoryAuthorizationCardState
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.tonalIcon(
-                onPressed: _busy ? null : _authorizeDirectories,
+                key: const ValueKey('skill-directory-batch-add-button'),
+                onPressed: _busy ? null : _showDirectoryAuthorizationDialog,
                 icon: _busy
                     ? const SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.create_new_folder_outlined),
+                    : const Icon(Icons.playlist_add_rounded),
                 label: Text(appText('批量添加自定义目录', 'Add Custom Directories')),
               ),
             ),
@@ -146,8 +157,8 @@ class _SkillDirectoryAuthorizationCardState
           const SizedBox(height: 12),
           Text(
             appText(
-              'macOS 会通过目录选择器显式授予只读访问，并持久化授权 bookmark；移除目录会立即停止扫描该目录。',
-              'On macOS the directory picker grants explicit read-only access and persists the authorization bookmark. Removing a directory stops scanning it immediately.',
+              '按路径添加会立即写入扫描列表；如果 macOS 对某个目录仍缺系统级访问权限，可使用旁侧目录向导补授 bookmark。移除目录会立即停止扫描该目录。',
+              'Direct path add updates the scan list immediately. If macOS still needs system-level access for a directory, use the adjacent picker flow to grant a bookmark. Removing a directory stops scanning it immediately.',
             ),
             style: theme.textTheme.bodySmall?.copyWith(
               color: palette.textSecondary,
@@ -163,7 +174,8 @@ class _SkillDirectoryAuthorizationCardState
     required String title,
     required String subtitle,
     required AuthorizedSkillDirectory? directory,
-    required Future<void> Function() onAuthorize,
+    required Future<void> Function() onDirectAuthorize,
+    required Future<void> Function() onPickerAuthorize,
   }) {
     final theme = Theme.of(context);
     final palette = context.palette;
@@ -196,17 +208,22 @@ class _SkillDirectoryAuthorizationCardState
             runSpacing: 8,
             children: [
               FilledButton.tonalIcon(
-                onPressed: _busy ? null : onAuthorize,
+                onPressed: _busy ? null : onDirectAuthorize,
                 icon: Icon(
                   directory == null
-                      ? Icons.folder_open_rounded
+                      ? Icons.playlist_add_rounded
                       : Icons.refresh_rounded,
                 ),
                 label: Text(
                   directory == null
-                      ? appText('授权目录', 'Authorize')
-                      : appText('重新授权', 'Re-authorize'),
+                      ? appText('按路径授权', 'Authorize by Path')
+                      : appText('重新同步', 'Resync Path'),
                 ),
+              ),
+              OutlinedButton.icon(
+                onPressed: _busy ? null : onPickerAuthorize,
+                icon: const Icon(Icons.folder_open_rounded),
+                label: Text(appText('目录向导', 'Directory Picker')),
               ),
               if (directory != null)
                 OutlinedButton.icon(
@@ -236,6 +253,30 @@ class _SkillDirectoryAuthorizationCardState
       }
     }
     return null;
+  }
+
+  Future<void> _showDirectoryAuthorizationDialog() async {
+    final result = await showDialog<_SkillDirectoryAuthorizationDialogResult>(
+      context: context,
+      builder: (context) => _SkillDirectoryAuthorizationDialog(
+        presetPaths: widget.controller.recommendedAuthorizedSkillDirectoryPaths
+            .map(
+              (path) => _resolvePathForDisplay(
+                path,
+                homeDirectory: widget.controller.userHomeDirectory,
+              ),
+            )
+            .toList(growable: false),
+      ),
+    );
+    if (!mounted || result == null) {
+      return;
+    }
+    if (result.mode == _SkillDirectoryAuthorizationMode.picker) {
+      await _authorizeDirectories(suggestedPaths: result.paths);
+      return;
+    }
+    await _saveDirectoriesFromPaths(result.paths);
   }
 
   Future<void> _authorizeDirectory({String suggestedPath = ''}) async {
@@ -286,14 +327,18 @@ class _SkillDirectoryAuthorizationCardState
     }
   }
 
-  Future<void> _authorizeDirectories() async {
+  Future<void> _authorizeDirectories({
+    List<String> suggestedPaths = const <String>[],
+  }) async {
     setState(() {
       _busy = true;
       _statusMessage = null;
       _errorMessage = null;
     });
     try {
-      final granted = await widget.controller.authorizeSkillDirectories();
+      final granted = await widget.controller.authorizeSkillDirectories(
+        suggestedPaths: suggestedPaths,
+      );
       if (granted.isEmpty) {
         if (!mounted) {
           return;
@@ -318,6 +363,49 @@ class _SkillDirectoryAuthorizationCardState
         _statusMessage = appText(
           '已授权 ${granted.length} 个目录并同步到 settings.yaml。',
           'Authorized ${granted.length} directories and synced them to settings.yaml.',
+        );
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _errorMessage = error.toString();
+      });
+    }
+  }
+
+  Future<void> _saveDirectoriesFromPaths(List<String> rawPaths) async {
+    final paths = _extractAuthorizedPathCandidates(rawPaths.join('\n'));
+    if (paths.isEmpty) {
+      setState(() {
+        _statusMessage = null;
+        _errorMessage = appText(
+          '没有识别到可用目录路径。请每行提供一个以 / 或 ~/ 开头的目录。',
+          'No usable directory paths were detected. Provide one directory per line starting with / or ~/.',
+        );
+      });
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _statusMessage = null;
+      _errorMessage = null;
+    });
+    try {
+      final next = _mergedAuthorizedDirectories(
+        paths.map(_authorizedDirectoryForPath).toList(growable: false),
+      );
+      await widget.controller.saveAuthorizedSkillDirectories(next);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _statusMessage = appText(
+          '已同步 ${paths.length} 个目录到 settings.yaml；如 macOS 仍无法读取，可再使用目录向导补授权。',
+          'Synced ${paths.length} directories to settings.yaml. If macOS still cannot read one, use the picker flow to grant access.',
         );
       });
     } catch (error) {
@@ -410,6 +498,210 @@ class _SkillDirectoryAuthorizationCardState
     final normalized = normalizeAuthorizedSkillDirectoryPath(path);
     final segments = normalized.split(RegExp(r'[\\/]'));
     return segments.isEmpty ? normalized : segments.last;
+  }
+
+  AuthorizedSkillDirectory _authorizedDirectoryForPath(String path) {
+    final normalized = normalizeAuthorizedSkillDirectoryPath(path);
+    final existing = _findAuthorizedDirectory(
+      widget.controller.authorizedSkillDirectories,
+      normalized,
+      homeDirectory: widget.controller.userHomeDirectory,
+    );
+    return AuthorizedSkillDirectory(
+      path: normalized,
+      bookmark: existing?.bookmark ?? '',
+    );
+  }
+}
+
+List<String> _extractAuthorizedPathCandidates(String rawInput) {
+  final extracted = <String>[];
+  final seen = <String>{};
+  for (final line in rawInput.split(RegExp(r'[\r\n]+'))) {
+    for (final candidate in _extractAuthorizedPathCandidatesFromLine(line)) {
+      final normalized = normalizeAuthorizedSkillDirectoryPath(candidate);
+      if (normalized.isNotEmpty && seen.add(normalized)) {
+        extracted.add(normalized);
+      }
+    }
+  }
+  return extracted;
+}
+
+Iterable<String> _extractAuthorizedPathCandidatesFromLine(String line) sync* {
+  var normalizedLine = line.trim();
+  if (normalizedLine.isEmpty) {
+    return;
+  }
+  normalizedLine = normalizedLine
+      .replaceFirst(RegExp(r'^[\-\*\u2022]\s*'), '')
+      .replaceFirst(RegExp(r'^\d+[.)]\s*'), '')
+      .replaceFirst(
+        RegExp(r'^(?:path|paths|dir|directory|路径|目录)\s*[:=]\s*'),
+        '',
+      );
+  final matches = RegExp(
+    r"""["']((?:~/|/)[^"']+)["']|`((?:~/|/)[^`]+)`|((?:~/|/)[^,\s;]+)""",
+  ).allMatches(normalizedLine);
+  if (matches.isNotEmpty) {
+    for (final match in matches) {
+      final candidate =
+          match.group(1) ?? match.group(2) ?? match.group(3) ?? '';
+      if (candidate.isNotEmpty) {
+        yield candidate;
+      }
+    }
+    return;
+  }
+  final unwrapped = normalizedLine.replaceAll(
+    RegExp(r"""^[\[\(\{<"'`]+|[\]\)\}>,"';`]+$"""),
+    '',
+  );
+  if (unwrapped.startsWith('/') || unwrapped.startsWith('~/')) {
+    yield unwrapped;
+  }
+}
+
+class _SkillDirectoryAuthorizationDialogResult {
+  const _SkillDirectoryAuthorizationDialogResult({
+    required this.mode,
+    required this.paths,
+  });
+
+  final _SkillDirectoryAuthorizationMode mode;
+  final List<String> paths;
+}
+
+class _SkillDirectoryAuthorizationDialog extends StatefulWidget {
+  const _SkillDirectoryAuthorizationDialog({required this.presetPaths});
+
+  final List<String> presetPaths;
+
+  @override
+  State<_SkillDirectoryAuthorizationDialog> createState() =>
+      _SkillDirectoryAuthorizationDialogState();
+}
+
+class _SkillDirectoryAuthorizationDialogState
+    extends State<_SkillDirectoryAuthorizationDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final parsedPaths = _extractAuthorizedPathCandidates(_controller.text);
+    return AlertDialog(
+      title: Text(appText('批量添加自定义目录', 'Add Custom Directories')),
+      content: SizedBox(
+        width: 640,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              appText(
+                '默认直接贴路径即可添加；系统目录选择器放在旁侧作为可选动作。支持一行一个目录，也支持直接粘贴终端输出。',
+                'Paste paths directly to add them by default. The system directory picker stays beside it as an optional action. Supports one directory per line or pasted terminal output.',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final path in widget.presetPaths)
+                  ActionChip(
+                    label: Text(path),
+                    onPressed: () {
+                      final current = _controller.text.trim();
+                      _controller.text = current.isEmpty
+                          ? path
+                          : '$current\n$path';
+                      _controller.selection = TextSelection.collapsed(
+                        offset: _controller.text.length,
+                      );
+                      setState(() {});
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('skill-directory-path-input'),
+              controller: _controller,
+              minLines: 5,
+              maxLines: 8,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: appText(
+                  '一行一个目录，或直接粘贴命令输出\n~/.agents/skills\n~/.codex/skills\n/Users/shenlan/.workbuddy/skills',
+                  'One directory per line, or paste command output\n~/.agents/skills\n~/.codex/skills\n/Users/shenlan/.workbuddy/skills',
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              appText(
+                '已识别 ${parsedPaths.length} 个路径',
+                'Detected ${parsedPaths.length} paths',
+              ),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(appText('取消', 'Cancel')),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FilledButton.icon(
+              key: const ValueKey('skill-directory-direct-add-button'),
+              onPressed: parsedPaths.isEmpty
+                  ? null
+                  : () {
+                      Navigator.of(context).pop(
+                        _SkillDirectoryAuthorizationDialogResult(
+                          mode: _SkillDirectoryAuthorizationMode.direct,
+                          paths: parsedPaths,
+                        ),
+                      );
+                    },
+              icon: const Icon(Icons.playlist_add_rounded),
+              label: Text(appText('按路径添加', 'Add by Path')),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              key: const ValueKey('skill-directory-picker-button'),
+              onPressed: () {
+                Navigator.of(context).pop(
+                  _SkillDirectoryAuthorizationDialogResult(
+                    mode: _SkillDirectoryAuthorizationMode.picker,
+                    paths: parsedPaths,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.folder_open_rounded),
+              label: Text(appText('目录向导', 'Directory Picker')),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }
 

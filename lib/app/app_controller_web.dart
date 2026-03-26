@@ -110,8 +110,9 @@ class AppController extends ChangeNotifier {
   List<AuthorizedSkillDirectory> get authorizedSkillDirectories =>
       _settings.authorizedSkillDirectories;
   List<String> get recommendedAuthorizedSkillDirectoryPaths => const <String>[
-    '/etc/skills',
     '~/.agents/skills',
+    '~/.codex/skills',
+    '~/.workbuddy/skills',
   ];
   String get userHomeDirectory => '';
   String get settingsYamlPath => '';
