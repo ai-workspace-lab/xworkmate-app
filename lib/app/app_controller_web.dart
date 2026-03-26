@@ -124,10 +124,17 @@ class AppController extends ChangeNotifier {
   AppLanguage get appLanguage => _settings.appLanguage;
   AssistantPermissionLevel get assistantPermissionLevel =>
       _settings.assistantPermissionLevel;
-  List<WorkspaceDestination> get assistantNavigationDestinations => _settings
+  List<AssistantFocusEntry> get assistantNavigationDestinations => _settings
       .assistantNavigationDestinations
-      .where(capabilities.supportsDestination)
+      .where(supportsAssistantFocusEntry)
       .toList(growable: false);
+  bool supportsAssistantFocusEntry(AssistantFocusEntry entry) {
+    final destination = entry.destination;
+    if (destination != null) {
+      return capabilities.supportsDestination(destination);
+    }
+    return capabilities.supportsDestination(WorkspaceDestination.settings);
+  }
   GatewayConnectionSnapshot get connection => _relayClient.snapshot;
   bool get relayBusy => _relayBusy;
   bool get aiGatewayBusy => _aiGatewayBusy;
@@ -892,16 +899,16 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> toggleAssistantNavigationDestination(
-    WorkspaceDestination destination,
+    AssistantFocusEntry destination,
   ) async {
     if (!kAssistantNavigationDestinationCandidates.contains(destination) ||
-        !capabilities.supportsDestination(destination)) {
+        !supportsAssistantFocusEntry(destination)) {
       return;
     }
     final current = assistantNavigationDestinations;
     final next = current.contains(destination)
         ? current.where((item) => item != destination).toList(growable: false)
-        : <WorkspaceDestination>[...current, destination];
+        : <AssistantFocusEntry>[...current, destination];
     _settings = _settings.copyWith(assistantNavigationDestinations: next);
     if (_settingsDraftInitialized) {
       _settingsDraft = settingsDraft.copyWith(
@@ -2342,7 +2349,13 @@ class AppController extends ChangeNotifier {
     final assistantNavigationDestinations =
         normalizeAssistantNavigationDestinations(
           snapshot.assistantNavigationDestinations,
-        ).where(allowedDestinations.contains).toList(growable: false);
+        ).where((entry) {
+          final destination = entry.destination;
+          if (destination != null) {
+            return allowedDestinations.contains(destination);
+          }
+          return allowedDestinations.contains(WorkspaceDestination.settings);
+        }).toList(growable: false);
     final normalizedSessionBaseUrl =
         RemoteWebSessionRepository.normalizeBaseUrl(
           snapshot.webSessionPersistence.remoteBaseUrl,

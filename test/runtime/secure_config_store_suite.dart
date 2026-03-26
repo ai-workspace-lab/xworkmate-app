@@ -34,9 +34,9 @@ void main() {
         accountWorkspace: 'QA',
         codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
         codexCliPath: '/opt/homebrew/bin/codex',
-        assistantNavigationDestinations: const <WorkspaceDestination>[
-          WorkspaceDestination.aiGateway,
-          WorkspaceDestination.secrets,
+        assistantNavigationDestinations: const <AssistantFocusEntry>[
+          AssistantFocusEntry.aiGateway,
+          AssistantFocusEntry.secrets,
         ],
         gatewayProfiles: replaceGatewayProfileAt(
           SettingsSnapshot.defaults().gatewayProfiles,
@@ -66,9 +66,9 @@ void main() {
       expect(loadedSnapshot.codexCliPath, '/opt/homebrew/bin/codex');
       expect(
         loadedSnapshot.assistantNavigationDestinations,
-        const <WorkspaceDestination>[
-          WorkspaceDestination.aiGateway,
-          WorkspaceDestination.secrets,
+        const <AssistantFocusEntry>[
+          AssistantFocusEntry.aiGateway,
+          AssistantFocusEntry.secrets,
         ],
       );
       expect(

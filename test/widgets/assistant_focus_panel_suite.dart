@@ -24,7 +24,7 @@ void main() {
           home: Scaffold(
             body: AssistantFocusDestinationCard(
               controller: controller,
-              destination: WorkspaceDestination.settings,
+              destination: AssistantFocusEntry.settings,
               onOpenPage: () {},
               onRemoveFavorite: () async {},
             ),
@@ -55,4 +55,49 @@ void main() {
       expect(controller.themeMode, ThemeMode.dark);
     },
   );
+
+  testWidgets('Language and theme focus entries run directly', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        theme: AppTheme.light(platform: TargetPlatform.macOS),
+        darkTheme: AppTheme.dark(platform: TargetPlatform.macOS),
+        home: Scaffold(
+          body: Column(
+            children: [
+              Expanded(
+                child: AssistantFocusDestinationCard(
+                  controller: controller,
+                  destination: AssistantFocusEntry.language,
+                  onOpenPage: () {},
+                  onRemoveFavorite: () async {},
+                ),
+              ),
+              Expanded(
+                child: AssistantFocusDestinationCard(
+                  controller: controller,
+                  destination: AssistantFocusEntry.theme,
+                  onOpenPage: () {},
+                  onRemoveFavorite: () async {},
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('assistant-focus-language-toggle')));
+    await tester.pumpAndSettle();
+    expect(controller.appLanguage, AppLanguage.en);
+
+    await tester.tap(find.byKey(const Key('assistant-focus-theme-toggle')));
+    await tester.pumpAndSettle();
+    expect(controller.themeMode, ThemeMode.dark);
+  });
 }

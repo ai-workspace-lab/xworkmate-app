@@ -27,7 +27,7 @@ class SidebarNavigation extends StatelessWidget {
     this.marginOverride,
     this.showCollapseControl = true,
     this.availableDestinations,
-    this.favoriteDestinations = const <WorkspaceDestination>{},
+    this.favoriteDestinations = const <AssistantFocusEntry>{},
     this.onToggleFavorite,
   });
 
@@ -49,8 +49,8 @@ class SidebarNavigation extends StatelessWidget {
   final EdgeInsetsGeometry? marginOverride;
   final bool showCollapseControl;
   final Set<WorkspaceDestination>? availableDestinations;
-  final Set<WorkspaceDestination> favoriteDestinations;
-  final Future<void> Function(WorkspaceDestination section)? onToggleFavorite;
+  final Set<AssistantFocusEntry> favoriteDestinations;
+  final Future<void> Function(AssistantFocusEntry section)? onToggleFavorite;
 
   static const _primarySections = <WorkspaceDestination>[
     WorkspaceDestination.assistant,
@@ -180,6 +180,8 @@ class SidebarNavigation extends StatelessWidget {
                         availableDestinations!.contains(
                           WorkspaceDestination.settings,
                         ),
+                    favoriteDestinations: favoriteDestinations,
+                    onToggleFavorite: onToggleFavorite,
                     sidebarState: sidebarState,
                     onCycleSidebarState: onCycleSidebarState,
                     onOpenAccount: onOpenAccount,
@@ -304,8 +306,8 @@ class _SidebarSectionGroup extends StatelessWidget {
   final WorkspaceDestination currentSection;
   final bool collapsed;
   final _SidebarItemEmphasis emphasis;
-  final Set<WorkspaceDestination> favoriteDestinations;
-  final Future<void> Function(WorkspaceDestination section)? onToggleFavorite;
+  final Set<AssistantFocusEntry> favoriteDestinations;
+  final Future<void> Function(AssistantFocusEntry section)? onToggleFavorite;
   final VoidCallback? onOpenHome;
   final ValueChanged<WorkspaceDestination> onSectionChanged;
 
@@ -333,6 +335,19 @@ class _SidebarSectionGroup extends StatelessWidget {
           final useHomeShortcut =
               currentSection == WorkspaceDestination.settings &&
               section == WorkspaceDestination.assistant;
+          final focusEntry = switch (section) {
+            WorkspaceDestination.tasks => AssistantFocusEntry.tasks,
+            WorkspaceDestination.skills => AssistantFocusEntry.skills,
+            WorkspaceDestination.nodes => AssistantFocusEntry.nodes,
+            WorkspaceDestination.agents => AssistantFocusEntry.agents,
+            WorkspaceDestination.mcpServer => AssistantFocusEntry.mcpServer,
+            WorkspaceDestination.clawHub => AssistantFocusEntry.clawHub,
+            WorkspaceDestination.secrets => AssistantFocusEntry.secrets,
+            WorkspaceDestination.aiGateway => AssistantFocusEntry.aiGateway,
+            WorkspaceDestination.settings => AssistantFocusEntry.settings,
+            WorkspaceDestination.assistant || WorkspaceDestination.account =>
+              null,
+          };
           return Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
             child: _SidebarNavItem(
@@ -340,18 +355,19 @@ class _SidebarSectionGroup extends StatelessWidget {
               selected: currentSection == section,
               collapsed: collapsed,
               emphasis: emphasis,
-              favorite: favoriteDestinations.contains(section),
+              favorite: focusEntry != null && favoriteDestinations.contains(focusEntry),
               showFavoriteToggle:
                   !collapsed &&
+                  focusEntry != null &&
                   onToggleFavorite != null &&
-                  kAssistantNavigationDestinationCandidates.contains(section),
+                  kAssistantNavigationDestinationCandidates.contains(focusEntry),
               labelOverride: useHomeShortcut
                   ? appText('回到 APP首页', 'Back to app home')
                   : null,
-              onToggleFavorite: onToggleFavorite == null
+              onToggleFavorite: onToggleFavorite == null || focusEntry == null
                   ? null
                   : () async {
-                      await onToggleFavorite!(section);
+                      await onToggleFavorite!(focusEntry);
                     },
               onTap: useHomeShortcut && onOpenHome != null
                   ? onOpenHome!
@@ -580,6 +596,8 @@ class SidebarFooter extends StatelessWidget {
     required this.onOpenThemeToggle,
     required this.onOpenSettings,
     required this.showSettingsButton,
+    required this.favoriteDestinations,
+    this.onToggleFavorite,
     required this.sidebarState,
     required this.onCycleSidebarState,
     required this.onOpenAccount,
@@ -599,6 +617,8 @@ class SidebarFooter extends StatelessWidget {
   final VoidCallback onOpenThemeToggle;
   final VoidCallback onOpenSettings;
   final bool showSettingsButton;
+  final Set<AssistantFocusEntry> favoriteDestinations;
+  final Future<void> Function(AssistantFocusEntry entry)? onToggleFavorite;
   final AppSidebarState sidebarState;
   final VoidCallback onCycleSidebarState;
   final VoidCallback onOpenAccount;
@@ -628,12 +648,26 @@ class SidebarFooter extends StatelessWidget {
             compact: true,
             tooltip: appText('切换语言', 'Toggle language'),
             onPressed: onToggleLanguage,
+            favorite: favoriteDestinations.contains(AssistantFocusEntry.language),
+            showFavoriteToggle: onToggleFavorite != null,
+            favoriteButtonKey: const ValueKey<String>(
+              'sidebar-favorite-language',
+            ),
+            onToggleFavorite: onToggleFavorite == null
+                ? null
+                : () => onToggleFavorite!(AssistantFocusEntry.language),
           ),
           const SizedBox(height: 6),
           ChromeIconActionButton(
             icon: chromeThemeToggleIcon(themeMode),
             tooltip: themeToggleTooltip,
             onPressed: onOpenThemeToggle,
+            favorite: favoriteDestinations.contains(AssistantFocusEntry.theme),
+            showFavoriteToggle: onToggleFavorite != null,
+            favoriteButtonKey: const ValueKey<String>('sidebar-favorite-theme'),
+            onToggleFavorite: onToggleFavorite == null
+                ? null
+                : () => onToggleFavorite!(AssistantFocusEntry.theme),
           ),
           const SizedBox(height: AppSpacing.xs),
           if (showCollapseControl) ...[
@@ -702,6 +736,16 @@ class SidebarFooter extends StatelessWidget {
                 compact: false,
                 tooltip: appText('切换语言', 'Toggle language'),
                 onPressed: onToggleLanguage,
+                favorite: favoriteDestinations.contains(
+                  AssistantFocusEntry.language,
+                ),
+                showFavoriteToggle: onToggleFavorite != null,
+                favoriteButtonKey: const ValueKey<String>(
+                  'sidebar-favorite-language',
+                ),
+                onToggleFavorite: onToggleFavorite == null
+                    ? null
+                    : () => onToggleFavorite!(AssistantFocusEntry.language),
               ),
             ),
             const SizedBox(width: AppSpacing.xs),
@@ -709,6 +753,14 @@ class SidebarFooter extends StatelessWidget {
               icon: chromeThemeToggleIcon(themeMode),
               tooltip: themeToggleTooltip,
               onPressed: onOpenThemeToggle,
+              favorite: favoriteDestinations.contains(AssistantFocusEntry.theme),
+              showFavoriteToggle: onToggleFavorite != null,
+              favoriteButtonKey: const ValueKey<String>(
+                'sidebar-favorite-theme',
+              ),
+              onToggleFavorite: onToggleFavorite == null
+                  ? null
+                  : () => onToggleFavorite!(AssistantFocusEntry.theme),
             ),
             const SizedBox(width: AppSpacing.xs),
             if (showCollapseControl)
