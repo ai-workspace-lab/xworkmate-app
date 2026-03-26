@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
+import '../../app/ui_feature_manifest.dart';
 import '../../app/workspace_navigation.dart';
 import '../../app/app_metadata.dart';
 import '../../i18n/app_language.dart';
@@ -33,7 +34,35 @@ class _ModulesPageState extends State<ModulesPage> {
   late ModulesTab _tab;
 
   ModulesTab _normalizeTab(ModulesTab tab) {
-    return tab == ModulesTab.gateway ? ModulesTab.nodes : tab;
+    final normalized = tab == ModulesTab.gateway ? ModulesTab.nodes : tab;
+    if (_isTabVisible(normalized)) {
+      return normalized;
+    }
+    return ModulesTab.skills;
+  }
+
+  bool _isTabVisible(ModulesTab tab) {
+    if (tab == ModulesTab.clawHub) {
+      final features = widget.controller.featuresFor(UiFeaturePlatform.desktop);
+      return features.isEnabledPath(UiFeatureKeys.workspaceClawHub);
+    }
+    if (tab == ModulesTab.connectors) {
+      final features = widget.controller.featuresFor(UiFeaturePlatform.desktop);
+      return features.isEnabledPath(UiFeatureKeys.workspaceConnectors);
+    }
+    return true;
+  }
+
+  List<ModulesTab> get _visibleTabs => ModulesTab.values
+      .where((item) => item != ModulesTab.gateway)
+      .where(_isTabVisible)
+      .toList(growable: false);
+
+  ModulesTab _tabForLabel(String value) {
+    return _visibleTabs.firstWhere(
+      (item) => item.label == value,
+      orElse: () => ModulesTab.skills,
+    );
   }
 
   @override
@@ -124,16 +153,14 @@ class _ModulesPageState extends State<ModulesPage> {
                               ? null
                               : controller.selectedAgentId,
                         );
-                        await controller.connectorsController.refresh();
                         await controller.modelsController.refresh();
                         await controller.cronJobsController.refresh();
                       },
                       icon: const Icon(Icons.refresh_rounded),
                     ),
                     FilledButton.tonalIcon(
-                      onPressed: () => controller.openSettings(
-                        tab: SettingsTab.gateway,
-                      ),
+                      onPressed: () =>
+                          controller.openSettings(tab: SettingsTab.gateway),
                       icon: const Icon(Icons.add_rounded),
                       label: Text(appText('打开设置中心', 'Open Settings')),
                     ),
@@ -142,15 +169,10 @@ class _ModulesPageState extends State<ModulesPage> {
               ),
               const SizedBox(height: 24),
               SectionTabs(
-                items: ModulesTab.values
-                    .where((item) => item != ModulesTab.gateway)
-                    .map((item) => item.label)
-                    .toList(),
+                items: _visibleTabs.map((item) => item.label).toList(),
                 value: _tab.label,
                 onChanged: (value) => setState(() {
-                  _tab = ModulesTab.values.firstWhere(
-                    (item) => item.label == value,
-                  );
+                  _tab = _tabForLabel(value);
                   controller.openModules(tab: _tab);
                 }),
               ),
@@ -190,11 +212,11 @@ class _ModulesPageState extends State<ModulesPage> {
                   controller: controller,
                   onOpenDetail: widget.onOpenDetail,
                 ),
-                ModulesTab.clawHub => _FallbackHubPanel(
+                ModulesTab.clawHub => _SkillsPanel(
                   controller: controller,
                   onOpenDetail: widget.onOpenDetail,
                 ),
-                ModulesTab.connectors => _FallbackConnectorsPanel(
+                ModulesTab.connectors => _SkillsPanel(
                   controller: controller,
                   onOpenDetail: widget.onOpenDetail,
                 ),
@@ -465,25 +487,65 @@ class _SkillsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = controller.skills;
-    if (items.isEmpty) {
-      return SurfaceCard(
-        child: Text(
-          controller.connection.status == RuntimeConnectionStatus.connected
-              ? appText(
-                  '当前网关或代理没有加载技能。',
-                  'No skills loaded for the active gateway / agent.',
-                )
-              : appText(
-                  '连接 Gateway 后可加载技能。',
-                  'Connect a gateway to load skills.',
-                ),
-        ),
-      );
-    }
+    final currentMode = controller.currentAssistantExecutionTarget;
+    final modeCards = _buildModeCards(items, currentMode);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: items
-          .map(
+      children: [
+        SectionHeader(
+          title: appText('技能模式', 'Skill modes'),
+          subtitle: appText(
+            '用相同界面简洁区分单机智能体、本地 Gateway、远程 Gateway 三种模式，以及各自可用的技能包。',
+            'Keep the same page structure while separating single-agent, local gateway, and remote gateway skill packs.',
+          ),
+        ),
+        const SizedBox(height: 16),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth > 1220
+                ? (constraints.maxWidth - 32) / 3
+                : constraints.maxWidth > 760
+                ? (constraints.maxWidth - 16) / 2
+                : constraints.maxWidth;
+            return Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: modeCards
+                  .map(
+                    (card) => SizedBox(
+                      width: width,
+                      child: _SkillModeCard(data: card),
+                    ),
+                  )
+                  .toList(),
+            );
+          },
+        ),
+        const SizedBox(height: 24),
+        SectionHeader(
+          title: appText('技能明细', 'Skill details'),
+          subtitle: appText(
+            '保留当前运行时返回的原始技能列表，便于查看状态、来源和依赖。',
+            'Keep the raw runtime skill list for status, source, and dependency inspection.',
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (items.isEmpty)
+          SurfaceCard(
+            child: Text(
+              controller.connection.status == RuntimeConnectionStatus.connected
+                  ? appText(
+                      '当前网关或代理没有加载技能。',
+                      'No skills loaded for the active gateway / agent.',
+                    )
+                  : appText(
+                      '连接 Gateway 后可加载技能。',
+                      'Connect a gateway to load skills.',
+                    ),
+            ),
+          )
+        else
+          ...items.map(
             (skill) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: SurfaceCard(
@@ -574,230 +636,187 @@ class _SkillsPanel extends StatelessWidget {
                 ),
               ),
             ),
-          )
-          .toList(),
+          ),
+      ],
     );
+  }
+
+  List<_SkillModeCardData> _buildModeCards(
+    List<GatewaySkillSummary> items,
+    AssistantExecutionTarget currentMode,
+  ) {
+    final singleAgentSkills = items
+        .where((item) => _isSingleAgentSkill(item))
+        .toList(growable: false);
+    final gatewaySkills = items
+        .where((item) => !_isSingleAgentSkill(item))
+        .toList(growable: false);
+    return <_SkillModeCardData>[
+      _SkillModeCardData(
+        title: appText('单机智能体', 'Single agent'),
+        subtitle: appText(
+          '直接挂载本地 / 已授权目录中的技能包，适合个人工作区快速调用。',
+          'Mount local or authorized skill packs directly for fast personal workspace use.',
+        ),
+        icon: Icons.auto_awesome_rounded,
+        status: currentMode == AssistantExecutionTarget.singleAgent
+            ? StatusInfo(appText('当前模式', 'Current mode'), StatusTone.accent)
+            : StatusInfo(appText('可切换', 'Available'), StatusTone.success),
+        chips: [
+          for (final provider in controller.availableSingleAgentProviders)
+            provider.label,
+        ],
+        skills: singleAgentSkills.map((item) => item.name).toList(),
+        emptyLabel: appText(
+          '切换到单机智能体模式后，将显示本地技能包。',
+          'Switch to single-agent mode to inspect local skill packs.',
+        ),
+      ),
+      _SkillModeCardData(
+        title: appText('本地 Gateway', 'Local gateway'),
+        subtitle: appText(
+          '通过本地 OpenClaw Gateway 暴露运行时技能，适合本机节点与代理协作。',
+          'Expose runtime skill packs through the local OpenClaw Gateway for local nodes and agents.',
+        ),
+        icon: Icons.lan_rounded,
+        status: currentMode == AssistantExecutionTarget.local
+            ? StatusInfo(appText('当前模式', 'Current mode'), StatusTone.accent)
+            : StatusInfo(appText('可切换', 'Available'), StatusTone.success),
+        chips: <String>[
+          appText('节点协作', 'Node orchestration'),
+          appText('本机运行时', 'Local runtime'),
+        ],
+        skills: currentMode == AssistantExecutionTarget.local
+            ? gatewaySkills.map((item) => item.name).toList()
+            : const <String>[],
+        emptyLabel: appText(
+          '切换到本地 Gateway 模式后，将显示当前本地网关返回的技能包。',
+          'Switch to local gateway mode to inspect the active local runtime skill packs.',
+        ),
+      ),
+      _SkillModeCardData(
+        title: appText('远程 Gateway', 'Remote gateway'),
+        subtitle: appText(
+          '通过远程 Gateway 暴露团队或服务端技能，适合共享节点、代理与平台能力。',
+          'Expose team or hosted skill packs through the remote gateway for shared nodes, agents, and services.',
+        ),
+        icon: Icons.cloud_done_rounded,
+        status: currentMode == AssistantExecutionTarget.remote
+            ? StatusInfo(appText('当前模式', 'Current mode'), StatusTone.accent)
+            : StatusInfo(appText('可切换', 'Available'), StatusTone.success),
+        chips: <String>[
+          appText('团队共享', 'Team shared'),
+          appText('平台服务', 'Platform services'),
+        ],
+        skills: currentMode == AssistantExecutionTarget.remote
+            ? gatewaySkills.map((item) => item.name).toList()
+            : const <String>[],
+        emptyLabel: appText(
+          '切换到远程 Gateway 模式后，将显示当前远程网关返回的技能包。',
+          'Switch to remote gateway mode to inspect the active remote runtime skill packs.',
+        ),
+      ),
+    ];
+  }
+
+  bool _isSingleAgentSkill(GatewaySkillSummary item) {
+    const gatewaySources = <String>{'gateway', 'workspace', 'acp'};
+    return !gatewaySources.contains(item.source.trim().toLowerCase());
   }
 }
 
-class _FallbackHubPanel extends StatelessWidget {
-  const _FallbackHubPanel({
-    required this.controller,
-    required this.onOpenDetail,
+class _SkillModeCardData {
+  const _SkillModeCardData({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.status,
+    required this.chips,
+    required this.skills,
+    required this.emptyLabel,
   });
 
-  final AppController controller;
-  final ValueChanged<DetailPanelData> onOpenDetail;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final StatusInfo status;
+  final List<String> chips;
+  final List<String> skills;
+  final String emptyLabel;
+}
+
+class _SkillModeCard extends StatelessWidget {
+  const _SkillModeCard({required this.data});
+
+  final _SkillModeCardData data;
 
   @override
   Widget build(BuildContext context) {
-    final items = controller.models;
-    if (items.isEmpty) {
-      final hasAiGateway = controller.settings.aiGateway.baseUrl
-          .trim()
-          .isNotEmpty;
-      return SurfaceCard(
-        child: Text(
-          hasAiGateway
-              ? appText(
-                  '当前 LLM API 没有返回模型目录。',
-                  'No model catalog returned by the LLM API.',
-                )
-              : appText(
-                  '先在设置 -> 集成 中同步 LLM API 模型目录。',
-                  'Sync the LLM API model catalog from Settings -> Integrations.',
-                ),
-        ),
-      );
-    }
-    return Wrap(
-      spacing: 16,
-      runSpacing: 16,
-      children: items
-          .map(
-            (model) => SizedBox(
-              width: 360,
-              child: SurfaceCard(
-                onTap: () => onOpenDetail(
-                  DetailPanelData(
-                    title: model.name,
-                    subtitle: appText('模型', 'Model'),
-                    icon: Icons.psychology_alt_rounded,
-                    status: StatusInfo(model.provider, StatusTone.accent),
-                    description: appText(
-                      '来自 LLM API 的可用模型目录项。',
-                      'Model catalog entry exposed by the LLM API.',
-                    ),
-                    meta: [model.id, model.provider],
-                    actions: [appText('刷新', 'Refresh')],
-                    sections: [
-                      DetailSection(
-                        title: appText('能力', 'Capabilities'),
-                        items: [
-                          DetailItem(label: 'ID', value: model.id),
-                          DetailItem(
-                            label: appText('提供方', 'Provider'),
-                            value: model.provider,
-                          ),
-                          DetailItem(
-                            label: appText('上下文窗口', 'Context Window'),
-                            value: '${model.contextWindow ?? 0}',
-                          ),
-                          DetailItem(
-                            label: appText('最大输出', 'Max Output'),
-                            value: '${model.maxOutputTokens ?? 0}',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(radius: 20, child: Icon(data.icon, size: 20)),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      model.name,
-                      style: Theme.of(context).textTheme.titleLarge,
+                      data.title,
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    const SizedBox(height: 8),
-                    Text('${model.provider} · ${model.id}'),
+                    const SizedBox(height: 4),
+                    StatusBadge(status: data.status, compact: true),
                   ],
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(data.subtitle, style: Theme.of(context).textTheme.bodySmall),
+          if (data.chips.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: data.chips
+                  .map(
+                    (item) => Chip(
+                      label: Text(item),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  )
+                  .toList(),
             ),
-          )
-          .toList(),
+          ],
+          const SizedBox(height: 14),
+          Text(
+            appText('可用技能包', 'Available skill packs'),
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: 8),
+          if (data.skills.isEmpty)
+            Text(data.emptyLabel, style: Theme.of(context).textTheme.bodySmall)
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: data.skills
+                  .map(
+                    (item) => Chip(
+                      label: Text(item),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  )
+                  .toList(),
+            ),
+        ],
+      ),
     );
   }
-}
-
-class _FallbackConnectorsPanel extends StatelessWidget {
-  const _FallbackConnectorsPanel({
-    required this.controller,
-    required this.onOpenDetail,
-  });
-
-  final AppController controller;
-  final ValueChanged<DetailPanelData> onOpenDetail;
-
-  @override
-  Widget build(BuildContext context) {
-    final connectors = controller.connectors;
-    if (connectors.isEmpty) {
-      return SurfaceCard(
-        child: Text(
-          controller.connection.status == RuntimeConnectionStatus.connected
-              ? appText(
-                  '当前网关没有返回连接器状态。',
-                  'No connector status returned by the gateway.',
-                )
-              : appText(
-                  '连接 Gateway 后可加载连接器状态。',
-                  'Connect a gateway to load connector status.',
-                ),
-        ),
-      );
-    }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth > 1220
-            ? (constraints.maxWidth - 32) / 3
-            : constraints.maxWidth > 760
-            ? (constraints.maxWidth - 16) / 2
-            : constraints.maxWidth;
-        return Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          children: connectors
-              .map(
-                (connector) => SizedBox(
-                  width: width,
-                  child: SurfaceCard(
-                    onTap: () => onOpenDetail(
-                      DetailPanelData(
-                        title: connector.label,
-                        subtitle: 'Connector',
-                        icon: Icons.cable_rounded,
-                        status: _connectorStatus(connector),
-                        description:
-                            connector.lastError ?? connector.detailLabel,
-                        meta: [
-                          if (connector.accountName != null)
-                            connector.accountName!,
-                          ...connector.meta,
-                        ],
-                        actions: const ['Refresh'],
-                        sections: [
-                          DetailSection(
-                            title: 'Connector',
-                            items: [
-                              DetailItem(
-                                label: appText('状态', 'Status'),
-                                value: connector.status,
-                              ),
-                              DetailItem(
-                                label: appText('账号', 'Account'),
-                                value: connector.accountName ?? 'default',
-                              ),
-                              DetailItem(
-                                label: appText('配置', 'Configured'),
-                                value: '${connector.configured}',
-                              ),
-                              DetailItem(
-                                label: appText('连接中', 'Connected'),
-                                value: '${connector.connected}',
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                connector.label,
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                            ),
-                            StatusBadge(
-                              status: _connectorStatus(connector),
-                              compact: true,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          connector.accountName == null
-                              ? connector.detailLabel
-                              : '${connector.detailLabel} · ${connector.accountName}',
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-        );
-      },
-    );
-  }
-}
-
-StatusInfo _connectorStatus(GatewayConnectorSummary connector) {
-  return switch (connector.status) {
-    'error' => StatusInfo(appText('异常', 'Error'), StatusTone.danger),
-    'connected' => StatusInfo(appText('已连接', 'Connected'), StatusTone.success),
-    'running' => StatusInfo(appText('运行中', 'Running'), StatusTone.accent),
-    'configured' => StatusInfo(
-      appText('已配置', 'Configured'),
-      StatusTone.warning,
-    ),
-    _ => StatusInfo(appText('空闲', 'Idle'), StatusTone.neutral),
-  };
 }
 
 StatusInfo _connectionStatus(RuntimeConnectionStatus status) =>
