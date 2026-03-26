@@ -52,6 +52,7 @@ abstract final class UiFeatureKeys {
   static const workspaceAgents = 'workspace.agents';
   static const workspaceMcpServer = 'workspace.mcp_server';
   static const workspaceClawHub = 'workspace.claw_hub';
+  static const workspaceConnectors = 'workspace.connectors';
   static const workspaceAiGateway = 'workspace.ai_gateway';
   static const workspaceAccount = 'workspace.account';
 
@@ -184,10 +185,16 @@ mobile:
       description: Mobile workspace MCP launcher
       ui_surface: mobile_workspace_hub
     claw_hub:
-      enabled: true
-      release_tier: stable
+      enabled: false
+      release_tier: experimental
       build_modes: [debug, profile, release]
       description: Mobile workspace ClawHub launcher
+      ui_surface: mobile_workspace_hub
+    connectors:
+      enabled: false
+      release_tier: experimental
+      build_modes: [debug, profile, release]
+      description: Mobile workspace connectors launcher
       ui_surface: mobile_workspace_hub
     ai_gateway:
       enabled: true
@@ -363,8 +370,8 @@ desktop:
       description: Desktop MCP Hub destination
       ui_surface: sidebar_navigation
     claw_hub:
-      enabled: true
-      release_tier: stable
+      enabled: false
+      release_tier: experimental
       build_modes: [debug, profile, release]
       description: Desktop ClawHub destination
       ui_surface: sidebar_navigation
@@ -392,6 +399,19 @@ desktop:
       build_modes: [debug, profile, release]
       description: Desktop account destination
       ui_surface: sidebar_navigation
+  workspace:
+    claw_hub:
+      enabled: false
+      release_tier: experimental
+      build_modes: [debug, profile, release]
+      description: Desktop workspace ClawHub tab
+      ui_surface: modules_page
+    connectors:
+      enabled: false
+      release_tier: experimental
+      build_modes: [debug, profile, release]
+      description: Desktop workspace connectors tab
+      ui_surface: modules_page
   assistant:
     direct_ai:
       enabled: true
