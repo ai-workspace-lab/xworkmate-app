@@ -412,6 +412,7 @@ class AppController extends ChangeNotifier {
       configuredCodeAgentRuntimeMode;
   CodexCooperationState get codexCooperationState => _codexCooperationState;
   bool get isMultiAgentRunPending => _multiAgentRunPending;
+  bool get _showsSingleAgentRuntimeDebugMessages => settings.experimentalDebug;
   bool _desktopPlatformBusy = false;
 
   static const String _draftAiGatewayApiKeyKey = 'ai_gateway_api_key';
@@ -3651,19 +3652,9 @@ class AppController extends ChangeNotifier {
         final provider = resolution.resolvedProvider;
         if (provider == null) {
           if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
-            _appendAssistantThreadMessage(
+            _appendSingleAgentFallbackStatusMessage(
               sessionKey,
-              GatewayChatMessage(
-                id: _nextLocalMessageId(),
-                role: 'assistant',
-                text: _singleAgentFallbackLabel(resolution.fallbackReason),
-                timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-                toolCallId: null,
-                toolName: 'AI Chat fallback',
-                stopReason: null,
-                pending: false,
-                error: false,
-              ),
+              resolution.fallbackReason,
             );
             await _sendAiGatewayMessage(
               message,
@@ -3685,7 +3676,9 @@ class AppController extends ChangeNotifier {
                 ),
                 timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
                 toolCallId: null,
-                toolName: provider?.label ?? selection.label,
+                toolName: _singleAgentRuntimeDebugToolName(
+                  provider?.label ?? selection.label,
+                ),
                 stopReason: null,
                 pending: false,
                 error: false,
@@ -3695,23 +3688,7 @@ class AppController extends ChangeNotifier {
           return;
         }
 
-        _appendAssistantThreadMessage(
-          sessionKey,
-          GatewayChatMessage(
-            id: _nextLocalMessageId(),
-            role: 'assistant',
-            text: appText(
-              '单机智能体已切换到 ${provider.label} 执行当前任务。',
-              'Single Agent is using ${provider.label} for this task.',
-            ),
-            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-            toolCallId: null,
-            toolName: provider.label,
-            stopReason: null,
-            pending: false,
-            error: false,
-          ),
-        );
+        _appendSingleAgentRuntimeStatusMessage(sessionKey, provider);
         _singleAgentExternalCliPendingSessionKeys.add(sessionKey);
 
         final result = await _singleAgentRunner.run(
@@ -3760,21 +3737,9 @@ class AppController extends ChangeNotifier {
         }
         if (result.shouldFallbackToAiChat) {
           if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
-            _appendAssistantThreadMessage(
+            _appendSingleAgentFallbackStatusMessage(
               sessionKey,
-              GatewayChatMessage(
-                id: _nextLocalMessageId(),
-                role: 'assistant',
-                text: _singleAgentFallbackLabel(
-                  result.fallbackReason ?? result.errorMessage,
-                ),
-                timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-                toolCallId: null,
-                toolName: 'AI Chat fallback',
-                stopReason: null,
-                pending: false,
-                error: false,
-              ),
+              result.fallbackReason ?? result.errorMessage,
             );
             await _sendAiGatewayMessage(
               message,
@@ -3796,7 +3761,7 @@ class AppController extends ChangeNotifier {
                 ),
                 timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
                 toolCallId: null,
-                toolName: provider.label,
+                toolName: _singleAgentRuntimeDebugToolName(provider.label),
                 stopReason: null,
                 pending: false,
                 error: false,
@@ -4205,6 +4170,66 @@ class AppController extends ChangeNotifier {
       stopReason: null,
       pending: false,
       error: true,
+    );
+  }
+
+  String? _singleAgentRuntimeDebugToolName(String label) {
+    if (!_showsSingleAgentRuntimeDebugMessages) {
+      return null;
+    }
+    final trimmed = label.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return trimmed;
+  }
+
+  void _appendSingleAgentRuntimeStatusMessage(
+    String sessionKey,
+    SingleAgentProvider provider,
+  ) {
+    if (!_showsSingleAgentRuntimeDebugMessages) {
+      return;
+    }
+    _appendAssistantThreadMessage(
+      sessionKey,
+      GatewayChatMessage(
+        id: _nextLocalMessageId(),
+        role: 'assistant',
+        text: appText(
+          '单机智能体已切换到 ${provider.label} 执行当前任务。',
+          'Single Agent is using ${provider.label} for this task.',
+        ),
+        timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        toolCallId: null,
+        toolName: provider.label,
+        stopReason: null,
+        pending: false,
+        error: false,
+      ),
+    );
+  }
+
+  void _appendSingleAgentFallbackStatusMessage(
+    String sessionKey,
+    String? reason,
+  ) {
+    if (!_showsSingleAgentRuntimeDebugMessages) {
+      return;
+    }
+    _appendAssistantThreadMessage(
+      sessionKey,
+      GatewayChatMessage(
+        id: _nextLocalMessageId(),
+        role: 'assistant',
+        text: _singleAgentFallbackLabel(reason),
+        timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        toolCallId: null,
+        toolName: 'AI Chat fallback',
+        stopReason: null,
+        pending: false,
+        error: false,
+      ),
     );
   }
 

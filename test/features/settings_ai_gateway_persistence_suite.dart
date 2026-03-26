@@ -65,6 +65,8 @@ void main() {
 
       await tester.tap(find.text('集成'));
       await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('LLM 接入点'));
+      await tester.pump(const Duration(milliseconds: 300));
 
       await tester.enterText(
         find.byKey(const ValueKey('ai-gateway-name-field')),
