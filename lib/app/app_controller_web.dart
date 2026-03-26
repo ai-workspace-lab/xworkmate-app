@@ -2181,6 +2181,53 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  Map<String, dynamic> desktopStatusSnapshot() {
+    final pausedTasks = _tasksController.scheduled
+        .where((item) => item.status == 'Disabled')
+        .length;
+    final timedOutTasks = _tasksController.failed
+        .where(_looksLikeTimedOutTask)
+        .length;
+    final failedTasks = _tasksController.failed.length;
+    final queuedTasks = _tasksController.queue.length;
+    final runningTasks = _tasksController.running.length;
+    final scheduledTasks = _tasksController.scheduled.length;
+    final badgeCount = runningTasks + pausedTasks + timedOutTasks;
+    return <String, dynamic>{
+      'connectionStatus': _desktopConnectionStatusValue(connection.status),
+      'connectionLabel': connection.status.label,
+      'runningTasks': runningTasks,
+      'pausedTasks': pausedTasks,
+      'timedOutTasks': timedOutTasks,
+      'queuedTasks': queuedTasks,
+      'scheduledTasks': scheduledTasks,
+      'failedTasks': failedTasks,
+      'totalTasks': _tasksController.totalCount,
+      'badgeCount': badgeCount > 0 ? badgeCount : runningTasks + queuedTasks,
+    };
+  }
+
+  bool _looksLikeTimedOutTask(DerivedTaskItem item) {
+    final haystack = '${item.status} ${item.title} ${item.summary}'
+        .toLowerCase();
+    return haystack.contains('timed out') ||
+        haystack.contains('timeout') ||
+        haystack.contains('超时');
+  }
+
+  String _desktopConnectionStatusValue(RuntimeConnectionStatus status) {
+    switch (status) {
+      case RuntimeConnectionStatus.connected:
+        return 'connected';
+      case RuntimeConnectionStatus.connecting:
+        return 'connecting';
+      case RuntimeConnectionStatus.error:
+        return 'error';
+      case RuntimeConnectionStatus.offline:
+        return 'disconnected';
+    }
+  }
+
   Future<void> selectDirectModel(String model) async {
     final trimmed = model.trim();
     if (trimmed.isEmpty) {
