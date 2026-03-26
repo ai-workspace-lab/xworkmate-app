@@ -30,7 +30,7 @@ void main() {
       addTearDown(() async {
         await server.close();
         if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
+          await _deleteDirectoryWithRetry(tempDirectory);
         }
       });
 
@@ -186,7 +186,7 @@ void main() {
     addTearDown(() async {
       await server.close();
       if (await tempDirectory.exists()) {
-        await tempDirectory.delete(recursive: true);
+        await _deleteDirectoryWithRetry(tempDirectory);
       }
     });
 
@@ -256,7 +256,7 @@ void main() {
       addTearDown(() async {
         await server.close();
         if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
+          await _deleteDirectoryWithRetry(tempDirectory);
         }
       });
 
@@ -332,7 +332,7 @@ void main() {
       );
       addTearDown(() async {
         if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
+          await _deleteDirectoryWithRetry(tempDirectory);
         }
       });
 
@@ -386,7 +386,81 @@ void main() {
         isTrue,
       );
       expect(
+        controller.chatMessages.any(
+          (message) =>
+              message.text.contains('单机智能体已切换到') ||
+              message.text.contains('Single Agent is using'),
+        ),
+        isFalse,
+      );
+      expect(
         controller.chatMessages.any((message) => message.toolName == 'Codex'),
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'AppController shows Single Agent runtime status only when debug runtime is enabled',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-single-agent-provider-debug-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await _deleteDirectoryWithRetry(tempDirectory);
+        }
+      });
+
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final runner = _FakeSingleAgentRunner(
+        resolvedProvider: SingleAgentProvider.codex,
+        result: const SingleAgentRunResult(
+          provider: SingleAgentProvider.codex,
+          output: 'CODEX_REPLY',
+          success: true,
+          errorMessage: '',
+          shouldFallbackToAiChat: false,
+          resolvedModel: 'codex-sonnet',
+        ),
+      );
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: _FakeGatewayRuntime(store: store),
+          codex: _FakeCodexRuntime(),
+        ),
+        singleAgentRunner: runner,
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      await controller.saveSettings(
+        controller.settings.copyWith(experimentalDebug: true),
+        refreshAfterSave: false,
+      );
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+
+      await controller.sendChatMessage('请输出 CODEX_REPLY', thinking: 'low');
+
+      expect(
+        controller.chatMessages.any(
+          (message) =>
+              message.toolName == 'Codex' &&
+              (message.text.contains('单机智能体已切换到') ||
+                  message.text.contains('Single Agent is using')),
+        ),
         isTrue,
       );
     },
@@ -405,7 +479,7 @@ void main() {
       addTearDown(() async {
         await server.close();
         if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
+          await _deleteDirectoryWithRetry(tempDirectory);
         }
       });
 
@@ -484,7 +558,7 @@ void main() {
       addTearDown(() async {
         await server.close();
         if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
+          await _deleteDirectoryWithRetry(tempDirectory);
         }
       });
 
@@ -533,11 +607,15 @@ void main() {
       expect(server.requestCount, 1);
       expect(
         controller.chatMessages.any(
-          (message) =>
-              message.toolName == 'AI Chat fallback' &&
-              message.text.contains('Codex CLI is unavailable'),
+          (message) => message.text.contains('Codex CLI is unavailable'),
         ),
-        isTrue,
+        isFalse,
+      );
+      expect(
+        controller.chatMessages.any(
+          (message) => message.toolName == 'AI Chat fallback',
+        ),
+        isFalse,
       );
       expect(
         controller.chatMessages.any(
@@ -566,7 +644,7 @@ void main() {
       await threadWorkspace.create(recursive: true);
       addTearDown(() async {
         if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
+          await _deleteDirectoryWithRetry(tempDirectory);
         }
       });
 
@@ -644,7 +722,7 @@ void main() {
       await defaultWorkspace.create(recursive: true);
       addTearDown(() async {
         if (await tempDirectory.exists()) {
-          await tempDirectory.delete(recursive: true);
+          await _deleteDirectoryWithRetry(tempDirectory);
         }
       });
 
@@ -712,6 +790,23 @@ void main() {
       );
     },
   );
+}
+
+Future<void> _deleteDirectoryWithRetry(Directory directory) async {
+  for (var attempt = 0; attempt < 5; attempt += 1) {
+    if (!await directory.exists()) {
+      return;
+    }
+    try {
+      await directory.delete(recursive: true);
+      return;
+    } on FileSystemException {
+      if (attempt == 4) {
+        rethrow;
+      }
+      await Future<void>.delayed(Duration(milliseconds: 80 * (attempt + 1)));
+    }
+  }
 }
 
 class _FakeGatewayRuntime extends GatewayRuntime {

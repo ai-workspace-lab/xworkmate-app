@@ -42,11 +42,16 @@ void main() {
       capabilities.allowedDestinations,
       equals(<WorkspaceDestination>{
         WorkspaceDestination.assistant,
+        WorkspaceDestination.tasks,
+        WorkspaceDestination.skills,
+        WorkspaceDestination.nodes,
+        WorkspaceDestination.secrets,
+        WorkspaceDestination.aiGateway,
         WorkspaceDestination.settings,
       }),
     );
-    expect(capabilities.supportsFileAttachments, isFalse);
-    expect(capabilities.supportsLocalGateway, isFalse);
+    expect(capabilities.supportsFileAttachments, isTrue);
+    expect(capabilities.supportsLocalGateway, isTrue);
     expect(capabilities.supportsRelayGateway, isTrue);
     expect(capabilities.supportsDesktopRuntime, isFalse);
     expect(capabilities.supportsDiagnostics, isFalse);
@@ -83,6 +88,7 @@ void main() {
       webAccess.availableExecutionTargets,
       equals(<AssistantExecutionTarget>[
         AssistantExecutionTarget.singleAgent,
+        AssistantExecutionTarget.local,
         AssistantExecutionTarget.remote,
       ]),
     );
