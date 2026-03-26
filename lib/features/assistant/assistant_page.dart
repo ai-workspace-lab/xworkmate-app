@@ -1604,17 +1604,9 @@ class _AssistantSideTabRail extends StatelessWidget {
       key: const Key('assistant-side-pane'),
       width: 46,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            palette.chromeHighlight.withValues(alpha: 0.96),
-            palette.chromeSurface,
-          ],
-        ),
+        color: palette.chromeSurface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: palette.chromeStroke),
-        boxShadow: [palette.chromeShadowAmbient],
+        border: Border.all(color: palette.strokeSoft),
       ),
       child: Column(
         children: [
@@ -1636,7 +1628,7 @@ class _AssistantSideTabRail extends StatelessWidget {
           ),
           if (favoriteDestinations.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Container(width: 24, height: 1, color: palette.chromeStroke),
+            Container(width: 24, height: 1, color: palette.strokeSoft),
             const SizedBox(height: 4),
             Expanded(
               child: SingleChildScrollView(
@@ -1673,9 +1665,9 @@ class _AssistantSideTabRail extends StatelessWidget {
                 : appText('收起侧板', 'Collapse side pane'),
             onPressed: onToggleCollapsed,
             style: IconButton.styleFrom(
-              backgroundColor: palette.chromeSurface,
+              backgroundColor: palette.surfacePrimary,
               foregroundColor: palette.textSecondary,
-              side: BorderSide(color: palette.chromeStroke),
+              side: BorderSide(color: palette.strokeSoft),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -1734,30 +1726,17 @@ class _AssistantSideTabButtonState extends State<_AssistantSideTabButton> {
               width: 34,
               height: 34,
               decoration: BoxDecoration(
-                gradient: widget.selected || _hovered
-                    ? LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          palette.chromeHighlight.withValues(
-                            alpha: widget.selected ? 0.96 : 0.84,
-                          ),
-                          widget.selected
-                              ? palette.chromeSurface
-                              : palette.chromeSurfacePressed,
-                        ],
-                      )
-                    : null,
-                color: widget.selected || _hovered ? null : Colors.transparent,
+                color: widget.selected
+                    ? palette.surfacePrimary
+                    : _hovered
+                    ? palette.surfaceSecondary
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: widget.selected || _hovered
-                      ? palette.chromeStroke
+                      ? palette.strokeSoft
                       : Colors.transparent,
                 ),
-                boxShadow: widget.selected
-                    ? [palette.chromeShadowLift]
-                    : const [],
               ),
               child: Icon(
                 widget.icon,
@@ -1903,22 +1882,20 @@ class _ConversationArea extends StatelessWidget {
       children: [
         Padding(
           padding: EdgeInsets.fromLTRB(10, 8, 10 + topTrailingInset, 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Spacer(),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _MessageViewModeChip(
-                    value: messageViewMode,
-                    onSelected: onMessageViewModeChanged,
-                  ),
-                  const SizedBox(width: 6),
-                  _ConnectionChip(controller: controller),
-                ],
-              ),
-            ],
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              alignment: WrapAlignment.end,
+              children: [
+                _MessageViewModeChip(
+                  value: messageViewMode,
+                  onSelected: onMessageViewModeChanged,
+                ),
+                _ConnectionChip(controller: controller),
+              ],
+            ),
           ),
         ),
         Divider(height: 1, color: palette.strokeSoft),
@@ -3248,16 +3225,16 @@ class _ComposerBarState extends State<_ComposerBar> {
                   decoration: InputDecoration(
                     isCollapsed: true,
                     filled: true,
-                    fillColor: palette.chromeSurface,
+                    fillColor: palette.surfacePrimary,
                     contentPadding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: palette.chromeStroke),
+                      borderSide: BorderSide(color: palette.strokeSoft),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(
-                        color: palette.accent.withValues(alpha: 0.18),
+                        color: palette.accent.withValues(alpha: 0.24),
                       ),
                     ),
                     hintText: appText(
@@ -3522,19 +3499,9 @@ class _ComposerIconButtonState extends State<_ComposerIconButton> {
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              palette.chromeHighlight.withValues(alpha: _hovered ? 0.94 : 0.88),
-              _hovered ? palette.chromeSurfacePressed : palette.chromeSurface,
-            ],
-          ),
+          color: _hovered ? palette.surfaceSecondary : palette.surfacePrimary,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: palette.chromeStroke),
-          boxShadow: [
-            _hovered ? palette.chromeShadowLift : palette.chromeShadowAmbient,
-          ],
+          border: Border.all(color: palette.strokeSoft),
         ),
         child: Icon(widget.icon, size: 18, color: palette.textMuted),
       ),
@@ -3580,21 +3547,9 @@ class _ComposerToolbarChipState extends State<_ComposerToolbarChip> {
         child: Container(
           padding: widget.padding,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                palette.chromeHighlight.withValues(
-                  alpha: _hovered ? 0.94 : 0.88,
-                ),
-                _hovered ? palette.chromeSurfacePressed : palette.chromeSurface,
-              ],
-            ),
+            color: _hovered ? palette.surfaceSecondary : palette.surfacePrimary,
             borderRadius: BorderRadius.circular(AppRadius.chip),
-            border: Border.all(color: palette.chromeStroke),
-            boxShadow: [
-              _hovered ? palette.chromeShadowLift : palette.chromeShadowAmbient,
-            ],
+            border: Border.all(color: palette.strokeSoft),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -3654,12 +3609,12 @@ class _SingleAgentProviderBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: isAuto
             ? palette.accent.withValues(alpha: 0.16)
-            : palette.chromeSurfacePressed,
+            : palette.surfaceSecondary,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color: isAuto
               ? palette.accent.withValues(alpha: 0.4)
-              : palette.chromeStroke,
+              : palette.strokeSoft,
         ),
       ),
       child: Text(
@@ -3719,33 +3674,38 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = context.palette;
-    final borderColor = switch (tone) {
-      _BubbleTone.user => theme.colorScheme.primary.withValues(alpha: 0.10),
-      _BubbleTone.agent => theme.colorScheme.tertiary.withValues(alpha: 0.10),
-      _BubbleTone.assistant => palette.surfaceSecondary,
+    final backgroundColor = switch (tone) {
+      _BubbleTone.user => palette.surfaceSecondary,
+      _BubbleTone.agent => palette.surfaceTertiary.withValues(alpha: 0.78),
+      _BubbleTone.assistant => palette.surfacePrimary,
+    };
+    final labelColor = switch (tone) {
+      _BubbleTone.user => palette.textSecondary,
+      _BubbleTone.agent => palette.success,
+      _BubbleTone.assistant => palette.textMuted,
     };
 
     return Align(
-      alignment: alignRight ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 760),
         child: Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
           decoration: BoxDecoration(
-            color: alignRight ? palette.accentMuted : palette.surfacePrimary,
+            color: backgroundColor,
             borderRadius: BorderRadius.circular(AppRadius.card),
-            boxShadow: [
-              BoxShadow(
-                color: borderColor.withValues(alpha: 0.24),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            border: Border.all(color: palette.strokeSoft),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: theme.textTheme.labelLarge),
+              Text(
+                label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: labelColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: 4),
               _MessageBubbleBody(
                 text: text.isEmpty ? appText('暂无内容。', 'No content yet.') : text,
@@ -3793,6 +3753,7 @@ class _MessageBubbleBodyState extends State<_MessageBubbleBody> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final palette = context.palette;
     if (!widget.renderMarkdown) {
       final parsed = _PromptDebugSnapshot.fromMessage(widget.text);
       final canCompactMetadata =
@@ -3883,7 +3844,19 @@ class _MessageBubbleBodyState extends State<_MessageBubbleBody> {
     final styleSheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
       p: theme.textTheme.bodyLarge?.copyWith(
         color: theme.colorScheme.onSurface,
-        height: 1.45,
+        height: 1.55,
+      ),
+      h1: theme.textTheme.headlineSmall?.copyWith(
+        fontWeight: FontWeight.w600,
+        color: palette.textPrimary,
+      ),
+      h2: theme.textTheme.titleMedium?.copyWith(
+        fontWeight: FontWeight.w600,
+        color: palette.textPrimary,
+      ),
+      h3: theme.textTheme.titleSmall?.copyWith(
+        fontWeight: FontWeight.w600,
+        color: palette.textPrimary,
       ),
       code: theme.textTheme.bodyMedium?.copyWith(
         fontFamily: 'Menlo',
@@ -3892,10 +3865,12 @@ class _MessageBubbleBodyState extends State<_MessageBubbleBody> {
       codeblockDecoration: BoxDecoration(
         color: context.palette.surfaceSecondary,
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.palette.strokeSoft),
       ),
       blockquoteDecoration: BoxDecoration(
         color: context.palette.surfaceSecondary.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.palette.strokeSoft),
       ),
       blockquotePadding: const EdgeInsets.symmetric(
         horizontal: 10,
@@ -4116,14 +4091,8 @@ class _TaskStatusCard extends StatelessWidget {
             padding: const EdgeInsets.all(AppSpacing.sm),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppRadius.card),
-              color: palette.surfacePrimary,
-              boxShadow: [
-                BoxShadow(
-                  color: palette.shadow.withValues(alpha: 0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              color: palette.surfaceSecondary.withValues(alpha: 0.82),
+              border: Border.all(color: palette.strokeSoft),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -4245,15 +4214,9 @@ class _ToolCallTileState extends State<_ToolCallTile> {
         constraints: const BoxConstraints(maxWidth: 760),
         child: Container(
           decoration: BoxDecoration(
-            color: palette.surfacePrimary,
+            color: palette.surfaceSecondary.withValues(alpha: 0.82),
             borderRadius: BorderRadius.circular(AppRadius.card),
-            boxShadow: [
-              BoxShadow(
-                color: palette.shadow.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            border: Border.all(color: palette.strokeSoft),
           ),
           child: Column(
             children: [
@@ -4380,13 +4343,7 @@ class _StatusPill extends StatelessWidget {
             backgroundColor ??
             Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.badge),
-        boxShadow: [
-          BoxShadow(
-            color: context.palette.shadow.withValues(alpha: 0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: context.palette.strokeSoft),
       ),
       child: Text(
         label,
@@ -4430,13 +4387,7 @@ class _ConnectionChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(AppRadius.chip),
-        boxShadow: [
-          BoxShadow(
-            color: context.palette.shadow.withValues(alpha: 0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: context.palette.strokeSoft),
       ),
       child: Text(
         '${controller.assistantConnectionStatusLabel} · ${controller.assistantConnectionTargetLabel}',
@@ -4482,13 +4433,7 @@ class _MessageViewModeChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: palette.surfaceSecondary,
           borderRadius: BorderRadius.circular(AppRadius.chip),
-          boxShadow: [
-            BoxShadow(
-              color: palette.shadow.withValues(alpha: 0.03),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: Border.all(color: palette.strokeSoft),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -4725,13 +4670,7 @@ class _MetaPill extends StatelessWidget {
           decoration: BoxDecoration(
             color: palette.surfaceSecondary,
             borderRadius: BorderRadius.circular(999),
-            boxShadow: [
-              BoxShadow(
-                color: palette.shadow.withValues(alpha: 0.03),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            border: Border.all(color: palette.strokeSoft),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -5084,13 +5023,7 @@ class _SkillPickerPopover extends StatelessWidget {
             color: palette.surfacePrimary,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: palette.strokeSoft),
-            boxShadow: [
-              BoxShadow(
-                color: palette.shadow.withValues(alpha: 0.16),
-                blurRadius: 24,
-                offset: const Offset(0, 12),
-              ),
-            ],
+            boxShadow: [palette.chromeShadowAmbient],
           ),
           child: Column(
             children: [
@@ -5213,13 +5146,7 @@ class _SkillPickerTile extends StatelessWidget {
                   ? palette.surfaceSecondary
                   : palette.surfacePrimary,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: palette.shadow.withValues(alpha: 0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              border: Border.all(color: palette.strokeSoft),
             ),
             child: Row(
               children: [

@@ -340,32 +340,10 @@ class _MobileShellState extends State<MobileShell> {
               );
         final detailPanel = widget.controller.detailPanel;
         final palette = context.palette;
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-
         return Scaffold(
           backgroundColor: palette.canvas,
           body: Stack(
             children: [
-              Positioned(
-                top: 100,
-                left: -80,
-                child: _GlowOrb(
-                  size: 180,
-                  color: palette.accentMuted.withValues(
-                    alpha: isDark ? 0.22 : 0.42,
-                  ),
-                ),
-              ),
-              Positioned(
-                right: -90,
-                bottom: 220,
-                child: _GlowOrb(
-                  size: 210,
-                  color: palette.chromeHighlight.withValues(
-                    alpha: isDark ? 0.12 : 0.28,
-                  ),
-                ),
-              ),
               SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
@@ -384,18 +362,8 @@ class _MobileShellState extends State<MobileShell> {
                           ),
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  palette.chromeHighlight.withValues(
-                                    alpha: isDark ? 0.14 : 0.72,
-                                  ),
-                                  palette.chromeSurface.withValues(alpha: 0.94),
-                                ],
-                              ),
-                              border: Border.all(color: palette.chromeStroke),
-                              boxShadow: [palette.chromeShadowAmbient],
+                              color: palette.chromeSurface,
+                              border: Border.all(color: palette.strokeSoft),
                             ),
                             child: AnimatedSwitcher(
                               duration: const Duration(milliseconds: 220),
@@ -1508,17 +1476,9 @@ class _WorkspaceHero extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            palette.chromeHighlight.withValues(alpha: 0.86),
-            palette.surfacePrimary.withValues(alpha: 0.94),
-          ],
-        ),
+        color: palette.surfacePrimary,
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(color: palette.strokeSoft),
-        boxShadow: [palette.chromeShadowAmbient],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1629,14 +1589,7 @@ class _WorkspaceShortcutCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                palette.chromeHighlight.withValues(alpha: 0.84),
-                palette.surfacePrimary.withValues(alpha: 0.94),
-              ],
-            ),
+            color: palette.surfacePrimary,
             borderRadius: BorderRadius.circular(AppRadius.card),
             border: Border.all(color: palette.strokeSoft),
           ),
@@ -1745,7 +1698,6 @@ class _BottomPillNav extends StatelessWidget {
         color: palette.surfacePrimary.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(AppRadius.dialog),
         border: Border.all(color: palette.strokeSoft),
-        boxShadow: [palette.chromeShadowAmbient],
       ),
       child: Row(
         children: tabs
@@ -1794,22 +1746,6 @@ class _BottomPillNav extends StatelessWidget {
             )
             .toList(),
       ),
-    );
-  }
-}
-
-class _GlowOrb extends StatelessWidget {
-  const _GlowOrb({required this.size, required this.color});
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 }
