@@ -72,13 +72,18 @@ class AppController extends ChangeNotifier {
   static const List<_SingleAgentSkillScanRoot>
   _defaultSingleAgentGlobalSkillScanRoots = <_SingleAgentSkillScanRoot>[
     _SingleAgentSkillScanRoot(
-      path: '/etc/skills',
-      source: 'system',
-      scope: 'system',
-    ),
-    _SingleAgentSkillScanRoot(
       path: '~/.agents/skills',
       source: 'agents',
+      scope: 'user',
+    ),
+    _SingleAgentSkillScanRoot(
+      path: '~/.codex/skills',
+      source: 'codex',
+      scope: 'user',
+    ),
+    _SingleAgentSkillScanRoot(
+      path: '~/.workbuddy/skills',
+      source: 'workbuddy',
       scope: 'user',
     ),
   ];
@@ -4427,6 +4432,12 @@ class AppController extends ChangeNotifier {
     }
     if (path == '~/.agents/skills' || path.endsWith('/.agents/skills')) {
       return 'agents';
+    }
+    if (path == '~/.codex/skills' || path.endsWith('/.codex/skills')) {
+      return 'codex';
+    }
+    if (path == '~/.workbuddy/skills' || path.endsWith('/.workbuddy/skills')) {
+      return 'workbuddy';
     }
     return 'custom';
   }
