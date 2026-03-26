@@ -38,6 +38,7 @@ const double _assistantCollapsedArtifactToggleClearance = 56;
 const double _assistantComposerSafeAreaGap = 8;
 const double _assistantComposerBaseHeightCompact = 192;
 const double _assistantComposerBaseHeightTall = 216;
+const int _assistantTaskActionMaxRetryCount = 5;
 
 typedef AssistantClipboardImageReader = Future<XFile?> Function();
 
@@ -85,11 +86,8 @@ class _AssistantPageState extends State<AssistantPage> {
       <String, _AssistantTaskSeed>{};
   final Set<String> _archivedTaskKeys = <String>{};
   List<_ComposerAttachment> _attachments = const <_ComposerAttachment>[];
-  String? _lastSubmittedPrompt;
-  String? _lastSubmittedSessionKey;
   String? _lastAutoAgentLabel;
   String _lastConversationScrollSignature = '';
-  List<String> _lastSubmittedAttachments = const <String>[];
   double _composerInputHeight = _assistantComposerDefaultInputHeight;
   double _workspaceLowerPaneHeightAdjustment = 0;
   bool _artifactPaneCollapsed = true;
@@ -233,12 +231,9 @@ class _AssistantPageState extends State<AssistantPage> {
                               _threadQuery = '';
                             });
                           },
-                          onRefreshTasks: controller.refreshSessions,
+                          onRefreshTasks: _refreshTasksWithRetry,
                           onCreateTask: _createNewThread,
-                          onSelectTask: (sessionKey) async {
-                            await controller.switchSession(sessionKey);
-                            _focusComposer();
-                          },
+                          onSelectTask: _switchSessionWithRetry,
                           onArchiveTask: _archiveTask,
                           onRenameTask: _renameTask,
                         ),
@@ -358,12 +353,9 @@ class _AssistantPageState extends State<AssistantPage> {
                           _threadQuery = '';
                         });
                       },
-                      onRefreshTasks: controller.refreshSessions,
+                      onRefreshTasks: _refreshTasksWithRetry,
                       onCreateTask: _createNewThread,
-                      onSelectTask: (sessionKey) async {
-                        await controller.switchSession(sessionKey);
-                        _focusComposer();
-                      },
+                      onSelectTask: _switchSessionWithRetry,
                       onArchiveTask: _archiveTask,
                       onRenameTask: _renameTask,
                     ),
@@ -715,51 +707,6 @@ class _AssistantPageState extends State<AssistantPage> {
       }
     }
 
-    final hasPendingTask =
-        controller.hasAssistantPendingRun || controller.activeRunId != null;
-    final lastMessage = messages.isEmpty ? null : messages.last;
-    final lastRole = lastMessage?.role.toLowerCase();
-    if (_lastSubmittedPrompt != null &&
-        _sessionKeysMatch(
-          _lastSubmittedSessionKey ?? '',
-          controller.currentSessionKey,
-        )) {
-      final status = hasPendingTask
-          ? 'running'
-          : (lastMessage?.error ?? false)
-          ? 'failed'
-          : (lastRole == 'user' ? 'queued' : 'open');
-      items.add(
-        _TimelineItem.taskCard(
-          title: _lastSubmittedPrompt!,
-          status: status,
-          summary: switch (status) {
-            'queued' => appText('已提交到任务队列', 'Submitted to the task queue'),
-            'running' => appText(
-              '正在由 ${_lastAutoAgentLabel ?? ownerLabel} 执行',
-              'Executing with ${_lastAutoAgentLabel ?? ownerLabel}',
-            ),
-            'failed' => appText(
-              '这次执行返回了错误',
-              'This execution returned an error',
-            ),
-            _ => appText(
-              '本轮已回复，可继续在当前线程处理',
-              'This turn finished. You can continue in the same thread.',
-            ),
-          },
-          detail: _lastSubmittedAttachments.isEmpty
-              ? '${controller.currentSessionKey} · ${_lastAutoAgentLabel ?? ownerLabel}'
-              : appText(
-                  '${controller.currentSessionKey} · ${_lastSubmittedAttachments.length} 个附件',
-                  '${controller.currentSessionKey} · ${_lastSubmittedAttachments.length} attachment(s)',
-                ),
-          owner: _lastAutoAgentLabel ?? ownerLabel,
-          sessionKey: controller.currentSessionKey,
-        ),
-      );
-    }
-
     return items;
   }
 
@@ -838,11 +785,8 @@ class _AssistantPageState extends State<AssistantPage> {
     );
 
     setState(() {
-      _lastSubmittedPrompt = rawPrompt;
-      _lastSubmittedSessionKey = controller.currentSessionKey;
       _lastAutoAgentLabel =
           autoAgent?.name ?? _conversationOwnerLabel(controller);
-      _lastSubmittedAttachments = attachmentNames;
       _attachments = const <_ComposerAttachment>[];
       _touchTaskSeed(
         sessionKey: controller.currentSessionKey,
@@ -1107,6 +1051,61 @@ class _AssistantPageState extends State<AssistantPage> {
     _composerFocusNode.requestFocus();
   }
 
+  Future<bool> _runTaskSessionActionWithRetry(
+    String label,
+    Future<void> Function() action,
+  ) async {
+    Object? lastError;
+    for (
+      var attempt = 1;
+      attempt <= _assistantTaskActionMaxRetryCount;
+      attempt++
+    ) {
+      try {
+        await action();
+        return true;
+      } catch (error) {
+        lastError = error;
+        if (attempt >= _assistantTaskActionMaxRetryCount) {
+          break;
+        }
+        await Future<void>.delayed(Duration(milliseconds: 240 * attempt));
+      }
+    }
+    if (!mounted) {
+      return false;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          appText(
+            '$label 失败，弱网环境下已重试 $_assistantTaskActionMaxRetryCount 次。',
+            '$label failed after $_assistantTaskActionMaxRetryCount retries on a weak network.',
+          ),
+        ),
+      ),
+    );
+    debugPrint('$label failed after retries: $lastError');
+    return false;
+  }
+
+  Future<void> _refreshTasksWithRetry() async {
+    await _runTaskSessionActionWithRetry(
+      appText('刷新任务列表', 'Refresh task list'),
+      widget.controller.refreshSessions,
+    );
+  }
+
+  Future<void> _switchSessionWithRetry(String sessionKey) async {
+    final switched = await _runTaskSessionActionWithRetry(
+      appText('切换会话', 'Switch session'),
+      () => widget.controller.switchSession(sessionKey),
+    );
+    if (switched) {
+      _focusComposer();
+    }
+  }
+
   Future<void> _createNewThread() async {
     final sessionKey = _buildDraftSessionKey(widget.controller);
     final inheritedTarget = widget.controller.currentAssistantExecutionTarget;
@@ -1137,8 +1136,7 @@ class _AssistantPageState extends State<AssistantPage> {
       messageViewMode: inheritedViewMode,
       singleAgentProvider: widget.controller.currentSingleAgentProvider,
     );
-    await widget.controller.switchSession(sessionKey);
-    _focusComposer();
+    await _switchSessionWithRetry(sessionKey);
   }
 
   List<_AssistantTaskEntry> _buildTaskEntries(AppController controller) {
@@ -1354,11 +1352,17 @@ class _AssistantPageState extends State<AssistantPage> {
     if (widget.controller.assistantSessionHasPendingRun(sessionKey)) {
       return;
     }
+    final archived = await _runTaskSessionActionWithRetry(
+      appText('归档任务', 'Archive task'),
+      () => widget.controller.saveAssistantTaskArchived(sessionKey, true),
+    );
+    if (!archived) {
+      return;
+    }
     setState(() {
       _archivedTaskKeys.add(sessionKey);
       _taskSeeds.removeWhere((key, _) => _sessionKeysMatch(key, sessionKey));
     });
-    await widget.controller.saveAssistantTaskArchived(sessionKey, true);
 
     if (!isCurrent) {
       return;
@@ -1369,8 +1373,7 @@ class _AssistantPageState extends State<AssistantPage> {
           _sessionKeysMatch(candidate, sessionKey)) {
         continue;
       }
-      await widget.controller.switchSession(candidate);
-      _focusComposer();
+      await _switchSessionWithRetry(candidate);
       return;
     }
 
@@ -1419,6 +1422,13 @@ class _AssistantPageState extends State<AssistantPage> {
     final nextTitle = normalized.isNotEmpty
         ? normalized
         : _defaultTaskTitle(controller, entry.sessionKey);
+    final saved = await _runTaskSessionActionWithRetry(
+      appText('重命名任务', 'Rename task'),
+      () => controller.saveAssistantTaskTitle(entry.sessionKey, normalized),
+    );
+    if (!saved) {
+      return;
+    }
     setState(() {
       final existing = _taskSeeds[entry.sessionKey];
       if (existing != null) {
@@ -1435,7 +1445,6 @@ class _AssistantPageState extends State<AssistantPage> {
         );
       }
     });
-    await controller.saveAssistantTaskTitle(entry.sessionKey, normalized);
   }
 
   String _buildDraftSessionKey(AppController controller) {
@@ -1976,14 +1985,6 @@ class _ConversationArea extends StatelessWidget {
                               sections: const [],
                             ),
                           ),
-                        ),
-                        _TimelineItemKind.taskCard => _TaskStatusCard(
-                          title: item.title!,
-                          status: item.status!,
-                          summary: item.summary!,
-                          detail: item.detail!,
-                          owner: item.owner!,
-                          sessionKey: item.sessionKey!,
                         ),
                       };
                     },
@@ -4048,165 +4049,6 @@ class _MessageMetaBlock extends StatelessWidget {
   }
 }
 
-class _TaskStatusCard extends StatefulWidget {
-  const _TaskStatusCard({
-    required this.title,
-    required this.status,
-    required this.summary,
-    required this.detail,
-    required this.owner,
-    required this.sessionKey,
-  });
-
-  final String title;
-  final String status;
-  final String summary;
-  final String detail;
-  final String owner;
-  final String sessionKey;
-
-  @override
-  State<_TaskStatusCard> createState() => _TaskStatusCardState();
-}
-
-class _TaskStatusCardState extends State<_TaskStatusCard> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final palette = context.palette;
-    final normalizedStatus = _normalizedTaskStatus(widget.status);
-    final statusStyle = _pillStyleForStatus(context, normalizedStatus);
-    final hint = switch (normalizedStatus) {
-      'queued' => appText('排队等待执行', 'Waiting in queue'),
-      'running' => appText('正在执行中', 'Working now'),
-      'failed' => appText('需要处理', 'Needs attention'),
-      _ => appText('已进入当前会话', 'Active in this session'),
-    };
-
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadius.card),
-            color: palette.surfaceSecondary.withValues(alpha: 0.72),
-            border: Border.all(color: palette.strokeSoft),
-          ),
-          child: Column(
-            children: [
-              InkWell(
-                borderRadius: BorderRadius.circular(AppRadius.card),
-                onTap: () => setState(() => _expanded = !_expanded),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: statusStyle.foregroundColor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          widget.summary,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: palette.textSecondary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _StatusPill(
-                        label: _taskStatusLabel(widget.status),
-                        backgroundColor: statusStyle.backgroundColor,
-                        textColor: statusStyle.foregroundColor,
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        _expanded
-                            ? Icons.keyboard_arrow_up_rounded
-                            : Icons.keyboard_arrow_down_rounded,
-                        size: 18,
-                        color: palette.textMuted,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              ClipRect(
-                child: AnimatedSize(
-                  duration: const Duration(milliseconds: 160),
-                  curve: Curves.easeOutCubic,
-                  child: _expanded
-                      ? Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.sm,
-                            0,
-                            AppSpacing.sm,
-                            AppSpacing.xs,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Divider(height: 1, color: palette.strokeSoft),
-                              const SizedBox(height: 6),
-                              Text(
-                                widget.title,
-                                style: theme.textTheme.titleSmall,
-                              ),
-                              const SizedBox(height: 4),
-                              Wrap(
-                                spacing: 10,
-                                runSpacing: 4,
-                                children: [
-                                  Text(
-                                    widget.detail,
-                                    style: theme.textTheme.bodySmall,
-                                  ),
-                                  Text(
-                                    widget.owner,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.onSurface,
-                                    ),
-                                  ),
-                                  Text(
-                                    widget.sessionKey,
-                                    style: theme.textTheme.bodySmall,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                hint,
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color: palette.textMuted,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _ToolCallTile extends StatefulWidget {
   const _ToolCallTile({
     required this.toolName,
@@ -4489,7 +4331,7 @@ class _MessageViewModeChip extends StatelessWidget {
 
 enum _BubbleTone { user, assistant, agent }
 
-enum _TimelineItemKind { user, assistant, agent, taskCard, toolCall }
+enum _TimelineItemKind { user, assistant, agent, toolCall }
 
 class _TimelineItem {
   const _TimelineItem._({
@@ -4497,11 +4339,6 @@ class _TimelineItem {
     this.label,
     this.text,
     this.title,
-    this.status,
-    this.summary,
-    this.detail,
-    this.owner,
-    this.sessionKey,
     this.pending = false,
     this.error = false,
   });
@@ -4518,23 +4355,6 @@ class _TimelineItem {
          text: text,
          pending: pending,
          error: error,
-       );
-
-  const _TimelineItem.taskCard({
-    required String title,
-    required String status,
-    required String summary,
-    required String detail,
-    required String owner,
-    required String sessionKey,
-  }) : this._(
-         kind: _TimelineItemKind.taskCard,
-         title: title,
-         status: status,
-         summary: summary,
-         detail: detail,
-         owner: owner,
-         sessionKey: sessionKey,
        );
 
   const _TimelineItem.toolCall({
@@ -4554,11 +4374,6 @@ class _TimelineItem {
   final String? label;
   final String? text;
   final String? title;
-  final String? status;
-  final String? summary;
-  final String? detail;
-  final String? owner;
-  final String? sessionKey;
   final bool pending;
   final bool error;
 }
@@ -4753,16 +4568,6 @@ _PillStyle _pillStyleForStatus(BuildContext context, String label) {
   };
 }
 
-StatusInfo _statusInfoForTask(String status) => switch (status) {
-  'running' ||
-  'Running' => StatusInfo(appText('运行中', 'Running'), StatusTone.accent),
-  'failed' ||
-  'Failed' => StatusInfo(appText('失败', 'Failed'), StatusTone.danger),
-  'queued' ||
-  'Queued' => StatusInfo(appText('排队中', 'Queued'), StatusTone.neutral),
-  _ => StatusInfo(appText('可继续', 'Open'), StatusTone.success),
-};
-
 String _normalizedTaskStatus(String status) {
   final value = status.trim().toLowerCase();
   return switch (value) {
@@ -4774,8 +4579,6 @@ String _normalizedTaskStatus(String status) {
     _ => 'open',
   };
 }
-
-String _taskStatusLabel(String status) => _statusInfoForTask(status).label;
 
 String _toolCallStatusLabel(String status) =>
     switch (_normalizedTaskStatus(status)) {
