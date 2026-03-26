@@ -4,28 +4,31 @@ import FlutterMacOS
 
 @main
 class AppDelegate: FlutterAppDelegate, NSWindowDelegate {
-  private let appLifecycleChannelName = "plus.svc.xworkmate/app_lifecycle"
   private let skillDirectoryChannelName = "plus.svc.xworkmate/skill_directory_access"
+  private let appLifecycleChannelName = "plus.svc.xworkmate/app_lifecycle"
+  private let dockDisplayMode: DockDisplayMode = .regular
+  private let statusProvider = FlutterAppStatusProvider()
   private var directoryAccessSessions: [String: URL] = [:]
   private var appLifecycleChannel: FlutterMethodChannel?
   private var appLifecycleMessengerId: ObjectIdentifier?
   private var skillDirectoryChannel: FlutterMethodChannel?
   private var skillDirectoryMessengerId: ObjectIdentifier?
-  private var statusItem: NSStatusItem?
+  private lazy var statusViewModel = AppStatusViewModel(provider: statusProvider)
+  private var statusBarController: StatusBarController?
   private var terminationInFlight = false
   private var terminationTimeoutWorkItem: DispatchWorkItem?
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
     super.applicationDidFinishLaunching(notification)
 
+    applyDockDisplayMode()
     mainFlutterWindow?.delegate = self
 
-    guard let controller = mainFlutterWindow?.contentViewController as? FlutterViewController else {
-      setUpStatusItem()
-      return
+    if let controller = mainFlutterWindow?.contentViewController as? FlutterViewController {
+      registerApplicationChannels(for: controller)
     }
-    registerApplicationChannels(for: controller)
-    setUpStatusItem()
+    setUpStatusBarController()
+    statusViewModel.startRefreshing()
   }
 
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -40,10 +43,6 @@ class AppDelegate: FlutterAppDelegate, NSWindowDelegate {
     guard !terminationInFlight else {
       return .terminateLater
     }
-    guard let channel = appLifecycleChannel else {
-      return .terminateNow
-    }
-
     terminationInFlight = true
     var hasReplied = false
     let finishTermination: () -> Void = { [weak self] in
@@ -63,9 +62,7 @@ class AppDelegate: FlutterAppDelegate, NSWindowDelegate {
     let timeoutWorkItem = DispatchWorkItem(block: finishTermination)
     terminationTimeoutWorkItem = timeoutWorkItem
     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: timeoutWorkItem)
-    channel.invokeMethod("prepareForExit", arguments: nil) { _ in
-      finishTermination()
-    }
+    statusViewModel.prepareForExit(completion: finishTermination)
     return .terminateLater
   }
 
@@ -75,6 +72,7 @@ class AppDelegate: FlutterAppDelegate, NSWindowDelegate {
   }
 
   override func applicationWillTerminate(_ notification: Notification) {
+    statusViewModel.stopRefreshing()
     for (_, url) in directoryAccessSessions {
       url.stopAccessingSecurityScopedResource()
     }
@@ -115,58 +113,26 @@ class AppDelegate: FlutterAppDelegate, NSWindowDelegate {
       binaryMessenger: controller.engine.binaryMessenger
     )
     appLifecycleMessengerId = messengerId
+    statusViewModel.bind(channel: appLifecycleChannel)
   }
 
-  private func setUpStatusItem() {
-    guard statusItem == nil else {
+  private func setUpStatusBarController() {
+    guard statusBarController == nil else {
       return
     }
-
-    let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    if let button = item.button {
-      if #available(macOS 11.0, *) {
-        if let image = NSImage(
-          systemSymbolName: "cpu",
-          accessibilityDescription: "XWorkmate"
-        ) {
-          image.isTemplate = true
-          button.image = image
-        } else {
-          button.title = "XW"
-        }
-      } else {
-        button.title = "XW"
+    statusBarController = StatusBarController(
+      viewModel: statusViewModel,
+      openAppHandler: { [weak self] in
+        self?.showMainWindow()
+      },
+      quitAndPauseHandler: { [weak self] in
+        self?.requestTermination()
       }
-      button.toolTip = "XWorkmate"
-    }
-
-    let menu = NSMenu()
-    let showItem = NSMenuItem(
-      title: "显示主窗口",
-      action: #selector(showMainWindowAction(_:)),
-      keyEquivalent: ""
     )
-    showItem.target = self
-    menu.addItem(showItem)
-
-    let quitItem = NSMenuItem(
-      title: "退出并暂停任务",
-      action: #selector(quitAndPauseTasksAction(_:)),
-      keyEquivalent: ""
-    )
-    quitItem.target = self
-    menu.addItem(quitItem)
-
-    item.menu = menu
-    statusItem = item
   }
 
-  @objc private func showMainWindowAction(_ sender: Any?) {
-    showMainWindow()
-  }
-
-  @objc private func quitAndPauseTasksAction(_ sender: Any?) {
-    NSApp.terminate(sender)
+  private func requestTermination() {
+    NSApp.terminate(nil)
   }
 
   func windowShouldClose(_ sender: NSWindow) -> Bool {
@@ -186,6 +152,15 @@ class AppDelegate: FlutterAppDelegate, NSWindowDelegate {
     window.makeKeyAndOrderFront(nil)
     window.orderFrontRegardless()
     NSApp.activate(ignoringOtherApps: true)
+  }
+
+  private func applyDockDisplayMode() {
+    switch dockDisplayMode {
+    case .regular:
+      NSApp.setActivationPolicy(.regular)
+    case .menuBarOnly:
+      NSApp.setActivationPolicy(.accessory)
+    }
   }
 
   private func handleSkillDirectoryCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

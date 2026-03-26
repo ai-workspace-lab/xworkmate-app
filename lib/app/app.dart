@@ -67,6 +67,8 @@ class _XWorkmateAppState extends State<XWorkmateApp> {
       case 'prepareForExit':
         await _controller.prepareForExit();
         return null;
+      case 'desktopStatusSnapshot':
+        return _controller.desktopStatusSnapshot();
       default:
         throw MissingPluginException(
           'Unhandled app lifecycle method: ${call.method}',

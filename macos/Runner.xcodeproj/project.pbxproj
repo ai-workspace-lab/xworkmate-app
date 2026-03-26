@@ -28,6 +28,8 @@
 		33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F42044A3C60003C045 /* MainMenu.xib */; };
 		33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC11122044BFA00003C045 /* MainFlutterWindow.swift */; };
 		8E6F4A7D31A1A10100A1B2C3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8E6F4A7C31A1A10100A1B2C3 /* PrivacyInfo.xcprivacy */; };
+		A1B2C3034F0A000100000001 /* AppStatusViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3024F0A000100000001 /* AppStatusViewModel.swift */; };
+		A1B2C3054F0A000100000001 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3044F0A000100000001 /* StatusBarController.swift */; };
 		A96EF8FFA0E80B16252FE834 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B5F4830709C3A67EC8096888 /* Pods_RunnerTests.framework */; };
 		F02922E20E15948F8CE5469F /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2099D82E31DC5912EA477802 /* Pods_Runner.framework */; };
 /* End PBXBuildFile section */
@@ -85,6 +87,8 @@
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		890E8B245EC31E1C0F085895 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		8E6F4A7C31A1A10100A1B2C3 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = Runner/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		A1B2C3024F0A000100000001 /* AppStatusViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStatusViewModel.swift; sourceTree = "<group>"; };
+		A1B2C3044F0A000100000001 /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		B5F4830709C3A67EC8096888 /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D8467093D02A39550CF15067 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
@@ -179,7 +183,9 @@
 			isa = PBXGroup;
 			children = (
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
+				A1B2C3024F0A000100000001 /* AppStatusViewModel.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
+				A1B2C3044F0A000100000001 /* StatusBarController.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
 				33E51914231749380026EE4D /* Release.entitlements */,
 				33CC11242044D66E0003C045 /* Resources */,
@@ -440,6 +446,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3054F0A000100000001 /* StatusBarController.swift in Sources */,
+				A1B2C3034F0A000100000001 /* AppStatusViewModel.swift in Sources */,
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
