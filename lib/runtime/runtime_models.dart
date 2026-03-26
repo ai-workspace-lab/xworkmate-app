@@ -431,7 +431,15 @@ List<ExternalAcpEndpointProfile> replaceExternalAcpEndpointForProvider(
 }
 
 String normalizeAuthorizedSkillDirectoryPath(String path) {
-  final trimmed = path.trim();
+  var trimmed = path.trim();
+  if (trimmed.isEmpty) {
+    return trimmed;
+  }
+  trimmed = trimmed.replaceFirst(RegExp(r'[\\/]+$'), '');
+  trimmed = trimmed.replaceFirst(
+    RegExp(r'([\\/])SKILL\.md$', caseSensitive: false),
+    '',
+  );
   if (trimmed.length <= 1) {
     return trimmed;
   }
@@ -1837,9 +1845,8 @@ class SettingsSnapshot {
         ? normalizeAssistantNavigationDestinations(
             rawAssistantNavigationDestinations
                 .map(
-                  (item) => AssistantFocusEntryCopy.fromJsonValue(
-                    item?.toString(),
-                  ),
+                  (item) =>
+                      AssistantFocusEntryCopy.fromJsonValue(item?.toString()),
                 )
                 .whereType<AssistantFocusEntry>(),
           )

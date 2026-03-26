@@ -322,6 +322,78 @@ void main() {
   );
 
   test(
+    'AppController accepts authorized single skill package paths and keeps fixed-root scanning intact',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-single-skill-package-path-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final fixedRoot = Directory('${tempDirectory.path}/fixed-root');
+      final externalRepoSkill = Directory(
+        '${tempDirectory.path}/ai-workflow-craft/skills/docx',
+      );
+      await _writeSkill(
+        fixedRoot,
+        'docx',
+        skillName: 'docx',
+        description: 'Fixed root version',
+      );
+      await _writeSkill(
+        externalRepoSkill.parent,
+        'docx',
+        skillName: 'docx',
+        description: 'Imported package version',
+      );
+
+      final store = await _createStore(tempDirectory.path);
+      await store.saveSettingsSnapshot(
+        _singleAgentTestSettings(workspacePath: tempDirectory.path).copyWith(
+          authorizedSkillDirectories: <AuthorizedSkillDirectory>[
+            AuthorizedSkillDirectory(
+              path: '${externalRepoSkill.path}/SKILL.md',
+            ),
+          ],
+        ),
+      );
+
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        singleAgentSharedSkillScanRootOverrides: <String>[fixedRoot.path],
+      );
+      addTearDown(controller.dispose);
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      await _waitFor(
+        () => controller
+            .assistantImportedSkillsForSession(controller.currentSessionKey)
+            .any((item) => item.label == 'docx'),
+      );
+
+      final docxSkill = controller
+          .assistantImportedSkillsForSession(controller.currentSessionKey)
+          .firstWhere((item) => item.label == 'docx');
+      expect(docxSkill.description, 'Imported package version');
+      expect(docxSkill.source, 'custom');
+      expect(
+        controller.authorizedSkillDirectories.map((item) => item.path),
+        <String>['${tempDirectory.path}/ai-workflow-craft/skills/docx'],
+      );
+    },
+  );
+
+  test(
     'AppController keeps thread-bound skills isolated and restores them after restart',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});

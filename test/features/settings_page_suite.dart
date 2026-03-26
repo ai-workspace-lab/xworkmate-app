@@ -469,6 +469,55 @@ paths:
     );
   });
 
+  testWidgets(
+    'SettingsPage batch add normalizes pasted SKILL.md paths to skill package directories',
+    (WidgetTester tester) async {
+      final controller = await _createControllerWithSkillAccessService(
+        tester,
+        _FakeSkillDirectoryAccessService(userHomeDirectory: '/Users/tester'),
+      );
+
+      await pumpPage(
+        tester,
+        child: SettingsPage(controller: controller),
+        platform: TargetPlatform.macOS,
+      );
+
+      await tester.tap(find.text('集成'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('SKILLS 目录授权'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('skill-directory-batch-add-button')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('skill-directory-path-input')),
+        '/Users/tester/workspaces/ai-workflow-craft/skills/docx/SKILL.md',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('skill-directory-direct-add-button')),
+      );
+      await tester.pump();
+      for (
+        var attempt = 0;
+        attempt < 10 && controller.authorizedSkillDirectories.isEmpty;
+        attempt += 1
+      ) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      expect(
+        controller.authorizedSkillDirectories.map((item) => item.path),
+        const <String>[
+          '/Users/tester/workspaces/ai-workflow-craft/skills/docx',
+        ],
+      );
+      expect(find.text('docx'), findsOneWidget);
+    },
+  );
+
   testWidgets('SettingsPage gateway sections can collapse individually', (
     WidgetTester tester,
   ) async {
