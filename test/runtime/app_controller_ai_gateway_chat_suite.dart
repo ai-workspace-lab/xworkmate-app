@@ -630,6 +630,88 @@ void main() {
       );
     },
   );
+
+  test(
+    'AppController uses an isolated workspace for draft Single Agent threads',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-single-agent-isolated-thread-cwd-',
+      );
+      final defaultWorkspace = Directory(
+        '${tempDirectory.path}/default-workspace',
+      );
+      await defaultWorkspace.create(recursive: true);
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await tempDirectory.delete(recursive: true);
+        }
+      });
+
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          workspacePath: defaultWorkspace.path,
+          assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
+        ),
+      );
+
+      final runner = _FakeSingleAgentRunner(
+        resolvedProvider: SingleAgentProvider.codex,
+        result: const SingleAgentRunResult(
+          provider: SingleAgentProvider.codex,
+          output: 'THREAD_OK',
+          success: true,
+          errorMessage: '',
+          shouldFallbackToAiChat: false,
+        ),
+      );
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: _FakeGatewayRuntime(store: store),
+          codex: _FakeCodexRuntime(),
+        ),
+        singleAgentRunner: runner,
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      controller.initializeAssistantThreadContext(
+        'draft:artifact-thread',
+        title: 'Artifact Thread',
+        executionTarget: AssistantExecutionTarget.singleAgent,
+      );
+      await controller.switchSession('draft:artifact-thread');
+      await controller.sendChatMessage('检查当前线程目录', thinking: 'low');
+
+      const expectedWorkspaceSuffix =
+          '.xworkmate/threads/draft-artifact-thread';
+      expect(runner.runCalls, 1);
+      expect(
+        runner.lastRequest?.workingDirectory,
+        '${defaultWorkspace.path}/$expectedWorkspaceSuffix',
+      );
+      expect(
+        controller.assistantWorkspaceRefForSession('draft:artifact-thread'),
+        '${defaultWorkspace.path}/$expectedWorkspaceSuffix',
+      );
+      expect(
+        Directory(
+          '${defaultWorkspace.path}/$expectedWorkspaceSuffix',
+        ).existsSync(),
+        isTrue,
+      );
+    },
+  );
 }
 
 class _FakeGatewayRuntime extends GatewayRuntime {
