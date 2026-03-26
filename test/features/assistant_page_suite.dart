@@ -560,10 +560,8 @@ void main() {
           'xworkmate-assistant-skills-ui-',
         );
         final agentsRoot = Directory('${tempDirectory.path}/agents-skills');
-        final codexRoot = Directory('${tempDirectory.path}/codex-skills');
-        final workbuddyRoot = Directory(
-          '${tempDirectory.path}/workbuddy-skills',
-        );
+        final customRootA = Directory('${tempDirectory.path}/custom-skills-a');
+        final customRootB = Directory('${tempDirectory.path}/custom-skills-b');
         await _writeSkill(
           agentsRoot,
           'browser',
@@ -571,13 +569,13 @@ void main() {
           description: 'Browse websites',
         );
         await _writeSkill(
-          codexRoot,
+          customRootA,
           'ppt',
           skillName: 'PPT',
           description: 'Presentation skill',
         );
         await _writeSkill(
-          workbuddyRoot,
+          customRootB,
           'wordx',
           skillName: 'WordX',
           description: 'Document skill',
@@ -588,8 +586,8 @@ void main() {
           useFakeGatewayRuntime: true,
           singleAgentSharedSkillScanRootOverrides: <String>[
             agentsRoot.path,
-            codexRoot.path,
-            workbuddyRoot.path,
+            customRootA.path,
+            customRootB.path,
           ],
         );
       });

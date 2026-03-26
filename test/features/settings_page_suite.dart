@@ -96,9 +96,6 @@ class _FakeSkillDirectoryAccessService implements SkillDirectoryAccessService {
   bool get isSupported => true;
 
   @override
-  bool get requiresAuthorizedSharedRoots => false;
-
-  @override
   Future<String> resolveUserHomeDirectory() async {
     return userHomeDirectory;
   }
@@ -377,9 +374,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('批量添加自定义目录'));
     await tester.pump();
-    for (var attempt = 0;
-        attempt < 10 && controller.authorizedSkillDirectories.length < 2;
-        attempt += 1) {
+    for (
+      var attempt = 0;
+      attempt < 10 && controller.authorizedSkillDirectories.length < 2;
+      attempt += 1
+    ) {
       await tester.pump(const Duration(milliseconds: 100));
     }
 
