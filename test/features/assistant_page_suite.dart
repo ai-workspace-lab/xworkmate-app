@@ -1049,6 +1049,9 @@ void main() {
                 text:
                     'Attached files:\n'
                     '- clipboard-image-1.png\n\n'
+                    'Preferred skills:\n'
+                    '- xiaohongshu\n'
+                    '- code-quality-gate\n\n'
                     'Execution context:\n'
                     '- target: single-agent\n'
                     '- provider: codex\n'
@@ -1075,6 +1078,9 @@ void main() {
       );
 
       expect(find.text('结合项目代码制作一份用户手册'), findsOneWidget);
+      expect(find.text('Preferred skills:'), findsNothing);
+      expect(find.text('xiaohongshu'), findsNothing);
+      expect(find.text('code-quality-gate'), findsNothing);
       expect(
         find.byKey(const Key('assistant-user-meta-attachments-toggle')),
         findsOneWidget,
@@ -1112,6 +1118,9 @@ void main() {
         find.byKey(const Key('assistant-user-meta-context-block')),
         findsOneWidget,
       );
+      expect(find.text('Preferred skills:'), findsOneWidget);
+      expect(find.text('xiaohongshu'), findsOneWidget);
+      expect(find.text('code-quality-gate'), findsOneWidget);
       expect(find.text('Execution context:'), findsOneWidget);
     },
     // Known flutter_tester host-exit hang in this widget scenario.

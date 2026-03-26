@@ -3893,8 +3893,8 @@ class _PromptDebugSnapshot {
   static _PromptDebugSnapshot fromMessage(String text) {
     var cursor = 0;
     String? attachments;
+    String? preferredSkills;
     String? executionContext;
-    final passthroughBlocks = <String>[];
 
     void skipLeadingNewlines() {
       while (cursor < text.length && text[cursor] == '\n') {
@@ -3926,7 +3926,7 @@ class _PromptDebugSnapshot {
       }
       final skillBlock = consumeBlock('Preferred skills');
       if (skillBlock != null) {
-        passthroughBlocks.add(skillBlock);
+        preferredSkills = skillBlock;
         continue;
       }
       final executionBlock = consumeBlock('Execution context');
@@ -3938,15 +3938,14 @@ class _PromptDebugSnapshot {
     }
 
     final remainder = text.substring(cursor).trimLeft();
-    final bodyParts = <String>[
-      ...passthroughBlocks,
-      if (remainder.isNotEmpty) remainder,
-    ];
+    final executionContextParts = <String>[?preferredSkills, ?executionContext];
 
     return _PromptDebugSnapshot(
-      bodyText: bodyParts.join('\n\n').trim(),
+      bodyText: remainder.trim(),
       attachmentsBlock: attachments,
-      executionContextBlock: executionContext,
+      executionContextBlock: executionContextParts.isEmpty
+          ? null
+          : executionContextParts.join('\n\n'),
     );
   }
 }
