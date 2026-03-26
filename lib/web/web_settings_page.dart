@@ -41,7 +41,6 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
   late final TextEditingController _sessionRemoteBaseUrlController;
   late final TextEditingController _sessionApiTokenController;
   late final Map<String, TextEditingController> _externalAcpLabelControllers;
-  late final Map<String, TextEditingController> _externalAcpBadgeControllers;
   late final Map<String, TextEditingController> _externalAcpEndpointControllers;
   late WebSessionPersistenceMode _sessionPersistenceMode;
   bool _remoteTls = true;
@@ -70,7 +69,6 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     _sessionRemoteBaseUrlController = TextEditingController();
     _sessionApiTokenController = TextEditingController();
     _externalAcpLabelControllers = <String, TextEditingController>{};
-    _externalAcpBadgeControllers = <String, TextEditingController>{};
     _externalAcpEndpointControllers = <String, TextEditingController>{};
     _sessionPersistenceMode = widget.controller.webSessionPersistence.mode;
     _syncControllers();
@@ -99,9 +97,6 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     _sessionRemoteBaseUrlController.dispose();
     _sessionApiTokenController.dispose();
     for (final controller in _externalAcpLabelControllers.values) {
-      controller.dispose();
-    }
-    for (final controller in _externalAcpBadgeControllers.values) {
       controller.dispose();
     }
     for (final controller in _externalAcpEndpointControllers.values) {
@@ -188,20 +183,14 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
         key,
         () => TextEditingController(),
       );
-      final badgeController = _externalAcpBadgeControllers.putIfAbsent(
-        key,
-        () => TextEditingController(),
-      );
       final endpointController = _externalAcpEndpointControllers.putIfAbsent(
         key,
         () => TextEditingController(),
       );
       _setIfDifferent(labelController, profile.label);
-      _setIfDifferent(badgeController, profile.badge);
       _setIfDifferent(endpointController, profile.endpoint);
     }
     _disposeRemovedControllers(_externalAcpLabelControllers, activeKeys);
-    _disposeRemovedControllers(_externalAcpBadgeControllers, activeKeys);
     _disposeRemovedControllers(_externalAcpEndpointControllers, activeKeys);
   }
 
@@ -937,8 +926,8 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           const SizedBox(height: 8),
           Text(
             appText(
-              '预设保留 Codex、OpenCode；其余 provider 从这个 ACP 列表动态扩展。每条记录都可自定义显示名称、标志和 ACP Server Endpoint，协议支持 ws / wss / http / https。',
-              'Codex and OpenCode stay as presets. Additional providers are driven directly from this ACP list. Each entry can define its own display name, badge, and ACP server endpoint with ws / wss / http / https.',
+              '预设保留 Codex、OpenCode；其余 provider 通过“自定义添加更多”扩展。每条记录可自定义显示名称和 ACP Server Endpoint，协议支持 ws / wss / http / https。',
+              'Codex and OpenCode stay as presets. Add more custom providers as needed. Each entry can define its own display name and ACP server endpoint with ws / wss / http / https.',
             ),
             style: theme.textTheme.bodyMedium,
           ),
@@ -955,7 +944,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
                 );
               },
               icon: const Icon(Icons.add_rounded),
-              label: Text(appText('添加自定义 Provider', 'Add custom provider')),
+              label: Text(appText('自定义添加更多', 'Add more custom providers')),
             ),
           ),
           const SizedBox(height: 16),
@@ -981,7 +970,6 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
   ) {
     final provider = profile.toProvider();
     final labelController = _externalAcpLabelControllers[profile.providerKey]!;
-    final badgeController = _externalAcpBadgeControllers[profile.providerKey]!;
     final endpointController =
         _externalAcpEndpointControllers[profile.providerKey]!;
     final configured = endpointController.text.trim().isNotEmpty;
@@ -997,17 +985,9 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           Row(
             children: [
               Expanded(
-                child: Row(
-                  children: [
-                    _WebExternalAcpProviderBadge(provider: provider),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        provider.label,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  provider.label,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
               if (!profile.isPreset) ...[
@@ -1043,12 +1023,6 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
             decoration: InputDecoration(
               labelText: appText('显示名称', 'Display name'),
             ),
-            onChanged: (_) => _stageExternalAcpDraft(controller),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: badgeController,
-            decoration: InputDecoration(labelText: appText('标志', 'Badge')),
             onChanged: (_) => _stageExternalAcpDraft(controller),
           ),
           const SizedBox(height: 12),
@@ -1089,9 +1063,6 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
             label:
                 _externalAcpLabelControllers[profile.providerKey]?.text ??
                 profile.label,
-            badge:
-                _externalAcpBadgeControllers[profile.providerKey]?.text ??
-                profile.badge,
             endpoint:
                 _externalAcpEndpointControllers[profile.providerKey]?.text ??
                 profile.endpoint,
@@ -1492,37 +1463,6 @@ class _StatusChip extends StatelessWidget {
         label,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
           color: foreground,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _WebExternalAcpProviderBadge extends StatelessWidget {
-  const _WebExternalAcpProviderBadge({required this.provider});
-
-  final SingleAgentProvider provider;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final display = provider.badge.trim().isEmpty
-        ? provider.label
-        : provider.badge;
-    final text = display.length <= 2 ? display : display.substring(0, 2);
-    return Container(
-      width: 28,
-      height: 28,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: palette.accent.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: palette.accent,
           fontWeight: FontWeight.w700,
         ),
       ),
