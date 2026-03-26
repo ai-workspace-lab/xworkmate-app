@@ -185,7 +185,10 @@ class _WebTasksPageState extends State<WebTasksPage> {
                               },
                             ),
                           ),
-                          Container(width: 1, color: context.palette.strokeSoft),
+                          Container(
+                            width: 1,
+                            color: context.palette.strokeSoft,
+                          ),
                           Expanded(
                             child: _TaskDetailPanel(
                               controller: controller,
@@ -259,7 +262,9 @@ class _WebSkillsPageState extends State<WebSkillsPage> {
       animation: widget.controller,
       builder: (context, _) {
         final controller = widget.controller;
-        final skills = controller.skills.where(_matchesQuery).toList(growable: false);
+        final skills = controller.skills
+            .where(_matchesQuery)
+            .toList(growable: false);
         final selected = _resolveSelectedSkill(skills);
         return DesktopWorkspaceScaffold(
           breadcrumbs: _buildWebBreadcrumbs(
@@ -409,9 +414,9 @@ class _WebNodesPageState extends State<WebNodesPage> {
       animation: widget.controller,
       builder: (context, _) {
         final controller = widget.controller;
-        final items = _itemsForTab(controller)
-            .where(_matchesQuery)
-            .toList(growable: false);
+        final items = _itemsForTab(
+          controller,
+        ).where(_matchesQuery).toList(growable: false);
         final selected = _resolveSelected(items);
         return DesktopWorkspaceScaffold(
           breadcrumbs: _buildWebBreadcrumbs(
@@ -507,7 +512,10 @@ class _WebNodesPageState extends State<WebNodesPage> {
                               },
                             ),
                           ),
-                          Container(width: 1, color: context.palette.strokeSoft),
+                          Container(
+                            width: 1,
+                            color: context.palette.strokeSoft,
+                          ),
                           Expanded(
                             child: _ResourceDetailPanel(
                               title: _tabLabel(_tab),
@@ -529,81 +537,86 @@ class _WebNodesPageState extends State<WebNodesPage> {
 
   List<_WorkspaceResourceItem> _itemsForTab(AppController controller) {
     return switch (_tab) {
-      _WebNodesTab.nodes => controller.instances
-          .map(
-            (item) => _WorkspaceResourceItem(
-              id: item.id,
-              title: item.host?.trim().isNotEmpty == true ? item.host! : item.id,
-              subtitle: [
-                item.platform,
-                item.deviceFamily,
-                item.ip,
-              ].whereType<String>().where((item) => item.trim().isNotEmpty).join(' · '),
-              status: item.mode ?? item.reason ?? appText('未知', 'Unknown'),
-              detailLines: <String>[
-                '${appText('实例 ID', 'Instance ID')}: ${item.id}',
-                if (item.version?.trim().isNotEmpty == true)
-                  '${appText('版本', 'Version')}: ${item.version}',
-                if (item.modelIdentifier?.trim().isNotEmpty == true)
-                  '${appText('机型', 'Model')}: ${item.modelIdentifier}',
-                if (item.text.trim().isNotEmpty)
-                  '${appText('状态说明', 'Status note')}: ${item.text}',
-              ],
-            ),
-          )
-          .toList(growable: false),
-      _WebNodesTab.agents => controller.agents
-          .map(
-            (item) => _WorkspaceResourceItem(
-              id: item.id,
-              title: '${item.emoji} ${item.name}',
-              subtitle: item.id,
-              status: item.theme,
-              detailLines: <String>[
-                '${appText('代理 ID', 'Agent ID')}: ${item.id}',
-                '${appText('主题', 'Theme')}: ${item.theme}',
-              ],
-            ),
-          )
-          .toList(growable: false),
-      _WebNodesTab.connectors => controller.connectors
-          .map(
-            (item) => _WorkspaceResourceItem(
-              id: '${item.id}:${item.accountName ?? 'default'}',
-              title: item.label,
-              subtitle: [
-                item.detailLabel,
-                item.accountName,
-              ].whereType<String>().where((item) => item.trim().isNotEmpty).join(' · '),
-              status: item.status,
-              detailLines: <String>[
-                '${appText('连接器', 'Connector')}: ${item.id}',
-                '${appText('状态', 'Status')}: ${item.status}',
-                if (item.meta.isNotEmpty) item.meta.join(' · '),
-                if (item.lastError?.trim().isNotEmpty == true)
-                  '${appText('错误', 'Error')}: ${item.lastError}',
-              ],
-            ),
-          )
-          .toList(growable: false),
-      _WebNodesTab.models => controller.models
-          .map(
-            (item) => _WorkspaceResourceItem(
-              id: item.id,
-              title: item.name,
-              subtitle: item.provider,
-              status: item.id,
-              detailLines: <String>[
-                '${appText('模型 ID', 'Model ID')}: ${item.id}',
-                '${appText('提供方', 'Provider')}: ${item.provider}',
-                if (item.contextWindow != null)
-                  '${appText('上下文窗口', 'Context window')}: ${item.contextWindow}',
-                if (item.maxOutputTokens != null)
-                  '${appText('最大输出', 'Max output')}: ${item.maxOutputTokens}',
-              ],
-            ),
-          )
-          .toList(growable: false),
+      _WebNodesTab.nodes =>
+        controller.instances
+            .map(
+              (item) => _WorkspaceResourceItem(
+                id: item.id,
+                title: item.host?.trim().isNotEmpty == true
+                    ? item.host!
+                    : item.id,
+                subtitle: [item.platform, item.deviceFamily, item.ip]
+                    .whereType<String>()
+                    .where((item) => item.trim().isNotEmpty)
+                    .join(' · '),
+                status: item.mode ?? item.reason ?? appText('未知', 'Unknown'),
+                detailLines: <String>[
+                  '${appText('实例 ID', 'Instance ID')}: ${item.id}',
+                  if (item.version?.trim().isNotEmpty == true)
+                    '${appText('版本', 'Version')}: ${item.version}',
+                  if (item.modelIdentifier?.trim().isNotEmpty == true)
+                    '${appText('机型', 'Model')}: ${item.modelIdentifier}',
+                  if (item.text.trim().isNotEmpty)
+                    '${appText('状态说明', 'Status note')}: ${item.text}',
+                ],
+              ),
+            )
+            .toList(growable: false),
+      _WebNodesTab.agents =>
+        controller.agents
+            .map(
+              (item) => _WorkspaceResourceItem(
+                id: item.id,
+                title: '${item.emoji} ${item.name}',
+                subtitle: item.id,
+                status: item.theme,
+                detailLines: <String>[
+                  '${appText('代理 ID', 'Agent ID')}: ${item.id}',
+                  '${appText('主题', 'Theme')}: ${item.theme}',
+                ],
+              ),
+            )
+            .toList(growable: false),
+      _WebNodesTab.connectors =>
+        controller.connectors
+            .map(
+              (item) => _WorkspaceResourceItem(
+                id: '${item.id}:${item.accountName ?? 'default'}',
+                title: item.label,
+                subtitle: [item.detailLabel, item.accountName]
+                    .whereType<String>()
+                    .where((item) => item.trim().isNotEmpty)
+                    .join(' · '),
+                status: item.status,
+                detailLines: <String>[
+                  '${appText('连接器', 'Connector')}: ${item.id}',
+                  '${appText('状态', 'Status')}: ${item.status}',
+                  if (item.meta.isNotEmpty) item.meta.join(' · '),
+                  if (item.lastError?.trim().isNotEmpty == true)
+                    '${appText('错误', 'Error')}: ${item.lastError}',
+                ],
+              ),
+            )
+            .toList(growable: false),
+      _WebNodesTab.models =>
+        controller.models
+            .map(
+              (item) => _WorkspaceResourceItem(
+                id: item.id,
+                title: item.name,
+                subtitle: item.provider,
+                status: item.id,
+                detailLines: <String>[
+                  '${appText('模型 ID', 'Model ID')}: ${item.id}',
+                  '${appText('提供方', 'Provider')}: ${item.provider}',
+                  if (item.contextWindow != null)
+                    '${appText('上下文窗口', 'Context window')}: ${item.contextWindow}',
+                  if (item.maxOutputTokens != null)
+                    '${appText('最大输出', 'Max output')}: ${item.maxOutputTokens}',
+                ],
+              ),
+            )
+            .toList(growable: false),
     };
   }
 
@@ -724,7 +737,8 @@ class _WebSecretsPageState extends State<WebSecretsPage> {
                 ),
               ),
               FilledButton.tonalIcon(
-                onPressed: () => controller.openSettings(tab: SettingsTab.gateway),
+                onPressed: () =>
+                    controller.openSettings(tab: SettingsTab.gateway),
                 icon: const Icon(Icons.tune_rounded),
                 label: Text(appText('打开设置', 'Open settings')),
               ),
@@ -737,7 +751,10 @@ class _WebSecretsPageState extends State<WebSecretsPage> {
                 SurfaceCard(
                   child: Row(
                     children: [
-                      Icon(Icons.shield_outlined, color: context.palette.accent),
+                      Icon(
+                        Icons.shield_outlined,
+                        color: context.palette.accent,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -769,10 +786,11 @@ class _WebSecretsPageState extends State<WebSecretsPage> {
                               },
                             ),
                           ),
-                          Container(width: 1, color: context.palette.strokeSoft),
-                          Expanded(
-                            child: _SecretDetailPanel(item: selected),
+                          Container(
+                            width: 1,
+                            color: context.palette.strokeSoft,
                           ),
+                          Expanded(child: _SecretDetailPanel(item: selected)),
                         ],
                       ),
                     ),
@@ -883,9 +901,8 @@ class _WebAiGatewayPageState extends State<WebAiGatewayPage> {
                 ),
               ),
               FilledButton.tonalIcon(
-                onPressed: () => widget.controller.openSettings(
-                  tab: SettingsTab.gateway,
-                ),
+                onPressed: () =>
+                    widget.controller.openSettings(tab: SettingsTab.gateway),
                 icon: const Icon(Icons.tune_rounded),
                 label: Text(appText('打开设置', 'Open settings')),
               ),
@@ -908,12 +925,19 @@ class _WebAiGatewayPageState extends State<WebAiGatewayPage> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              controller.settings.aiGateway.baseUrl.trim().isEmpty
-                                  ? appText('当前还没有配置 endpoint。', 'No endpoint is configured yet.')
-                                  : controller.settings.aiGateway.baseUrl.trim(),
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: context.palette.textSecondary,
-                              ),
+                              controller.settings.aiGateway.baseUrl
+                                      .trim()
+                                      .isEmpty
+                                  ? appText(
+                                      '当前还没有配置 endpoint。',
+                                      'No endpoint is configured yet.',
+                                    )
+                                  : controller.settings.aiGateway.baseUrl
+                                        .trim(),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: context.palette.textSecondary,
+                                  ),
                             ),
                           ],
                         ),
@@ -949,7 +973,10 @@ class _WebAiGatewayPageState extends State<WebAiGatewayPage> {
                               },
                             ),
                           ),
-                          Container(width: 1, color: context.palette.strokeSoft),
+                          Container(
+                            width: 1,
+                            color: context.palette.strokeSoft,
+                          ),
                           Expanded(child: _ModelDetailPanel(model: selected)),
                         ],
                       ),
@@ -1379,56 +1406,14 @@ class _SkillListTile extends StatelessWidget {
                   ]
                 : const [],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      skill.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  StatusBadge(
-                    status: skill.disabled
-                        ? _skillStatus(
-                            appText('已禁用', 'Disabled'),
-                            StatusTone.warning,
-                          )
-                        : _skillStatus(
-                            appText('已启用', 'Enabled'),
-                            StatusTone.success,
-                          ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                skill.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: palette.textSecondary,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 10,
-                runSpacing: 6,
-                children: [
-                  _SkillMeta(label: skill.source),
-                  _SkillMeta(label: skill.primaryEnv ?? 'workspace'),
-                ],
-              ),
-            ],
+          child: Text(
+            skill.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: selected ? palette.textPrimary : null,
+            ),
           ),
         ),
       ),
@@ -1672,22 +1657,6 @@ class _InlineMeta extends StatelessWidget {
   }
 }
 
-class _SkillMeta extends StatelessWidget {
-  const _SkillMeta({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: Theme.of(
-        context,
-      ).textTheme.bodySmall?.copyWith(color: context.palette.textMuted),
-    );
-  }
-}
-
 StatusInfo _taskStatusInfo(String status) => switch (status) {
   'running' ||
   'Running' => StatusInfo(appText('运行中', 'Running'), StatusTone.accent),
@@ -1712,14 +1681,16 @@ class _WorkspaceStatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final connected = controller.connection.status ==
-        RuntimeConnectionStatus.connected;
+    final connected =
+        controller.connection.status == RuntimeConnectionStatus.connected;
     return SurfaceCard(
       child: Row(
         children: [
           Icon(
             connected ? Icons.check_circle_outline_rounded : Icons.info_outline,
-            color: connected ? context.palette.success : context.palette.warning,
+            color: connected
+                ? context.palette.success
+                : context.palette.warning,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1897,18 +1868,13 @@ class _ResourceDetailPanel extends StatelessWidget {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: [
-            Chip(label: Text(item!.status)),
-          ],
+          children: [Chip(label: Text(item!.status))],
         ),
         const SizedBox(height: 16),
         ...item!.detailLines.map(
           (line) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              line,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            child: Text(line, style: Theme.of(context).textTheme.bodyMedium),
           ),
         ),
       ],
@@ -1977,13 +1943,15 @@ class _SecretListPanel extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(item.name, style: Theme.of(context).textTheme.titleSmall),
+                          Text(
+                            item.name,
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
                           const SizedBox(height: 4),
                           Text(
                             '${item.provider} · ${item.module}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: palette.textSecondary,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: palette.textSecondary),
                           ),
                           const SizedBox(height: 8),
                           Text(item.maskedValue),
@@ -2081,10 +2049,7 @@ class _ModelListPanel extends StatelessWidget {
           child: items.isEmpty
               ? Center(
                   child: Text(
-                    appText(
-                      '当前没有可显示的模型。',
-                      'No models are available yet.',
-                    ),
+                    appText('当前没有可显示的模型。', 'No models are available yet.'),
                   ),
                 )
               : ListView.separated(
@@ -2102,13 +2067,15 @@ class _ModelListPanel extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(item.name, style: Theme.of(context).textTheme.titleSmall),
+                          Text(
+                            item.name,
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
                           const SizedBox(height: 4),
                           Text(
                             item.provider,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: palette.textSecondary,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: palette.textSecondary),
                           ),
                           const SizedBox(height: 8),
                           Text(item.id),

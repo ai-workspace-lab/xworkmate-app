@@ -279,56 +279,14 @@ class _SkillListTile extends StatelessWidget {
                   ]
                 : const [],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      skill.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  StatusBadge(
-                    status: skill.disabled
-                        ? _skillStatus(
-                            appText('已禁用', 'Disabled'),
-                            StatusTone.warning,
-                          )
-                        : _skillStatus(
-                            appText('已启用', 'Enabled'),
-                            StatusTone.success,
-                          ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                skill.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: palette.textSecondary,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 10,
-                runSpacing: 6,
-                children: [
-                  _SkillMeta(label: skill.source),
-                  _SkillMeta(label: skill.primaryEnv ?? 'workspace'),
-                ],
-              ),
-            ],
+          child: Text(
+            skill.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: selected ? palette.textPrimary : null,
+            ),
           ),
         ),
       ),
@@ -514,22 +472,6 @@ class _DependencyCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SkillMeta extends StatelessWidget {
-  const _SkillMeta({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: Theme.of(
-        context,
-      ).textTheme.bodySmall?.copyWith(color: context.palette.textMuted),
     );
   }
 }
