@@ -274,25 +274,20 @@ class AppController extends ChangeNotifier {
 
   SingleAgentProvider singleAgentProviderForSession(String sessionKey) {
     final normalizedSessionKey = _normalizedSessionKey(sessionKey);
-    return _threadRecords[normalizedSessionKey]?.singleAgentProvider ??
+    final stored =
+        _threadRecords[normalizedSessionKey]?.singleAgentProvider ??
         SingleAgentProvider.auto;
+    return _settings.resolveSingleAgentProvider(stored);
   }
 
   SingleAgentProvider get currentSingleAgentProvider =>
       singleAgentProviderForSession(_currentSessionKey);
 
   List<SingleAgentProvider> get singleAgentProviderOptions =>
-      _acpCapabilities.providers.isEmpty
-      ? const <SingleAgentProvider>[
-          SingleAgentProvider.auto,
-          ...kBuiltinExternalAcpProviders,
-        ]
-      : <SingleAgentProvider>[
-          SingleAgentProvider.auto,
-          ...kBuiltinExternalAcpProviders.where(
-            _acpCapabilities.providers.contains,
-          ),
-        ];
+      <SingleAgentProvider>[
+        SingleAgentProvider.auto,
+        ..._settings.availableSingleAgentProviders,
+      ];
 
   bool singleAgentUsesAiChatFallbackForSession(String sessionKey) {
     final provider = singleAgentProviderForSession(sessionKey);
@@ -1209,17 +1204,18 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> setSingleAgentProvider(SingleAgentProvider provider) async {
-    if (!singleAgentProviderOptions.contains(provider)) {
+    final resolvedProvider = _settings.resolveSingleAgentProvider(provider);
+    if (!singleAgentProviderOptions.contains(resolvedProvider)) {
       return;
     }
     final sessionKey = _normalizedSessionKey(_currentSessionKey);
-    if (singleAgentProviderForSession(sessionKey) == provider) {
+    if (singleAgentProviderForSession(sessionKey) == resolvedProvider) {
       return;
     }
     _singleAgentRuntimeModelBySession.remove(sessionKey);
     _upsertThreadRecord(
       sessionKey,
-      singleAgentProvider: provider,
+      singleAgentProvider: resolvedProvider,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     await _persistThreads();

@@ -40,8 +40,9 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
   late final TextEditingController _remotePasswordController;
   late final TextEditingController _sessionRemoteBaseUrlController;
   late final TextEditingController _sessionApiTokenController;
-  late final Map<SingleAgentProvider, TextEditingController>
-  _externalAcpEndpointControllers;
+  late final Map<String, TextEditingController> _externalAcpLabelControllers;
+  late final Map<String, TextEditingController> _externalAcpBadgeControllers;
+  late final Map<String, TextEditingController> _externalAcpEndpointControllers;
   late WebSessionPersistenceMode _sessionPersistenceMode;
   bool _remoteTls = true;
   _WebGatewaySettingsSubTab _gatewaySubTab = _WebGatewaySettingsSubTab.gateway;
@@ -68,11 +69,9 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     _remotePasswordController = TextEditingController();
     _sessionRemoteBaseUrlController = TextEditingController();
     _sessionApiTokenController = TextEditingController();
-    _externalAcpEndpointControllers =
-        <SingleAgentProvider, TextEditingController>{
-          for (final provider in kBuiltinExternalAcpProviders)
-            provider: TextEditingController(),
-        };
+    _externalAcpLabelControllers = <String, TextEditingController>{};
+    _externalAcpBadgeControllers = <String, TextEditingController>{};
+    _externalAcpEndpointControllers = <String, TextEditingController>{};
     _sessionPersistenceMode = widget.controller.webSessionPersistence.mode;
     _syncControllers();
   }
@@ -99,6 +98,12 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     _remotePasswordController.dispose();
     _sessionRemoteBaseUrlController.dispose();
     _sessionApiTokenController.dispose();
+    for (final controller in _externalAcpLabelControllers.values) {
+      controller.dispose();
+    }
+    for (final controller in _externalAcpBadgeControllers.values) {
+      controller.dispose();
+    }
     for (final controller in _externalAcpEndpointControllers.values) {
       controller.dispose();
     }
@@ -106,7 +111,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
   }
 
   void _syncControllers() {
-    final settings = widget.controller.settings;
+    final settings = widget.controller.settingsDraft;
     final localProfile = settings.primaryLocalGatewayProfile;
     final remoteProfile = settings.primaryRemoteGatewayProfile;
     _setIfDifferent(_directNameController, settings.aiGateway.name);
@@ -170,11 +175,45 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           ? ''
           : _sessionApiTokenController.text,
     );
-    for (final provider in kBuiltinExternalAcpProviders) {
-      _setIfDifferent(
-        _externalAcpEndpointControllers[provider]!,
-        settings.externalAcpEndpointForProvider(provider).endpoint,
+    _syncExternalAcpControllers(settings);
+  }
+
+  void _syncExternalAcpControllers(SettingsSnapshot settings) {
+    final activeKeys = settings.externalAcpEndpoints
+        .map((item) => item.providerKey)
+        .toSet();
+    for (final profile in settings.externalAcpEndpoints) {
+      final key = profile.providerKey;
+      final labelController = _externalAcpLabelControllers.putIfAbsent(
+        key,
+        () => TextEditingController(),
       );
+      final badgeController = _externalAcpBadgeControllers.putIfAbsent(
+        key,
+        () => TextEditingController(),
+      );
+      final endpointController = _externalAcpEndpointControllers.putIfAbsent(
+        key,
+        () => TextEditingController(),
+      );
+      _setIfDifferent(labelController, profile.label);
+      _setIfDifferent(badgeController, profile.badge);
+      _setIfDifferent(endpointController, profile.endpoint);
+    }
+    _disposeRemovedControllers(_externalAcpLabelControllers, activeKeys);
+    _disposeRemovedControllers(_externalAcpBadgeControllers, activeKeys);
+    _disposeRemovedControllers(_externalAcpEndpointControllers, activeKeys);
+  }
+
+  void _disposeRemovedControllers(
+    Map<String, TextEditingController> controllers,
+    Set<String> activeKeys,
+  ) {
+    final removedKeys = controllers.keys
+        .where((key) => !activeKeys.contains(key))
+        .toList(growable: false);
+    for (final key in removedKeys) {
+      controllers.remove(key)?.dispose();
     }
   }
 
@@ -184,7 +223,6 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final settings = controller.settings;
         final uiFeatures = controller.featuresFor(UiFeaturePlatform.web);
         final availableTabs = uiFeatures.availableSettingsTabs;
         final currentTab = uiFeatures.sanitizeSettingsTab(
@@ -253,7 +291,7 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
                   SettingsTab.gateway => _buildGateway(
                     context,
                     controller,
-                    settings,
+                    controller.settingsDraft,
                   ),
                   SettingsTab.appearance => _buildAppearance(
                     context,
@@ -899,19 +937,35 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           const SizedBox(height: 8),
           Text(
             appText(
-              '第一批内置 4 个 provider：Codex、OpenCode、Claude、Gemini。每个 provider 都可以自定义接入自己的 ACP Server Endpoint，协议支持 ws / wss / http / https。Gateway profile 与 ACP endpoint 分开存储，后续可在这个列表上扩展自定义 provider。',
-              'The first batch includes 4 built-in providers: Codex, OpenCode, Claude, and Gemini. Each provider can point to its own ACP server endpoint with ws / wss / http / https. Gateway profiles and ACP endpoints are stored separately, and this list is designed to extend to custom providers later.',
+              '预设保留 Codex、OpenCode；其余 provider 从这个 ACP 列表动态扩展。每条记录都可自定义显示名称、标志和 ACP Server Endpoint，协议支持 ws / wss / http / https。',
+              'Codex and OpenCode stay as presets. Additional providers are driven directly from this ACP list. Each entry can define its own display name, badge, and ACP server endpoint with ws / wss / http / https.',
             ),
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),
-          ...kBuiltinExternalAcpProviders.map(
-            (provider) => Padding(
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              key: const ValueKey('web-external-acp-provider-add-button'),
+              onPressed: () {
+                unawaited(
+                  controller.saveSettingsDraft(
+                    _appendExternalAcpProvider(controller.settingsDraft),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add_rounded),
+              label: Text(appText('添加自定义 Provider', 'Add custom provider')),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...controller.settingsDraft.externalAcpEndpoints.map(
+            (profile) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: _buildExternalAcpProviderCard(
                 context,
                 controller,
-                provider,
+                profile,
               ),
             ),
           ),
@@ -923,9 +977,13 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
   Widget _buildExternalAcpProviderCard(
     BuildContext context,
     AppController controller,
-    SingleAgentProvider provider,
+    ExternalAcpEndpointProfile profile,
   ) {
-    final endpointController = _externalAcpEndpointControllers[provider]!;
+    final provider = profile.toProvider();
+    final labelController = _externalAcpLabelControllers[profile.providerKey]!;
+    final badgeController = _externalAcpBadgeControllers[profile.providerKey]!;
+    final endpointController =
+        _externalAcpEndpointControllers[profile.providerKey]!;
     final configured = endpointController.text.trim().isNotEmpty;
     return Container(
       padding: const EdgeInsets.all(16),
@@ -939,11 +997,38 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  provider.label,
-                  style: Theme.of(context).textTheme.titleMedium,
+                child: Row(
+                  children: [
+                    _WebExternalAcpProviderBadge(provider: provider),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        provider.label,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              if (!profile.isPreset) ...[
+                IconButton(
+                  tooltip: appText('删除 Provider', 'Remove provider'),
+                  onPressed: () {
+                    final next = controller.settingsDraft.copyWith(
+                      externalAcpEndpoints: controller
+                          .settingsDraft
+                          .externalAcpEndpoints
+                          .where(
+                            (item) => item.providerKey != profile.providerKey,
+                          )
+                          .toList(growable: false),
+                    );
+                    unawaited(controller.saveSettingsDraft(next));
+                  },
+                  icon: const Icon(Icons.delete_outline_rounded),
+                ),
+                const SizedBox(width: 4),
+              ],
               _StatusChip(
                 label: configured
                     ? appText('已配置', 'Configured')
@@ -954,12 +1039,23 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
           ),
           const SizedBox(height: 12),
           TextField(
+            controller: labelController,
+            decoration: InputDecoration(
+              labelText: appText('显示名称', 'Display name'),
+            ),
+            onChanged: (_) => _stageExternalAcpDraft(controller),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: badgeController,
+            decoration: InputDecoration(labelText: appText('标志', 'Badge')),
+            onChanged: (_) => _stageExternalAcpDraft(controller),
+          ),
+          const SizedBox(height: 12),
+          TextField(
             controller: endpointController,
             decoration: InputDecoration(
-              labelText: appText(
-                '${provider.label} ACP Endpoint',
-                '${provider.label} ACP Endpoint',
-              ),
+              labelText: appText('ACP Endpoint', 'ACP Endpoint'),
             ),
             onChanged: (_) => _stageExternalAcpDraft(controller),
           ),
@@ -987,19 +1083,51 @@ class _WebSettingsPageState extends State<WebSettingsPage> {
   }
 
   void _stageExternalAcpDraft(AppController controller) {
-    var next = controller.settingsDraft;
-    for (final provider in kBuiltinExternalAcpProviders) {
-      final currentProfile = next.externalAcpEndpointForProvider(provider);
-      final endpoint = _externalAcpEndpointControllers[provider]!.text.trim();
-      next = next.copyWithExternalAcpEndpointForProvider(
-        provider,
-        currentProfile.copyWith(endpoint: endpoint),
-      );
-    }
+    final nextProfiles = controller.settingsDraft.externalAcpEndpoints
+        .map(
+          (profile) => profile.copyWith(
+            label:
+                _externalAcpLabelControllers[profile.providerKey]?.text ??
+                profile.label,
+            badge:
+                _externalAcpBadgeControllers[profile.providerKey]?.text ??
+                profile.badge,
+            endpoint:
+                _externalAcpEndpointControllers[profile.providerKey]?.text ??
+                profile.endpoint,
+          ),
+        )
+        .toList(growable: false);
+    final next = controller.settingsDraft.copyWith(
+      externalAcpEndpoints: nextProfiles,
+    );
     if (next.toJsonString() == controller.settingsDraft.toJsonString()) {
       return;
     }
     unawaited(controller.saveSettingsDraft(next));
+  }
+
+  SettingsSnapshot _appendExternalAcpProvider(SettingsSnapshot settings) {
+    var suffix = settings.externalAcpEndpoints.length + 1;
+    String providerKey() => 'custom-agent-$suffix';
+    final existingKeys = settings.externalAcpEndpoints
+        .map((item) => item.providerKey)
+        .toSet();
+    while (existingKeys.contains(providerKey())) {
+      suffix += 1;
+    }
+    return settings.copyWith(
+      externalAcpEndpoints: <ExternalAcpEndpointProfile>[
+        ...settings.externalAcpEndpoints,
+        ExternalAcpEndpointProfile(
+          providerKey: providerKey(),
+          label: appText('自定义 Provider $suffix', 'Custom Provider $suffix'),
+          badge: '$suffix',
+          endpoint: '',
+          enabled: true,
+        ),
+      ],
+    );
   }
 
   Widget _buildGatewayCard(
@@ -1364,6 +1492,37 @@ class _StatusChip extends StatelessWidget {
         label,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
           color: foreground,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _WebExternalAcpProviderBadge extends StatelessWidget {
+  const _WebExternalAcpProviderBadge({required this.provider});
+
+  final SingleAgentProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final display = provider.badge.trim().isEmpty
+        ? provider.label
+        : provider.badge;
+    final text = display.length <= 2 ? display : display.substring(0, 2);
+    return Container(
+      width: 28,
+      height: 28,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: palette.accent.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: palette.accent,
           fontWeight: FontWeight.w700,
         ),
       ),

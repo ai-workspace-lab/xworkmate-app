@@ -71,6 +71,7 @@ class SingleAgentRunResult {
 abstract class SingleAgentRunner {
   Future<SingleAgentProviderResolution> resolveProvider({
     required SingleAgentProvider selection,
+    required List<SingleAgentProvider> availableProviders,
     required String configuredCodexCliPath,
     required String gatewayToken,
   });
@@ -90,6 +91,7 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
   @override
   Future<SingleAgentProviderResolution> resolveProvider({
     required SingleAgentProvider selection,
+    required List<SingleAgentProvider> availableProviders,
     required String configuredCodexCliPath,
     required String gatewayToken,
   }) async {
@@ -117,7 +119,10 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
       }
 
       String? fallbackReason;
-      for (final provider in kBuiltinExternalAcpProviders) {
+      for (final provider in availableProviders) {
+        if (provider == SingleAgentProvider.auto) {
+          continue;
+        }
         final capabilities = await _appServerClient.loadCapabilities(
           provider: provider,
           gatewayToken: gatewayToken,

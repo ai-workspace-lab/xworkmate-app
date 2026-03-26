@@ -441,9 +441,15 @@ class AppController extends ChangeNotifier {
   String? storedGatewayPasswordMaskForProfile(int profileIndex) =>
       _settingsController.storedGatewayPasswordMaskForProfile(profileIndex);
 
-  List<SingleAgentProvider> get availableSingleAgentProviders =>
-      (_availableSingleAgentProvidersOverride ?? kBuiltinExternalAcpProviders)
+  List<SingleAgentProvider> get configuredSingleAgentProviders =>
+      (_availableSingleAgentProvidersOverride ??
+              settings.availableSingleAgentProviders)
           .where((item) => item != SingleAgentProvider.auto)
+          .map(settings.resolveSingleAgentProvider)
+          .toList(growable: false);
+
+  List<SingleAgentProvider> get availableSingleAgentProviders =>
+      configuredSingleAgentProviders
           .where(_canUseSingleAgentProvider)
           .toList(growable: false);
 
@@ -468,12 +474,12 @@ class AppController extends ChangeNotifier {
     SingleAgentProvider selection,
   ) {
     if (selection != SingleAgentProvider.auto) {
-      return _canUseSingleAgentProvider(selection) ? selection : null;
+      final resolvedSelection = settings.resolveSingleAgentProvider(selection);
+      return _canUseSingleAgentProvider(resolvedSelection)
+          ? resolvedSelection
+          : null;
     }
-    for (final provider in SingleAgentProvider.values) {
-      if (provider == SingleAgentProvider.auto) {
-        continue;
-      }
+    for (final provider in configuredSingleAgentProviders) {
       if (_canUseSingleAgentProvider(provider)) {
         return provider;
       }
@@ -650,10 +656,14 @@ class AppController extends ChangeNotifier {
 
   SingleAgentProvider singleAgentProviderForSession(String sessionKey) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    return sanitizeAppStoreSingleAgentProvider(
-      _assistantThreadRecords[normalizedSessionKey]?.singleAgentProvider ??
-          SingleAgentProvider.auto,
-      isAppleHost: Platform.isIOS || Platform.isMacOS,
+    final stored =
+        _assistantThreadRecords[normalizedSessionKey]?.singleAgentProvider ??
+        SingleAgentProvider.auto;
+    return settings.resolveSingleAgentProvider(
+      sanitizeAppStoreSingleAgentProvider(
+        stored,
+        isAppleHost: Platform.isIOS || Platform.isMacOS,
+      ),
     );
   }
 
@@ -772,9 +782,9 @@ class AppController extends ChangeNotifier {
       singleAgentShouldShowModelControlForSession(currentSessionKey);
 
   List<SingleAgentProvider> get singleAgentProviderOptions =>
-      const <SingleAgentProvider>[
+      <SingleAgentProvider>[
         SingleAgentProvider.auto,
-        ...kBuiltinExternalAcpProviders,
+        ...configuredSingleAgentProviders,
       ];
 
   String singleAgentProviderLabelForSession(String sessionKey) {
@@ -1983,9 +1993,11 @@ class AppController extends ChangeNotifier {
 
   Future<void> setSingleAgentProvider(SingleAgentProvider provider) async {
     final sessionKey = _normalizedAssistantSessionKey(currentSessionKey);
-    final sanitizedProvider = sanitizeAppStoreSingleAgentProvider(
-      provider,
-      isAppleHost: Platform.isIOS || Platform.isMacOS,
+    final sanitizedProvider = settings.resolveSingleAgentProvider(
+      sanitizeAppStoreSingleAgentProvider(
+        provider,
+        isAppleHost: Platform.isIOS || Platform.isMacOS,
+      ),
     );
     if (singleAgentProviderForSession(sessionKey) == sanitizedProvider) {
       return;
@@ -3479,6 +3491,7 @@ class AppController extends ChangeNotifier {
         final gatewayToken = await settingsController.loadGatewayToken();
         final resolution = await _singleAgentRunner.resolveProvider(
           selection: selection,
+          availableProviders: configuredSingleAgentProviders,
           configuredCodexCliPath: configuredCodexCliPath,
           gatewayToken: gatewayToken,
         );
@@ -5120,7 +5133,7 @@ class AppController extends ChangeNotifier {
   }) async {
     final gatewayToken = await settingsController.loadGatewayToken();
     final next = <SingleAgentProvider, DirectSingleAgentCapabilities>{};
-    for (final provider in kBuiltinExternalAcpProviders) {
+    for (final provider in configuredSingleAgentProviders) {
       final profile = settings.externalAcpEndpointForProvider(provider);
       if (!profile.enabled || profile.endpoint.trim().isEmpty) {
         next[provider] = const DirectSingleAgentCapabilities.unavailable(

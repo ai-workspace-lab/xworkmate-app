@@ -70,44 +70,191 @@ extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   }
 }
 
-enum SingleAgentProvider { auto, codex, opencode, claude, gemini }
-
-extension SingleAgentProviderCopy on SingleAgentProvider {
-  String get label => switch (this) {
-    SingleAgentProvider.auto => 'Auto',
-    SingleAgentProvider.codex => 'Codex',
-    SingleAgentProvider.opencode => 'OpenCode',
-    SingleAgentProvider.claude => 'Claude',
-    SingleAgentProvider.gemini => 'Gemini',
-  };
-
-  String get providerId => switch (this) {
-    SingleAgentProvider.auto => 'auto',
-    SingleAgentProvider.codex => 'codex',
-    SingleAgentProvider.opencode => 'opencode',
-    SingleAgentProvider.claude => 'claude',
-    SingleAgentProvider.gemini => 'gemini',
-  };
-
-  static SingleAgentProvider fromJsonValue(String? value) {
-    final normalized = value?.trim() ?? '';
-    switch (normalized) {
-      case 'codex':
-        return SingleAgentProvider.codex;
-      case 'opencode':
-        return SingleAgentProvider.opencode;
-      case 'claude':
-        return SingleAgentProvider.claude;
-      case 'gemini':
-        return SingleAgentProvider.gemini;
-      case 'auto':
-      default:
-        return SingleAgentProvider.auto;
+String normalizeSingleAgentProviderId(String value) {
+  final trimmed = value.trim().toLowerCase();
+  if (trimmed.isEmpty) {
+    return '';
+  }
+  final normalizedWhitespace = trimmed.replaceAll(RegExp(r'\s+'), '-');
+  final buffer = StringBuffer();
+  var previousWasSeparator = false;
+  var hasOutput = false;
+  for (final rune in normalizedWhitespace.runes) {
+    final char = String.fromCharCode(rune);
+    final isAlphaNumeric =
+        (rune >= 97 && rune <= 122) || (rune >= 48 && rune <= 57);
+    final isSeparator = char == '-' || char == '_' || char == '.';
+    if (isAlphaNumeric) {
+      buffer.write(char);
+      previousWasSeparator = false;
+      hasOutput = true;
+      continue;
+    }
+    if (isSeparator && !previousWasSeparator && hasOutput) {
+      buffer.write('-');
+      previousWasSeparator = true;
     }
   }
+  return buffer.toString().replaceAll(RegExp(r'^[-_.]+|[-_.]+$'), '');
+}
+
+String _singleAgentProviderFallbackLabel(String providerId) {
+  final normalized = normalizeSingleAgentProviderId(providerId);
+  if (normalized.isEmpty) {
+    return 'Custom Agent';
+  }
+  return normalized
+      .split(RegExp(r'[-_.]+'))
+      .where((item) => item.isNotEmpty)
+      .map((item) => '${item[0].toUpperCase()}${item.substring(1)}')
+      .join(' ');
+}
+
+String _singleAgentProviderFallbackBadge({
+  required String providerId,
+  required String label,
+}) {
+  final normalized = normalizeSingleAgentProviderId(providerId);
+  final known = <String, String>{
+    'auto': 'A',
+    'codex': 'C',
+    'opencode': 'O',
+    'claude': 'Cl',
+    'gemini': 'G',
+  };
+  final explicit = known[normalized];
+  if (explicit != null) {
+    return explicit;
+  }
+  final stripped = label.replaceAll(RegExp(r'\s+'), '');
+  if (stripped.isEmpty) {
+    return '?';
+  }
+  final length = stripped.length >= 2 ? 2 : 1;
+  return stripped.substring(0, length).toUpperCase();
+}
+
+class SingleAgentProvider {
+  const SingleAgentProvider({
+    required this.providerId,
+    required this.label,
+    required this.badge,
+    this.preset = false,
+  });
+
+  static const SingleAgentProvider auto = SingleAgentProvider(
+    providerId: 'auto',
+    label: 'Auto',
+    badge: 'A',
+  );
+
+  static const SingleAgentProvider codex = SingleAgentProvider(
+    providerId: 'codex',
+    label: 'Codex',
+    badge: 'C',
+    preset: true,
+  );
+
+  static const SingleAgentProvider opencode = SingleAgentProvider(
+    providerId: 'opencode',
+    label: 'OpenCode',
+    badge: 'O',
+    preset: true,
+  );
+
+  static const SingleAgentProvider claude = SingleAgentProvider(
+    providerId: 'claude',
+    label: 'Claude',
+    badge: 'Cl',
+  );
+
+  static const SingleAgentProvider gemini = SingleAgentProvider(
+    providerId: 'gemini',
+    label: 'Gemini',
+    badge: 'G',
+  );
+
+  final String providerId;
+  final String label;
+  final String badge;
+  final bool preset;
+
+  bool get isAuto => providerId == auto.providerId;
+
+  SingleAgentProvider copyWith({
+    String? providerId,
+    String? label,
+    String? badge,
+    bool? preset,
+  }) {
+    final resolvedProviderId = normalizeSingleAgentProviderId(
+      providerId ?? this.providerId,
+    );
+    final resolvedLabel = (label ?? this.label).trim();
+    final resolvedBadge = (badge ?? this.badge).trim();
+    return SingleAgentProvider(
+      providerId: resolvedProviderId,
+      label: resolvedLabel.isEmpty
+          ? _singleAgentProviderFallbackLabel(resolvedProviderId)
+          : resolvedLabel,
+      badge: resolvedBadge.isEmpty
+          ? _singleAgentProviderFallbackBadge(
+              providerId: resolvedProviderId,
+              label: resolvedLabel,
+            )
+          : resolvedBadge,
+      preset: preset ?? this.preset,
+    );
+  }
+
+  static SingleAgentProvider fromJsonValue(
+    String? value, {
+    String? label,
+    String? badge,
+  }) {
+    final normalized = normalizeSingleAgentProviderId(value ?? '');
+    final base = switch (normalized) {
+      'codex' => codex,
+      'opencode' => opencode,
+      'claude' => claude,
+      'gemini' => gemini,
+      'auto' || '' => auto,
+      _ => SingleAgentProvider(
+        providerId: normalized,
+        label: _singleAgentProviderFallbackLabel(normalized),
+        badge: _singleAgentProviderFallbackBadge(
+          providerId: normalized,
+          label: _singleAgentProviderFallbackLabel(normalized),
+        ),
+      ),
+    };
+    return base.copyWith(label: label, badge: badge);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SingleAgentProvider && other.providerId == providerId);
+
+  @override
+  int get hashCode => providerId.hashCode;
+}
+
+extension SingleAgentProviderCopy on SingleAgentProvider {
+  static SingleAgentProvider fromJsonValue(
+    String? value, {
+    String? label,
+    String? badge,
+  }) => SingleAgentProvider.fromJsonValue(value, label: label, badge: badge);
 }
 
 const List<SingleAgentProvider> kBuiltinExternalAcpProviders =
+    <SingleAgentProvider>[
+      SingleAgentProvider.codex,
+      SingleAgentProvider.opencode,
+    ];
+
+const List<SingleAgentProvider> kKnownSingleAgentProviders =
     <SingleAgentProvider>[
       SingleAgentProvider.codex,
       SingleAgentProvider.opencode,
@@ -119,12 +266,14 @@ class ExternalAcpEndpointProfile {
   const ExternalAcpEndpointProfile({
     required this.providerKey,
     required this.label,
+    required this.badge,
     required this.endpoint,
     required this.enabled,
   });
 
   final String providerKey;
   final String label;
+  final String badge;
   final String endpoint;
   final bool enabled;
 
@@ -134,6 +283,7 @@ class ExternalAcpEndpointProfile {
     return ExternalAcpEndpointProfile(
       providerKey: provider.providerId,
       label: provider.label,
+      badge: provider.badge,
       endpoint: '',
       enabled: true,
     );
@@ -142,12 +292,16 @@ class ExternalAcpEndpointProfile {
   ExternalAcpEndpointProfile copyWith({
     String? providerKey,
     String? label,
+    String? badge,
     String? endpoint,
     bool? enabled,
   }) {
     return ExternalAcpEndpointProfile(
-      providerKey: (providerKey ?? this.providerKey).trim(),
+      providerKey: normalizeSingleAgentProviderId(
+        providerKey ?? this.providerKey,
+      ),
       label: (label ?? this.label).trim(),
+      badge: (badge ?? this.badge).trim(),
       endpoint: (endpoint ?? this.endpoint).trim(),
       enabled: enabled ?? this.enabled,
     );
@@ -155,7 +309,7 @@ class ExternalAcpEndpointProfile {
 
   SingleAgentProvider? get builtinProvider {
     final normalized = providerKey.trim().toLowerCase();
-    for (final provider in kBuiltinExternalAcpProviders) {
+    for (final provider in kKnownSingleAgentProviders) {
       if (provider.providerId == normalized) {
         return provider;
       }
@@ -163,28 +317,46 @@ class ExternalAcpEndpointProfile {
     return null;
   }
 
-  bool get isBuiltin => builtinProvider != null;
+  bool get isPreset => kBuiltinExternalAcpProviders.any(
+    (item) => item.providerId == providerKey,
+  );
+
+  SingleAgentProvider toProvider() {
+    return SingleAgentProvider.fromJsonValue(
+      providerKey,
+      label: label,
+      badge: badge,
+    ).copyWith(preset: isPreset);
+  }
 
   Map<String, dynamic> toJson() {
     return {
       'providerKey': providerKey,
       'label': label,
+      'badge': badge,
       'endpoint': endpoint,
       'enabled': enabled,
     };
   }
 
   factory ExternalAcpEndpointProfile.fromJson(Map<String, dynamic> json) {
-    final providerKey = json['providerKey']?.toString().trim() ?? '';
+    final providerKey = normalizeSingleAgentProviderId(
+      json['providerKey']?.toString() ?? '',
+    );
     final builtin = SingleAgentProviderCopy.fromJsonValue(providerKey);
-    final fallbackLabel = builtin == SingleAgentProvider.auto
-        ? providerKey
-        : builtin.label;
+    final fallbackLabel = builtin.isAuto ? providerKey : builtin.label;
+    final label = json['label']?.toString().trim().isNotEmpty == true
+        ? json['label'].toString().trim()
+        : fallbackLabel;
     return ExternalAcpEndpointProfile(
       providerKey: providerKey,
-      label: json['label']?.toString().trim().isNotEmpty == true
-          ? json['label'].toString().trim()
-          : fallbackLabel,
+      label: label,
+      badge: json['badge']?.toString().trim().isNotEmpty == true
+          ? json['badge'].toString().trim()
+          : _singleAgentProviderFallbackBadge(
+              providerId: providerKey,
+              label: label,
+            ),
       endpoint: json['endpoint']?.toString().trim() ?? '',
       enabled: json['enabled'] as bool? ?? true,
     );
@@ -227,6 +399,7 @@ List<ExternalAcpEndpointProfile> replaceExternalAcpEndpointForProvider(
   final resolved = profile.copyWith(
     providerKey: provider.providerId,
     label: profile.label.trim().isEmpty ? provider.label : profile.label,
+    badge: profile.badge.trim().isEmpty ? provider.badge : profile.badge,
   );
   if (index == -1) {
     next.add(resolved);
@@ -1820,6 +1993,49 @@ class SettingsSnapshot {
       orElse: () => ExternalAcpEndpointProfile.defaultsForProvider(provider),
     );
   }
+
+  ExternalAcpEndpointProfile? externalAcpEndpointForProviderId(
+    String providerId,
+  ) {
+    final normalized = normalizeSingleAgentProviderId(providerId);
+    if (normalized.isEmpty) {
+      return null;
+    }
+    for (final item in externalAcpEndpoints) {
+      if (item.providerKey == normalized) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  SingleAgentProvider resolveSingleAgentProvider(SingleAgentProvider provider) {
+    if (provider.isAuto) {
+      return SingleAgentProvider.auto;
+    }
+    final profile = externalAcpEndpointForProviderId(provider.providerId);
+    if (profile != null) {
+      return profile.toProvider();
+    }
+    return provider;
+  }
+
+  SingleAgentProvider singleAgentProviderForId(String providerId) {
+    final resolved = normalizeSingleAgentProviderId(providerId);
+    if (resolved.isEmpty || resolved == SingleAgentProvider.auto.providerId) {
+      return SingleAgentProvider.auto;
+    }
+    final profile = externalAcpEndpointForProviderId(resolved);
+    if (profile != null) {
+      return profile.toProvider();
+    }
+    return SingleAgentProvider.fromJsonValue(resolved);
+  }
+
+  List<SingleAgentProvider> get availableSingleAgentProviders =>
+      externalAcpEndpoints
+          .map((item) => item.toProvider())
+          .toList(growable: false);
 
   SettingsSnapshot copyWithExternalAcpEndpointForProvider(
     SingleAgentProvider provider,

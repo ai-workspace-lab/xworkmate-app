@@ -172,7 +172,11 @@ void main() {
     expect(find.text('设置提交流程'), findsOneWidget);
     expect(find.text('Codex'), findsWidgets);
     expect(find.text('OpenCode'), findsWidgets);
-    expect(find.text('Claude'), findsWidgets);
-    expect(find.text('Gemini'), findsWidgets);
+    expect(find.text('Claude'), findsNothing);
+    expect(find.text('Gemini'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('web-external-acp-provider-add-button')),
+      findsOneWidget,
+    );
   });
 }
