@@ -63,21 +63,21 @@ void main() {
       );
     });
 
-    test('legacy claude and gemini entries migrate into custom endpoints', () {
+    test('empty legacy claude and gemini entries are dropped', () {
       final normalized = normalizeExternalAcpEndpoints(
         profiles: const <ExternalAcpEndpointProfile>[
           ExternalAcpEndpointProfile(
             providerKey: 'claude',
             label: 'Claude',
             badge: 'Cl',
-            endpoint: 'ws://127.0.0.1:9011',
+            endpoint: '',
             enabled: true,
           ),
           ExternalAcpEndpointProfile(
             providerKey: 'gemini',
             label: 'Gemini',
             badge: 'G',
-            endpoint: 'ws://127.0.0.1:9012',
+            endpoint: '',
             enabled: true,
           ),
         ],
@@ -88,14 +88,94 @@ void main() {
         const <String>['codex', 'opencode'],
       );
       expect(
-        normalized
-            .where((item) => item.providerKey.startsWith('custom-agent-'))
-            .map((item) => item.label)
-            .toList(growable: false),
-        const <String>['Claude', 'Gemini'],
+        normalized.where(
+          (item) => item.providerKey.startsWith('custom-agent-'),
+        ),
+        isEmpty,
       );
       expect(normalized.any((item) => item.providerKey == 'claude'), isFalse);
       expect(normalized.any((item) => item.providerKey == 'gemini'), isFalse);
     });
+
+    test(
+      'configured legacy claude and gemini entries migrate into custom endpoints',
+      () {
+        final normalized = normalizeExternalAcpEndpoints(
+          profiles: const <ExternalAcpEndpointProfile>[
+            ExternalAcpEndpointProfile(
+              providerKey: 'claude',
+              label: 'Claude',
+              badge: 'Cl',
+              endpoint: 'wss://claude.example.com/acp',
+              enabled: true,
+            ),
+            ExternalAcpEndpointProfile(
+              providerKey: 'gemini',
+              label: 'Gemini',
+              badge: 'G',
+              endpoint: 'wss://gemini.example.com/acp',
+              enabled: true,
+            ),
+          ],
+        );
+
+        expect(
+          normalized
+              .where((item) => item.providerKey.startsWith('custom-agent-'))
+              .map((item) => item.label)
+              .toList(growable: false),
+          const <String>['Claude', 'Gemini'],
+        );
+        expect(normalized.any((item) => item.providerKey == 'claude'), isFalse);
+        expect(normalized.any((item) => item.providerKey == 'gemini'), isFalse);
+      },
+    );
+
+    test(
+      'custom endpoint builder validates sequential keys and label fallback',
+      () {
+        final profile = buildCustomExternalAcpEndpointProfile(
+          SettingsSnapshot.defaults().externalAcpEndpoints,
+          label: '',
+          endpoint: 'wss://lab.example.com/acp',
+        );
+
+        expect(profile.providerKey, 'custom-agent-3');
+        expect(profile.label, 'Custom ACP Endpoint 3');
+        expect(profile.endpoint, 'wss://lab.example.com/acp');
+      },
+    );
+
+    test(
+      'available single-agent providers follow normalized endpoint settings',
+      () {
+        final snapshot = SettingsSnapshot.defaults().copyWith(
+          externalAcpEndpoints: normalizeExternalAcpEndpoints(
+            profiles: <ExternalAcpEndpointProfile>[
+              ...SettingsSnapshot.defaults().externalAcpEndpoints,
+              buildCustomExternalAcpEndpointProfile(
+                SettingsSnapshot.defaults().externalAcpEndpoints,
+                label: 'Lab Agent',
+                endpoint: 'wss://lab.example.com/acp',
+              ),
+              const ExternalAcpEndpointProfile(
+                providerKey: 'claude',
+                label: 'Claude',
+                badge: 'Cl',
+                endpoint: '',
+                enabled: true,
+              ),
+            ],
+          ),
+        );
+
+        expect(
+          snapshot.availableSingleAgentProviders
+              .map((item) => item.label)
+              .toList(),
+          const <String>['Codex', 'OpenCode', 'Lab Agent'],
+        );
+      },
+    );
   });
 }
