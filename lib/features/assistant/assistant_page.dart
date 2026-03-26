@@ -397,6 +397,7 @@ class _AssistantPageState extends State<AssistantPage> {
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final palette = context.palette;
         final mediaQuery = MediaQuery.of(context);
         final composerBottomInset = math.max(
           mediaQuery.viewPadding.bottom,
@@ -448,111 +449,120 @@ class _AssistantPageState extends State<AssistantPage> {
                 .clamp(composerHeightLowerBound, composerHeightUpperBound)
                 .toDouble();
 
-        return Column(
-          children: [
-            Expanded(
-              child: KeyedSubtree(
-                key: const Key('assistant-conversation-shell'),
-                child: _ConversationArea(
-                  controller: controller,
-                  currentTask: currentTask,
-                  items: timelineItems,
-                  messageViewMode: controller.currentAssistantMessageViewMode,
+        return SurfaceCard(
+          borderRadius: 0,
+          padding: EdgeInsets.zero,
+          tone: SurfaceCardTone.chrome,
+          child: Column(
+            children: [
+              Expanded(
+                child: KeyedSubtree(
+                  key: const Key('assistant-conversation-shell'),
+                  child: _ConversationArea(
+                    controller: controller,
+                    currentTask: currentTask,
+                    items: timelineItems,
+                    messageViewMode: controller.currentAssistantMessageViewMode,
+                    bottomContentInset: composerBottomSpacing,
+                    topTrailingInset: _artifactPaneCollapsed
+                        ? _assistantCollapsedArtifactToggleClearance
+                        : 0,
+                    scrollController: _conversationController,
+                    onOpenDetail: widget.onOpenDetail,
+                    onFocusComposer: _focusComposer,
+                    onOpenGateway: _openGatewaySettings,
+                    onOpenAiGatewaySettings: _openAiGatewaySettings,
+                    onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
+                    onMessageViewModeChanged:
+                        controller.setAssistantMessageViewMode,
+                  ),
+                ),
+              ),
+              ColoredBox(
+                color: palette.canvas,
+                child: SizedBox(
+                  key: const Key('assistant-workspace-resize-handle'),
+                  height: _assistantVerticalResizeHandleHeight,
+                  child: PaneResizeHandle(
+                    axis: Axis.vertical,
+                    onDelta: (delta) {
+                      setState(() {
+                        final nextComposerHeight = (composerHeight - delta)
+                            .clamp(
+                              composerHeightLowerBound,
+                              composerHeightUpperBound,
+                            )
+                            .toDouble();
+                        _workspaceLowerPaneHeightAdjustment =
+                            nextComposerHeight - defaultComposerHeight;
+                      });
+                    },
+                  ),
+                ),
+              ),
+              SizedBox(
+                key: const Key('assistant-composer-shell'),
+                height: composerHeight,
+                child: _AssistantLowerPane(
                   bottomContentInset: composerBottomSpacing,
-                  topTrailingInset: _artifactPaneCollapsed
-                      ? _assistantCollapsedArtifactToggleClearance
-                      : 0,
-                  scrollController: _conversationController,
-                  onOpenDetail: widget.onOpenDetail,
-                  onFocusComposer: _focusComposer,
+                  inputController: _inputController,
+                  focusNode: _composerFocusNode,
+                  thinkingLabel: _thinkingLabel,
+                  showModelControl: !controller.isSingleAgentMode
+                      ? true
+                      : controller.currentSingleAgentShouldShowModelControl,
+                  modelLabel: controller.isSingleAgentMode
+                      ? controller.currentSingleAgentModelDisplayLabel
+                      : controller.resolvedAssistantModel.isEmpty
+                      ? appText('未选择模型', 'No model selected')
+                      : controller.resolvedAssistantModel,
+                  modelOptions: controller.assistantModelChoices,
+                  attachments: _attachments,
+                  availableSkills: _availableSkillOptions(controller),
+                  selectedSkillKeys: _selectedSkillKeysFor(controller),
+                  controller: controller,
+                  onRemoveAttachment: (attachment) {
+                    setState(() {
+                      _attachments = _attachments
+                          .where((item) => item.path != attachment.path)
+                          .toList(growable: false);
+                    });
+                  },
+                  onToggleSkill: (key) {
+                    unawaited(
+                      controller.toggleAssistantSkillForSession(
+                        controller.currentSessionKey,
+                        key,
+                      ),
+                    );
+                    _focusComposer();
+                  },
+                  onThinkingChanged: (value) {
+                    setState(() => _thinkingLabel = value);
+                  },
+                  onModelChanged: (modelId) =>
+                      controller.selectAssistantModelForSession(
+                        controller.currentSessionKey,
+                        modelId,
+                      ),
                   onOpenGateway: _openGatewaySettings,
                   onOpenAiGatewaySettings: _openAiGatewaySettings,
                   onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
-                  onMessageViewModeChanged:
-                      controller.setAssistantMessageViewMode,
+                  onPickAttachments: _pickAttachments,
+                  onAddAttachment: (attachment) {
+                    setState(() {
+                      _attachments = [..._attachments, attachment];
+                    });
+                  },
+                  onPasteImageAttachment:
+                      widget.clipboardImageReader ?? _readClipboardImageAsXFile,
+                  onComposerInputHeightChanged:
+                      _handleComposerInputHeightChanged,
+                  onSend: _submitPrompt,
                 ),
               ),
-            ),
-            SizedBox(
-              key: const Key('assistant-workspace-resize-handle'),
-              height: _assistantVerticalResizeHandleHeight,
-              child: PaneResizeHandle(
-                axis: Axis.vertical,
-                onDelta: (delta) {
-                  setState(() {
-                    final nextComposerHeight = (composerHeight - delta)
-                        .clamp(
-                          composerHeightLowerBound,
-                          composerHeightUpperBound,
-                        )
-                        .toDouble();
-                    _workspaceLowerPaneHeightAdjustment =
-                        nextComposerHeight - defaultComposerHeight;
-                  });
-                },
-              ),
-            ),
-            SizedBox(
-              key: const Key('assistant-composer-shell'),
-              height: composerHeight,
-              child: _AssistantLowerPane(
-                bottomContentInset: composerBottomSpacing,
-                inputController: _inputController,
-                focusNode: _composerFocusNode,
-                thinkingLabel: _thinkingLabel,
-                showModelControl: !controller.isSingleAgentMode
-                    ? true
-                    : controller.currentSingleAgentShouldShowModelControl,
-                modelLabel: controller.isSingleAgentMode
-                    ? controller.currentSingleAgentModelDisplayLabel
-                    : controller.resolvedAssistantModel.isEmpty
-                    ? appText('未选择模型', 'No model selected')
-                    : controller.resolvedAssistantModel,
-                modelOptions: controller.assistantModelChoices,
-                attachments: _attachments,
-                availableSkills: _availableSkillOptions(controller),
-                selectedSkillKeys: _selectedSkillKeysFor(controller),
-                controller: controller,
-                onRemoveAttachment: (attachment) {
-                  setState(() {
-                    _attachments = _attachments
-                        .where((item) => item.path != attachment.path)
-                        .toList(growable: false);
-                  });
-                },
-                onToggleSkill: (key) {
-                  unawaited(
-                    controller.toggleAssistantSkillForSession(
-                      controller.currentSessionKey,
-                      key,
-                    ),
-                  );
-                  _focusComposer();
-                },
-                onThinkingChanged: (value) {
-                  setState(() => _thinkingLabel = value);
-                },
-                onModelChanged: (modelId) =>
-                    controller.selectAssistantModelForSession(
-                      controller.currentSessionKey,
-                      modelId,
-                    ),
-                onOpenGateway: _openGatewaySettings,
-                onOpenAiGatewaySettings: _openAiGatewaySettings,
-                onReconnectGateway: _connectFromSavedSettingsOrShowDialog,
-                onPickAttachments: _pickAttachments,
-                onAddAttachment: (attachment) {
-                  setState(() {
-                    _attachments = [..._attachments, attachment];
-                  });
-                },
-                onPasteImageAttachment:
-                    widget.clipboardImageReader ?? _readClipboardImageAsXFile,
-                onComposerInputHeightChanged: _handleComposerInputHeightChanged,
-                onSend: _submitPrompt,
-              ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -1817,36 +1827,36 @@ class _AssistantLowerPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.bottomCenter,
+    final palette = context.palette;
+
+    return ColoredBox(
+      color: palette.canvas,
       child: SingleChildScrollView(
         physics: const ClampingScrollPhysics(),
-        child: Padding(
-          padding: EdgeInsets.only(bottom: bottomContentInset),
-          child: _ComposerBar(
-            controller: controller,
-            inputController: inputController,
-            focusNode: focusNode,
-            thinkingLabel: thinkingLabel,
-            showModelControl: showModelControl,
-            modelLabel: modelLabel,
-            modelOptions: modelOptions,
-            attachments: attachments,
-            availableSkills: availableSkills,
-            selectedSkillKeys: selectedSkillKeys,
-            onRemoveAttachment: onRemoveAttachment,
-            onToggleSkill: onToggleSkill,
-            onThinkingChanged: onThinkingChanged,
-            onModelChanged: onModelChanged,
-            onOpenGateway: onOpenGateway,
-            onOpenAiGatewaySettings: onOpenAiGatewaySettings,
-            onReconnectGateway: onReconnectGateway,
-            onPickAttachments: onPickAttachments,
-            onAddAttachment: onAddAttachment,
-            onPasteImageAttachment: onPasteImageAttachment,
-            onInputHeightChanged: onComposerInputHeightChanged,
-            onSend: onSend,
-          ),
+        padding: EdgeInsets.only(bottom: bottomContentInset),
+        child: _ComposerBar(
+          controller: controller,
+          inputController: inputController,
+          focusNode: focusNode,
+          thinkingLabel: thinkingLabel,
+          showModelControl: showModelControl,
+          modelLabel: modelLabel,
+          modelOptions: modelOptions,
+          attachments: attachments,
+          availableSkills: availableSkills,
+          selectedSkillKeys: selectedSkillKeys,
+          onRemoveAttachment: onRemoveAttachment,
+          onToggleSkill: onToggleSkill,
+          onThinkingChanged: onThinkingChanged,
+          onModelChanged: onModelChanged,
+          onOpenGateway: onOpenGateway,
+          onOpenAiGatewaySettings: onOpenAiGatewaySettings,
+          onReconnectGateway: onReconnectGateway,
+          onPickAttachments: onPickAttachments,
+          onAddAttachment: onAddAttachment,
+          onPasteImageAttachment: onPasteImageAttachment,
+          onInputHeightChanged: onComposerInputHeightChanged,
+          onSend: onSend,
         ),
       ),
     );
@@ -1889,122 +1899,117 @@ class _ConversationArea extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
 
-    return SurfaceCard(
-      borderRadius: 0,
-      padding: EdgeInsets.zero,
-      tone: SurfaceCardTone.chrome,
-      child: Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(10, 8, 10 + topTrailingInset, 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Spacer(),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _MessageViewModeChip(
-                      value: messageViewMode,
-                      onSelected: onMessageViewModeChanged,
-                    ),
-                    const SizedBox(width: 6),
-                    _ConnectionChip(controller: controller),
-                  ],
-                ),
-              ],
-            ),
+    return Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(10, 8, 10 + topTrailingInset, 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Spacer(),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _MessageViewModeChip(
+                    value: messageViewMode,
+                    onSelected: onMessageViewModeChanged,
+                  ),
+                  const SizedBox(width: 6),
+                  _ConnectionChip(controller: controller),
+                ],
+              ),
+            ],
           ),
-          Divider(height: 1, color: palette.strokeSoft),
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(color: palette.canvas),
-              child: items.isEmpty
-                  ? _AssistantEmptyState(
-                      controller: controller,
-                      onFocusComposer: onFocusComposer,
-                      onOpenGateway: onOpenGateway,
-                      onOpenAiGatewaySettings: onOpenAiGatewaySettings,
-                      onReconnectGateway: onReconnectGateway,
-                    )
-                  : ListView.separated(
-                      controller: scrollController,
-                      padding: EdgeInsets.fromLTRB(
-                        10,
-                        8,
-                        10,
-                        8 + bottomContentInset,
-                      ),
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: items.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 6),
-                      itemBuilder: (context, index) {
-                        final item = items[index];
-                        return switch (item.kind) {
-                          _TimelineItemKind.user => _MessageBubble(
-                            label: item.label!,
-                            text: item.text!,
-                            alignRight: true,
-                            tone: _BubbleTone.user,
-                            messageViewMode: messageViewMode,
-                          ),
-                          _TimelineItemKind.assistant => _MessageBubble(
-                            label: item.label!,
-                            text: item.text!,
-                            alignRight: false,
-                            tone: _BubbleTone.assistant,
-                            messageViewMode: messageViewMode,
-                          ),
-                          _TimelineItemKind.agent => _MessageBubble(
-                            label: item.label!,
-                            text: item.text!,
-                            alignRight: false,
-                            tone: _BubbleTone.agent,
-                            messageViewMode: messageViewMode,
-                          ),
-                          _TimelineItemKind.toolCall => _ToolCallTile(
-                            toolName: item.title!,
-                            summary: item.text!,
-                            pending: item.pending,
-                            error: item.error,
-                            onOpenDetail: () => onOpenDetail(
-                              DetailPanelData(
-                                title: item.title!,
-                                subtitle: appText('工具调用', 'Tool Call'),
-                                icon: Icons.build_circle_outlined,
-                                status: StatusInfo(
-                                  item.pending
-                                      ? appText('运行中', 'Running')
-                                      : appText('已完成', 'Completed'),
-                                  item.error
-                                      ? StatusTone.danger
-                                      : StatusTone.accent,
-                                ),
-                                description: item.text ?? '',
-                                meta: [
-                                  controller.currentSessionKey,
-                                  controller.activeAgentName,
-                                ],
-                                actions: [appText('复制', 'Copy')],
-                                sections: const [],
+        ),
+        Divider(height: 1, color: palette.strokeSoft),
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(color: palette.canvas),
+            child: items.isEmpty
+                ? _AssistantEmptyState(
+                    controller: controller,
+                    onFocusComposer: onFocusComposer,
+                    onOpenGateway: onOpenGateway,
+                    onOpenAiGatewaySettings: onOpenAiGatewaySettings,
+                    onReconnectGateway: onReconnectGateway,
+                  )
+                : ListView.separated(
+                    controller: scrollController,
+                    padding: EdgeInsets.fromLTRB(
+                      10,
+                      8,
+                      10,
+                      8 + bottomContentInset,
+                    ),
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: items.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 6),
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return switch (item.kind) {
+                        _TimelineItemKind.user => _MessageBubble(
+                          label: item.label!,
+                          text: item.text!,
+                          alignRight: true,
+                          tone: _BubbleTone.user,
+                          messageViewMode: messageViewMode,
+                        ),
+                        _TimelineItemKind.assistant => _MessageBubble(
+                          label: item.label!,
+                          text: item.text!,
+                          alignRight: false,
+                          tone: _BubbleTone.assistant,
+                          messageViewMode: messageViewMode,
+                        ),
+                        _TimelineItemKind.agent => _MessageBubble(
+                          label: item.label!,
+                          text: item.text!,
+                          alignRight: false,
+                          tone: _BubbleTone.agent,
+                          messageViewMode: messageViewMode,
+                        ),
+                        _TimelineItemKind.toolCall => _ToolCallTile(
+                          toolName: item.title!,
+                          summary: item.text!,
+                          pending: item.pending,
+                          error: item.error,
+                          onOpenDetail: () => onOpenDetail(
+                            DetailPanelData(
+                              title: item.title!,
+                              subtitle: appText('工具调用', 'Tool Call'),
+                              icon: Icons.build_circle_outlined,
+                              status: StatusInfo(
+                                item.pending
+                                    ? appText('运行中', 'Running')
+                                    : appText('已完成', 'Completed'),
+                                item.error
+                                    ? StatusTone.danger
+                                    : StatusTone.accent,
                               ),
+                              description: item.text ?? '',
+                              meta: [
+                                controller.currentSessionKey,
+                                controller.activeAgentName,
+                              ],
+                              actions: [appText('复制', 'Copy')],
+                              sections: const [],
                             ),
                           ),
-                          _TimelineItemKind.taskCard => _TaskStatusCard(
-                            title: item.title!,
-                            status: item.status!,
-                            summary: item.summary!,
-                            detail: item.detail!,
-                            owner: item.owner!,
-                            sessionKey: item.sessionKey!,
-                          ),
-                        };
-                      },
-                    ),
-            ),
+                        ),
+                        _TimelineItemKind.taskCard => _TaskStatusCard(
+                          title: item.title!,
+                          status: item.status!,
+                          summary: item.summary!,
+                          detail: item.detail!,
+                          owner: item.owner!,
+                          sessionKey: item.sessionKey!,
+                        ),
+                      };
+                    },
+                  ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -2992,9 +2997,8 @@ class _ComposerBarState extends State<_ComposerBar> {
         ? appText('重连', 'Reconnect')
         : appText('连接', 'Connect');
 
-    return SurfaceCard(
-      borderRadius: 10,
-      tone: SurfaceCardTone.chrome,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

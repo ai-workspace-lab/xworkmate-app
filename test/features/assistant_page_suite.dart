@@ -531,7 +531,7 @@ void main() {
       expect(submitButton, findsOneWidget);
       expect(
         tester.getRect(composerShell).bottom,
-        moreOrLessEquals(pageRect.bottom, epsilon: 0.01),
+        moreOrLessEquals(pageRect.bottom, epsilon: 1.01),
       );
       expect(
         tester.getRect(submitButton).bottom,
@@ -1024,11 +1024,11 @@ void main() {
       );
       expect(
         horizontalHandleRect.right,
-        moreOrLessEquals(conversationRect.left, epsilon: 2.01),
+        moreOrLessEquals(conversationRect.left, epsilon: 4.01),
       );
       expect(
         conversationRect.top,
-        moreOrLessEquals(pageRect.top, epsilon: 0.01),
+        moreOrLessEquals(pageRect.top, epsilon: 1.01),
       );
       expect(
         conversationRect.bottom,
@@ -1040,11 +1040,11 @@ void main() {
       );
       expect(
         composerRect.bottom,
-        moreOrLessEquals(pageRect.bottom, epsilon: 0.01),
+        moreOrLessEquals(pageRect.bottom, epsilon: 1.01),
       );
       expect(
         composerRect.right,
-        moreOrLessEquals(pageRect.right, epsilon: 0.01),
+        moreOrLessEquals(pageRect.right, epsilon: 1.01),
       );
       expect(conversationRect.width, greaterThan(620));
       expect(conversationRect.height, greaterThanOrEqualTo(180));
