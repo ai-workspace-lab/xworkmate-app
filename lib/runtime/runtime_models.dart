@@ -402,6 +402,20 @@ List<ExternalAcpEndpointProfile> normalizeExternalAcpEndpoints({
     }
   }
 
+  bool isLegacyCustomPlaceholder(ExternalAcpEndpointProfile profile) {
+    final key = profile.providerKey.trim().toLowerCase();
+    if (!key.startsWith('custom-agent-') ||
+        profile.endpoint.trim().isNotEmpty) {
+      return false;
+    }
+    final label = profile.label.trim();
+    final badge = profile.badge.trim();
+    return (label == SingleAgentProvider.claude.label &&
+            badge == SingleAgentProvider.claude.badge) ||
+        (label == SingleAgentProvider.gemini.label &&
+            badge == SingleAgentProvider.gemini.badge);
+  }
+
   for (final item in incoming) {
     final key = item.providerKey.trim().toLowerCase();
     if (key.isEmpty || byKey.containsKey(key)) {
@@ -412,6 +426,9 @@ List<ExternalAcpEndpointProfile> normalizeExternalAcpEndpoints({
         continue;
       }
       migratedCustomProfiles.add(item.copyWith(providerKey: nextCustomKey()));
+      continue;
+    }
+    if (isLegacyCustomPlaceholder(item)) {
       continue;
     }
     byKey[key] = item.copyWith(providerKey: key);
