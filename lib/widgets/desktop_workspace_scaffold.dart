@@ -106,17 +106,9 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
           Expanded(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    palette.chromeHighlight.withValues(alpha: 0.9),
-                    palette.chromeSurface.withValues(alpha: 0.92),
-                  ],
-                ),
+                color: palette.chromeSurface,
                 borderRadius: BorderRadius.circular(AppRadius.card),
-                border: Border.all(color: palette.chromeStroke),
-                boxShadow: [palette.chromeShadowAmbient],
+                border: Border.all(color: palette.strokeSoft),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadius.card),

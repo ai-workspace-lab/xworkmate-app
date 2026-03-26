@@ -91,17 +91,9 @@ class SidebarNavigation extends StatelessWidget {
       height: double.infinity,
       margin: marginOverride ?? const EdgeInsets.fromLTRB(4, 4, 4, 0),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            palette.chromeHighlight.withValues(alpha: 0.9),
-            palette.chromeSurface.withValues(alpha: 0.92),
-          ],
-        ),
+        color: palette.chromeSurface,
         borderRadius: BorderRadius.circular(AppRadius.sidebar),
-        border: Border.all(color: palette.chromeStroke),
-        boxShadow: [palette.chromeShadowAmbient],
+        border: Border.all(color: palette.strokeSoft),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -265,17 +257,9 @@ class _SidebarHeaderChevron extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            palette.chromeHighlight.withValues(alpha: 0.9),
-            palette.chromeSurface,
-          ],
-        ),
+        color: palette.surfacePrimary,
         borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(color: palette.chromeStroke),
-        boxShadow: [palette.chromeShadowAmbient],
+        border: Border.all(color: palette.strokeSoft),
       ),
       child: Center(
         child: Icon(
@@ -345,8 +329,8 @@ class _SidebarSectionGroup extends StatelessWidget {
             WorkspaceDestination.secrets => AssistantFocusEntry.secrets,
             WorkspaceDestination.aiGateway => AssistantFocusEntry.aiGateway,
             WorkspaceDestination.settings => AssistantFocusEntry.settings,
-            WorkspaceDestination.assistant || WorkspaceDestination.account =>
-              null,
+            WorkspaceDestination.assistant ||
+            WorkspaceDestination.account => null,
           };
           return Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
@@ -355,12 +339,16 @@ class _SidebarSectionGroup extends StatelessWidget {
               selected: currentSection == section,
               collapsed: collapsed,
               emphasis: emphasis,
-              favorite: focusEntry != null && favoriteDestinations.contains(focusEntry),
+              favorite:
+                  focusEntry != null &&
+                  favoriteDestinations.contains(focusEntry),
               showFavoriteToggle:
                   !collapsed &&
                   focusEntry != null &&
                   onToggleFavorite != null &&
-                  kAssistantNavigationDestinationCandidates.contains(focusEntry),
+                  kAssistantNavigationDestinationCandidates.contains(
+                    focusEntry,
+                  ),
               labelOverride: useHomeShortcut
                   ? appText('回到 APP首页', 'Back to app home')
                   : null,
@@ -435,28 +423,15 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           decoration: BoxDecoration(
-            gradient: widget.selected || _hovered
-                ? LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      palette.chromeHighlight.withValues(
-                        alpha: widget.selected ? 0.84 : 0.7,
-                      ),
-                      background.withValues(
-                        alpha: widget.selected ? 0.96 : 0.9,
-                      ),
-                    ],
-                  )
-                : null,
-            color: widget.selected || _hovered ? null : Colors.transparent,
+            color: widget.selected || _hovered
+                ? background.withValues(alpha: widget.selected ? 1 : 0.96)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(radius),
             border: Border.all(
               color: widget.selected || _hovered
-                  ? palette.chromeStroke
+                  ? palette.strokeSoft
                   : Colors.transparent,
             ),
-            boxShadow: widget.selected ? [palette.chromeShadowLift] : const [],
           ),
           child: Material(
             color: Colors.transparent,
@@ -648,7 +623,9 @@ class SidebarFooter extends StatelessWidget {
             compact: true,
             tooltip: appText('切换语言', 'Toggle language'),
             onPressed: onToggleLanguage,
-            favorite: favoriteDestinations.contains(AssistantFocusEntry.language),
+            favorite: favoriteDestinations.contains(
+              AssistantFocusEntry.language,
+            ),
             showFavoriteToggle: onToggleFavorite != null,
             favoriteButtonKey: const ValueKey<String>(
               'sidebar-favorite-language',
@@ -753,7 +730,9 @@ class SidebarFooter extends StatelessWidget {
               icon: chromeThemeToggleIcon(themeMode),
               tooltip: themeToggleTooltip,
               onPressed: onOpenThemeToggle,
-              favorite: favoriteDestinations.contains(AssistantFocusEntry.theme),
+              favorite: favoriteDestinations.contains(
+                AssistantFocusEntry.theme,
+              ),
               showFavoriteToggle: onToggleFavorite != null,
               favoriteButtonKey: const ValueKey<String>(
                 'sidebar-favorite-theme',
@@ -845,26 +824,15 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           decoration: BoxDecoration(
-            gradient: widget.selected || _hovered
-                ? LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      palette.chromeHighlight.withValues(
-                        alpha: widget.selected ? 0.96 : 0.84,
-                      ),
-                      background,
-                    ],
-                  )
-                : null,
-            color: widget.selected || _hovered ? null : Colors.transparent,
+            color: widget.selected || _hovered
+                ? background
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.button),
             border: Border.all(
               color: widget.selected || _hovered
-                  ? palette.chromeStroke
+                  ? palette.strokeSoft
                   : Colors.transparent,
             ),
-            boxShadow: widget.selected ? [palette.chromeShadowLift] : const [],
           ),
           child: Material(
             color: Colors.transparent,
