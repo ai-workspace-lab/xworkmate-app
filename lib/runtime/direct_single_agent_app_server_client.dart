@@ -147,12 +147,10 @@ class DirectSingleAgentAppServerClient {
   DirectSingleAgentAppServerClient({required this.endpointResolver});
 
   final Uri? Function(SingleAgentProvider provider) endpointResolver;
-
-  final Map<String, _DirectAppServerConnection> _activeConnections =
-      <String, _DirectAppServerConnection>{};
-  final Map<String, String> _threadIds = <String, String>{};
-  final Map<String, String> _restSessionIds = <String, String>{};
-  final Set<String> _abortedSessions = <String>{};
+  final _DirectSingleAgentWebSocketTransport _webSocketTransport =
+      _DirectSingleAgentWebSocketTransport();
+  final _DirectSingleAgentRestTransport _restTransport =
+      _DirectSingleAgentRestTransport();
 
   final Map<SingleAgentProvider, DirectSingleAgentCapabilities>
   _cachedCapabilities = <SingleAgentProvider, DirectSingleAgentCapabilities>{};
@@ -237,9 +235,147 @@ class DirectSingleAgentAppServerClient {
       );
     }
     if (transport.kind == _DirectSingleAgentTransportKind.restSessionApi) {
-      return _runViaRestApi(request, base: transport.endpoint);
+      return transport.rest!.run(request, base: transport.endpoint);
+    }
+    return transport.websocket!.run(request, endpoint: transport.endpoint);
+  }
+
+  Future<void> abort(String sessionId) async {
+    await _restTransport.abort(
+      sessionId,
+      candidateBases: <Uri>[
+        for (final entry in _transportKinds.entries)
+          if (entry.value == _DirectSingleAgentTransportKind.restSessionApi)
+            ...[
+              if (_describeEndpoint(entry.key).baseUri != null)
+                _describeEndpoint(entry.key).baseUri!,
+            ],
+      ],
+    );
+    await _webSocketTransport.abort(sessionId);
+  }
+
+  Future<void> dispose() async {
+    await _webSocketTransport.dispose();
+  }
+
+  DirectSingleAgentEndpointDescriptor _describeEndpoint(
+    SingleAgentProvider provider,
+  ) {
+    return DirectSingleAgentEndpointDescriptor.describe(endpointResolver(provider));
+  }
+
+  Future<_ResolvedSingleAgentTransport> _resolveTransport(
+    SingleAgentProvider provider, {
+    required DirectSingleAgentEndpointDescriptor descriptor,
+    required String gatewayToken,
+  }) async {
+    final cachedKind = _transportKinds[provider];
+    if (cachedKind != null) {
+      final cachedEndpoint = cachedKind ==
+              _DirectSingleAgentTransportKind.websocketAppServer
+          ? descriptor.websocketUri
+          : descriptor.baseUri;
+      if (cachedEndpoint != null) {
+        return _ResolvedSingleAgentTransport(
+          kind: cachedKind,
+          endpoint: cachedEndpoint,
+          websocket: cachedKind ==
+                  _DirectSingleAgentTransportKind.websocketAppServer
+              ? _webSocketTransport
+              : null,
+          rest: cachedKind == _DirectSingleAgentTransportKind.restSessionApi
+              ? _restTransport
+              : null,
+        );
+      }
     }
 
+    if (descriptor.prefersWebSocket) {
+      final endpoint = descriptor.websocketUri;
+      if (endpoint == null) {
+        throw StateError('Single-agent websocket endpoint is not configured.');
+      }
+      await _webSocketTransport.probe(endpoint, gatewayToken: gatewayToken);
+      return _ResolvedSingleAgentTransport(
+        kind: _DirectSingleAgentTransportKind.websocketAppServer,
+        endpoint: endpoint,
+        websocket: _webSocketTransport,
+      );
+    }
+
+    if (descriptor.allowsRest) {
+      final base = descriptor.baseUri;
+      if (base == null) {
+        throw StateError('Single-agent endpoint is not configured.');
+      }
+      try {
+        await _restTransport.probe(base, gatewayToken: gatewayToken);
+        return _ResolvedSingleAgentTransport(
+          kind: _DirectSingleAgentTransportKind.restSessionApi,
+          endpoint: base,
+          rest: _restTransport,
+        );
+      } catch (_) {
+        final websocket = descriptor.websocketUri;
+        if (websocket == null) {
+          rethrow;
+        }
+        await _webSocketTransport.probe(websocket, gatewayToken: gatewayToken);
+        return _ResolvedSingleAgentTransport(
+          kind: _DirectSingleAgentTransportKind.websocketAppServer,
+          endpoint: websocket,
+          websocket: _webSocketTransport,
+        );
+      }
+    }
+
+    throw StateError(
+      'Single-agent endpoint mode ${descriptor.mode.name} is not supported.',
+    );
+  }
+}
+
+class _ResolvedSingleAgentTransport {
+  const _ResolvedSingleAgentTransport({
+    required this.kind,
+    required this.endpoint,
+    this.websocket,
+    this.rest,
+  });
+
+  final _DirectSingleAgentTransportKind kind;
+  final Uri endpoint;
+  final _DirectSingleAgentWebSocketTransport? websocket;
+  final _DirectSingleAgentRestTransport? rest;
+}
+
+class _DirectSingleAgentWebSocketTransport {
+  final Map<String, _DirectAppServerConnection> _activeConnections =
+      <String, _DirectAppServerConnection>{};
+  final Map<String, String> _threadIds = <String, String>{};
+  final Set<String> _abortedSessions = <String>{};
+
+  Future<void> probe(
+    Uri endpoint, {
+    required String gatewayToken,
+  }) async {
+    _DirectAppServerConnection? connection;
+    try {
+      connection = await _DirectAppServerConnection.connect(
+        endpoint,
+        gatewayToken: gatewayToken,
+      );
+      await connection.initialize();
+    } finally {
+      await connection?.close();
+    }
+  }
+
+  Future<DirectSingleAgentRunResult> run(
+    DirectSingleAgentRunRequest request, {
+    required Uri endpoint,
+  }) async {
     final normalizedSessionId = request.sessionId.trim();
     if (normalizedSessionId.isEmpty) {
       return const DirectSingleAgentRunResult(
@@ -251,7 +387,7 @@ class DirectSingleAgentAppServerClient {
 
     _abortedSessions.remove(normalizedSessionId);
     final connection = await _DirectAppServerConnection.connect(
-      transport.endpoint,
+      endpoint,
       gatewayToken: request.gatewayToken,
     );
     _activeConnections[normalizedSessionId] = connection;
@@ -398,29 +534,6 @@ class DirectSingleAgentAppServerClient {
       return;
     }
     _abortedSessions.add(normalizedSessionId);
-    final restSessionId = _restSessionIds[normalizedSessionId]?.trim() ?? '';
-    if (restSessionId.isNotEmpty) {
-      for (final entry in _transportKinds.entries) {
-        if (entry.value != _DirectSingleAgentTransportKind.restSessionApi) {
-          continue;
-        }
-        final descriptor = _describeEndpoint(entry.key);
-        final base = descriptor.baseUri;
-        if (base == null) {
-          continue;
-        }
-        try {
-          await _postJson(
-            _buildRestUri(base, '/session/$restSessionId/abort'),
-            body: null,
-            gatewayToken: '',
-          );
-        } catch (_) {
-          // Best effort only.
-        }
-        break;
-      }
-    }
     final connection = _activeConnections[normalizedSessionId];
     final threadId = _threadIds[normalizedSessionId];
     if (connection == null || threadId == null || threadId.isEmpty) {
@@ -483,10 +596,24 @@ class DirectSingleAgentAppServerClient {
     _threadIds[sessionId] = threadId;
     return threadId;
   }
+}
 
-  Future<DirectSingleAgentRunResult> _runViaRestApi(
-    DirectSingleAgentRunRequest request,
-    {
+class _DirectSingleAgentRestTransport {
+  final Map<String, String> _restSessionIds = <String, String>{};
+  final Set<String> _abortedSessions = <String>{};
+
+  Future<void> probe(
+    Uri base, {
+    required String gatewayToken,
+  }) async {
+    await _fetchJson(
+      _buildRestUri(base, '/global/health'),
+      gatewayToken: gatewayToken,
+    );
+  }
+
+  Future<DirectSingleAgentRunResult> run(
+    DirectSingleAgentRunRequest request, {
     required Uri base,
   }) async {
     final normalizedSessionId = request.sessionId.trim();
@@ -538,10 +665,7 @@ class DirectSingleAgentAppServerClient {
     try {
       final eventUri = _buildRestUri(base, '/global/event');
       eventRequest = await eventClient.getUrl(eventUri);
-      eventRequest.headers.set(
-        HttpHeaders.acceptHeader,
-        'text/event-stream',
-      );
+      eventRequest.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
       final normalizedToken = request.gatewayToken.trim();
       if (normalizedToken.isNotEmpty) {
         eventRequest.headers.set(
@@ -632,10 +756,7 @@ class DirectSingleAgentAppServerClient {
                 }
               }
             },
-            onError: (Object error, StackTrace stackTrace) {
-              // OpenCode event streams can disconnect independently from the
-              // backing session lifecycle. Keep polling session state instead.
-            },
+            onError: (Object error, StackTrace stackTrace) {},
             onDone: () {},
             cancelOnError: true,
           );
@@ -710,6 +831,33 @@ class DirectSingleAgentAppServerClient {
       unawaited(lineSubscription?.cancel());
       eventClient.close(force: true);
       _abortedSessions.remove(normalizedSessionId);
+    }
+  }
+
+  Future<void> abort(
+    String sessionId, {
+    required List<Uri> candidateBases,
+  }) async {
+    final normalizedSessionId = sessionId.trim();
+    if (normalizedSessionId.isEmpty) {
+      return;
+    }
+    _abortedSessions.add(normalizedSessionId);
+    final restSessionId = _restSessionIds[normalizedSessionId]?.trim() ?? '';
+    if (restSessionId.isEmpty) {
+      return;
+    }
+    for (final base in candidateBases) {
+      try {
+        await _postJson(
+          _buildRestUri(base, '/session/$restSessionId/abort'),
+          body: null,
+          gatewayToken: '',
+        );
+      } catch (_) {
+        // Best effort only.
+      }
+      break;
     }
   }
 
@@ -807,220 +955,6 @@ class DirectSingleAgentAppServerClient {
     }
     return '';
   }
-
-  Uri _buildRestUri(
-    Uri base,
-    String path, {
-    Map<String, String>? queryParameters,
-  }) {
-    final normalizedPath = path.startsWith('/') ? path : '/$path';
-    return base.replace(
-      path: normalizedPath,
-      queryParameters: queryParameters,
-      fragment: null,
-    );
-  }
-
-  Future<Map<String, dynamic>> _fetchJson(
-    Uri uri, {
-    required String gatewayToken,
-  }) async {
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
-    try {
-      final request = await client.getUrl(uri);
-      final normalizedToken = gatewayToken.trim();
-      if (normalizedToken.isNotEmpty) {
-        request.headers.set(
-          HttpHeaders.authorizationHeader,
-          'Bearer $normalizedToken',
-        );
-      }
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
-      return _decodeMap(body);
-    } finally {
-      client.close(force: true);
-    }
-  }
-
-  Future<Map<String, dynamic>> _postJson(
-    Uri uri, {
-    required Object? body,
-    required String gatewayToken,
-  }) async {
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
-    try {
-      final request = await client.postUrl(uri);
-      request.headers.set(
-        HttpHeaders.contentTypeHeader,
-        'application/json; charset=utf-8',
-      );
-      final normalizedToken = gatewayToken.trim();
-      if (normalizedToken.isNotEmpty) {
-        request.headers.set(
-          HttpHeaders.authorizationHeader,
-          'Bearer $normalizedToken',
-        );
-      }
-      if (body != null) {
-        request.add(utf8.encode(jsonEncode(body)));
-      }
-      final response = await request.close();
-      final text = await response.transform(utf8.decoder).join();
-      if (text.trim().isEmpty) {
-        return const <String, dynamic>{};
-      }
-      return _decodeMap(text);
-    } finally {
-      client.close(force: true);
-    }
-  }
-
-  Future<List<Object?>> _fetchJsonList(
-    Uri uri, {
-    required String gatewayToken,
-  }) async {
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
-    try {
-      final request = await client.getUrl(uri);
-      final normalizedToken = gatewayToken.trim();
-      if (normalizedToken.isNotEmpty) {
-        request.headers.set(
-          HttpHeaders.authorizationHeader,
-          'Bearer $normalizedToken',
-        );
-      }
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
-      final decoded = jsonDecode(body);
-      if (decoded is List<Object?>) {
-        return decoded;
-      }
-      if (decoded is List) {
-        return decoded.cast<Object?>();
-      }
-      return const <Object?>[];
-    } finally {
-      client.close(force: true);
-    }
-  }
-
-  String? _extractThreadId(Map<String, dynamic> payload) {
-    final topLevelId = payload['id']?.toString().trim() ?? '';
-    if (topLevelId.isNotEmpty) {
-      return topLevelId;
-    }
-    final thread = _asMap(payload['thread']);
-    final nestedId = thread['id']?.toString().trim() ?? '';
-    if (nestedId.isNotEmpty) {
-      return nestedId;
-    }
-    return null;
-  }
-
-  String? _extractModel(Map<String, dynamic> payload) {
-    final model = payload['model']?.toString().trim() ?? '';
-    if (model.isNotEmpty) {
-      return model;
-    }
-    return null;
-  }
-
-  DirectSingleAgentEndpointDescriptor _describeEndpoint(
-    SingleAgentProvider provider,
-  ) {
-    return DirectSingleAgentEndpointDescriptor.describe(endpointResolver(provider));
-  }
-
-  Future<_ResolvedSingleAgentTransport> _resolveTransport(
-    SingleAgentProvider provider, {
-    required DirectSingleAgentEndpointDescriptor descriptor,
-    required String gatewayToken,
-  }) async {
-    final cachedKind = _transportKinds[provider];
-    if (cachedKind != null) {
-      final cachedEndpoint = cachedKind ==
-              _DirectSingleAgentTransportKind.websocketAppServer
-          ? descriptor.websocketUri
-          : descriptor.baseUri;
-      if (cachedEndpoint != null) {
-        return _ResolvedSingleAgentTransport(
-          kind: cachedKind,
-          endpoint: cachedEndpoint,
-        );
-      }
-    }
-
-    if (descriptor.prefersWebSocket) {
-      final endpoint = descriptor.websocketUri;
-      if (endpoint == null) {
-        throw StateError('Single-agent websocket endpoint is not configured.');
-      }
-      await _probeWebSocketEndpoint(endpoint, gatewayToken: gatewayToken);
-      return _ResolvedSingleAgentTransport(
-        kind: _DirectSingleAgentTransportKind.websocketAppServer,
-        endpoint: endpoint,
-      );
-    }
-
-    if (descriptor.allowsRest) {
-      final base = descriptor.baseUri;
-      if (base == null) {
-        throw StateError('Single-agent endpoint is not configured.');
-      }
-      try {
-        await _fetchJson(
-          _buildRestUri(base, '/global/health'),
-          gatewayToken: gatewayToken,
-        );
-        return _ResolvedSingleAgentTransport(
-          kind: _DirectSingleAgentTransportKind.restSessionApi,
-          endpoint: base,
-        );
-      } catch (_) {
-        final websocket = descriptor.websocketUri;
-        if (websocket == null) {
-          rethrow;
-        }
-        await _probeWebSocketEndpoint(websocket, gatewayToken: gatewayToken);
-        return _ResolvedSingleAgentTransport(
-          kind: _DirectSingleAgentTransportKind.websocketAppServer,
-          endpoint: websocket,
-        );
-      }
-    }
-
-    throw StateError(
-      'Single-agent endpoint mode ${descriptor.mode.name} is not supported.',
-    );
-  }
-
-  Future<void> _probeWebSocketEndpoint(
-    Uri endpoint, {
-    required String gatewayToken,
-  }) async {
-    _DirectAppServerConnection? connection;
-    try {
-      connection = await _DirectAppServerConnection.connect(
-        endpoint,
-        gatewayToken: gatewayToken,
-      );
-      await connection.initialize();
-    } finally {
-      await connection?.close();
-    }
-  }
-
-}
-
-class _ResolvedSingleAgentTransport {
-  const _ResolvedSingleAgentTransport({
-    required this.kind,
-    required this.endpoint,
-  });
-
-  final _DirectSingleAgentTransportKind kind;
-  final Uri endpoint;
 }
 
 class _DirectAppServerConnection {
@@ -1194,6 +1128,124 @@ class _DirectAppServerConnection {
       // Best effort only.
     }
   }
+}
+
+Uri _buildRestUri(
+  Uri base,
+  String path, {
+  Map<String, String>? queryParameters,
+}) {
+  final normalizedPath = path.startsWith('/') ? path : '/$path';
+  return base.replace(
+    path: normalizedPath,
+    queryParameters: queryParameters,
+    fragment: null,
+  );
+}
+
+Future<Map<String, dynamic>> _fetchJson(
+  Uri uri, {
+  required String gatewayToken,
+}) async {
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+  try {
+    final request = await client.getUrl(uri);
+    final normalizedToken = gatewayToken.trim();
+    if (normalizedToken.isNotEmpty) {
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer $normalizedToken',
+      );
+    }
+    final response = await request.close();
+    final body = await response.transform(utf8.decoder).join();
+    return _decodeMap(body);
+  } finally {
+    client.close(force: true);
+  }
+}
+
+Future<Map<String, dynamic>> _postJson(
+  Uri uri, {
+  required Object? body,
+  required String gatewayToken,
+}) async {
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+  try {
+    final request = await client.postUrl(uri);
+    request.headers.set(
+      HttpHeaders.contentTypeHeader,
+      'application/json; charset=utf-8',
+    );
+    final normalizedToken = gatewayToken.trim();
+    if (normalizedToken.isNotEmpty) {
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer $normalizedToken',
+      );
+    }
+    if (body != null) {
+      request.add(utf8.encode(jsonEncode(body)));
+    }
+    final response = await request.close();
+    final text = await response.transform(utf8.decoder).join();
+    if (text.trim().isEmpty) {
+      return const <String, dynamic>{};
+    }
+    return _decodeMap(text);
+  } finally {
+    client.close(force: true);
+  }
+}
+
+Future<List<Object?>> _fetchJsonList(
+  Uri uri, {
+  required String gatewayToken,
+}) async {
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+  try {
+    final request = await client.getUrl(uri);
+    final normalizedToken = gatewayToken.trim();
+    if (normalizedToken.isNotEmpty) {
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer $normalizedToken',
+      );
+    }
+    final response = await request.close();
+    final body = await response.transform(utf8.decoder).join();
+    final decoded = jsonDecode(body);
+    if (decoded is List<Object?>) {
+      return decoded;
+    }
+    if (decoded is List) {
+      return decoded.cast<Object?>();
+    }
+    return const <Object?>[];
+  } finally {
+    client.close(force: true);
+  }
+}
+
+String? _extractThreadId(Map<String, dynamic> payload) {
+  final topLevelId = payload['id']?.toString().trim() ?? '';
+  if (topLevelId.isNotEmpty) {
+    return topLevelId;
+  }
+  final thread = _asMap(payload['thread']);
+  final nestedId = thread['id']?.toString().trim() ?? '';
+  if (nestedId.isNotEmpty) {
+    return nestedId;
+  }
+  return null;
+}
+
+String? _extractModel(Map<String, dynamic> payload) {
+  final model = payload['model']?.toString().trim() ?? '';
+  if (model.isNotEmpty) {
+    return model;
+  }
+  return null;
 }
 
 Map<String, dynamic> _decodeMap(Object raw) {
