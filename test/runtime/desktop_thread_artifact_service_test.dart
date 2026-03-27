@@ -114,4 +114,21 @@ void main() {
       );
     },
   );
+
+  test(
+    'DesktopThreadArtifactService reports remote workspaces as non-browsable',
+    () async {
+      final snapshot = await service.loadSnapshot(
+        workspaceRef: '/opt/data/.xworkmate/threads/draft-remote-thread',
+        workspaceRefKind: WorkspaceRefKind.remotePath,
+      );
+
+      expect(snapshot.resultEntries, isEmpty);
+      expect(snapshot.fileEntries, isEmpty);
+      expect(
+        snapshot.resultMessage,
+        contains('recorded on a remote agent'),
+      );
+    },
+  );
 }
