@@ -454,11 +454,12 @@ class AppController extends ChangeNotifier {
       _settingsController.storedGatewayPasswordMaskForProfile(profileIndex);
 
   List<SingleAgentProvider> get configuredSingleAgentProviders =>
-      (_availableSingleAgentProvidersOverride ??
-              settings.availableSingleAgentProviders)
-          .where((item) => item != SingleAgentProvider.auto)
-          .map(settings.resolveSingleAgentProvider)
-          .toList(growable: false);
+      normalizeSingleAgentProviderList(
+        (_availableSingleAgentProvidersOverride ??
+                settings.availableSingleAgentProviders)
+            .where((item) => item != SingleAgentProvider.auto)
+            .map(settings.resolveSingleAgentProvider),
+      );
 
   List<SingleAgentProvider> get availableSingleAgentProviders =>
       configuredSingleAgentProviders
@@ -2623,16 +2624,6 @@ class AppController extends ChangeNotifier {
 
       await _refreshAcpCapabilities(forceRefresh: true);
       await _refreshSingleAgentCapabilities(forceRefresh: true);
-      final runtimeMode = effectiveCodeAgentRuntimeMode;
-      if (runtimeMode == CodeAgentRuntimeMode.externalCli &&
-          !_canUseSingleAgentProvider(SingleAgentProvider.codex)) {
-        throw StateError(
-          appText(
-            '外部 single-agent endpoint 未报告 Codex 可用，请先检查 app-server / Gateway 配置。',
-            'The external single-agent endpoint did not report Codex availability. Check the app-server or Gateway endpoint first.',
-          ),
-        );
-      }
 
       await _runtimeCoordinator.configureCodexForGateway(
         gatewayUrl: gatewayUrl,
@@ -4220,18 +4211,26 @@ class AppController extends ChangeNotifier {
   }
 
   SettingsSnapshot _sanitizeCodeAgentSettings(SettingsSnapshot snapshot) {
+    final normalizedRuntimeMode =
+        snapshot.codeAgentRuntimeMode == CodeAgentRuntimeMode.builtIn
+        ? CodeAgentRuntimeMode.externalCli
+        : snapshot.codeAgentRuntimeMode;
     _codexRuntimeWarning =
         snapshot.codeAgentRuntimeMode == CodeAgentRuntimeMode.builtIn
         ? appText(
-            '内置 Codex 仍处于实验阶段；建议优先使用 External Codex CLI。',
-            'Built-in Codex is still experimental; External Codex CLI is recommended.',
+            '内置 Codex 运行时当前仅保留为未来扩展位；已自动切换为 External Codex CLI。',
+            'Built-in Codex runtime is reserved for a future release; XWorkmate switched back to External Codex CLI automatically.',
           )
         : null;
     final normalizedPath = snapshot.codexCliPath.trim();
-    if (normalizedPath == snapshot.codexCliPath) {
+    if (normalizedPath == snapshot.codexCliPath &&
+        normalizedRuntimeMode == snapshot.codeAgentRuntimeMode) {
       return snapshot;
     }
-    return snapshot.copyWith(codexCliPath: normalizedPath);
+    return snapshot.copyWith(
+      codeAgentRuntimeMode: normalizedRuntimeMode,
+      codexCliPath: normalizedPath,
+    );
   }
 
   Future<void> _refreshAcpCapabilities({
@@ -4386,14 +4385,13 @@ class AppController extends ChangeNotifier {
   }
 
   void _registerCodexExternalProvider() {
-    final endpoint = _resolveSingleAgentEndpoint(SingleAgentProvider.codex);
     _runtimeCoordinator.registerExternalCodeAgent(
       ExternalCodeAgentProvider(
         id: 'codex',
         name: 'Codex ACP',
         command: 'xworkmate-agent-gateway',
         transport: ExternalAgentTransport.websocketJsonRpc,
-        endpoint: endpoint?.toString() ?? '',
+        endpoint: '',
         defaultArgs: const <String>[],
         capabilities: const <String>[
           'chat',

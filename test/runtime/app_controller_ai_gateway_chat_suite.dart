@@ -342,9 +342,9 @@ void main() {
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
       );
       final runner = _FakeSingleAgentRunner(
-        resolvedProvider: SingleAgentProvider.codex,
+        resolvedProvider: SingleAgentProvider.opencode,
         result: const SingleAgentRunResult(
-          provider: SingleAgentProvider.codex,
+          provider: SingleAgentProvider.opencode,
           output: 'CODEX_REPLY',
           success: true,
           errorMessage: '',
@@ -355,7 +355,7 @@ void main() {
       final controller = AppController(
         store: store,
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
         runtimeCoordinator: RuntimeCoordinator(
           gateway: _FakeGatewayRuntime(store: store),
@@ -369,13 +369,13 @@ void main() {
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.singleAgent,
       );
-      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+      await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
 
       await controller.sendChatMessage('请输出 CODEX_REPLY', thinking: 'low');
 
       expect(runner.resolveCalls, 1);
       expect(runner.runCalls, 1);
-      expect(runner.lastRequest?.provider, SingleAgentProvider.codex);
+      expect(runner.lastRequest?.provider, SingleAgentProvider.opencode);
       expect(runner.lastRequest?.model, isEmpty);
       expect(controller.currentSingleAgentModelDisplayLabel, 'codex-sonnet');
       expect(
@@ -394,7 +394,9 @@ void main() {
         isFalse,
       );
       expect(
-        controller.chatMessages.any((message) => message.toolName == 'Codex'),
+        controller.chatMessages.any(
+          (message) => message.toolName == 'OpenCode',
+        ),
         isFalse,
       );
     },
@@ -419,9 +421,9 @@ void main() {
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
       );
       final runner = _FakeSingleAgentRunner(
-        resolvedProvider: SingleAgentProvider.codex,
+        resolvedProvider: SingleAgentProvider.opencode,
         result: const SingleAgentRunResult(
-          provider: SingleAgentProvider.codex,
+          provider: SingleAgentProvider.opencode,
           output: 'CODEX_REPLY',
           success: true,
           errorMessage: '',
@@ -432,7 +434,7 @@ void main() {
       final controller = AppController(
         store: store,
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
         runtimeCoordinator: RuntimeCoordinator(
           gateway: _FakeGatewayRuntime(store: store),
@@ -450,14 +452,14 @@ void main() {
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.singleAgent,
       );
-      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+      await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
 
       await controller.sendChatMessage('请输出 CODEX_REPLY', thinking: 'low');
 
       expect(
         controller.chatMessages.any(
           (message) =>
-              message.toolName == 'Codex' &&
+              message.toolName == 'OpenCode' &&
               (message.text.contains('单机智能体已切换到') ||
                   message.text.contains('Single Agent is using')),
         ),
@@ -528,7 +530,7 @@ void main() {
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.singleAgent,
       );
-      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+      await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
 
       await controller.sendChatMessage('你好', thinking: 'low');
 
@@ -598,7 +600,7 @@ void main() {
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.singleAgent,
       );
-      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+      await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
 
       await controller.sendChatMessage('你好', thinking: 'low');
 
@@ -675,9 +677,9 @@ void main() {
       ]);
 
       final runner = _FakeSingleAgentRunner(
-        resolvedProvider: SingleAgentProvider.codex,
+        resolvedProvider: SingleAgentProvider.opencode,
         result: const SingleAgentRunResult(
-          provider: SingleAgentProvider.codex,
+          provider: SingleAgentProvider.opencode,
           output: 'THREAD_OK',
           success: true,
           errorMessage: '',
@@ -687,7 +689,7 @@ void main() {
       final controller = AppController(
         store: store,
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
         runtimeCoordinator: RuntimeCoordinator(
           gateway: _FakeGatewayRuntime(store: store),
@@ -740,9 +742,9 @@ void main() {
       );
 
       final runner = _FakeSingleAgentRunner(
-        resolvedProvider: SingleAgentProvider.codex,
+        resolvedProvider: SingleAgentProvider.opencode,
         result: const SingleAgentRunResult(
-          provider: SingleAgentProvider.codex,
+          provider: SingleAgentProvider.opencode,
           output: 'THREAD_OK',
           success: true,
           errorMessage: '',
@@ -752,7 +754,7 @@ void main() {
       final controller = AppController(
         store: store,
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
         runtimeCoordinator: RuntimeCoordinator(
           gateway: _FakeGatewayRuntime(store: store),

@@ -38,7 +38,7 @@ void main() {
       );
     });
 
-    test('probes websocket endpoint and reports codex support', () async {
+    test('probes websocket endpoint and reports provider support', () async {
       final server = await _FakeAppServer.start();
       addTearDown(server.close);
 
@@ -47,11 +47,14 @@ void main() {
       );
 
       final capabilities = await client.loadCapabilities(
-        provider: SingleAgentProvider.codex,
+        provider: SingleAgentProvider.opencode,
       );
 
       expect(capabilities.available, isTrue);
-      expect(capabilities.supportsCodex, isTrue);
+      expect(
+        capabilities.supportsProvider(SingleAgentProvider.opencode),
+        isTrue,
+      );
       expect(capabilities.endpoint, 'ws://127.0.0.1:${server.port}');
       expect(server.methods, contains('initialize'));
     });
@@ -69,7 +72,7 @@ void main() {
       final result = await client.run(
         const DirectSingleAgentRunRequest(
           sessionId: 'session-1',
-          provider: SingleAgentProvider.codex,
+          provider: SingleAgentProvider.opencode,
           prompt: 'hello world',
           model: 'gpt-4.1',
           workingDirectory: '/tmp',
@@ -103,7 +106,7 @@ void main() {
       final result = await client.run(
         DirectSingleAgentRunRequest(
           sessionId: 'session-skills',
-          provider: SingleAgentProvider.codex,
+          provider: SingleAgentProvider.opencode,
           prompt: 'use the selected skills',
           model: 'gpt-4.1',
           workingDirectory: '/tmp',
@@ -159,7 +162,7 @@ void main() {
       final runFuture = client.run(
         const DirectSingleAgentRunRequest(
           sessionId: 'session-abort',
-          provider: SingleAgentProvider.codex,
+          provider: SingleAgentProvider.opencode,
           prompt: 'abort me',
           model: 'gpt-4.1',
           workingDirectory: '/tmp',
@@ -189,7 +192,7 @@ void main() {
         final result = await client.run(
           const DirectSingleAgentRunRequest(
             sessionId: 'session-nested',
-            provider: SingleAgentProvider.codex,
+            provider: SingleAgentProvider.opencode,
             prompt: 'hello nested world',
             model: 'qwen2.5-coder:latest',
             workingDirectory: '/tmp',
@@ -203,25 +206,28 @@ void main() {
       },
     );
 
-    test('probes OpenCode REST endpoint and reports provider support', () async {
-      final server = await _FakeOpenCodeRestServer.start();
-      addTearDown(server.close);
+    test(
+      'probes OpenCode REST endpoint and reports provider support',
+      () async {
+        final server = await _FakeOpenCodeRestServer.start();
+        addTearDown(server.close);
 
-      final client = DirectSingleAgentAppServerClient(
-        endpointResolver: (_) => server.baseHttpUri,
-      );
+        final client = DirectSingleAgentAppServerClient(
+          endpointResolver: (_) => server.baseHttpUri,
+        );
 
-      final capabilities = await client.loadCapabilities(
-        provider: SingleAgentProvider.opencode,
-      );
+        final capabilities = await client.loadCapabilities(
+          provider: SingleAgentProvider.opencode,
+        );
 
-      expect(capabilities.available, isTrue);
-      expect(
-        capabilities.supportsProvider(SingleAgentProvider.opencode),
-        isTrue,
-      );
-      expect(server.healthRequested, isTrue);
-    });
+        expect(capabilities.available, isTrue);
+        expect(
+          capabilities.supportsProvider(SingleAgentProvider.opencode),
+          isTrue,
+        );
+        expect(server.healthRequested, isTrue);
+      },
+    );
 
     test('runs OpenCode turns over REST session api', () async {
       final server = await _FakeOpenCodeRestServer.start();
@@ -547,9 +553,14 @@ class _FakeOpenCodeRestServer {
           HttpHeaders.contentTypeHeader,
           'text/event-stream',
         );
-        request.response.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+        request.response.headers.set(
+          HttpHeaders.cacheControlHeader,
+          'no-cache',
+        );
         request.response.write(
-          'data: ${jsonEncode(<String, dynamic>{'payload': <String, dynamic>{'type': 'server.connected', 'properties': <String, dynamic>{}}})}\n\n',
+          'data: ${jsonEncode(<String, dynamic>{
+            'payload': <String, dynamic>{'type': 'server.connected', 'properties': <String, dynamic>{}},
+          })}\n\n',
         );
         await request.response.flush();
         _eventResponses.add(request.response);
@@ -564,15 +575,16 @@ class _FakeOpenCodeRestServer {
             'id': sessionId,
             'title': 'test',
             'directory':
-                request.uri.queryParameters['directory'] ?? Directory.current.path,
+                request.uri.queryParameters['directory'] ??
+                Directory.current.path,
           }),
         );
         await request.response.close();
         continue;
       }
-      final sessionMatch = RegExp(r'^/session/([^/]+)/message$').firstMatch(
-        request.uri.path,
-      );
+      final sessionMatch = RegExp(
+        r'^/session/([^/]+)/message$',
+      ).firstMatch(request.uri.path);
       if (sessionMatch != null && request.method == 'GET') {
         final sessionId = sessionMatch.group(1)!;
         final text = _assistantTextBySession[sessionId] ?? '';
@@ -603,87 +615,78 @@ class _FakeOpenCodeRestServer {
       if (sessionMatch != null && request.method == 'POST') {
         final sessionId = sessionMatch.group(1)!;
         final body = jsonDecode(await utf8.decodeStream(request));
-        final parts = (body as Map<String, dynamic>)['parts'] as List<dynamic>? ??
+        final parts =
+            (body as Map<String, dynamic>)['parts'] as List<dynamic>? ??
             const <dynamic>[];
         if (parts.isNotEmpty) {
           lastPromptText =
               (parts.first as Map<String, dynamic>)['text']?.toString() ?? '';
         }
         final assistantMessageId = 'msg-assistant-${_messageCounter++}';
-        await _broadcastEvent(
-          <String, dynamic>{
-            'payload': <String, dynamic>{
-              'type': 'session.status',
-              'properties': <String, dynamic>{
-                'sessionID': sessionId,
-                'status': <String, dynamic>{'type': 'busy'},
+        await _broadcastEvent(<String, dynamic>{
+          'payload': <String, dynamic>{
+            'type': 'session.status',
+            'properties': <String, dynamic>{
+              'sessionID': sessionId,
+              'status': <String, dynamic>{'type': 'busy'},
+            },
+          },
+        });
+        await _broadcastEvent(<String, dynamic>{
+          'payload': <String, dynamic>{
+            'type': 'message.updated',
+            'properties': <String, dynamic>{
+              'sessionID': sessionId,
+              'info': <String, dynamic>{
+                'id': assistantMessageId,
+                'role': 'assistant',
               },
             },
           },
-        );
-        await _broadcastEvent(
-          <String, dynamic>{
-            'payload': <String, dynamic>{
-              'type': 'message.updated',
-              'properties': <String, dynamic>{
-                'sessionID': sessionId,
-                'info': <String, dynamic>{
-                  'id': assistantMessageId,
-                  'role': 'assistant',
-                },
-              },
-            },
-          },
-        );
+        });
         for (final delta in <String>['hello ', 'world ', 'from ', 'opencode']) {
-          await _broadcastEvent(
-            <String, dynamic>{
-              'payload': <String, dynamic>{
-                'type': 'message.part.delta',
-                'properties': <String, dynamic>{
-                  'sessionID': sessionId,
-                  'part': <String, dynamic>{'messageID': assistantMessageId},
-                  'text': delta,
-                },
+          await _broadcastEvent(<String, dynamic>{
+            'payload': <String, dynamic>{
+              'type': 'message.part.delta',
+              'properties': <String, dynamic>{
+                'sessionID': sessionId,
+                'part': <String, dynamic>{'messageID': assistantMessageId},
+                'text': delta,
               },
             },
-          );
+          });
         }
-        await _broadcastEvent(
-          <String, dynamic>{
-            'payload': <String, dynamic>{
-              'type': 'message.part.updated',
-              'properties': <String, dynamic>{
-                'sessionID': sessionId,
-                'part': <String, dynamic>{
-                  'messageID': assistantMessageId,
-                  'type': 'text',
-                  'text': 'hello world from opencode',
-                },
+        await _broadcastEvent(<String, dynamic>{
+          'payload': <String, dynamic>{
+            'type': 'message.part.updated',
+            'properties': <String, dynamic>{
+              'sessionID': sessionId,
+              'part': <String, dynamic>{
+                'messageID': assistantMessageId,
+                'type': 'text',
+                'text': 'hello world from opencode',
               },
             },
           },
-        );
+        });
         _assistantTextBySession[sessionId] = 'hello world from opencode';
-        await _broadcastEvent(
-          <String, dynamic>{
-            'payload': <String, dynamic>{
-              'type': 'session.status',
-              'properties': <String, dynamic>{
-                'sessionID': sessionId,
-                'status': <String, dynamic>{'type': 'idle'},
-              },
+        await _broadcastEvent(<String, dynamic>{
+          'payload': <String, dynamic>{
+            'type': 'session.status',
+            'properties': <String, dynamic>{
+              'sessionID': sessionId,
+              'status': <String, dynamic>{'type': 'idle'},
             },
           },
-        );
+        });
         request.response.headers.contentType = ContentType.json;
         request.response.write('');
         await request.response.close();
         continue;
       }
-      final abortMatch = RegExp(r'^/session/([^/]+)/abort$').firstMatch(
-        request.uri.path,
-      );
+      final abortMatch = RegExp(
+        r'^/session/([^/]+)/abort$',
+      ).firstMatch(request.uri.path);
       if (abortMatch != null && request.method == 'POST') {
         request.response.headers.contentType = ContentType.json;
         request.response.write('{}');

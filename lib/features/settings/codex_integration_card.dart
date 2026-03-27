@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
 import '../../runtime/platform_environment.dart';
-import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 
 class CodexIntegrationCard extends StatefulWidget {
@@ -51,9 +50,6 @@ class _CodexIntegrationCardState extends State<CodexIntegrationCard> {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final controller = widget.controller;
-    final selectedRuntimeMode = controller.configuredCodeAgentRuntimeMode;
-    final isExternalMode =
-        selectedRuntimeMode == CodeAgentRuntimeMode.externalCli;
     final cooperationLabel = switch (controller.codexCooperationState) {
       CodexCooperationState.notStarted => appText('未启动', 'Not started'),
       CodexCooperationState.bridgeOnly => appText(
@@ -65,9 +61,7 @@ class _CodexIntegrationCardState extends State<CodexIntegrationCard> {
         'Started and registered to the gateway',
       ),
     };
-    final binaryLabel = !isExternalMode
-        ? appText('不需要', 'Not required')
-        : controller.hasDetectedCodexCli
+    final binaryLabel = controller.hasDetectedCodexCli
         ? appText('已就绪', 'Ready')
         : appText('未检测到', 'Not found');
     final bridgeLabel = controller.isCodexBridgeEnabled
@@ -99,62 +93,22 @@ class _CodexIntegrationCardState extends State<CodexIntegrationCard> {
             const SizedBox(height: 12),
             Text(
               appText(
-                '显式启用桥接后，XWorkmate 会使用外部 Codex CLI 进程，并在 Gateway 已连接时注册为协同 code-agent bridge。',
-                'When enabled, XWorkmate launches an external Codex CLI process and registers as a cooperative code-agent bridge if the gateway is connected.',
+                'XWorkmate 当前通过外部 Codex CLI 进程提供桥接能力；启用后会在 Gateway 已连接时注册为协同 code-agent bridge。',
+                'XWorkmate currently exposes bridge capabilities through an external Codex CLI process. When enabled, it registers as a cooperative code-agent bridge if the gateway is connected.',
               ),
               style: TextStyle(fontSize: 13, color: palette.textSecondary),
             ),
             const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                ChoiceChip(
-                  label: Text(
-                    appText('External Codex CLI', 'External Codex CLI'),
-                  ),
-                  selected:
-                      selectedRuntimeMode == CodeAgentRuntimeMode.externalCli,
-                  onSelected: controller.isCodexBridgeBusy
-                      ? null
-                      : (selected) => selected
-                            ? _setRuntimeMode(CodeAgentRuntimeMode.externalCli)
-                            : null,
-                ),
-                ChoiceChip(
-                  label: Text(
-                    appText(
-                      'Built-in Codex (Experimental)',
-                      'Built-in Codex (Experimental)',
-                    ),
-                  ),
-                  selected: selectedRuntimeMode == CodeAgentRuntimeMode.builtIn,
-                  onSelected: controller.isCodexBridgeBusy
-                      ? null
-                      : (selected) => selected
-                            ? _setRuntimeMode(CodeAgentRuntimeMode.builtIn)
-                            : null,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
             _StatusRow(
               label: appText('运行时模式', 'Runtime mode'),
-              value: controller.effectiveCodeAgentRuntimeMode.label,
+              value: appText('外部 Codex CLI', 'External Codex CLI'),
             ),
             _StatusRow(
               label: appText('Binary 状态', 'Binary status'),
               value: binaryLabel,
-              detail: !isExternalMode
-                  ? appText(
-                      'Built-in 运行时不依赖外部 codex 可执行文件。',
-                      'Built-in runtime does not require an external codex binary.',
-                    )
-                  : controller.resolvedCodexCliPath ??
-                        appText(
-                          '请安装 codex 或填写路径。',
-                          'Install codex or set a path.',
-                        ),
+              detail:
+                  controller.resolvedCodexCliPath ??
+                  appText('请安装 codex 或填写路径。', 'Install codex or set a path.'),
             ),
             _StatusRow(
               label: appText('Bridge 状态', 'Bridge status'),
@@ -182,7 +136,7 @@ class _CodexIntegrationCardState extends State<CodexIntegrationCard> {
               ),
               onSubmitted: (_) => _savePathOverride(),
             ),
-            if (isExternalMode && !controller.hasDetectedCodexCli) ...[
+            if (!controller.hasDetectedCodexCli) ...[
               const SizedBox(height: 8),
               Text(
                 appText(
@@ -273,36 +227,6 @@ class _CodexIntegrationCardState extends State<CodexIntegrationCard> {
           ],
         ),
       ),
-    );
-  }
-
-  Future<void> _setRuntimeMode(CodeAgentRuntimeMode mode) async {
-    if (widget.controller.isCodexBridgeEnabled) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            appText(
-              '请先停用 Bridge 再切换运行时模式。',
-              'Disable the bridge before switching runtime mode.',
-            ),
-          ),
-        ),
-      );
-      return;
-    }
-
-    await widget.controller.saveSettings(
-      widget.controller.settings.copyWith(codeAgentRuntimeMode: mode),
-      refreshAfterSave: false,
-    );
-    if (!mounted) {
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(appText('运行时模式已更新。', 'Runtime mode updated.'))),
     );
   }
 

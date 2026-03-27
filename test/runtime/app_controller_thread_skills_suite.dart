@@ -65,7 +65,7 @@ void main() {
       final controller = AppController(
         store: await _createStore(tempDirectory.path),
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
           SingleAgentProvider.claude,
         ],
         singleAgentSharedSkillScanRootOverrides: <String>[
@@ -80,7 +80,7 @@ void main() {
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.singleAgent,
       );
-      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+      await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
       await _waitFor(
         () =>
             controller
@@ -165,7 +165,7 @@ void main() {
       final controller = AppController(
         store: store,
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
         singleAgentSharedSkillScanRootOverrides: const <String>[],
       );
@@ -241,7 +241,7 @@ void main() {
       final controller = AppController(
         store: await _createStore(tempDirectory.path),
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
         singleAgentSharedSkillScanRootOverrides: <String>[sharedRoot.path],
       );
@@ -294,7 +294,7 @@ void main() {
           userHomeDirectory: userHome.path,
         ),
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
         singleAgentSharedSkillScanRootOverrides: const <String>[
           '~/.agents/skills',
@@ -366,7 +366,7 @@ void main() {
       final controller = AppController(
         store: store,
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
         singleAgentSharedSkillScanRootOverrides: <String>[fixedRoot.path],
       );
@@ -443,7 +443,7 @@ void main() {
         return AppController(
           store: await createStore(),
           availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-            SingleAgentProvider.codex,
+            SingleAgentProvider.opencode,
             SingleAgentProvider.claude,
           ],
           singleAgentSharedSkillScanRootOverrides: <String>[
@@ -642,7 +642,7 @@ void main() {
       final controller = AppController(
         store: store,
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
         singleAgentSharedSkillScanRootOverrides: const <String>[],
       );
@@ -734,7 +734,7 @@ void main() {
       final controller = AppController(
         store: store,
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
         singleAgentSharedSkillScanRootOverrides: <String>[customRoot.path],
       );
@@ -821,7 +821,7 @@ void main() {
       final controller = AppController(
         store: store,
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
         singleAgentSharedSkillScanRootOverrides: const <String>[],
       );
@@ -933,7 +933,7 @@ void main() {
       final controller = AppController(
         store: store,
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
         singleAgentSharedSkillScanRootOverrides: <String>[customRoot.path],
       );
@@ -1035,7 +1035,7 @@ void main() {
       final controller = AppController(
         store: store,
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
         singleAgentSharedSkillScanRootOverrides: <String>[customRoot.path],
       );
@@ -1109,7 +1109,7 @@ void main() {
       final controller = AppController(
         store: store,
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
         singleAgentSharedSkillScanRootOverrides: const <String>[],
       );
@@ -1295,11 +1295,11 @@ class _AcpSkillsStatusServer {
           'result': <String, dynamic>{
             'singleAgent': true,
             'multiAgent': true,
-            'providers': const <String>['codex'],
+            'providers': const <String>['opencode'],
             'capabilities': <String, dynamic>{
               'single_agent': true,
               'multi_agent': true,
-              'providers': const <String>['codex'],
+              'providers': const <String>['opencode'],
             },
           },
         });
