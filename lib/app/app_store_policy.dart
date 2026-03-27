@@ -1,4 +1,3 @@
-import '../runtime/runtime_models.dart';
 import 'ui_feature_manifest.dart';
 
 const bool kAppStoreDistribution = bool.fromEnvironment(
@@ -121,32 +120,6 @@ UiFeatureManifest applyAppleAppStorePolicy(
   }
 
   return next;
-}
-
-bool blocksAppStoreEmbeddedAgentProcesses({
-  required bool isAppleHost,
-  bool? enabled,
-}) {
-  return shouldApplyAppleAppStorePolicy(
-    isAppleHost: isAppleHost,
-    enabled: enabled,
-  );
-}
-
-SingleAgentProvider sanitizeAppStoreSingleAgentProvider(
-  SingleAgentProvider provider, {
-  required bool isAppleHost,
-  bool? enabled,
-}) {
-  if (blocksAppStoreEmbeddedAgentProcesses(
-        isAppleHost: isAppleHost,
-        enabled: enabled,
-      ) &&
-      provider != SingleAgentProvider.auto &&
-      provider != SingleAgentProvider.codex) {
-    return SingleAgentProvider.auto;
-  }
-  return provider;
 }
 
 String _featureKeyLeaf(String keyPath) {
