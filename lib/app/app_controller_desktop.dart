@@ -35,6 +35,11 @@ import '../runtime/platform_environment.dart';
 import '../runtime/single_agent_runner.dart';
 import '../runtime/skill_directory_access.dart';
 
+part 'app_controller_desktop_navigation.dart';
+part 'app_controller_desktop_gateway.dart';
+part 'app_controller_desktop_settings.dart';
+part 'app_controller_desktop_single_agent.dart';
+
 enum CodexCooperationState { notStarted, bridgeOnly, registered }
 
 class _SingleAgentSkillScanRoot {
@@ -1441,308 +1446,76 @@ class AppController extends ChangeNotifier {
         matchesSessionKey(normalized, _sessionsController.currentSessionKey);
   }
 
-  void navigateTo(WorkspaceDestination destination) {
-    if (!capabilities.supportsDestination(destination)) {
-      return;
-    }
-    if (destination == WorkspaceDestination.aiGateway ||
-        destination == WorkspaceDestination.secrets) {
-      openSettings(tab: SettingsTab.gateway);
-      return;
-    }
-    final nextModulesTab = switch (destination) {
-      WorkspaceDestination.nodes => ModulesTab.nodes,
-      WorkspaceDestination.agents => ModulesTab.agents,
-      _ => _modulesTab,
-    };
-    final shouldClearSettingsDrillIn =
-        _settingsDetail != null || _settingsNavigationContext != null;
-    final changed =
-        _destination != destination ||
-        _detailPanel != null ||
-        shouldClearSettingsDrillIn ||
-        nextModulesTab != _modulesTab;
-    if (!changed) {
-      return;
-    }
-    _destination = destination;
-    _modulesTab = nextModulesTab;
-    _settingsDetail = null;
-    _settingsNavigationContext = null;
-    _detailPanel = null;
-    notifyListeners();
-  }
+  void navigateTo(WorkspaceDestination destination) =>
+      AppControllerDesktopNavigation(this).navigateTo(destination);
 
-  void navigateHome() {
-    final mainSessionKey =
-        _runtime.snapshot.mainSessionKey?.trim().isNotEmpty == true
-        ? _runtime.snapshot.mainSessionKey!.trim()
-        : 'main';
-    final homeDestination =
-        capabilities.supportsDestination(WorkspaceDestination.assistant)
-        ? WorkspaceDestination.assistant
-        : (capabilities.allowedDestinations.isEmpty
-              ? WorkspaceDestination.assistant
-              : capabilities.allowedDestinations.first);
-    final destinationChanged = _destination != homeDestination;
-    final detailChanged = _detailPanel != null;
-    final settingsDrillInChanged =
-        _settingsDetail != null || _settingsNavigationContext != null;
-    _destination = homeDestination;
-    _settingsDetail = null;
-    _settingsNavigationContext = null;
-    _detailPanel = null;
-    if (destinationChanged || detailChanged || settingsDrillInChanged) {
-      notifyListeners();
-    }
-    if (_sessionsController.currentSessionKey != mainSessionKey) {
-      unawaited(switchSession(mainSessionKey));
-    }
-  }
+  void navigateHome() => AppControllerDesktopNavigation(this).navigateHome();
 
-  void openModules({ModulesTab tab = ModulesTab.nodes}) {
-    if (tab == ModulesTab.gateway) {
-      openSettings(tab: SettingsTab.gateway);
-      return;
-    }
-    final destination = tab == ModulesTab.agents
-        ? WorkspaceDestination.agents
-        : WorkspaceDestination.nodes;
-    if (!capabilities.supportsDestination(destination)) {
-      return;
-    }
-    final changed =
-        _destination != destination ||
-        _modulesTab != tab ||
-        _detailPanel != null ||
-        _settingsDetail != null ||
-        _settingsNavigationContext != null;
-    if (!changed) {
-      return;
-    }
-    _destination = destination;
-    _modulesTab = tab;
-    _detailPanel = null;
-    _settingsDetail = null;
-    _settingsNavigationContext = null;
-    notifyListeners();
-  }
+  void openModules({ModulesTab tab = ModulesTab.nodes}) =>
+      AppControllerDesktopNavigation(this).openModules(tab: tab);
 
-  void setModulesTab(ModulesTab tab) {
-    if (_modulesTab == tab) {
-      return;
-    }
-    _modulesTab = tab;
-    notifyListeners();
-  }
+  void setModulesTab(ModulesTab tab) =>
+      AppControllerDesktopNavigation(this).setModulesTab(tab);
 
-  void openSecrets({SecretsTab tab = SecretsTab.vault}) {
-    if (!capabilities.supportsDestination(WorkspaceDestination.settings)) {
-      return;
-    }
-    _secretsTab = tab;
-    openSettings(tab: SettingsTab.gateway);
-  }
+  void openSecrets({SecretsTab tab = SecretsTab.vault}) =>
+      AppControllerDesktopNavigation(this).openSecrets(tab: tab);
 
-  void setSecretsTab(SecretsTab tab) {
-    if (_secretsTab == tab) {
-      return;
-    }
-    _secretsTab = tab;
-    notifyListeners();
-  }
+  void setSecretsTab(SecretsTab tab) =>
+      AppControllerDesktopNavigation(this).setSecretsTab(tab);
 
-  void openAiGateway({AiGatewayTab tab = AiGatewayTab.models}) {
-    if (!capabilities.supportsDestination(WorkspaceDestination.settings)) {
-      return;
-    }
-    _aiGatewayTab = tab;
-    openSettings(tab: SettingsTab.gateway);
-  }
+  void openAiGateway({AiGatewayTab tab = AiGatewayTab.models}) =>
+      AppControllerDesktopNavigation(this).openAiGateway(tab: tab);
 
-  void setAiGatewayTab(AiGatewayTab tab) {
-    if (_aiGatewayTab == tab) {
-      return;
-    }
-    _aiGatewayTab = tab;
-    notifyListeners();
-  }
+  void setAiGatewayTab(AiGatewayTab tab) =>
+      AppControllerDesktopNavigation(this).setAiGatewayTab(tab);
 
   void openSettings({
     SettingsTab tab = SettingsTab.general,
     SettingsDetailPage? detail,
     SettingsNavigationContext? navigationContext,
-  }) {
-    if (!capabilities.supportsDestination(WorkspaceDestination.settings)) {
-      return;
-    }
-    final requestedTab = detail?.tab ?? tab;
-    final resolvedTab = _sanitizeSettingsTab(requestedTab);
-    final resolvedDetail = detail != null && resolvedTab == detail.tab
-        ? detail
-        : null;
-    final changed =
-        _destination != WorkspaceDestination.settings ||
-        _settingsTab != resolvedTab ||
-        _settingsDetail != resolvedDetail ||
-        _settingsNavigationContext != navigationContext ||
-        _detailPanel != null;
-    if (!changed) {
-      return;
-    }
-    _destination = WorkspaceDestination.settings;
-    _settingsTab = resolvedTab;
-    _settingsDetail = resolvedDetail;
-    _settingsNavigationContext = resolvedDetail == null
-        ? null
-        : navigationContext;
-    _detailPanel = null;
-    notifyListeners();
-  }
+  }) => AppControllerDesktopNavigation(this).openSettings(
+    tab: tab,
+    detail: detail,
+    navigationContext: navigationContext,
+  );
 
-  void setSettingsTab(SettingsTab tab, {bool clearDetail = true}) {
-    final resolvedTab = _sanitizeSettingsTab(tab);
-    final changed =
-        _settingsTab != resolvedTab ||
-        (clearDetail &&
-            (_settingsDetail != null || _settingsNavigationContext != null));
-    if (!changed) {
-      return;
-    }
-    _settingsTab = resolvedTab;
-    if (clearDetail) {
-      _settingsDetail = null;
-      _settingsNavigationContext = null;
-    }
-    notifyListeners();
-  }
+  void setSettingsTab(SettingsTab tab, {bool clearDetail = true}) =>
+      AppControllerDesktopNavigation(
+        this,
+      ).setSettingsTab(tab, clearDetail: clearDetail);
 
-  void closeSettingsDetail() {
-    if (_settingsDetail == null && _settingsNavigationContext == null) {
-      return;
-    }
-    _settingsDetail = null;
-    _settingsNavigationContext = null;
-    notifyListeners();
-  }
+  void closeSettingsDetail() =>
+      AppControllerDesktopNavigation(this).closeSettingsDetail();
 
-  void cycleSidebarState() {
-    _sidebarState = switch (_sidebarState) {
-      AppSidebarState.expanded => AppSidebarState.collapsed,
-      AppSidebarState.collapsed => AppSidebarState.hidden,
-      AppSidebarState.hidden => AppSidebarState.expanded,
-    };
-    notifyListeners();
-  }
+  void cycleSidebarState() =>
+      AppControllerDesktopNavigation(this).cycleSidebarState();
 
-  void setSidebarState(AppSidebarState state) {
-    if (_sidebarState == state) {
-      return;
-    }
-    _sidebarState = state;
-    notifyListeners();
-  }
+  void setSidebarState(AppSidebarState state) =>
+      AppControllerDesktopNavigation(this).setSidebarState(state);
 
-  void setThemeMode(ThemeMode mode) {
-    if (_themeMode == mode) {
-      return;
-    }
-    _themeMode = mode;
-    notifyListeners();
-  }
+  void setThemeMode(ThemeMode mode) =>
+      AppControllerDesktopNavigation(this).setThemeMode(mode);
 
-  Future<void> toggleAppLanguage() async {
-    await setAppLanguage(
-      settings.appLanguage == AppLanguage.zh ? AppLanguage.en : AppLanguage.zh,
-    );
-  }
+  Future<void> toggleAppLanguage() =>
+      AppControllerDesktopNavigation(this).toggleAppLanguage();
 
-  Future<void> setAppLanguage(AppLanguage language) async {
-    if (settings.appLanguage == language) {
-      return;
-    }
-    setActiveAppLanguage(language);
-    await saveSettings(
-      settings.copyWith(appLanguage: language),
-      refreshAfterSave: false,
-    );
-  }
+  Future<void> setAppLanguage(AppLanguage language) =>
+      AppControllerDesktopNavigation(this).setAppLanguage(language);
 
-  void openDetail(DetailPanelData detailPanel) {
-    _detailPanel = detailPanel;
-    notifyListeners();
-  }
+  void openDetail(DetailPanelData detailPanel) =>
+      AppControllerDesktopNavigation(this).openDetail(detailPanel);
 
-  void closeDetail() {
-    if (_detailPanel == null) {
-      return;
-    }
-    _detailPanel = null;
-    notifyListeners();
-  }
+  void closeDetail() => AppControllerDesktopNavigation(this).closeDetail();
 
   Future<void> connectWithSetupCode({
     required String setupCode,
     String token = '',
     String password = '',
-  }) async {
-    final decoded = decodeGatewaySetupCode(setupCode);
-    final resolvedToken = token.trim().isNotEmpty
-        ? token.trim()
-        : (decoded?.token.trim() ?? '');
-    final resolvedPassword = password.trim().isNotEmpty
-        ? password.trim()
-        : (decoded?.password.trim() ?? '');
-    final resolvedProfileIndex = _gatewayProfileIndexForExecutionTarget(
-      _assistantExecutionTargetForMode(
-        _modeFromHost(
-          decoded?.host ?? settings.primaryRemoteGatewayProfile.host,
-        ),
-      ),
-    );
-    await _settingsController.saveGatewaySecrets(
-      profileIndex: resolvedProfileIndex,
-      token: resolvedToken,
-      password: resolvedPassword,
-    );
-    final resolvedTarget = _assistantExecutionTargetForMode(
-      _modeFromHost(decoded?.host ?? settings.primaryRemoteGatewayProfile.host),
-    );
-    final currentProfile = _gatewayProfileForAssistantExecutionTarget(
-      resolvedTarget,
-    );
-    final nextProfile = currentProfile.copyWith(
-      useSetupCode: true,
-      setupCode: setupCode.trim(),
-      host: decoded?.host ?? currentProfile.host,
-      port: decoded?.port ?? currentProfile.port,
-      tls: decoded?.tls ?? currentProfile.tls,
-      mode: resolvedTarget == AssistantExecutionTarget.local
-          ? RuntimeConnectionMode.local
-          : RuntimeConnectionMode.remote,
-    );
-    await saveSettings(
-      settings
-          .copyWithGatewayProfileAt(
-            _gatewayProfileIndexForExecutionTarget(resolvedTarget),
-            nextProfile,
-          )
-          .copyWith(assistantExecutionTarget: resolvedTarget),
-      refreshAfterSave: false,
-    );
-    _upsertAssistantThreadRecord(
-      _sessionsController.currentSessionKey,
-      executionTarget: resolvedTarget,
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
-    await _connectProfile(
-      nextProfile,
-      profileIndex: resolvedProfileIndex,
-      authTokenOverride: resolvedToken,
-      authPasswordOverride: resolvedPassword,
-    );
-    await _chatController.loadSession(_sessionsController.currentSessionKey);
-  }
+  }) => AppControllerDesktopGateway(this).connectWithSetupCode(
+    setupCode: setupCode,
+    token: token,
+    password: password,
+  );
 
   Future<void> connectManual({
     required String host,
@@ -1751,68 +1524,82 @@ class AppController extends ChangeNotifier {
     required RuntimeConnectionMode mode,
     String token = '',
     String password = '',
-  }) async {
-    final nextTarget = _assistantExecutionTargetForMode(mode);
-    final nextProfileIndex = _gatewayProfileIndexForExecutionTarget(nextTarget);
-    await _settingsController.saveGatewaySecrets(
-      profileIndex: nextProfileIndex,
-      token: token.trim(),
-      password: password.trim(),
-    );
-    final resolvedHost =
-        host.trim().isEmpty && mode == RuntimeConnectionMode.local
-        ? '127.0.0.1'
-        : host.trim();
-    final resolvedPort = mode == RuntimeConnectionMode.local && port <= 0
-        ? 18789
-        : port;
-    final nextProfile = _gatewayProfileForAssistantExecutionTarget(nextTarget)
-        .copyWith(
-          mode: mode,
-          useSetupCode: false,
-          setupCode: '',
-          host: resolvedHost,
-          port: resolvedPort <= 0 ? 443 : resolvedPort,
-          tls: mode == RuntimeConnectionMode.local ? false : tls,
-        );
-    await saveSettings(
-      settings
-          .copyWithGatewayProfileAt(
-            _gatewayProfileIndexForExecutionTarget(nextTarget),
-            nextProfile,
-          )
-          .copyWith(assistantExecutionTarget: nextTarget),
-      refreshAfterSave: false,
-    );
-    _upsertAssistantThreadRecord(
-      _sessionsController.currentSessionKey,
-      executionTarget: nextTarget,
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
-    await _connectProfile(
-      nextProfile,
-      profileIndex: nextProfileIndex,
-      authTokenOverride: token.trim(),
-      authPasswordOverride: password.trim(),
-    );
-    await _chatController.loadSession(_sessionsController.currentSessionKey);
-  }
+  }) => AppControllerDesktopGateway(this).connectManual(
+    host: host,
+    port: port,
+    tls: tls,
+    mode: mode,
+    token: token,
+    password: password,
+  );
 
-  Future<void> disconnectGateway() async {
-    _clearCodexGatewayRegistration();
-    await _runtime.disconnect(clearDesiredProfile: false);
-    await _settingsController.refreshDerivedState();
-    await _agentsController.refresh();
-    await _sessionsController.refresh();
-    _chatController.clear();
-    await _instancesController.refresh();
-    await _skillsController.refresh();
-    await _connectorsController.refresh();
-    await _modelsController.refresh();
-    await _cronJobsController.refresh();
-    _devicesController.clear();
-    _recomputeTasks();
-  }
+  Future<void> disconnectGateway() =>
+      AppControllerDesktopGateway(this).disconnectGateway();
+
+  Future<void> saveSettingsDraft(SettingsSnapshot snapshot) =>
+      AppControllerDesktopSettings(this).saveSettingsDraft(snapshot);
+
+  void saveGatewayTokenDraft(String value, {required int profileIndex}) =>
+      AppControllerDesktopSettings(
+        this,
+      ).saveGatewayTokenDraft(value, profileIndex: profileIndex);
+
+  void saveGatewayPasswordDraft(String value, {required int profileIndex}) =>
+      AppControllerDesktopSettings(
+        this,
+      ).saveGatewayPasswordDraft(value, profileIndex: profileIndex);
+
+  void saveAiGatewayApiKeyDraft(String value) =>
+      AppControllerDesktopSettings(this).saveAiGatewayApiKeyDraft(value);
+
+  void saveVaultTokenDraft(String value) =>
+      AppControllerDesktopSettings(this).saveVaultTokenDraft(value);
+
+  void saveOllamaCloudApiKeyDraft(String value) =>
+      AppControllerDesktopSettings(this).saveOllamaCloudApiKeyDraft(value);
+
+  Future<void> persistSettingsDraft() =>
+      AppControllerDesktopSettings(this).persistSettingsDraft();
+
+  Future<void> applySettingsDraft() =>
+      AppControllerDesktopSettings(this).applySettingsDraft();
+
+  Future<void> saveSettings(
+    SettingsSnapshot snapshot, {
+    bool refreshAfterSave = true,
+  }) => AppControllerDesktopSettings(
+    this,
+  ).saveSettings(snapshot, refreshAfterSave: refreshAfterSave);
+
+  Future<void> clearAssistantLocalState() =>
+      AppControllerDesktopSettings(this).clearAssistantLocalState();
+
+  Future<void> _connectProfile(
+    GatewayConnectionProfile profile, {
+    int? profileIndex,
+    String authTokenOverride = '',
+    String authPasswordOverride = '',
+  }) => AppControllerDesktopGateway(this)._connectProfile(
+    profile,
+    profileIndex: profileIndex,
+    authTokenOverride: authTokenOverride,
+    authPasswordOverride: authPasswordOverride,
+  );
+
+  Future<void> _sendSingleAgentMessage(
+    String message, {
+    required String thinking,
+    required List<GatewayChatAttachmentPayload> attachments,
+    required List<CollaborationAttachment> localAttachments,
+  }) => AppControllerDesktopSingleAgent(this)._sendSingleAgentMessage(
+    message,
+    thinking: thinking,
+    attachments: attachments,
+    localAttachments: localAttachments,
+  );
+
+  Future<void> _abortAiGatewayRun(String sessionKey) =>
+      AppControllerDesktopSingleAgent(this)._abortAiGatewayRun(sessionKey);
 
   Future<void> connectSavedGateway() async {
     final target = currentAssistantExecutionTarget;
@@ -2545,168 +2332,6 @@ class AppController extends ChangeNotifier {
     return synced;
   }
 
-  Future<void> saveSettingsDraft(SettingsSnapshot snapshot) async {
-    if (_disposed) {
-      return;
-    }
-    _settingsDraft = _sanitizeFeatureFlagSettings(
-      _sanitizeMultiAgentSettings(
-        _sanitizeOllamaCloudSettings(_sanitizeCodeAgentSettings(snapshot)),
-      ),
-    );
-    _settingsDraftInitialized = true;
-    _settingsDraftStatusMessage = appText(
-      '草稿已更新，点击顶部保存持久化。',
-      'Draft updated. Use the top Save button to persist it.',
-    );
-    notifyListeners();
-  }
-
-  void saveGatewayTokenDraft(String value, {required int profileIndex}) {
-    _saveSecretDraft(_draftGatewayTokenKey(profileIndex), value);
-  }
-
-  void saveGatewayPasswordDraft(String value, {required int profileIndex}) {
-    _saveSecretDraft(_draftGatewayPasswordKey(profileIndex), value);
-  }
-
-  void saveAiGatewayApiKeyDraft(String value) {
-    _saveSecretDraft(_draftAiGatewayApiKeyKey, value);
-  }
-
-  void saveVaultTokenDraft(String value) {
-    _saveSecretDraft(_draftVaultTokenKey, value);
-  }
-
-  void saveOllamaCloudApiKeyDraft(String value) {
-    _saveSecretDraft(_draftOllamaApiKeyKey, value);
-  }
-
-  Future<void> persistSettingsDraft() async {
-    if (_disposed) {
-      return;
-    }
-    if (!hasSettingsDraftChanges) {
-      _settingsDraftStatusMessage = appText(
-        '没有需要保存的更改。',
-        'There are no changes to save.',
-      );
-      notifyListeners();
-      return;
-    }
-    final nextSettings = settingsDraft;
-    _markPendingApplyDomains(settings, nextSettings);
-    await _persistDraftSecrets();
-    if (nextSettings.toJsonString() != settings.toJsonString()) {
-      await _persistSettingsSnapshot(nextSettings);
-    }
-    _settingsDraft = settings;
-    _settingsDraftInitialized = true;
-    _pendingSettingsApply = true;
-    _settingsDraftStatusMessage = appText(
-      '已保存配置，不立即生效。',
-      'Settings saved. They do not take effect until Apply.',
-    );
-    notifyListeners();
-  }
-
-  Future<void> applySettingsDraft() async {
-    if (_disposed) {
-      return;
-    }
-    if (hasSettingsDraftChanges) {
-      await persistSettingsDraft();
-    }
-    if (!_pendingSettingsApply) {
-      _settingsDraftStatusMessage = appText(
-        '没有需要应用的更改。',
-        'There are no saved changes to apply.',
-      );
-      notifyListeners();
-      return;
-    }
-    final currentSettings = settings;
-    await _applyPersistedSettingsSideEffects(
-      previous: _lastAppliedSettings,
-      current: currentSettings,
-      refreshAfterSave: true,
-    );
-    if (_pendingGatewayApply) {
-      await _applyPersistedGatewaySettings(currentSettings);
-    }
-    if (_pendingAiGatewayApply) {
-      await _applyPersistedAiGatewaySettings(currentSettings);
-    }
-    _lastAppliedSettings = settings;
-    _pendingSettingsApply = false;
-    _pendingGatewayApply = false;
-    _pendingAiGatewayApply = false;
-    _settingsDraft = settings;
-    _settingsDraftInitialized = true;
-    _settingsDraftStatusMessage = appText(
-      '已按当前配置生效。',
-      'The current configuration is now in effect.',
-    );
-    notifyListeners();
-  }
-
-  Future<void> saveSettings(
-    SettingsSnapshot snapshot, {
-    bool refreshAfterSave = true,
-  }) async {
-    if (_disposed) {
-      return;
-    }
-    final previous = settings;
-    await _persistSettingsSnapshot(snapshot);
-    if (_disposed) {
-      return;
-    }
-    await _applyPersistedSettingsSideEffects(
-      previous: previous,
-      current: settings,
-      refreshAfterSave: refreshAfterSave,
-    );
-    _lastAppliedSettings = settings;
-    _settingsDraft = settings;
-    _settingsDraftInitialized = true;
-    _pendingSettingsApply = false;
-    _pendingGatewayApply = false;
-    _pendingAiGatewayApply = false;
-    _draftSecretValues.clear();
-    _settingsDraftStatusMessage = '';
-  }
-
-  Future<void> clearAssistantLocalState() async {
-    await _flushAssistantThreadPersistence();
-    await _store.clearAssistantLocalState();
-    await _store.saveAssistantThreadRecords(const <AssistantThreadRecord>[]);
-    _assistantThreadPersistQueue = Future<void>.value();
-    final defaults = SettingsSnapshot.defaults();
-    _assistantThreadRecords.clear();
-    _assistantThreadMessages.clear();
-    _localSessionMessages.clear();
-    _gatewayHistoryCache.clear();
-    _aiGatewayStreamingTextBySession.clear();
-    _aiGatewayStreamingClients.clear();
-    _aiGatewayPendingSessionKeys.clear();
-    _aiGatewayAbortedSessionKeys.clear();
-    _singleAgentExternalCliPendingSessionKeys.clear();
-    _assistantThreadTurnQueues.clear();
-    _multiAgentRunPending = false;
-    setActiveAppLanguage(defaults.appLanguage);
-    await _settingsController.resetSnapshot(defaults);
-    _multiAgentOrchestrator.updateConfig(defaults.multiAgent);
-    _agentsController.restoreSelection(
-      defaults.primaryRemoteGatewayProfile.selectedAgentId,
-    );
-    _modelsController.restoreFromSettings(defaults.aiGateway);
-    await _setCurrentAssistantSessionKey('main', persistSelection: false);
-    _chatController.clear();
-    _recomputeTasks();
-    notifyListeners();
-  }
-
   Future<void> refreshDesktopIntegration() async {
     _desktopPlatformBusy = true;
     notifyListeners();
@@ -3193,50 +2818,6 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  Future<void> _connectProfile(
-    GatewayConnectionProfile profile, {
-    int? profileIndex,
-    String authTokenOverride = '',
-    String authPasswordOverride = '',
-  }) async {
-    await _runtime.connectProfile(
-      profile,
-      profileIndex: profileIndex,
-      authTokenOverride: authTokenOverride,
-      authPasswordOverride: authPasswordOverride,
-    );
-    await refreshGatewayHealth();
-    await refreshAgents();
-    await refreshSessions();
-    await _instancesController.refresh();
-    await _skillsController.refresh(
-      agentId: _agentsController.selectedAgentId.isEmpty
-          ? null
-          : _agentsController.selectedAgentId,
-    );
-    await _connectorsController.refresh();
-    await _modelsController.refresh();
-    await _cronJobsController.refresh();
-    await _devicesController.refresh(quiet: true);
-    await _settingsController.refreshDerivedState();
-    await _ensureCodexGatewayRegistration();
-    _recomputeTasks();
-  }
-
-  void _saveSecretDraft(String key, String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) {
-      _draftSecretValues.remove(key);
-    } else {
-      _draftSecretValues[key] = trimmed;
-    }
-    _settingsDraftStatusMessage = appText(
-      '草稿已更新，点击顶部保存持久化。',
-      'Draft updated. Use the top Save button to persist it.',
-    );
-    notifyListeners();
-  }
-
   void _markPendingApplyDomains(
     SettingsSnapshot previous,
     SettingsSnapshot next,
@@ -3595,685 +3176,6 @@ class AppController extends ChangeNotifier {
           ? MultiAgentConfig.defaults().mountTargets
           : current.mountTargets,
     );
-  }
-
-  Future<void> _sendSingleAgentMessage(
-    String message, {
-    required String thinking,
-    required List<GatewayChatAttachmentPayload> attachments,
-    required List<CollaborationAttachment> localAttachments,
-  }) async {
-    final sessionKey = _normalizedAssistantSessionKey(
-      _sessionsController.currentSessionKey,
-    );
-    final trimmed = message.trim();
-    if (trimmed.isEmpty && attachments.isEmpty) {
-      return;
-    }
-    await _enqueueThreadTurn<void>(sessionKey, () async {
-      final userText = trimmed.isEmpty ? 'See attached.' : trimmed;
-      _appendAssistantThreadMessage(
-        sessionKey,
-        GatewayChatMessage(
-          id: _nextLocalMessageId(),
-          role: 'user',
-          text: userText,
-          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          toolCallId: null,
-          toolName: null,
-          stopReason: null,
-          pending: false,
-          error: false,
-        ),
-      );
-      _aiGatewayPendingSessionKeys.add(sessionKey);
-      _recomputeTasks();
-      _notifyIfActive();
-
-      try {
-        final selection = singleAgentProviderForSession(sessionKey);
-        final selectedSkills = assistantSelectedSkillsForSession(sessionKey);
-        final gatewayToken = await settingsController.loadGatewayToken();
-        final resolution = await _singleAgentRunner.resolveProvider(
-          selection: selection,
-          availableProviders: configuredSingleAgentProviders,
-          configuredCodexCliPath: configuredCodexCliPath,
-          gatewayToken: gatewayToken,
-        );
-        final provider = resolution.resolvedProvider;
-        if (provider == null) {
-          if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
-            _appendSingleAgentFallbackStatusMessage(
-              sessionKey,
-              resolution.fallbackReason,
-            );
-            await _sendAiGatewayMessage(
-              message,
-              thinking: thinking,
-              attachments: attachments,
-              sessionKeyOverride: sessionKey,
-              appendUserMessage: false,
-              managePendingState: false,
-            );
-          } else {
-            _appendAssistantThreadMessage(
-              sessionKey,
-              GatewayChatMessage(
-                id: _nextLocalMessageId(),
-                role: 'assistant',
-                text: _singleAgentUnavailableLabel(
-                  sessionKey,
-                  resolution.fallbackReason,
-                ),
-                timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-                toolCallId: null,
-                toolName: _singleAgentRuntimeDebugToolName(
-                  provider?.label ?? selection.label,
-                ),
-                stopReason: null,
-                pending: false,
-                error: false,
-              ),
-            );
-          }
-          return;
-        }
-
-        _appendSingleAgentRuntimeStatusMessage(sessionKey, provider);
-        _singleAgentExternalCliPendingSessionKeys.add(sessionKey);
-
-        final result = await _singleAgentRunner.run(
-          SingleAgentRunRequest(
-            sessionId: sessionKey,
-            provider: provider,
-            prompt: message,
-            model: assistantModelForSession(sessionKey),
-            gatewayToken: gatewayToken,
-            workingDirectory:
-                _resolveLocalAssistantWorkingDirectoryForSession(sessionKey) ??
-                Directory.current.path,
-            attachments: localAttachments,
-            selectedSkills: selectedSkills,
-            aiGatewayBaseUrl: aiGatewayUrl,
-            aiGatewayApiKey: await loadAiGatewayApiKey(),
-            config: settings.multiAgent,
-            onOutput: (text) => _appendAiGatewayStreamingText(sessionKey, text),
-            configuredCodexCliPath: configuredCodexCliPath,
-          ),
-        );
-        final resolvedRuntimeModel = result.resolvedModel.trim();
-        if (resolvedRuntimeModel.isNotEmpty) {
-          _singleAgentRuntimeModelBySession[sessionKey] = resolvedRuntimeModel;
-        }
-        _clearAiGatewayStreamingText(sessionKey);
-        if (result.aborted) {
-          final partial = result.output.trim();
-          if (partial.isNotEmpty) {
-            _appendAssistantThreadMessage(
-              sessionKey,
-              GatewayChatMessage(
-                id: _nextLocalMessageId(),
-                role: 'assistant',
-                text: partial,
-                timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-                toolCallId: null,
-                toolName: null,
-                stopReason: 'aborted',
-                pending: false,
-                error: false,
-              ),
-            );
-          }
-          return;
-        }
-        if (result.shouldFallbackToAiChat) {
-          if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
-            _appendSingleAgentFallbackStatusMessage(
-              sessionKey,
-              result.fallbackReason ?? result.errorMessage,
-            );
-            await _sendAiGatewayMessage(
-              message,
-              thinking: thinking,
-              attachments: attachments,
-              sessionKeyOverride: sessionKey,
-              appendUserMessage: false,
-              managePendingState: false,
-            );
-          } else {
-            _appendAssistantThreadMessage(
-              sessionKey,
-              GatewayChatMessage(
-                id: _nextLocalMessageId(),
-                role: 'assistant',
-                text: _singleAgentUnavailableLabel(
-                  sessionKey,
-                  result.fallbackReason ?? result.errorMessage,
-                ),
-                timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-                toolCallId: null,
-                toolName: _singleAgentRuntimeDebugToolName(provider.label),
-                stopReason: null,
-                pending: false,
-                error: false,
-              ),
-            );
-          }
-          return;
-        }
-
-        if (!result.success) {
-          _appendAssistantThreadMessage(
-            sessionKey,
-            _assistantErrorMessage(
-              appText(
-                '单机智能体执行失败：${result.errorMessage}',
-                'Single Agent execution failed: ${result.errorMessage}',
-              ),
-            ),
-          );
-          return;
-        }
-
-        _appendAssistantThreadMessage(
-          sessionKey,
-          GatewayChatMessage(
-            id: _nextLocalMessageId(),
-            role: 'assistant',
-            text: result.output,
-            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-            toolCallId: null,
-            toolName: null,
-            stopReason: null,
-            pending: false,
-            error: false,
-          ),
-        );
-      } catch (error) {
-        _clearAiGatewayStreamingText(sessionKey);
-        _appendAssistantThreadMessage(
-          sessionKey,
-          _assistantErrorMessage(error.toString()),
-        );
-      } finally {
-        _singleAgentExternalCliPendingSessionKeys.remove(sessionKey);
-        _clearAiGatewayStreamingText(sessionKey);
-        _aiGatewayPendingSessionKeys.remove(sessionKey);
-        _recomputeTasks();
-        _notifyIfActive();
-      }
-    });
-  }
-
-  Future<void> _sendAiGatewayMessage(
-    String message, {
-    required String thinking,
-    required List<GatewayChatAttachmentPayload> attachments,
-    String? sessionKeyOverride,
-    bool appendUserMessage = true,
-    bool managePendingState = true,
-  }) async {
-    final sessionKey = _normalizedAssistantSessionKey(
-      sessionKeyOverride ?? _sessionsController.currentSessionKey,
-    );
-    final trimmed = message.trim();
-    if (trimmed.isEmpty && attachments.isEmpty) {
-      return;
-    }
-
-    final baseUrl = _normalizeAiGatewayBaseUrl(settings.aiGateway.baseUrl);
-    if (baseUrl == null) {
-      _appendAssistantThreadMessage(
-        sessionKey,
-        _assistantErrorMessage(
-          appText(
-            'LLM API Endpoint 未配置，无法发送对话。',
-            'LLM API Endpoint is not configured, so the conversation could not be sent.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    final apiKey = await loadAiGatewayApiKey();
-    if (apiKey.isEmpty) {
-      _appendAssistantThreadMessage(
-        sessionKey,
-        _assistantErrorMessage(
-          appText(
-            'LLM API Token 未配置，无法发送对话。',
-            'LLM API Token is not configured, so the conversation could not be sent.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    final model = resolvedAiGatewayModel;
-    if (model.isEmpty) {
-      _appendAssistantThreadMessage(
-        sessionKey,
-        _assistantErrorMessage(
-          appText(
-            '当前没有可用的 LLM API 对话模型。请先在 设置 -> 集成 中同步并选择可用模型。',
-            'No LLM API chat model is available yet. Sync and select a supported model in Settings -> Integrations first.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (appendUserMessage) {
-      final userText = trimmed.isEmpty ? 'See attached.' : trimmed;
-      _appendAssistantThreadMessage(
-        sessionKey,
-        GatewayChatMessage(
-          id: _nextLocalMessageId(),
-          role: 'user',
-          text: userText,
-          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          toolCallId: null,
-          toolName: null,
-          stopReason: null,
-          pending: false,
-          error: false,
-        ),
-      );
-    }
-    if (managePendingState) {
-      _aiGatewayPendingSessionKeys.add(sessionKey);
-      _recomputeTasks();
-      _notifyIfActive();
-    }
-
-    try {
-      final assistantText = await _requestAiGatewayCompletion(
-        baseUrl: baseUrl,
-        apiKey: apiKey,
-        model: model,
-        thinking: thinking,
-        sessionKey: sessionKey,
-      );
-      _appendAssistantThreadMessage(
-        sessionKey,
-        GatewayChatMessage(
-          id: _nextLocalMessageId(),
-          role: 'assistant',
-          text: assistantText,
-          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          toolCallId: null,
-          toolName: null,
-          stopReason: null,
-          pending: false,
-          error: false,
-        ),
-      );
-    } on _AiGatewayAbortException catch (error) {
-      final partial = error.partialText.trim();
-      if (partial.isNotEmpty) {
-        _appendAssistantThreadMessage(
-          sessionKey,
-          GatewayChatMessage(
-            id: _nextLocalMessageId(),
-            role: 'assistant',
-            text: partial,
-            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-            toolCallId: null,
-            toolName: null,
-            stopReason: 'aborted',
-            pending: false,
-            error: false,
-          ),
-        );
-      }
-    } catch (error) {
-      _appendAssistantThreadMessage(
-        sessionKey,
-        _assistantErrorMessage(_aiGatewayErrorLabel(error)),
-      );
-    } finally {
-      _aiGatewayStreamingClients.remove(sessionKey);
-      _clearAiGatewayStreamingText(sessionKey);
-      if (managePendingState) {
-        _aiGatewayPendingSessionKeys.remove(sessionKey);
-        _recomputeTasks();
-        _notifyIfActive();
-      }
-    }
-  }
-
-  Future<String> _requestAiGatewayCompletion({
-    required Uri baseUrl,
-    required String apiKey,
-    required String model,
-    required String thinking,
-    required String sessionKey,
-  }) async {
-    final uri = _aiGatewayChatUri(baseUrl);
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 20);
-    _aiGatewayStreamingClients[sessionKey] = client;
-    try {
-      final request = await client
-          .postUrl(uri)
-          .timeout(const Duration(seconds: 20));
-      request.headers.set(
-        HttpHeaders.acceptHeader,
-        'text/event-stream, application/json',
-      );
-      request.headers.set(
-        HttpHeaders.contentTypeHeader,
-        'application/json; charset=utf-8',
-      );
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $apiKey');
-      request.headers.set('x-api-key', apiKey);
-      final payload = <String, dynamic>{
-        'model': model,
-        'stream': true,
-        'messages': _buildAiGatewayRequestMessages(sessionKey),
-      };
-      final normalizedThinking = thinking.trim().toLowerCase();
-      if (normalizedThinking.isNotEmpty && normalizedThinking != 'off') {
-        payload['reasoning_effort'] = normalizedThinking;
-      }
-      request.add(utf8.encode(jsonEncode(payload)));
-      final response = await request.close().timeout(
-        const Duration(seconds: 60),
-      );
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        final body = await response.transform(utf8.decoder).join();
-        throw _AiGatewayChatException(
-          _formatAiGatewayHttpError(
-            response.statusCode,
-            _extractAiGatewayErrorDetail(body),
-          ),
-        );
-      }
-      final contentType =
-          response.headers.contentType?.mimeType.toLowerCase() ??
-          response.headers
-              .value(HttpHeaders.contentTypeHeader)
-              ?.toLowerCase() ??
-          '';
-      if (contentType.contains('text/event-stream')) {
-        final streamed = await _readAiGatewayStreamingResponse(
-          response: response,
-          sessionKey: sessionKey,
-        );
-        if (streamed.trim().isEmpty) {
-          throw const FormatException('Missing assistant content');
-        }
-        return streamed.trim();
-      }
-      return await _readAiGatewayJsonCompletion(response);
-    } catch (error) {
-      if (_consumeAiGatewayAbort(sessionKey)) {
-        throw _AiGatewayAbortException(
-          _aiGatewayStreamingTextBySession[sessionKey] ?? '',
-        );
-      }
-      rethrow;
-    } finally {
-      _aiGatewayStreamingClients.remove(sessionKey);
-      client.close(force: true);
-    }
-  }
-
-  List<Map<String, String>> _buildAiGatewayRequestMessages(String sessionKey) {
-    final history = <GatewayChatMessage>[
-      ...(_gatewayHistoryCache[sessionKey] ?? const <GatewayChatMessage>[]),
-      ...(_assistantThreadMessages[sessionKey] ?? const <GatewayChatMessage>[]),
-    ];
-    return history
-        .where((message) {
-          final role = message.role.trim().toLowerCase();
-          return (role == 'user' || role == 'assistant') &&
-              (message.toolName ?? '').trim().isEmpty &&
-              message.text.trim().isNotEmpty;
-        })
-        .map(
-          (message) => <String, String>{
-            'role': message.role.trim().toLowerCase() == 'assistant'
-                ? 'assistant'
-                : 'user',
-            'content': message.text.trim(),
-          },
-        )
-        .toList(growable: false);
-  }
-
-  Future<String> _readAiGatewayJsonCompletion(
-    HttpClientResponse response,
-  ) async {
-    final body = await response.transform(utf8.decoder).join();
-    final decoded = jsonDecode(_extractFirstJsonDocument(body));
-    final assistantText = _extractAiGatewayAssistantText(decoded);
-    if (assistantText.trim().isEmpty) {
-      throw const FormatException('Missing assistant content');
-    }
-    return assistantText.trim();
-  }
-
-  Future<String> _readAiGatewayStreamingResponse({
-    required HttpClientResponse response,
-    required String sessionKey,
-  }) async {
-    final buffer = StringBuffer();
-    final eventLines = <String>[];
-
-    void processEvent(String payload) {
-      final trimmed = payload.trim();
-      if (trimmed.isEmpty) {
-        return;
-      }
-      if (trimmed == '[DONE]') {
-        return;
-      }
-      final deltaText = _extractAiGatewayStreamText(trimmed);
-      if (deltaText.isEmpty) {
-        return;
-      }
-      final current = buffer.toString();
-      if (current.isEmpty || deltaText == current) {
-        buffer
-          ..clear()
-          ..write(deltaText);
-      } else if (deltaText.startsWith(current)) {
-        buffer
-          ..clear()
-          ..write(deltaText);
-      } else {
-        buffer.write(deltaText);
-      }
-      _setAiGatewayStreamingText(sessionKey, buffer.toString());
-    }
-
-    await for (final line
-        in response.transform(utf8.decoder).transform(const LineSplitter())) {
-      if (_consumeAiGatewayAbort(sessionKey)) {
-        throw _AiGatewayAbortException(buffer.toString());
-      }
-      if (line.isEmpty) {
-        if (eventLines.isNotEmpty) {
-          processEvent(eventLines.join('\n'));
-          eventLines.clear();
-        }
-        continue;
-      }
-      if (line.startsWith('data:')) {
-        eventLines.add(line.substring(5).trimLeft());
-      }
-    }
-
-    if (eventLines.isNotEmpty) {
-      processEvent(eventLines.join('\n'));
-    }
-
-    return buffer.toString();
-  }
-
-  String _extractAiGatewayStreamText(String payload) {
-    final decoded = jsonDecode(_extractFirstJsonDocument(payload));
-    final map = asMap(decoded);
-    final choices = asList(map['choices']);
-    if (choices.isNotEmpty) {
-      final firstChoice = asMap(choices.first);
-      final delta = asMap(firstChoice['delta']);
-      final deltaContent = _extractAiGatewayContent(delta['content']);
-      if (deltaContent.isNotEmpty) {
-        return deltaContent;
-      }
-    }
-    return _extractAiGatewayAssistantText(decoded);
-  }
-
-  Future<void> _abortAiGatewayRun(String sessionKey) async {
-    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    _aiGatewayAbortedSessionKeys.add(normalizedSessionKey);
-    final client = _aiGatewayStreamingClients.remove(normalizedSessionKey);
-    if (client != null) {
-      try {
-        client.close(force: true);
-      } catch (_) {
-        // Best effort only.
-      }
-    }
-    _aiGatewayPendingSessionKeys.remove(normalizedSessionKey);
-    _clearAiGatewayStreamingText(normalizedSessionKey);
-    _recomputeTasks();
-    _notifyIfActive();
-  }
-
-  bool _consumeAiGatewayAbort(String sessionKey) {
-    return _aiGatewayAbortedSessionKeys.remove(
-      _normalizedAssistantSessionKey(sessionKey),
-    );
-  }
-
-  GatewayChatMessage _assistantErrorMessage(String text) {
-    return GatewayChatMessage(
-      id: _nextLocalMessageId(),
-      role: 'assistant',
-      text: text,
-      timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      toolCallId: null,
-      toolName: null,
-      stopReason: null,
-      pending: false,
-      error: true,
-    );
-  }
-
-  String? _singleAgentRuntimeDebugToolName(String label) {
-    if (!_showsSingleAgentRuntimeDebugMessages) {
-      return null;
-    }
-    final trimmed = label.trim();
-    if (trimmed.isEmpty) {
-      return null;
-    }
-    return trimmed;
-  }
-
-  void _appendSingleAgentRuntimeStatusMessage(
-    String sessionKey,
-    SingleAgentProvider provider,
-  ) {
-    if (!_showsSingleAgentRuntimeDebugMessages) {
-      return;
-    }
-    _appendAssistantThreadMessage(
-      sessionKey,
-      GatewayChatMessage(
-        id: _nextLocalMessageId(),
-        role: 'assistant',
-        text: appText(
-          '单机智能体已切换到 ${provider.label} 执行当前任务。',
-          'Single Agent is using ${provider.label} for this task.',
-        ),
-        timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        toolCallId: null,
-        toolName: provider.label,
-        stopReason: null,
-        pending: false,
-        error: false,
-      ),
-    );
-  }
-
-  void _appendSingleAgentFallbackStatusMessage(
-    String sessionKey,
-    String? reason,
-  ) {
-    if (!_showsSingleAgentRuntimeDebugMessages) {
-      return;
-    }
-    _appendAssistantThreadMessage(
-      sessionKey,
-      GatewayChatMessage(
-        id: _nextLocalMessageId(),
-        role: 'assistant',
-        text: _singleAgentFallbackLabel(reason),
-        timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        toolCallId: null,
-        toolName: 'AI Chat fallback',
-        stopReason: null,
-        pending: false,
-        error: false,
-      ),
-    );
-  }
-
-  String _singleAgentFallbackLabel(String? reason) {
-    final detail = reason?.trim() ?? '';
-    return detail.isEmpty
-        ? appText(
-            '未发现可用的外部 Agent ACP 端点，已回退到 AI Chat。',
-            'No external Agent ACP endpoint is available. Falling back to AI Chat.',
-          )
-        : appText(
-            '外部 Agent ACP 连接不可用，已回退到 AI Chat：$detail',
-            'External Agent ACP connection is unavailable. Falling back to AI Chat: $detail',
-          );
-  }
-
-  String _singleAgentUnavailableLabel(String sessionKey, String? reason) {
-    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    final detail = reason?.trim() ?? '';
-    final selection = singleAgentProviderForSession(normalizedSessionKey);
-    if (singleAgentShouldSuggestAutoSwitchForSession(normalizedSessionKey)) {
-      return detail.isEmpty
-          ? appText(
-              '当前线程固定为 ${selection.label}，但它在这台设备上不可用。检测到其他外部 Agent ACP 端点时不会自动改线，可切到 Auto。',
-              'This thread is pinned to ${selection.label}, but it is unavailable on this device. XWorkmate will not reroute to another external Agent ACP endpoint automatically. Switch to Auto instead.',
-            )
-          : appText(
-              '当前线程固定为 ${selection.label}：$detail 检测到其他外部 Agent ACP 端点时不会自动改线，可切到 Auto。',
-              'This thread is pinned to ${selection.label}: $detail XWorkmate will not reroute to another external Agent ACP endpoint automatically. Switch to Auto instead.',
-            );
-    }
-    if (singleAgentNeedsAiGatewayConfigurationForSession(
-      normalizedSessionKey,
-    )) {
-      return detail.isEmpty
-          ? appText(
-              '当前没有可用的外部 Agent ACP 端点，也没有可用的 AI Chat fallback。请先配置外部 Agent 连接，或配置 LLM API。',
-              'No external Agent ACP endpoint is available, and AI Chat fallback is not configured. Configure an external Agent connection or configure LLM API first.',
-            )
-          : appText(
-              '$detail 当前没有可用的外部 Agent ACP 端点，也没有可用的 AI Chat fallback。请先配置外部 Agent 连接，或配置 LLM API。',
-              '$detail No external Agent ACP endpoint is available, and AI Chat fallback is not configured. Configure an external Agent connection or configure LLM API first.',
-            );
-    }
-    return detail.isEmpty
-        ? appText(
-            '当前线程的外部 Agent ACP 连接尚未就绪。',
-            'The external Agent ACP connection for this thread is not ready yet.',
-          )
-        : appText(
-            '当前线程的外部 Agent ACP 连接尚未就绪：$detail',
-            'The external Agent ACP connection for this thread is not ready yet: $detail',
-          );
   }
 
   void _appendAssistantThreadMessage(
