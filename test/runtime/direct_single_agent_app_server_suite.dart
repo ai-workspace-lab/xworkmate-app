@@ -83,6 +83,8 @@ void main() {
       expect(result.success, isTrue, reason: result.errorMessage);
       expect(result.output, 'hello world from app server');
       expect(result.resolvedModel, 'codex-sonnet');
+      expect(result.resolvedWorkingDirectory, '/tmp');
+      expect(result.resolvedWorkspaceRefKind, WorkspaceRefKind.localPath);
       expect(server.lastTurnInput, <Object?>[
         <String, dynamic>{'type': 'text', 'text': 'hello world'},
       ]);
@@ -200,9 +202,39 @@ void main() {
           ),
         );
 
-        expect(result.success, isTrue);
-        expect(result.output, 'hello world from app server');
-        expect(result.resolvedModel, 'codex-sonnet');
+      expect(result.success, isTrue);
+      expect(result.output, 'hello world from app server');
+      expect(result.resolvedModel, 'codex-sonnet');
+      expect(result.resolvedWorkingDirectory, '/tmp');
+      expect(result.resolvedWorkspaceRefKind, WorkspaceRefKind.localPath);
+    },
+    );
+
+    test('captures the resolved thread path returned by app-server', () async {
+      final server = await _FakeAppServer.start(
+        resolvedThreadPath: '/tmp/app-server-thread',
+      );
+      addTearDown(server.close);
+
+      final client = DirectSingleAgentAppServerClient(
+        endpointResolver: (_) => server.baseHttpUri,
+      );
+      addTearDown(client.dispose);
+
+      final result = await client.run(
+        const DirectSingleAgentRunRequest(
+          sessionId: 'session-thread-path',
+          provider: SingleAgentProvider.opencode,
+          prompt: 'hello thread path',
+          model: 'gpt-4.1',
+          workingDirectory: '/tmp/requested-thread',
+          gatewayToken: '',
+        ),
+      );
+
+      expect(result.success, isTrue);
+      expect(result.resolvedWorkingDirectory, '/tmp/app-server-thread');
+      expect(result.resolvedWorkspaceRefKind, WorkspaceRefKind.localPath);
       },
     );
 
@@ -294,11 +326,13 @@ class _FakeAppServer {
     this._server, {
     required this.delayCompletion,
     required this.nestedThreadResult,
+    required this.resolvedThreadPath,
   });
 
   final HttpServer _server;
   final bool delayCompletion;
   final bool nestedThreadResult;
+  final String? resolvedThreadPath;
   final List<String> methods = <String>[];
   final List<String> authorizationHeaders = <String>[];
   final Map<String, Completer<void>> _methodWaiters =
@@ -312,12 +346,14 @@ class _FakeAppServer {
   static Future<_FakeAppServer> start({
     bool delayCompletion = false,
     bool nestedThreadResult = false,
+    String? resolvedThreadPath,
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final fake = _FakeAppServer._(
       server,
       delayCompletion: delayCompletion,
       nestedThreadResult: nestedThreadResult,
+      resolvedThreadPath: resolvedThreadPath,
     );
     unawaited(fake._listen());
     return fake;
@@ -378,17 +414,18 @@ class _FakeAppServer {
           break;
         case 'thread/start':
           _threadCounter += 1;
+          final threadPath = resolvedThreadPath ?? params['cwd'] ?? '/tmp';
           final result = nestedThreadResult
               ? <String, dynamic>{
                   'thread': <String, dynamic>{
                     'id': 'thread-$_threadCounter',
-                    'path': params['cwd'] ?? '/tmp',
+                    'path': threadPath,
                     'ephemeral': false,
                   },
                 }
               : <String, dynamic>{
                   'id': 'thread-$_threadCounter',
-                  'path': params['cwd'] ?? '/tmp',
+                  'path': threadPath,
                   'ephemeral': false,
                 };
           socket.add(
@@ -400,17 +437,18 @@ class _FakeAppServer {
           );
           break;
         case 'thread/resume':
+          final threadPath = resolvedThreadPath ?? params['cwd'] ?? '/tmp';
           final result = nestedThreadResult
               ? <String, dynamic>{
                   'thread': <String, dynamic>{
                     'id': params['threadId'] ?? 'thread-resumed',
-                    'path': params['cwd'] ?? '/tmp',
+                    'path': threadPath,
                     'ephemeral': false,
                   },
                 }
               : <String, dynamic>{
                   'id': params['threadId'] ?? 'thread-resumed',
-                  'path': params['cwd'] ?? '/tmp',
+                  'path': threadPath,
                   'ephemeral': false,
                 };
           socket.add(

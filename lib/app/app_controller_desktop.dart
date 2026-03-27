@@ -1831,7 +1831,11 @@ class AppController extends ChangeNotifier {
         const <CollaborationAttachment>[],
     List<String> selectedSkillLabels = const <String>[],
   }) async {
-    _syncAssistantWorkspaceRefForSession(_sessionsController.currentSessionKey);
+    final currentSessionKey = _sessionsController.currentSessionKey;
+    if (!isSingleAgentMode ||
+        assistantWorkspaceRefForSession(currentSessionKey).trim().isEmpty) {
+      _syncAssistantWorkspaceRefForSession(currentSessionKey);
+    }
     if (isSingleAgentMode) {
       await _sendSingleAgentMessage(
         message,
@@ -4449,6 +4453,17 @@ class AppController extends ChangeNotifier {
     }
     final directory = Directory(candidate);
     return directory.existsSync() ? directory.path : null;
+  }
+
+  String? _resolveSingleAgentWorkingDirectoryForSession(String sessionKey) {
+    final workspaceKind = assistantWorkspaceRefKindForSession(sessionKey);
+    if (workspaceKind == WorkspaceRefKind.objectStore) {
+      return null;
+    }
+    if (workspaceKind == WorkspaceRefKind.remotePath) {
+      return _assistantWorkingDirectoryForSession(sessionKey);
+    }
+    return _resolveLocalAssistantWorkingDirectoryForSession(sessionKey);
   }
 
   void _registerCodexExternalProvider() {
