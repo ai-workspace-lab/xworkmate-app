@@ -231,4 +231,62 @@ void main() {
       );
     },
   );
+
+  test(
+    'AppController rebinds default thread workspaces after bootstrap updates the workspace root',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-workspace-bootstrap-migrate-',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(SettingsSnapshot.defaults());
+      await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
+        AssistantThreadRecord(
+          sessionKey: 'draft:artifact-thread',
+          messages: const <GatewayChatMessage>[],
+          updatedAtMs: 1,
+          title: 'Artifact Thread',
+          archived: false,
+          executionTarget: AssistantExecutionTarget.singleAgent,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          workspaceRef: '/opt/data/.xworkmate/threads/draft-artifact-thread',
+          workspaceRefKind: WorkspaceRefKind.localPath,
+        ),
+      ]);
+
+      final controller = AppController(store: store);
+      addTearDown(controller.dispose);
+
+      final deadline = DateTime.now().add(const Duration(seconds: 5));
+      while (controller.initializing) {
+        if (DateTime.now().isAfter(deadline)) {
+          fail('controller did not initialize in time');
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+
+      expect(controller.settings.workspacePath, isNot('/opt/data'));
+      final migratedWorkspace = controller.assistantWorkspaceRefForSession(
+        'draft:artifact-thread',
+      );
+      expect(
+        migratedWorkspace,
+        '${controller.settings.workspacePath}/.xworkmate/threads/draft-artifact-thread',
+      );
+      expect(Directory(migratedWorkspace).existsSync(), isTrue);
+    },
+  );
 }
