@@ -11,6 +11,33 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   group('DirectSingleAgentAppServerClient', () {
+    test('classifies the four endpoint modes', () {
+      expect(
+        DirectSingleAgentEndpointDescriptor.describe(
+          Uri.parse('ws://127.0.0.1:9001'),
+        ).mode,
+        DirectSingleAgentEndpointMode.wsLocal,
+      );
+      expect(
+        DirectSingleAgentEndpointDescriptor.describe(
+          Uri.parse('wss://agent.example.com'),
+        ).mode,
+        DirectSingleAgentEndpointMode.wss,
+      );
+      expect(
+        DirectSingleAgentEndpointDescriptor.describe(
+          Uri.parse('http://localhost:38992'),
+        ).mode,
+        DirectSingleAgentEndpointMode.httpLocal,
+      );
+      expect(
+        DirectSingleAgentEndpointDescriptor.describe(
+          Uri.parse('https://agent.example.com'),
+        ).mode,
+        DirectSingleAgentEndpointMode.https,
+      );
+    });
+
     test('probes websocket endpoint and reports codex support', () async {
       final server = await _FakeAppServer.start();
       addTearDown(server.close);

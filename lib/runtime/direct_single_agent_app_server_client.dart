@@ -67,6 +67,82 @@ class DirectSingleAgentRunRequest {
   final void Function(String text)? onOutput;
 }
 
+enum DirectSingleAgentEndpointMode {
+  wsLocal,
+  wss,
+  httpLocal,
+  https,
+  unsupported,
+}
+
+enum _DirectSingleAgentTransportKind { websocketAppServer, restSessionApi }
+
+class DirectSingleAgentEndpointDescriptor {
+  const DirectSingleAgentEndpointDescriptor({
+    required this.mode,
+    required this.baseUri,
+    this.websocketUri,
+  });
+
+  final DirectSingleAgentEndpointMode mode;
+  final Uri? baseUri;
+  final Uri? websocketUri;
+
+  bool get isSupported => mode != DirectSingleAgentEndpointMode.unsupported;
+
+  bool get prefersWebSocket =>
+      mode == DirectSingleAgentEndpointMode.wsLocal ||
+      mode == DirectSingleAgentEndpointMode.wss;
+
+  bool get allowsRest =>
+      mode == DirectSingleAgentEndpointMode.httpLocal ||
+      mode == DirectSingleAgentEndpointMode.https;
+
+  static DirectSingleAgentEndpointDescriptor describe(Uri? endpoint) {
+    if (endpoint == null) {
+      return const DirectSingleAgentEndpointDescriptor(
+        mode: DirectSingleAgentEndpointMode.unsupported,
+        baseUri: null,
+      );
+    }
+    final scheme = endpoint.scheme.toLowerCase();
+    final normalizedBase = endpoint.replace(path: '', query: null, fragment: null);
+    final isLocal = _isLocalHost(endpoint.host);
+    if (scheme == 'ws' && isLocal) {
+      return DirectSingleAgentEndpointDescriptor(
+        mode: DirectSingleAgentEndpointMode.wsLocal,
+        baseUri: normalizedBase,
+        websocketUri: normalizedBase,
+      );
+    }
+    if (scheme == 'wss') {
+      return DirectSingleAgentEndpointDescriptor(
+        mode: DirectSingleAgentEndpointMode.wss,
+        baseUri: normalizedBase,
+        websocketUri: normalizedBase,
+      );
+    }
+    if (scheme == 'http' && isLocal) {
+      return DirectSingleAgentEndpointDescriptor(
+        mode: DirectSingleAgentEndpointMode.httpLocal,
+        baseUri: normalizedBase,
+        websocketUri: normalizedBase.replace(scheme: 'ws'),
+      );
+    }
+    if (scheme == 'https') {
+      return DirectSingleAgentEndpointDescriptor(
+        mode: DirectSingleAgentEndpointMode.https,
+        baseUri: normalizedBase,
+        websocketUri: normalizedBase.replace(scheme: 'wss'),
+      );
+    }
+    return DirectSingleAgentEndpointDescriptor(
+      mode: DirectSingleAgentEndpointMode.unsupported,
+      baseUri: normalizedBase,
+    );
+  }
+}
+
 class DirectSingleAgentAppServerClient {
   DirectSingleAgentAppServerClient({required this.endpointResolver});
 
@@ -82,6 +158,8 @@ class DirectSingleAgentAppServerClient {
   _cachedCapabilities = <SingleAgentProvider, DirectSingleAgentCapabilities>{};
   final Map<SingleAgentProvider, DateTime> _capabilitiesRefreshedAt =
       <SingleAgentProvider, DateTime>{};
+  final Map<SingleAgentProvider, _DirectSingleAgentTransportKind>
+  _transportKinds = <SingleAgentProvider, _DirectSingleAgentTransportKind>{};
 
   Future<DirectSingleAgentCapabilities> loadCapabilities({
     required SingleAgentProvider provider,
@@ -97,39 +175,8 @@ class DirectSingleAgentAppServerClient {
       return cached;
     }
 
-    final endpoint = _resolveWebSocketEndpoint(provider);
-    if (_usesRestSessionApi(provider)) {
-      final base = endpointResolver(provider);
-      if (base == null) {
-        final unavailable = const DirectSingleAgentCapabilities.unavailable(
-          endpoint: '',
-          errorMessage: 'Single-agent app-server endpoint is not configured.',
-        );
-        _cachedCapabilities[provider] = unavailable;
-        _capabilitiesRefreshedAt[provider] = DateTime.now();
-        return unavailable;
-      }
-      try {
-        await _fetchJson(
-          _buildRestUri(base, '/global/health'),
-          gatewayToken: gatewayToken,
-        );
-        _cachedCapabilities[provider] = DirectSingleAgentCapabilities(
-          available: true,
-          supportedProviders: <SingleAgentProvider>[provider],
-          endpoint: base.toString(),
-        );
-      } catch (error) {
-        _cachedCapabilities[provider] = DirectSingleAgentCapabilities.unavailable(
-          endpoint: base.toString(),
-          errorMessage: error.toString(),
-        );
-      } finally {
-        _capabilitiesRefreshedAt[provider] = DateTime.now();
-      }
-      return _cachedCapabilities[provider]!;
-    }
-    if (endpoint == null) {
+    final descriptor = _describeEndpoint(provider);
+    if (!descriptor.isSupported || descriptor.baseUri == null) {
       final unavailable = const DirectSingleAgentCapabilities.unavailable(
         endpoint: '',
         errorMessage: 'Single-agent app-server endpoint is not configured.',
@@ -139,26 +186,26 @@ class DirectSingleAgentAppServerClient {
       return unavailable;
     }
 
-    _DirectAppServerConnection? connection;
     try {
-      connection = await _DirectAppServerConnection.connect(
-        endpoint,
+      final transport = await _resolveTransport(
+        provider,
+        descriptor: descriptor,
         gatewayToken: gatewayToken,
       );
-      await connection.initialize();
+      _transportKinds[provider] = transport.kind;
       _cachedCapabilities[provider] = DirectSingleAgentCapabilities(
         available: true,
         supportedProviders: <SingleAgentProvider>[provider],
-        endpoint: endpoint.toString(),
+        endpoint: transport.endpoint.toString(),
       );
     } catch (error) {
       _cachedCapabilities[provider] = DirectSingleAgentCapabilities.unavailable(
-        endpoint: endpoint.toString(),
+        endpoint: descriptor.baseUri.toString(),
         errorMessage: error.toString(),
       );
+      _transportKinds.remove(provider);
     } finally {
       _capabilitiesRefreshedAt[provider] = DateTime.now();
-      await connection?.close();
     }
 
     return _cachedCapabilities[provider]!;
@@ -167,16 +214,30 @@ class DirectSingleAgentAppServerClient {
   Future<DirectSingleAgentRunResult> run(
     DirectSingleAgentRunRequest request,
   ) async {
-    if (_usesRestSessionApi(request.provider)) {
-      return _runViaRestApi(request);
-    }
-    final endpoint = _resolveWebSocketEndpoint(request.provider);
-    if (endpoint == null) {
+    final descriptor = _describeEndpoint(request.provider);
+    if (!descriptor.isSupported || descriptor.baseUri == null) {
       return const DirectSingleAgentRunResult(
         success: false,
         output: '',
         errorMessage: 'Single-agent app-server endpoint is missing.',
       );
+    }
+    late final _ResolvedSingleAgentTransport transport;
+    try {
+      transport = await _resolveTransport(
+        request.provider,
+        descriptor: descriptor,
+        gatewayToken: request.gatewayToken,
+      );
+    } catch (error) {
+      return DirectSingleAgentRunResult(
+        success: false,
+        output: '',
+        errorMessage: error.toString(),
+      );
+    }
+    if (transport.kind == _DirectSingleAgentTransportKind.restSessionApi) {
+      return _runViaRestApi(request, base: transport.endpoint);
     }
 
     final normalizedSessionId = request.sessionId.trim();
@@ -190,7 +251,7 @@ class DirectSingleAgentAppServerClient {
 
     _abortedSessions.remove(normalizedSessionId);
     final connection = await _DirectAppServerConnection.connect(
-      endpoint,
+      transport.endpoint,
       gatewayToken: request.gatewayToken,
     );
     _activeConnections[normalizedSessionId] = connection;
@@ -339,9 +400,15 @@ class DirectSingleAgentAppServerClient {
     _abortedSessions.add(normalizedSessionId);
     final restSessionId = _restSessionIds[normalizedSessionId]?.trim() ?? '';
     if (restSessionId.isNotEmpty) {
-      final provider = SingleAgentProvider.opencode;
-      final base = endpointResolver(provider);
-      if (base != null) {
+      for (final entry in _transportKinds.entries) {
+        if (entry.value != _DirectSingleAgentTransportKind.restSessionApi) {
+          continue;
+        }
+        final descriptor = _describeEndpoint(entry.key);
+        final base = descriptor.baseUri;
+        if (base == null) {
+          continue;
+        }
         try {
           await _postJson(
             _buildRestUri(base, '/session/$restSessionId/abort'),
@@ -351,6 +418,7 @@ class DirectSingleAgentAppServerClient {
         } catch (_) {
           // Best effort only.
         }
+        break;
       }
     }
     final connection = _activeConnections[normalizedSessionId];
@@ -418,15 +486,9 @@ class DirectSingleAgentAppServerClient {
 
   Future<DirectSingleAgentRunResult> _runViaRestApi(
     DirectSingleAgentRunRequest request,
-  ) async {
-    final base = endpointResolver(request.provider);
-    if (base == null) {
-      return const DirectSingleAgentRunResult(
-        success: false,
-        output: '',
-        errorMessage: 'Single-agent REST endpoint is missing.',
-      );
-    }
+    {
+    required Uri base,
+  }) async {
     final normalizedSessionId = request.sessionId.trim();
     if (normalizedSessionId.isEmpty) {
       return const DirectSingleAgentRunResult(
@@ -746,15 +808,6 @@ class DirectSingleAgentAppServerClient {
     return '';
   }
 
-  bool _usesRestSessionApi(SingleAgentProvider provider) {
-    if (provider.providerId != SingleAgentProvider.opencode.providerId) {
-      return false;
-    }
-    final base = endpointResolver(provider);
-    final scheme = base?.scheme.toLowerCase() ?? '';
-    return scheme == 'http' || scheme == 'https';
-  }
-
   Uri _buildRestUri(
     Uri base,
     String path, {
@@ -873,25 +926,101 @@ class DirectSingleAgentAppServerClient {
     return null;
   }
 
-  Uri? _resolveWebSocketEndpoint(SingleAgentProvider provider) {
-    final base = endpointResolver(provider);
-    if (base == null) {
-      return null;
+  DirectSingleAgentEndpointDescriptor _describeEndpoint(
+    SingleAgentProvider provider,
+  ) {
+    return DirectSingleAgentEndpointDescriptor.describe(endpointResolver(provider));
+  }
+
+  Future<_ResolvedSingleAgentTransport> _resolveTransport(
+    SingleAgentProvider provider, {
+    required DirectSingleAgentEndpointDescriptor descriptor,
+    required String gatewayToken,
+  }) async {
+    final cachedKind = _transportKinds[provider];
+    if (cachedKind != null) {
+      final cachedEndpoint = cachedKind ==
+              _DirectSingleAgentTransportKind.websocketAppServer
+          ? descriptor.websocketUri
+          : descriptor.baseUri;
+      if (cachedEndpoint != null) {
+        return _ResolvedSingleAgentTransport(
+          kind: cachedKind,
+          endpoint: cachedEndpoint,
+        );
+      }
     }
-    final scheme = base.scheme.toLowerCase();
-    if (scheme == 'ws' || scheme == 'wss') {
-      return base.replace(path: '', query: null, fragment: null);
-    }
-    if (scheme == 'http' || scheme == 'https') {
-      return base.replace(
-        scheme: scheme == 'https' ? 'wss' : 'ws',
-        path: '',
-        query: null,
-        fragment: null,
+
+    if (descriptor.prefersWebSocket) {
+      final endpoint = descriptor.websocketUri;
+      if (endpoint == null) {
+        throw StateError('Single-agent websocket endpoint is not configured.');
+      }
+      await _probeWebSocketEndpoint(endpoint, gatewayToken: gatewayToken);
+      return _ResolvedSingleAgentTransport(
+        kind: _DirectSingleAgentTransportKind.websocketAppServer,
+        endpoint: endpoint,
       );
     }
-    return null;
+
+    if (descriptor.allowsRest) {
+      final base = descriptor.baseUri;
+      if (base == null) {
+        throw StateError('Single-agent endpoint is not configured.');
+      }
+      try {
+        await _fetchJson(
+          _buildRestUri(base, '/global/health'),
+          gatewayToken: gatewayToken,
+        );
+        return _ResolvedSingleAgentTransport(
+          kind: _DirectSingleAgentTransportKind.restSessionApi,
+          endpoint: base,
+        );
+      } catch (_) {
+        final websocket = descriptor.websocketUri;
+        if (websocket == null) {
+          rethrow;
+        }
+        await _probeWebSocketEndpoint(websocket, gatewayToken: gatewayToken);
+        return _ResolvedSingleAgentTransport(
+          kind: _DirectSingleAgentTransportKind.websocketAppServer,
+          endpoint: websocket,
+        );
+      }
+    }
+
+    throw StateError(
+      'Single-agent endpoint mode ${descriptor.mode.name} is not supported.',
+    );
   }
+
+  Future<void> _probeWebSocketEndpoint(
+    Uri endpoint, {
+    required String gatewayToken,
+  }) async {
+    _DirectAppServerConnection? connection;
+    try {
+      connection = await _DirectAppServerConnection.connect(
+        endpoint,
+        gatewayToken: gatewayToken,
+      );
+      await connection.initialize();
+    } finally {
+      await connection?.close();
+    }
+  }
+
+}
+
+class _ResolvedSingleAgentTransport {
+  const _ResolvedSingleAgentTransport({
+    required this.kind,
+    required this.endpoint,
+  });
+
+  final _DirectSingleAgentTransportKind kind;
+  final Uri endpoint;
 }
 
 class _DirectAppServerConnection {
@@ -1092,4 +1221,16 @@ Map<String, dynamic> _asMap(Object? value) {
     return value.cast<String, dynamic>();
   }
   return const <String, dynamic>{};
+}
+
+bool _isLocalHost(String host) {
+  final normalized = host.trim().toLowerCase();
+  if (normalized.isEmpty ||
+      normalized == 'localhost' ||
+      normalized == '127.0.0.1' ||
+      normalized == '::1') {
+    return true;
+  }
+  final address = InternetAddress.tryParse(normalized);
+  return address?.isLoopback ?? false;
 }
