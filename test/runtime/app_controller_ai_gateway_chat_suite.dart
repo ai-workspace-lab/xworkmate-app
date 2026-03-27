@@ -792,6 +792,92 @@ void main() {
       );
     },
   );
+
+  test(
+    'AppController adopts and reuses resolved remote single-agent thread workspaces',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-single-agent-remote-thread-cwd-',
+      );
+      final defaultWorkspace = Directory(
+        '${tempDirectory.path}/default-workspace',
+      );
+      await defaultWorkspace.create(recursive: true);
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          await _deleteDirectoryWithRetry(tempDirectory);
+        }
+      });
+
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          workspacePath: defaultWorkspace.path,
+          assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
+        ),
+      );
+
+      final runner = _FakeSingleAgentRunner(
+        resolvedProvider: SingleAgentProvider.opencode,
+        result: const SingleAgentRunResult(
+          provider: SingleAgentProvider.opencode,
+          output: 'THREAD_OK',
+          success: true,
+          errorMessage: '',
+          shouldFallbackToAiChat: false,
+          resolvedWorkingDirectory:
+              '/opt/data/.xworkmate/threads/draft-remote-thread',
+          resolvedWorkspaceRefKind: WorkspaceRefKind.remotePath,
+        ),
+      );
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.opencode,
+        ],
+        runtimeCoordinator: RuntimeCoordinator(
+          gateway: _FakeGatewayRuntime(store: store),
+          codex: _FakeCodexRuntime(),
+        ),
+        singleAgentRunner: runner,
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      controller.initializeAssistantThreadContext(
+        'draft:remote-thread',
+        title: 'Remote Thread',
+        executionTarget: AssistantExecutionTarget.singleAgent,
+      );
+      await controller.switchSession('draft:remote-thread');
+
+      await controller.sendChatMessage('第一次运行', thinking: 'low');
+      expect(
+        runner.requests.first.workingDirectory,
+        '${defaultWorkspace.path}/.xworkmate/threads/draft-remote-thread',
+      );
+      expect(
+        controller.assistantWorkspaceRefForSession('draft:remote-thread'),
+        '/opt/data/.xworkmate/threads/draft-remote-thread',
+      );
+      expect(
+        controller.assistantWorkspaceRefKindForSession('draft:remote-thread'),
+        WorkspaceRefKind.remotePath,
+      );
+
+      await controller.sendChatMessage('第二次运行', thinking: 'low');
+      expect(
+        runner.requests.last.workingDirectory,
+        '/opt/data/.xworkmate/threads/draft-remote-thread',
+      );
+    },
+  );
 }
 
 Future<void> _deleteDirectoryWithRetry(Directory directory) async {
@@ -915,6 +1001,7 @@ class _FakeSingleAgentRunner implements SingleAgentRunner {
   int runCalls = 0;
   int abortCalls = 0;
   SingleAgentRunRequest? lastRequest;
+  final List<SingleAgentRunRequest> requests = <SingleAgentRunRequest>[];
 
   @override
   Future<SingleAgentProviderResolution> resolveProvider({
@@ -935,6 +1022,7 @@ class _FakeSingleAgentRunner implements SingleAgentRunner {
   Future<SingleAgentRunResult> run(SingleAgentRunRequest request) async {
     runCalls += 1;
     lastRequest = request;
+    requests.add(request);
     if (result?.output.isNotEmpty == true) {
       request.onOutput?.call(result!.output);
     }

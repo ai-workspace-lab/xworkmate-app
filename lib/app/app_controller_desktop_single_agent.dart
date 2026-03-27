@@ -94,7 +94,7 @@ extension AppControllerDesktopSingleAgent on AppController {
             model: assistantModelForSession(sessionKey),
             gatewayToken: gatewayToken,
             workingDirectory:
-                _resolveLocalAssistantWorkingDirectoryForSession(sessionKey) ??
+                _resolveSingleAgentWorkingDirectoryForSession(sessionKey) ??
                 Directory.current.path,
             attachments: localAttachments,
             selectedSkills: selectedSkills,
@@ -108,6 +108,17 @@ extension AppControllerDesktopSingleAgent on AppController {
         final resolvedRuntimeModel = result.resolvedModel.trim();
         if (resolvedRuntimeModel.isNotEmpty) {
           _singleAgentRuntimeModelBySession[sessionKey] = resolvedRuntimeModel;
+        }
+        final resolvedWorkingDirectory = result.resolvedWorkingDirectory.trim();
+        if (resolvedWorkingDirectory.isNotEmpty) {
+          _upsertAssistantThreadRecord(
+            sessionKey,
+            workspaceRef: resolvedWorkingDirectory,
+            workspaceRefKind:
+                result.resolvedWorkspaceRefKind ??
+                assistantWorkspaceRefKindForSession(sessionKey),
+            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          );
         }
         _clearAiGatewayStreamingText(sessionKey);
         if (result.aborted) {

@@ -56,6 +56,8 @@ class SingleAgentRunResult {
     this.aborted = false,
     this.fallbackReason,
     this.resolvedModel = '',
+    this.resolvedWorkingDirectory = '',
+    this.resolvedWorkspaceRefKind,
   });
 
   final SingleAgentProvider provider;
@@ -66,6 +68,8 @@ class SingleAgentRunResult {
   final bool aborted;
   final String? fallbackReason;
   final String resolvedModel;
+  final String resolvedWorkingDirectory;
+  final WorkspaceRefKind? resolvedWorkspaceRefKind;
 }
 
 abstract class SingleAgentRunner {
@@ -175,6 +179,8 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
         shouldFallbackToAiChat: !result.success && result.output.isEmpty,
         aborted: result.aborted,
         resolvedModel: result.resolvedModel,
+        resolvedWorkingDirectory: result.resolvedWorkingDirectory,
+        resolvedWorkspaceRefKind: result.resolvedWorkspaceRefKind,
         fallbackReason: !result.success
             ? 'Single-agent app-server run failed: ${result.errorMessage}'
             : null,

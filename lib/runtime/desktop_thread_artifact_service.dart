@@ -42,6 +42,18 @@ class DesktopThreadArtifactService {
             'This thread workspace is recorded as object storage and is not browsable from desktop.',
       );
     }
+    if (workspaceRefKind == WorkspaceRefKind.remotePath) {
+      return AssistantArtifactSnapshot(
+        workspaceRef: normalizedRef,
+        workspaceRefKind: workspaceRefKind,
+        resultMessage:
+            'This thread workspace is recorded on a remote agent and is not browsable from desktop.',
+        filesMessage:
+            'This thread workspace is recorded on a remote agent and is not browsable from desktop.',
+        changesMessage:
+            'This thread workspace is recorded on a remote agent and is not browsable from desktop.',
+      );
+    }
     final root = Directory(normalizedRef);
     if (!await root.exists()) {
       return AssistantArtifactSnapshot(
@@ -98,6 +110,12 @@ class DesktopThreadArtifactService {
       return const AssistantArtifactPreview.empty(
         message:
             'Object storage artifacts are not directly readable on desktop.',
+      );
+    }
+    if (workspaceRefKind == WorkspaceRefKind.remotePath) {
+      return const AssistantArtifactPreview.empty(
+        message:
+            'Remote agent artifacts are not directly readable on desktop.',
       );
     }
     final root = Directory(workspaceRef.trim());

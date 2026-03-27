@@ -36,6 +36,8 @@ class DirectSingleAgentRunResult {
     required this.errorMessage,
     this.aborted = false,
     this.resolvedModel = '',
+    this.resolvedWorkingDirectory = '',
+    this.resolvedWorkspaceRefKind,
   });
 
   final bool success;
@@ -43,6 +45,8 @@ class DirectSingleAgentRunResult {
   final String errorMessage;
   final bool aborted;
   final String resolvedModel;
+  final String resolvedWorkingDirectory;
+  final WorkspaceRefKind? resolvedWorkspaceRefKind;
 }
 
 class DirectSingleAgentRunRequest {
@@ -239,9 +243,17 @@ class DirectSingleAgentAppServerClient {
       );
     }
     if (transport.kind == _DirectSingleAgentTransportKind.restSessionApi) {
-      return transport.rest!.run(request, base: transport.endpoint);
+      return transport.rest!.run(
+        request,
+        base: transport.endpoint,
+        workspaceRefKind: transport.workspaceRefKind,
+      );
     }
-    return transport.websocket!.run(request, endpoint: transport.endpoint);
+    return transport.websocket!.run(
+      request,
+      endpoint: transport.endpoint,
+      workspaceRefKind: transport.workspaceRefKind,
+    );
   }
 
   Future<void> abort(String sessionId) async {
@@ -286,6 +298,7 @@ class DirectSingleAgentAppServerClient {
         return _ResolvedSingleAgentTransport(
           kind: cachedKind,
           endpoint: cachedEndpoint,
+          workspaceRefKind: _workspaceRefKindForEndpointMode(descriptor.mode),
           websocket:
               cachedKind == _DirectSingleAgentTransportKind.websocketAppServer
               ? _webSocketTransport
@@ -306,6 +319,7 @@ class DirectSingleAgentAppServerClient {
       return _ResolvedSingleAgentTransport(
         kind: _DirectSingleAgentTransportKind.websocketAppServer,
         endpoint: endpoint,
+        workspaceRefKind: _workspaceRefKindForEndpointMode(descriptor.mode),
         websocket: _webSocketTransport,
       );
     }
@@ -320,6 +334,7 @@ class DirectSingleAgentAppServerClient {
         return _ResolvedSingleAgentTransport(
           kind: _DirectSingleAgentTransportKind.restSessionApi,
           endpoint: base,
+          workspaceRefKind: _workspaceRefKindForEndpointMode(descriptor.mode),
           rest: _restTransport,
         );
       } catch (_) {
@@ -331,6 +346,7 @@ class DirectSingleAgentAppServerClient {
         return _ResolvedSingleAgentTransport(
           kind: _DirectSingleAgentTransportKind.websocketAppServer,
           endpoint: websocket,
+          workspaceRefKind: _workspaceRefKindForEndpointMode(descriptor.mode),
           websocket: _webSocketTransport,
         );
       }
@@ -346,14 +362,26 @@ class _ResolvedSingleAgentTransport {
   const _ResolvedSingleAgentTransport({
     required this.kind,
     required this.endpoint,
+    required this.workspaceRefKind,
     this.websocket,
     this.rest,
   });
 
   final _DirectSingleAgentTransportKind kind;
   final Uri endpoint;
+  final WorkspaceRefKind workspaceRefKind;
   final _DirectSingleAgentWebSocketTransport? websocket;
   final _DirectSingleAgentRestTransport? rest;
+}
+
+class _ResolvedDirectThread {
+  const _ResolvedDirectThread({
+    required this.threadId,
+    this.workingDirectory = '',
+  });
+
+  final String threadId;
+  final String workingDirectory;
 }
 
 class _DirectSingleAgentWebSocketTransport {
@@ -378,6 +406,7 @@ class _DirectSingleAgentWebSocketTransport {
   Future<DirectSingleAgentRunResult> run(
     DirectSingleAgentRunRequest request, {
     required Uri endpoint,
+    required WorkspaceRefKind workspaceRefKind,
   }) async {
     final normalizedSessionId = request.sessionId.trim();
     if (normalizedSessionId.isEmpty) {
@@ -397,12 +426,14 @@ class _DirectSingleAgentWebSocketTransport {
 
     try {
       await connection.initialize();
-      final threadId = await _ensureThread(
+      final resolvedThread = await _ensureThread(
         connection,
         sessionId: normalizedSessionId,
         workingDirectory: request.workingDirectory,
         model: request.model,
       );
+      final threadId = resolvedThread.threadId;
+      final resolvedWorkingDirectory = resolvedThread.workingDirectory.trim();
 
       final output = StringBuffer();
       String resolvedModel = '';
@@ -430,6 +461,8 @@ class _DirectSingleAgentWebSocketTransport {
                 output: output.toString(),
                 errorMessage: '',
                 resolvedModel: resolvedModel,
+                resolvedWorkingDirectory: resolvedWorkingDirectory,
+                resolvedWorkspaceRefKind: workspaceRefKind,
               ),
             );
             return;
@@ -448,6 +481,8 @@ class _DirectSingleAgentWebSocketTransport {
                 output: output.toString(),
                 aborted: aborted,
                 resolvedModel: resolvedModel,
+                resolvedWorkingDirectory: resolvedWorkingDirectory,
+                resolvedWorkspaceRefKind: workspaceRefKind,
                 errorMessage:
                     params['message']?.toString() ??
                     params['error']?.toString() ??
@@ -465,6 +500,8 @@ class _DirectSingleAgentWebSocketTransport {
                 errorMessage: error.toString(),
                 aborted: _abortedSessions.contains(normalizedSessionId),
                 resolvedModel: resolvedModel,
+                resolvedWorkingDirectory: resolvedWorkingDirectory,
+                resolvedWorkspaceRefKind: workspaceRefKind,
               ),
             );
           }
@@ -480,6 +517,8 @@ class _DirectSingleAgentWebSocketTransport {
                     : 'Single-agent app-server connection closed before completion.',
                 aborted: _abortedSessions.contains(normalizedSessionId),
                 resolvedModel: resolvedModel,
+                resolvedWorkingDirectory: resolvedWorkingDirectory,
+                resolvedWorkspaceRefKind: workspaceRefKind,
               ),
             );
           }
@@ -511,6 +550,8 @@ class _DirectSingleAgentWebSocketTransport {
             errorMessage: 'Single-agent app-server request timed out.',
             aborted: _abortedSessions.contains(normalizedSessionId),
             resolvedModel: resolvedModel,
+            resolvedWorkingDirectory: resolvedWorkingDirectory,
+            resolvedWorkspaceRefKind: workspaceRefKind,
           ),
         );
       } finally {
@@ -523,6 +564,8 @@ class _DirectSingleAgentWebSocketTransport {
         errorMessage: error.toString(),
         aborted: _abortedSessions.contains(normalizedSessionId),
         resolvedModel: '',
+        resolvedWorkingDirectory: request.workingDirectory,
+        resolvedWorkspaceRefKind: workspaceRefKind,
       );
     } finally {
       _activeConnections.remove(normalizedSessionId);
@@ -561,7 +604,7 @@ class _DirectSingleAgentWebSocketTransport {
     }
   }
 
-  Future<String> _ensureThread(
+  Future<_ResolvedDirectThread> _ensureThread(
     _DirectAppServerConnection connection, {
     required String sessionId,
     required String workingDirectory,
@@ -579,7 +622,11 @@ class _DirectSingleAgentWebSocketTransport {
         );
         final resumedId = _extractThreadId(resumed) ?? existingThreadId;
         _threadIds[sessionId] = resumedId;
-        return resumedId;
+        return _ResolvedDirectThread(
+          threadId: resumedId,
+          workingDirectory:
+              _extractThreadPath(resumed)?.trim() ?? workingDirectory.trim(),
+        );
       } catch (_) {
         _threadIds.remove(sessionId);
       }
@@ -597,7 +644,11 @@ class _DirectSingleAgentWebSocketTransport {
       throw StateError('Single-agent app-server returned an empty thread id.');
     }
     _threadIds[sessionId] = threadId;
-    return threadId;
+    return _ResolvedDirectThread(
+      threadId: threadId,
+      workingDirectory:
+          _extractThreadPath(created)?.trim() ?? workingDirectory.trim(),
+    );
   }
 }
 
@@ -615,6 +666,7 @@ class _DirectSingleAgentRestTransport {
   Future<DirectSingleAgentRunResult> run(
     DirectSingleAgentRunRequest request, {
     required Uri base,
+    required WorkspaceRefKind workspaceRefKind,
   }) async {
     final normalizedSessionId = request.sessionId.trim();
     if (normalizedSessionId.isEmpty) {
@@ -639,11 +691,6 @@ class _DirectSingleAgentRestTransport {
     String? lastAssistantText;
     var busySeen = false;
 
-    bool hasResolvedAssistantContent() {
-      return output.toString().trim().isNotEmpty ||
-          (lastAssistantText?.trim().isNotEmpty ?? false);
-    }
-
     void completeFailure(String message) {
       if (completion.isCompleted) {
         return;
@@ -655,6 +702,8 @@ class _DirectSingleAgentRestTransport {
           errorMessage: message,
           aborted: _abortedSessions.contains(normalizedSessionId),
           resolvedModel: request.model,
+          resolvedWorkingDirectory: request.workingDirectory,
+          resolvedWorkspaceRefKind: workspaceRefKind,
         ),
       );
     }
@@ -684,6 +733,8 @@ class _DirectSingleAgentRestTransport {
           output: resolvedOutput,
           errorMessage: '',
           resolvedModel: request.model,
+          resolvedWorkingDirectory: request.workingDirectory,
+          resolvedWorkspaceRefKind: workspaceRefKind,
         ),
       );
     }
@@ -825,6 +876,8 @@ class _DirectSingleAgentRestTransport {
           errorMessage: 'OpenCode REST request timed out.',
           aborted: _abortedSessions.contains(normalizedSessionId),
           resolvedModel: request.model,
+          resolvedWorkingDirectory: request.workingDirectory,
+          resolvedWorkspaceRefKind: workspaceRefKind,
         ),
       );
     } catch (error) {
@@ -834,6 +887,8 @@ class _DirectSingleAgentRestTransport {
         errorMessage: error.toString(),
         aborted: _abortedSessions.contains(normalizedSessionId),
         resolvedModel: request.model,
+        resolvedWorkingDirectory: request.workingDirectory,
+        resolvedWorkspaceRefKind: workspaceRefKind,
       );
     } finally {
       unawaited(lineSubscription?.cancel());
@@ -1257,6 +1312,19 @@ String? _extractModel(Map<String, dynamic> payload) {
   return null;
 }
 
+String? _extractThreadPath(Map<String, dynamic> payload) {
+  final directPath = payload['path']?.toString().trim() ?? '';
+  if (directPath.isNotEmpty) {
+    return directPath;
+  }
+  final thread = _asMap(payload['thread']);
+  final nestedPath = thread['path']?.toString().trim() ?? '';
+  if (nestedPath.isNotEmpty) {
+    return nestedPath;
+  }
+  return null;
+}
+
 Map<String, dynamic> _decodeMap(Object raw) {
   if (raw is Map<String, dynamic>) {
     return raw;
@@ -1294,4 +1362,16 @@ bool _isLocalHost(String host) {
   }
   final address = InternetAddress.tryParse(normalized);
   return address?.isLoopback ?? false;
+}
+
+WorkspaceRefKind _workspaceRefKindForEndpointMode(
+  DirectSingleAgentEndpointMode mode,
+) {
+  return switch (mode) {
+    DirectSingleAgentEndpointMode.wsLocal ||
+    DirectSingleAgentEndpointMode.httpLocal => WorkspaceRefKind.localPath,
+    DirectSingleAgentEndpointMode.wss ||
+    DirectSingleAgentEndpointMode.https => WorkspaceRefKind.remotePath,
+    DirectSingleAgentEndpointMode.unsupported => WorkspaceRefKind.localPath,
+  };
 }
