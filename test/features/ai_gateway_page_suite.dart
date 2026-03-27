@@ -170,21 +170,9 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('External Codex CLI'), findsOneWidget);
-      expect(find.text('Built-in Codex (Experimental)'), findsOneWidget);
+      expect(find.text('外部 Codex CLI'), findsOneWidget);
       expect(find.text('未检测到'), findsOneWidget);
-
-      final builtInChip = find.widgetWithText(
-        ChoiceChip,
-        'Built-in Codex (Experimental)',
-      );
-      await tester.ensureVisible(builtInChip);
-      await tester.tap(builtInChip);
-      await tester.pumpAndSettle();
-      expect(
-        controller.settings.codeAgentRuntimeMode,
-        CodeAgentRuntimeMode.builtIn,
-      );
+      expect(find.byType(ChoiceChip), findsNothing);
 
       late Directory tempDir;
       late File codexBinary;

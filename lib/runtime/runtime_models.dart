@@ -156,7 +156,7 @@ class SingleAgentProvider {
     required this.providerId,
     required this.label,
     required this.badge,
-    this.preset = false,
+    this.source = SingleAgentProviderSource.externalExtension,
   });
 
   static const SingleAgentProvider auto = SingleAgentProvider(
@@ -169,14 +169,13 @@ class SingleAgentProvider {
     providerId: 'codex',
     label: 'Codex',
     badge: 'C',
-    preset: true,
+    source: SingleAgentProviderSource.builtInReserved,
   );
 
   static const SingleAgentProvider opencode = SingleAgentProvider(
     providerId: 'opencode',
     label: 'OpenCode',
     badge: 'O',
-    preset: true,
   );
 
   static const SingleAgentProvider claude = SingleAgentProvider(
@@ -194,15 +193,19 @@ class SingleAgentProvider {
   final String providerId;
   final String label;
   final String badge;
-  final bool preset;
+  final SingleAgentProviderSource source;
 
   bool get isAuto => providerId == auto.providerId;
+  bool get isBuiltInReserved =>
+      source == SingleAgentProviderSource.builtInReserved;
+  bool get isExternalExtension =>
+      source == SingleAgentProviderSource.externalExtension;
 
   SingleAgentProvider copyWith({
     String? providerId,
     String? label,
     String? badge,
-    bool? preset,
+    SingleAgentProviderSource? source,
   }) {
     final resolvedProviderId = normalizeSingleAgentProviderId(
       providerId ?? this.providerId,
@@ -220,7 +223,7 @@ class SingleAgentProvider {
               label: resolvedLabel,
             )
           : resolvedBadge,
-      preset: preset ?? this.preset,
+      source: source ?? this.source,
     );
   }
 
@@ -265,11 +268,33 @@ extension SingleAgentProviderCopy on SingleAgentProvider {
   }) => SingleAgentProvider.fromJsonValue(value, label: label, badge: badge);
 }
 
-const List<SingleAgentProvider> kBuiltinExternalAcpProviders =
-    <SingleAgentProvider>[
-      SingleAgentProvider.codex,
-      SingleAgentProvider.opencode,
-    ];
+enum SingleAgentProviderSource { externalExtension, builtInReserved }
+
+SingleAgentProvider normalizeSingleAgentProviderSelection(
+  SingleAgentProvider provider,
+) {
+  if (provider.isBuiltInReserved) {
+    return SingleAgentProvider.opencode;
+  }
+  return provider;
+}
+
+List<SingleAgentProvider> normalizeSingleAgentProviderList(
+  Iterable<SingleAgentProvider> providers,
+) {
+  final normalized = <SingleAgentProvider>[];
+  final seen = <String>{};
+  for (final provider in providers) {
+    final resolved = normalizeSingleAgentProviderSelection(provider);
+    if (seen.add(resolved.providerId)) {
+      normalized.add(resolved);
+    }
+  }
+  return normalized;
+}
+
+const List<SingleAgentProvider> kPresetExternalAcpProviders =
+    <SingleAgentProvider>[SingleAgentProvider.opencode];
 
 const List<SingleAgentProvider> kKnownSingleAgentProviders =
     <SingleAgentProvider>[
@@ -279,7 +304,11 @@ const List<SingleAgentProvider> kKnownSingleAgentProviders =
       SingleAgentProvider.gemini,
     ];
 
-const Set<String> kLegacyExternalAcpProviderIds = <String>{'claude', 'gemini'};
+const Set<String> kLegacyExternalAcpProviderIds = <String>{
+  'claude',
+  'gemini',
+  'codex',
+};
 
 class ExternalAcpEndpointProfile {
   const ExternalAcpEndpointProfile({
@@ -336,16 +365,18 @@ class ExternalAcpEndpointProfile {
     return null;
   }
 
-  bool get isPreset => kBuiltinExternalAcpProviders.any(
-    (item) => item.providerId == providerKey,
-  );
+  bool get isPreset =>
+      kPresetExternalAcpProviders.any((item) => item.providerId == providerKey);
 
   SingleAgentProvider toProvider() {
+    final builtin = builtinProvider;
     return SingleAgentProvider.fromJsonValue(
       providerKey,
       label: label,
       badge: badge,
-    ).copyWith(preset: isPreset);
+    ).copyWith(
+      source: builtin?.source ?? SingleAgentProviderSource.externalExtension,
+    );
   }
 
   Map<String, dynamic> toJson() {
@@ -435,7 +466,7 @@ List<ExternalAcpEndpointProfile> normalizeExternalAcpEndpoints({
   }
 
   final normalized = <ExternalAcpEndpointProfile>[
-    for (final provider in kBuiltinExternalAcpProviders)
+    for (final provider in kPresetExternalAcpProviders)
       byKey.remove(provider.providerId) ??
           ExternalAcpEndpointProfile.defaultsForProvider(provider),
     ...migratedCustomProfiles,
@@ -2086,10 +2117,8 @@ class SettingsSnapshot {
   ExternalAcpEndpointProfile externalAcpEndpointForProvider(
     SingleAgentProvider provider,
   ) {
-    return externalAcpEndpoints.firstWhere(
-      (item) => item.providerKey.trim().toLowerCase() == provider.providerId,
-      orElse: () => ExternalAcpEndpointProfile.defaultsForProvider(provider),
-    );
+    return externalAcpEndpointForProviderId(provider.providerId) ??
+        ExternalAcpEndpointProfile.defaultsForProvider(provider);
   }
 
   ExternalAcpEndpointProfile? externalAcpEndpointForProviderId(
@@ -2104,18 +2133,31 @@ class SettingsSnapshot {
         return item;
       }
     }
+    if (kLegacyExternalAcpProviderIds.contains(normalized)) {
+      final canonical = SingleAgentProvider.fromJsonValue(normalized);
+      for (final item in externalAcpEndpoints) {
+        if (!item.isPreset &&
+            item.label.trim() == canonical.label &&
+            item.badge.trim() == canonical.badge) {
+          return item;
+        }
+      }
+    }
     return null;
   }
 
   SingleAgentProvider resolveSingleAgentProvider(SingleAgentProvider provider) {
-    if (provider.isAuto) {
+    final normalizedSelection = normalizeSingleAgentProviderSelection(provider);
+    if (normalizedSelection.isAuto) {
       return SingleAgentProvider.auto;
     }
-    final profile = externalAcpEndpointForProviderId(provider.providerId);
+    final profile = externalAcpEndpointForProviderId(
+      normalizedSelection.providerId,
+    );
     if (profile != null) {
       return profile.toProvider();
     }
-    return provider;
+    return normalizedSelection;
   }
 
   SingleAgentProvider singleAgentProviderForId(String providerId) {
@@ -2123,17 +2165,22 @@ class SettingsSnapshot {
     if (resolved.isEmpty || resolved == SingleAgentProvider.auto.providerId) {
       return SingleAgentProvider.auto;
     }
-    final profile = externalAcpEndpointForProviderId(resolved);
+    final normalizedSelection = normalizeSingleAgentProviderSelection(
+      SingleAgentProvider.fromJsonValue(resolved),
+    );
+    final profile = externalAcpEndpointForProviderId(
+      normalizedSelection.providerId,
+    );
     if (profile != null) {
       return profile.toProvider();
     }
-    return SingleAgentProvider.fromJsonValue(resolved);
+    return normalizedSelection;
   }
 
   List<SingleAgentProvider> get availableSingleAgentProviders =>
-      externalAcpEndpoints
-          .map((item) => item.toProvider())
-          .toList(growable: false);
+      normalizeSingleAgentProviderList(
+        externalAcpEndpoints.map((item) => item.toProvider()),
+      );
 
   SettingsSnapshot copyWithExternalAcpEndpointForProvider(
     SingleAgentProvider provider,
