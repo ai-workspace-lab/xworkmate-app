@@ -2,7 +2,7 @@ name: xworkmate
 description: "XWorkmate desktop-first AI workspace shell."
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.0+2
 build-date: 2026-03-27
 build-id: dc1fb76
 
@@ -40,6 +40,10 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 dependency_overrides:
+  # Keep debug info in the bundled native asset so archive builds can emit
+  # a matching dSYM for App Store symbol upload.
+  objective_c:
+    path: third_party/objective_c
   # Use a local patch so Cargokit can recover from transient GitHub asset
   # download failures during macOS packaging.
   super_native_extensions:

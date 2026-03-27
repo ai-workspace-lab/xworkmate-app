@@ -1,0 +1,7 @@
+analysis_options.yaml
+example/
+ffigen_c.yaml
+ffigen_objc.yaml
+ffigen_runtime.yaml
+test/
+tool/
