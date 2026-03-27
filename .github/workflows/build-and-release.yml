@@ -49,7 +49,7 @@ jobs:
       release_notes: ${{ steps.meta.outputs.release_notes }}
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           fetch-depth: 0
 
@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Set up Flutter SDK
         uses: ./.github/actions/setup-flutter-sdk
@@ -131,7 +131,7 @@ jobs:
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Set up Flutter SDK
         uses: ./.github/actions/setup-flutter-sdk
@@ -140,7 +140,7 @@ jobs:
 
       - name: Install Go
         if: ${{ matrix.platform == 'macos' }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
           go-version: "1.24.1"
 
@@ -153,7 +153,7 @@ jobs:
         run: bash ./scripts/ci/build_matrix_artifacts.sh "$PLATFORM" "$ARCH" "$SHOULD_RELEASE"
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: build-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
@@ -177,10 +177,10 @@ jobs:
       - build
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           path: release-artifacts
 
