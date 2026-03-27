@@ -555,6 +555,22 @@ void main() {
     },
   );
 
+  testWidgets('AssistantPage keeps the default composer footprint compact', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+    );
+
+    final composerShell = find.byKey(const Key('assistant-composer-shell'));
+
+    expect(composerShell, findsOneWidget);
+    expect(tester.getRect(composerShell).height, lessThan(210));
+  });
+
   testWidgets('AssistantPage keeps a minimal composer action menu', (
     WidgetTester tester,
   ) async {
