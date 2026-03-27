@@ -28,7 +28,7 @@ import '../../widgets/surface_card.dart';
 
 const double _assistantComposerDefaultInputHeight = 78;
 const double _assistantWorkspaceMinConversationHeight = 180;
-const double _assistantWorkspaceMinLowerPaneHeight = 176;
+const double _assistantWorkspaceMinLowerPaneHeight = 160;
 const double _assistantHorizontalResizeHandleWidth = 6;
 const double _assistantHorizontalPaneGap = 2;
 const double _assistantVerticalResizeHandleHeight = 10;
@@ -36,8 +36,8 @@ const double _assistantArtifactPaneMinWidth = 280;
 const double _assistantArtifactPaneDefaultWidth = 360;
 const double _assistantCollapsedArtifactToggleClearance = 56;
 const double _assistantComposerSafeAreaGap = 8;
-const double _assistantComposerBaseHeightCompact = 192;
-const double _assistantComposerBaseHeightTall = 216;
+const double _assistantComposerBaseHeightCompact = 168;
+const double _assistantComposerBaseHeightTall = 188;
 const int _assistantTaskActionMaxRetryCount = 5;
 
 typedef AssistantClipboardImageReader = Future<XFile?> Function();
@@ -89,6 +89,7 @@ class _AssistantPageState extends State<AssistantPage> {
   String? _lastAutoAgentLabel;
   String _lastConversationScrollSignature = '';
   double _composerInputHeight = _assistantComposerDefaultInputHeight;
+  double _composerMeasuredContentHeight = 0;
   double _workspaceLowerPaneHeightAdjustment = 0;
   bool _artifactPaneCollapsed = true;
   double _artifactPaneWidth = _assistantArtifactPaneDefaultWidth;
@@ -110,6 +111,18 @@ class _AssistantPageState extends State<AssistantPage> {
         widget.unifiedPaneStartsCollapsed) {
       _sidePaneCollapsed = widget.unifiedPaneStartsCollapsed;
     }
+  }
+
+  void _handleComposerContentHeightChanged(double value) {
+    if (!mounted || !value.isFinite || value <= 0) {
+      return;
+    }
+    if ((_composerMeasuredContentHeight - value).abs() < 0.5) {
+      return;
+    }
+    setState(() {
+      _composerMeasuredContentHeight = value;
+    });
   }
 
   @override
@@ -418,16 +431,20 @@ class _AssistantPageState extends State<AssistantPage> {
           availableWidth: composerContentWidth,
           averageChipWidth: 132,
         );
+        final fallbackComposerContentHeight =
+            baseComposerHeight +
+            math.max(
+              0.0,
+              _composerInputHeight - _assistantComposerDefaultInputHeight,
+            ) +
+            attachmentExtraHeight +
+            selectedSkillExtraHeight;
+        final composerContentHeight = _composerMeasuredContentHeight > 0
+            ? _composerMeasuredContentHeight
+            : fallbackComposerContentHeight;
         final defaultComposerHeight = math.min(
           availableWorkspaceHeight,
-          baseComposerHeight +
-              math.max(
-                0.0,
-                _composerInputHeight - _assistantComposerDefaultInputHeight,
-              ) +
-              attachmentExtraHeight +
-              selectedSkillExtraHeight +
-              composerBottomSpacing,
+          composerContentHeight + composerBottomSpacing,
         );
         final composerHeightUpperBound = math.min(
           availableWorkspaceHeight,
@@ -552,6 +569,8 @@ class _AssistantPageState extends State<AssistantPage> {
                   },
                   onPasteImageAttachment:
                       widget.clipboardImageReader ?? _readClipboardImageAsXFile,
+                  onComposerContentHeightChanged:
+                      _handleComposerContentHeightChanged,
                   onComposerInputHeightChanged:
                       _handleComposerInputHeightChanged,
                   onSend: _submitPrompt,
@@ -1789,6 +1808,7 @@ class _AssistantLowerPane extends StatelessWidget {
     required this.onPickAttachments,
     required this.onAddAttachment,
     required this.onPasteImageAttachment,
+    required this.onComposerContentHeightChanged,
     required this.onComposerInputHeightChanged,
     required this.onSend,
   });
@@ -1814,6 +1834,7 @@ class _AssistantLowerPane extends StatelessWidget {
   final VoidCallback onPickAttachments;
   final ValueChanged<_ComposerAttachment> onAddAttachment;
   final AssistantClipboardImageReader onPasteImageAttachment;
+  final ValueChanged<double> onComposerContentHeightChanged;
   final ValueChanged<double> onComposerInputHeightChanged;
   final Future<void> Function() onSend;
 
@@ -1847,6 +1868,7 @@ class _AssistantLowerPane extends StatelessWidget {
           onPickAttachments: onPickAttachments,
           onAddAttachment: onAddAttachment,
           onPasteImageAttachment: onPasteImageAttachment,
+          onContentHeightChanged: onComposerContentHeightChanged,
           onInputHeightChanged: onComposerInputHeightChanged,
           onSend: onSend,
         ),
@@ -2632,6 +2654,7 @@ class _ComposerBar extends StatefulWidget {
     required this.onPickAttachments,
     required this.onAddAttachment,
     required this.onPasteImageAttachment,
+    required this.onContentHeightChanged,
     required this.onInputHeightChanged,
     required this.onSend,
   });
@@ -2656,6 +2679,7 @@ class _ComposerBar extends StatefulWidget {
   final VoidCallback onPickAttachments;
   final ValueChanged<_ComposerAttachment> onAddAttachment;
   final AssistantClipboardImageReader onPasteImageAttachment;
+  final ValueChanged<double> onContentHeightChanged;
   final ValueChanged<double> onInputHeightChanged;
   final Future<void> Function() onSend;
 
@@ -2683,6 +2707,7 @@ class _ComposerBarState extends State<_ComposerBar> {
   final GlobalKey _skillPickerTargetKey = GlobalKey(
     debugLabel: 'assistant-skill-picker-target',
   );
+  final GlobalKey _contentKey = GlobalKey(debugLabel: 'assistant-composer-bar');
   final LayerLink _skillPickerLayerLink = LayerLink();
   final OverlayPortalController _skillPickerPortalController =
       OverlayPortalController(debugLabel: 'assistant-skill-picker');
@@ -2704,6 +2729,7 @@ class _ComposerBarState extends State<_ComposerBar> {
         return;
       }
       widget.onInputHeightChanged(_inputHeight);
+      _reportContentHeight();
     });
   }
 
@@ -2714,6 +2740,7 @@ class _ComposerBarState extends State<_ComposerBar> {
       oldWidget.controller.removeListener(_handleControllerChanged);
       widget.controller.addListener(_handleControllerChanged);
     }
+    _reportContentHeight();
   }
 
   @override
@@ -2732,6 +2759,19 @@ class _ComposerBarState extends State<_ComposerBar> {
       return;
     }
     setState(() {});
+  }
+
+  void _reportContentHeight() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final height = _contentKey.currentContext?.size?.height;
+      if (height == null || !height.isFinite || height <= 0) {
+        return;
+      }
+      widget.onContentHeightChanged(height);
+    });
   }
 
   void _resizeInput(double delta) {
@@ -2979,7 +3019,10 @@ class _ComposerBarState extends State<_ComposerBar> {
         ? appText('重连', 'Reconnect')
         : appText('连接', 'Connect');
 
+    _reportContentHeight();
+
     return Padding(
+      key: _contentKey,
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
