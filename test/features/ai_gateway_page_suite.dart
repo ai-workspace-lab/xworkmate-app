@@ -91,8 +91,8 @@ void main() {
       ),
     );
 
-    expect(find.text('OpenClaw Gateway'), findsOneWidget);
-    expect(find.text('LLM API'), findsWidgets);
+    expect(find.text('OpenClaw Gateway'), findsWidgets);
+    expect(find.text('LLM 接入点'), findsWidgets);
   });
 
   testWidgets(

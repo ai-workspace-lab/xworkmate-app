@@ -11,6 +11,33 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   group('DirectSingleAgentAppServerClient', () {
+    test('classifies the four endpoint modes', () {
+      expect(
+        DirectSingleAgentEndpointDescriptor.describe(
+          Uri.parse('ws://127.0.0.1:9001'),
+        ).mode,
+        DirectSingleAgentEndpointMode.wsLocal,
+      );
+      expect(
+        DirectSingleAgentEndpointDescriptor.describe(
+          Uri.parse('wss://agent.example.com'),
+        ).mode,
+        DirectSingleAgentEndpointMode.wss,
+      );
+      expect(
+        DirectSingleAgentEndpointDescriptor.describe(
+          Uri.parse('http://localhost:38992'),
+        ).mode,
+        DirectSingleAgentEndpointMode.httpLocal,
+      );
+      expect(
+        DirectSingleAgentEndpointDescriptor.describe(
+          Uri.parse('https://agent.example.com'),
+        ).mode,
+        DirectSingleAgentEndpointMode.https,
+      );
+    });
+
     test('probes websocket endpoint and reports codex support', () async {
       final server = await _FakeAppServer.start();
       addTearDown(server.close);
@@ -50,7 +77,7 @@ void main() {
         ).copyWith(onOutput: deltas.add),
       );
 
-      expect(result.success, isTrue);
+      expect(result.success, isTrue, reason: result.errorMessage);
       expect(result.output, 'hello world from app server');
       expect(result.resolvedModel, 'codex-sonnet');
       expect(server.lastTurnInput, <Object?>[
@@ -175,6 +202,54 @@ void main() {
         expect(result.resolvedModel, 'codex-sonnet');
       },
     );
+
+    test('probes OpenCode REST endpoint and reports provider support', () async {
+      final server = await _FakeOpenCodeRestServer.start();
+      addTearDown(server.close);
+
+      final client = DirectSingleAgentAppServerClient(
+        endpointResolver: (_) => server.baseHttpUri,
+      );
+
+      final capabilities = await client.loadCapabilities(
+        provider: SingleAgentProvider.opencode,
+      );
+
+      expect(capabilities.available, isTrue);
+      expect(
+        capabilities.supportsProvider(SingleAgentProvider.opencode),
+        isTrue,
+      );
+      expect(server.healthRequested, isTrue);
+    });
+
+    test('runs OpenCode turns over REST session api', () async {
+      final server = await _FakeOpenCodeRestServer.start();
+      addTearDown(server.close);
+
+      final client = DirectSingleAgentAppServerClient(
+        endpointResolver: (_) => server.baseHttpUri,
+      );
+      addTearDown(client.dispose);
+
+      final deltas = <String>[];
+      final result = await client.run(
+        const DirectSingleAgentRunRequest(
+          sessionId: 'session-opencode',
+          provider: SingleAgentProvider.opencode,
+          prompt: 'hello opencode',
+          model: '',
+          workingDirectory: '/tmp',
+          gatewayToken: '',
+        ).copyWith(onOutput: deltas.add),
+      );
+
+      expect(result.success, isTrue);
+      expect(result.output, 'hello world from opencode');
+      expect(deltas.join(), 'hello world from opencode');
+      expect(server.createdSessionCount, 1);
+      expect(server.lastPromptText, 'hello opencode');
+    });
   });
 }
 
@@ -421,6 +496,211 @@ class _FakeAppServer {
         'params': <String, dynamic>{'threadId': threadId, 'turnId': 'turn-1'},
       }),
     );
+  }
+}
+
+class _FakeOpenCodeRestServer {
+  _FakeOpenCodeRestServer._(this._server);
+
+  final HttpServer _server;
+  final List<HttpResponse> _eventResponses = <HttpResponse>[];
+  var _sessionCounter = 0;
+  var _messageCounter = 0;
+  bool healthRequested = false;
+  int createdSessionCount = 0;
+  String lastPromptText = '';
+  final Map<String, String> _assistantTextBySession = <String, String>{};
+
+  Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${_server.port}');
+
+  static Future<_FakeOpenCodeRestServer> start() async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final fake = _FakeOpenCodeRestServer._(server);
+    unawaited(fake._listen());
+    return fake;
+  }
+
+  Future<void> close() async {
+    for (final response in _eventResponses.toList(growable: false)) {
+      try {
+        await response.close();
+      } catch (_) {
+        // Best effort.
+      }
+    }
+    await _server.close(force: true);
+  }
+
+  Future<void> _listen() async {
+    await for (final request in _server) {
+      if (request.uri.path == '/global/health') {
+        healthRequested = true;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode(<String, dynamic>{'healthy': true, 'version': '1.3.3'}),
+        );
+        await request.response.close();
+        continue;
+      }
+      if (request.uri.path == '/global/event') {
+        request.response.headers.set(
+          HttpHeaders.contentTypeHeader,
+          'text/event-stream',
+        );
+        request.response.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+        request.response.write(
+          'data: ${jsonEncode(<String, dynamic>{'payload': <String, dynamic>{'type': 'server.connected', 'properties': <String, dynamic>{}}})}\n\n',
+        );
+        await request.response.flush();
+        _eventResponses.add(request.response);
+        continue;
+      }
+      if (request.uri.path == '/session' && request.method == 'POST') {
+        createdSessionCount += 1;
+        final sessionId = 'ses-${_sessionCounter++}';
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode(<String, dynamic>{
+            'id': sessionId,
+            'title': 'test',
+            'directory':
+                request.uri.queryParameters['directory'] ?? Directory.current.path,
+          }),
+        );
+        await request.response.close();
+        continue;
+      }
+      final sessionMatch = RegExp(r'^/session/([^/]+)/message$').firstMatch(
+        request.uri.path,
+      );
+      if (sessionMatch != null && request.method == 'GET') {
+        final sessionId = sessionMatch.group(1)!;
+        final text = _assistantTextBySession[sessionId] ?? '';
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode(<Map<String, dynamic>>[
+            <String, dynamic>{
+              'info': <String, dynamic>{'id': 'msg-user', 'role': 'user'},
+              'parts': <Map<String, dynamic>>[
+                <String, dynamic>{'type': 'text', 'text': lastPromptText},
+              ],
+            },
+            if (text.isNotEmpty)
+              <String, dynamic>{
+                'info': <String, dynamic>{
+                  'id': 'msg-assistant',
+                  'role': 'assistant',
+                },
+                'parts': <Map<String, dynamic>>[
+                  <String, dynamic>{'type': 'text', 'text': text},
+                ],
+              },
+          ]),
+        );
+        await request.response.close();
+        continue;
+      }
+      if (sessionMatch != null && request.method == 'POST') {
+        final sessionId = sessionMatch.group(1)!;
+        final body = jsonDecode(await utf8.decodeStream(request));
+        final parts = (body as Map<String, dynamic>)['parts'] as List<dynamic>? ??
+            const <dynamic>[];
+        if (parts.isNotEmpty) {
+          lastPromptText =
+              (parts.first as Map<String, dynamic>)['text']?.toString() ?? '';
+        }
+        final assistantMessageId = 'msg-assistant-${_messageCounter++}';
+        await _broadcastEvent(
+          <String, dynamic>{
+            'payload': <String, dynamic>{
+              'type': 'session.status',
+              'properties': <String, dynamic>{
+                'sessionID': sessionId,
+                'status': <String, dynamic>{'type': 'busy'},
+              },
+            },
+          },
+        );
+        await _broadcastEvent(
+          <String, dynamic>{
+            'payload': <String, dynamic>{
+              'type': 'message.updated',
+              'properties': <String, dynamic>{
+                'sessionID': sessionId,
+                'info': <String, dynamic>{
+                  'id': assistantMessageId,
+                  'role': 'assistant',
+                },
+              },
+            },
+          },
+        );
+        for (final delta in <String>['hello ', 'world ', 'from ', 'opencode']) {
+          await _broadcastEvent(
+            <String, dynamic>{
+              'payload': <String, dynamic>{
+                'type': 'message.part.delta',
+                'properties': <String, dynamic>{
+                  'sessionID': sessionId,
+                  'part': <String, dynamic>{'messageID': assistantMessageId},
+                  'text': delta,
+                },
+              },
+            },
+          );
+        }
+        await _broadcastEvent(
+          <String, dynamic>{
+            'payload': <String, dynamic>{
+              'type': 'message.part.updated',
+              'properties': <String, dynamic>{
+                'sessionID': sessionId,
+                'part': <String, dynamic>{
+                  'messageID': assistantMessageId,
+                  'type': 'text',
+                  'text': 'hello world from opencode',
+                },
+              },
+            },
+          },
+        );
+        _assistantTextBySession[sessionId] = 'hello world from opencode';
+        await _broadcastEvent(
+          <String, dynamic>{
+            'payload': <String, dynamic>{
+              'type': 'session.status',
+              'properties': <String, dynamic>{
+                'sessionID': sessionId,
+                'status': <String, dynamic>{'type': 'idle'},
+              },
+            },
+          },
+        );
+        request.response.headers.contentType = ContentType.json;
+        request.response.write('');
+        await request.response.close();
+        continue;
+      }
+      final abortMatch = RegExp(r'^/session/([^/]+)/abort$').firstMatch(
+        request.uri.path,
+      );
+      if (abortMatch != null && request.method == 'POST') {
+        request.response.headers.contentType = ContentType.json;
+        request.response.write('{}');
+        await request.response.close();
+        continue;
+      }
+      request.response.statusCode = HttpStatus.notFound;
+      await request.response.close();
+    }
+  }
+
+  Future<void> _broadcastEvent(Map<String, dynamic> event) async {
+    final payload = 'data: ${jsonEncode(event)}\n\n';
+    for (final response in _eventResponses.toList(growable: false)) {
+      response.write(payload);
+      await response.flush();
+    }
   }
 }
 
