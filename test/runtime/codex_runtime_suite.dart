@@ -1,6 +1,8 @@
 @TestOn('vm')
 library;
 
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 
@@ -175,6 +177,93 @@ void main() {
       await runtime.stop();
       await runtime.stop();
       expect(runtime.isConnected, isFalse);
+    });
+
+    test('decodes model/list responses from models array', () {
+      final models = CodexRuntime.decodeModelListResponseForTest({
+        'models': <Map<String, dynamic>>[
+          {'id': 'codex-sonnet', 'name': 'Codex Sonnet'},
+          {'id': 'codex-opus', 'name': 'Codex Opus'},
+        ],
+      });
+
+      expect(models, hasLength(2));
+      expect(models.first['id'], 'codex-sonnet');
+      expect(models.last['id'], 'codex-opus');
+    });
+
+    test('decodes model/list responses from OpenAI-style data array', () {
+      final models = CodexRuntime.decodeModelListResponseForTest({
+        'object': 'list',
+        'data': <Map<String, dynamic>>[
+          {'id': 'glm-5:cloud', 'owned_by': 'library'},
+          {'id': 'kimi-k2.5:cloud', 'owned_by': 'library'},
+        ],
+      });
+
+      expect(models, hasLength(2));
+      expect(models.first['id'], 'glm-5:cloud');
+      expect(models.last['id'], 'kimi-k2.5:cloud');
+    });
+
+    test('deduplicates malformed duplicate model ids while decoding', () {
+      final models = CodexRuntime.decodeModelListResponseForTest({
+        'data': <Map<String, dynamic>>[
+          {'id': 'glm-5:cloud'},
+          {'id': 'glm-5:cloud'},
+          {'name': 'fallback-name'},
+        ],
+      });
+
+      expect(models, hasLength(2));
+      expect(models[0]['id'], 'glm-5:cloud');
+      expect(models[1]['name'], 'fallback-name');
+    });
+
+    test('normalizes Cloudflare model refresh errors', () {
+      final normalized = CodexRuntime.normalizeModelListErrorForTest(
+        const CodexRpcError(
+          code: 403,
+          message: 'Access blocked by Cloudflare. This usually happens when connecting from a restricted region (status 403 Forbidden)',
+        ),
+      );
+
+      expect(normalized, isA<CodexRpcError>());
+      expect(
+        (normalized as CodexRpcError).message,
+        'Codex model refresh blocked by Cloudflare (403)',
+      );
+    });
+
+    test('normalizes child-exit timeouts during model refresh', () {
+      final normalized = CodexRuntime.normalizeModelListErrorForTest(
+        const CodexRpcError(
+          code: -1,
+          message: 'timeout waiting for child process to exit',
+        ),
+      );
+
+      expect(normalized, isA<TimeoutException>());
+      expect(
+        (normalized as TimeoutException).message,
+        'Codex model refresh timed out waiting for child process exit',
+      );
+    });
+
+    test('normalizes unsupported model payload schema errors', () {
+      final normalized = CodexRuntime.normalizeModelListErrorForTest(
+        const CodexRpcError(
+          code: -32603,
+          message:
+              'stream disconnected before completion: failed to decode models response: missing field `models` at line 1 column 1685',
+        ),
+      );
+
+      expect(normalized, isA<CodexRpcError>());
+      expect(
+        (normalized as CodexRpcError).message,
+        'Codex model list payload used an unsupported schema',
+      );
     });
   });
 }
