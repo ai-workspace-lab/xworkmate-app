@@ -1344,6 +1344,70 @@ class AppController extends ChangeNotifier {
         normalizedRef == settings.workspacePath.trim();
   }
 
+  bool _usesDefaultThreadWorkspaceRefFromAnotherRoot(
+    String sessionKey, {
+    AssistantExecutionTarget? executionTarget,
+    String? workspaceRef,
+    WorkspaceRefKind? workspaceRefKind,
+  }) {
+    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+    final resolvedTarget =
+        executionTarget ??
+        assistantExecutionTargetForSession(normalizedSessionKey);
+    if (resolvedTarget == AssistantExecutionTarget.remote) {
+      return false;
+    }
+    final normalizedRef = workspaceRef?.trim() ?? '';
+    if (normalizedRef.isEmpty || workspaceRefKind != WorkspaceRefKind.localPath) {
+      return false;
+    }
+    final expectedDefault = _defaultWorkspaceRefForSession(
+      normalizedSessionKey,
+    ).trim();
+    if (expectedDefault.isEmpty) {
+      return false;
+    }
+    final normalizedPath = _trimTrailingPathSeparator(
+      normalizedRef.replaceAll('\\', '/'),
+    );
+    final normalizedExpected = _trimTrailingPathSeparator(
+      expectedDefault.replaceAll('\\', '/'),
+    );
+    if (normalizedPath == normalizedExpected) {
+      return false;
+    }
+    if (normalizedSessionKey == 'main') {
+      return normalizedPath == SettingsSnapshot.defaults().workspacePath;
+    }
+    final expectedSuffix =
+        '/.xworkmate/threads/${_threadWorkspaceDirectoryName(normalizedSessionKey)}';
+    return normalizedPath.endsWith(expectedSuffix);
+  }
+
+  bool _shouldMigrateWorkspaceRef(
+    String sessionKey, {
+    AssistantExecutionTarget? executionTarget,
+    String? workspaceRef,
+    WorkspaceRefKind? workspaceRefKind,
+  }) {
+    final normalizedRef = workspaceRef?.trim() ?? '';
+    if (normalizedRef.isEmpty) {
+      return true;
+    }
+    return _usesLegacySharedWorkspaceRef(
+          sessionKey,
+          executionTarget: executionTarget,
+          workspaceRef: normalizedRef,
+          workspaceRefKind: workspaceRefKind,
+        ) ||
+        _usesDefaultThreadWorkspaceRefFromAnotherRoot(
+          sessionKey,
+          executionTarget: executionTarget,
+          workspaceRef: normalizedRef,
+          workspaceRefKind: workspaceRefKind,
+        );
+  }
+
   WorkspaceRefKind _defaultWorkspaceRefKindForTarget(
     AssistantExecutionTarget target,
   ) {
@@ -1373,7 +1437,7 @@ class AppController extends ChangeNotifier {
     if (existing != null &&
         existingWorkspaceRef.isNotEmpty &&
         existing.workspaceRefKind == nextWorkspaceRefKind &&
-        !_usesLegacySharedWorkspaceRef(
+        !_shouldMigrateWorkspaceRef(
           normalizedSessionKey,
           executionTarget: resolvedTarget,
           workspaceRef: existingWorkspaceRef,
@@ -2704,8 +2768,7 @@ class AppController extends ChangeNotifier {
       _resolvedUserHomeDirectory = await _skillDirectoryAccessService
           .resolveUserHomeDirectory();
       await _settingsController.initialize();
-      _restoreAssistantThreads(await _store.loadAssistantThreadRecords());
-      await _restoreSharedSingleAgentLocalSkillsCache();
+      final storedAssistantThreads = await _store.loadAssistantThreadRecords();
       if (_disposed) {
         return;
       }
@@ -2736,6 +2799,11 @@ class AppController extends ChangeNotifier {
         if (_disposed) {
           return;
         }
+      }
+      _restoreAssistantThreads(storedAssistantThreads);
+      await _restoreSharedSingleAgentLocalSkillsCache();
+      if (_disposed) {
+        return;
       }
       _lastObservedSettingsSnapshot = settings;
       _modelsController.restoreFromSettings(settings.aiGateway);
@@ -3559,8 +3627,7 @@ class AppController extends ChangeNotifier {
       }
       final titleFromSettings = assistantCustomTaskTitle(sessionKey);
       final shouldMigrateWorkspaceRef =
-          record.workspaceRef.trim().isEmpty ||
-          _usesLegacySharedWorkspaceRef(
+          _shouldMigrateWorkspaceRef(
             sessionKey,
             executionTarget:
                 record.executionTarget ?? settings.assistantExecutionTarget,
