@@ -8,7 +8,7 @@ DART ?= dart
 DEVICE ?= macos
 APP_STORE_DART_DEFINE ?= --dart-define=XWORKMATE_APP_STORE=true
 
-.PHONY: help deps analyze test check format run build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs check-export-compliance
+.PHONY: help deps analyze test check format run open-macos-xcode build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs check-export-compliance
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -32,6 +32,9 @@ render-release-docs: ## Render feature matrix, roadmap, release notes, and chang
 
 run: ## Run the app on a device or desktop target (DEVICE=macos by default)
 	$(FLUTTER) run -d $(DEVICE)
+
+open-macos-xcode: ## Open the supported macOS Xcode workspace entrypoint
+	open macos/Runner.xcworkspace
 
 build-linux: ## Build the Linux app in release mode
 	$(FLUTTER) build linux --release

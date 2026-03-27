@@ -390,7 +390,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [[ \"${WORKSPACE_DIR:-}\" == *.xcodeproj ]]; then\n  echo \"error: XWorkmate macOS builds with CocoaPods plugins must be launched from macos/Runner.xcworkspace, not Runner.xcodeproj.\" >&2\n  echo \"error: Open macos/Runner.xcworkspace in Xcode or run 'flutter build macos' from the repository root.\" >&2\n  exit 1\nfi\n\"$FLUTTER_ROOT\"/packages/flutter_tools/bin/macos_assemble.sh && touch Flutter/ephemeral/tripwire";
+			shellScript = "if [[ \"${WORKSPACE_DIR:-}\" == *.xcodeproj ]]; then\n  echo \"error: XWorkmate macOS builds with CocoaPods plugins must be launched from macos/Runner.xcworkspace, not Runner.xcodeproj.\" >&2\n  echo \"error: Close this project, open macos/Runner.xcworkspace in Xcode, and build the shared Runner scheme for My Mac.\" >&2\n  echo \"error: Pods targets appearing in the workspace are expected. Only configure signing on the Runner target.\" >&2\n  echo \"error: For release packaging, run 'flutter build macos' from the repository root.\" >&2\n  exit 1\nfi\n\"$FLUTTER_ROOT\"/packages/flutter_tools/bin/macos_assemble.sh && touch Flutter/ephemeral/tripwire";
 		};
 		8E8C2A3EBAA3461603096C04 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;

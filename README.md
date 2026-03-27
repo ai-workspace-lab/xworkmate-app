@@ -16,6 +16,34 @@ flutter test
 flutter run -d macos
 ```
 
+## Xcode Run For macOS
+
+XWorkmate only supports launching the macOS app from the workspace entrypoint:
+
+```bash
+open macos/Runner.xcworkspace
+```
+
+If you prefer a repo-native shortcut, run:
+
+```bash
+make open-macos-xcode
+```
+
+In Xcode:
+
+- Select the shared `Runner` scheme.
+- Select `My Mac` as the destination.
+- Configure signing only on the `Runner` target.
+- Leave CocoaPods plugin targets under `Pods` alone. They appear in the workspace by design and are not app signing targets.
+
+For release builds, archives, and packaging, continue to use:
+
+```bash
+flutter build macos
+make build-macos
+```
+
 ## Downloads
 
 | Platform | Download |
