@@ -36,16 +36,31 @@ target 'Runner' do
 end
 
 post_install do |installer|
+  append_ignored_attributes_suppression = lambda do |build_settings|
+    other_cflags = build_settings['OTHER_CFLAGS'] || '$(inherited)'
+    return if other_cflags.include?('-Wno-ignored-attributes')
+
+    build_settings['OTHER_CFLAGS'] =
+      "#{other_cflags} -Wno-ignored-attributes"
+  end
+
   installer.pods_project.targets.each do |target|
     flutter_additional_macos_build_settings(target)
     next unless target.name == 'mobile_scanner'
 
     target.build_configurations.each do |config|
-      other_cflags = config.build_settings['OTHER_CFLAGS'] || '$(inherited)'
-      unless other_cflags.include?('-Wno-ignored-attributes')
-        config.build_settings['OTHER_CFLAGS'] =
-          "#{other_cflags} -Wno-ignored-attributes"
+      append_ignored_attributes_suppression.call(config.build_settings)
+    end
+  end
+
+  installer.aggregate_targets.each do |aggregate_target|
+    aggregate_target.user_project.targets.each do |target|
+      next unless ['Runner', 'RunnerTests'].include?(target.name)
+
+      target.build_configurations.each do |config|
+        append_ignored_attributes_suppression.call(config.build_settings)
       end
     end
+    aggregate_target.user_project.save
   end
 end

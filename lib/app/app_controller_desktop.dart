@@ -19,6 +19,7 @@ import '../runtime/gateway_runtime.dart';
 import '../runtime/runtime_controllers.dart';
 import '../runtime/runtime_models.dart';
 import '../runtime/secure_config_store.dart';
+import '../runtime/embedded_agent_launch_policy.dart';
 import '../runtime/runtime_coordinator.dart';
 import '../runtime/direct_single_agent_app_server_client.dart';
 import '../runtime/gateway_acp_client.dart';
@@ -665,12 +666,7 @@ class AppController extends ChangeNotifier {
     final stored =
         _assistantThreadRecords[normalizedSessionKey]?.singleAgentProvider ??
         SingleAgentProvider.auto;
-    return settings.resolveSingleAgentProvider(
-      sanitizeAppStoreSingleAgentProvider(
-        stored,
-        isAppleHost: Platform.isIOS || Platform.isMacOS,
-      ),
-    );
+    return settings.resolveSingleAgentProvider(stored);
   }
 
   SingleAgentProvider get currentSingleAgentProvider =>
@@ -2140,12 +2136,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> setSingleAgentProvider(SingleAgentProvider provider) async {
     final sessionKey = _normalizedAssistantSessionKey(currentSessionKey);
-    final sanitizedProvider = settings.resolveSingleAgentProvider(
-      sanitizeAppStoreSingleAgentProvider(
-        provider,
-        isAppleHost: Platform.isIOS || Platform.isMacOS,
-      ),
-    );
+    final sanitizedProvider = settings.resolveSingleAgentProvider(provider);
     if (singleAgentProviderForSession(sessionKey) == sanitizedProvider) {
       return;
     }
@@ -2981,7 +2972,7 @@ class AppController extends ChangeNotifier {
   /// Enable Codex ↔ Gateway bridge
   Future<void> enableCodexBridge() async {
     if (_isCodexBridgeEnabled || _isCodexBridgeBusy) return;
-    if (blocksAppStoreEmbeddedAgentProcesses(
+    if (shouldBlockEmbeddedAgentLaunch(
       isAppleHost: Platform.isIOS || Platform.isMacOS,
     )) {
       throw StateError(
@@ -5407,7 +5398,7 @@ class AppController extends ChangeNotifier {
       _resolvedCodexCliPath = null;
       return;
     }
-    if (blocksAppStoreEmbeddedAgentProcesses(
+    if (shouldBlockEmbeddedAgentLaunch(
       isAppleHost: Platform.isIOS || Platform.isMacOS,
     )) {
       _resolvedCodexCliPath = null;

@@ -4,8 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import '../app/app_store_policy.dart';
 import '../app/app_metadata.dart';
+import 'embedded_agent_launch_policy.dart';
 import 'platform_environment.dart';
 
 /// Codex sandbox mode for controlling file system access.
@@ -354,7 +354,7 @@ class CodexRuntime extends ChangeNotifier {
     CodexApprovalPolicy approval = CodexApprovalPolicy.suggest,
     List<String> extraArgs = const [],
   }) async {
-    if (blocksAppStoreEmbeddedAgentProcesses(
+    if (shouldBlockEmbeddedAgentLaunch(
       isAppleHost: Platform.isIOS || Platform.isMacOS,
     )) {
       throw UnsupportedError(
@@ -834,7 +834,9 @@ class CodexRuntime extends ChangeNotifier {
       _normalizeModelListError(error);
 }
 
-List<Map<String, dynamic>> _decodeModelListResponse(Map<String, dynamic> result) {
+List<Map<String, dynamic>> _decodeModelListResponse(
+  Map<String, dynamic> result,
+) {
   final rawModels = <Object?>[
     ...switch (result['models']) {
       final List<Object?> items => items,
@@ -881,7 +883,9 @@ Object _normalizeModelListError(Object error) {
       );
     }
     if (lower.contains('timeout waiting for child process to exit')) {
-      return TimeoutException('Codex model refresh timed out waiting for child process exit');
+      return TimeoutException(
+        'Codex model refresh timed out waiting for child process exit',
+      );
     }
     if (lower.contains('missing field `models`')) {
       return CodexRpcError(
