@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import '../app/app_store_policy.dart';
+import 'embedded_agent_launch_policy.dart';
 import 'go_core.dart';
 
 typedef ArisProcessStarter =
@@ -88,7 +88,7 @@ class ArisLlmChatClient {
     required Map<String, String> environment,
     required Map<String, dynamic> arguments,
   }) async {
-    if (blocksAppStoreEmbeddedAgentProcesses(
+    if (shouldBlockEmbeddedAgentLaunch(
       isAppleHost: Platform.isIOS || Platform.isMacOS,
     )) {
       throw UnsupportedError(

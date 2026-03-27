@@ -29,6 +29,9 @@ class AppDelegate: FlutterAppDelegate, NSWindowDelegate {
     }
     setUpStatusBarController()
     statusViewModel.startRefreshing()
+    DispatchQueue.main.async { [weak self] in
+      self?.showMainWindow()
+    }
   }
 
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

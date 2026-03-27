@@ -4,8 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import '../app/app_store_policy.dart';
 import 'aris_bundle.dart';
+import 'embedded_agent_launch_policy.dart';
 import 'go_core.dart';
 import 'aris_llm_chat_client.dart';
 import 'multi_agent_frameworks.dart';
@@ -125,7 +125,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
   }
 
   void _assertEmbeddedProcessesAllowed() {
-    if (blocksAppStoreEmbeddedAgentProcesses(
+    if (shouldBlockEmbeddedAgentLaunch(
       isAppleHost: Platform.isIOS || Platform.isMacOS,
     )) {
       throw UnsupportedError(

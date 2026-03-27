@@ -141,6 +141,43 @@ void main() {
       expect(controller.resolvedAssistantModel, isEmpty);
     },
   );
+
+  test(
+    'AppController preserves an explicitly selected OpenCode provider',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-app-controller-opencode-provider-',
+      );
+      addTearDown(() => _deleteDirectoryWithRetry(tempDirectory));
+      final store = _createIsolatedStore(tempDirectory.path);
+      final controller = AppController(
+        store: store,
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
+        ],
+      );
+      addTearDown(controller.dispose);
+      addTearDown(store.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+
+      await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
+
+      expect(
+        controller.currentSingleAgentProvider,
+        SingleAgentProvider.opencode,
+      );
+      expect(
+        controller.currentSingleAgentResolvedProvider,
+        SingleAgentProvider.opencode,
+      );
+    },
+  );
 }
 
 SecureConfigStore _createIsolatedStore(String rootPath) {
