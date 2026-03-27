@@ -2982,6 +2982,7 @@ class _ComposerBarState extends State<_ComposerBar> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
