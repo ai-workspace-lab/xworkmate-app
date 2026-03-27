@@ -256,6 +256,36 @@ void main() {
       expect(server.createdSessionCount, 1);
       expect(server.lastPromptText, 'hello opencode');
     });
+
+    test(
+      'fails OpenCode REST turns that complete without assistant content',
+      () async {
+        final server = await _FakeOpenCodeRestServer.start(
+          emitAssistantContent: false,
+        );
+        addTearDown(server.close);
+
+        final client = DirectSingleAgentAppServerClient(
+          endpointResolver: (_) => server.baseHttpUri,
+        );
+        addTearDown(client.dispose);
+
+        final result = await client.run(
+          const DirectSingleAgentRunRequest(
+            sessionId: 'session-opencode-empty',
+            provider: SingleAgentProvider.opencode,
+            prompt: 'hello opencode',
+            model: '',
+            workingDirectory: '/tmp',
+            gatewayToken: '',
+          ),
+        );
+
+        expect(result.success, isFalse);
+        expect(result.output, isEmpty);
+        expect(result.errorMessage, contains('without assistant content'));
+      },
+    );
   });
 }
 
@@ -506,9 +536,10 @@ class _FakeAppServer {
 }
 
 class _FakeOpenCodeRestServer {
-  _FakeOpenCodeRestServer._(this._server);
+  _FakeOpenCodeRestServer._(this._server, {required this.emitAssistantContent});
 
   final HttpServer _server;
+  final bool emitAssistantContent;
   final List<HttpResponse> _eventResponses = <HttpResponse>[];
   var _sessionCounter = 0;
   var _messageCounter = 0;
@@ -519,9 +550,14 @@ class _FakeOpenCodeRestServer {
 
   Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${_server.port}');
 
-  static Future<_FakeOpenCodeRestServer> start() async {
+  static Future<_FakeOpenCodeRestServer> start({
+    bool emitAssistantContent = true,
+  }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final fake = _FakeOpenCodeRestServer._(server);
+    final fake = _FakeOpenCodeRestServer._(
+      server,
+      emitAssistantContent: emitAssistantContent,
+    );
     unawaited(fake._listen());
     return fake;
   }
@@ -644,32 +680,39 @@ class _FakeOpenCodeRestServer {
             },
           },
         });
-        for (final delta in <String>['hello ', 'world ', 'from ', 'opencode']) {
+        if (emitAssistantContent) {
+          for (final delta in <String>[
+            'hello ',
+            'world ',
+            'from ',
+            'opencode',
+          ]) {
+            await _broadcastEvent(<String, dynamic>{
+              'payload': <String, dynamic>{
+                'type': 'message.part.delta',
+                'properties': <String, dynamic>{
+                  'sessionID': sessionId,
+                  'part': <String, dynamic>{'messageID': assistantMessageId},
+                  'text': delta,
+                },
+              },
+            });
+          }
           await _broadcastEvent(<String, dynamic>{
             'payload': <String, dynamic>{
-              'type': 'message.part.delta',
+              'type': 'message.part.updated',
               'properties': <String, dynamic>{
                 'sessionID': sessionId,
-                'part': <String, dynamic>{'messageID': assistantMessageId},
-                'text': delta,
+                'part': <String, dynamic>{
+                  'messageID': assistantMessageId,
+                  'type': 'text',
+                  'text': 'hello world from opencode',
+                },
               },
             },
           });
+          _assistantTextBySession[sessionId] = 'hello world from opencode';
         }
-        await _broadcastEvent(<String, dynamic>{
-          'payload': <String, dynamic>{
-            'type': 'message.part.updated',
-            'properties': <String, dynamic>{
-              'sessionID': sessionId,
-              'part': <String, dynamic>{
-                'messageID': assistantMessageId,
-                'type': 'text',
-                'text': 'hello world from opencode',
-              },
-            },
-          },
-        });
-        _assistantTextBySession[sessionId] = 'hello world from opencode';
         await _broadcastEvent(<String, dynamic>{
           'payload': <String, dynamic>{
             'type': 'session.status',
