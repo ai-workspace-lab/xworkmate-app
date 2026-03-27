@@ -1302,6 +1302,7 @@ class _ConversationWorkspace extends StatelessWidget {
                 borderRadius: 10,
                 tone: SurfaceCardTone.chrome,
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (attachments.isNotEmpty) ...[
