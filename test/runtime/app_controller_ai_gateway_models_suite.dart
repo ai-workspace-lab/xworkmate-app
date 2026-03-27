@@ -18,7 +18,7 @@ void main() {
       final tempDirectory = await Directory.systemTemp.createTemp(
         'xworkmate-app-controller-models-',
       );
-      addTearDown(() => tempDirectory.delete(recursive: true));
+      addTearDown(() => _deleteDirectoryWithRetry(tempDirectory));
       final store = _createIsolatedStore(tempDirectory.path);
       final controller = AppController(
         store: store,
@@ -55,7 +55,7 @@ void main() {
       final tempDirectory = await Directory.systemTemp.createTemp(
         'xworkmate-app-controller-models-',
       );
-      addTearDown(() => tempDirectory.delete(recursive: true));
+      addTearDown(() => _deleteDirectoryWithRetry(tempDirectory));
       final store = _createIsolatedStore(tempDirectory.path);
       final controller = AppController(
         store: store,
@@ -106,7 +106,7 @@ void main() {
       final tempDirectory = await Directory.systemTemp.createTemp(
         'xworkmate-app-controller-provider-models-',
       );
-      addTearDown(() => tempDirectory.delete(recursive: true));
+      addTearDown(() => _deleteDirectoryWithRetry(tempDirectory));
       final store = _createIsolatedStore(tempDirectory.path);
       final controller = AppController(
         store: store,
@@ -150,6 +150,23 @@ SecureConfigStore _createIsolatedStore(String rootPath) {
     fallbackDirectoryPathResolver: () async => rootPath,
     defaultSupportDirectoryPathResolver: () async => rootPath,
   );
+}
+
+Future<void> _deleteDirectoryWithRetry(Directory directory) async {
+  for (var attempt = 0; attempt < 5; attempt += 1) {
+    if (!await directory.exists()) {
+      return;
+    }
+    try {
+      await directory.delete(recursive: true);
+      return;
+    } on FileSystemException {
+      if (attempt == 4) {
+        rethrow;
+      }
+      await Future<void>.delayed(Duration(milliseconds: 80 * (attempt + 1)));
+    }
+  }
 }
 
 Future<void> _waitFor(
