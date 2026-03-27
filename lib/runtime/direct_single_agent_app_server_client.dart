@@ -75,6 +75,7 @@ class DirectSingleAgentAppServerClient {
   final Map<String, _DirectAppServerConnection> _activeConnections =
       <String, _DirectAppServerConnection>{};
   final Map<String, String> _threadIds = <String, String>{};
+  final Map<String, String> _restSessionIds = <String, String>{};
   final Set<String> _abortedSessions = <String>{};
 
   final Map<SingleAgentProvider, DirectSingleAgentCapabilities>
@@ -97,6 +98,37 @@ class DirectSingleAgentAppServerClient {
     }
 
     final endpoint = _resolveWebSocketEndpoint(provider);
+    if (_usesRestSessionApi(provider)) {
+      final base = endpointResolver(provider);
+      if (base == null) {
+        final unavailable = const DirectSingleAgentCapabilities.unavailable(
+          endpoint: '',
+          errorMessage: 'Single-agent app-server endpoint is not configured.',
+        );
+        _cachedCapabilities[provider] = unavailable;
+        _capabilitiesRefreshedAt[provider] = DateTime.now();
+        return unavailable;
+      }
+      try {
+        await _fetchJson(
+          _buildRestUri(base, '/global/health'),
+          gatewayToken: gatewayToken,
+        );
+        _cachedCapabilities[provider] = DirectSingleAgentCapabilities(
+          available: true,
+          supportedProviders: <SingleAgentProvider>[provider],
+          endpoint: base.toString(),
+        );
+      } catch (error) {
+        _cachedCapabilities[provider] = DirectSingleAgentCapabilities.unavailable(
+          endpoint: base.toString(),
+          errorMessage: error.toString(),
+        );
+      } finally {
+        _capabilitiesRefreshedAt[provider] = DateTime.now();
+      }
+      return _cachedCapabilities[provider]!;
+    }
     if (endpoint == null) {
       final unavailable = const DirectSingleAgentCapabilities.unavailable(
         endpoint: '',
@@ -135,6 +167,9 @@ class DirectSingleAgentAppServerClient {
   Future<DirectSingleAgentRunResult> run(
     DirectSingleAgentRunRequest request,
   ) async {
+    if (_usesRestSessionApi(request.provider)) {
+      return _runViaRestApi(request);
+    }
     final endpoint = _resolveWebSocketEndpoint(request.provider);
     if (endpoint == null) {
       return const DirectSingleAgentRunResult(
@@ -302,6 +337,22 @@ class DirectSingleAgentAppServerClient {
       return;
     }
     _abortedSessions.add(normalizedSessionId);
+    final restSessionId = _restSessionIds[normalizedSessionId]?.trim() ?? '';
+    if (restSessionId.isNotEmpty) {
+      final provider = SingleAgentProvider.opencode;
+      final base = endpointResolver(provider);
+      if (base != null) {
+        try {
+          await _postJson(
+            _buildRestUri(base, '/session/$restSessionId/abort'),
+            body: null,
+            gatewayToken: '',
+          );
+        } catch (_) {
+          // Best effort only.
+        }
+      }
+    }
     final connection = _activeConnections[normalizedSessionId];
     final threadId = _threadIds[normalizedSessionId];
     if (connection == null || threadId == null || threadId.isEmpty) {
@@ -363,6 +414,442 @@ class DirectSingleAgentAppServerClient {
     }
     _threadIds[sessionId] = threadId;
     return threadId;
+  }
+
+  Future<DirectSingleAgentRunResult> _runViaRestApi(
+    DirectSingleAgentRunRequest request,
+  ) async {
+    final base = endpointResolver(request.provider);
+    if (base == null) {
+      return const DirectSingleAgentRunResult(
+        success: false,
+        output: '',
+        errorMessage: 'Single-agent REST endpoint is missing.',
+      );
+    }
+    final normalizedSessionId = request.sessionId.trim();
+    if (normalizedSessionId.isEmpty) {
+      return const DirectSingleAgentRunResult(
+        success: false,
+        output: '',
+        errorMessage: 'Single-agent session id is missing.',
+      );
+    }
+
+    _abortedSessions.remove(normalizedSessionId);
+    final remoteSessionId = await _ensureRestSession(
+      base,
+      sessionId: normalizedSessionId,
+      workingDirectory: request.workingDirectory,
+      gatewayToken: request.gatewayToken,
+    );
+
+    final output = StringBuffer();
+    final completion = Completer<DirectSingleAgentRunResult>();
+    String? activeAssistantMessageId;
+    String? lastAssistantText;
+    var busySeen = false;
+
+    final eventClient = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 8);
+    late final HttpClientRequest eventRequest;
+    late final HttpClientResponse eventResponse;
+    StreamSubscription<String>? lineSubscription;
+
+    void completeSuccess() {
+      if (completion.isCompleted) {
+        return;
+      }
+      final resolvedOutput = output.toString().trim().isNotEmpty
+          ? output.toString()
+          : (lastAssistantText ?? '');
+      completion.complete(
+        DirectSingleAgentRunResult(
+          success: true,
+          output: resolvedOutput,
+          errorMessage: '',
+          resolvedModel: request.model,
+        ),
+      );
+    }
+
+    try {
+      final eventUri = _buildRestUri(base, '/global/event');
+      eventRequest = await eventClient.getUrl(eventUri);
+      eventRequest.headers.set(
+        HttpHeaders.acceptHeader,
+        'text/event-stream',
+      );
+      final normalizedToken = request.gatewayToken.trim();
+      if (normalizedToken.isNotEmpty) {
+        eventRequest.headers.set(
+          HttpHeaders.authorizationHeader,
+          'Bearer $normalizedToken',
+        );
+      }
+      eventResponse = await eventRequest.close();
+      lineSubscription = eventResponse
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen(
+            (line) {
+              if (!line.startsWith('data: ')) {
+                return;
+              }
+              final event = _decodeMap(line.substring(6));
+              final payload = _asMap(event['payload']);
+              final type = payload['type']?.toString().trim() ?? '';
+              final properties = _asMap(payload['properties']);
+              if (properties['sessionID']?.toString().trim() !=
+                  remoteSessionId) {
+                return;
+              }
+              if (type == 'session.status') {
+                final status = _asMap(properties['status']);
+                final statusType = status['type']?.toString().trim() ?? '';
+                if (statusType == 'busy') {
+                  busySeen = true;
+                }
+                if (statusType == 'idle' && busySeen) {
+                  completeSuccess();
+                }
+                return;
+              }
+              if (type == 'session.idle' && busySeen) {
+                completeSuccess();
+                return;
+              }
+              if (type == 'session.error' && !completion.isCompleted) {
+                final error = _asMap(properties['error']);
+                completion.complete(
+                  DirectSingleAgentRunResult(
+                    success: false,
+                    output: output.toString(),
+                    errorMessage:
+                        error['message']?.toString() ??
+                        error['name']?.toString() ??
+                        'OpenCode session failed.',
+                    aborted: _abortedSessions.contains(normalizedSessionId),
+                    resolvedModel: request.model,
+                  ),
+                );
+                return;
+              }
+              if (type == 'message.updated') {
+                final info = _asMap(properties['info']);
+                if (info['role']?.toString().trim() == 'assistant') {
+                  activeAssistantMessageId = info['id']?.toString().trim();
+                }
+                return;
+              }
+              if (type == 'message.part.delta') {
+                final part = _asMap(properties['part']);
+                if (activeAssistantMessageId != null &&
+                    part['messageID']?.toString().trim() ==
+                        activeAssistantMessageId) {
+                  final delta = properties['text']?.toString() ??
+                      properties['delta']?.toString() ??
+                      '';
+                  if (delta.isNotEmpty) {
+                    output.write(delta);
+                    request.onOutput?.call(delta);
+                  }
+                }
+                return;
+              }
+              if (type == 'message.part.updated') {
+                final part = _asMap(properties['part']);
+                if (activeAssistantMessageId != null &&
+                    part['messageID']?.toString().trim() ==
+                        activeAssistantMessageId &&
+                    part['type']?.toString().trim() == 'text') {
+                  lastAssistantText = part['text']?.toString();
+                  if ((lastAssistantText?.trim().isNotEmpty ?? false)) {
+                    completeSuccess();
+                  }
+                }
+              }
+            },
+            onError: (Object error, StackTrace stackTrace) {
+              // OpenCode event streams can disconnect independently from the
+              // backing session lifecycle. Keep polling session state instead.
+            },
+            onDone: () {},
+            cancelOnError: true,
+          );
+
+      await _postJson(
+        _buildRestUri(
+          base,
+          '/session/$remoteSessionId/message',
+          queryParameters: <String, String>{
+            'directory': request.workingDirectory,
+          },
+        ),
+        body: <String, dynamic>{
+          'agent': 'build',
+          'parts': <Map<String, dynamic>>[
+            <String, dynamic>{'type': 'text', 'text': request.prompt},
+          ],
+        },
+        gatewayToken: request.gatewayToken,
+      );
+      unawaited(
+        _pollRestAssistantMessage(
+          base,
+          remoteSessionId: remoteSessionId,
+          workingDirectory: request.workingDirectory,
+          gatewayToken: request.gatewayToken,
+          onResolved: (text) {
+            if (text.trim().isNotEmpty) {
+              lastAssistantText = text;
+              if (output.toString().trim().isEmpty) {
+                output.write(text);
+                request.onOutput?.call(text);
+              }
+              completeSuccess();
+            }
+          },
+          onError: (message) {
+            if (!completion.isCompleted) {
+              completion.complete(
+                DirectSingleAgentRunResult(
+                  success: false,
+                  output: output.toString(),
+                  errorMessage: message,
+                  aborted: _abortedSessions.contains(normalizedSessionId),
+                  resolvedModel: request.model,
+                ),
+              );
+            }
+          },
+        ),
+      );
+
+      return await completion.future.timeout(
+        const Duration(minutes: 10),
+        onTimeout: () => DirectSingleAgentRunResult(
+          success: false,
+          output: output.toString(),
+          errorMessage: 'OpenCode REST request timed out.',
+          aborted: _abortedSessions.contains(normalizedSessionId),
+          resolvedModel: request.model,
+        ),
+      );
+    } catch (error) {
+      return DirectSingleAgentRunResult(
+        success: false,
+        output: output.toString(),
+        errorMessage: error.toString(),
+        aborted: _abortedSessions.contains(normalizedSessionId),
+        resolvedModel: request.model,
+      );
+    } finally {
+      unawaited(lineSubscription?.cancel());
+      eventClient.close(force: true);
+      _abortedSessions.remove(normalizedSessionId);
+    }
+  }
+
+  Future<String> _ensureRestSession(
+    Uri base, {
+    required String sessionId,
+    required String workingDirectory,
+    required String gatewayToken,
+  }) async {
+    final existing = _restSessionIds[sessionId]?.trim() ?? '';
+    if (existing.isNotEmpty) {
+      return existing;
+    }
+    final created = await _postJson(
+      _buildRestUri(
+        base,
+        '/session',
+        queryParameters: <String, String>{'directory': workingDirectory},
+      ),
+      body: <String, dynamic>{'title': sessionId},
+      gatewayToken: gatewayToken,
+    );
+    final createdId = created['id']?.toString().trim() ?? '';
+    if (createdId.isEmpty) {
+      throw StateError('OpenCode REST endpoint returned an empty session id.');
+    }
+    _restSessionIds[sessionId] = createdId;
+    return createdId;
+  }
+
+  Future<void> _pollRestAssistantMessage(
+    Uri base, {
+    required String remoteSessionId,
+    required String workingDirectory,
+    required String gatewayToken,
+    required void Function(String text) onResolved,
+    required void Function(String message) onError,
+  }) async {
+    String? previousText;
+    var stableCount = 0;
+    for (var attempt = 0; attempt < 100; attempt++) {
+      try {
+        final items = await _fetchJsonList(
+          _buildRestUri(
+            base,
+            '/session/$remoteSessionId/message',
+            queryParameters: <String, String>{
+              'directory': workingDirectory,
+              'limit': '20',
+            },
+          ),
+          gatewayToken: gatewayToken,
+        );
+        final text = _latestAssistantTextFromRestMessages(items);
+        if (text.trim().isNotEmpty) {
+          if (text == previousText) {
+            stableCount += 1;
+          } else {
+            previousText = text;
+            stableCount = 1;
+          }
+          if (stableCount >= 2) {
+            onResolved(text);
+            return;
+          }
+        }
+      } catch (error) {
+        onError(error.toString());
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+  }
+
+  String _latestAssistantTextFromRestMessages(List<Object?> items) {
+    for (final raw in items.reversed) {
+      final item = _asMap(raw);
+      final info = _asMap(item['info']);
+      if (info['role']?.toString().trim() != 'assistant') {
+        continue;
+      }
+      final parts = item['parts'];
+      if (parts is! List) {
+        continue;
+      }
+      for (final rawPart in parts) {
+        final part = _asMap(rawPart);
+        if (part['type']?.toString().trim() == 'text') {
+          final text = part['text']?.toString() ?? '';
+          if (text.trim().isNotEmpty) {
+            return text;
+          }
+        }
+      }
+    }
+    return '';
+  }
+
+  bool _usesRestSessionApi(SingleAgentProvider provider) {
+    if (provider.providerId != SingleAgentProvider.opencode.providerId) {
+      return false;
+    }
+    final base = endpointResolver(provider);
+    final scheme = base?.scheme.toLowerCase() ?? '';
+    return scheme == 'http' || scheme == 'https';
+  }
+
+  Uri _buildRestUri(
+    Uri base,
+    String path, {
+    Map<String, String>? queryParameters,
+  }) {
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    return base.replace(
+      path: normalizedPath,
+      queryParameters: queryParameters,
+      fragment: null,
+    );
+  }
+
+  Future<Map<String, dynamic>> _fetchJson(
+    Uri uri, {
+    required String gatewayToken,
+  }) async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+    try {
+      final request = await client.getUrl(uri);
+      final normalizedToken = gatewayToken.trim();
+      if (normalizedToken.isNotEmpty) {
+        request.headers.set(
+          HttpHeaders.authorizationHeader,
+          'Bearer $normalizedToken',
+        );
+      }
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      return _decodeMap(body);
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<Map<String, dynamic>> _postJson(
+    Uri uri, {
+    required Object? body,
+    required String gatewayToken,
+  }) async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+    try {
+      final request = await client.postUrl(uri);
+      request.headers.set(
+        HttpHeaders.contentTypeHeader,
+        'application/json; charset=utf-8',
+      );
+      final normalizedToken = gatewayToken.trim();
+      if (normalizedToken.isNotEmpty) {
+        request.headers.set(
+          HttpHeaders.authorizationHeader,
+          'Bearer $normalizedToken',
+        );
+      }
+      if (body != null) {
+        request.add(utf8.encode(jsonEncode(body)));
+      }
+      final response = await request.close();
+      final text = await response.transform(utf8.decoder).join();
+      if (text.trim().isEmpty) {
+        return const <String, dynamic>{};
+      }
+      return _decodeMap(text);
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<List<Object?>> _fetchJsonList(
+    Uri uri, {
+    required String gatewayToken,
+  }) async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+    try {
+      final request = await client.getUrl(uri);
+      final normalizedToken = gatewayToken.trim();
+      if (normalizedToken.isNotEmpty) {
+        request.headers.set(
+          HttpHeaders.authorizationHeader,
+          'Bearer $normalizedToken',
+        );
+      }
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      final decoded = jsonDecode(body);
+      if (decoded is List<Object?>) {
+        return decoded;
+      }
+      if (decoded is List) {
+        return decoded.cast<Object?>();
+      }
+      return const <Object?>[];
+    } finally {
+      client.close(force: true);
+    }
   }
 
   String? _extractThreadId(Map<String, dynamic> payload) {
