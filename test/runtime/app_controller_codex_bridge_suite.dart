@@ -251,7 +251,7 @@ void main() {
     );
 
     test(
-      'AppController preserves built-in mode and does not require external codex binary',
+      'AppController sanitizes legacy built-in mode back to external cli',
       () async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
         final store = createIsolatedTestStore();
@@ -277,7 +277,7 @@ void main() {
 
         expect(
           controller.settings.codeAgentRuntimeMode,
-          CodeAgentRuntimeMode.builtIn,
+          CodeAgentRuntimeMode.externalCli,
         );
         expect(controller.codexRuntimeWarning, isNotNull);
 
@@ -289,7 +289,7 @@ void main() {
           CodexCooperationState.bridgeOnly,
         );
         expect(codex.startCalled, isFalse);
-        expect(coordinator.runtimeMode, CodeAgentRuntimeMode.builtIn);
+        expect(coordinator.runtimeMode, CodeAgentRuntimeMode.externalCli);
       },
     );
   }, skip: _manualCodexBridgeSkipReason);

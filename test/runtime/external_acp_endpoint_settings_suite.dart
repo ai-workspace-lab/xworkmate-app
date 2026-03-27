@@ -11,57 +11,64 @@ void main() {
 
       expect(
         snapshot.externalAcpEndpoints
-            .take(2)
+            .take(1)
             .map((item) => item.providerKey)
             .toList(growable: false),
-        const <String>['codex', 'opencode'],
+        const <String>['opencode'],
       );
     });
 
-    test('round-trip preserves built-in entries and custom extensions', () {
-      final snapshot = SettingsSnapshot.defaults().copyWith(
-        externalAcpEndpoints: normalizeExternalAcpEndpoints(
-          profiles: <ExternalAcpEndpointProfile>[
-            ExternalAcpEndpointProfile.defaultsForProvider(
-              SingleAgentProvider.codex,
-            ).copyWith(endpoint: 'ws://127.0.0.1:9001'),
-            ExternalAcpEndpointProfile.defaultsForProvider(
-              SingleAgentProvider.opencode,
-            ).copyWith(endpoint: 'https://opencode.example.com'),
-            const ExternalAcpEndpointProfile(
-              providerKey: 'custom-lab',
-              label: 'Custom Lab',
-              badge: 'CL',
-              endpoint: 'wss://lab.example.com/acp',
-              enabled: true,
-            ),
-          ],
-        ),
-      );
+    test(
+      'round-trip preserves migrated legacy entries and custom extensions',
+      () {
+        final snapshot = SettingsSnapshot.defaults().copyWith(
+          externalAcpEndpoints: normalizeExternalAcpEndpoints(
+            profiles: <ExternalAcpEndpointProfile>[
+              ExternalAcpEndpointProfile.defaultsForProvider(
+                SingleAgentProvider.codex,
+              ).copyWith(endpoint: 'ws://127.0.0.1:9001'),
+              ExternalAcpEndpointProfile.defaultsForProvider(
+                SingleAgentProvider.opencode,
+              ).copyWith(endpoint: 'https://opencode.example.com'),
+              const ExternalAcpEndpointProfile(
+                providerKey: 'custom-lab',
+                label: 'Custom Lab',
+                badge: 'CL',
+                endpoint: 'wss://lab.example.com/acp',
+                enabled: true,
+              ),
+            ],
+          ),
+        );
 
-      final decoded = SettingsSnapshot.fromJson(snapshot.toJson());
+        final decoded = SettingsSnapshot.fromJson(snapshot.toJson());
 
-      expect(
-        decoded
-            .externalAcpEndpointForProvider(SingleAgentProvider.codex)
-            .endpoint,
-        'ws://127.0.0.1:9001',
-      );
-      expect(
-        decoded
-            .externalAcpEndpointForProvider(SingleAgentProvider.opencode)
-            .endpoint,
-        'https://opencode.example.com',
-      );
-      expect(
-        decoded.externalAcpEndpoints.any(
-          (item) =>
-              item.providerKey == 'custom-lab' &&
-              item.endpoint == 'wss://lab.example.com/acp',
-        ),
-        isTrue,
-      );
-    });
+        expect(
+          decoded.externalAcpEndpoints.any(
+            (item) =>
+                item.label == 'Codex' &&
+                item.endpoint == 'ws://127.0.0.1:9001' &&
+                item.providerKey.startsWith('custom-agent-'),
+          ),
+          isTrue,
+        );
+        expect(
+          decoded
+              .externalAcpEndpointForProvider(SingleAgentProvider.opencode)
+              .endpoint,
+          'https://opencode.example.com',
+        );
+        expect(decoded.externalAcpEndpointForProviderId('codex'), isNull);
+        expect(
+          decoded.externalAcpEndpoints.any(
+            (item) =>
+                item.providerKey == 'custom-lab' &&
+                item.endpoint == 'wss://lab.example.com/acp',
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test('empty legacy claude and gemini entries are dropped', () {
       final normalized = normalizeExternalAcpEndpoints(
@@ -84,8 +91,8 @@ void main() {
       );
 
       expect(
-        normalized.take(2).map((item) => item.providerKey).toList(),
-        const <String>['codex', 'opencode'],
+        normalized.take(1).map((item) => item.providerKey).toList(),
+        const <String>['opencode'],
       );
       expect(
         normalized.where(
@@ -153,7 +160,7 @@ void main() {
 
       expect(
         normalized.map((item) => item.providerKey).toList(growable: false),
-        const <String>['codex', 'opencode'],
+        const <String>['opencode'],
       );
     });
 
@@ -166,8 +173,8 @@ void main() {
           endpoint: 'wss://lab.example.com/acp',
         );
 
-        expect(profile.providerKey, 'custom-agent-3');
-        expect(profile.label, 'Custom ACP Endpoint 3');
+        expect(profile.providerKey, 'custom-agent-2');
+        expect(profile.label, 'Custom ACP Endpoint 2');
         expect(profile.endpoint, 'wss://lab.example.com/acp');
       },
     );
@@ -199,7 +206,7 @@ void main() {
           snapshot.availableSingleAgentProviders
               .map((item) => item.label)
               .toList(),
-          const <String>['Codex', 'OpenCode', 'Lab Agent'],
+          const <String>['OpenCode', 'Lab Agent'],
         );
       },
     );

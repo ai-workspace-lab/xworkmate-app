@@ -111,7 +111,7 @@ void main() {
       final controller = AppController(
         store: store,
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
         ],
       );
       addTearDown(controller.dispose);
@@ -132,7 +132,7 @@ void main() {
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.singleAgent,
       );
-      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+      await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
 
       expect(controller.currentSingleAgentHasResolvedProvider, isTrue);
       expect(controller.currentSingleAgentUsesAiChatFallback, isFalse);
@@ -154,7 +154,7 @@ void main() {
       final controller = AppController(
         store: store,
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
           SingleAgentProvider.opencode,
         ],
       );

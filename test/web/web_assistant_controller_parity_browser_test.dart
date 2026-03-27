@@ -47,7 +47,7 @@ void main() {
       );
 
       final threadSingle = controller.currentSessionKey;
-      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+      await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
       await controller.setAssistantMessageViewMode(
         AssistantMessageViewMode.raw,
       );
@@ -101,7 +101,7 @@ void main() {
       );
       expect(
         controller.singleAgentProviderForSession(threadSingle),
-        SingleAgentProvider.codex,
+        SingleAgentProvider.opencode,
       );
       expect(
         controller.assistantMessageViewModeForSession(threadSingle),
@@ -150,7 +150,7 @@ void main() {
       );
       expect(
         reloaded.singleAgentProviderForSession(threadSingle),
-        SingleAgentProvider.codex,
+        SingleAgentProvider.opencode,
       );
       expect(
         reloaded.assistantMessageViewModeForSession(threadSingle),
@@ -232,12 +232,12 @@ void main() {
         ];
       final fakeAcp = _FakeAcpClient(
         skillCatalog: <String, List<Map<String, dynamic>>>{
-          'codex': <Map<String, dynamic>>[
+          'opencode': <Map<String, dynamic>>[
             <String, dynamic>{
               'skillKey': 'codex-skill',
-              'name': 'Codex Skill',
-              'description': 'Codex-owned skill',
-              'source': 'codex',
+              'name': 'OpenCode Skill',
+              'description': 'OpenCode-owned skill',
+              'source': 'opencode',
             },
           ],
           'claude': <Map<String, dynamic>>[
@@ -284,12 +284,24 @@ void main() {
       );
       await controller.applySettingsDraft();
 
-      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+      final claudeProvider = controller.singleAgentProviderOptions.singleWhere(
+        (item) => item.label == 'Claude',
+      );
+      fakeAcp._skillCatalog[claudeProvider.providerId] = <Map<String, dynamic>>[
+        <String, dynamic>{
+          'skillKey': 'claude-skill',
+          'name': 'Claude Skill',
+          'description': 'Claude-owned skill',
+          'source': 'claude',
+        },
+      ];
+
+      await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
       expect(
         controller
             .assistantImportedSkillsForSession(controller.currentSessionKey)
             .map((item) => item.label),
-        contains('Codex Skill'),
+        contains('OpenCode Skill'),
       );
       await controller.toggleAssistantSkillForSession(
         controller.currentSessionKey,
@@ -302,7 +314,7 @@ void main() {
         hasLength(1),
       );
 
-      await controller.setSingleAgentProvider(SingleAgentProvider.claude);
+      await controller.setSingleAgentProvider(claudeProvider);
       expect(
         controller
             .assistantImportedSkillsForSession(controller.currentSessionKey)
@@ -335,12 +347,12 @@ void main() {
 
       final fakeAcp = _FakeAcpClient(
         skillCatalog: <String, List<Map<String, dynamic>>>{
-          'codex': <Map<String, dynamic>>[
+          'opencode': <Map<String, dynamic>>[
             <String, dynamic>{
               'skillKey': 'codex-skill',
-              'name': 'Codex Skill',
-              'description': 'Codex-owned skill',
-              'source': 'codex',
+              'name': 'OpenCode Skill',
+              'description': 'OpenCode-owned skill',
+              'source': 'opencode',
             },
           ],
         },
@@ -361,7 +373,7 @@ void main() {
         token: '',
         password: '',
       );
-      await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+      await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
       await controller.toggleAssistantSkillForSession(
         controller.currentSessionKey,
         'codex-skill',
@@ -507,7 +519,7 @@ class _FakeAcpClient extends WebAcpClient {
       singleAgent: true,
       multiAgent: true,
       providers: <SingleAgentProvider>{
-        SingleAgentProvider.codex,
+        SingleAgentProvider.opencode,
         SingleAgentProvider.opencode,
         SingleAgentProvider.claude,
         SingleAgentProvider.gemini,
