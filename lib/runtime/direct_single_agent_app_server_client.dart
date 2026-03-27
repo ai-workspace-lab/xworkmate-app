@@ -106,7 +106,11 @@ class DirectSingleAgentEndpointDescriptor {
       );
     }
     final scheme = endpoint.scheme.toLowerCase();
-    final normalizedBase = endpoint.replace(path: '', query: null, fragment: null);
+    final normalizedBase = endpoint.replace(
+      path: '',
+      query: null,
+      fragment: null,
+    );
     final isLocal = _isLocalHost(endpoint.host);
     if (scheme == 'ws' && isLocal) {
       return DirectSingleAgentEndpointDescriptor(
@@ -245,11 +249,11 @@ class DirectSingleAgentAppServerClient {
       sessionId,
       candidateBases: <Uri>[
         for (final entry in _transportKinds.entries)
-          if (entry.value == _DirectSingleAgentTransportKind.restSessionApi)
-            ...[
-              if (_describeEndpoint(entry.key).baseUri != null)
-                _describeEndpoint(entry.key).baseUri!,
-            ],
+          if (entry.value ==
+              _DirectSingleAgentTransportKind.restSessionApi) ...[
+            if (_describeEndpoint(entry.key).baseUri != null)
+              _describeEndpoint(entry.key).baseUri!,
+          ],
       ],
     );
     await _webSocketTransport.abort(sessionId);
@@ -262,7 +266,9 @@ class DirectSingleAgentAppServerClient {
   DirectSingleAgentEndpointDescriptor _describeEndpoint(
     SingleAgentProvider provider,
   ) {
-    return DirectSingleAgentEndpointDescriptor.describe(endpointResolver(provider));
+    return DirectSingleAgentEndpointDescriptor.describe(
+      endpointResolver(provider),
+    );
   }
 
   Future<_ResolvedSingleAgentTransport> _resolveTransport(
@@ -272,16 +278,16 @@ class DirectSingleAgentAppServerClient {
   }) async {
     final cachedKind = _transportKinds[provider];
     if (cachedKind != null) {
-      final cachedEndpoint = cachedKind ==
-              _DirectSingleAgentTransportKind.websocketAppServer
+      final cachedEndpoint =
+          cachedKind == _DirectSingleAgentTransportKind.websocketAppServer
           ? descriptor.websocketUri
           : descriptor.baseUri;
       if (cachedEndpoint != null) {
         return _ResolvedSingleAgentTransport(
           kind: cachedKind,
           endpoint: cachedEndpoint,
-          websocket: cachedKind ==
-                  _DirectSingleAgentTransportKind.websocketAppServer
+          websocket:
+              cachedKind == _DirectSingleAgentTransportKind.websocketAppServer
               ? _webSocketTransport
               : null,
           rest: cachedKind == _DirectSingleAgentTransportKind.restSessionApi
@@ -356,10 +362,7 @@ class _DirectSingleAgentWebSocketTransport {
   final Map<String, String> _threadIds = <String, String>{};
   final Set<String> _abortedSessions = <String>{};
 
-  Future<void> probe(
-    Uri endpoint, {
-    required String gatewayToken,
-  }) async {
+  Future<void> probe(Uri endpoint, {required String gatewayToken}) async {
     _DirectAppServerConnection? connection;
     try {
       connection = await _DirectAppServerConnection.connect(
@@ -602,10 +605,7 @@ class _DirectSingleAgentRestTransport {
   final Map<String, String> _restSessionIds = <String, String>{};
   final Set<String> _abortedSessions = <String>{};
 
-  Future<void> probe(
-    Uri base, {
-    required String gatewayToken,
-  }) async {
+  Future<void> probe(Uri base, {required String gatewayToken}) async {
     await _fetchJson(
       _buildRestUri(base, '/global/health'),
       gatewayToken: gatewayToken,
@@ -639,6 +639,26 @@ class _DirectSingleAgentRestTransport {
     String? lastAssistantText;
     var busySeen = false;
 
+    bool hasResolvedAssistantContent() {
+      return output.toString().trim().isNotEmpty ||
+          (lastAssistantText?.trim().isNotEmpty ?? false);
+    }
+
+    void completeFailure(String message) {
+      if (completion.isCompleted) {
+        return;
+      }
+      completion.complete(
+        DirectSingleAgentRunResult(
+          success: false,
+          output: output.toString(),
+          errorMessage: message,
+          aborted: _abortedSessions.contains(normalizedSessionId),
+          resolvedModel: request.model,
+        ),
+      );
+    }
+
     final eventClient = HttpClient()
       ..connectionTimeout = const Duration(seconds: 8);
     late final HttpClientRequest eventRequest;
@@ -652,6 +672,12 @@ class _DirectSingleAgentRestTransport {
       final resolvedOutput = output.toString().trim().isNotEmpty
           ? output.toString()
           : (lastAssistantText ?? '');
+      if (resolvedOutput.trim().isEmpty) {
+        completeFailure(
+          'OpenCode REST session completed without assistant content.',
+        );
+        return;
+      }
       completion.complete(
         DirectSingleAgentRunResult(
           success: true,
@@ -707,17 +733,10 @@ class _DirectSingleAgentRestTransport {
               }
               if (type == 'session.error' && !completion.isCompleted) {
                 final error = _asMap(properties['error']);
-                completion.complete(
-                  DirectSingleAgentRunResult(
-                    success: false,
-                    output: output.toString(),
-                    errorMessage:
-                        error['message']?.toString() ??
-                        error['name']?.toString() ??
-                        'OpenCode session failed.',
-                    aborted: _abortedSessions.contains(normalizedSessionId),
-                    resolvedModel: request.model,
-                  ),
+                completeFailure(
+                  error['message']?.toString() ??
+                      error['name']?.toString() ??
+                      'OpenCode session failed.',
                 );
                 return;
               }
@@ -733,7 +752,8 @@ class _DirectSingleAgentRestTransport {
                 if (activeAssistantMessageId != null &&
                     part['messageID']?.toString().trim() ==
                         activeAssistantMessageId) {
-                  final delta = properties['text']?.toString() ??
+                  final delta =
+                      properties['text']?.toString() ??
                       properties['delta']?.toString() ??
                       '';
                   if (delta.isNotEmpty) {
@@ -793,19 +813,7 @@ class _DirectSingleAgentRestTransport {
               completeSuccess();
             }
           },
-          onError: (message) {
-            if (!completion.isCompleted) {
-              completion.complete(
-                DirectSingleAgentRunResult(
-                  success: false,
-                  output: output.toString(),
-                  errorMessage: message,
-                  aborted: _abortedSessions.contains(normalizedSessionId),
-                  resolvedModel: request.model,
-                ),
-              );
-            }
-          },
+          onError: completeFailure,
         ),
       );
 
@@ -930,6 +938,7 @@ class _DirectSingleAgentRestTransport {
       }
       await Future<void>.delayed(const Duration(milliseconds: 200));
     }
+    onError('OpenCode REST session completed without assistant content.');
   }
 
   String _latestAssistantTextFromRestMessages(List<Object?> items) {
