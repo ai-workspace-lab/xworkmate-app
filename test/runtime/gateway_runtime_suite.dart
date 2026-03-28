@@ -14,6 +14,28 @@ import '../test_support.dart';
 
 void main() {
   test(
+    'GatewayRuntime formats connect auth summary consistently',
+    () {
+      expect(
+        formatGatewayConnectAuthSummary(
+          mode: 'shared-token',
+          fields: const <String>['token', 'deviceToken'],
+          sources: const <String>['shared:form', 'device:store'],
+        ),
+        'shared-token | fields: token, deviceToken | sources: shared:form · device:store',
+      );
+      expect(
+        formatGatewayConnectAuthSummary(
+          mode: 'none',
+          fields: const <String>[],
+          sources: const <String>[],
+        ),
+        'none | fields: none | sources: none',
+      );
+    },
+  );
+
+  test(
     'GatewayRuntime uses explicit shared token override for the initial connect handshake',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
