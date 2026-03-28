@@ -17,3 +17,10 @@ import 'app_capabilities.dart';
 import 'ui_feature_manifest.dart';
 
 part 'app_controller_web_core.part.dart';
+part 'app_controller_web_sessions.part.dart';
+part 'app_controller_web_workspace.part.dart';
+part 'app_controller_web_session_actions.part.dart';
+part 'app_controller_web_gateway_config.part.dart';
+part 'app_controller_web_gateway_relay.part.dart';
+part 'app_controller_web_gateway_chat.part.dart';
+part 'app_controller_web_helpers.part.dart';
