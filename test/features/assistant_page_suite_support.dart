@@ -207,6 +207,34 @@ class PendingSendAppControllerInternal extends AppController {
   }
 }
 
+class CaptureSendAppControllerInternal extends AppController {
+  CaptureSendAppControllerInternal({
+    required SecureConfigStore store,
+    RuntimeCoordinator? runtimeCoordinator,
+  }) : super(store: store, runtimeCoordinator: runtimeCoordinator);
+
+  int sendCallCount = 0;
+  String lastSentMessage = '';
+  String lastSessionKey = '';
+  String lastWorkspaceRef = '';
+
+  @override
+  Future<void> sendChatMessage(
+    String message, {
+    String thinking = 'off',
+    List<GatewayChatAttachmentPayload> attachments =
+        const <GatewayChatAttachmentPayload>[],
+    List<CollaborationAttachment> localAttachments =
+        const <CollaborationAttachment>[],
+    List<String> selectedSkillLabels = const <String>[],
+  }) async {
+    sendCallCount += 1;
+    lastSentMessage = message;
+    lastSessionKey = currentSessionKey;
+    lastWorkspaceRef = assistantWorkspaceRefForSession(currentSessionKey);
+  }
+}
+
 class FakeGatewayRuntimeInternal extends GatewayRuntime {
   FakeGatewayRuntimeInternal({required super.store})
     : super(identityStore: DeviceIdentityStore(store));
