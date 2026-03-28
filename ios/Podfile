@@ -42,10 +42,10 @@ post_install do |installer|
     next unless ['mobile_scanner', 'Pods-Runner', 'Pods-RunnerTests'].include?(target.name)
 
     target.build_configurations.each do |config|
-      # mobile_scanner and the generated Pods aggregate targets exclude arm64
-      # simulators upstream, which breaks Apple Silicon simulator builds with
-      # missing module / missing Pods_Runner.framework errors.
-      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'i386 armv7'
+      # mobile_scanner and the generated Pods aggregate targets need to avoid
+      # arm64 on simulators here because MLImage ships a device-only object
+      # slice that fails when the Apple Silicon simulator tries to link it.
+      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64 i386 armv7'
     end
   end
 end
