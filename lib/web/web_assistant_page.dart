@@ -17,3 +17,6 @@ import '../widgets/surface_card.dart';
 import 'web_focus_panel.dart';
 
 part 'web_assistant_page_core.part.dart';
+part 'web_assistant_page_chrome.part.dart';
+part 'web_assistant_page_workspace.part.dart';
+part 'web_assistant_page_helpers.part.dart';
