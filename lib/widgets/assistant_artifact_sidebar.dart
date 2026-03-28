@@ -114,36 +114,65 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        appText('当前任务工作路径', 'Current task workspace'),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: palette.textMuted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xxs),
                       Tooltip(
                         message: widget.workspaceRef.trim(),
-                        child: Row(
-                          children: [
-                            Icon(
-                              widget.workspaceRefKind ==
-                                      WorkspaceRefKind.objectStore
-                                  ? Icons.storage_rounded
-                                  : Icons.folder_open_rounded,
-                              size: 14,
-                              color: palette.textSecondary,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.xs,
+                            vertical: AppSpacing.xxs,
+                          ),
+                          decoration: BoxDecoration(
+                            color: palette.chromeSurface.withValues(
+                              alpha: 0.72,
                             ),
-                            const SizedBox(width: AppSpacing.xxs),
-                            Expanded(
-                              child: Text(
-                                _workspaceSummary(
-                                  widget.workspaceRef,
-                                  widget.workspaceRefKind,
-                                ),
-                                key: const Key(
-                                  'assistant-artifact-pane-workspace-ref',
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall?.copyWith(
+                            borderRadius: BorderRadius.circular(
+                              AppRadius.button,
+                            ),
+                            border: Border.all(color: palette.chromeStroke),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(top: 1),
+                                child: Icon(
+                                  widget.workspaceRefKind ==
+                                          WorkspaceRefKind.objectStore
+                                      ? Icons.storage_rounded
+                                      : Icons.folder_open_rounded,
+                                  size: 14,
                                   color: palette.textSecondary,
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: AppSpacing.xxs),
+                              Expanded(
+                                child: Text(
+                                  _workspaceSummary(
+                                    widget.workspaceRef,
+                                    widget.workspaceRefKind,
+                                  ),
+                                  key: const Key(
+                                    'assistant-artifact-pane-workspace-ref',
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: palette.textSecondary,
+                                    height: 1.25,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -382,20 +411,26 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
   static String _workspaceSummary(String workspaceRef, WorkspaceRefKind kind) {
     final trimmed = workspaceRef.trim();
     if (trimmed.isEmpty) {
-      return '';
+      return appText('未设置', 'Not set');
     }
     if (kind == WorkspaceRefKind.objectStore) {
       return trimmed.replaceFirst('object://thread/', '');
     }
+    if (kind == WorkspaceRefKind.remotePath) {
+      return trimmed;
+    }
     final normalized = trimmed.replaceAll('\\', '/');
+    if (normalized.length <= 56) {
+      return normalized;
+    }
     final segments = normalized
         .split('/')
         .where((item) => item.isNotEmpty)
         .toList();
-    if (segments.length <= 2) {
+    if (segments.length <= 4) {
       return normalized;
     }
-    return '${segments[segments.length - 2]}/${segments.last}';
+    return '.../${segments.sublist(segments.length - 4).join('/')}';
   }
 }
 
