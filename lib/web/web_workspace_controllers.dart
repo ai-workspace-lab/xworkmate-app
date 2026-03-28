@@ -20,7 +20,7 @@ class WebTasksController {
       failedInternal.length;
 
   void recompute({
-    required List<AssistantThreadRecord> threads,
+    required List<TaskThread> threads,
     required List<GatewayCronJobSummary> cronJobs,
     required String currentSessionKey,
     required Set<String> pendingSessionKeys,
@@ -89,7 +89,7 @@ class WebTasksController {
   }
 
   String statusForThreadInternal({
-    required AssistantThreadRecord thread,
+    required TaskThread thread,
     required String currentSessionKey,
     required Set<String> pendingSessionKeys,
   }) {
@@ -116,7 +116,7 @@ class WebTasksController {
     };
   }
 
-  String summaryForThreadInternal(AssistantThreadRecord thread) {
+  String summaryForThreadInternal(TaskThread thread) {
     final latest = thread.messages.isEmpty ? null : thread.messages.last;
     final text = latest?.text.trim() ?? '';
     if (text.isNotEmpty) {

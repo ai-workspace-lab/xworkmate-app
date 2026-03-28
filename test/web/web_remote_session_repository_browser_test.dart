@@ -43,8 +43,8 @@ void main() {
     () async {
       final requests = <http.BaseRequest>[];
       final bodies = <String>[];
-      final records = <AssistantThreadRecord>[
-        AssistantThreadRecord(
+      final records = <TaskThread>[
+        TaskThread(
           sessionKey: 'direct:1',
           messages: const <GatewayChatMessage>[
             GatewayChatMessage(

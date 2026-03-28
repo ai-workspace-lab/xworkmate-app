@@ -70,7 +70,7 @@ void registerAssistantPageSuiteSupportTestsInternal() {
 
 Future<AppController> createControllerWithThreadRecordsInternal({
   WidgetTester? tester,
-  required List<AssistantThreadRecord> records,
+  required List<TaskThread> records,
   bool useFakeGatewayRuntime = false,
   List<String>? singleAgentSharedSkillScanRootOverrides,
 }) async {
@@ -121,7 +121,7 @@ Future<AppController> createControllerWithThreadRecordsInternal({
       workspacePath: tempDirectory.path,
     ),
   );
-  await store.saveAssistantThreadRecords(records);
+  await store.saveTaskThreads(records);
   final controller = AppController(
     store: store,
     runtimeCoordinator: useFakeGatewayRuntime
@@ -210,8 +210,8 @@ class PendingSendAppControllerInternal extends AppController {
 class CaptureSendAppControllerInternal extends AppController {
   CaptureSendAppControllerInternal({
     required SecureConfigStore store,
-    RuntimeCoordinator? runtimeCoordinator,
-  }) : super(store: store, runtimeCoordinator: runtimeCoordinator);
+    super.runtimeCoordinator,
+  }) : super(store: store);
 
   int sendCallCount = 0;
   String lastSentMessage = '';

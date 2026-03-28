@@ -75,12 +75,12 @@ class SecureConfigStore {
     return _settingsStore.resolvedSettingsWatchDirectories();
   }
 
-  Future<List<AssistantThreadRecord>> loadAssistantThreadRecords() {
-    return _settingsStore.loadAssistantThreadRecords();
+  Future<List<TaskThread>> loadTaskThreads() {
+    return _settingsStore.loadTaskThreads();
   }
 
-  Future<void> saveAssistantThreadRecords(List<AssistantThreadRecord> records) {
-    return _settingsStore.saveAssistantThreadRecords(records);
+  Future<void> saveTaskThreads(List<TaskThread> records) {
+    return _settingsStore.saveTaskThreads(records);
   }
 
   Future<void> clearAssistantLocalState() {

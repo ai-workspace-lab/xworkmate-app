@@ -28,8 +28,8 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
           assistantCustomTaskTitles: const <String, String>{'main': '研发任务'},
           assistantLastSessionKey: 'main',
         );
-        const records = <AssistantThreadRecord>[
-          AssistantThreadRecord(
+        final records = <TaskThread>[
+          TaskThread(
             sessionKey: 'main',
             title: '研发任务',
             archived: true,
@@ -77,10 +77,10 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         ];
 
         await store.saveSettingsSnapshot(snapshot);
-        await store.saveAssistantThreadRecords(records);
+        await store.saveTaskThreads(records);
 
         final reloadedSnapshot = await store.loadSettingsSnapshot();
-        final reloadedRecords = await store.loadAssistantThreadRecords();
+        final reloadedRecords = await store.loadTaskThreads();
 
         expect(reloadedSnapshot.assistantArchivedTaskKeys, const <String>[
           'main',
@@ -130,8 +130,8 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
           accountUsername: 'backup-user',
           assistantLastSessionKey: 'draft:backup-1',
         );
-        const records = <AssistantThreadRecord>[
-          AssistantThreadRecord(
+        final records = <TaskThread>[
+          TaskThread(
             sessionKey: 'draft:backup-1',
             title: '备份线程',
             archived: false,
@@ -155,7 +155,7 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         ];
 
         await store.saveSettingsSnapshot(snapshot);
-        await store.saveAssistantThreadRecords(records);
+        await store.saveTaskThreads(records);
         final settingsFile = File(
           '${tempDirectory.path}/settings-snapshot.json',
         );
@@ -177,7 +177,7 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         );
         final recoveredSnapshot = await recoveredStore.loadSettingsSnapshot();
         final recoveredRecords = await recoveredStore
-            .loadAssistantThreadRecords();
+            .loadTaskThreads();
 
         expect(recoveredSnapshot.accountUsername, 'backup-user');
         expect(recoveredSnapshot.assistantLastSessionKey, 'draft:backup-1');
@@ -200,8 +200,8 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
           accountUsername: 'clear-me',
           assistantLastSessionKey: 'draft:clear-1',
         );
-        const records = <AssistantThreadRecord>[
-          AssistantThreadRecord(
+        final records = <TaskThread>[
+          TaskThread(
             sessionKey: 'draft:clear-1',
             title: '清理线程',
             archived: false,
@@ -213,29 +213,36 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         ];
 
         await store.saveSettingsSnapshot(snapshot);
-        await store.saveAssistantThreadRecords(records);
+        await store.saveTaskThreads(records);
         await store.saveGatewayToken('token-secret');
 
         await store.clearAssistantLocalState();
 
         final clearedSnapshot = await store.loadSettingsSnapshot();
-        final clearedRecords = await store.loadAssistantThreadRecords();
+        final clearedRecords = await store.loadTaskThreads();
+        final settingsFiles = await store.resolvedSettingsFiles();
 
         expect(
           clearedSnapshot.accountUsername,
-          SettingsSnapshot.defaults().accountUsername,
+          'clear-me',
         );
         expect(clearedSnapshot.assistantLastSessionKey, isEmpty);
         expect(clearedRecords, isEmpty);
         expect(await store.loadGatewayToken(), 'token-secret');
-        expect(
-          await File('${tempDirectory.path}/settings-snapshot.json').exists(),
-          isFalse,
-        );
-        expect(
-          await File('${tempDirectory.path}/assistant-threads.json').exists(),
-          isFalse,
-        );
+        expect(settingsFiles, isNotEmpty);
+        for (final file in settingsFiles) {
+          expect(await file.exists(), isTrue);
+        }
+
+        store.dispose();
+        final reloadedStore = createStoreFromTempDirectoryInternal(tempDirectory);
+        final reloadedSnapshot = await reloadedStore.loadSettingsSnapshot();
+        final reloadedRecords = await reloadedStore.loadTaskThreads();
+        expect(reloadedSnapshot.accountUsername, 'clear-me');
+        expect(reloadedSnapshot.assistantLastSessionKey, isEmpty);
+        expect(reloadedRecords, isEmpty);
+        expect(await reloadedStore.loadGatewayToken(), 'token-secret');
+        reloadedStore.dispose();
       },
     );
 

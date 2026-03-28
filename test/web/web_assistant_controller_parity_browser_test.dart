@@ -93,11 +93,11 @@ void main() {
       );
       expect(
         controller.assistantWorkspaceRefForSession(threadSingle),
-        'object://thread/$threadSingle',
+        controller.threadRecordsInternal[threadSingle]!.workspacePath,
       );
       expect(
         controller.assistantWorkspaceRefKindForSession(threadSingle),
-        WorkspaceRefKind.objectStore,
+        WorkspaceRefKind.remotePath,
       );
       expect(
         controller.singleAgentProviderForSession(threadSingle),
@@ -112,11 +112,11 @@ void main() {
       expect(controller.assistantModelForSession(threadLocal), 'local-model');
       expect(
         controller.assistantWorkspaceRefForSession(threadLocal),
-        'object://thread/$threadLocal',
+        controller.threadRecordsInternal[threadLocal]!.workspacePath,
       );
       expect(
         controller.assistantWorkspaceRefKindForSession(threadLocal),
-        WorkspaceRefKind.objectStore,
+        WorkspaceRefKind.remotePath,
       );
 
       expect(controller.isAssistantTaskArchived(threadRemote), isTrue);
@@ -142,11 +142,11 @@ void main() {
       );
       expect(
         reloaded.assistantWorkspaceRefForSession(threadSingle),
-        'object://thread/$threadSingle',
+        reloaded.threadRecordsInternal[threadSingle]!.workspacePath,
       );
       expect(
         reloaded.assistantWorkspaceRefKindForSession(threadSingle),
-        WorkspaceRefKind.objectStore,
+        WorkspaceRefKind.remotePath,
       );
       expect(
         reloaded.singleAgentProviderForSession(threadSingle),
@@ -160,11 +160,11 @@ void main() {
       expect(reloaded.assistantModelForSession(threadLocal), 'local-model');
       expect(
         reloaded.assistantWorkspaceRefForSession(threadRemote),
-        'object://thread/$threadRemote',
+        reloaded.threadRecordsInternal[threadRemote]!.workspacePath,
       );
       expect(
         reloaded.assistantWorkspaceRefKindForSession(threadRemote),
-        WorkspaceRefKind.objectStore,
+        WorkspaceRefKind.remotePath,
       );
       expect(reloaded.isAssistantTaskArchived(threadRemote), isTrue);
 
@@ -519,7 +519,6 @@ class _FakeAcpClient extends WebAcpClient {
       singleAgent: true,
       multiAgent: true,
       providers: <SingleAgentProvider>{
-        SingleAgentProvider.opencode,
         SingleAgentProvider.opencode,
         SingleAgentProvider.claude,
         SingleAgentProvider.gemini,

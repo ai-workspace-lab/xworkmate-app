@@ -93,7 +93,7 @@ extension AppControllerWebGatewayRelay on AppController {
     for (final session in sessions) {
       final sessionKey = normalizedSessionKeyInternal(session.key);
       final existing = threadRecordsInternal[sessionKey];
-      final next = AssistantThreadRecord(
+      final next = TaskThread(
         sessionKey: sessionKey,
         messages: existing?.messages ?? const <GatewayChatMessage>[],
         updatedAtMs:
@@ -114,13 +114,12 @@ extension AppControllerWebGatewayRelay on AppController {
         gatewayEntryState:
             existing?.gatewayEntryState ??
             gatewayEntryStateForTargetInternal(target),
-        workspaceRef: existing?.workspaceRef.trim().isNotEmpty == true
-            ? existing!.workspaceRef
-            : defaultWorkspaceRefForSessionInternal(sessionKey),
-        workspaceRefKind:
-            existing?.workspaceRefKind ?? WorkspaceRefKind.objectStore,
       );
       threadRecordsInternal[sessionKey] = next;
+      await ensureWebTaskThreadBindingInternal(
+        sessionKey,
+        executionTarget: next.executionTarget,
+      );
     }
     await persistThreadsInternal();
     recomputeDerivedWorkspaceStateInternal();
@@ -214,6 +213,10 @@ extension AppControllerWebGatewayRelay on AppController {
           gatewayEntryStateForTargetInternal(target),
     );
     threadRecordsInternal[resolvedKey] = next;
+    await ensureWebTaskThreadBindingInternal(
+      resolvedKey,
+      executionTarget: next.executionTarget,
+    );
     streamingTextBySessionInternal.remove(resolvedKey);
     await persistThreadsInternal();
     recomputeDerivedWorkspaceStateInternal();

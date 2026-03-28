@@ -272,8 +272,8 @@ class AppController extends ChangeNotifier {
       const <SingleAgentProvider, DirectSingleAgentCapabilities>{};
   final Map<String, List<GatewayChatMessage>> assistantThreadMessagesInternal =
       <String, List<GatewayChatMessage>>{};
-  final Map<String, AssistantThreadRecord> assistantThreadRecordsInternal =
-      <String, AssistantThreadRecord>{};
+  final Map<String, TaskThread> assistantThreadRecordsInternal =
+      <String, TaskThread>{};
   final Map<String, List<GatewayChatMessage>> localSessionMessagesInternal =
       <String, List<GatewayChatMessage>>{};
   final Map<String, List<GatewayChatMessage>> gatewayHistoryCacheInternal =

@@ -52,11 +52,12 @@ class SettingsStore {
   List<File> _settingsFiles = const <File>[];
   List<Directory> _settingsWatchDirectories = const <Directory>[];
   SettingsSnapshot _settingsSnapshot = SettingsSnapshot.defaults();
-  List<AssistantThreadRecord> _threadRecords = const <AssistantThreadRecord>[];
+  List<TaskThread> _threadRecords = const <TaskThread>[];
   List<SecretAuditEntry> _auditTrail = const <SecretAuditEntry>[];
   PersistentWriteFailure? _settingsWriteFailure;
   PersistentWriteFailure? _tasksWriteFailure;
   PersistentWriteFailure? _auditWriteFailure;
+  bool _taskThreadStateResetRequired = false;
 
   PersistentWriteFailure? get settingsWriteFailure => _settingsWriteFailure;
   PersistentWriteFailure? get tasksWriteFailure => _tasksWriteFailure;
@@ -80,7 +81,33 @@ class SettingsStore {
       return;
     }
     _settingsSnapshot = await _readSettingsSnapshot();
-    _threadRecords = await _readAssistantThreadRecords();
+    _threadRecords = await _readTaskThreads();
+    if (_taskThreadStateResetRequired) {
+      _settingsSnapshot = _settingsSnapshot.copyWith(
+        assistantCustomTaskTitles: const <String, String>{},
+        assistantArchivedTaskKeys: const <String>[],
+        assistantLastSessionKey: '',
+      );
+      final layout = _layout;
+      if (layout != null) {
+        try {
+          final contents = encodeYamlDocument(_settingsSnapshot.toJson());
+          for (final file
+              in _settingsFiles.isEmpty
+                  ? <File>[layout.settingsFile]
+                  : _settingsFiles) {
+            await atomicWriteString(file, contents);
+          }
+          _settingsWriteFailure = null;
+        } catch (error) {
+          _settingsWriteFailure = _buildWriteFailure(
+            PersistentStoreScope.settings,
+            'resetTaskThreadState',
+            error,
+          );
+        }
+      }
+    }
     _auditTrail = await _readAuditTrail();
   }
 
@@ -150,13 +177,13 @@ class SettingsStore {
     }
   }
 
-  Future<List<AssistantThreadRecord>> loadAssistantThreadRecords() async {
+  Future<List<TaskThread>> loadTaskThreads() async {
     await initialize();
-    return List<AssistantThreadRecord>.from(_threadRecords);
+    return List<TaskThread>.from(_threadRecords);
   }
 
-  Future<void> saveAssistantThreadRecords(
-    List<AssistantThreadRecord> records,
+  Future<void> saveTaskThreads(
+    List<TaskThread> records,
   ) async {
     await initialize();
     final normalized = records
@@ -167,7 +194,7 @@ class SettingsStore {
     if (layout == null) {
       _tasksWriteFailure = _buildWriteFailure(
         PersistentStoreScope.tasks,
-        'saveAssistantThreadRecords',
+        'saveTaskThreads',
         StateError('Persistent task path unavailable; using memory only.'),
       );
       return;
@@ -182,7 +209,7 @@ class SettingsStore {
       await atomicWriteString(
         layout.taskIndexFile,
         jsonEncode(<String, dynamic>{
-          'version': 1,
+          'version': taskThreadSchemaVersion,
           'sessions': normalized
               .map((item) => item.sessionKey)
               .toList(growable: false),
@@ -206,7 +233,7 @@ class SettingsStore {
     } catch (error) {
       _tasksWriteFailure = _buildWriteFailure(
         PersistentStoreScope.tasks,
-        'saveAssistantThreadRecords',
+        'saveTaskThreads',
         error,
       );
     }
@@ -214,8 +241,13 @@ class SettingsStore {
 
   Future<void> clearAssistantLocalState() async {
     await initialize();
-    _settingsSnapshot = SettingsSnapshot.defaults();
-    _threadRecords = const <AssistantThreadRecord>[];
+    final nextSnapshot = _settingsSnapshot.copyWith(
+      assistantCustomTaskTitles: const <String, String>{},
+      assistantArchivedTaskKeys: const <String>[],
+      assistantLastSessionKey: '',
+    );
+    _settingsSnapshot = nextSnapshot;
+    _threadRecords = const <TaskThread>[];
     final layout = _layout;
     if (layout == null) {
       _settingsWriteFailure = _buildWriteFailure(
@@ -237,7 +269,7 @@ class SettingsStore {
           ? <File>[layout.settingsFile]
           : _settingsFiles;
       for (final file in settingsFiles) {
-        await deleteIfExists(file);
+        await atomicWriteString(file, encodeYamlDocument(nextSnapshot.toJson()));
       }
       _settingsWriteFailure = null;
     } catch (error) {
@@ -382,13 +414,20 @@ class SettingsStore {
     return List<Directory>.unmodifiable(directories);
   }
 
-  Future<List<AssistantThreadRecord>> _readAssistantThreadRecords() async {
+  Future<List<TaskThread>> _readTaskThreads() async {
     final layout = _layout;
     if (layout == null) {
-      return const <AssistantThreadRecord>[];
+      return const <TaskThread>[];
     }
-    final orderedKeys = await _readThreadIndex(layout);
-    final recordsByKey = <String, AssistantThreadRecord>{};
+    final index = await _readThreadIndex(layout);
+    if (index.resetRequired) {
+      await _resetTaskThreadState(layout);
+      _taskThreadStateResetRequired = true;
+      return const <TaskThread>[];
+    }
+    _taskThreadStateResetRequired = false;
+    final orderedKeys = index.sessions;
+    final recordsByKey = <String, TaskThread>{};
     try {
       await for (final entity in layout.tasksDirectory.list()) {
         if (entity is! File ||
@@ -400,7 +439,14 @@ class SettingsStore {
           final raw = await entity.readAsString();
           final decoded = jsonDecode(raw);
           if (decoded is Map<String, dynamic>) {
-            final record = AssistantThreadRecord.fromJson(decoded);
+            final schemaVersion = decoded['schemaVersion'];
+            if (schemaVersion is! int ||
+                schemaVersion != taskThreadSchemaVersion) {
+              await _resetTaskThreadState(layout);
+              _taskThreadStateResetRequired = true;
+              return const <TaskThread>[];
+            }
+            final record = TaskThread.fromJson(decoded);
             if (record.sessionKey.trim().isNotEmpty) {
               recordsByKey[record.sessionKey] = record;
             }
@@ -410,9 +456,9 @@ class SettingsStore {
         }
       }
     } catch (_) {
-      return const <AssistantThreadRecord>[];
+      return const <TaskThread>[];
     }
-    final ordered = <AssistantThreadRecord>[];
+    final ordered = <TaskThread>[];
     for (final sessionKey in orderedKeys) {
       final record = recordsByKey.remove(sessionKey);
       if (record != null) {
@@ -429,24 +475,53 @@ class SettingsStore {
     return ordered;
   }
 
-  Future<List<String>> _readThreadIndex(StoreLayout layout) async {
+  Future<_ThreadIndexReadResult> _readThreadIndex(StoreLayout layout) async {
     if (!await layout.taskIndexFile.exists()) {
-      return const <String>[];
+      return const _ThreadIndexReadResult(
+        sessions: <String>[],
+        resetRequired: false,
+      );
     }
     try {
       final raw = await layout.taskIndexFile.readAsString();
       final decoded = jsonDecode(raw);
       if (decoded is Map<String, dynamic>) {
+        final version = decoded['version'];
+        if (version is! int || version != taskThreadSchemaVersion) {
+          return const _ThreadIndexReadResult(
+            sessions: <String>[],
+            resetRequired: true,
+          );
+        }
         final sessions = decoded['sessions'];
         if (sessions is List) {
-          return sessions
-              .map((item) => item.toString().trim())
-              .where((item) => item.isNotEmpty)
-              .toList(growable: false);
+          return _ThreadIndexReadResult(
+            sessions: sessions
+                .map((item) => item.toString().trim())
+                .where((item) => item.isNotEmpty)
+                .toList(growable: false),
+            resetRequired: false,
+          );
         }
       }
     } catch (_) {}
-    return const <String>[];
+    return const _ThreadIndexReadResult(
+      sessions: <String>[],
+      resetRequired: true,
+    );
+  }
+
+  Future<void> _resetTaskThreadState(StoreLayout layout) async {
+    try {
+      await deleteIfExists(layout.taskIndexFile);
+      await for (final entity in layout.tasksDirectory.list()) {
+        if (entity is File && entity.path.endsWith('.json')) {
+          await entity.delete();
+        }
+      }
+    } catch (_) {
+      // Best effort. A later save will normalize the directory.
+    }
   }
 
   Future<List<SecretAuditEntry>> _readAuditTrail() async {
@@ -481,4 +556,14 @@ class SettingsStore {
       timestampMs: DateTime.now().millisecondsSinceEpoch,
     );
   }
+}
+
+class _ThreadIndexReadResult {
+  const _ThreadIndexReadResult({
+    required this.sessions,
+    required this.resetRequired,
+  });
+
+  final List<String> sessions;
+  final bool resetRequired;
 }

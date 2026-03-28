@@ -305,8 +305,8 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
           ),
         );
-        await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
-          AssistantThreadRecord(
+        await store.saveTaskThreads(<TaskThread>[
+          TaskThread(
             sessionKey: 'main',
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,

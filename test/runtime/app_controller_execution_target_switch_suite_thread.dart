@@ -255,7 +255,7 @@ void registerExecutionTargetSwitchThreadTests() {
         AssistantMessageViewMode.raw,
       );
 
-      final reloaded = await store.loadAssistantThreadRecords();
+      final reloaded = await store.loadTaskThreads();
       final secondary = reloaded.firstWhere(
         (item) => item.sessionKey == 'draft:secondary',
       );
@@ -388,7 +388,7 @@ void registerExecutionTargetSwitchThreadTests() {
         );
         final reloadedSnapshot = await reloadedStore.loadSettingsSnapshot();
         final reloadedThreads = await reloadedStore
-            .loadAssistantThreadRecords();
+            .loadTaskThreads();
 
         expect(
           reloadedSnapshot.accountUsername,

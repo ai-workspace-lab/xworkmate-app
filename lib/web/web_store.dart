@@ -35,34 +35,66 @@ class WebStore {
     await _prefs!.setString(settingsKey, snapshot.toJsonString());
   }
 
-  Future<List<AssistantThreadRecord>> loadAssistantThreadRecords() async {
+  Future<List<TaskThread>> loadTaskThreads() async {
     await initialize();
     final raw = _prefs!.getString(threadsKey);
     if (raw == null || raw.trim().isEmpty) {
-      return const <AssistantThreadRecord>[];
+      return const <TaskThread>[];
     }
     try {
-      final decoded = jsonDecode(raw) as List<dynamic>;
-      return decoded
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        await clearTaskThreadState();
+        return const <TaskThread>[];
+      }
+      if (decoded is! Map<String, dynamic>) {
+        await clearTaskThreadState();
+        return const <TaskThread>[];
+      }
+      final version = decoded['version'];
+      if (version is! int || version != taskThreadSchemaVersion) {
+        await clearTaskThreadState();
+        return const <TaskThread>[];
+      }
+      final threads = decoded['threads'];
+      if (threads is! List) {
+        await clearTaskThreadState();
+        return const <TaskThread>[];
+      }
+      return threads
           .whereType<Map>()
-          .map(
-            (item) =>
-                AssistantThreadRecord.fromJson(item.cast<String, dynamic>()),
-          )
+          .map((item) => TaskThread.fromJson(item.cast<String, dynamic>()))
           .toList(growable: false);
     } catch (_) {
-      return const <AssistantThreadRecord>[];
+      await clearTaskThreadState();
+      return const <TaskThread>[];
     }
   }
 
-  Future<void> saveAssistantThreadRecords(
-    List<AssistantThreadRecord> records,
+  Future<void> saveTaskThreads(
+    List<TaskThread> records,
   ) async {
     await initialize();
     await _prefs!.setString(
       threadsKey,
-      jsonEncode(records.map((item) => item.toJson()).toList(growable: false)),
+      jsonEncode(<String, dynamic>{
+        'version': taskThreadSchemaVersion,
+        'threads': records.map((item) => item.toJson()).toList(growable: false),
+      }),
     );
+  }
+
+  Future<void> clearTaskThreadState() async {
+    await initialize();
+    await _prefs!.remove(threadsKey);
+    final nextSettings = SettingsSnapshot.fromJsonString(
+      _prefs!.getString(settingsKey),
+    ).copyWith(
+      assistantCustomTaskTitles: const <String, String>{},
+      assistantArchivedTaskKeys: const <String>[],
+      assistantLastSessionKey: '',
+    );
+    await _prefs!.setString(settingsKey, nextSettings.toJsonString());
   }
 
   Future<String> loadAiGatewayApiKey() async {

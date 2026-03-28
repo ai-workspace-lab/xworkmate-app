@@ -251,8 +251,8 @@ void registerAssistantPageSuiteComposerTestsInternal() {
         await Directory(
           '${tempDirectory.path}/thread-task',
         ).create(recursive: true);
-        await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
-          AssistantThreadRecord(
+        await store.saveTaskThreads(<TaskThread>[
+          TaskThread(
             sessionKey: 'main',
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,
@@ -263,7 +263,7 @@ void registerAssistantPageSuiteComposerTestsInternal() {
             workspaceRef: '${tempDirectory.path}/thread-main',
             workspaceRefKind: WorkspaceRefKind.localPath,
           ),
-          AssistantThreadRecord(
+          TaskThread(
             sessionKey: 'draft:artifact-thread',
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 2,
@@ -368,7 +368,7 @@ void registerAssistantPageSuiteComposerTestsInternal() {
         );
 
         controller = await createControllerWithThreadRecordsInternal(
-          records: const <AssistantThreadRecord>[],
+          records: <TaskThread>[],
           useFakeGatewayRuntime: true,
           singleAgentSharedSkillScanRootOverrides: <String>[
             agentsRoot.path,
@@ -743,7 +743,7 @@ void registerAssistantPageSuiteComposerTestsInternal() {
     'AssistantPage syncs task selection with execution target menu and connection chip',
     (WidgetTester tester) async {
       final controller = await createControllerWithThreadRecordsInternal(
-        records: const <AssistantThreadRecord>[],
+        records: <TaskThread>[],
         useFakeGatewayRuntime: true,
       );
       addTearDown(controller.dispose);
@@ -820,8 +820,8 @@ void registerAssistantPageSuiteComposerTestsInternal() {
     'AssistantPage keeps attached files and execution context collapsed by default',
     (WidgetTester tester) async {
       final controller = await createControllerWithThreadRecordsInternal(
-        records: const <AssistantThreadRecord>[
-          AssistantThreadRecord(
+        records: <TaskThread>[
+          TaskThread(
             sessionKey: 'main',
             title: '研发任务',
             archived: false,
@@ -934,8 +934,8 @@ void registerAssistantPageSuiteComposerTestsInternal() {
     WidgetTester tester,
   ) async {
     final controller = await createControllerWithThreadRecordsInternal(
-      records: const <AssistantThreadRecord>[
-        AssistantThreadRecord(
+      records: <TaskThread>[
+        TaskThread(
           sessionKey: 'main',
           title: '研发任务',
           archived: false,

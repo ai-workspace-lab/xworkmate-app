@@ -37,7 +37,7 @@ void registerSecureConfigStoreSuiteCompatibilityTestsInternal() {
         );
 
         final loadedSnapshot = await firstStore.loadSettingsSnapshot();
-        final loadedThreads = await firstStore.loadAssistantThreadRecords();
+        final loadedThreads = await firstStore.loadTaskThreads();
 
         expect(
           loadedSnapshot.accountUsername,
@@ -56,8 +56,8 @@ void registerSecureConfigStoreSuiteCompatibilityTestsInternal() {
           accountUsername: 'legacy-user',
           assistantLastSessionKey: 'draft:legacy-1',
         );
-        const legacyRecords = <AssistantThreadRecord>[
-          AssistantThreadRecord(
+        final legacyRecords = <TaskThread>[
+          TaskThread(
             sessionKey: 'draft:legacy-1',
             title: 'Legacy thread',
             archived: false,
@@ -96,7 +96,7 @@ void registerSecureConfigStoreSuiteCompatibilityTestsInternal() {
           fallbackDirectoryPathResolver: () async => tempDirectory.path,
         );
         final loadedSnapshot = await store.loadSettingsSnapshot();
-        final loadedThreads = await store.loadAssistantThreadRecords();
+        final loadedThreads = await store.loadTaskThreads();
 
         expect(
           loadedSnapshot.accountUsername,
@@ -138,7 +138,7 @@ void registerSecureConfigStoreSuiteCompatibilityTestsInternal() {
           fallbackDirectoryPathResolver: () async => tempDirectory.path,
         );
         final loadedSnapshot = await store.loadSettingsSnapshot();
-        final loadedThreads = await store.loadAssistantThreadRecords();
+        final loadedThreads = await store.loadTaskThreads();
 
         expect(
           loadedSnapshot.accountUsername,
@@ -196,73 +196,111 @@ void registerSecureConfigStoreSuiteCompatibilityTestsInternal() {
       },
     );
 
-    test(
-      'AssistantThreadRecord keeps compatibility with legacy json payloads',
-      () {
-        final decoded = AssistantThreadRecord.fromJson(<String, dynamic>{
-          'sessionKey': 'legacy-thread',
-          'messages': const <Object>[],
-          'updatedAtMs': 1700000000000,
-          'title': 'Legacy',
-          'archived': false,
-          'executionTarget': 'aiGatewayOnly',
-          'messageViewMode': 'rendered',
-          'discoveredSkills': const <Object>[
-            <String, Object?>{
-              'key': '/tmp/legacy-discovered-skill',
-              'label': 'Legacy Discovered Skill',
-            },
-          ],
-          'singleAgentProvider': 'gemini',
-          'gatewayEntryState': 'ai-gateway-only',
-        });
-
-        expect(decoded.executionTarget, AssistantExecutionTarget.singleAgent);
-        expect(decoded.importedSkills, isEmpty);
-        expect(decoded.selectedSkillKeys, isEmpty);
-        expect(decoded.assistantModelId, isEmpty);
-        expect(decoded.singleAgentProvider, SingleAgentProvider.gemini);
-        expect(decoded.gatewayEntryState, 'single-agent');
-        expect(decoded.workspaceRef, isEmpty);
-        expect(decoded.workspaceRefKind, WorkspaceRefKind.localPath);
-      },
-    );
-
-    test('AssistantThreadRecord round-trips workspaceRef fields', () {
-      const record = AssistantThreadRecord(
-        sessionKey: 'thread-1',
-        messages: <GatewayChatMessage>[],
-        updatedAtMs: 1700000000000,
+    test('TaskThread round-trips structured bindings', () {
+      final record = TaskThread(
+        threadId: 'thread-1',
         title: 'Thread 1',
-        archived: false,
-        executionTarget: AssistantExecutionTarget.remote,
-        messageViewMode: AssistantMessageViewMode.rendered,
-        workspaceRef: 'object://thread/thread-1',
-        workspaceRefKind: WorkspaceRefKind.objectStore,
+        ownerScope: const ThreadOwnerScope(
+          realm: ThreadRealm.remote,
+          subjectType: ThreadSubjectType.user,
+          subjectId: 'user-1',
+          displayName: 'User 1',
+        ),
+        workspaceBinding: const WorkspaceBinding(
+          workspaceId: 'workspace-1',
+          workspaceKind: WorkspaceKind.remoteFs,
+          workspacePath: '/owners/remote/user/user-1/threads/thread-1',
+          displayPath: '/owners/remote/user/user-1/threads/thread-1',
+          writable: true,
+        ),
+        executionBinding: const ExecutionBinding(
+          executionMode: ThreadExecutionMode.gatewayRemote,
+          executorId: 'gateway',
+          providerId: 'gateway',
+          endpointId: 'remote',
+        ),
+        contextState: const ThreadContextState(
+          messages: <GatewayChatMessage>[],
+          selectedModelId: 'gpt-5.4',
+          selectedSkillKeys: <String>['skill.a'],
+          importedSkills: <AssistantThreadSkillEntry>[],
+          permissionLevel: AssistantPermissionLevel.defaultAccess,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          latestResolvedRuntimeModel: 'gpt-5.4',
+        ),
+        lifecycleState: const ThreadLifecycleState(
+          archived: false,
+          status: 'ready',
+          lastRunAtMs: 1700000000000,
+          lastResultCode: 'ok',
+        ),
+        createdAtMs: 1700000000000,
+        updatedAtMs: 1700000001000,
       );
 
-      final decoded = AssistantThreadRecord.fromJson(record.toJson());
+      final decoded = TaskThread.fromJson(record.toJson());
 
-      expect(decoded.workspaceRef, 'object://thread/thread-1');
-      expect(decoded.workspaceRefKind, WorkspaceRefKind.objectStore);
+      expect(decoded.threadId, 'thread-1');
+      expect(decoded.ownerScope.subjectId, 'user-1');
+      expect(
+        decoded.workspaceBinding.workspacePath,
+        '/owners/remote/user/user-1/threads/thread-1',
+      );
+      expect(decoded.workspaceBinding.workspaceKind, WorkspaceKind.remoteFs);
+      expect(
+        decoded.executionBinding.executionMode,
+        ThreadExecutionMode.gatewayRemote,
+      );
+      expect(decoded.contextState.selectedModelId, 'gpt-5.4');
+      expect(decoded.lifecycleState.status, 'ready');
     });
 
-    test(
-      'AssistantThreadRecord infers objectStore kind from legacy workspace ref',
-      () {
-        final decoded = AssistantThreadRecord.fromJson(<String, dynamic>{
-          'sessionKey': 'thread-legacy',
-          'messages': const <Object>[],
-          'updatedAtMs': 1700000000000,
-          'title': 'Legacy Object Thread',
-          'archived': false,
-          'executionTarget': 'remote',
+    test('TaskThread defaults lifecycle status to needs_workspace', () {
+      final decoded = TaskThread.fromJson(<String, dynamic>{
+        'schemaVersion': taskThreadSchemaVersion,
+        'threadId': 'thread-legacy',
+        'title': 'Needs Workspace',
+        'ownerScope': const <String, Object?>{
+          'realm': 'local',
+          'subjectType': 'user',
+          'subjectId': 'device-1',
+          'displayName': 'device-1',
+        },
+        'workspaceBinding': const <String, Object?>{
+          'workspaceId': 'thread-legacy',
+          'workspaceKind': 'localFs',
+          'workspacePath': '',
+          'displayPath': '',
+          'writable': true,
+        },
+        'executionBinding': const <String, Object?>{
+          'executionMode': 'localAgent',
+          'executorId': 'auto',
+          'providerId': 'auto',
+          'endpointId': '',
+        },
+        'contextState': const <String, Object?>{
+          'messages': <Object>[],
+          'selectedModelId': '',
+          'selectedSkillKeys': <Object>[],
+          'importedSkills': <Object>[],
+          'permissionLevel': 'defaultAccess',
           'messageViewMode': 'rendered',
-          'workspaceRef': 'object://thread/thread-legacy',
-        });
+          'latestResolvedRuntimeModel': '',
+        },
+        'lifecycleState': const <String, Object?>{
+          'archived': false,
+          'status': 'needs_workspace',
+          'lastRunAtMs': null,
+          'lastResultCode': null,
+        },
+        'createdAtMs': 1700000000000,
+        'updatedAtMs': 1700000000000,
+      });
 
-        expect(decoded.workspaceRefKind, WorkspaceRefKind.objectStore);
-      },
-    );
+      expect(decoded.workspaceRef, isEmpty);
+      expect(decoded.workspaceKind, WorkspaceKind.localFs);
+      expect(decoded.lifecycleState.status, 'needs_workspace');
+    });
   });
 }

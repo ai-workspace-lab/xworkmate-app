@@ -39,6 +39,7 @@ import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
 import 'app_controller_desktop_single_agent.dart';
+import 'app_controller_desktop_thread_binding.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_actions.dart';
 import 'app_controller_desktop_settings_runtime.dart';
@@ -59,12 +60,12 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         settings.assistantExecutionTarget == resolvedTarget) {
       return;
     }
-    upsertAssistantThreadRecordInternal(
+    upsertTaskThreadInternal(
       sessionsControllerInternal.currentSessionKey,
       executionTarget: resolvedTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
-    syncAssistantWorkspaceRefForSessionInternal(
+    await ensureDesktopTaskThreadBindingInternal(
       sessionsControllerInternal.currentSessionKey,
       executionTarget: resolvedTarget,
     );
@@ -91,7 +92,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       return;
     }
     singleAgentRuntimeModelBySessionInternal.remove(sessionKey);
-    upsertAssistantThreadRecordInternal(
+    upsertTaskThreadInternal(
       sessionKey,
       singleAgentProvider: sanitizedProvider,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
@@ -114,7 +115,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     if (assistantMessageViewModeForSession(sessionKey) == mode) {
       return;
     }
-    upsertAssistantThreadRecordInternal(
+    upsertTaskThreadInternal(
       sessionKey,
       messageViewMode: mode,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
@@ -236,7 +237,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         trimmed) {
       return;
     }
-    upsertAssistantThreadRecordInternal(
+    upsertTaskThreadInternal(
       normalizedSessionKey,
       assistantModelId: trimmed,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
@@ -271,7 +272,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     final resolvedTarget =
         executionTarget ??
         assistantExecutionTargetForSession(currentSessionKey);
-    upsertAssistantThreadRecordInternal(
+    upsertTaskThreadInternal(
       normalizedSessionKey,
       title: title.trim(),
       executionTarget: resolvedTarget,
@@ -281,11 +282,13 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       singleAgentProvider:
           singleAgentProvider ??
           singleAgentProviderForSession(currentSessionKey),
-      workspaceRef: defaultWorkspaceRefForSessionInternal(normalizedSessionKey),
-      workspaceRefKind: defaultWorkspaceRefKindForTargetInternal(
-        resolvedTarget,
-      ),
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    unawaited(
+      ensureDesktopTaskThreadBindingInternal(
+        normalizedSessionKey,
+        executionTarget: resolvedTarget,
+      ),
     );
     unawaited(persistAssistantLastSessionKeyInternal(normalizedSessionKey));
     notifyIfActiveInternal();
@@ -312,6 +315,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       );
       return;
     }
+    await replaceSingleAgentThreadSkillsInternal(normalizedSessionKey, localSkills);
     try {
       await refreshAcpCapabilitiesInternal();
       final response = await gatewayAcpClientInternal.request(
@@ -388,7 +392,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     } else {
       nextSelected.add(normalizedSkillKey);
     }
-    upsertAssistantThreadRecordInternal(
+    upsertTaskThreadInternal(
       normalizedSessionKey,
       selectedSkillKeys: nextSelected,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
@@ -422,7 +426,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       settings.copyWith(assistantCustomTaskTitles: next),
       refreshAfterSave: false,
     );
-    upsertAssistantThreadRecordInternal(
+    upsertTaskThreadInternal(
       normalizedSessionKey,
       title: normalizedTitle,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
@@ -478,7 +482,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         }).catchError((_) {}),
       );
     }
-    upsertAssistantThreadRecordInternal(
+    upsertTaskThreadInternal(
       normalizedSessionKey,
       archived: archived,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),

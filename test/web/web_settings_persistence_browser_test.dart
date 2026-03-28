@@ -16,7 +16,7 @@ void main() {
     'web controller persists single-agent and relay configuration',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final remoteRecords = <AssistantThreadRecord>[];
+      final remoteRecords = <TaskThread>[];
 
       final controller = AppController(
         store: WebStore(),
@@ -118,7 +118,7 @@ void main() {
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final store = WebStore();
-      final remoteRecords = <AssistantThreadRecord>[];
+      final remoteRecords = <TaskThread>[];
 
       await store.initialize();
       await store.saveSettingsSnapshot(
@@ -129,8 +129,8 @@ void main() {
           ),
         ),
       );
-      await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
-        AssistantThreadRecord(
+      await store.saveTaskThreads(<TaskThread>[
+        TaskThread(
           sessionKey: 'direct:stale-browser-cache',
           messages: const <GatewayChatMessage>[],
           updatedAtMs: 1,
@@ -169,15 +169,15 @@ void main() {
 class MemoryRemoteSessionRepositoryInternal implements WebSessionRepository {
   MemoryRemoteSessionRepositoryInternal(this.recordsInternal);
 
-  final List<AssistantThreadRecord> recordsInternal;
+  final List<TaskThread> recordsInternal;
 
   @override
-  Future<List<AssistantThreadRecord>> loadThreadRecords() async {
-    return List<AssistantThreadRecord>.from(recordsInternal, growable: false);
+  Future<List<TaskThread>> loadThreadRecords() async {
+    return List<TaskThread>.from(recordsInternal, growable: false);
   }
 
   @override
-  Future<void> saveThreadRecords(List<AssistantThreadRecord> records) async {
+  Future<void> saveThreadRecords(List<TaskThread> records) async {
     recordsInternal
       ..clear()
       ..addAll(records);

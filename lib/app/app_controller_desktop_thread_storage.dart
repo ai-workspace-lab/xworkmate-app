@@ -264,7 +264,7 @@ extension AppControllerDesktopThreadStorage on AppController {
       assistantThreadMessagesInternal[key] ?? const <GatewayChatMessage>[],
     )..add(message);
     assistantThreadMessagesInternal[key] = next;
-    upsertAssistantThreadRecordInternal(
+    upsertTaskThreadInternal(
       key,
       messages: next,
       updatedAtMs:
@@ -334,7 +334,7 @@ extension AppControllerDesktopThreadStorage on AppController {
 
   GatewaySessionSummary assistantSessionSummaryForInternal(
     String sessionKey, {
-    AssistantThreadRecord? record,
+    TaskThread? record,
   }) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -638,7 +638,7 @@ extension AppControllerDesktopThreadStorage on AppController {
     );
   }
 
-  void restoreAssistantThreadsInternal(List<AssistantThreadRecord> records) {
+  void restoreAssistantThreadsInternal(List<TaskThread> records) {
     assistantThreadRecordsInternal.clear();
     assistantThreadMessagesInternal.clear();
     singleAgentSharedImportedSkillsInternal =
@@ -655,19 +655,13 @@ extension AppControllerDesktopThreadStorage on AppController {
         continue;
       }
       final titleFromSettings = assistantCustomTaskTitle(sessionKey);
-      final shouldMigrateWorkspaceRef = shouldMigrateWorkspaceRefInternal(
-        sessionKey,
-        workspaceRef: record.workspaceRef,
-        workspaceRefKind: record.workspaceRefKind,
-      );
       final normalizedRecord = record.copyWith(
         sessionKey: sessionKey,
         title: titleFromSettings.isEmpty
             ? record.title.trim()
             : titleFromSettings,
         archived: record.archived || archivedKeys.contains(sessionKey),
-        executionTarget:
-            record.executionTarget ?? settings.assistantExecutionTarget,
+        executionTarget: record.executionTarget,
         messageViewMode: record.messageViewMode,
         selectedSkillKeys: record.selectedSkillKeys
             .where(
@@ -676,23 +670,23 @@ extension AppControllerDesktopThreadStorage on AppController {
             .toList(growable: false),
         assistantModelId: record.assistantModelId.trim().isEmpty
             ? resolvedAssistantModelForTargetInternal(
-                record.executionTarget ?? settings.assistantExecutionTarget,
+                record.executionTarget,
               )
             : record.assistantModelId.trim(),
         singleAgentProvider: record.singleAgentProvider,
         gatewayEntryState: (record.gatewayEntryState ?? '').trim().isEmpty
             ? gatewayEntryStateForTargetInternal(
-                record.executionTarget ?? settings.assistantExecutionTarget,
+                record.executionTarget,
               )
             : record.gatewayEntryState,
-        workspaceRef: shouldMigrateWorkspaceRef
-            ? defaultWorkspaceRefForSessionInternal(sessionKey)
-            : record.workspaceRef.trim(),
-        workspaceRefKind: shouldMigrateWorkspaceRef
-            ? defaultWorkspaceRefKindForTargetInternal(
-                record.executionTarget ?? settings.assistantExecutionTarget,
-              )
-            : record.workspaceRefKind,
+        workspacePath: record.workspacePath.trim(),
+        displayPath: record.displayPath.trim().isEmpty
+            ? record.workspacePath.trim()
+            : record.displayPath.trim(),
+        workspaceKind: record.workspaceKind,
+        lifecycleStatus: record.workspacePath.trim().isEmpty
+            ? 'needs_workspace'
+            : record.lifecycleState.status,
       );
       assistantThreadRecordsInternal[sessionKey] = normalizedRecord;
       if (normalizedRecord.messages.isNotEmpty) {

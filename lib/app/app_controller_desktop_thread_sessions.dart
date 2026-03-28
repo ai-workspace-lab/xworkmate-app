@@ -123,14 +123,11 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final recordRef =
-        assistantThreadRecordsInternal[normalizedSessionKey]?.workspaceRef
+    return assistantThreadRecordsInternal[normalizedSessionKey]
+            ?.workspaceBinding
+            .workspacePath
             .trim() ??
         '';
-    if (recordRef.isNotEmpty) {
-      return recordRef;
-    }
-    return defaultWorkspaceRefForSessionInternal(normalizedSessionKey);
   }
 
   WorkspaceRefKind assistantWorkspaceRefKindForSession(String sessionKey) {
@@ -138,12 +135,23 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final record = assistantThreadRecordsInternal[normalizedSessionKey];
-    if (record != null && record.workspaceRef.trim().isNotEmpty) {
+    if (record != null) {
       return record.workspaceRefKind;
     }
     return defaultWorkspaceRefKindForTargetInternal(
       assistantExecutionTargetForSession(normalizedSessionKey),
     );
+  }
+
+  String assistantWorkspaceDisplayPathForSession(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    return assistantThreadRecordsInternal[normalizedSessionKey]
+            ?.workspaceBinding
+            .displayPath
+            .trim() ??
+        '';
   }
 
   Future<AssistantArtifactSnapshot> loadAssistantArtifactSnapshot({
@@ -557,145 +565,6 @@ extension AppControllerDesktopThreadSessions on AppController {
         AssistantMessageViewMode.rendered;
   }
 
-  String defaultWorkspaceRefForSessionInternal(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    return defaultLocalWorkspaceRefForSessionInternal(normalizedSessionKey);
-  }
-
-  String defaultLocalWorkspaceRefForSessionInternal(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final baseWorkspace = settings.workspacePath.trim();
-    if (baseWorkspace.isEmpty) {
-      return '';
-    }
-    final threadWorkspace =
-        '${trimTrailingPathSeparatorInternal(baseWorkspace)}/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
-    ensureLocalWorkspaceDirectoryInternal(threadWorkspace);
-    return threadWorkspace;
-  }
-
-  String threadWorkspaceDirectoryNameInternal(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final sanitized = normalizedSessionKey
-        .replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '-')
-        .replaceAll(RegExp(r'-{2,}'), '-')
-        .replaceAll(RegExp(r'^[-.]+|[-.]+$'), '');
-    return sanitized.isEmpty ? 'thread' : sanitized;
-  }
-
-  String trimTrailingPathSeparatorInternal(String path) {
-    if (path.endsWith('/') && path.length > 1) {
-      return path.substring(0, path.length - 1);
-    }
-    return path;
-  }
-
-  void ensureLocalWorkspaceDirectoryInternal(String path) {
-    final normalizedPath = path.trim();
-    if (normalizedPath.isEmpty) {
-      return;
-    }
-    try {
-      Directory(normalizedPath).createSync(recursive: true);
-    } catch (_) {
-      // Best effort only. The caller can still decide whether to use fallback behavior.
-    }
-  }
-
-  bool usesLegacySharedWorkspaceRefInternal(
-    String? workspaceRef,
-    WorkspaceRefKind? workspaceRefKind,
-  ) {
-    final normalizedRef = workspaceRef?.trim() ?? '';
-    if (normalizedRef.isEmpty) {
-      return false;
-    }
-    return workspaceRefKind == WorkspaceRefKind.localPath &&
-        normalizedRef == settings.workspacePath.trim();
-  }
-
-  bool usesDefaultThreadWorkspaceRefFromAnotherRootInternal(
-    String sessionKey, {
-    String? workspaceRef,
-    WorkspaceRefKind? workspaceRefKind,
-  }) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final normalizedRef = workspaceRef?.trim() ?? '';
-    if (normalizedRef.isEmpty ||
-        workspaceRefKind != WorkspaceRefKind.localPath) {
-      return false;
-    }
-    final expectedDefault = defaultWorkspaceRefForSessionInternal(
-      normalizedSessionKey,
-    ).trim();
-    if (expectedDefault.isEmpty) {
-      return false;
-    }
-    final normalizedPath = trimTrailingPathSeparatorInternal(
-      normalizedRef.replaceAll('\\', '/'),
-    );
-    final normalizedExpected = trimTrailingPathSeparatorInternal(
-      expectedDefault.replaceAll('\\', '/'),
-    );
-    if (normalizedPath == normalizedExpected) {
-      return false;
-    }
-    final expectedSuffix =
-        '/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
-    return normalizedPath.endsWith(expectedSuffix);
-  }
-
-  bool shouldMigrateWorkspaceRefInternal(
-    String sessionKey, {
-    String? workspaceRef,
-    WorkspaceRefKind? workspaceRefKind,
-  }) {
-    final normalizedRef = workspaceRef?.trim() ?? '';
-    if (normalizedRef.isEmpty) {
-      return true;
-    }
-    if (usesMissingWorkspaceRefInternal(
-      sessionKey,
-      workspaceRefKind,
-      normalizedRef,
-    )) {
-      return true;
-    }
-    return usesLegacySharedWorkspaceRefInternal(
-          normalizedRef,
-          workspaceRefKind,
-        ) ||
-        usesDefaultThreadWorkspaceRefFromAnotherRootInternal(
-          sessionKey,
-          workspaceRef: normalizedRef,
-          workspaceRefKind: workspaceRefKind,
-        );
-  }
-
-  bool usesMissingWorkspaceRefInternal(
-    String sessionKey,
-    WorkspaceRefKind? workspaceRefKind,
-    String workspaceRef,
-  ) {
-    if (workspaceRefKind != WorkspaceRefKind.localPath) {
-      return false;
-    }
-    final normalizedPath = workspaceRef.trim();
-    if (normalizedPath.isEmpty) {
-      return true;
-    }
-    return FileSystemEntity.typeSync(normalizedPath) ==
-        FileSystemEntityType.notFound;
-  }
-
   WorkspaceRefKind defaultWorkspaceRefKindForTargetInternal(
     AssistantExecutionTarget target,
   ) {
@@ -704,48 +573,6 @@ extension AppControllerDesktopThreadSessions on AppController {
       AssistantExecutionTarget.local ||
       AssistantExecutionTarget.remote => WorkspaceRefKind.remotePath,
     };
-  }
-
-  void syncAssistantWorkspaceRefForSessionInternal(
-    String sessionKey, {
-    AssistantExecutionTarget? executionTarget,
-  }) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final nextWorkspaceRef = defaultWorkspaceRefForSessionInternal(
-      normalizedSessionKey,
-    );
-    final nextWorkspaceRefKind = defaultWorkspaceRefKindForTargetInternal(
-      executionTarget ??
-          assistantExecutionTargetForSession(normalizedSessionKey),
-    );
-    final existing = assistantThreadRecordsInternal[normalizedSessionKey];
-    final existingWorkspaceRef = existing?.workspaceRef.trim() ?? '';
-    if (existing != null &&
-        existingWorkspaceRef.isNotEmpty &&
-        existing.workspaceRefKind == nextWorkspaceRefKind &&
-        !shouldMigrateWorkspaceRefInternal(
-          normalizedSessionKey,
-          workspaceRef: existingWorkspaceRef,
-          workspaceRefKind: existing.workspaceRefKind,
-        )) {
-      return;
-    }
-    if (existing != null &&
-        existingWorkspaceRef == nextWorkspaceRef &&
-        existing.workspaceRefKind == nextWorkspaceRefKind) {
-      return;
-    }
-    upsertAssistantThreadRecordInternal(
-      normalizedSessionKey,
-      executionTarget:
-          executionTarget ??
-          assistantExecutionTargetForSession(normalizedSessionKey),
-      workspaceRef: nextWorkspaceRef,
-      workspaceRefKind: nextWorkspaceRefKind,
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
   }
 
   List<GatewaySessionSummary> assistantSessionsInternal() {
