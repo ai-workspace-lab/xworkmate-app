@@ -10,3 +10,5 @@ import 'settings_focus_quick_actions.dart';
 import 'surface_card.dart';
 
 part 'assistant_focus_panel_core.part.dart';
+part 'assistant_focus_panel_previews.part.dart';
+part 'assistant_focus_panel_support.part.dart';
