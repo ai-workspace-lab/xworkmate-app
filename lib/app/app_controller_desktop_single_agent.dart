@@ -155,6 +155,21 @@ extension AppControllerDesktopSingleAgent on AppController {
             configuredCodexCliPath: configuredCodexCliPath,
           ),
         );
+        final resolvedWorkingDirectory = result.resolvedWorkingDirectory.trim();
+        final resolvedWorkspaceRefKind = result.resolvedWorkspaceRefKind;
+        if (resolvedWorkingDirectory.isNotEmpty &&
+            resolvedWorkspaceRefKind == WorkspaceRefKind.remotePath &&
+            (assistantWorkspaceRefForSession(sessionKey) !=
+                    resolvedWorkingDirectory ||
+                assistantWorkspaceRefKindForSession(sessionKey) !=
+                    resolvedWorkspaceRefKind)) {
+          upsertAssistantThreadRecordInternal(
+            sessionKey,
+            workspaceRef: resolvedWorkingDirectory,
+            workspaceRefKind: resolvedWorkspaceRefKind,
+            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          );
+        }
         final resolvedRuntimeModel = result.resolvedModel.trim();
         if (resolvedRuntimeModel.isNotEmpty) {
           singleAgentRuntimeModelBySessionInternal[sessionKey] =

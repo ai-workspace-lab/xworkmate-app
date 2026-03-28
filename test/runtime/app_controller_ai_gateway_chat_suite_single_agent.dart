@@ -495,5 +495,92 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         );
       },
     );
+
+    test(
+      'AppController rebinds remote Single Agent threads to the resolved thread directory',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-single-agent-remote-rebind-cwd-',
+        );
+        final defaultWorkspace = Directory(
+          '${tempDirectory.path}/default-workspace',
+        );
+        await defaultWorkspace.create(recursive: true);
+
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(
+            workspacePath: defaultWorkspace.path,
+            assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
+            externalAcpEndpoints: normalizeExternalAcpEndpoints(
+              profiles: <ExternalAcpEndpointProfile>[
+                ExternalAcpEndpointProfile.defaultsForProvider(
+                  SingleAgentProvider.opencode,
+                ).copyWith(
+                  enabled: true,
+                  endpoint: 'https://remote.example.com/acp',
+                ),
+              ],
+            ),
+          ),
+        );
+
+        final runner = FakeSingleAgentRunnerInternal(
+          resolvedProvider: SingleAgentProvider.opencode,
+          result: const SingleAgentRunResult(
+            provider: SingleAgentProvider.opencode,
+            output: 'THREAD_OK',
+            success: true,
+            errorMessage: '',
+            shouldFallbackToAiChat: false,
+            resolvedWorkingDirectory: '/remote/threads/task-42',
+            resolvedWorkspaceRefKind: WorkspaceRefKind.remotePath,
+          ),
+        );
+        final controller = await createAppControllerInternal(
+          store: store,
+          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+            SingleAgentProvider.opencode,
+          ],
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+          singleAgentRunner: runner,
+        );
+
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.singleAgent,
+        );
+        await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
+        controller.initializeAssistantThreadContext(
+          'draft:remote-thread',
+          title: 'Remote Thread',
+          executionTarget: AssistantExecutionTarget.singleAgent,
+        );
+        await controller.switchSession('draft:remote-thread');
+
+        await controller.sendChatMessage('第一次运行', thinking: 'low');
+        expect(
+          runner.requests.first.workingDirectory,
+          '${defaultWorkspace.path}/.xworkmate/threads/draft-remote-thread',
+        );
+        expect(
+          controller.assistantWorkspaceRefForSession('draft:remote-thread'),
+          '/remote/threads/task-42',
+        );
+        expect(
+          controller.assistantWorkspaceRefKindForSession('draft:remote-thread'),
+          WorkspaceRefKind.remotePath,
+        );
+
+        await controller.sendChatMessage('第二次运行', thinking: 'low');
+        expect(
+          runner.requests.last.workingDirectory,
+          '/remote/threads/task-42',
+        );
+      },
+    );
   });
 }

@@ -219,6 +219,124 @@ void registerAssistantPageSuiteComposerTestsInternal() {
   );
 
   testWidgets(
+    'AssistantPage submits from the selected task thread workspace after switching tasks',
+    (WidgetTester tester) async {
+      late final Directory tempDirectory;
+      late final SecureConfigStore store;
+      late final CaptureSendAppControllerInternal controller;
+      await tester.runAsync(() async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        tempDirectory = await Directory.systemTemp.createTemp(
+          'xworkmate-assistant-page-thread-cwd-ui-',
+        );
+        store = SecureConfigStore(
+          enableSecureStorage: false,
+          databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+          fallbackDirectoryPathResolver: () async => tempDirectory.path,
+          defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
+        );
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(
+            assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
+            workspacePath: '${tempDirectory.path}/workspace-root',
+          ),
+        );
+        await Directory(
+          '${tempDirectory.path}/workspace-root',
+        ).create(recursive: true);
+        await Directory(
+          '${tempDirectory.path}/thread-main',
+        ).create(recursive: true);
+        await Directory(
+          '${tempDirectory.path}/thread-task',
+        ).create(recursive: true);
+        await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
+          AssistantThreadRecord(
+            sessionKey: 'main',
+            messages: const <GatewayChatMessage>[],
+            updatedAtMs: 1,
+            title: 'Main',
+            archived: false,
+            executionTarget: AssistantExecutionTarget.singleAgent,
+            messageViewMode: AssistantMessageViewMode.rendered,
+            workspaceRef: '${tempDirectory.path}/thread-main',
+            workspaceRefKind: WorkspaceRefKind.localPath,
+          ),
+          AssistantThreadRecord(
+            sessionKey: 'draft:artifact-thread',
+            messages: const <GatewayChatMessage>[],
+            updatedAtMs: 2,
+            title: 'Artifact Thread',
+            archived: false,
+            executionTarget: AssistantExecutionTarget.singleAgent,
+            messageViewMode: AssistantMessageViewMode.rendered,
+            workspaceRef: '${tempDirectory.path}/thread-task',
+            workspaceRefKind: WorkspaceRefKind.localPath,
+          ),
+        ]);
+        controller = CaptureSendAppControllerInternal(
+          store: store,
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+        );
+        final stopwatch = Stopwatch()..start();
+        while (controller.initializing) {
+          if (stopwatch.elapsed > const Duration(seconds: 10)) {
+            fail('controller did not finish initializing before timeout');
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+      });
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      addTearDown(controller.dispose);
+
+      await pumpPage(
+        tester,
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+        platform: TargetPlatform.macOS,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('assistant-task-group-singleAgent')),
+      );
+      await pumpForUiSyncInternal(tester);
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('assistant-task-item-draft:artifact-thread'),
+        ),
+      );
+      await pumpForUiSyncInternal(tester);
+
+      expect(controller.currentSessionKey, 'draft:artifact-thread');
+
+      final composerInput = find.descendant(
+        of: find.byKey(const Key('assistant-composer-input-area')),
+        matching: find.byType(TextField),
+      );
+      expect(composerInput, findsOneWidget);
+
+      await tester.enterText(composerInput, '检查线程目录');
+      await tester.tap(find.byKey(const Key('assistant-submit-button')));
+      await pumpForUiSyncInternal(tester);
+
+      expect(controller.sendCallCount, 1);
+      expect(controller.lastSentMessage, contains('检查线程目录'));
+      expect(controller.lastSessionKey, 'draft:artifact-thread');
+      expect(controller.lastWorkspaceRef, '${tempDirectory.path}/thread-task');
+    },
+  );
+
+  testWidgets(
     'AssistantPage shows a persistent skill popover in single-agent mode and keeps thread selections isolated',
     (WidgetTester tester) async {
       late final Directory tempDirectory;

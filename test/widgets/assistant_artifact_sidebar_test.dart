@@ -82,6 +82,11 @@ void main() {
       },
     );
 
+    expect(find.text('全部文件'), findsOneWidget);
+    expect(find.text('预览'), findsOneWidget);
+    expect(find.text('结果'), findsNothing);
+    expect(find.text('变更'), findsNothing);
+
     await tester.tap(
       find.byKey(const ValueKey<String>('assistant-artifact-entry-README.md')),
     );
@@ -92,7 +97,7 @@ void main() {
     );
     expect(find.text('Markdown Preview'), findsOneWidget);
 
-    await tester.tap(find.text('结果'));
+    await tester.tap(find.text('全部文件'));
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(
