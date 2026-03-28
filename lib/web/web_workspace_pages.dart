@@ -13,3 +13,8 @@ import '../widgets/surface_card.dart';
 import '../widgets/top_bar.dart';
 
 part 'web_workspace_pages_core.part.dart';
+part 'web_workspace_pages_tasks.part.dart';
+part 'web_workspace_pages_skills.part.dart';
+part 'web_workspace_pages_nodes.part.dart';
+part 'web_workspace_pages_secrets.part.dart';
+part 'web_workspace_pages_ai_gateway.part.dart';

@@ -14,3 +14,7 @@ import '../../widgets/detail_drawer.dart';
 import 'mobile_gateway_pairing_guide_page.dart';
 
 part 'mobile_shell_core.part.dart';
+part 'mobile_shell_strip.part.dart';
+part 'mobile_shell_sheet.part.dart';
+part 'mobile_shell_workspace.part.dart';
+part 'mobile_shell_nav.part.dart';
