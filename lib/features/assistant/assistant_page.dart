@@ -28,4 +28,13 @@ import '../../widgets/surface_card.dart';
 
 part 'assistant_page_main.part.dart';
 part 'assistant_page_components.part.dart';
+part 'assistant_page_composer_bar.part.dart';
+part 'assistant_page_composer_state_helpers.part.dart';
+part 'assistant_page_composer_support.part.dart';
+part 'assistant_page_tooltip_labels.part.dart';
+part 'assistant_page_message_widgets.part.dart';
+part 'assistant_page_task_models.part.dart';
+part 'assistant_page_composer_skill_models.part.dart';
+part 'assistant_page_composer_skill_picker.part.dart';
+part 'assistant_page_composer_clipboard.part.dart';
 part 'assistant_page_components_core.part.dart';
