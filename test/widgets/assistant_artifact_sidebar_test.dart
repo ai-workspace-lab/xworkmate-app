@@ -86,6 +86,9 @@ void main() {
     expect(find.text('预览'), findsOneWidget);
     expect(find.text('结果'), findsNothing);
     expect(find.text('变更'), findsNothing);
+    expect(find.text('当前任务工作路径'), findsOneWidget);
+    expect(find.text('.../tmp/thread'), findsNothing);
+    expect(find.text('/tmp/thread'), findsOneWidget);
 
     await tester.tap(
       find.byKey(const ValueKey<String>('assistant-artifact-entry-README.md')),
