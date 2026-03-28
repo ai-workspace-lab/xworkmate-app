@@ -1,6 +1,8 @@
 @TestOn('vm')
 library;
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/i18n/app_language.dart';
@@ -11,6 +13,23 @@ import 'package:xworkmate/widgets/assistant_focus_panel.dart';
 import '../test_support.dart';
 
 void main() {
+  test('assistant focus panel core files stay within 800 lines', () {
+    const targets = <String>[
+      'lib/widgets/assistant_focus_panel_core.part.dart',
+      'lib/web/web_focus_panel_core.part.dart',
+    ];
+
+    for (final path in targets) {
+      final file = File(path);
+      expect(file.existsSync(), isTrue, reason: 'missing file: $path');
+      expect(
+        file.readAsLinesSync().length,
+        lessThanOrEqualTo(800),
+        reason: '$path should be split into smaller parts',
+      );
+    }
+  });
+
   testWidgets(
     'Settings focused preview reuses language and theme quick actions',
     (WidgetTester tester) async {
