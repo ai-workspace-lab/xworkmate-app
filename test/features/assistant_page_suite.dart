@@ -1,10 +1,11 @@
+// ignore_for_file: unused_import, unnecessary_import
+
 @TestOn('vm')
 library;
 
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show PointerDeviceKind;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -23,15 +24,13 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 import 'package:xworkmate/widgets/pane_resize_handle.dart';
-
 import '../test_support.dart';
-
-part 'assistant_page_suite_core.part.dart';
-part 'assistant_page_suite_composer.part.dart';
-part 'assistant_page_suite_support.part.dart';
+import 'assistant_page_suite_core.dart';
+import 'assistant_page_suite_composer.dart';
+import 'assistant_page_suite_support.dart';
 
 void main() {
-  _registerAssistantPageSuiteCoreTests();
-  _registerAssistantPageSuiteComposerTests();
-  _registerAssistantPageSuiteSupportTests();
+  registerAssistantPageSuiteCoreTestsInternal();
+  registerAssistantPageSuiteComposerTestsInternal();
+  registerAssistantPageSuiteSupportTestsInternal();
 }

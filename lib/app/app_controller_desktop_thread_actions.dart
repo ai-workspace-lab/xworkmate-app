@@ -1,0 +1,379 @@
+// ignore_for_file: unused_import, unnecessary_import
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'app_metadata.dart';
+import 'app_capabilities.dart';
+import 'app_store_policy.dart';
+import 'ui_feature_manifest.dart';
+import '../i18n/app_language.dart';
+import '../models/app_models.dart';
+import '../runtime/device_identity_store.dart';
+import '../runtime/aris_bundle.dart';
+import '../runtime/go_core.dart';
+import '../runtime/runtime_bootstrap.dart';
+import '../runtime/desktop_platform_service.dart';
+import '../runtime/gateway_runtime.dart';
+import '../runtime/runtime_controllers.dart';
+import '../runtime/runtime_models.dart';
+import '../runtime/secure_config_store.dart';
+import '../runtime/embedded_agent_launch_policy.dart';
+import '../runtime/runtime_coordinator.dart';
+import '../runtime/direct_single_agent_app_server_client.dart';
+import '../runtime/gateway_acp_client.dart';
+import '../runtime/codex_runtime.dart';
+import '../runtime/codex_config_bridge.dart';
+import '../runtime/code_agent_node_orchestrator.dart';
+import '../runtime/assistant_artifacts.dart';
+import '../runtime/desktop_thread_artifact_service.dart';
+import '../runtime/mode_switcher.dart';
+import '../runtime/agent_registry.dart';
+import '../runtime/multi_agent_orchestrator.dart';
+import '../runtime/platform_environment.dart';
+import '../runtime/single_agent_runner.dart';
+import '../runtime/skill_directory_access.dart';
+import 'app_controller_desktop_core.dart';
+import 'app_controller_desktop_navigation.dart';
+import 'app_controller_desktop_gateway.dart';
+import 'app_controller_desktop_settings.dart';
+import 'app_controller_desktop_single_agent.dart';
+import 'app_controller_desktop_thread_sessions.dart';
+import 'app_controller_desktop_workspace_execution.dart';
+import 'app_controller_desktop_settings_runtime.dart';
+import 'app_controller_desktop_thread_storage.dart';
+import 'app_controller_desktop_skill_permissions.dart';
+import 'app_controller_desktop_runtime_helpers.dart';
+
+// ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
+extension AppControllerDesktopThreadActions on AppController {
+  bool assistantSessionHasPendingRun(String sessionKey) {
+    final normalized = normalizedAssistantSessionKeyInternal(sessionKey);
+    if (assistantExecutionTargetForSession(normalized) ==
+        AssistantExecutionTarget.singleAgent) {
+      return aiGatewayPendingSessionKeysInternal.contains(normalized);
+    }
+    return (chatControllerInternal.hasPendingRun ||
+            multiAgentRunPendingInternal) &&
+        matchesSessionKey(
+          normalized,
+          sessionsControllerInternal.currentSessionKey,
+        );
+  }
+
+  Future<void> sendSingleAgentMessageInternal(
+    String message, {
+    required String thinking,
+    required List<GatewayChatAttachmentPayload> attachments,
+    required List<CollaborationAttachment> localAttachments,
+  }) => AppControllerDesktopSingleAgent(this).sendSingleAgentMessageInternal(
+    message,
+    thinking: thinking,
+    attachments: attachments,
+    localAttachments: localAttachments,
+  );
+
+  Future<void> abortAiGatewayRunInternal(String sessionKey) =>
+      AppControllerDesktopSingleAgent(
+        this,
+      ).abortAiGatewayRunInternal(sessionKey);
+
+  Future<void> connectSavedGateway() async {
+    final target = currentAssistantExecutionTarget;
+    if (target == AssistantExecutionTarget.singleAgent) {
+      return;
+    }
+    await AppControllerDesktopGateway(this).connectProfileInternal(
+      gatewayProfileForAssistantExecutionTargetInternal(target),
+      profileIndex: gatewayProfileIndexForExecutionTargetInternal(target),
+    );
+  }
+
+  Future<void> clearStoredGatewayToken({int? profileIndex}) async {
+    await settingsControllerInternal.clearGatewaySecrets(
+      profileIndex: profileIndex,
+      token: true,
+    );
+  }
+
+  Future<void> refreshGatewayHealth() async {
+    if (!runtimeInternal.isConnected) {
+      return;
+    }
+    try {
+      await runtimeInternal.health();
+    } catch (_) {}
+    try {
+      await runtimeInternal.status();
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  Future<void> refreshDevices({bool quiet = false}) async {
+    await devicesControllerInternal.refresh(quiet: quiet);
+  }
+
+  Future<void> approveDevicePairing(String requestId) async {
+    await devicesControllerInternal.approve(requestId);
+    await settingsControllerInternal.refreshDerivedState();
+  }
+
+  Future<void> rejectDevicePairing(String requestId) async {
+    await devicesControllerInternal.reject(requestId);
+  }
+
+  Future<void> removePairedDevice(String deviceId) async {
+    await devicesControllerInternal.remove(deviceId);
+    await settingsControllerInternal.refreshDerivedState();
+  }
+
+  Future<String?> rotateDeviceRoleToken({
+    required String deviceId,
+    required String role,
+    List<String> scopes = const <String>[],
+  }) async {
+    final token = await devicesControllerInternal.rotateToken(
+      deviceId: deviceId,
+      role: role,
+      scopes: scopes,
+    );
+    await settingsControllerInternal.refreshDerivedState();
+    return token;
+  }
+
+  Future<void> revokeDeviceRoleToken({
+    required String deviceId,
+    required String role,
+  }) async {
+    await devicesControllerInternal.revokeToken(deviceId: deviceId, role: role);
+    await settingsControllerInternal.refreshDerivedState();
+  }
+
+  Future<void> refreshAgents() async {
+    await agentsControllerInternal.refresh();
+    sessionsControllerInternal.configure(
+      mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? 'main',
+      selectedAgentId: agentsControllerInternal.selectedAgentId,
+      defaultAgentId: '',
+    );
+    recomputeTasksInternal();
+  }
+
+  Future<void> selectAgent(String? agentId) async {
+    agentsControllerInternal.selectAgent(agentId);
+    if (currentAssistantExecutionTarget !=
+        AssistantExecutionTarget.singleAgent) {
+      final target = currentAssistantExecutionTarget;
+      final nextProfile = gatewayProfileForAssistantExecutionTargetInternal(
+        target,
+      ).copyWith(selectedAgentId: agentsControllerInternal.selectedAgentId);
+      await AppControllerDesktopSettings(this).saveSettings(
+        settings.copyWithGatewayProfileAt(
+          gatewayProfileIndexForExecutionTargetInternal(target),
+          nextProfile,
+        ),
+        refreshAfterSave: false,
+      );
+    }
+    sessionsControllerInternal.configure(
+      mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? 'main',
+      selectedAgentId: agentsControllerInternal.selectedAgentId,
+      defaultAgentId: '',
+    );
+    await chatControllerInternal.loadSession(
+      sessionsControllerInternal.currentSessionKey,
+    );
+    await skillsControllerInternal.refresh(
+      agentId: agentsControllerInternal.selectedAgentId.isEmpty
+          ? null
+          : agentsControllerInternal.selectedAgentId,
+    );
+    recomputeTasksInternal();
+  }
+
+  Future<void> refreshSessions() async {
+    sessionsControllerInternal.configure(
+      mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? 'main',
+      selectedAgentId: agentsControllerInternal.selectedAgentId,
+      defaultAgentId: '',
+    );
+    await sessionsControllerInternal.refresh();
+    await chatControllerInternal.loadSession(
+      sessionsControllerInternal.currentSessionKey,
+    );
+    recomputeTasksInternal();
+  }
+
+  Future<void> switchSession(String sessionKey) async {
+    final previousSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionsControllerInternal.currentSessionKey,
+    );
+    final nextSessionKey = normalizedAssistantSessionKeyInternal(sessionKey);
+    final nextTarget = assistantExecutionTargetForSession(nextSessionKey);
+    final nextViewMode = assistantMessageViewModeForSession(nextSessionKey);
+
+    if (!isSingleAgentMode) {
+      preserveGatewayHistoryForSessionInternal(previousSessionKey);
+    }
+
+    await setCurrentAssistantSessionKeyInternal(nextSessionKey);
+    upsertAssistantThreadRecordInternal(
+      nextSessionKey,
+      executionTarget: nextTarget,
+      messageViewMode: nextViewMode,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    syncAssistantWorkspaceRefForSessionInternal(
+      nextSessionKey,
+      executionTarget: nextTarget,
+    );
+    await applyAssistantExecutionTargetInternal(
+      nextTarget,
+      sessionKey: nextSessionKey,
+      persistDefaultSelection: false,
+    );
+    if (nextTarget == AssistantExecutionTarget.singleAgent) {
+      await refreshSingleAgentSkillsForSession(nextSessionKey);
+    }
+    recomputeTasksInternal();
+  }
+
+  Future<void> sendChatMessage(
+    String message, {
+    String thinking = 'off',
+    List<GatewayChatAttachmentPayload> attachments =
+        const <GatewayChatAttachmentPayload>[],
+    List<CollaborationAttachment> localAttachments =
+        const <CollaborationAttachment>[],
+    List<String> selectedSkillLabels = const <String>[],
+  }) async {
+    final currentSessionKey = sessionsControllerInternal.currentSessionKey;
+    if (!isSingleAgentMode ||
+        assistantWorkspaceRefForSession(currentSessionKey).trim().isEmpty) {
+      syncAssistantWorkspaceRefForSessionInternal(currentSessionKey);
+    }
+    if (isSingleAgentMode) {
+      await sendSingleAgentMessageInternal(
+        message,
+        thinking: thinking,
+        attachments: attachments,
+        localAttachments: localAttachments,
+      );
+      await flushAssistantThreadPersistenceInternal();
+      recomputeTasksInternal();
+      return;
+    }
+    final dispatch = codeAgentNodeOrchestratorInternal.buildGatewayDispatch(
+      buildCodeAgentNodeStateInternal(),
+    );
+    await chatControllerInternal.sendMessage(
+      sessionKey: sessionsControllerInternal.currentSessionKey,
+      message: message,
+      thinking: thinking,
+      attachments: attachments,
+      agentId: dispatch.agentId,
+      metadata: dispatch.metadata,
+    );
+    recomputeTasksInternal();
+  }
+
+  Future<void> abortRun() async {
+    if (multiAgentRunPendingInternal) {
+      final sessionKey = normalizedAssistantSessionKeyInternal(
+        sessionsControllerInternal.currentSessionKey,
+      );
+      try {
+        await gatewayAcpClientInternal.cancelSession(
+          sessionId: sessionKey,
+          threadId: sessionKey,
+        );
+      } catch (_) {
+        // Best effort cancellation only.
+      }
+      multiAgentRunPendingInternal = false;
+      recomputeTasksInternal();
+      notifyIfActiveInternal();
+      return;
+    }
+    if (isSingleAgentMode) {
+      final sessionKey = normalizedAssistantSessionKeyInternal(
+        sessionsControllerInternal.currentSessionKey,
+      );
+      if (singleAgentExternalCliPendingSessionKeysInternal.contains(
+        sessionKey,
+      )) {
+        await singleAgentRunnerInternal.abort(sessionKey);
+        aiGatewayPendingSessionKeysInternal.remove(sessionKey);
+        singleAgentExternalCliPendingSessionKeysInternal.remove(sessionKey);
+        clearAiGatewayStreamingTextInternal(sessionKey);
+        recomputeTasksInternal();
+        notifyIfActiveInternal();
+        return;
+      }
+      await abortAiGatewayRunInternal(
+        sessionsControllerInternal.currentSessionKey,
+      );
+      return;
+    }
+    await chatControllerInternal.abortRun();
+  }
+
+  Future<void> prepareForExit() async {
+    try {
+      await abortRun();
+    } catch (_) {
+      // Best effort only. Native termination still proceeds.
+    }
+    await flushAssistantThreadPersistenceInternal();
+  }
+
+  Map<String, dynamic> desktopStatusSnapshot() {
+    final pausedTasks = tasksControllerInternal.scheduled
+        .where((item) => item.status == 'Disabled')
+        .length;
+    final timedOutTasks = tasksControllerInternal.failed
+        .where(looksLikeTimedOutTaskInternal)
+        .length;
+    final failedTasks = tasksControllerInternal.failed.length;
+    final queuedTasks = tasksControllerInternal.queue.length;
+    final runningTasks = tasksControllerInternal.running.length;
+    final scheduledTasks = tasksControllerInternal.scheduled.length;
+    final badgeCount = runningTasks + pausedTasks + timedOutTasks;
+    return <String, dynamic>{
+      'connectionStatus': desktopConnectionStatusValueInternal(
+        connection.status,
+      ),
+      'connectionLabel': connection.status.label,
+      'runningTasks': runningTasks,
+      'pausedTasks': pausedTasks,
+      'timedOutTasks': timedOutTasks,
+      'queuedTasks': queuedTasks,
+      'scheduledTasks': scheduledTasks,
+      'failedTasks': failedTasks,
+      'totalTasks': tasksControllerInternal.totalCount,
+      'badgeCount': badgeCount > 0 ? badgeCount : runningTasks + queuedTasks,
+    };
+  }
+
+  bool looksLikeTimedOutTaskInternal(DerivedTaskItem item) {
+    final haystack = '${item.status} ${item.title} ${item.summary}'
+        .toLowerCase();
+    return haystack.contains('timed out') ||
+        haystack.contains('timeout') ||
+        haystack.contains('超时');
+  }
+
+  String desktopConnectionStatusValueInternal(RuntimeConnectionStatus status) {
+    switch (status) {
+      case RuntimeConnectionStatus.connected:
+        return 'connected';
+      case RuntimeConnectionStatus.connecting:
+        return 'connecting';
+      case RuntimeConnectionStatus.error:
+        return 'error';
+      case RuntimeConnectionStatus.offline:
+        return 'disconnected';
+    }
+  }
+}

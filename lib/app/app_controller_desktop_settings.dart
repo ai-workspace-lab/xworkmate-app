@@ -1,19 +1,66 @@
+// ignore_for_file: unused_import, unnecessary_import
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'app_metadata.dart';
+import 'app_capabilities.dart';
+import 'app_store_policy.dart';
+import 'ui_feature_manifest.dart';
+import '../i18n/app_language.dart';
+import '../models/app_models.dart';
+import '../runtime/device_identity_store.dart';
+import '../runtime/aris_bundle.dart';
+import '../runtime/go_core.dart';
+import '../runtime/runtime_bootstrap.dart';
+import '../runtime/desktop_platform_service.dart';
+import '../runtime/gateway_runtime.dart';
+import '../runtime/runtime_controllers.dart';
+import '../runtime/runtime_models.dart';
+import '../runtime/secure_config_store.dart';
+import '../runtime/embedded_agent_launch_policy.dart';
+import '../runtime/runtime_coordinator.dart';
+import '../runtime/direct_single_agent_app_server_client.dart';
+import '../runtime/gateway_acp_client.dart';
+import '../runtime/codex_runtime.dart';
+import '../runtime/codex_config_bridge.dart';
+import '../runtime/code_agent_node_orchestrator.dart';
+import '../runtime/assistant_artifacts.dart';
+import '../runtime/desktop_thread_artifact_service.dart';
+import '../runtime/mode_switcher.dart';
+import '../runtime/agent_registry.dart';
+import '../runtime/multi_agent_orchestrator.dart';
+import '../runtime/platform_environment.dart';
+import '../runtime/single_agent_runner.dart';
+import '../runtime/skill_directory_access.dart';
+import 'app_controller_desktop_core.dart';
+import 'app_controller_desktop_navigation.dart';
+import 'app_controller_desktop_gateway.dart';
+import 'app_controller_desktop_single_agent.dart';
+import 'app_controller_desktop_thread_sessions.dart';
+import 'app_controller_desktop_thread_actions.dart';
+import 'app_controller_desktop_workspace_execution.dart';
+import 'app_controller_desktop_settings_runtime.dart';
+import 'app_controller_desktop_thread_storage.dart';
+import 'app_controller_desktop_skill_permissions.dart';
+import 'app_controller_desktop_runtime_helpers.dart';
+
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
-
-part of 'app_controller_desktop.dart';
-
 extension AppControllerDesktopSettings on AppController {
   Future<void> saveSettingsDraft(SettingsSnapshot snapshot) async {
-    if (_disposed) {
+    if (disposedInternal) {
       return;
     }
-    _settingsDraft = _sanitizeFeatureFlagSettings(
-      _sanitizeMultiAgentSettings(
-        _sanitizeOllamaCloudSettings(_sanitizeCodeAgentSettings(snapshot)),
+    settingsDraftInternal = sanitizeFeatureFlagSettingsInternal(
+      sanitizeMultiAgentSettingsInternal(
+        sanitizeOllamaCloudSettingsInternal(
+          sanitizeCodeAgentSettingsInternal(snapshot),
+        ),
       ),
     );
-    _settingsDraftInitialized = true;
-    _settingsDraftStatusMessage = appText(
+    settingsDraftInitializedInternal = true;
+    settingsDraftStatusMessageInternal = appText(
       '草稿已更新，点击顶部保存持久化。',
       'Draft updated. Use the top Save button to persist it.',
     );
@@ -21,31 +68,37 @@ extension AppControllerDesktopSettings on AppController {
   }
 
   void saveGatewayTokenDraft(String value, {required int profileIndex}) {
-    _saveSecretDraft(_draftGatewayTokenKey(profileIndex), value);
+    saveSecretDraftInternal(draftGatewayTokenKeyInternal(profileIndex), value);
   }
 
   void saveGatewayPasswordDraft(String value, {required int profileIndex}) {
-    _saveSecretDraft(_draftGatewayPasswordKey(profileIndex), value);
+    saveSecretDraftInternal(
+      draftGatewayPasswordKeyInternal(profileIndex),
+      value,
+    );
   }
 
   void saveAiGatewayApiKeyDraft(String value) {
-    _saveSecretDraft(AppController._draftAiGatewayApiKeyKey, value);
+    saveSecretDraftInternal(
+      AppController.draftAiGatewayApiKeyKeyInternal,
+      value,
+    );
   }
 
   void saveVaultTokenDraft(String value) {
-    _saveSecretDraft(AppController._draftVaultTokenKey, value);
+    saveSecretDraftInternal(AppController.draftVaultTokenKeyInternal, value);
   }
 
   void saveOllamaCloudApiKeyDraft(String value) {
-    _saveSecretDraft(AppController._draftOllamaApiKeyKey, value);
+    saveSecretDraftInternal(AppController.draftOllamaApiKeyKeyInternal, value);
   }
 
   Future<void> persistSettingsDraft() async {
-    if (_disposed) {
+    if (disposedInternal) {
       return;
     }
     if (!hasSettingsDraftChanges) {
-      _settingsDraftStatusMessage = appText(
+      settingsDraftStatusMessageInternal = appText(
         '没有需要保存的更改。',
         'There are no changes to save.',
       );
@@ -53,15 +106,15 @@ extension AppControllerDesktopSettings on AppController {
       return;
     }
     final nextSettings = settingsDraft;
-    _markPendingApplyDomains(settings, nextSettings);
-    await _persistDraftSecrets();
+    markPendingApplyDomainsInternal(settings, nextSettings);
+    await persistDraftSecretsInternal();
     if (nextSettings.toJsonString() != settings.toJsonString()) {
-      await _persistSettingsSnapshot(nextSettings);
+      await persistSettingsSnapshotInternal(nextSettings);
     }
-    _settingsDraft = settings;
-    _settingsDraftInitialized = true;
-    _pendingSettingsApply = true;
-    _settingsDraftStatusMessage = appText(
+    settingsDraftInternal = settings;
+    settingsDraftInitializedInternal = true;
+    pendingSettingsApplyInternal = true;
+    settingsDraftStatusMessageInternal = appText(
       '已保存配置，不立即生效。',
       'Settings saved. They do not take effect until Apply.',
     );
@@ -69,14 +122,14 @@ extension AppControllerDesktopSettings on AppController {
   }
 
   Future<void> applySettingsDraft() async {
-    if (_disposed) {
+    if (disposedInternal) {
       return;
     }
     if (hasSettingsDraftChanges) {
       await persistSettingsDraft();
     }
-    if (!_pendingSettingsApply) {
-      _settingsDraftStatusMessage = appText(
+    if (!pendingSettingsApplyInternal) {
+      settingsDraftStatusMessageInternal = appText(
         '没有需要应用的更改。',
         'There are no saved changes to apply.',
       );
@@ -84,24 +137,24 @@ extension AppControllerDesktopSettings on AppController {
       return;
     }
     final currentSettings = settings;
-    await _applyPersistedSettingsSideEffects(
-      previous: _lastAppliedSettings,
+    await applyPersistedSettingsSideEffectsInternal(
+      previous: lastAppliedSettingsInternal,
       current: currentSettings,
       refreshAfterSave: true,
     );
-    if (_pendingGatewayApply) {
-      await _applyPersistedGatewaySettings(currentSettings);
+    if (pendingGatewayApplyInternal) {
+      await applyPersistedGatewaySettingsInternal(currentSettings);
     }
-    if (_pendingAiGatewayApply) {
-      await _applyPersistedAiGatewaySettings(currentSettings);
+    if (pendingAiGatewayApplyInternal) {
+      await applyPersistedAiGatewaySettingsInternal(currentSettings);
     }
-    _lastAppliedSettings = settings;
-    _pendingSettingsApply = false;
-    _pendingGatewayApply = false;
-    _pendingAiGatewayApply = false;
-    _settingsDraft = settings;
-    _settingsDraftInitialized = true;
-    _settingsDraftStatusMessage = appText(
+    lastAppliedSettingsInternal = settings;
+    pendingSettingsApplyInternal = false;
+    pendingGatewayApplyInternal = false;
+    pendingAiGatewayApplyInternal = false;
+    settingsDraftInternal = settings;
+    settingsDraftInitializedInternal = true;
+    settingsDraftStatusMessageInternal = appText(
       '已按当前配置生效。',
       'The current configuration is now in effect.',
     );
@@ -112,67 +165,72 @@ extension AppControllerDesktopSettings on AppController {
     SettingsSnapshot snapshot, {
     bool refreshAfterSave = true,
   }) async {
-    if (_disposed) {
+    if (disposedInternal) {
       return;
     }
     final previous = settings;
-    await _persistSettingsSnapshot(snapshot);
-    if (_disposed) {
+    await persistSettingsSnapshotInternal(snapshot);
+    if (disposedInternal) {
       return;
     }
-    await _applyPersistedSettingsSideEffects(
+    await applyPersistedSettingsSideEffectsInternal(
       previous: previous,
       current: settings,
       refreshAfterSave: refreshAfterSave,
     );
-    _lastAppliedSettings = settings;
-    _settingsDraft = settings;
-    _settingsDraftInitialized = true;
-    _pendingSettingsApply = false;
-    _pendingGatewayApply = false;
-    _pendingAiGatewayApply = false;
-    _draftSecretValues.clear();
-    _settingsDraftStatusMessage = '';
+    lastAppliedSettingsInternal = settings;
+    settingsDraftInternal = settings;
+    settingsDraftInitializedInternal = true;
+    pendingSettingsApplyInternal = false;
+    pendingGatewayApplyInternal = false;
+    pendingAiGatewayApplyInternal = false;
+    draftSecretValuesInternal.clear();
+    settingsDraftStatusMessageInternal = '';
   }
 
   Future<void> clearAssistantLocalState() async {
-    await _flushAssistantThreadPersistence();
-    await _store.clearAssistantLocalState();
-    await _store.saveAssistantThreadRecords(const <AssistantThreadRecord>[]);
-    _assistantThreadPersistQueue = Future<void>.value();
+    await flushAssistantThreadPersistenceInternal();
+    await storeInternal.clearAssistantLocalState();
+    await storeInternal.saveAssistantThreadRecords(
+      const <AssistantThreadRecord>[],
+    );
+    assistantThreadPersistQueueInternal = Future<void>.value();
     final defaults = SettingsSnapshot.defaults();
-    _assistantThreadRecords.clear();
-    _assistantThreadMessages.clear();
-    _localSessionMessages.clear();
-    _gatewayHistoryCache.clear();
-    _aiGatewayStreamingTextBySession.clear();
-    _aiGatewayStreamingClients.clear();
-    _aiGatewayPendingSessionKeys.clear();
-    _aiGatewayAbortedSessionKeys.clear();
-    _singleAgentExternalCliPendingSessionKeys.clear();
-    _assistantThreadTurnQueues.clear();
-    _multiAgentRunPending = false;
+    assistantThreadRecordsInternal.clear();
+    assistantThreadMessagesInternal.clear();
+    localSessionMessagesInternal.clear();
+    gatewayHistoryCacheInternal.clear();
+    aiGatewayStreamingTextBySessionInternal.clear();
+    aiGatewayStreamingClientsInternal.clear();
+    aiGatewayPendingSessionKeysInternal.clear();
+    aiGatewayAbortedSessionKeysInternal.clear();
+    singleAgentExternalCliPendingSessionKeysInternal.clear();
+    assistantThreadTurnQueuesInternal.clear();
+    multiAgentRunPendingInternal = false;
     setActiveAppLanguage(defaults.appLanguage);
-    await _settingsController.resetSnapshot(defaults);
-    _multiAgentOrchestrator.updateConfig(defaults.multiAgent);
-    _agentsController.restoreSelection(
+    await settingsControllerInternal.resetSnapshot(defaults);
+    multiAgentOrchestratorInternal.updateConfig(defaults.multiAgent);
+    agentsControllerInternal.restoreSelection(
       defaults.primaryRemoteGatewayProfile.selectedAgentId,
     );
-    _modelsController.restoreFromSettings(defaults.aiGateway);
-    await _setCurrentAssistantSessionKey('main', persistSelection: false);
-    _chatController.clear();
-    _recomputeTasks();
+    modelsControllerInternal.restoreFromSettings(defaults.aiGateway);
+    await setCurrentAssistantSessionKeyInternal(
+      'main',
+      persistSelection: false,
+    );
+    chatControllerInternal.clear();
+    recomputeTasksInternal();
     notifyListeners();
   }
 
-  void _saveSecretDraft(String key, String value) {
+  void saveSecretDraftInternal(String key, String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
-      _draftSecretValues.remove(key);
+      draftSecretValuesInternal.remove(key);
     } else {
-      _draftSecretValues[key] = trimmed;
+      draftSecretValuesInternal[key] = trimmed;
     }
-    _settingsDraftStatusMessage = appText(
+    settingsDraftStatusMessageInternal = appText(
       '草稿已更新，点击顶部保存持久化。',
       'Draft updated. Use the top Save button to persist it.',
     );
