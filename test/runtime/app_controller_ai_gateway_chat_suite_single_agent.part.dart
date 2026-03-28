@@ -405,7 +405,7 @@ void _registerAppControllerAiGatewayChatSuiteSingleAgentTests() {
     );
 
     test(
-      'AppController adopts and reuses resolved remote single-agent thread workspaces',
+      'AppController keeps isolated thread workspace even when runner reports another directory',
       () async {
         final tempDirectory = await _createTempDirectory(
           'xworkmate-single-agent-remote-thread-cwd-',
@@ -434,7 +434,7 @@ void _registerAppControllerAiGatewayChatSuiteSingleAgentTests() {
             shouldFallbackToAiChat: false,
             resolvedWorkingDirectory:
                 '/opt/data/.xworkmate/threads/draft-remote-thread',
-            resolvedWorkspaceRefKind: WorkspaceRefKind.remotePath,
+            resolvedWorkspaceRefKind: WorkspaceRefKind.localPath,
           ),
         );
         final controller = await _createAppController(
@@ -463,17 +463,17 @@ void _registerAppControllerAiGatewayChatSuiteSingleAgentTests() {
         );
         expect(
           controller.assistantWorkspaceRefForSession('draft:remote-thread'),
-          '/opt/data/.xworkmate/threads/draft-remote-thread',
+          '${defaultWorkspace.path}/.xworkmate/threads/draft-remote-thread',
         );
         expect(
           controller.assistantWorkspaceRefKindForSession('draft:remote-thread'),
-          WorkspaceRefKind.remotePath,
+          WorkspaceRefKind.localPath,
         );
 
         await controller.sendChatMessage('第二次运行', thinking: 'low');
         expect(
           runner.requests.last.workingDirectory,
-          '/opt/data/.xworkmate/threads/draft-remote-thread',
+          '${defaultWorkspace.path}/.xworkmate/threads/draft-remote-thread',
         );
       },
     );

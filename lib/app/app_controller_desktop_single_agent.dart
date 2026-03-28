@@ -112,17 +112,6 @@ extension AppControllerDesktopSingleAgent on AppController {
         if (resolvedRuntimeModel.isNotEmpty) {
           _singleAgentRuntimeModelBySession[sessionKey] = resolvedRuntimeModel;
         }
-        final resolvedWorkingDirectory = result.resolvedWorkingDirectory.trim();
-        if (resolvedWorkingDirectory.isNotEmpty) {
-          _upsertAssistantThreadRecord(
-            sessionKey,
-            workspaceRef: resolvedWorkingDirectory,
-            workspaceRefKind:
-                result.resolvedWorkspaceRefKind ??
-                assistantWorkspaceRefKindForSession(sessionKey),
-            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          );
-        }
         _clearAiGatewayStreamingText(sessionKey);
         if (result.aborted) {
           final partial = result.output.trim();

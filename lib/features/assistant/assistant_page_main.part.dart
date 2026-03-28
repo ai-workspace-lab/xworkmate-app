@@ -773,8 +773,9 @@ class _AssistantPageState extends State<AssistantPage> {
       executionTarget: executionTarget,
       singleAgentProvider: controller.currentSingleAgentProvider,
       permissionLevel: settings.assistantPermissionLevel,
-      workspacePath: settings.workspacePath,
-      remoteProjectRoot: settings.remoteProjectRoot,
+      workspacePath: controller.assistantWorkspaceRefForSession(
+        controller.currentSessionKey,
+      ),
     );
 
     setState(() {
@@ -985,7 +986,6 @@ class _AssistantPageState extends State<AssistantPage> {
     required SingleAgentProvider singleAgentProvider,
     required AssistantPermissionLevel permissionLevel,
     required String workspacePath,
-    required String remoteProjectRoot,
   }) {
     final attachmentBlock = attachmentNames.isEmpty
         ? ''
@@ -993,9 +993,7 @@ class _AssistantPageState extends State<AssistantPage> {
     final skillBlock = selectedSkillLabels.isEmpty
         ? ''
         : 'Preferred skills:\n${selectedSkillLabels.map((name) => '- $name').join('\n')}\n\n';
-    final targetRoot = executionTarget == AssistantExecutionTarget.local
-        ? workspacePath.trim()
-        : remoteProjectRoot.trim();
+    final targetRoot = workspacePath.trim();
     final executionContext =
         'Execution context:\n'
         '- target: ${executionTarget.promptValue}\n'
