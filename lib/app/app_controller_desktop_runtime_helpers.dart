@@ -45,6 +45,7 @@ import 'app_controller_desktop_workspace_execution.dart';
 import 'app_controller_desktop_settings_runtime.dart';
 import 'app_controller_desktop_thread_storage.dart';
 import 'app_controller_desktop_skill_permissions.dart';
+import 'app_controller_desktop_runtime_coordination_impl.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 extension AppControllerDesktopRuntimeHelpers on AppController {
@@ -379,64 +380,18 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   Future<void> refreshAcpCapabilitiesInternal({
     bool forceRefresh = false,
     bool persistMountTargets = false,
-  }) async {
-    GatewayAcpCapabilities capabilities;
-    try {
-      capabilities = await gatewayAcpClientInternal.loadCapabilities(
-        forceRefresh: forceRefresh,
-      );
-    } catch (_) {
-      capabilities = const GatewayAcpCapabilities.empty();
-    }
-    if (persistMountTargets && !disposedInternal) {
-      final currentConfig = settings.multiAgent;
-      final nextTargets = mergeAcpCapabilitiesIntoMountTargetsInternal(
-        currentConfig.mountTargets,
-        capabilities,
-      );
-      final nextConfig = currentConfig.copyWith(mountTargets: nextTargets);
-      if (jsonEncode(nextConfig.toJson()) !=
-          jsonEncode(currentConfig.toJson())) {
-        await settingsControllerInternal.saveSnapshot(
-          settings.copyWith(multiAgent: nextConfig),
-        );
-        multiAgentOrchestratorInternal.updateConfig(nextConfig);
-      }
-    }
-    notifyIfActiveInternal();
-  }
+  }) => refreshAcpCapabilitiesRuntimeInternal(
+    this,
+    forceRefresh: forceRefresh,
+    persistMountTargets: persistMountTargets,
+  );
 
   Future<void> refreshSingleAgentCapabilitiesInternal({
     bool forceRefresh = false,
-  }) async {
-    final gatewayToken = await settingsController.loadGatewayToken();
-    final next = <SingleAgentProvider, DirectSingleAgentCapabilities>{};
-    for (final provider in configuredSingleAgentProviders) {
-      final profile = settings.externalAcpEndpointForProvider(provider);
-      if (!profile.enabled || profile.endpoint.trim().isEmpty) {
-        next[provider] = const DirectSingleAgentCapabilities.unavailable(
-          endpoint: '',
-        );
-        continue;
-      }
-      try {
-        next[provider] = await singleAgentAppServerClientInternal
-            .loadCapabilities(
-              provider: provider,
-              forceRefresh: forceRefresh,
-              gatewayToken: gatewayToken,
-            );
-      } catch (_) {
-        next[provider] = const DirectSingleAgentCapabilities.unavailable(
-          endpoint: '',
-        );
-      }
-    }
-    singleAgentCapabilitiesByProviderInternal = next;
-    if (!disposedInternal) {
-      notifyIfActiveInternal();
-    }
-  }
+  }) => refreshSingleAgentCapabilitiesRuntimeInternal(
+    this,
+    forceRefresh: forceRefresh,
+  );
 
   Future<void> refreshResolvedCodexCliPathInternal() async {
     if (effectiveCodeAgentRuntimeMode != CodeAgentRuntimeMode.externalCli) {
@@ -471,116 +426,36 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   List<ManagedMountTargetState> mergeAcpCapabilitiesIntoMountTargetsInternal(
     List<ManagedMountTargetState> current,
     GatewayAcpCapabilities capabilities,
-  ) {
-    final source = current.isEmpty
-        ? ManagedMountTargetState.defaults()
-        : current;
-    final providers = capabilities.providers
-        .map((item) => item.providerId)
-        .toSet();
-    return source
-        .map((item) {
-          final available = switch (item.targetId) {
-            'codex' => providers.contains('codex'),
-            'opencode' => providers.contains('opencode'),
-            'claude' => providers.contains('claude'),
-            'gemini' => providers.contains('gemini'),
-            'aris' => capabilities.multiAgent,
-            'openclaw' => capabilities.multiAgent || capabilities.singleAgent,
-            _ => false,
-          };
-          return item.copyWith(
-            available: available,
-            discoveryState: available ? 'ready' : 'unavailable',
-            syncState: available ? item.syncState : 'idle',
-            detail: available
-                ? appText(
-                    '来源：Gateway ACP capabilities',
-                    'Source: Gateway ACP capabilities',
-                  )
-                : appText(
-                    'Gateway ACP 未报告该能力。',
-                    'Gateway ACP did not report this capability.',
-                  ),
-          );
-        })
-        .toList(growable: false);
-  }
+  ) => mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal(
+    this,
+    current,
+    capabilities,
+  );
 
-  String? assistantWorkingDirectoryForSessionInternal(String sessionKey) {
-    final candidate = assistantWorkspaceRefForSession(sessionKey).trim();
-    if (candidate.isEmpty) {
-      return null;
-    }
-    return candidate;
-  }
+  String? assistantWorkingDirectoryForSessionInternal(String sessionKey) =>
+      assistantWorkingDirectoryForSessionRuntimeInternal(this, sessionKey);
 
   String? resolveLocalAssistantWorkingDirectoryForSessionInternal(
     String sessionKey, {
     bool requireLocalExistence = true,
-  }) {
-    if (assistantWorkspaceRefKindForSession(sessionKey) !=
-        WorkspaceRefKind.localPath) {
-      return null;
-    }
-    final candidate = assistantWorkingDirectoryForSessionInternal(sessionKey);
-    if (candidate == null) {
-      return null;
-    }
-    final directory = Directory(candidate);
-    if (directory.existsSync()) {
-      return directory.path;
-    }
-    if (requireLocalExistence) {
-      return null;
-    }
-    return candidate;
-  }
+  }) => resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal(
+    this,
+    sessionKey,
+    requireLocalExistence: requireLocalExistence,
+  );
 
   String? resolveSingleAgentWorkingDirectoryForSessionInternal(
     String sessionKey, {
     SingleAgentProvider? provider,
-  }) {
-    final workspaceKind = assistantWorkspaceRefKindForSession(sessionKey);
-    if (workspaceKind == WorkspaceRefKind.objectStore) {
-      return null;
-    }
-    if (workspaceKind == WorkspaceRefKind.remotePath) {
-      return assistantWorkingDirectoryForSessionInternal(sessionKey);
-    }
-    return resolveLocalAssistantWorkingDirectoryForSessionInternal(
-      sessionKey,
-      requireLocalExistence:
-          provider == null ||
-          singleAgentProviderRequiresLocalPathInternal(provider),
-    );
-  }
+  }) => resolveSingleAgentWorkingDirectoryForSessionRuntimeInternal(
+    this,
+    sessionKey,
+    provider: provider,
+  );
 
   bool singleAgentProviderRequiresLocalPathInternal(
     SingleAgentProvider provider,
-  ) {
-    final endpoint = resolveSingleAgentEndpointInternal(provider);
-    if (endpoint == null) {
-      return true;
-    }
-    final scheme = endpoint.scheme.trim().toLowerCase();
-    if (scheme == 'wss' || scheme == 'https') {
-      return false;
-    }
-    final host = endpoint.host.trim();
-    if (host.isEmpty) {
-      return true;
-    }
-    final address = InternetAddress.tryParse(host);
-    if (address != null) {
-      return !(address.isLoopback || address.type == InternetAddressType.unix);
-    }
-    final normalizedHost = host.toLowerCase();
-    if (normalizedHost == 'localhost') {
-      return true;
-    }
-    return false;
-  }
+  ) => singleAgentProviderRequiresLocalPathRuntimeInternal(this, provider);
 
   void registerCodexExternalProviderInternal() {
     runtimeCoordinatorInternal.registerExternalCodeAgent(
@@ -603,117 +478,19 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     );
   }
 
-  CodeAgentNodeState buildCodeAgentNodeStateInternal() {
-    return CodeAgentNodeState(
-      selectedAgentId: agentsControllerInternal.selectedAgentId,
-      gatewayConnected: runtimeInternal.isConnected,
-      executionTarget: currentAssistantExecutionTarget,
-      runtimeMode: effectiveCodeAgentRuntimeMode,
-      bridgeEnabled: isCodexBridgeEnabledInternal,
-      bridgeState: codexCooperationStateInternal.name,
-      preferredProviderId: 'codex',
-      resolvedCodexCliPath: resolvedCodexCliPathInternal,
-      configuredCodexCliPath: configuredCodexCliPath,
-    );
-  }
+  CodeAgentNodeState buildCodeAgentNodeStateInternal() =>
+      buildCodeAgentNodeStateRuntimeInternal(this);
 
-  GatewayMode bridgeGatewayModeInternal() {
-    if (!runtimeInternal.isConnected) {
-      return GatewayMode.offline;
-    }
-    return switch (currentAssistantExecutionTarget) {
-      AssistantExecutionTarget.singleAgent => GatewayMode.offline,
-      AssistantExecutionTarget.local => GatewayMode.local,
-      AssistantExecutionTarget.remote => GatewayMode.remote,
-    };
-  }
+  GatewayMode bridgeGatewayModeInternal() =>
+      bridgeGatewayModeRuntimeInternal(this);
 
-  Future<void> ensureCodexGatewayRegistrationInternal() async {
-    if (!isCodexBridgeEnabledInternal) {
-      return;
-    }
+  Future<void> ensureCodexGatewayRegistrationInternal() =>
+      ensureCodexGatewayRegistrationRuntimeInternal(this);
 
-    if (!runtimeInternal.isConnected) {
-      codexCooperationStateInternal = CodexCooperationState.bridgeOnly;
-      codeAgentBridgeRegistryInternal.clearRegistration();
-      notifyListeners();
-      return;
-    }
+  void clearCodexGatewayRegistrationInternal() =>
+      clearCodexGatewayRegistrationRuntimeInternal(this);
 
-    if (codeAgentBridgeRegistryInternal.isRegistered) {
-      codexCooperationStateInternal = CodexCooperationState.registered;
-      notifyListeners();
-      return;
-    }
-
-    try {
-      final dispatch = codeAgentNodeOrchestratorInternal.buildGatewayDispatch(
-        buildCodeAgentNodeStateInternal(),
-      );
-      await codeAgentBridgeRegistryInternal.register(
-        agentType: 'code-agent-bridge',
-        name: 'XWorkmate Codex Bridge',
-        version: kAppVersion,
-        transport: 'stdio-bridge',
-        capabilities: const <AgentCapability>[
-          AgentCapability(
-            name: 'chat',
-            description: 'Bridge external Codex CLI chat turns.',
-          ),
-          AgentCapability(
-            name: 'code-edit',
-            description: 'Bridge code editing tasks through Codex CLI.',
-          ),
-          AgentCapability(
-            name: 'memory-sync',
-            description: 'Coordinate memory sync through OpenClaw Gateway.',
-          ),
-        ],
-        metadata: <String, dynamic>{
-          ...dispatch.metadata,
-          'providerId': 'codex',
-          'runtimeMode': effectiveCodeAgentRuntimeMode.name,
-          'gatewayMode': bridgeGatewayModeInternal().name,
-          'binaryConfigured': (resolvedCodexCliPath ?? configuredCodexCliPath)
-              .trim()
-              .isNotEmpty,
-          'capabilities': const <String>[
-            'chat',
-            'code-edit',
-            'gateway-bridge',
-            'memory-sync',
-          ],
-        },
-      );
-      codexCooperationStateInternal = CodexCooperationState.registered;
-      codexBridgeErrorInternal = null;
-    } catch (error) {
-      codexCooperationStateInternal = CodexCooperationState.bridgeOnly;
-      codexBridgeErrorInternal = error.toString();
-    }
-
-    notifyListeners();
-  }
-
-  void clearCodexGatewayRegistrationInternal() {
-    codeAgentBridgeRegistryInternal.clearRegistration();
-    if (isCodexBridgeEnabledInternal) {
-      codexCooperationStateInternal = CodexCooperationState.bridgeOnly;
-    } else {
-      codexCooperationStateInternal = CodexCooperationState.notStarted;
-    }
-    notifyListeners();
-  }
-
-  void recomputeTasksInternal() {
-    tasksControllerInternal.recompute(
-      sessions: sessions,
-      cronJobs: cronJobsControllerInternal.items,
-      currentSessionKey: sessionsControllerInternal.currentSessionKey,
-      hasPendingRun: hasAssistantPendingRun,
-      activeAgentName: agentsControllerInternal.activeAgentName,
-    );
-  }
+  void recomputeTasksInternal() => recomputeTasksRuntimeInternal(this);
 
   void attachChildListenersInternal() {
     runtimeCoordinatorInternal.addListener(relayChildChangeInternal);
