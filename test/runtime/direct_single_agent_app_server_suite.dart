@@ -96,6 +96,48 @@ void main() {
       expect(server.authorizationHeaders, contains('Bearer token-1'));
     });
 
+    test(
+      'starts a new websocket thread when working directory changes for a session',
+      () async {
+        final server = await _FakeAppServer.start();
+        addTearDown(server.close);
+
+        final client = DirectSingleAgentAppServerClient(
+          endpointResolver: (_) => server.baseHttpUri,
+        );
+        addTearDown(client.dispose);
+
+        final first = await client.run(
+          const DirectSingleAgentRunRequest(
+            sessionId: 'session-cwd-change',
+            provider: SingleAgentProvider.opencode,
+            prompt: 'first turn',
+            model: 'gpt-4.1',
+            workingDirectory: '/tmp/a',
+            gatewayToken: '',
+          ),
+        );
+        final second = await client.run(
+          const DirectSingleAgentRunRequest(
+            sessionId: 'session-cwd-change',
+            provider: SingleAgentProvider.opencode,
+            prompt: 'second turn',
+            model: 'gpt-4.1',
+            workingDirectory: '/tmp/b',
+            gatewayToken: '',
+          ),
+        );
+
+        expect(first.success, isTrue, reason: first.errorMessage);
+        expect(second.success, isTrue, reason: second.errorMessage);
+        expect(second.resolvedWorkingDirectory, '/tmp/b');
+        expect(
+          server.methods.where((method) => method == 'thread/start').length,
+          2,
+        );
+      },
+    );
+
     test('sends selected skills as structured app-server inputs', () async {
       final server = await _FakeAppServer.start();
       addTearDown(server.close);
@@ -202,12 +244,12 @@ void main() {
           ),
         );
 
-      expect(result.success, isTrue);
-      expect(result.output, 'hello world from app server');
-      expect(result.resolvedModel, 'codex-sonnet');
-      expect(result.resolvedWorkingDirectory, '/tmp');
-      expect(result.resolvedWorkspaceRefKind, WorkspaceRefKind.localPath);
-    },
+        expect(result.success, isTrue);
+        expect(result.output, 'hello world from app server');
+        expect(result.resolvedModel, 'codex-sonnet');
+        expect(result.resolvedWorkingDirectory, '/tmp');
+        expect(result.resolvedWorkspaceRefKind, WorkspaceRefKind.localPath);
+      },
     );
 
     test('captures the resolved thread path returned by app-server', () async {
@@ -235,8 +277,7 @@ void main() {
       expect(result.success, isTrue);
       expect(result.resolvedWorkingDirectory, '/tmp/app-server-thread');
       expect(result.resolvedWorkspaceRefKind, WorkspaceRefKind.localPath);
-      },
-    );
+    });
 
     test(
       'probes OpenCode REST endpoint and reports provider support',
@@ -288,6 +329,44 @@ void main() {
       expect(server.createdSessionCount, 1);
       expect(server.lastPromptText, 'hello opencode');
     });
+
+    test(
+      'creates a new REST session when working directory changes for a session',
+      () async {
+        final server = await _FakeOpenCodeRestServer.start();
+        addTearDown(server.close);
+
+        final client = DirectSingleAgentAppServerClient(
+          endpointResolver: (_) => server.baseHttpUri,
+        );
+        addTearDown(client.dispose);
+
+        final first = await client.run(
+          const DirectSingleAgentRunRequest(
+            sessionId: 'session-opencode-cwd-change',
+            provider: SingleAgentProvider.opencode,
+            prompt: 'first',
+            model: '',
+            workingDirectory: '/tmp/a',
+            gatewayToken: '',
+          ),
+        );
+        final second = await client.run(
+          const DirectSingleAgentRunRequest(
+            sessionId: 'session-opencode-cwd-change',
+            provider: SingleAgentProvider.opencode,
+            prompt: 'second',
+            model: '',
+            workingDirectory: '/tmp/b',
+            gatewayToken: '',
+          ),
+        );
+
+        expect(first.success, isTrue, reason: first.errorMessage);
+        expect(second.success, isTrue, reason: second.errorMessage);
+        expect(server.createdSessionCount, 2);
+      },
+    );
 
     test(
       'fails OpenCode REST turns that complete without assistant content',

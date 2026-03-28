@@ -1358,7 +1358,8 @@ class AppController extends ChangeNotifier {
       return false;
     }
     final normalizedRef = workspaceRef?.trim() ?? '';
-    if (normalizedRef.isEmpty || workspaceRefKind != WorkspaceRefKind.localPath) {
+    if (normalizedRef.isEmpty ||
+        workspaceRefKind != WorkspaceRefKind.localPath) {
       return false;
     }
     final expectedDefault = _defaultWorkspaceRefForSession(
@@ -3630,14 +3631,13 @@ class AppController extends ChangeNotifier {
         continue;
       }
       final titleFromSettings = assistantCustomTaskTitle(sessionKey);
-      final shouldMigrateWorkspaceRef =
-          _shouldMigrateWorkspaceRef(
-            sessionKey,
-            executionTarget:
-                record.executionTarget ?? settings.assistantExecutionTarget,
-            workspaceRef: record.workspaceRef,
-            workspaceRefKind: record.workspaceRefKind,
-          );
+      final shouldMigrateWorkspaceRef = _shouldMigrateWorkspaceRef(
+        sessionKey,
+        executionTarget:
+            record.executionTarget ?? settings.assistantExecutionTarget,
+        workspaceRef: record.workspaceRef,
+        workspaceRefKind: record.workspaceRefKind,
+      );
       final normalizedRecord = record.copyWith(
         sessionKey: sessionKey,
         title: titleFromSettings.isEmpty
@@ -4442,7 +4442,10 @@ class AppController extends ChangeNotifier {
     return candidate;
   }
 
-  String? _resolveLocalAssistantWorkingDirectoryForSession(String sessionKey) {
+  String? _resolveLocalAssistantWorkingDirectoryForSession(
+    String sessionKey, {
+    bool requireLocalExistence = true,
+  }) {
     if (assistantWorkspaceRefKindForSession(sessionKey) !=
         WorkspaceRefKind.localPath) {
       return null;
@@ -4452,10 +4455,19 @@ class AppController extends ChangeNotifier {
       return null;
     }
     final directory = Directory(candidate);
-    return directory.existsSync() ? directory.path : null;
+    if (directory.existsSync()) {
+      return directory.path;
+    }
+    if (requireLocalExistence) {
+      return null;
+    }
+    return candidate;
   }
 
-  String? _resolveSingleAgentWorkingDirectoryForSession(String sessionKey) {
+  String? _resolveSingleAgentWorkingDirectoryForSession(
+    String sessionKey, {
+    SingleAgentProvider? provider,
+  }) {
     final workspaceKind = assistantWorkspaceRefKindForSession(sessionKey);
     if (workspaceKind == WorkspaceRefKind.objectStore) {
       return null;
@@ -4463,7 +4475,35 @@ class AppController extends ChangeNotifier {
     if (workspaceKind == WorkspaceRefKind.remotePath) {
       return _assistantWorkingDirectoryForSession(sessionKey);
     }
-    return _resolveLocalAssistantWorkingDirectoryForSession(sessionKey);
+    return _resolveLocalAssistantWorkingDirectoryForSession(
+      sessionKey,
+      requireLocalExistence:
+          provider == null || _singleAgentProviderRequiresLocalPath(provider),
+    );
+  }
+
+  bool _singleAgentProviderRequiresLocalPath(SingleAgentProvider provider) {
+    final endpoint = _resolveSingleAgentEndpoint(provider);
+    if (endpoint == null) {
+      return true;
+    }
+    final scheme = endpoint.scheme.trim().toLowerCase();
+    if (scheme == 'wss' || scheme == 'https') {
+      return false;
+    }
+    final host = endpoint.host.trim();
+    if (host.isEmpty) {
+      return true;
+    }
+    final address = InternetAddress.tryParse(host);
+    if (address != null) {
+      return !(address.isLoopback || address.type == InternetAddressType.unix);
+    }
+    final normalizedHost = host.toLowerCase();
+    if (normalizedHost == 'localhost') {
+      return true;
+    }
+    return false;
   }
 
   void _registerCodexExternalProvider() {

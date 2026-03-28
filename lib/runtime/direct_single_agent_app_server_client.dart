@@ -388,6 +388,7 @@ class _DirectSingleAgentWebSocketTransport {
   final Map<String, _DirectAppServerConnection> _activeConnections =
       <String, _DirectAppServerConnection>{};
   final Map<String, String> _threadIds = <String, String>{};
+  final Map<String, String> _threadWorkingDirectories = <String, String>{};
   final Set<String> _abortedSessions = <String>{};
 
   Future<void> probe(Uri endpoint, {required String gatewayToken}) async {
@@ -610,32 +611,53 @@ class _DirectSingleAgentWebSocketTransport {
     required String workingDirectory,
     required String model,
   }) async {
+    final normalizedWorkingDirectory = workingDirectory.trim();
     final existingThreadId = _threadIds[sessionId]?.trim() ?? '';
+    final existingWorkingDirectory =
+        _threadWorkingDirectories[sessionId]?.trim() ?? '';
+    final canReuseExistingThread =
+        existingThreadId.isNotEmpty &&
+        (normalizedWorkingDirectory.isEmpty ||
+            (existingWorkingDirectory.isNotEmpty &&
+                existingWorkingDirectory == normalizedWorkingDirectory));
     if (existingThreadId.isNotEmpty) {
+      if (!canReuseExistingThread) {
+        _threadIds.remove(sessionId);
+        _threadWorkingDirectories.remove(sessionId);
+      }
+    }
+    if (canReuseExistingThread) {
       try {
         final resumed = await connection.request(
           'thread/resume',
           params: <String, dynamic>{
             'threadId': existingThreadId,
-            if (workingDirectory.trim().isNotEmpty) 'cwd': workingDirectory,
+            if (normalizedWorkingDirectory.isNotEmpty)
+              'cwd': normalizedWorkingDirectory,
           },
         );
         final resumedId = _extractThreadId(resumed) ?? existingThreadId;
+        final resumedWorkingDirectory =
+            _extractThreadPath(resumed)?.trim() ?? normalizedWorkingDirectory;
         _threadIds[sessionId] = resumedId;
+        if (resumedWorkingDirectory.isNotEmpty) {
+          _threadWorkingDirectories[sessionId] = resumedWorkingDirectory;
+        }
         return _ResolvedDirectThread(
           threadId: resumedId,
-          workingDirectory:
-              _extractThreadPath(resumed)?.trim() ?? workingDirectory.trim(),
+          workingDirectory: resumedWorkingDirectory,
         );
       } catch (_) {
         _threadIds.remove(sessionId);
+        _threadWorkingDirectories.remove(sessionId);
       }
     }
 
     final created = await connection.request(
       'thread/start',
       params: <String, dynamic>{
-        if (workingDirectory.trim().isNotEmpty) 'cwd': workingDirectory,
+        if (normalizedWorkingDirectory.isNotEmpty)
+          'cwd': normalizedWorkingDirectory,
         if (model.trim().isNotEmpty) 'model': model.trim(),
       },
     );
@@ -643,17 +665,22 @@ class _DirectSingleAgentWebSocketTransport {
     if (threadId.isEmpty) {
       throw StateError('Single-agent app-server returned an empty thread id.');
     }
+    final createdWorkingDirectory =
+        _extractThreadPath(created)?.trim() ?? normalizedWorkingDirectory;
     _threadIds[sessionId] = threadId;
+    if (createdWorkingDirectory.isNotEmpty) {
+      _threadWorkingDirectories[sessionId] = createdWorkingDirectory;
+    }
     return _ResolvedDirectThread(
       threadId: threadId,
-      workingDirectory:
-          _extractThreadPath(created)?.trim() ?? workingDirectory.trim(),
+      workingDirectory: createdWorkingDirectory,
     );
   }
 }
 
 class _DirectSingleAgentRestTransport {
   final Map<String, String> _restSessionIds = <String, String>{};
+  final Map<String, String> _restSessionWorkingDirectories = <String, String>{};
   final Set<String> _abortedSessions = <String>{};
 
   Future<void> probe(Uri base, {required String gatewayToken}) async {
@@ -930,15 +957,28 @@ class _DirectSingleAgentRestTransport {
     required String workingDirectory,
     required String gatewayToken,
   }) async {
+    final normalizedWorkingDirectory = workingDirectory.trim();
     final existing = _restSessionIds[sessionId]?.trim() ?? '';
     if (existing.isNotEmpty) {
-      return existing;
+      final existingWorkingDirectory =
+          _restSessionWorkingDirectories[sessionId]?.trim() ?? '';
+      final canReuseExistingSession =
+          normalizedWorkingDirectory.isEmpty ||
+          (existingWorkingDirectory.isNotEmpty &&
+              existingWorkingDirectory == normalizedWorkingDirectory);
+      if (canReuseExistingSession) {
+        return existing;
+      }
+      _restSessionIds.remove(sessionId);
+      _restSessionWorkingDirectories.remove(sessionId);
     }
     final created = await _postJson(
       _buildRestUri(
         base,
         '/session',
-        queryParameters: <String, String>{'directory': workingDirectory},
+        queryParameters: <String, String>{
+          'directory': normalizedWorkingDirectory,
+        },
       ),
       body: <String, dynamic>{'title': sessionId},
       gatewayToken: gatewayToken,
@@ -948,6 +988,9 @@ class _DirectSingleAgentRestTransport {
       throw StateError('OpenCode REST endpoint returned an empty session id.');
     }
     _restSessionIds[sessionId] = createdId;
+    if (normalizedWorkingDirectory.isNotEmpty) {
+      _restSessionWorkingDirectories[sessionId] = normalizedWorkingDirectory;
+    }
     return createdId;
   }
 
