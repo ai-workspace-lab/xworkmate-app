@@ -16,18 +16,9 @@ class StatusBadge extends StatelessWidget {
     final tone = switch (status.tone) {
       StatusTone.neutral => (palette.surfaceSecondary, palette.textSecondary),
       StatusTone.accent => (palette.accentMuted, palette.accent),
-      StatusTone.success => (
-        palette.surfacePrimary,
-        palette.success,
-      ),
-      StatusTone.warning => (
-        palette.surfacePrimary,
-        palette.warning,
-      ),
-      StatusTone.danger => (
-        palette.surfacePrimary,
-        palette.danger,
-      ),
+      StatusTone.success => (palette.surfacePrimary, palette.success),
+      StatusTone.warning => (palette.surfacePrimary, palette.warning),
+      StatusTone.danger => (palette.surfacePrimary, palette.danger),
     };
 
     return Container(

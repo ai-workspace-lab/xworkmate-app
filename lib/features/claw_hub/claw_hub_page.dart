@@ -1,5 +1,5 @@
- import 'package:flutter/material.dart';
- 
+import 'package:flutter/material.dart';
+
 import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
@@ -19,37 +19,42 @@ class ClawHubPage extends StatefulWidget {
   final ValueChanged<DetailPanelData> onOpenDetail;
 
   @override
-  State<ClawHubPage> createState() => _ClawHubPageState();
+  State<ClawHubPage> createState() => ClawHubPageStateInternal();
 }
 
-class _ClawHubPageState extends State<ClawHubPage> {
-  final _searchController = TextEditingController();
-  final _commandController = TextEditingController();
-  final _scrollController = ScrollController();
-  final List<ClawHubLogEntry> _logs = [];
-  bool _isExecuting = false;
+class ClawHubPageStateInternal extends State<ClawHubPage> {
+  final searchControllerInternal = TextEditingController();
+  final commandControllerInternal = TextEditingController();
+  final scrollControllerInternal = ScrollController();
+  final List<ClawHubLogEntry> logsInternal = [];
+  bool isExecutingInternal = false;
 
   @override
   void dispose() {
-    _searchController.dispose();
-    _commandController.dispose();
-    _scrollController.dispose();
+    searchControllerInternal.dispose();
+    commandControllerInternal.dispose();
+    scrollControllerInternal.dispose();
     super.dispose();
   }
 
-  void _addLog(String message, {ClawHubLogType type = ClawHubLogType.info}) {
+  void addLogInternal(
+    String message, {
+    ClawHubLogType type = ClawHubLogType.info,
+  }) {
     setState(() {
-      _logs.add(ClawHubLogEntry(
-        timestamp: DateTime.now(),
-        message: message,
-        type: type,
-      ));
+      logsInternal.add(
+        ClawHubLogEntry(
+          timestamp: DateTime.now(),
+          message: message,
+          type: type,
+        ),
+      );
     });
     // Auto-scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+      if (scrollControllerInternal.hasClients) {
+        scrollControllerInternal.animateTo(
+          scrollControllerInternal.position.maxScrollExtent,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
@@ -57,11 +62,11 @@ class _ClawHubPageState extends State<ClawHubPage> {
     });
   }
 
-  void _executeCommand(String input) {
+  void executeCommandInternal(String input) {
     if (input.trim().isEmpty) return;
 
-    _addLog('\$ clawhub \$input', type: ClawHubLogType.command);
-    _commandController.clear();
+    addLogInternal('\$ clawhub \$input', type: ClawHubLogType.command);
+    commandControllerInternal.clear();
 
     final parts = input.trim().split(RegExp(r'\s+'));
     final command = parts.isNotEmpty ? parts[0] : '';
@@ -69,107 +74,123 @@ class _ClawHubPageState extends State<ClawHubPage> {
 
     switch (command) {
       case 'search':
-        _handleSearch(args);
+        handleSearchInternal(args);
         break;
       case 'install':
-        _handleInstall(args);
+        handleInstallInternal(args);
         break;
       case 'update':
-        _handleUpdate(args);
+        handleUpdateInternal(args);
         break;
       case 'help':
       case '--help':
       case '-h':
-        _showHelp();
+        showHelpInternal();
         break;
       default:
-        _addLog(
+        addLogInternal(
           'Unknown command: \$command. Type "clawhub help" for available commands.',
           type: ClawHubLogType.error,
         );
     }
   }
 
-  void _handleSearch(List<String> args) {
+  void handleSearchInternal(List<String> args) {
     final query = args.join(' ');
     if (query.isEmpty) {
-      _addLog('Usage: clawhub search "<query>"', type: ClawHubLogType.warning);
+      addLogInternal(
+        'Usage: clawhub search "<query>"',
+        type: ClawHubLogType.warning,
+      );
       return;
     }
 
-    setState(() => _isExecuting = true);
-    _addLog('Searching for "\$query"...');
+    setState(() => isExecutingInternal = true);
+    addLogInternal('Searching for "\$query"...');
 
     // Simulate search results
     Future.delayed(const Duration(milliseconds: 800), () {
-      setState(() => _isExecuting = false);
-      _addLog('');
-      _addLog('Found 3 packages:', type: ClawHubLogType.success);
-      _addLog('  ├─ skill-analyzer      v1.2.0    Code analysis skill');
-      _addLog('  ├─ feishu-connector      v2.1.3    Feishu integration');
-      _addLog('  └─ azure-deploy         v3.0.1    Azure deployment helper');
-      _addLog('');
-      _addLog('Use "clawhub install <slug>" to install a package.');
+      setState(() => isExecutingInternal = false);
+      addLogInternal('');
+      addLogInternal('Found 3 packages:', type: ClawHubLogType.success);
+      addLogInternal('  ├─ skill-analyzer      v1.2.0    Code analysis skill');
+      addLogInternal('  ├─ feishu-connector      v2.1.3    Feishu integration');
+      addLogInternal(
+        '  └─ azure-deploy         v3.0.1    Azure deployment helper',
+      );
+      addLogInternal('');
+      addLogInternal('Use "clawhub install <slug>" to install a package.');
     });
   }
 
-  void _handleInstall(List<String> args) {
+  void handleInstallInternal(List<String> args) {
     if (args.isEmpty) {
-      _addLog('Usage: clawhub install <slug>', type: ClawHubLogType.warning);
+      addLogInternal(
+        'Usage: clawhub install <slug>',
+        type: ClawHubLogType.warning,
+      );
       return;
     }
 
-    setState(() => _isExecuting = true);
-    _addLog('Installing ${args[0]}...');
+    setState(() => isExecutingInternal = true);
+    addLogInternal('Installing ${args[0]}...');
 
     Future.delayed(const Duration(milliseconds: 1200), () {
-      setState(() => _isExecuting = false);
-      _addLog(
+      setState(() => isExecutingInternal = false);
+      addLogInternal(
         '✓ Successfully installed ${args[0]}',
         type: ClawHubLogType.success,
       );
-      _addLog('  Location: ~/.clawhub/skills/${args[0]}');
-      _addLog('  Run "clawhub update" to check for updates.');
+      addLogInternal('  Location: ~/.clawhub/skills/${args[0]}');
+      addLogInternal('  Run "clawhub update" to check for updates.');
     });
   }
 
-  void _handleUpdate(List<String> args) {
+  void handleUpdateInternal(List<String> args) {
     final isAll = args.contains('--all') || args.contains('-a');
     final slug = isAll ? null : (args.isNotEmpty ? args[0] : null);
 
-    setState(() => _isExecuting = true);
+    setState(() => isExecutingInternal = true);
 
     if (isAll) {
-      _addLog('Checking for updates...');
+      addLogInternal('Checking for updates...');
       Future.delayed(const Duration(milliseconds: 1000), () {
-        setState(() => _isExecuting = false);
-        _addLog('✓ All packages are up to date', type: ClawHubLogType.success);
+        setState(() => isExecutingInternal = false);
+        addLogInternal(
+          '✓ All packages are up to date',
+          type: ClawHubLogType.success,
+        );
       });
     } else if (slug != null) {
-      _addLog('Updating \$slug...');
+      addLogInternal('Updating \$slug...');
       Future.delayed(const Duration(milliseconds: 800), () {
-        setState(() => _isExecuting = false);
-        _addLog('✓ \$slug updated to latest version', type: ClawHubLogType.success);
+        setState(() => isExecutingInternal = false);
+        addLogInternal(
+          '✓ \$slug updated to latest version',
+          type: ClawHubLogType.success,
+        );
       });
     } else {
-      _addLog('Usage: clawhub update <slug>  or  clawhub update --all',
-          type: ClawHubLogType.warning);
-      setState(() => _isExecuting = false);
+      addLogInternal(
+        'Usage: clawhub update <slug>  or  clawhub update --all',
+        type: ClawHubLogType.warning,
+      );
+      setState(() => isExecutingInternal = false);
     }
   }
 
-  void _showHelp() {
-    _addLog('');
-    _addLog('ClawHub Package Manager', type: ClawHubLogType.success);
-    _addLog('Usage: clawhub <command> [options]');
-    _addLog('');
-    _addLog('Commands:');
-    _addLog('  search "<query>"     Search for packages');
-    _addLog('  install <slug>       Install a package');
-    _addLog('  update <slug>        Update a specific package');
-    _addLog('  update --all         Update all packages');
-    _addLog('  help                 Show this help message');
-    _addLog('');
+  void showHelpInternal() {
+    addLogInternal('');
+    addLogInternal('ClawHub Package Manager', type: ClawHubLogType.success);
+    addLogInternal('Usage: clawhub <command> [options]');
+    addLogInternal('');
+    addLogInternal('Commands:');
+    addLogInternal('  search "<query>"     Search for packages');
+    addLogInternal('  install <slug>       Install a package');
+    addLogInternal('  update <slug>        Update a specific package');
+    addLogInternal('  update --all         Update all packages');
+    addLogInternal('  help                 Show this help message');
+    addLogInternal('');
   }
 
   @override
@@ -243,7 +264,7 @@ class _ClawHubPageState extends State<ClawHubPage> {
                               ),
                             ),
                             const Spacer(),
-                            if (_isExecuting)
+                            if (isExecutingInternal)
                               SizedBox(
                                 width: 14,
                                 height: 14,
@@ -260,11 +281,14 @@ class _ClawHubPageState extends State<ClawHubPage> {
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           child: ListView.builder(
-                            controller: _scrollController,
-                            itemCount: _logs.length,
+                            controller: scrollControllerInternal,
+                            itemCount: logsInternal.length,
                             itemBuilder: (context, index) {
-                              final log = _logs[index];
-                              return _LogLine(entry: log, palette: palette);
+                              final log = logsInternal[index];
+                              return LogLineInternal(
+                                entry: log,
+                                palette: palette,
+                              );
                             },
                           ),
                         ),
@@ -295,7 +319,7 @@ class _ClawHubPageState extends State<ClawHubPage> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: TextField(
-                                controller: _commandController,
+                                controller: commandControllerInternal,
                                 style: TextStyle(
                                   fontFamily: 'monospace',
                                   fontSize: 14,
@@ -315,7 +339,7 @@ class _ClawHubPageState extends State<ClawHubPage> {
                                   isDense: true,
                                   contentPadding: EdgeInsets.zero,
                                 ),
-                                onSubmitted: _executeCommand,
+                                onSubmitted: executeCommandInternal,
                               ),
                             ),
                             IconButton(
@@ -324,8 +348,9 @@ class _ClawHubPageState extends State<ClawHubPage> {
                                 size: 18,
                                 color: palette.accent,
                               ),
-                              onPressed: () =>
-                                  _executeCommand(_commandController.text),
+                              onPressed: () => executeCommandInternal(
+                                commandControllerInternal.text,
+                              ),
                               visualDensity: VisualDensity.compact,
                             ),
                           ],
@@ -345,25 +370,26 @@ class _ClawHubPageState extends State<ClawHubPage> {
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  _QuickActionButton(
+                  QuickActionButtonInternal(
                     icon: Icons.search_rounded,
                     label: appText('搜索技能', 'Search Skills'),
-                    onTap: () => _executeCommand('search analytics'),
+                    onTap: () => executeCommandInternal('search analytics'),
                   ),
-                  _QuickActionButton(
+                  QuickActionButtonInternal(
                     icon: Icons.download_rounded,
                     label: appText('安装技能', 'Install Skill'),
-                    onTap: () => _executeCommand('install example-skill'),
+                    onTap: () =>
+                        executeCommandInternal('install example-skill'),
                   ),
-                  _QuickActionButton(
+                  QuickActionButtonInternal(
                     icon: Icons.update_rounded,
                     label: appText('更新全部', 'Update All'),
-                    onTap: () => _executeCommand('update --all'),
+                    onTap: () => executeCommandInternal('update --all'),
                   ),
-                  _QuickActionButton(
+                  QuickActionButtonInternal(
                     icon: Icons.help_outline_rounded,
                     label: appText('查看帮助', 'View Help'),
-                    onTap: () => _executeCommand('help'),
+                    onTap: () => executeCommandInternal('help'),
                   ),
                 ],
               ),
@@ -389,13 +415,17 @@ class ClawHubLogEntry {
   });
 }
 
-class _LogLine extends StatelessWidget {
-  const _LogLine({required this.entry, required this.palette});
+class LogLineInternal extends StatelessWidget {
+  const LogLineInternal({
+    super.key,
+    required this.entry,
+    required this.palette,
+  });
 
   final ClawHubLogEntry entry;
   final AppPalette palette;
 
-  Color get _color {
+  Color get colorInternal {
     switch (entry.type) {
       case ClawHubLogType.command:
         return palette.accent;
@@ -419,7 +449,7 @@ class _LogLine extends StatelessWidget {
         style: TextStyle(
           fontFamily: 'monospace',
           fontSize: 13,
-          color: _color,
+          color: colorInternal,
           height: 1.4,
         ),
       ),
@@ -427,8 +457,9 @@ class _LogLine extends StatelessWidget {
   }
 }
 
-class _QuickActionButton extends StatelessWidget {
-  const _QuickActionButton({
+class QuickActionButtonInternal extends StatelessWidget {
+  const QuickActionButtonInternal({
+    super.key,
     required this.icon,
     required this.label,
     required this.onTap,

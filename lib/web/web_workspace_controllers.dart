@@ -1,20 +1,23 @@
 import '../runtime/runtime_models.dart';
 
 class WebTasksController {
-  List<DerivedTaskItem> _queue = const <DerivedTaskItem>[];
-  List<DerivedTaskItem> _running = const <DerivedTaskItem>[];
-  List<DerivedTaskItem> _history = const <DerivedTaskItem>[];
-  List<DerivedTaskItem> _failed = const <DerivedTaskItem>[];
-  List<DerivedTaskItem> _scheduled = const <DerivedTaskItem>[];
+  List<DerivedTaskItem> queueInternal = const <DerivedTaskItem>[];
+  List<DerivedTaskItem> runningInternal = const <DerivedTaskItem>[];
+  List<DerivedTaskItem> historyInternal = const <DerivedTaskItem>[];
+  List<DerivedTaskItem> failedInternal = const <DerivedTaskItem>[];
+  List<DerivedTaskItem> scheduledInternal = const <DerivedTaskItem>[];
 
-  List<DerivedTaskItem> get queue => _queue;
-  List<DerivedTaskItem> get running => _running;
-  List<DerivedTaskItem> get history => _history;
-  List<DerivedTaskItem> get failed => _failed;
-  List<DerivedTaskItem> get scheduled => _scheduled;
+  List<DerivedTaskItem> get queue => queueInternal;
+  List<DerivedTaskItem> get running => runningInternal;
+  List<DerivedTaskItem> get history => historyInternal;
+  List<DerivedTaskItem> get failed => failedInternal;
+  List<DerivedTaskItem> get scheduled => scheduledInternal;
 
   int get totalCount =>
-      _queue.length + _running.length + _history.length + _failed.length;
+      queueInternal.length +
+      runningInternal.length +
+      historyInternal.length +
+      failedInternal.length;
 
   void recompute({
     required List<AssistantThreadRecord> threads,
@@ -36,15 +39,15 @@ class WebTasksController {
         id: thread.sessionKey,
         title: thread.title.trim().isEmpty ? 'Untitled task' : thread.title,
         owner: 'Assistant',
-        status: _statusForThread(
+        status: statusForThreadInternal(
           thread: thread,
           currentSessionKey: currentSessionKey,
           pendingSessionKeys: pendingSessionKeys,
         ),
-        surface: _surfaceForTarget(thread.executionTarget),
-        startedAtLabel: _timeLabel(thread.updatedAtMs),
-        durationLabel: _durationLabel(thread.updatedAtMs),
-        summary: _summaryForThread(thread),
+        surface: surfaceForTargetInternal(thread.executionTarget),
+        startedAtLabel: timeLabelInternal(thread.updatedAtMs),
+        durationLabel: durationLabelInternal(thread.updatedAtMs),
+        summary: summaryForThreadInternal(thread),
         sessionKey: thread.sessionKey,
       );
       switch (item.status) {
@@ -58,20 +61,21 @@ class WebTasksController {
           history.add(item);
       }
     }
-    _queue = queue;
-    _running = running;
-    _history = history;
-    _failed = failed;
-    _scheduled = cronJobs
+    queueInternal = queue;
+    runningInternal = running;
+    historyInternal = history;
+    failedInternal = failed;
+    scheduledInternal = cronJobs
         .map(
           (job) => DerivedTaskItem(
             id: job.id,
             title: job.name,
-            owner:
-                job.agentId?.trim().isNotEmpty == true ? job.agentId! : 'Cron',
+            owner: job.agentId?.trim().isNotEmpty == true
+                ? job.agentId!
+                : 'Cron',
             status: job.enabled ? 'Scheduled' : 'Disabled',
             surface: 'Cron',
-            startedAtLabel: _timeLabel(job.nextRunAtMs?.toDouble()),
+            startedAtLabel: timeLabelInternal(job.nextRunAtMs?.toDouble()),
             durationLabel: job.scheduleLabel,
             summary:
                 job.description ??
@@ -84,7 +88,7 @@ class WebTasksController {
         .toList(growable: false);
   }
 
-  String _statusForThread({
+  String statusForThreadInternal({
     required AssistantThreadRecord thread,
     required String currentSessionKey,
     required Set<String> pendingSessionKeys,
@@ -104,7 +108,7 @@ class WebTasksController {
     return 'Open';
   }
 
-  String _surfaceForTarget(AssistantExecutionTarget? target) {
+  String surfaceForTargetInternal(AssistantExecutionTarget? target) {
     return switch (target) {
       AssistantExecutionTarget.local => 'Local Gateway',
       AssistantExecutionTarget.remote => 'Remote Gateway',
@@ -112,7 +116,7 @@ class WebTasksController {
     };
   }
 
-  String _summaryForThread(AssistantThreadRecord thread) {
+  String summaryForThreadInternal(AssistantThreadRecord thread) {
     final latest = thread.messages.isEmpty ? null : thread.messages.last;
     final text = latest?.text.trim() ?? '';
     if (text.isNotEmpty) {
@@ -124,7 +128,7 @@ class WebTasksController {
     return 'No activity yet';
   }
 
-  String _timeLabel(double? timestampMs) {
+  String timeLabelInternal(double? timestampMs) {
     if (timestampMs == null) {
       return 'Unknown';
     }
@@ -132,7 +136,7 @@ class WebTasksController {
     return '${date.month}/${date.day} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
-  String _durationLabel(double? timestampMs) {
+  String durationLabelInternal(double? timestampMs) {
     if (timestampMs == null) {
       return 'n/a';
     }
@@ -153,11 +157,11 @@ class WebTasksController {
 }
 
 class WebSkillsController {
-  WebSkillsController(this._onRefresh);
+  WebSkillsController(this.onRefreshInternal);
 
-  final Future<void> Function(String? agentId) _onRefresh;
+  final Future<void> Function(String? agentId) onRefreshInternal;
 
   Future<void> refresh({String? agentId}) {
-    return _onRefresh(agentId);
+    return onRefreshInternal(agentId);
   }
 }

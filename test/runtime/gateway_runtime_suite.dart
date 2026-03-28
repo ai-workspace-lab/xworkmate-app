@@ -13,27 +13,24 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 import '../test_support.dart';
 
 void main() {
-  test(
-    'GatewayRuntime formats connect auth summary consistently',
-    () {
-      expect(
-        formatGatewayConnectAuthSummary(
-          mode: 'shared-token',
-          fields: const <String>['token', 'deviceToken'],
-          sources: const <String>['shared:form', 'device:store'],
-        ),
-        'shared-token | fields: token, deviceToken | sources: shared:form · device:store',
-      );
-      expect(
-        formatGatewayConnectAuthSummary(
-          mode: 'none',
-          fields: const <String>[],
-          sources: const <String>[],
-        ),
-        'none | fields: none | sources: none',
-      );
-    },
-  );
+  test('GatewayRuntime formats connect auth summary consistently', () {
+    expect(
+      formatGatewayConnectAuthSummary(
+        mode: 'shared-token',
+        fields: const <String>['token', 'deviceToken'],
+        sources: const <String>['shared:form', 'device:store'],
+      ),
+      'shared-token | fields: token, deviceToken | sources: shared:form · device:store',
+    );
+    expect(
+      formatGatewayConnectAuthSummary(
+        mode: 'none',
+        fields: const <String>[],
+        sources: const <String>[],
+      ),
+      'none | fields: none | sources: none',
+    );
+  });
 
   test(
     'GatewayRuntime uses explicit shared token override for the initial connect handshake',
@@ -44,7 +41,7 @@ void main() {
         store: store,
         identityStore: DeviceIdentityStore(store),
       );
-      final server = await _FakeGatewayRuntimeServer.start();
+      final server = await FakeGatewayRuntimeServerInternal.start();
       addTearDown(runtime.dispose);
       addTearDown(server.close);
 
@@ -98,7 +95,7 @@ void main() {
         store: store,
         identityStore: identityStore,
       );
-      final server = await _FakeGatewayRuntimeServer.start();
+      final server = await FakeGatewayRuntimeServerInternal.start();
       addTearDown(runtime.dispose);
       addTearDown(server.close);
 
@@ -138,7 +135,7 @@ void main() {
         store: store,
         identityStore: identityStore,
       );
-      final server = await _FakeGatewayRuntimeServer.start(
+      final server = await FakeGatewayRuntimeServerInternal.start(
         currentDeviceId: identity.deviceId,
       );
       addTearDown(runtime.dispose);
@@ -197,7 +194,7 @@ void main() {
         store: store,
         identityStore: DeviceIdentityStore(store),
       );
-      final server = await _FakeGatewayRuntimeServer.start(
+      final server = await FakeGatewayRuntimeServerInternal.start(
         connectErrorCode: 'INVALID_REQUEST',
         connectErrorDetailCode: 'PAIRING_REQUIRED',
         connectErrorMessage: 'pairing required',
@@ -251,7 +248,7 @@ void main() {
         store: store,
         identityStore: identityStore,
       );
-      final server = await _FakeGatewayRuntimeServer.start(
+      final server = await FakeGatewayRuntimeServerInternal.start(
         connectErrorCode: 'NOT_PAIRED',
         connectErrorDetailCode: 'PAIRING_REQUIRED',
         connectErrorMessage: 'pairing required',
@@ -294,9 +291,9 @@ void main() {
   );
 }
 
-class _FakeGatewayRuntimeServer {
-  _FakeGatewayRuntimeServer._(
-    this._server, {
+class FakeGatewayRuntimeServerInternal {
+  FakeGatewayRuntimeServerInternal._(
+    this.serverInternal, {
     required this.currentDeviceId,
     required this.connectErrorCode,
     required this.connectErrorDetailCode,
@@ -304,7 +301,7 @@ class _FakeGatewayRuntimeServer {
     required this.closeAfterConnectError,
   });
 
-  final HttpServer _server;
+  final HttpServer serverInternal;
   final String? currentDeviceId;
   final String? connectErrorCode;
   final String? connectErrorDetailCode;
@@ -313,9 +310,9 @@ class _FakeGatewayRuntimeServer {
   Map<String, dynamic>? connectAuth;
   int connectRequestCount = 0;
 
-  int get port => _server.port;
+  int get port => serverInternal.port;
 
-  static Future<_FakeGatewayRuntimeServer> start({
+  static Future<FakeGatewayRuntimeServerInternal> start({
     String? currentDeviceId,
     String? connectErrorCode,
     String? connectErrorDetailCode,
@@ -323,7 +320,7 @@ class _FakeGatewayRuntimeServer {
     bool closeAfterConnectError = false,
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final fake = _FakeGatewayRuntimeServer._(
+    final fake = FakeGatewayRuntimeServerInternal._(
       server,
       currentDeviceId: currentDeviceId,
       connectErrorCode: connectErrorCode,
@@ -331,16 +328,16 @@ class _FakeGatewayRuntimeServer {
       connectErrorMessage: connectErrorMessage,
       closeAfterConnectError: closeAfterConnectError,
     );
-    unawaited(fake._serve());
+    unawaited(fake.serveInternal());
     return fake;
   }
 
   Future<void> close() async {
-    await _server.close(force: true);
+    await serverInternal.close(force: true);
   }
 
-  Future<void> _serve() async {
-    await for (final request in _server) {
+  Future<void> serveInternal() async {
+    await for (final request in serverInternal) {
       final socket = await WebSocketTransformer.upgrade(request);
       socket.add(
         jsonEncode(<String, dynamic>{
