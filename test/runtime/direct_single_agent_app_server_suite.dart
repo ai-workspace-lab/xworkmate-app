@@ -11,17 +11,20 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   group('DirectSingleAgentAppServerClient', () {
-    test('direct single-agent app-server core file stays split into focused parts', () {
-      final lines = File(
-        'lib/runtime/direct_single_agent_app_server_client_core.part.dart',
-      ).readAsLinesSync();
+    test(
+      'direct single-agent app-server core file stays split into focused parts',
+      () {
+        final lines = File(
+          'lib/runtime/direct_single_agent_app_server_client_core.dart',
+        ).readAsLinesSync();
 
-      expect(
-        lines.length,
-        lessThanOrEqualTo(1000),
-        reason: 'The core file should stay under the target line budget.',
-      );
-    });
+        expect(
+          lines.length,
+          lessThanOrEqualTo(1000),
+          reason: 'The core file should stay under the target line budget.',
+        );
+      },
+    );
 
     test('classifies the four endpoint modes', () {
       expect(
@@ -51,7 +54,7 @@ void main() {
     });
 
     test('probes websocket endpoint and reports provider support', () async {
-      final server = await _FakeAppServer.start();
+      final server = await FakeAppServerInternal.start();
       addTearDown(server.close);
 
       final client = DirectSingleAgentAppServerClient(
@@ -72,7 +75,7 @@ void main() {
     });
 
     test('runs single-agent turns over direct websocket app-server', () async {
-      final server = await _FakeAppServer.start();
+      final server = await FakeAppServerInternal.start();
       addTearDown(server.close);
 
       final client = DirectSingleAgentAppServerClient(
@@ -111,7 +114,7 @@ void main() {
     test(
       'starts a new websocket thread when working directory changes for a session',
       () async {
-        final server = await _FakeAppServer.start();
+        final server = await FakeAppServerInternal.start();
         addTearDown(server.close);
 
         final client = DirectSingleAgentAppServerClient(
@@ -151,7 +154,7 @@ void main() {
     );
 
     test('sends selected skills as structured app-server inputs', () async {
-      final server = await _FakeAppServer.start();
+      final server = await FakeAppServerInternal.start();
       addTearDown(server.close);
 
       final client = DirectSingleAgentAppServerClient(
@@ -207,7 +210,7 @@ void main() {
     });
 
     test('interrupts active turns on abort', () async {
-      final server = await _FakeAppServer.start(delayCompletion: true);
+      final server = await FakeAppServerInternal.start(delayCompletion: true);
       addTearDown(server.close);
 
       final client = DirectSingleAgentAppServerClient(
@@ -237,7 +240,9 @@ void main() {
     test(
       'accepts nested thread objects returned by codex app-server',
       () async {
-        final server = await _FakeAppServer.start(nestedThreadResult: true);
+        final server = await FakeAppServerInternal.start(
+          nestedThreadResult: true,
+        );
         addTearDown(server.close);
 
         final client = DirectSingleAgentAppServerClient(
@@ -265,7 +270,7 @@ void main() {
     );
 
     test('captures the resolved thread path returned by app-server', () async {
-      final server = await _FakeAppServer.start(
+      final server = await FakeAppServerInternal.start(
         resolvedThreadPath: '/tmp/app-server-thread',
       );
       addTearDown(server.close);
@@ -294,7 +299,7 @@ void main() {
     test(
       'probes OpenCode REST endpoint and reports provider support',
       () async {
-        final server = await _FakeOpenCodeRestServer.start();
+        final server = await FakeOpenCodeRestServerInternal.start();
         addTearDown(server.close);
 
         final client = DirectSingleAgentAppServerClient(
@@ -315,7 +320,7 @@ void main() {
     );
 
     test('runs OpenCode turns over REST session api', () async {
-      final server = await _FakeOpenCodeRestServer.start();
+      final server = await FakeOpenCodeRestServerInternal.start();
       addTearDown(server.close);
 
       final client = DirectSingleAgentAppServerClient(
@@ -345,7 +350,7 @@ void main() {
     test(
       'creates a new REST session when working directory changes for a session',
       () async {
-        final server = await _FakeOpenCodeRestServer.start();
+        final server = await FakeOpenCodeRestServerInternal.start();
         addTearDown(server.close);
 
         final client = DirectSingleAgentAppServerClient(
@@ -383,7 +388,7 @@ void main() {
     test(
       'fails OpenCode REST turns that complete without assistant content',
       () async {
-        final server = await _FakeOpenCodeRestServer.start(
+        final server = await FakeOpenCodeRestServerInternal.start(
           emitAssistantContent: false,
         );
         addTearDown(server.close);
@@ -412,65 +417,68 @@ void main() {
   });
 }
 
-class _FakeAppServer {
-  _FakeAppServer._(
-    this._server, {
+class FakeAppServerInternal {
+  FakeAppServerInternal._(
+    this.serverInternal, {
     required this.delayCompletion,
     required this.nestedThreadResult,
     required this.resolvedThreadPath,
   });
 
-  final HttpServer _server;
+  final HttpServer serverInternal;
   final bool delayCompletion;
   final bool nestedThreadResult;
   final String? resolvedThreadPath;
   final List<String> methods = <String>[];
   final List<String> authorizationHeaders = <String>[];
-  final Map<String, Completer<void>> _methodWaiters =
+  final Map<String, Completer<void>> methodWaitersInternal =
       <String, Completer<void>>{};
-  int _threadCounter = 0;
+  int threadCounterInternal = 0;
   List<Object?>? lastTurnInput;
 
-  int get port => _server.port;
-  Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${_server.port}');
+  int get port => serverInternal.port;
+  Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${serverInternal.port}');
 
-  static Future<_FakeAppServer> start({
+  static Future<FakeAppServerInternal> start({
     bool delayCompletion = false,
     bool nestedThreadResult = false,
     String? resolvedThreadPath,
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final fake = _FakeAppServer._(
+    final fake = FakeAppServerInternal._(
       server,
       delayCompletion: delayCompletion,
       nestedThreadResult: nestedThreadResult,
       resolvedThreadPath: resolvedThreadPath,
     );
-    unawaited(fake._listen());
+    unawaited(fake.listenInternal());
     return fake;
   }
 
   Future<void> close() async {
-    await _server.close(force: true);
+    await serverInternal.close(force: true);
   }
 
   Future<void> waitForMethod(String method) async {
     if (methods.contains(method)) {
       return;
     }
-    final completer = _methodWaiters.putIfAbsent(method, Completer<void>.new);
+    final completer = methodWaitersInternal.putIfAbsent(
+      method,
+      Completer<void>.new,
+    );
     await completer.future.timeout(const Duration(seconds: 3));
   }
 
-  Future<void> _listen() async {
-    await for (final request in _server) {
+  Future<void> listenInternal() async {
+    await for (final request in serverInternal) {
       authorizationHeaders.add(
         request.headers.value(HttpHeaders.authorizationHeader) ?? '',
       );
       if (request.uri.path == '/' &&
           WebSocketTransformer.isUpgradeRequest(request)) {
         final socket = await WebSocketTransformer.upgrade(request);
-        unawaited(_handleSocket(socket));
+        unawaited(handleSocketInternal(socket));
         continue;
       }
       request.response.statusCode = HttpStatus.notFound;
@@ -478,17 +486,17 @@ class _FakeAppServer {
     }
   }
 
-  Future<void> _handleSocket(WebSocket socket) async {
+  Future<void> handleSocketInternal(WebSocket socket) async {
     await for (final raw in socket) {
-      final message = _decodeMap(raw);
+      final message = decodeMapInternal(raw);
       final method = message['method']?.toString() ?? '';
       final id = message['id'];
-      final params = _asMap(message['params']);
+      final params = asMapInternal(message['params']);
       if (method.isEmpty) {
         continue;
       }
       methods.add(method);
-      _methodWaiters.remove(method)?.complete();
+      methodWaitersInternal.remove(method)?.complete();
       switch (method) {
         case 'initialize':
           socket.add(
@@ -504,18 +512,18 @@ class _FakeAppServer {
         case 'initialized':
           break;
         case 'thread/start':
-          _threadCounter += 1;
+          threadCounterInternal += 1;
           final threadPath = resolvedThreadPath ?? params['cwd'] ?? '/tmp';
           final result = nestedThreadResult
               ? <String, dynamic>{
                   'thread': <String, dynamic>{
-                    'id': 'thread-$_threadCounter',
+                    'id': 'thread-$threadCounterInternal',
                     'path': threadPath,
                     'ephemeral': false,
                   },
                 }
               : <String, dynamic>{
-                  'id': 'thread-$_threadCounter',
+                  'id': 'thread-$threadCounterInternal',
                   'path': threadPath,
                   'ephemeral': false,
                 };
@@ -593,7 +601,7 @@ class _FakeAppServer {
               },
             }),
           );
-          unawaited(_emitTurn(socket, threadId));
+          unawaited(emitTurnInternal(socket, threadId));
           break;
         case 'turn/interrupt':
           final threadId = params['threadId']?.toString() ?? 'thread-1';
@@ -631,7 +639,7 @@ class _FakeAppServer {
     }
   }
 
-  Future<void> _emitTurn(WebSocket socket, String threadId) async {
+  Future<void> emitTurnInternal(WebSocket socket, String threadId) async {
     const parts = <String>['hello ', 'world ', 'from app server'];
     for (final part in parts) {
       try {
@@ -664,46 +672,49 @@ class _FakeAppServer {
   }
 }
 
-class _FakeOpenCodeRestServer {
-  _FakeOpenCodeRestServer._(this._server, {required this.emitAssistantContent});
+class FakeOpenCodeRestServerInternal {
+  FakeOpenCodeRestServerInternal._(
+    this.serverInternal, {
+    required this.emitAssistantContent,
+  });
 
-  final HttpServer _server;
+  final HttpServer serverInternal;
   final bool emitAssistantContent;
-  final List<HttpResponse> _eventResponses = <HttpResponse>[];
-  var _sessionCounter = 0;
-  var _messageCounter = 0;
+  final List<HttpResponse> eventResponsesInternal = <HttpResponse>[];
+  var sessionCounterInternal = 0;
+  var messageCounterInternal = 0;
   bool healthRequested = false;
   int createdSessionCount = 0;
   String lastPromptText = '';
-  final Map<String, String> _assistantTextBySession = <String, String>{};
+  final Map<String, String> assistantTextBySessionInternal = <String, String>{};
 
-  Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${_server.port}');
+  Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${serverInternal.port}');
 
-  static Future<_FakeOpenCodeRestServer> start({
+  static Future<FakeOpenCodeRestServerInternal> start({
     bool emitAssistantContent = true,
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final fake = _FakeOpenCodeRestServer._(
+    final fake = FakeOpenCodeRestServerInternal._(
       server,
       emitAssistantContent: emitAssistantContent,
     );
-    unawaited(fake._listen());
+    unawaited(fake.listenInternal());
     return fake;
   }
 
   Future<void> close() async {
-    for (final response in _eventResponses.toList(growable: false)) {
+    for (final response in eventResponsesInternal.toList(growable: false)) {
       try {
         await response.close();
       } catch (_) {
         // Best effort.
       }
     }
-    await _server.close(force: true);
+    await serverInternal.close(force: true);
   }
 
-  Future<void> _listen() async {
-    await for (final request in _server) {
+  Future<void> listenInternal() async {
+    await for (final request in serverInternal) {
       if (request.uri.path == '/global/health') {
         healthRequested = true;
         request.response.headers.contentType = ContentType.json;
@@ -728,12 +739,12 @@ class _FakeOpenCodeRestServer {
           })}\n\n',
         );
         await request.response.flush();
-        _eventResponses.add(request.response);
+        eventResponsesInternal.add(request.response);
         continue;
       }
       if (request.uri.path == '/session' && request.method == 'POST') {
         createdSessionCount += 1;
-        final sessionId = 'ses-${_sessionCounter++}';
+        final sessionId = 'ses-${sessionCounterInternal++}';
         request.response.headers.contentType = ContentType.json;
         request.response.write(
           jsonEncode(<String, dynamic>{
@@ -752,7 +763,7 @@ class _FakeOpenCodeRestServer {
       ).firstMatch(request.uri.path);
       if (sessionMatch != null && request.method == 'GET') {
         final sessionId = sessionMatch.group(1)!;
-        final text = _assistantTextBySession[sessionId] ?? '';
+        final text = assistantTextBySessionInternal[sessionId] ?? '';
         request.response.headers.contentType = ContentType.json;
         request.response.write(
           jsonEncode(<Map<String, dynamic>>[
@@ -787,8 +798,8 @@ class _FakeOpenCodeRestServer {
           lastPromptText =
               (parts.first as Map<String, dynamic>)['text']?.toString() ?? '';
         }
-        final assistantMessageId = 'msg-assistant-${_messageCounter++}';
-        await _broadcastEvent(<String, dynamic>{
+        final assistantMessageId = 'msg-assistant-${messageCounterInternal++}';
+        await broadcastEventInternal(<String, dynamic>{
           'payload': <String, dynamic>{
             'type': 'session.status',
             'properties': <String, dynamic>{
@@ -797,7 +808,7 @@ class _FakeOpenCodeRestServer {
             },
           },
         });
-        await _broadcastEvent(<String, dynamic>{
+        await broadcastEventInternal(<String, dynamic>{
           'payload': <String, dynamic>{
             'type': 'message.updated',
             'properties': <String, dynamic>{
@@ -816,7 +827,7 @@ class _FakeOpenCodeRestServer {
             'from ',
             'opencode',
           ]) {
-            await _broadcastEvent(<String, dynamic>{
+            await broadcastEventInternal(<String, dynamic>{
               'payload': <String, dynamic>{
                 'type': 'message.part.delta',
                 'properties': <String, dynamic>{
@@ -827,7 +838,7 @@ class _FakeOpenCodeRestServer {
               },
             });
           }
-          await _broadcastEvent(<String, dynamic>{
+          await broadcastEventInternal(<String, dynamic>{
             'payload': <String, dynamic>{
               'type': 'message.part.updated',
               'properties': <String, dynamic>{
@@ -840,9 +851,10 @@ class _FakeOpenCodeRestServer {
               },
             },
           });
-          _assistantTextBySession[sessionId] = 'hello world from opencode';
+          assistantTextBySessionInternal[sessionId] =
+              'hello world from opencode';
         }
-        await _broadcastEvent(<String, dynamic>{
+        await broadcastEventInternal(<String, dynamic>{
           'payload': <String, dynamic>{
             'type': 'session.status',
             'properties': <String, dynamic>{
@@ -870,16 +882,16 @@ class _FakeOpenCodeRestServer {
     }
   }
 
-  Future<void> _broadcastEvent(Map<String, dynamic> event) async {
+  Future<void> broadcastEventInternal(Map<String, dynamic> event) async {
     final payload = 'data: ${jsonEncode(event)}\n\n';
-    for (final response in _eventResponses.toList(growable: false)) {
+    for (final response in eventResponsesInternal.toList(growable: false)) {
       response.write(payload);
       await response.flush();
     }
   }
 }
 
-Map<String, dynamic> _decodeMap(Object raw) {
+Map<String, dynamic> decodeMapInternal(Object raw) {
   if (raw is Map<String, dynamic>) {
     return raw;
   }
@@ -896,7 +908,7 @@ Map<String, dynamic> _decodeMap(Object raw) {
   return const <String, dynamic>{};
 }
 
-Map<String, dynamic> _asMap(Object? value) {
+Map<String, dynamic> asMapInternal(Object? value) {
   if (value is Map<String, dynamic>) {
     return value;
   }

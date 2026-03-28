@@ -39,22 +39,20 @@ class WebAcpCapabilities {
 class WebAcpClient {
   const WebAcpClient();
 
-  static const Duration _defaultTimeout = Duration(seconds: 120);
+  static const Duration defaultTimeoutInternal = Duration(seconds: 120);
 
-  Future<WebAcpCapabilities> loadCapabilities({
-    required Uri endpoint,
-  }) async {
+  Future<WebAcpCapabilities> loadCapabilities({required Uri endpoint}) async {
     final response = await request(
       endpoint: endpoint,
       method: 'acp.capabilities',
       params: const <String, dynamic>{},
     );
-    final result = _asMap(response['result']);
-    final caps = _asMap(result['capabilities']);
+    final result = asMapInternal(response['result']);
+    final caps = asMapInternal(result['capabilities']);
     final providers = <SingleAgentProvider>{};
     for (final raw in <Object?>[
-      ..._asList(result['providers']),
-      ..._asList(caps['providers']),
+      ...asListInternal(result['providers']),
+      ...asListInternal(caps['providers']),
     ]) {
       if (raw == null) {
         continue;
@@ -67,12 +65,12 @@ class WebAcpClient {
       }
     }
     final singleAgent =
-        _boolValue(result['singleAgent']) ??
-        _boolValue(caps['single_agent']) ??
+        boolValueInternal(result['singleAgent']) ??
+        boolValueInternal(caps['single_agent']) ??
         providers.isNotEmpty;
     final multiAgent =
-        _boolValue(result['multiAgent']) ??
-        _boolValue(caps['multi_agent']) ??
+        boolValueInternal(result['multiAgent']) ??
+        boolValueInternal(caps['multi_agent']) ??
         false;
     return WebAcpCapabilities(
       singleAgent: singleAgent,
@@ -99,10 +97,10 @@ class WebAcpClient {
     required String method,
     required Map<String, dynamic> params,
     void Function(Map<String, dynamic> notification)? onNotification,
-    Duration timeout = _defaultTimeout,
+    Duration timeout = defaultTimeoutInternal,
   }) async {
     final requestId = '${DateTime.now().microsecondsSinceEpoch}-$method';
-    final wsEndpoint = _resolveWebSocketEndpoint(endpoint);
+    final wsEndpoint = resolveWebSocketEndpointInternal(endpoint);
     if (wsEndpoint == null) {
       throw const WebAcpException(
         'Missing ACP endpoint',
@@ -114,9 +112,9 @@ class WebAcpClient {
     late final StreamSubscription<dynamic> subscription;
     subscription = socket.stream.listen(
       (raw) {
-        final json = _decodeMap(raw);
-        final id = _stringValue(json['id']);
-        final methodName = _stringValue(json['method']) ?? '';
+        final json = decodeMapInternal(raw);
+        final id = stringValueInternal(json['id']);
+        final methodName = stringValueInternal(json['method']) ?? '';
         if (id == requestId &&
             (json.containsKey('result') || json.containsKey('error'))) {
           if (!completer.isCompleted) {
@@ -159,7 +157,7 @@ class WebAcpClient {
         }),
       );
       final response = await completer.future.timeout(timeout);
-      _throwIfJsonRpcError(response);
+      throwIfJsonRpcErrorInternal(response);
       return response;
     } finally {
       await subscription.cancel();
@@ -167,7 +165,7 @@ class WebAcpClient {
     }
   }
 
-  static Uri? _resolveWebSocketEndpoint(Uri? endpoint) {
+  static Uri? resolveWebSocketEndpointInternal(Uri? endpoint) {
     if (endpoint == null || endpoint.host.trim().isEmpty) {
       return null;
     }
@@ -176,22 +174,27 @@ class WebAcpClient {
       'https' || 'wss' => 'wss',
       _ => 'ws',
     };
-    return endpoint.replace(path: '/acp', query: null, fragment: null, scheme: wsScheme);
+    return endpoint.replace(
+      path: '/acp',
+      query: null,
+      fragment: null,
+      scheme: wsScheme,
+    );
   }
 
-  void _throwIfJsonRpcError(Map<String, dynamic> response) {
-    final error = _asMap(response['error']);
+  void throwIfJsonRpcErrorInternal(Map<String, dynamic> response) {
+    final error = asMapInternal(response['error']);
     if (error.isEmpty) {
       return;
     }
     throw WebAcpException(
-      _stringValue(error['message']) ?? 'ACP request failed',
-      code: _stringValue(error['code']),
+      stringValueInternal(error['message']) ?? 'ACP request failed',
+      code: stringValueInternal(error['code']),
       details: error['data'],
     );
   }
 
-  static Map<String, dynamic> _decodeMap(Object? raw) {
+  static Map<String, dynamic> decodeMapInternal(Object? raw) {
     if (raw is Map<String, dynamic>) {
       return raw;
     }
@@ -210,7 +213,7 @@ class WebAcpClient {
     return const <String, dynamic>{};
   }
 
-  static Map<String, dynamic> _asMap(Object? value) {
+  static Map<String, dynamic> asMapInternal(Object? value) {
     if (value is Map<String, dynamic>) {
       return value;
     }
@@ -220,7 +223,7 @@ class WebAcpClient {
     return const <String, dynamic>{};
   }
 
-  static List<dynamic> _asList(Object? value) {
+  static List<dynamic> asListInternal(Object? value) {
     if (value is List<dynamic>) {
       return value;
     }
@@ -230,12 +233,12 @@ class WebAcpClient {
     return const <dynamic>[];
   }
 
-  static String? _stringValue(Object? value) {
+  static String? stringValueInternal(Object? value) {
     final text = value?.toString().trim();
     return (text == null || text.isEmpty) ? null : text;
   }
 
-  static bool? _boolValue(Object? value) {
+  static bool? boolValueInternal(Object? value) {
     if (value is bool) {
       return value;
     }

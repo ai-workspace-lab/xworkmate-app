@@ -59,8 +59,7 @@ class ArisBundleManifest {
       upstreamRepository: json['upstreamRepository'] as String? ?? '',
       upstreamCommit: json['upstreamCommit'] as String? ?? '',
       llmChatServerPath: json['llmChatServerPath'] as String? ?? '',
-      llmChatRequirementsPath:
-          json['llmChatRequirementsPath'] as String? ?? '',
+      llmChatRequirementsPath: json['llmChatRequirementsPath'] as String? ?? '',
       roleSkills: parseRoleSkills(json['roleSkills']),
       codexRoleSkills: parseRoleSkills(json['codexRoleSkills']),
     );
@@ -68,10 +67,7 @@ class ArisBundleManifest {
 }
 
 class ResolvedArisBundle {
-  const ResolvedArisBundle({
-    required this.rootPath,
-    required this.manifest,
-  });
+  const ResolvedArisBundle({required this.rootPath, required this.manifest});
 
   final String rootPath;
   final ArisBundleManifest manifest;
@@ -79,7 +75,8 @@ class ResolvedArisBundle {
   String resolve(String relativePath) => '$rootPath/$relativePath';
 
   String get llmChatServerPath => resolve(manifest.llmChatServerPath);
-  String get llmChatRequirementsPath => resolve(manifest.llmChatRequirementsPath);
+  String get llmChatRequirementsPath =>
+      resolve(manifest.llmChatRequirementsPath);
 
   List<String> skillPathsForRole(
     MultiAgentRole role, {
@@ -103,39 +100,39 @@ class ArisBundleRepository {
     AssetBundle? assetBundle,
     Future<String> Function()? rootPathResolver,
     Future<List<String>> Function()? assetKeysResolver,
-  }) : _assetBundle = assetBundle ?? rootBundle,
-       _rootPathResolver = rootPathResolver,
-       _assetKeysResolver = assetKeysResolver;
+  }) : assetBundleInternal = assetBundle ?? rootBundle,
+       rootPathResolverInternal = rootPathResolver,
+       assetKeysResolverInternal = assetKeysResolver;
 
   static const String assetPrefix = 'assets/aris/';
   static const String manifestAssetPath = '${assetPrefix}manifest.json';
 
-  final AssetBundle _assetBundle;
-  final Future<String> Function()? _rootPathResolver;
-  final Future<List<String>> Function()? _assetKeysResolver;
+  final AssetBundle assetBundleInternal;
+  final Future<String> Function()? rootPathResolverInternal;
+  final Future<List<String>> Function()? assetKeysResolverInternal;
 
-  ArisBundleManifest? _manifestCache;
-  ResolvedArisBundle? _bundleCache;
+  ArisBundleManifest? manifestCacheInternal;
+  ResolvedArisBundle? bundleCacheInternal;
 
   Future<ArisBundleManifest> loadManifest() async {
-    final cached = _manifestCache;
+    final cached = manifestCacheInternal;
     if (cached != null) {
       return cached;
     }
-    final raw = await _assetBundle.loadString(manifestAssetPath);
+    final raw = await assetBundleInternal.loadString(manifestAssetPath);
     final decoded = jsonDecode(raw) as Map<String, dynamic>;
     final manifest = ArisBundleManifest.fromJson(decoded);
-    _manifestCache = manifest;
+    manifestCacheInternal = manifest;
     return manifest;
   }
 
   Future<ResolvedArisBundle> ensureReady() async {
-    final cached = _bundleCache;
+    final cached = bundleCacheInternal;
     if (cached != null) {
       return cached;
     }
     final manifest = await loadManifest();
-    final rootPath = await _resolveRootPath();
+    final rootPath = await resolveRootPathInternal();
     final markerFile = File('$rootPath/.bundle-version');
     final directory = Directory(rootPath);
     final needsExtract =
@@ -144,15 +141,17 @@ class ArisBundleRepository {
         (await markerFile.readAsString()).trim() != manifest.bundleVersion;
 
     if (needsExtract) {
-      await _extractBundle(rootPath, manifest);
+      await extractBundleInternal(rootPath, manifest);
     }
 
     final bundle = ResolvedArisBundle(rootPath: rootPath, manifest: manifest);
-    _bundleCache = bundle;
+    bundleCacheInternal = bundle;
     return bundle;
   }
 
-  Future<Map<String, String>> loadSkillContents(List<String> absolutePaths) async {
+  Future<Map<String, String>> loadSkillContents(
+    List<String> absolutePaths,
+  ) async {
     final loaded = <String, String>{};
     for (final path in absolutePaths) {
       final file = File(path);
@@ -177,8 +176,8 @@ class ArisBundleRepository {
         .length;
   }
 
-  Future<String> _resolveRootPath() async {
-    final override = await _rootPathResolver?.call();
+  Future<String> resolveRootPathInternal() async {
+    final override = await rootPathResolverInternal?.call();
     final trimmed = override?.trim() ?? '';
     if (trimmed.isNotEmpty) {
       return trimmed;
@@ -187,7 +186,7 @@ class ArisBundleRepository {
     return '${supportDirectory.path}/xworkmate/aris-bundle';
   }
 
-  Future<void> _extractBundle(
+  Future<void> extractBundleInternal(
     String rootPath,
     ArisBundleManifest manifest,
   ) async {
@@ -197,14 +196,14 @@ class ArisBundleRepository {
     }
     await directory.create(recursive: true);
 
-    final resolver = _assetKeysResolver;
+    final resolver = assetKeysResolverInternal;
     final assetKeys = resolver != null
         ? await resolver()
-        : (await AssetManifest.loadFromAssetBundle(_assetBundle))
+        : (await AssetManifest.loadFromAssetBundle(assetBundleInternal))
               .listAssets()
               .where((item) => item.startsWith(assetPrefix))
               .toList(growable: false);
-    final requiredAssets = _requiredAssetKeys(
+    final requiredAssets = requiredAssetKeysInternal(
       manifest: manifest,
       assetKeys: assetKeys,
     );
@@ -214,7 +213,7 @@ class ArisBundleRepository {
       if (relativePath.isEmpty) {
         continue;
       }
-      final data = await _assetBundle.load(assetKey);
+      final data = await assetBundleInternal.load(assetKey);
       final bytes = data.buffer.asUint8List(
         data.offsetInBytes,
         data.lengthInBytes,
@@ -229,21 +228,21 @@ class ArisBundleRepository {
     ).writeAsString(manifest.bundleVersion, flush: true);
   }
 
-  List<String> _requiredAssetKeys({
+  List<String> requiredAssetKeysInternal({
     required ArisBundleManifest manifest,
     required List<String> assetKeys,
   }) {
     final required = <String>{manifestAssetPath};
     final requiredPrefixes = <String>{
-      _parentAssetPrefix(manifest.llmChatServerPath),
-      _parentAssetPrefix(manifest.llmChatRequirementsPath),
+      parentAssetPrefixInternal(manifest.llmChatServerPath),
+      parentAssetPrefixInternal(manifest.llmChatRequirementsPath),
     }..removeWhere((item) => item.isEmpty);
 
     for (final skillPath in <String>[
       ...manifest.roleSkills.values.expand((items) => items),
       ...manifest.codexRoleSkills.values.expand((items) => items),
     ]) {
-      requiredPrefixes.add(_parentAssetPrefix(skillPath));
+      requiredPrefixes.add(parentAssetPrefixInternal(skillPath));
     }
 
     for (final assetKey in assetKeys) {
@@ -257,7 +256,7 @@ class ArisBundleRepository {
     return required.toList(growable: false)..sort();
   }
 
-  String _parentAssetPrefix(String relativePath) {
+  String parentAssetPrefixInternal(String relativePath) {
     final trimmed = relativePath.trim();
     if (trimmed.isEmpty) {
       return '';

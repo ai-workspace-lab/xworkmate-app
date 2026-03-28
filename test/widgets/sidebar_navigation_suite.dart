@@ -152,16 +152,15 @@ void main() {
       find.byKey(const ValueKey<String>('sidebar-favorite-language')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey<String>('sidebar-favorite-theme')));
+    await tester.tap(
+      find.byKey(const ValueKey<String>('sidebar-favorite-theme')),
+    );
     await tester.pumpAndSettle();
 
-    expect(
-      toggled,
-      const <AssistantFocusEntry>[
-        AssistantFocusEntry.language,
-        AssistantFocusEntry.theme,
-      ],
-    );
+    expect(toggled, const <AssistantFocusEntry>[
+      AssistantFocusEntry.language,
+      AssistantFocusEntry.theme,
+    ]);
   });
 
   testWidgets(

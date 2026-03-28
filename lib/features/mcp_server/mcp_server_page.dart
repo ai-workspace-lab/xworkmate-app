@@ -142,15 +142,16 @@ class McpServerPage extends StatelessWidget {
                                     children: [
                                       Text(
                                         connector.label,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleMedium,
                                       ),
                                       const SizedBox(height: 6),
                                       Text(
                                         connector.detailLabel,
-                                        style:
-                                            Theme.of(context).textTheme.bodySmall,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
                                       ),
                                     ],
                                   ),
