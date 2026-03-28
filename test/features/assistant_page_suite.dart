@@ -27,3 +27,11 @@ import 'package:xworkmate/widgets/pane_resize_handle.dart';
 import '../test_support.dart';
 
 part 'assistant_page_suite_core.part.dart';
+part 'assistant_page_suite_composer.part.dart';
+part 'assistant_page_suite_support.part.dart';
+
+void main() {
+  _registerAssistantPageSuiteCoreTests();
+  _registerAssistantPageSuiteComposerTests();
+  _registerAssistantPageSuiteSupportTests();
+}
