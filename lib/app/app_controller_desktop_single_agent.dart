@@ -1,25 +1,71 @@
-part of 'app_controller_desktop.dart';
+// ignore_for_file: unused_import, unnecessary_import
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'app_metadata.dart';
+import 'app_capabilities.dart';
+import 'app_store_policy.dart';
+import 'ui_feature_manifest.dart';
+import '../i18n/app_language.dart';
+import '../models/app_models.dart';
+import '../runtime/device_identity_store.dart';
+import '../runtime/aris_bundle.dart';
+import '../runtime/go_core.dart';
+import '../runtime/runtime_bootstrap.dart';
+import '../runtime/desktop_platform_service.dart';
+import '../runtime/gateway_runtime.dart';
+import '../runtime/runtime_controllers.dart';
+import '../runtime/runtime_models.dart';
+import '../runtime/secure_config_store.dart';
+import '../runtime/embedded_agent_launch_policy.dart';
+import '../runtime/runtime_coordinator.dart';
+import '../runtime/direct_single_agent_app_server_client.dart';
+import '../runtime/gateway_acp_client.dart';
+import '../runtime/codex_runtime.dart';
+import '../runtime/codex_config_bridge.dart';
+import '../runtime/code_agent_node_orchestrator.dart';
+import '../runtime/assistant_artifacts.dart';
+import '../runtime/desktop_thread_artifact_service.dart';
+import '../runtime/mode_switcher.dart';
+import '../runtime/agent_registry.dart';
+import '../runtime/multi_agent_orchestrator.dart';
+import '../runtime/platform_environment.dart';
+import '../runtime/single_agent_runner.dart';
+import '../runtime/skill_directory_access.dart';
+import 'app_controller_desktop_core.dart';
+import 'app_controller_desktop_navigation.dart';
+import 'app_controller_desktop_gateway.dart';
+import 'app_controller_desktop_settings.dart';
+import 'app_controller_desktop_thread_sessions.dart';
+import 'app_controller_desktop_thread_actions.dart';
+import 'app_controller_desktop_workspace_execution.dart';
+import 'app_controller_desktop_settings_runtime.dart';
+import 'app_controller_desktop_thread_storage.dart';
+import 'app_controller_desktop_skill_permissions.dart';
+import 'app_controller_desktop_runtime_helpers.dart';
 
 extension AppControllerDesktopSingleAgent on AppController {
-  Future<void> _sendSingleAgentMessage(
+  Future<void> sendSingleAgentMessageInternal(
     String message, {
     required String thinking,
     required List<GatewayChatAttachmentPayload> attachments,
     required List<CollaborationAttachment> localAttachments,
   }) async {
-    final sessionKey = _normalizedAssistantSessionKey(
-      _sessionsController.currentSessionKey,
+    final sessionKey = normalizedAssistantSessionKeyInternal(
+      sessionsControllerInternal.currentSessionKey,
     );
     final trimmed = message.trim();
     if (trimmed.isEmpty && attachments.isEmpty) {
       return;
     }
-    await _enqueueThreadTurn<void>(sessionKey, () async {
+    await enqueueThreadTurnInternal<void>(sessionKey, () async {
       final userText = trimmed.isEmpty ? 'See attached.' : trimmed;
-      _appendAssistantThreadMessage(
+      appendAssistantThreadMessageInternal(
         sessionKey,
         GatewayChatMessage(
-          id: _nextLocalMessageId(),
+          id: nextLocalMessageIdInternal(),
           role: 'user',
           text: userText,
           timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
@@ -30,15 +76,15 @@ extension AppControllerDesktopSingleAgent on AppController {
           error: false,
         ),
       );
-      _aiGatewayPendingSessionKeys.add(sessionKey);
-      _recomputeTasks();
-      _notifyIfActive();
+      aiGatewayPendingSessionKeysInternal.add(sessionKey);
+      recomputeTasksInternal();
+      notifyIfActiveInternal();
 
       try {
         final selection = singleAgentProviderForSession(sessionKey);
         final selectedSkills = assistantSelectedSkillsForSession(sessionKey);
         final gatewayToken = await settingsController.loadGatewayToken();
-        final resolution = await _singleAgentRunner.resolveProvider(
+        final resolution = await singleAgentRunnerInternal.resolveProvider(
           selection: selection,
           availableProviders: configuredSingleAgentProviders,
           configuredCodexCliPath: configuredCodexCliPath,
@@ -47,11 +93,11 @@ extension AppControllerDesktopSingleAgent on AppController {
         final provider = resolution.resolvedProvider;
         if (provider == null) {
           if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
-            _appendSingleAgentFallbackStatusMessage(
+            appendSingleAgentFallbackStatusMessageInternal(
               sessionKey,
               resolution.fallbackReason,
             );
-            await _sendAiGatewayMessage(
+            await sendAiGatewayMessageInternal(
               message,
               thinking: thinking,
               attachments: attachments,
@@ -60,18 +106,18 @@ extension AppControllerDesktopSingleAgent on AppController {
               managePendingState: false,
             );
           } else {
-            _appendAssistantThreadMessage(
+            appendAssistantThreadMessageInternal(
               sessionKey,
               GatewayChatMessage(
-                id: _nextLocalMessageId(),
+                id: nextLocalMessageIdInternal(),
                 role: 'assistant',
-                text: _singleAgentUnavailableLabel(
+                text: singleAgentUnavailableLabelInternal(
                   sessionKey,
                   resolution.fallbackReason,
                 ),
                 timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
                 toolCallId: null,
-                toolName: _singleAgentRuntimeDebugToolName(
+                toolName: singleAgentRuntimeDebugToolNameInternal(
                   provider?.label ?? selection.label,
                 ),
                 stopReason: null,
@@ -83,10 +129,10 @@ extension AppControllerDesktopSingleAgent on AppController {
           return;
         }
 
-        _appendSingleAgentRuntimeStatusMessage(sessionKey, provider);
-        _singleAgentExternalCliPendingSessionKeys.add(sessionKey);
+        appendSingleAgentRuntimeStatusMessageInternal(sessionKey, provider);
+        singleAgentExternalCliPendingSessionKeysInternal.add(sessionKey);
 
-        final result = await _singleAgentRunner.run(
+        final result = await singleAgentRunnerInternal.run(
           SingleAgentRunRequest(
             sessionId: sessionKey,
             provider: provider,
@@ -94,7 +140,7 @@ extension AppControllerDesktopSingleAgent on AppController {
             model: assistantModelForSession(sessionKey),
             gatewayToken: gatewayToken,
             workingDirectory:
-                _resolveSingleAgentWorkingDirectoryForSession(
+                resolveSingleAgentWorkingDirectoryForSessionInternal(
                   sessionKey,
                   provider: provider,
                 ) ??
@@ -104,22 +150,24 @@ extension AppControllerDesktopSingleAgent on AppController {
             aiGatewayBaseUrl: aiGatewayUrl,
             aiGatewayApiKey: await loadAiGatewayApiKey(),
             config: settings.multiAgent,
-            onOutput: (text) => _appendAiGatewayStreamingText(sessionKey, text),
+            onOutput: (text) =>
+                appendAiGatewayStreamingTextInternal(sessionKey, text),
             configuredCodexCliPath: configuredCodexCliPath,
           ),
         );
         final resolvedRuntimeModel = result.resolvedModel.trim();
         if (resolvedRuntimeModel.isNotEmpty) {
-          _singleAgentRuntimeModelBySession[sessionKey] = resolvedRuntimeModel;
+          singleAgentRuntimeModelBySessionInternal[sessionKey] =
+              resolvedRuntimeModel;
         }
-        _clearAiGatewayStreamingText(sessionKey);
+        clearAiGatewayStreamingTextInternal(sessionKey);
         if (result.aborted) {
           final partial = result.output.trim();
           if (partial.isNotEmpty) {
-            _appendAssistantThreadMessage(
+            appendAssistantThreadMessageInternal(
               sessionKey,
               GatewayChatMessage(
-                id: _nextLocalMessageId(),
+                id: nextLocalMessageIdInternal(),
                 role: 'assistant',
                 text: partial,
                 timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
@@ -135,11 +183,11 @@ extension AppControllerDesktopSingleAgent on AppController {
         }
         if (result.shouldFallbackToAiChat) {
           if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
-            _appendSingleAgentFallbackStatusMessage(
+            appendSingleAgentFallbackStatusMessageInternal(
               sessionKey,
               result.fallbackReason ?? result.errorMessage,
             );
-            await _sendAiGatewayMessage(
+            await sendAiGatewayMessageInternal(
               message,
               thinking: thinking,
               attachments: attachments,
@@ -148,18 +196,20 @@ extension AppControllerDesktopSingleAgent on AppController {
               managePendingState: false,
             );
           } else {
-            _appendAssistantThreadMessage(
+            appendAssistantThreadMessageInternal(
               sessionKey,
               GatewayChatMessage(
-                id: _nextLocalMessageId(),
+                id: nextLocalMessageIdInternal(),
                 role: 'assistant',
-                text: _singleAgentUnavailableLabel(
+                text: singleAgentUnavailableLabelInternal(
                   sessionKey,
                   result.fallbackReason ?? result.errorMessage,
                 ),
                 timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
                 toolCallId: null,
-                toolName: _singleAgentRuntimeDebugToolName(provider.label),
+                toolName: singleAgentRuntimeDebugToolNameInternal(
+                  provider.label,
+                ),
                 stopReason: null,
                 pending: false,
                 error: false,
@@ -170,9 +220,9 @@ extension AppControllerDesktopSingleAgent on AppController {
         }
 
         if (!result.success) {
-          _appendAssistantThreadMessage(
+          appendAssistantThreadMessageInternal(
             sessionKey,
-            _assistantErrorMessage(
+            assistantErrorMessageInternal(
               appText(
                 '单机智能体执行失败：${result.errorMessage}',
                 'Single Agent execution failed: ${result.errorMessage}',
@@ -182,10 +232,10 @@ extension AppControllerDesktopSingleAgent on AppController {
           return;
         }
 
-        _appendAssistantThreadMessage(
+        appendAssistantThreadMessageInternal(
           sessionKey,
           GatewayChatMessage(
-            id: _nextLocalMessageId(),
+            id: nextLocalMessageIdInternal(),
             role: 'assistant',
             text: result.output,
             timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
@@ -197,22 +247,22 @@ extension AppControllerDesktopSingleAgent on AppController {
           ),
         );
       } catch (error) {
-        _clearAiGatewayStreamingText(sessionKey);
-        _appendAssistantThreadMessage(
+        clearAiGatewayStreamingTextInternal(sessionKey);
+        appendAssistantThreadMessageInternal(
           sessionKey,
-          _assistantErrorMessage(error.toString()),
+          assistantErrorMessageInternal(error.toString()),
         );
       } finally {
-        _singleAgentExternalCliPendingSessionKeys.remove(sessionKey);
-        _clearAiGatewayStreamingText(sessionKey);
-        _aiGatewayPendingSessionKeys.remove(sessionKey);
-        _recomputeTasks();
-        _notifyIfActive();
+        singleAgentExternalCliPendingSessionKeysInternal.remove(sessionKey);
+        clearAiGatewayStreamingTextInternal(sessionKey);
+        aiGatewayPendingSessionKeysInternal.remove(sessionKey);
+        recomputeTasksInternal();
+        notifyIfActiveInternal();
       }
     });
   }
 
-  Future<void> _sendAiGatewayMessage(
+  Future<void> sendAiGatewayMessageInternal(
     String message, {
     required String thinking,
     required List<GatewayChatAttachmentPayload> attachments,
@@ -220,19 +270,21 @@ extension AppControllerDesktopSingleAgent on AppController {
     bool appendUserMessage = true,
     bool managePendingState = true,
   }) async {
-    final sessionKey = _normalizedAssistantSessionKey(
-      sessionKeyOverride ?? _sessionsController.currentSessionKey,
+    final sessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKeyOverride ?? sessionsControllerInternal.currentSessionKey,
     );
     final trimmed = message.trim();
     if (trimmed.isEmpty && attachments.isEmpty) {
       return;
     }
 
-    final baseUrl = _normalizeAiGatewayBaseUrl(settings.aiGateway.baseUrl);
+    final baseUrl = normalizeAiGatewayBaseUrlInternal(
+      settings.aiGateway.baseUrl,
+    );
     if (baseUrl == null) {
-      _appendAssistantThreadMessage(
+      appendAssistantThreadMessageInternal(
         sessionKey,
-        _assistantErrorMessage(
+        assistantErrorMessageInternal(
           appText(
             'LLM API Endpoint 未配置，无法发送对话。',
             'LLM API Endpoint is not configured, so the conversation could not be sent.',
@@ -244,9 +296,9 @@ extension AppControllerDesktopSingleAgent on AppController {
 
     final apiKey = await loadAiGatewayApiKey();
     if (apiKey.isEmpty) {
-      _appendAssistantThreadMessage(
+      appendAssistantThreadMessageInternal(
         sessionKey,
-        _assistantErrorMessage(
+        assistantErrorMessageInternal(
           appText(
             'LLM API Token 未配置，无法发送对话。',
             'LLM API Token is not configured, so the conversation could not be sent.',
@@ -258,9 +310,9 @@ extension AppControllerDesktopSingleAgent on AppController {
 
     final model = resolvedAiGatewayModel;
     if (model.isEmpty) {
-      _appendAssistantThreadMessage(
+      appendAssistantThreadMessageInternal(
         sessionKey,
-        _assistantErrorMessage(
+        assistantErrorMessageInternal(
           appText(
             '当前没有可用的 LLM API 对话模型。请先在 设置 -> 集成 中同步并选择可用模型。',
             'No LLM API chat model is available yet. Sync and select a supported model in Settings -> Integrations first.',
@@ -272,10 +324,10 @@ extension AppControllerDesktopSingleAgent on AppController {
 
     if (appendUserMessage) {
       final userText = trimmed.isEmpty ? 'See attached.' : trimmed;
-      _appendAssistantThreadMessage(
+      appendAssistantThreadMessageInternal(
         sessionKey,
         GatewayChatMessage(
-          id: _nextLocalMessageId(),
+          id: nextLocalMessageIdInternal(),
           role: 'user',
           text: userText,
           timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
@@ -288,23 +340,23 @@ extension AppControllerDesktopSingleAgent on AppController {
       );
     }
     if (managePendingState) {
-      _aiGatewayPendingSessionKeys.add(sessionKey);
-      _recomputeTasks();
-      _notifyIfActive();
+      aiGatewayPendingSessionKeysInternal.add(sessionKey);
+      recomputeTasksInternal();
+      notifyIfActiveInternal();
     }
 
     try {
-      final assistantText = await _requestAiGatewayCompletion(
+      final assistantText = await requestAiGatewayCompletionInternal(
         baseUrl: baseUrl,
         apiKey: apiKey,
         model: model,
         thinking: thinking,
         sessionKey: sessionKey,
       );
-      _appendAssistantThreadMessage(
+      appendAssistantThreadMessageInternal(
         sessionKey,
         GatewayChatMessage(
-          id: _nextLocalMessageId(),
+          id: nextLocalMessageIdInternal(),
           role: 'assistant',
           text: assistantText,
           timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
@@ -315,13 +367,13 @@ extension AppControllerDesktopSingleAgent on AppController {
           error: false,
         ),
       );
-    } on _AiGatewayAbortException catch (error) {
+    } on AiGatewayAbortExceptionInternal catch (error) {
       final partial = error.partialText.trim();
       if (partial.isNotEmpty) {
-        _appendAssistantThreadMessage(
+        appendAssistantThreadMessageInternal(
           sessionKey,
           GatewayChatMessage(
-            id: _nextLocalMessageId(),
+            id: nextLocalMessageIdInternal(),
             role: 'assistant',
             text: partial,
             timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
@@ -334,32 +386,32 @@ extension AppControllerDesktopSingleAgent on AppController {
         );
       }
     } catch (error) {
-      _appendAssistantThreadMessage(
+      appendAssistantThreadMessageInternal(
         sessionKey,
-        _assistantErrorMessage(_aiGatewayErrorLabel(error)),
+        assistantErrorMessageInternal(aiGatewayErrorLabelInternal(error)),
       );
     } finally {
-      _aiGatewayStreamingClients.remove(sessionKey);
-      _clearAiGatewayStreamingText(sessionKey);
+      aiGatewayStreamingClientsInternal.remove(sessionKey);
+      clearAiGatewayStreamingTextInternal(sessionKey);
       if (managePendingState) {
-        _aiGatewayPendingSessionKeys.remove(sessionKey);
-        _recomputeTasks();
-        _notifyIfActive();
+        aiGatewayPendingSessionKeysInternal.remove(sessionKey);
+        recomputeTasksInternal();
+        notifyIfActiveInternal();
       }
     }
   }
 
-  Future<String> _requestAiGatewayCompletion({
+  Future<String> requestAiGatewayCompletionInternal({
     required Uri baseUrl,
     required String apiKey,
     required String model,
     required String thinking,
     required String sessionKey,
   }) async {
-    final uri = _aiGatewayChatUri(baseUrl);
+    final uri = aiGatewayChatUriInternal(baseUrl);
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 20);
-    _aiGatewayStreamingClients[sessionKey] = client;
+    aiGatewayStreamingClientsInternal[sessionKey] = client;
     try {
       final request = await client
           .postUrl(uri)
@@ -377,7 +429,7 @@ extension AppControllerDesktopSingleAgent on AppController {
       final payload = <String, dynamic>{
         'model': model,
         'stream': true,
-        'messages': _buildAiGatewayRequestMessages(sessionKey),
+        'messages': buildAiGatewayRequestMessagesInternal(sessionKey),
       };
       final normalizedThinking = thinking.trim().toLowerCase();
       if (normalizedThinking.isNotEmpty && normalizedThinking != 'off') {
@@ -389,10 +441,10 @@ extension AppControllerDesktopSingleAgent on AppController {
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final body = await response.transform(utf8.decoder).join();
-        throw _AiGatewayChatException(
-          _formatAiGatewayHttpError(
+        throw AiGatewayChatExceptionInternal(
+          formatAiGatewayHttpErrorInternal(
             response.statusCode,
-            _extractAiGatewayErrorDetail(body),
+            extractAiGatewayErrorDetailInternal(body),
           ),
         );
       }
@@ -403,7 +455,7 @@ extension AppControllerDesktopSingleAgent on AppController {
               ?.toLowerCase() ??
           '';
       if (contentType.contains('text/event-stream')) {
-        final streamed = await _readAiGatewayStreamingResponse(
+        final streamed = await readAiGatewayStreamingResponseInternal(
           response: response,
           sessionKey: sessionKey,
         );
@@ -412,24 +464,28 @@ extension AppControllerDesktopSingleAgent on AppController {
         }
         return streamed.trim();
       }
-      return await _readAiGatewayJsonCompletion(response);
+      return await readAiGatewayJsonCompletionInternal(response);
     } catch (error) {
-      if (_consumeAiGatewayAbort(sessionKey)) {
-        throw _AiGatewayAbortException(
-          _aiGatewayStreamingTextBySession[sessionKey] ?? '',
+      if (consumeAiGatewayAbortInternal(sessionKey)) {
+        throw AiGatewayAbortExceptionInternal(
+          aiGatewayStreamingTextBySessionInternal[sessionKey] ?? '',
         );
       }
       rethrow;
     } finally {
-      _aiGatewayStreamingClients.remove(sessionKey);
+      aiGatewayStreamingClientsInternal.remove(sessionKey);
       client.close(force: true);
     }
   }
 
-  List<Map<String, String>> _buildAiGatewayRequestMessages(String sessionKey) {
+  List<Map<String, String>> buildAiGatewayRequestMessagesInternal(
+    String sessionKey,
+  ) {
     final history = <GatewayChatMessage>[
-      ...(_gatewayHistoryCache[sessionKey] ?? const <GatewayChatMessage>[]),
-      ...(_assistantThreadMessages[sessionKey] ?? const <GatewayChatMessage>[]),
+      ...(gatewayHistoryCacheInternal[sessionKey] ??
+          const <GatewayChatMessage>[]),
+      ...(assistantThreadMessagesInternal[sessionKey] ??
+          const <GatewayChatMessage>[]),
     ];
     return history
         .where((message) {
@@ -449,19 +505,19 @@ extension AppControllerDesktopSingleAgent on AppController {
         .toList(growable: false);
   }
 
-  Future<String> _readAiGatewayJsonCompletion(
+  Future<String> readAiGatewayJsonCompletionInternal(
     HttpClientResponse response,
   ) async {
     final body = await response.transform(utf8.decoder).join();
-    final decoded = jsonDecode(_extractFirstJsonDocument(body));
-    final assistantText = _extractAiGatewayAssistantText(decoded);
+    final decoded = jsonDecode(extractFirstJsonDocumentInternal(body));
+    final assistantText = extractAiGatewayAssistantTextInternal(decoded);
     if (assistantText.trim().isEmpty) {
       throw const FormatException('Missing assistant content');
     }
     return assistantText.trim();
   }
 
-  Future<String> _readAiGatewayStreamingResponse({
+  Future<String> readAiGatewayStreamingResponseInternal({
     required HttpClientResponse response,
     required String sessionKey,
   }) async {
@@ -476,7 +532,7 @@ extension AppControllerDesktopSingleAgent on AppController {
       if (trimmed == '[DONE]') {
         return;
       }
-      final deltaText = _extractAiGatewayStreamText(trimmed);
+      final deltaText = extractAiGatewayStreamTextInternal(trimmed);
       if (deltaText.isEmpty) {
         return;
       }
@@ -492,13 +548,13 @@ extension AppControllerDesktopSingleAgent on AppController {
       } else {
         buffer.write(deltaText);
       }
-      _setAiGatewayStreamingText(sessionKey, buffer.toString());
+      setAiGatewayStreamingTextInternal(sessionKey, buffer.toString());
     }
 
     await for (final line
         in response.transform(utf8.decoder).transform(const LineSplitter())) {
-      if (_consumeAiGatewayAbort(sessionKey)) {
-        throw _AiGatewayAbortException(buffer.toString());
+      if (consumeAiGatewayAbortInternal(sessionKey)) {
+        throw AiGatewayAbortExceptionInternal(buffer.toString());
       }
       if (line.isEmpty) {
         if (eventLines.isNotEmpty) {
@@ -519,25 +575,29 @@ extension AppControllerDesktopSingleAgent on AppController {
     return buffer.toString();
   }
 
-  String _extractAiGatewayStreamText(String payload) {
-    final decoded = jsonDecode(_extractFirstJsonDocument(payload));
+  String extractAiGatewayStreamTextInternal(String payload) {
+    final decoded = jsonDecode(extractFirstJsonDocumentInternal(payload));
     final map = asMap(decoded);
     final choices = asList(map['choices']);
     if (choices.isNotEmpty) {
       final firstChoice = asMap(choices.first);
       final delta = asMap(firstChoice['delta']);
-      final deltaContent = _extractAiGatewayContent(delta['content']);
+      final deltaContent = extractAiGatewayContentInternal(delta['content']);
       if (deltaContent.isNotEmpty) {
         return deltaContent;
       }
     }
-    return _extractAiGatewayAssistantText(decoded);
+    return extractAiGatewayAssistantTextInternal(decoded);
   }
 
-  Future<void> _abortAiGatewayRun(String sessionKey) async {
-    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    _aiGatewayAbortedSessionKeys.add(normalizedSessionKey);
-    final client = _aiGatewayStreamingClients.remove(normalizedSessionKey);
+  Future<void> abortAiGatewayRunInternal(String sessionKey) async {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    aiGatewayAbortedSessionKeysInternal.add(normalizedSessionKey);
+    final client = aiGatewayStreamingClientsInternal.remove(
+      normalizedSessionKey,
+    );
     if (client != null) {
       try {
         client.close(force: true);
@@ -545,21 +605,21 @@ extension AppControllerDesktopSingleAgent on AppController {
         // Best effort only.
       }
     }
-    _aiGatewayPendingSessionKeys.remove(normalizedSessionKey);
-    _clearAiGatewayStreamingText(normalizedSessionKey);
-    _recomputeTasks();
-    _notifyIfActive();
+    aiGatewayPendingSessionKeysInternal.remove(normalizedSessionKey);
+    clearAiGatewayStreamingTextInternal(normalizedSessionKey);
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
   }
 
-  bool _consumeAiGatewayAbort(String sessionKey) {
-    return _aiGatewayAbortedSessionKeys.remove(
-      _normalizedAssistantSessionKey(sessionKey),
+  bool consumeAiGatewayAbortInternal(String sessionKey) {
+    return aiGatewayAbortedSessionKeysInternal.remove(
+      normalizedAssistantSessionKeyInternal(sessionKey),
     );
   }
 
-  GatewayChatMessage _assistantErrorMessage(String text) {
+  GatewayChatMessage assistantErrorMessageInternal(String text) {
     return GatewayChatMessage(
-      id: _nextLocalMessageId(),
+      id: nextLocalMessageIdInternal(),
       role: 'assistant',
       text: text,
       timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
@@ -571,8 +631,8 @@ extension AppControllerDesktopSingleAgent on AppController {
     );
   }
 
-  String? _singleAgentRuntimeDebugToolName(String label) {
-    if (!_showsSingleAgentRuntimeDebugMessages) {
+  String? singleAgentRuntimeDebugToolNameInternal(String label) {
+    if (!showsSingleAgentRuntimeDebugMessagesInternal) {
       return null;
     }
     final trimmed = label.trim();
@@ -582,17 +642,17 @@ extension AppControllerDesktopSingleAgent on AppController {
     return trimmed;
   }
 
-  void _appendSingleAgentRuntimeStatusMessage(
+  void appendSingleAgentRuntimeStatusMessageInternal(
     String sessionKey,
     SingleAgentProvider provider,
   ) {
-    if (!_showsSingleAgentRuntimeDebugMessages) {
+    if (!showsSingleAgentRuntimeDebugMessagesInternal) {
       return;
     }
-    _appendAssistantThreadMessage(
+    appendAssistantThreadMessageInternal(
       sessionKey,
       GatewayChatMessage(
-        id: _nextLocalMessageId(),
+        id: nextLocalMessageIdInternal(),
         role: 'assistant',
         text: appText(
           '单机智能体已切换到 ${provider.label} 执行当前任务。',
@@ -608,19 +668,19 @@ extension AppControllerDesktopSingleAgent on AppController {
     );
   }
 
-  void _appendSingleAgentFallbackStatusMessage(
+  void appendSingleAgentFallbackStatusMessageInternal(
     String sessionKey,
     String? reason,
   ) {
-    if (!_showsSingleAgentRuntimeDebugMessages) {
+    if (!showsSingleAgentRuntimeDebugMessagesInternal) {
       return;
     }
-    _appendAssistantThreadMessage(
+    appendAssistantThreadMessageInternal(
       sessionKey,
       GatewayChatMessage(
-        id: _nextLocalMessageId(),
+        id: nextLocalMessageIdInternal(),
         role: 'assistant',
-        text: _singleAgentFallbackLabel(reason),
+        text: singleAgentFallbackLabelInternal(reason),
         timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
         toolCallId: null,
         toolName: 'AI Chat fallback',
@@ -631,7 +691,7 @@ extension AppControllerDesktopSingleAgent on AppController {
     );
   }
 
-  String _singleAgentFallbackLabel(String? reason) {
+  String singleAgentFallbackLabelInternal(String? reason) {
     final detail = reason?.trim() ?? '';
     return detail.isEmpty
         ? appText(
@@ -644,8 +704,13 @@ extension AppControllerDesktopSingleAgent on AppController {
           );
   }
 
-  String _singleAgentUnavailableLabel(String sessionKey, String? reason) {
-    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
+  String singleAgentUnavailableLabelInternal(
+    String sessionKey,
+    String? reason,
+  ) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
     final detail = reason?.trim() ?? '';
     final selection = singleAgentProviderForSession(normalizedSessionKey);
     if (singleAgentShouldSuggestAutoSwitchForSession(normalizedSessionKey)) {

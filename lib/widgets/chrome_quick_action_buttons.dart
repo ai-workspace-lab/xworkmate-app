@@ -39,24 +39,26 @@ class ChromeIconActionButton extends StatefulWidget {
   final Future<void> Function()? onToggleFavorite;
 
   @override
-  State<ChromeIconActionButton> createState() => _ChromeIconActionButtonState();
+  State<ChromeIconActionButton> createState() =>
+      ChromeIconActionButtonStateInternal();
 }
 
-class _ChromeIconActionButtonState extends State<ChromeIconActionButton> {
-  bool _hovered = false;
+class ChromeIconActionButtonStateInternal
+    extends State<ChromeIconActionButton> {
+  bool hoveredInternal = false;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final resolvedBackground = _hovered
+    final resolvedBackground = hoveredInternal
         ? palette.chromeSurfacePressed
         : palette.chromeSurface;
 
     final button = Tooltip(
       message: widget.tooltip ?? '',
       child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
+        onEnter: (_) => setState(() => hoveredInternal = true),
+        onExit: (_) => setState(() => hoveredInternal = false),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           decoration: BoxDecoration(
@@ -65,7 +67,7 @@ class _ChromeIconActionButtonState extends State<ChromeIconActionButton> {
               end: Alignment.bottomRight,
               colors: [
                 palette.chromeHighlight.withValues(
-                  alpha: _hovered ? 0.94 : 0.88,
+                  alpha: hoveredInternal ? 0.94 : 0.88,
                 ),
                 resolvedBackground,
               ],
@@ -73,7 +75,9 @@ class _ChromeIconActionButtonState extends State<ChromeIconActionButton> {
             borderRadius: BorderRadius.circular(AppRadius.button),
             border: Border.all(color: palette.chromeStroke),
             boxShadow: [
-              _hovered ? palette.chromeShadowLift : palette.chromeShadowAmbient,
+              hoveredInternal
+                  ? palette.chromeShadowLift
+                  : palette.chromeShadowAmbient,
             ],
           ),
           child: Material(
@@ -98,7 +102,7 @@ class _ChromeIconActionButtonState extends State<ChromeIconActionButton> {
       ),
     );
 
-    return _ChromeQuickActionFavoriteFrame(
+    return ChromeQuickActionFavoriteFrameInternal(
       favorite: widget.favorite,
       showFavoriteToggle: widget.showFavoriteToggle,
       favoriteButtonKey: widget.favoriteButtonKey,
@@ -132,12 +136,12 @@ class ChromeLanguageActionButton extends StatefulWidget {
 
   @override
   State<ChromeLanguageActionButton> createState() =>
-      _ChromeLanguageActionButtonState();
+      ChromeLanguageActionButtonStateInternal();
 }
 
-class _ChromeLanguageActionButtonState
+class ChromeLanguageActionButtonStateInternal
     extends State<ChromeLanguageActionButton> {
-  bool _hovered = false;
+  bool hoveredInternal = false;
 
   @override
   Widget build(BuildContext context) {
@@ -145,8 +149,8 @@ class _ChromeLanguageActionButtonState
     final size = widget.compact ? AppSizes.sidebarItemHeight : 44.0;
 
     final button = MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      onEnter: (_) => setState(() => hoveredInternal = true),
+      onExit: (_) => setState(() => hoveredInternal = false),
       child: Tooltip(
         message: widget.tooltip,
         child: InkWell(
@@ -163,9 +167,9 @@ class _ChromeLanguageActionButtonState
                 end: Alignment.bottomRight,
                 colors: [
                   palette.chromeHighlight.withValues(
-                    alpha: _hovered ? 0.94 : 0.88,
+                    alpha: hoveredInternal ? 0.94 : 0.88,
                   ),
-                  _hovered
+                  hoveredInternal
                       ? palette.chromeSurfacePressed
                       : palette.chromeSurface,
                 ],
@@ -173,7 +177,7 @@ class _ChromeLanguageActionButtonState
               borderRadius: BorderRadius.circular(AppRadius.button),
               border: Border.all(color: palette.chromeStroke),
               boxShadow: [
-                _hovered
+                hoveredInternal
                     ? palette.chromeShadowLift
                     : palette.chromeShadowAmbient,
               ],
@@ -190,7 +194,7 @@ class _ChromeLanguageActionButtonState
       ),
     );
 
-    return _ChromeQuickActionFavoriteFrame(
+    return ChromeQuickActionFavoriteFrameInternal(
       favorite: widget.favorite,
       showFavoriteToggle: widget.showFavoriteToggle,
       favoriteButtonKey: widget.favoriteButtonKey,
@@ -200,8 +204,9 @@ class _ChromeLanguageActionButtonState
   }
 }
 
-class _ChromeQuickActionFavoriteFrame extends StatelessWidget {
-  const _ChromeQuickActionFavoriteFrame({
+class ChromeQuickActionFavoriteFrameInternal extends StatelessWidget {
+  const ChromeQuickActionFavoriteFrameInternal({
+    super.key,
     required this.favorite,
     required this.showFavoriteToggle,
     required this.child,
@@ -246,9 +251,7 @@ class _ChromeQuickActionFavoriteFrame extends StatelessWidget {
                   width: 22,
                   height: 22,
                   child: Icon(
-                    favorite
-                        ? Icons.star_rounded
-                        : Icons.star_outline_rounded,
+                    favorite ? Icons.star_rounded : Icons.star_outline_rounded,
                     size: 14,
                     color: favorite ? palette.accent : palette.textMuted,
                   ),

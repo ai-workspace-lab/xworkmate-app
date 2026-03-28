@@ -125,10 +125,7 @@ void main() {
 
       expect(snapshot.resultEntries, isEmpty);
       expect(snapshot.fileEntries, isEmpty);
-      expect(
-        snapshot.resultMessage,
-        contains('recorded on a remote agent'),
-      );
+      expect(snapshot.resultMessage, contains('recorded on a remote agent'));
     },
   );
 }

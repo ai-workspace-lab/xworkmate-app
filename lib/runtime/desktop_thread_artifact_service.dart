@@ -4,8 +4,8 @@ import 'assistant_artifacts.dart';
 import 'runtime_models.dart';
 
 class DesktopThreadArtifactService {
-  static const int _defaultResultLimit = 24;
-  static const Set<String> _ignoredDirectoryNames = <String>{
+  static const int defaultResultLimitInternal = 24;
+  static const Set<String> ignoredDirectoryNamesInternal = <String>{
     '.git',
     '.dart_tool',
     'build',
@@ -68,10 +68,10 @@ class DesktopThreadArtifactService {
       );
     }
 
-    final files = await _collectFiles(root);
-    final fileEntries = await _buildEntries(files, normalizedRef);
-    final changes = await _readGitChanges(root, normalizedRef);
-    final results = await _buildResultEntries(
+    final files = await collectFilesInternal(root);
+    final fileEntries = await buildEntriesInternal(files, normalizedRef);
+    final changes = await readGitChangesInternal(root, normalizedRef);
+    final results = await buildResultEntriesInternal(
       changes: changes,
       fileEntries: fileEntries,
       workspaceRef: normalizedRef,
@@ -114,8 +114,7 @@ class DesktopThreadArtifactService {
     }
     if (workspaceRefKind == WorkspaceRefKind.remotePath) {
       return const AssistantArtifactPreview.empty(
-        message:
-            'Remote agent artifacts are not directly readable on desktop.',
+        message: 'Remote agent artifacts are not directly readable on desktop.',
       );
     }
     final root = Directory(workspaceRef.trim());
@@ -125,7 +124,10 @@ class DesktopThreadArtifactService {
             'The recorded working directory is not available on this machine.',
       );
     }
-    final targetPath = _resolveAbsolutePath(workspaceRef, entry.relativePath);
+    final targetPath = resolveAbsolutePathInternal(
+      workspaceRef,
+      entry.relativePath,
+    );
     final file = File(targetPath);
     if (!await file.exists()) {
       return AssistantArtifactPreview.empty(
@@ -134,7 +136,7 @@ class DesktopThreadArtifactService {
       );
     }
 
-    final extension = _fileExtension(entry.relativePath);
+    final extension = fileExtensionInternal(entry.relativePath);
     final content = await file.readAsString();
     final title = entry.label;
     if (extension == 'md' || extension == 'markdown') {
@@ -148,10 +150,10 @@ class DesktopThreadArtifactService {
       return AssistantArtifactPreview(
         kind: AssistantArtifactPreviewKind.html,
         title: title,
-        content: _sanitizeHtml(content),
+        content: sanitizeHtmlInternal(content),
       );
     }
-    if (_isPlainTextExtension(extension)) {
+    if (isPlainTextExtensionInternal(extension)) {
       return AssistantArtifactPreview(
         kind: AssistantArtifactPreviewKind.text,
         title: title,
@@ -164,15 +166,17 @@ class DesktopThreadArtifactService {
     );
   }
 
-  Future<List<File>> _collectFiles(Directory root) async {
+  Future<List<File>> collectFilesInternal(Directory root) async {
     final files = <File>[];
     try {
       await for (final entity in root.list(followLinks: false)) {
         if (entity is Directory) {
-          if (_ignoredDirectoryNames.contains(_baseName(entity.path))) {
+          if (ignoredDirectoryNamesInternal.contains(
+            baseNameInternal(entity.path),
+          )) {
             continue;
           }
-          files.addAll(await _collectFiles(entity));
+          files.addAll(await collectFilesInternal(entity));
           continue;
         }
         if (entity is File) {
@@ -185,7 +189,7 @@ class DesktopThreadArtifactService {
     return files;
   }
 
-  Future<List<AssistantArtifactEntry>> _buildEntries(
+  Future<List<AssistantArtifactEntry>> buildEntriesInternal(
     List<File> files,
     String workspaceRef,
   ) async {
@@ -194,18 +198,18 @@ class DesktopThreadArtifactService {
       try {
         final stat = await file.stat();
         final relativePath =
-            _relativePath(workspaceRef, file.path) ?? file.path;
-        final extension = _fileExtension(relativePath);
+            relativePathInternal(workspaceRef, file.path) ?? file.path;
+        final extension = fileExtensionInternal(relativePath);
         entries.add(
           AssistantArtifactEntry(
             id: '$workspaceRef::$relativePath',
-            label: _baseName(relativePath),
+            label: baseNameInternal(relativePath),
             relativePath: relativePath,
             kind: AssistantArtifactEntryKind.file,
-            mimeType: _guessMimeType(relativePath),
+            mimeType: guessMimeTypeInternal(relativePath),
             sizeBytes: stat.size,
             updatedAtMs: stat.modified.millisecondsSinceEpoch.toDouble(),
-            previewable: _isPreviewableExtension(extension),
+            previewable: isPreviewableExtensionInternal(extension),
             workspaceRef: workspaceRef,
           ),
         );
@@ -223,7 +227,7 @@ class DesktopThreadArtifactService {
     return entries;
   }
 
-  Future<List<AssistantArtifactEntry>> _buildResultEntries({
+  Future<List<AssistantArtifactEntry>> buildResultEntriesInternal({
     required List<AssistantArtifactChangeEntry> changes,
     required List<AssistantArtifactEntry> fileEntries,
     required String workspaceRef,
@@ -241,10 +245,10 @@ class DesktopThreadArtifactService {
     if (results.isNotEmpty) {
       return results;
     }
-    return fileEntries.take(_defaultResultLimit).toList(growable: false);
+    return fileEntries.take(defaultResultLimitInternal).toList(growable: false);
   }
 
-  Future<List<AssistantArtifactChangeEntry>> _readGitChanges(
+  Future<List<AssistantArtifactChangeEntry>> readGitChangesInternal(
     Directory workspaceRoot,
     String workspaceRef,
   ) async {
@@ -288,8 +292,8 @@ class DesktopThreadArtifactService {
         final path = rawPath.contains(' -> ')
             ? rawPath.split(' -> ').last.trim()
             : rawPath;
-        final absolutePath = _joinPath(repositoryRoot, path);
-        final relativePath = _relativePath(workspaceRef, absolutePath);
+        final absolutePath = joinPathInternal(repositoryRoot, path);
+        final relativePath = relativePathInternal(workspaceRef, absolutePath);
         if (relativePath == null || relativePath.isEmpty) {
           continue;
         }
@@ -297,7 +301,7 @@ class DesktopThreadArtifactService {
           AssistantArtifactChangeEntry(
             path: relativePath,
             changeType: statusCode,
-            displayLabel: _statusLabelFor(statusCode),
+            displayLabel: statusLabelForInternal(statusCode),
           ),
         );
       }
@@ -307,16 +311,16 @@ class DesktopThreadArtifactService {
     }
   }
 
-  static String _resolveAbsolutePath(String root, String relativePath) {
+  static String resolveAbsolutePathInternal(String root, String relativePath) {
     if (relativePath.startsWith('/') ||
         relativePath.startsWith('\\') ||
         relativePath.contains(':\\')) {
       return relativePath;
     }
-    return _joinPath(root, relativePath);
+    return joinPathInternal(root, relativePath);
   }
 
-  static String _sanitizeHtml(String value) {
+  static String sanitizeHtmlInternal(String value) {
     final withoutBlockedTags = value
         .replaceAll(
           RegExp(
@@ -359,7 +363,7 @@ class DesktopThreadArtifactService {
     );
   }
 
-  static String _joinPath(String root, String child) {
+  static String joinPathInternal(String root, String child) {
     final separator = Platform.pathSeparator;
     final normalizedRoot = root.endsWith(separator) ? root : '$root$separator';
     final normalizedChild = child.startsWith(separator)
@@ -368,9 +372,9 @@ class DesktopThreadArtifactService {
     return '$normalizedRoot$normalizedChild';
   }
 
-  static String? _relativePath(String root, String absolutePath) {
-    final normalizedRoot = _normalizePath(root);
-    final normalizedPath = _normalizePath(absolutePath);
+  static String? relativePathInternal(String root, String absolutePath) {
+    final normalizedRoot = normalizePathInternal(root);
+    final normalizedPath = normalizePathInternal(absolutePath);
     if (normalizedRoot == normalizedPath) {
       return '';
     }
@@ -383,7 +387,7 @@ class DesktopThreadArtifactService {
     return normalizedPath.substring(prefix.length);
   }
 
-  static String _normalizePath(String path) {
+  static String normalizePathInternal(String path) {
     try {
       final type = FileSystemEntity.typeSync(path, followLinks: true);
       final resolved = switch (type) {
@@ -401,14 +405,14 @@ class DesktopThreadArtifactService {
     }
   }
 
-  static String _baseName(String path) {
+  static String baseNameInternal(String path) {
     final normalized = path.replaceAll('\\', '/');
     final parts = normalized.split('/');
     return parts.isEmpty ? normalized : parts.last;
   }
 
-  static String _fileExtension(String path) {
-    final name = _baseName(path);
+  static String fileExtensionInternal(String path) {
+    final name = baseNameInternal(path);
     final index = name.lastIndexOf('.');
     if (index <= 0 || index >= name.length - 1) {
       return '';
@@ -416,8 +420,8 @@ class DesktopThreadArtifactService {
     return name.substring(index + 1).toLowerCase();
   }
 
-  static String _guessMimeType(String path) {
-    final extension = _fileExtension(path);
+  static String guessMimeTypeInternal(String path) {
+    final extension = fileExtensionInternal(path);
     return switch (extension) {
       'md' || 'markdown' => 'text/markdown',
       'html' || 'htm' => 'text/html',
@@ -439,15 +443,15 @@ class DesktopThreadArtifactService {
     };
   }
 
-  static bool _isPreviewableExtension(String extension) {
+  static bool isPreviewableExtensionInternal(String extension) {
     return extension == 'md' ||
         extension == 'markdown' ||
         extension == 'html' ||
         extension == 'htm' ||
-        _isPlainTextExtension(extension);
+        isPlainTextExtensionInternal(extension);
   }
 
-  static bool _isPlainTextExtension(String extension) {
+  static bool isPlainTextExtensionInternal(String extension) {
     return <String>{
       'txt',
       'log',
@@ -464,7 +468,7 @@ class DesktopThreadArtifactService {
     }.contains(extension);
   }
 
-  static String _statusLabelFor(String code) {
+  static String statusLabelForInternal(String code) {
     if (code == '??') {
       return 'Untracked';
     }

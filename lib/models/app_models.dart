@@ -237,12 +237,12 @@ extension AssistantFocusEntryCopy on AssistantFocusEntry {
       WorkspaceDestination.secrets => AssistantFocusEntry.secrets,
       WorkspaceDestination.aiGateway => AssistantFocusEntry.aiGateway,
       WorkspaceDestination.settings => AssistantFocusEntry.settings,
-      WorkspaceDestination.assistant || WorkspaceDestination.account =>
-        throw ArgumentError.value(
-          destination,
-          'destination',
-          'Focused assistant entries only support pinnable workspace targets.',
-        ),
+      WorkspaceDestination.assistant ||
+      WorkspaceDestination.account => throw ArgumentError.value(
+        destination,
+        'destination',
+        'Focused assistant entries only support pinnable workspace targets.',
+      ),
     };
   }
 }

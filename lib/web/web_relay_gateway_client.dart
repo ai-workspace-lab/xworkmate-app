@@ -24,26 +24,29 @@ class GatewayPushEvent {
 }
 
 class WebRelayGatewayClient {
-  WebRelayGatewayClient(this._store);
+  WebRelayGatewayClient(this.storeInternal);
 
-  final WebStore _store;
-  final StreamController<GatewayPushEvent> _events =
+  final WebStore storeInternal;
+  final StreamController<GatewayPushEvent> eventsInternal =
       StreamController<GatewayPushEvent>.broadcast();
-  final Map<String, Completer<_RelayRpcResponse>> _pending =
-      <String, Completer<_RelayRpcResponse>>{};
-  final _WebRelayIdentityManager _identityManager = _WebRelayIdentityManager();
+  final Map<String, Completer<RelayRpcResponseInternal>> pendingInternal =
+      <String, Completer<RelayRpcResponseInternal>>{};
+  final WebRelayIdentityManagerInternal identityManagerInternal =
+      WebRelayIdentityManagerInternal();
 
-  WebSocketChannel? _channel;
-  StreamSubscription<dynamic>? _subscription;
-  int _requestCounter = 0;
-  GatewayConnectionSnapshot _snapshot = GatewayConnectionSnapshot.initial(
-    mode: RuntimeConnectionMode.unconfigured,
-  );
+  WebSocketChannel? channelInternal;
+  StreamSubscription<dynamic>? subscriptionInternal;
+  int requestCounterInternal = 0;
+  GatewayConnectionSnapshot snapshotInternal =
+      GatewayConnectionSnapshot.initial(
+        mode: RuntimeConnectionMode.unconfigured,
+      );
 
-  Stream<GatewayPushEvent> get events => _events.stream;
-  GatewayConnectionSnapshot get snapshot => _snapshot;
-  bool get isConnected => _snapshot.status == RuntimeConnectionStatus.connected;
-  String get mainSessionKey => _snapshot.mainSessionKey ?? 'main';
+  Stream<GatewayPushEvent> get events => eventsInternal.stream;
+  GatewayConnectionSnapshot get snapshot => snapshotInternal;
+  bool get isConnected =>
+      snapshotInternal.status == RuntimeConnectionStatus.connected;
+  String get mainSessionKey => snapshotInternal.mainSessionKey ?? 'main';
 
   Future<void> connect({
     required GatewayConnectionProfile profile,
@@ -54,12 +57,10 @@ class WebRelayGatewayClient {
     final targetMode = profile.mode == RuntimeConnectionMode.local
         ? RuntimeConnectionMode.local
         : RuntimeConnectionMode.remote;
-    final endpoint = _resolveEndpoint(profile);
+    final endpoint = resolveEndpointInternal(profile);
     if (endpoint == null) {
-      _snapshot =
-          GatewayConnectionSnapshot.initial(
-            mode: targetMode,
-          ).copyWith(
+      snapshotInternal = GatewayConnectionSnapshot.initial(mode: targetMode)
+          .copyWith(
             status: RuntimeConnectionStatus.error,
             statusText: 'Missing relay endpoint',
             lastError: 'Configure relay host / port first.',
@@ -68,11 +69,9 @@ class WebRelayGatewayClient {
       throw const WebRelayGatewayException('Missing relay endpoint');
     }
 
-    final identity = await _identityManager.loadOrCreate(_store);
-    _snapshot =
-        GatewayConnectionSnapshot.initial(
-          mode: targetMode,
-        ).copyWith(
+    final identity = await identityManagerInternal.loadOrCreate(storeInternal);
+    snapshotInternal = GatewayConnectionSnapshot.initial(mode: targetMode)
+        .copyWith(
           status: RuntimeConnectionStatus.connecting,
           statusText: 'Connecting…',
           remoteAddress: '${endpoint.host}:${endpoint.port}',
@@ -114,11 +113,11 @@ class WebRelayGatewayClient {
     final channel = WebSocketChannel.connect(uri);
     final challenge = Completer<String>();
 
-    _channel = channel;
-    _subscription = channel.stream.listen(
-      (dynamic raw) => _handleIncoming(raw, challenge),
+    channelInternal = channel;
+    subscriptionInternal = channel.stream.listen(
+      (dynamic raw) => handleIncomingInternal(raw, challenge),
       onError: (Object error, StackTrace stackTrace) {
-        _snapshot = _snapshot.copyWith(
+        snapshotInternal = snapshotInternal.copyWith(
           status: RuntimeConnectionStatus.error,
           statusText: 'Relay error',
           lastError: error.toString(),
@@ -126,8 +125,8 @@ class WebRelayGatewayClient {
         );
       },
       onDone: () {
-        if (_snapshot.status == RuntimeConnectionStatus.connected) {
-          _snapshot = _snapshot.copyWith(
+        if (snapshotInternal.status == RuntimeConnectionStatus.connected) {
+          snapshotInternal = snapshotInternal.copyWith(
             status: RuntimeConnectionStatus.error,
             statusText: 'Disconnected',
             lastError: 'Relay connection closed',
@@ -145,9 +144,9 @@ class WebRelayGatewayClient {
         onTimeout: () =>
             throw const WebRelayGatewayException('Relay challenge timeout'),
       );
-      final result = await _requestRaw(
+      final result = await requestRawInternal(
         'connect',
-        params: await _buildConnectParams(
+        params: await buildConnectParamsInternal(
           identity: identity,
           nonce: nonce,
           authToken: authToken.trim(),
@@ -155,29 +154,29 @@ class WebRelayGatewayClient {
         ),
         timeout: const Duration(seconds: 12),
       );
-      final payload = _asMap(result.payload);
-      final auth = _asMap(payload['auth']);
-      final snapshot = _asMap(payload['snapshot']);
-      final sessionDefaults = _asMap(snapshot['sessionDefaults']);
-      final server = _asMap(payload['server']);
-      _snapshot = _snapshot.copyWith(
+      final payload = asMapInternal(result.payload);
+      final auth = asMapInternal(payload['auth']);
+      final snapshot = asMapInternal(payload['snapshot']);
+      final sessionDefaults = asMapInternal(snapshot['sessionDefaults']);
+      final server = asMapInternal(payload['server']);
+      snapshotInternal = snapshotInternal.copyWith(
         status: RuntimeConnectionStatus.connected,
         statusText: 'Connected',
         mode: targetMode,
-        serverName: _stringValue(server['host']),
+        serverName: stringValueInternal(server['host']),
         remoteAddress: '${endpoint.host}:${endpoint.port}',
         mainSessionKey:
-            _stringValue(sessionDefaults['mainSessionKey']) ?? 'main',
+            stringValueInternal(sessionDefaults['mainSessionKey']) ?? 'main',
         lastConnectedAtMs: DateTime.now().millisecondsSinceEpoch,
-        authRole: _stringValue(auth['role']) ?? 'operator',
-        authScopes: _stringList(auth['scopes']),
+        authRole: stringValueInternal(auth['role']) ?? 'operator',
+        authScopes: stringListInternal(auth['scopes']),
         clearLastError: true,
         clearLastErrorCode: true,
         clearLastErrorDetailCode: true,
       );
     } catch (error) {
       await disconnect();
-      _snapshot = _snapshot.copyWith(
+      snapshotInternal = snapshotInternal.copyWith(
         mode: targetMode,
         status: RuntimeConnectionStatus.error,
         statusText: 'Connection failed',
@@ -189,20 +188,20 @@ class WebRelayGatewayClient {
   }
 
   Future<void> disconnect() async {
-    for (final pending in _pending.values) {
+    for (final pending in pendingInternal.values) {
       if (!pending.isCompleted) {
         pending.completeError(
           const WebRelayGatewayException('Relay request cancelled'),
         );
       }
     }
-    _pending.clear();
-    await _subscription?.cancel();
-    _subscription = null;
-    await _channel?.sink.close();
-    _channel = null;
-    if (_snapshot.status != RuntimeConnectionStatus.offline) {
-      _snapshot = _snapshot.copyWith(
+    pendingInternal.clear();
+    await subscriptionInternal?.cancel();
+    subscriptionInternal = null;
+    await channelInternal?.sink.close();
+    channelInternal = null;
+    if (snapshotInternal.status != RuntimeConnectionStatus.offline) {
+      snapshotInternal = snapshotInternal.copyWith(
         status: RuntimeConnectionStatus.offline,
         statusText: 'Offline',
         clearRemoteAddress: true,
@@ -211,7 +210,7 @@ class WebRelayGatewayClient {
   }
 
   Future<List<GatewaySessionSummary>> listSessions({int limit = 50}) async {
-    final payload = _asMap(
+    final payload = asMapInternal(
       await request(
         'sessions.list',
         params: <String, dynamic>{
@@ -223,31 +222,32 @@ class WebRelayGatewayClient {
         },
       ),
     );
-    return _asList(payload['sessions'])
+    return asListInternal(payload['sessions'])
         .map((item) {
-          final map = _asMap(item);
+          final map = asMapInternal(item);
           return GatewaySessionSummary(
-            key: _stringValue(map['key']) ?? 'main',
-            kind: _stringValue(map['kind']),
+            key: stringValueInternal(map['key']) ?? 'main',
+            kind: stringValueInternal(map['kind']),
             displayName:
-                _stringValue(map['displayName']) ?? _stringValue(map['label']),
-            surface: _stringValue(map['surface']),
-            subject: _stringValue(map['subject']),
-            room: _stringValue(map['room']),
-            space: _stringValue(map['space']),
-            updatedAtMs: _doubleValue(map['updatedAt']),
-            sessionId: _stringValue(map['sessionId']),
-            systemSent: _boolValue(map['systemSent']),
-            abortedLastRun: _boolValue(map['abortedLastRun']),
-            thinkingLevel: _stringValue(map['thinkingLevel']),
-            verboseLevel: _stringValue(map['verboseLevel']),
-            inputTokens: _intValue(map['inputTokens']),
-            outputTokens: _intValue(map['outputTokens']),
-            totalTokens: _intValue(map['totalTokens']),
-            model: _stringValue(map['model']),
-            contextTokens: _intValue(map['contextTokens']),
-            derivedTitle: _stringValue(map['derivedTitle']),
-            lastMessagePreview: _stringValue(map['lastMessagePreview']),
+                stringValueInternal(map['displayName']) ??
+                stringValueInternal(map['label']),
+            surface: stringValueInternal(map['surface']),
+            subject: stringValueInternal(map['subject']),
+            room: stringValueInternal(map['room']),
+            space: stringValueInternal(map['space']),
+            updatedAtMs: doubleValueInternal(map['updatedAt']),
+            sessionId: stringValueInternal(map['sessionId']),
+            systemSent: boolValueInternal(map['systemSent']),
+            abortedLastRun: boolValueInternal(map['abortedLastRun']),
+            thinkingLevel: stringValueInternal(map['thinkingLevel']),
+            verboseLevel: stringValueInternal(map['verboseLevel']),
+            inputTokens: intValueInternal(map['inputTokens']),
+            outputTokens: intValueInternal(map['outputTokens']),
+            totalTokens: intValueInternal(map['totalTokens']),
+            model: stringValueInternal(map['model']),
+            contextTokens: intValueInternal(map['contextTokens']),
+            derivedTitle: stringValueInternal(map['derivedTitle']),
+            lastMessagePreview: stringValueInternal(map['lastMessagePreview']),
           );
         })
         .toList(growable: false);
@@ -257,26 +257,27 @@ class WebRelayGatewayClient {
     String sessionKey, {
     int limit = 120,
   }) async {
-    final payload = _asMap(
+    final payload = asMapInternal(
       await request(
         'chat.history',
         params: <String, dynamic>{'sessionKey': sessionKey, 'limit': limit},
       ),
     );
-    return _asList(payload['messages'])
+    return asListInternal(payload['messages'])
         .map((item) {
-          final map = _asMap(item);
+          final map = asMapInternal(item);
           return GatewayChatMessage(
-            id: _randomId(),
-            role: _stringValue(map['role']) ?? 'assistant',
-            text: _extractMessageText(map),
-            timestampMs: _doubleValue(map['timestamp']),
+            id: randomIdInternal(),
+            role: stringValueInternal(map['role']) ?? 'assistant',
+            text: extractMessageTextInternal(map),
+            timestampMs: doubleValueInternal(map['timestamp']),
             toolCallId:
-                _stringValue(map['toolCallId']) ??
-                _stringValue(map['tool_call_id']),
+                stringValueInternal(map['toolCallId']) ??
+                stringValueInternal(map['tool_call_id']),
             toolName:
-                _stringValue(map['toolName']) ?? _stringValue(map['tool_name']),
-            stopReason: _stringValue(map['stopReason']),
+                stringValueInternal(map['toolName']) ??
+                stringValueInternal(map['tool_name']),
+            stopReason: stringValueInternal(map['stopReason']),
             pending: false,
             error: false,
           );
@@ -292,12 +293,12 @@ class WebRelayGatewayClient {
         const <GatewayChatAttachmentPayload>[],
     Map<String, dynamic> metadata = const <String, dynamic>{},
   }) async {
-    final runId = _randomId();
+    final runId = randomIdInternal();
     final normalizedMetadata = <String, dynamic>{
       for (final entry in metadata.entries)
         if (entry.key.trim().isNotEmpty) entry.key: entry.value,
     };
-    final payload = _asMap(
+    final payload = asMapInternal(
       await request(
         'chat.send',
         params: <String, dynamic>{
@@ -315,44 +316,44 @@ class WebRelayGatewayClient {
         timeout: const Duration(seconds: 35),
       ),
     );
-    return _stringValue(payload['runId']) ?? runId;
+    return stringValueInternal(payload['runId']) ?? runId;
   }
 
   Future<List<GatewayModelSummary>> listModels() async {
-    final payload = _asMap(await request('models.list'));
-    return _asList(payload['models'])
+    final payload = asMapInternal(await request('models.list'));
+    return asListInternal(payload['models'])
         .map((item) {
-          final map = _asMap(item);
+          final map = asMapInternal(item);
           return GatewayModelSummary(
-            id: _stringValue(map['id']) ?? 'unknown',
+            id: stringValueInternal(map['id']) ?? 'unknown',
             name:
-                _stringValue(map['name']) ??
-                _stringValue(map['id']) ??
+                stringValueInternal(map['name']) ??
+                stringValueInternal(map['id']) ??
                 'unknown',
-            provider: _stringValue(map['provider']) ?? 'relay',
-            contextWindow: _intValue(map['contextWindow']),
-            maxOutputTokens: _intValue(map['maxOutputTokens']),
+            provider: stringValueInternal(map['provider']) ?? 'relay',
+            contextWindow: intValueInternal(map['contextWindow']),
+            maxOutputTokens: intValueInternal(map['maxOutputTokens']),
           );
         })
         .toList(growable: false);
   }
 
   Future<List<GatewayAgentSummary>> listAgents() async {
-    final payload = _asMap(
+    final payload = asMapInternal(
       await request('agents.list', params: const <String, dynamic>{}),
     );
-    return _asList(payload['agents'])
+    return asListInternal(payload['agents'])
         .map((item) {
-          final map = _asMap(item);
-          final identity = _asMap(map['identity']);
+          final map = asMapInternal(item);
+          final identity = asMapInternal(map['identity']);
           return GatewayAgentSummary(
-            id: _stringValue(map['id']) ?? 'unknown',
+            id: stringValueInternal(map['id']) ?? 'unknown',
             name:
-                _stringValue(map['name']) ??
-                _stringValue(identity['name']) ??
+                stringValueInternal(map['name']) ??
+                stringValueInternal(identity['name']) ??
                 'Agent',
-            emoji: _stringValue(identity['emoji']) ?? '·',
-            theme: _stringValue(identity['theme']) ?? 'default',
+            emoji: stringValueInternal(identity['emoji']) ?? '·',
+            theme: stringValueInternal(identity['theme']) ?? 'default',
           );
         })
         .toList(growable: false);
@@ -363,23 +364,23 @@ class WebRelayGatewayClient {
       'system-presence',
       params: const <String, dynamic>{},
     );
-    return _asList(payload)
+    return asListInternal(payload)
         .map((item) {
-          final map = _asMap(item);
+          final map = asMapInternal(item);
           return GatewayInstanceSummary(
-            id: _stringValue(map['id']) ?? _randomId(),
-            host: _stringValue(map['host']),
-            ip: _stringValue(map['ip']),
-            version: _stringValue(map['version']),
-            platform: _stringValue(map['platform']),
-            deviceFamily: _stringValue(map['deviceFamily']),
-            modelIdentifier: _stringValue(map['modelIdentifier']),
-            lastInputSeconds: _intValue(map['lastInputSeconds']),
-            mode: _stringValue(map['mode']),
-            reason: _stringValue(map['reason']),
-            text: _stringValue(map['text']) ?? '',
+            id: stringValueInternal(map['id']) ?? randomIdInternal(),
+            host: stringValueInternal(map['host']),
+            ip: stringValueInternal(map['ip']),
+            version: stringValueInternal(map['version']),
+            platform: stringValueInternal(map['platform']),
+            deviceFamily: stringValueInternal(map['deviceFamily']),
+            modelIdentifier: stringValueInternal(map['modelIdentifier']),
+            lastInputSeconds: intValueInternal(map['lastInputSeconds']),
+            mode: stringValueInternal(map['mode']),
+            reason: stringValueInternal(map['reason']),
+            text: stringValueInternal(map['text']) ?? '',
             timestampMs:
-                _doubleValue(map['ts']) ??
+                doubleValueInternal(map['ts']) ??
                 DateTime.now().millisecondsSinceEpoch.toDouble(),
           );
         })
@@ -387,7 +388,7 @@ class WebRelayGatewayClient {
   }
 
   Future<List<GatewayConnectorSummary>> listConnectors() async {
-    final payload = _asMap(
+    final payload = asMapInternal(
       await request(
         'channels.status',
         params: const <String, dynamic>{'probe': true, 'timeoutMs': 8000},
@@ -395,30 +396,32 @@ class WebRelayGatewayClient {
       ),
     );
     final channelMeta = <String, Map<String, dynamic>>{
-      for (final entry in _asList(payload['channelMeta']))
-        if (_stringValue(_asMap(entry)['id']) != null)
-          _stringValue(_asMap(entry)['id'])!: _asMap(entry),
+      for (final entry in asListInternal(payload['channelMeta']))
+        if (stringValueInternal(asMapInternal(entry)['id']) != null)
+          stringValueInternal(asMapInternal(entry)['id'])!: asMapInternal(
+            entry,
+          ),
     };
-    final labels = _asMap(payload['channelLabels']);
-    final detailLabels = _asMap(payload['channelDetailLabels']);
-    final accounts = _asMap(payload['channelAccounts']);
-    final order = _stringList(payload['channelOrder']);
+    final labels = asMapInternal(payload['channelLabels']);
+    final detailLabels = asMapInternal(payload['channelDetailLabels']);
+    final accounts = asMapInternal(payload['channelAccounts']);
+    final order = stringListInternal(payload['channelOrder']);
     final summaries = <GatewayConnectorSummary>[];
 
     for (final channelId in order) {
-      final channelAccounts = _asList(accounts[channelId]);
+      final channelAccounts = asListInternal(accounts[channelId]);
       if (channelAccounts.isEmpty) {
         final meta = channelMeta[channelId] ?? const <String, dynamic>{};
         summaries.add(
           GatewayConnectorSummary(
             id: channelId,
             label:
-                _stringValue(meta['label']) ??
-                _stringValue(labels[channelId]) ??
+                stringValueInternal(meta['label']) ??
+                stringValueInternal(labels[channelId]) ??
                 channelId,
             detailLabel:
-                _stringValue(meta['detailLabel']) ??
-                _stringValue(detailLabels[channelId]) ??
+                stringValueInternal(meta['detailLabel']) ??
+                stringValueInternal(detailLabels[channelId]) ??
                 channelId,
             accountName: null,
             configured: false,
@@ -433,13 +436,15 @@ class WebRelayGatewayClient {
         continue;
       }
       for (final account in channelAccounts) {
-        final map = _asMap(account);
-        final configured = _boolValue(map['configured']) ?? false;
-        final enabled = _boolValue(map['enabled']) ?? configured;
-        final running = _boolValue(map['running']) ?? false;
+        final map = asMapInternal(account);
+        final configured = boolValueInternal(map['configured']) ?? false;
+        final enabled = boolValueInternal(map['enabled']) ?? configured;
+        final running = boolValueInternal(map['running']) ?? false;
         final connected =
-            _boolValue(map['connected']) ?? _boolValue(map['linked']) ?? false;
-        final lastError = _stringValue(map['lastError']);
+            boolValueInternal(map['connected']) ??
+            boolValueInternal(map['linked']) ??
+            false;
+        final lastError = stringValueInternal(map['lastError']);
         final status = lastError != null && lastError.trim().isNotEmpty
             ? 'error'
             : connected
@@ -449,22 +454,23 @@ class WebRelayGatewayClient {
             : configured
             ? 'configured'
             : 'idle';
-        final mode = _stringValue(map['mode']);
-        final tokenSource = _stringValue(map['tokenSource']);
-        final baseUrl = _stringValue(map['baseUrl']);
+        final mode = stringValueInternal(map['mode']);
+        final tokenSource = stringValueInternal(map['tokenSource']);
+        final baseUrl = stringValueInternal(map['baseUrl']);
         summaries.add(
           GatewayConnectorSummary(
             id: channelId,
             label:
-                _stringValue(channelMeta[channelId]?['label']) ??
-                _stringValue(labels[channelId]) ??
+                stringValueInternal(channelMeta[channelId]?['label']) ??
+                stringValueInternal(labels[channelId]) ??
                 channelId,
             detailLabel:
-                _stringValue(channelMeta[channelId]?['detailLabel']) ??
-                _stringValue(detailLabels[channelId]) ??
+                stringValueInternal(channelMeta[channelId]?['detailLabel']) ??
+                stringValueInternal(detailLabels[channelId]) ??
                 channelId,
             accountName:
-                _stringValue(map['name']) ?? _stringValue(map['accountId']),
+                stringValueInternal(map['name']) ??
+                stringValueInternal(map['accountId']),
             configured: configured,
             enabled: enabled,
             running: running,
@@ -484,28 +490,30 @@ class WebRelayGatewayClient {
   }
 
   Future<List<GatewayCronJobSummary>> listCronJobs() async {
-    final payload = _asMap(
+    final payload = asMapInternal(
       await request(
         'cron.list',
         params: const <String, dynamic>{'includeDisabled': true},
         timeout: const Duration(seconds: 16),
       ),
     );
-    return _asList(payload['jobs'])
+    return asListInternal(payload['jobs'])
         .map((item) {
-          final map = _asMap(item);
-          final state = _asMap(map['state']);
+          final map = asMapInternal(item);
+          final state = asMapInternal(map['state']);
           return GatewayCronJobSummary(
-            id: _stringValue(map['id']) ?? _randomId(),
-            name: _stringValue(map['name']) ?? 'Untitled job',
-            description: _stringValue(map['description']),
-            enabled: _boolValue(map['enabled']) ?? true,
-            agentId: _stringValue(map['agentId']),
-            scheduleLabel: _cronScheduleLabel(_asMap(map['schedule'])),
-            nextRunAtMs: _intValue(state['nextRunAtMs']),
-            lastRunAtMs: _intValue(state['lastRunAtMs']),
-            lastStatus: _stringValue(state['lastStatus']),
-            lastError: _stringValue(state['lastError']),
+            id: stringValueInternal(map['id']) ?? randomIdInternal(),
+            name: stringValueInternal(map['name']) ?? 'Untitled job',
+            description: stringValueInternal(map['description']),
+            enabled: boolValueInternal(map['enabled']) ?? true,
+            agentId: stringValueInternal(map['agentId']),
+            scheduleLabel: cronScheduleLabelInternal(
+              asMapInternal(map['schedule']),
+            ),
+            nextRunAtMs: intValueInternal(state['nextRunAtMs']),
+            lastRunAtMs: intValueInternal(state['lastRunAtMs']),
+            lastStatus: stringValueInternal(state['lastStatus']),
+            lastError: stringValueInternal(state['lastError']),
           );
         })
         .toList(growable: false);
@@ -516,25 +524,30 @@ class WebRelayGatewayClient {
     Map<String, dynamic>? params,
     Duration timeout = const Duration(seconds: 15),
   }) async {
-    if (_channel == null || !isConnected) {
+    if (channelInternal == null || !isConnected) {
       throw const WebRelayGatewayException('Relay not connected');
     }
-    final result = await _requestRaw(method, params: params, timeout: timeout);
+    final result = await requestRawInternal(
+      method,
+      params: params,
+      timeout: timeout,
+    );
     return result.payload;
   }
 
-  Future<_RelayRpcResponse> _requestRaw(
+  Future<RelayRpcResponseInternal> requestRawInternal(
     String method, {
     Map<String, dynamic>? params,
     Duration timeout = const Duration(seconds: 15),
   }) async {
-    final channel = _channel;
+    final channel = channelInternal;
     if (channel == null) {
       throw const WebRelayGatewayException('Relay not connected');
     }
-    final id = '${DateTime.now().microsecondsSinceEpoch}-${_requestCounter++}';
-    final completer = Completer<_RelayRpcResponse>();
-    _pending[id] = completer;
+    final id =
+        '${DateTime.now().microsecondsSinceEpoch}-${requestCounterInternal++}';
+    final completer = Completer<RelayRpcResponseInternal>();
+    pendingInternal[id] = completer;
     channel.sink.add(
       jsonEncode(<String, dynamic>{
         'type': 'req',
@@ -550,11 +563,11 @@ class WebRelayGatewayClient {
             throw WebRelayGatewayException('$method request timeout'),
       );
     } finally {
-      _pending.remove(id);
+      pendingInternal.remove(id);
     }
   }
 
-  Future<Map<String, dynamic>> _buildConnectParams({
+  Future<Map<String, dynamic>> buildConnectParamsInternal({
     required LocalDeviceIdentity identity,
     required String nonce,
     required String authToken,
@@ -570,7 +583,7 @@ class WebRelayGatewayClient {
     const clientId = 'xworkmate-web';
     const clientMode = 'ui';
     final signedAtMs = DateTime.now().millisecondsSinceEpoch;
-    final signaturePayload = _identityManager.buildDeviceAuthPayloadV3(
+    final signaturePayload = identityManagerInternal.buildDeviceAuthPayloadV3(
       deviceId: identity.deviceId,
       clientId: clientId,
       clientMode: clientMode,
@@ -582,7 +595,7 @@ class WebRelayGatewayClient {
       platform: 'web',
       deviceFamily: 'Browser',
     );
-    final signature = await _identityManager.signPayload(
+    final signature = await identityManagerInternal.signPayload(
       identity: identity,
       payload: signaturePayload,
     );
@@ -623,25 +636,25 @@ class WebRelayGatewayClient {
     };
   }
 
-  void _handleIncoming(dynamic raw, Completer<String> challenge) {
+  void handleIncomingInternal(dynamic raw, Completer<String> challenge) {
     final text = raw is String ? raw : utf8.decode(raw as List<int>);
     final decoded = jsonDecode(text) as Map<String, dynamic>;
-    final type = _stringValue(decoded['type']);
+    final type = stringValueInternal(decoded['type']);
     if (type == 'event') {
-      final event = _stringValue(decoded['event']) ?? '';
+      final event = stringValueInternal(decoded['event']) ?? '';
       final payload = decoded['payload'];
       if (event == 'connect.challenge') {
-        final nonce = _stringValue(_asMap(payload)['nonce']);
+        final nonce = stringValueInternal(asMapInternal(payload)['nonce']);
         if (nonce != null && !challenge.isCompleted) {
           challenge.complete(nonce);
         }
         return;
       }
-      _events.add(
+      eventsInternal.add(
         GatewayPushEvent(
           event: event,
           payload: payload,
-          sequence: _intValue(decoded['seq']),
+          sequence: intValueInternal(decoded['seq']),
         ),
       );
       return;
@@ -649,34 +662,36 @@ class WebRelayGatewayClient {
     if (type != 'res') {
       return;
     }
-    final id = _stringValue(decoded['id']);
+    final id = stringValueInternal(decoded['id']);
     if (id == null) {
       return;
     }
-    final completer = _pending.remove(id);
+    final completer = pendingInternal.remove(id);
     if (completer == null || completer.isCompleted) {
       return;
     }
-    final ok = _boolValue(decoded['ok']) ?? false;
+    final ok = boolValueInternal(decoded['ok']) ?? false;
     if (!ok) {
-      final error = _asMap(decoded['error']);
+      final error = asMapInternal(decoded['error']);
       completer.completeError(
         WebRelayGatewayException(
-          _stringValue(error['message']) ?? 'Relay request failed',
+          stringValueInternal(error['message']) ?? 'Relay request failed',
         ),
       );
       return;
     }
     completer.complete(
-      _RelayRpcResponse(
+      RelayRpcResponseInternal(
         ok: true,
         payload: decoded['payload'],
-        error: _asMap(decoded['error']),
+        error: asMapInternal(decoded['error']),
       ),
     );
   }
 
-  _ResolvedRelayEndpoint? _resolveEndpoint(GatewayConnectionProfile profile) {
+  ResolvedRelayEndpointInternal? resolveEndpointInternal(
+    GatewayConnectionProfile profile,
+  ) {
     final rawHost = profile.host.trim();
     if (rawHost.isEmpty) {
       return null;
@@ -692,7 +707,7 @@ class WebRelayGatewayClient {
       'http' || 'ws' => false,
       _ => true,
     };
-    return _ResolvedRelayEndpoint(
+    return ResolvedRelayEndpointInternal(
       host: uri.host.trim(),
       port: uri.hasPort ? uri.port : (tls ? 443 : 80),
       tls: tls,
@@ -701,7 +716,7 @@ class WebRelayGatewayClient {
 
   Future<void> dispose() async {
     await disconnect();
-    await _events.close();
+    await eventsInternal.close();
   }
 }
 
@@ -714,8 +729,8 @@ class WebRelayGatewayException implements Exception {
   String toString() => message;
 }
 
-class _ResolvedRelayEndpoint {
-  const _ResolvedRelayEndpoint({
+class ResolvedRelayEndpointInternal {
+  const ResolvedRelayEndpointInternal({
     required this.host,
     required this.port,
     required this.tls,
@@ -726,8 +741,8 @@ class _ResolvedRelayEndpoint {
   final bool tls;
 }
 
-class _RelayRpcResponse {
-  const _RelayRpcResponse({
+class RelayRpcResponseInternal {
+  const RelayRpcResponseInternal({
     required this.ok,
     required this.payload,
     required this.error,
@@ -738,8 +753,8 @@ class _RelayRpcResponse {
   final Map<String, dynamic> error;
 }
 
-class _WebRelayIdentityManager {
-  final Ed25519 _algorithm = Ed25519();
+class WebRelayIdentityManagerInternal {
+  final Ed25519 algorithmInternal = Ed25519();
 
   Future<LocalDeviceIdentity> loadOrCreate(WebStore store) async {
     final existing = await store.loadRelayDeviceIdentity();
@@ -749,14 +764,14 @@ class _WebRelayIdentityManager {
         existing.privateKeyBase64Url.isNotEmpty) {
       return existing;
     }
-    final keyPair = await _algorithm.newKeyPair();
+    final keyPair = await algorithmInternal.newKeyPair();
     final publicKey = await keyPair.extractPublicKey();
     final privateKeyBytes = await keyPair.extractPrivateKeyBytes();
     final publicKeyBytes = publicKey.bytes;
     final identity = LocalDeviceIdentity(
-      deviceId: _deriveDeviceId(publicKeyBytes),
-      publicKeyBase64Url: _base64UrlEncode(publicKeyBytes),
-      privateKeyBase64Url: _base64UrlEncode(privateKeyBytes),
+      deviceId: deriveDeviceIdInternal(publicKeyBytes),
+      publicKeyBase64Url: base64UrlEncodeInternal(publicKeyBytes),
+      privateKeyBase64Url: base64UrlEncodeInternal(privateKeyBytes),
       createdAtMs: DateTime.now().millisecondsSinceEpoch,
     );
     await store.saveRelayDeviceIdentity(identity);
@@ -767,18 +782,20 @@ class _WebRelayIdentityManager {
     required LocalDeviceIdentity identity,
     required String payload,
   }) async {
-    final publicKeyBytes = _base64UrlDecode(identity.publicKeyBase64Url);
-    final privateKeyBytes = _base64UrlDecode(identity.privateKeyBase64Url);
+    final publicKeyBytes = base64UrlDecodeInternal(identity.publicKeyBase64Url);
+    final privateKeyBytes = base64UrlDecodeInternal(
+      identity.privateKeyBase64Url,
+    );
     final keyPair = SimpleKeyPairData(
       privateKeyBytes,
       publicKey: SimplePublicKey(publicKeyBytes, type: KeyPairType.ed25519),
       type: KeyPairType.ed25519,
     );
-    final signature = await _algorithm.sign(
+    final signature = await algorithmInternal.sign(
       utf8.encode(payload),
       keyPair: keyPair,
     );
-    return _base64UrlEncode(signature.bytes);
+    return base64UrlEncodeInternal(signature.bytes);
   }
 
   String buildDeviceAuthPayloadV3({
@@ -803,12 +820,12 @@ class _WebRelayIdentityManager {
       '$signedAtMs',
       token,
       nonce,
-      _normalizeMetadata(platform),
-      _normalizeMetadata(deviceFamily),
+      normalizeMetadataInternal(platform),
+      normalizeMetadataInternal(deviceFamily),
     ].join('|');
   }
 
-  String _normalizeMetadata(String value) {
+  String normalizeMetadataInternal(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
       return '';
@@ -824,22 +841,22 @@ class _WebRelayIdentityManager {
     return buffer.toString();
   }
 
-  String _deriveDeviceId(List<int> publicKeyBytes) {
+  String deriveDeviceIdInternal(List<int> publicKeyBytes) {
     return crypto.sha256.convert(publicKeyBytes).toString();
   }
 
-  String _base64UrlEncode(List<int> value) {
+  String base64UrlEncodeInternal(List<int> value) {
     return base64Url.encode(value).replaceAll('=', '');
   }
 
-  Uint8List _base64UrlDecode(String value) {
+  Uint8List base64UrlDecodeInternal(String value) {
     final normalized = value.replaceAll('-', '+').replaceAll('_', '/');
     final padded = normalized + '=' * ((4 - normalized.length % 4) % 4);
     return Uint8List.fromList(base64.decode(padded));
   }
 }
 
-Map<String, dynamic> _asMap(Object? value) {
+Map<String, dynamic> asMapInternal(Object? value) {
   if (value is Map<String, dynamic>) {
     return value;
   }
@@ -849,7 +866,7 @@ Map<String, dynamic> _asMap(Object? value) {
   return const <String, dynamic>{};
 }
 
-List<Object?> _asList(Object? value) {
+List<Object?> asListInternal(Object? value) {
   if (value is List<Object?>) {
     return value;
   }
@@ -859,26 +876,26 @@ List<Object?> _asList(Object? value) {
   return const <Object?>[];
 }
 
-String? _stringValue(Object? value) {
+String? stringValueInternal(Object? value) {
   final text = value?.toString().trim() ?? '';
   return text.isEmpty ? null : text;
 }
 
-int? _intValue(Object? value) {
+int? intValueInternal(Object? value) {
   if (value is num) {
     return value.toInt();
   }
   return int.tryParse(value?.toString() ?? '');
 }
 
-double? _doubleValue(Object? value) {
+double? doubleValueInternal(Object? value) {
   if (value is num) {
     return value.toDouble();
   }
   return double.tryParse(value?.toString() ?? '');
 }
 
-bool? _boolValue(Object? value) {
+bool? boolValueInternal(Object? value) {
   if (value is bool) {
     return value;
   }
@@ -895,21 +912,23 @@ bool? _boolValue(Object? value) {
   return null;
 }
 
-List<String> _stringList(Object? value) {
-  return _asList(
+List<String> stringListInternal(Object? value) {
+  return asListInternal(
     value,
-  ).map(_stringValue).whereType<String>().toList(growable: false);
+  ).map(stringValueInternal).whereType<String>().toList(growable: false);
 }
 
-String _extractMessageText(Map<String, dynamic> message) {
+String extractMessageTextInternal(Map<String, dynamic> message) {
   final directContent = message['content'];
   if (directContent is String) {
     return directContent;
   }
   final parts = <String>[];
-  for (final part in _asList(directContent)) {
-    final map = _asMap(part);
-    final text = _stringValue(map['text']) ?? _stringValue(map['thinking']);
+  for (final part in asListInternal(directContent)) {
+    final map = asMapInternal(part);
+    final text =
+        stringValueInternal(map['text']) ??
+        stringValueInternal(map['thinking']);
     if (text != null && text.isNotEmpty) {
       parts.add(text);
       continue;
@@ -922,11 +941,11 @@ String _extractMessageText(Map<String, dynamic> message) {
   return parts.join('\n').trim();
 }
 
-String _cronScheduleLabel(Map<String, dynamic> schedule) {
-  final type = _stringValue(schedule['type']) ?? 'cron';
-  final every = _intValue(schedule['every']);
-  final at = _stringValue(schedule['at']);
-  final weekdays = _stringList(schedule['weekdays']);
+String cronScheduleLabelInternal(Map<String, dynamic> schedule) {
+  final type = stringValueInternal(schedule['type']) ?? 'cron';
+  final every = intValueInternal(schedule['every']);
+  final at = stringValueInternal(schedule['at']);
+  final weekdays = stringListInternal(schedule['weekdays']);
   final parts = <String>[type];
   if (every != null && every > 0) {
     parts.add('every $every');
@@ -940,7 +959,7 @@ String _cronScheduleLabel(Map<String, dynamic> schedule) {
   return parts.join(' · ');
 }
 
-String _randomId() {
+String randomIdInternal() {
   final random = Random.secure();
   final timestamp = DateTime.now().microsecondsSinceEpoch.toRadixString(16);
   final suffix = List<int>.generate(

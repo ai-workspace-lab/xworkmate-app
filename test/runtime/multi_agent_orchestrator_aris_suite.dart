@@ -14,7 +14,7 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 void main() {
   test('multi-agent orchestrator core file stays split into focused parts', () {
     final lines = File(
-      'lib/runtime/multi_agent_orchestrator_core.part.dart',
+      'lib/runtime/multi_agent_orchestrator_core.dart',
     ).readAsLinesSync();
 
     expect(
@@ -27,9 +27,9 @@ void main() {
   test(
     'MultiAgentOrchestrator falls back to local Ollama + ARIS Go core chat runtime',
     () async {
-      final fakeOllama = await _FakeOllamaServer.start();
+      final fakeOllama = await FakeOllamaServerInternal.start();
       addTearDown(fakeOllama.close);
-      final bridgeClient = _FakeGoCoreClient();
+      final bridgeClient = FakeGoCoreClientInternal();
       final orchestrator = MultiAgentOrchestrator(
         config: MultiAgentConfig.defaults().copyWith(
           enabled: true,
@@ -55,7 +55,7 @@ void main() {
             enabled: true,
           ),
         ),
-        arisBundleRepository: _FakeArisBundleRepository(),
+        arisBundleRepository: FakeArisBundleRepositoryInternal(),
         binaryExistsResolver: (command) async => command == 'go',
         arisLlmChatClient: bridgeClient,
       );
@@ -82,9 +82,9 @@ void main() {
   test(
     'MultiAgentOrchestrator routes tester claude reviews through the same Go core runtime',
     () async {
-      final fakeOllama = await _FakeOllamaServer.start();
+      final fakeOllama = await FakeOllamaServerInternal.start();
       addTearDown(fakeOllama.close);
-      final bridgeClient = _FakeGoCoreClient();
+      final bridgeClient = FakeGoCoreClientInternal();
       final orchestrator = MultiAgentOrchestrator(
         config: MultiAgentConfig.defaults().copyWith(
           enabled: true,
@@ -110,7 +110,7 @@ void main() {
             enabled: true,
           ),
         ),
-        arisBundleRepository: _FakeArisBundleRepository(),
+        arisBundleRepository: FakeArisBundleRepositoryInternal(),
         binaryExistsResolver: (command) async =>
             command == 'go' || command == 'claude',
         arisLlmChatClient: bridgeClient,
@@ -129,8 +129,8 @@ void main() {
   );
 }
 
-class _FakeGoCoreClient extends ArisLlmChatClient {
-  _FakeGoCoreClient();
+class FakeGoCoreClientInternal extends ArisLlmChatClient {
+  FakeGoCoreClientInternal();
 
   int chatCallCount = 0;
   int claudeReviewCallCount = 0;
@@ -144,7 +144,7 @@ class _FakeGoCoreClient extends ArisLlmChatClient {
     String systemPrompt = '',
   }) async {
     chatCallCount += 1;
-    return _reviewResponse;
+    return reviewResponseInternal;
   }
 
   @override
@@ -155,10 +155,10 @@ class _FakeGoCoreClient extends ArisLlmChatClient {
     String tools = '',
   }) async {
     claudeReviewCallCount += 1;
-    return _reviewResponse;
+    return reviewResponseInternal;
   }
 
-  static const String _reviewResponse = '''
+  static const String reviewResponseInternal = '''
 评分: 8
 
 ## 问题列表
@@ -169,8 +169,8 @@ class _FakeGoCoreClient extends ArisLlmChatClient {
 ''';
 }
 
-class _FakeArisBundleRepository extends ArisBundleRepository {
-  _FakeArisBundleRepository();
+class FakeArisBundleRepositoryInternal extends ArisBundleRepository {
+  FakeArisBundleRepositoryInternal();
 
   @override
   Future<ResolvedArisBundle> ensureReady() async {
@@ -206,27 +206,27 @@ class _FakeArisBundleRepository extends ArisBundleRepository {
   }
 }
 
-class _FakeOllamaServer {
-  _FakeOllamaServer._(this._server);
+class FakeOllamaServerInternal {
+  FakeOllamaServerInternal._(this.serverInternal);
 
-  final HttpServer _server;
+  final HttpServer serverInternal;
   int requestCount = 0;
 
-  String get baseUrl => 'http://127.0.0.1:${_server.port}';
+  String get baseUrl => 'http://127.0.0.1:${serverInternal.port}';
 
-  static Future<_FakeOllamaServer> start() async {
+  static Future<FakeOllamaServerInternal> start() async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final fake = _FakeOllamaServer._(server);
-    unawaited(fake._serve());
+    final fake = FakeOllamaServerInternal._(server);
+    unawaited(fake.serveInternal());
     return fake;
   }
 
   Future<void> close() async {
-    await _server.close(force: true);
+    await serverInternal.close(force: true);
   }
 
-  Future<void> _serve() async {
-    await for (final request in _server) {
+  Future<void> serveInternal() async {
+    await for (final request in serverInternal) {
       requestCount += 1;
       final body = await utf8.decoder.bind(request).join();
       final payload = jsonDecode(body) as Map<String, dynamic>;
