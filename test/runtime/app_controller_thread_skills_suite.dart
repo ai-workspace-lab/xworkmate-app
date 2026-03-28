@@ -13,3 +13,13 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/runtime/skill_directory_access.dart';
 
 part 'app_controller_thread_skills_suite_core.part.dart';
+part 'app_controller_thread_skills_suite_shared_roots.part.dart';
+part 'app_controller_thread_skills_suite_thread_isolation.part.dart';
+part 'app_controller_thread_skills_suite_workspace_fallback.part.dart';
+part 'app_controller_thread_skills_suite_acp.part.dart';
+part 'app_controller_thread_skills_suite_fixtures.part.dart';
+part 'app_controller_thread_skills_suite_fakes.part.dart';
+
+void main() {
+  registerThreadSkillsSuiteTests();
+}

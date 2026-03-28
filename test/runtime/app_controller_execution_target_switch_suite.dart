@@ -15,3 +15,11 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
 part 'app_controller_execution_target_switch_suite_core.part.dart';
+part 'app_controller_execution_target_switch_suite_connection.part.dart';
+part 'app_controller_execution_target_switch_suite_thread.part.dart';
+part 'app_controller_execution_target_switch_suite_fixtures.part.dart';
+part 'app_controller_execution_target_switch_suite_fakes.part.dart';
+
+void main() {
+  registerExecutionTargetSwitchSuiteTests();
+}
