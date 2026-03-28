@@ -107,6 +107,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
 
   Future<List<AssistantThreadSkillEntry>>
   singleAgentLocalSkillsForSessionInternal(String sessionKey) async {
+    await ensureSharedSingleAgentLocalSkillsLoaded();
     final workspaceSkills = await scanSingleAgentWorkspaceSkillEntriesInternal(
       sessionKey,
     );
@@ -204,7 +205,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
                 const <String>[])
             .where(importedKeys.contains)
             .toList(growable: false);
-    upsertAssistantThreadRecordInternal(
+    upsertTaskThreadInternal(
       normalizedSessionKey,
       importedSkills: importedSkills,
       selectedSkillKeys: nextSelected,
@@ -247,8 +248,13 @@ extension AppControllerDesktopSkillPermissions on AppController {
         message.contains('skills.status');
   }
 
-  void upsertAssistantThreadRecordInternal(
+  void upsertTaskThreadInternal(
     String sessionKey, {
+    ThreadOwnerScope? ownerScope,
+    WorkspaceBinding? workspaceBinding,
+    ExecutionBinding? executionBinding,
+    ThreadContextState? contextState,
+    ThreadLifecycleState? lifecycleState,
     List<GatewayChatMessage>? messages,
     double? updatedAtMs,
     String? title,
@@ -285,45 +291,143 @@ extension AppControllerDesktopSkillPermissions on AppController {
         existing?.messages ??
         assistantThreadMessagesInternal[normalizedSessionKey] ??
         const <GatewayChatMessage>[];
-    final nextRecord = AssistantThreadRecord(
-      sessionKey: normalizedSessionKey,
-      messages: nextMessages,
+    final nextOwnerScope =
+        ownerScope ??
+        existing?.ownerScope ??
+        const ThreadOwnerScope(
+          realm: ThreadRealm.local,
+          subjectType: ThreadSubjectType.user,
+          subjectId: '',
+          displayName: '',
+        );
+    final explicitWorkspaceKind = workspaceRefKind == null
+        ? null
+        : (workspaceRefKind == WorkspaceRefKind.localPath
+              ? WorkspaceKind.localFs
+              : WorkspaceKind.remoteFs);
+    final baseWorkspaceBinding =
+        workspaceBinding ??
+        existing?.workspaceBinding ??
+        WorkspaceBinding(
+          workspaceId: normalizedSessionKey,
+          workspaceKind:
+              explicitWorkspaceKind ??
+              (nextExecutionTarget == AssistantExecutionTarget.singleAgent
+                  ? WorkspaceKind.localFs
+                  : WorkspaceKind.remoteFs),
+          workspacePath: '',
+          displayPath: '',
+          writable: true,
+        );
+    final nextWorkspacePath =
+        workspaceRef ?? baseWorkspaceBinding.workspacePath;
+    final nextDisplayPath =
+        workspaceRef ??
+        (baseWorkspaceBinding.displayPath.trim().isNotEmpty
+            ? baseWorkspaceBinding.displayPath
+            : nextWorkspacePath);
+    final nextWorkspaceBinding = baseWorkspaceBinding.copyWith(
+      workspaceId: baseWorkspaceBinding.workspaceId.trim().isEmpty
+          ? normalizedSessionKey
+          : baseWorkspaceBinding.workspaceId,
+      workspaceKind: explicitWorkspaceKind,
+      workspacePath: nextWorkspacePath,
+      displayPath: nextDisplayPath,
+    );
+    final nextProvider =
+        singleAgentProvider ??
+        SingleAgentProviderCopy.fromJsonValue(
+          executionBinding?.providerId ?? existing?.executionBinding.providerId,
+        );
+    final nextExecutionBinding =
+        (executionBinding ??
+                existing?.executionBinding ??
+                ExecutionBinding(
+                  executionMode: ThreadExecutionMode.localAgent,
+                  executorId: nextProvider.providerId,
+                  providerId: nextProvider.providerId,
+                  endpointId: '',
+                ))
+            .copyWith(
+              executionMode: switch (nextExecutionTarget) {
+                AssistantExecutionTarget.singleAgent =>
+                  ThreadExecutionMode.localAgent,
+                AssistantExecutionTarget.local =>
+                  ThreadExecutionMode.gatewayLocal,
+                AssistantExecutionTarget.remote =>
+                  ThreadExecutionMode.gatewayRemote,
+              },
+              executorId: nextProvider.providerId,
+              providerId: nextProvider.providerId,
+            );
+    final nextContextState =
+        (contextState ??
+                existing?.contextState ??
+                ThreadContextState(
+                  messages: nextMessages,
+                  selectedModelId:
+                      assistantModelId ??
+                      resolvedAssistantModelForTargetInternal(
+                        nextExecutionTarget,
+                      ),
+                  selectedSkillKeys: const <String>[],
+                  importedSkills: const <AssistantThreadSkillEntry>[],
+                  permissionLevel: AssistantPermissionLevel.defaultAccess,
+                  messageViewMode: AssistantMessageViewMode.rendered,
+                  latestResolvedRuntimeModel: '',
+                  gatewayEntryState: gatewayEntryStateForTargetInternal(
+                    nextExecutionTarget,
+                  ),
+                ))
+            .copyWith(
+              messages: nextMessages,
+              messageViewMode: messageViewMode,
+              importedSkills: nextImportedSkills,
+              selectedSkillKeys: nextSelectedSkillKeys,
+              selectedModelId:
+                  assistantModelId ??
+                  existing?.assistantModelId ??
+                  resolvedAssistantModelForTargetInternal(nextExecutionTarget),
+              gatewayEntryState: gatewayEntryState,
+            );
+    final nextStatus = nextWorkspaceBinding.workspacePath.trim().isEmpty
+        ? 'needs_workspace'
+        : (lifecycleState?.status ??
+              existing?.lifecycleState.status ??
+              'ready');
+    final nextLifecycleState =
+        (lifecycleState ??
+                existing?.lifecycleState ??
+                ThreadLifecycleState(
+                  archived: archived ??
+                      existing?.archived ??
+                      isAssistantTaskArchived(normalizedSessionKey),
+                  status: nextStatus,
+                  lastRunAtMs: null,
+                  lastResultCode: null,
+                ))
+            .copyWith(
+              archived:
+                  archived ??
+                  existing?.archived ??
+                  isAssistantTaskArchived(normalizedSessionKey),
+              status: nextStatus,
+            );
+    final nextRecord = TaskThread(
+      threadId: normalizedSessionKey,
+      createdAtMs:
+          existing?.createdAtMs ??
+          DateTime.now().millisecondsSinceEpoch.toDouble(),
+      title: title ?? existing?.title ?? '',
+      ownerScope: nextOwnerScope,
+      workspaceBinding: nextWorkspaceBinding,
+      executionBinding: nextExecutionBinding,
+      contextState: nextContextState,
+      lifecycleState: nextLifecycleState,
       updatedAtMs:
           updatedAtMs ??
           existing?.updatedAtMs ??
           (nextMessages.isNotEmpty ? nextMessages.last.timestampMs : null),
-      title: title ?? existing?.title ?? '',
-      archived:
-          archived ??
-          existing?.archived ??
-          isAssistantTaskArchived(normalizedSessionKey),
-      executionTarget: nextExecutionTarget,
-      messageViewMode:
-          messageViewMode ??
-          existing?.messageViewMode ??
-          AssistantMessageViewMode.rendered,
-      importedSkills: nextImportedSkills,
-      selectedSkillKeys: nextSelectedSkillKeys,
-      assistantModelId:
-          assistantModelId ??
-          existing?.assistantModelId ??
-          resolvedAssistantModelForTargetInternal(nextExecutionTarget),
-      singleAgentProvider:
-          singleAgentProvider ??
-          existing?.singleAgentProvider ??
-          SingleAgentProvider.auto,
-      gatewayEntryState:
-          gatewayEntryState ??
-          existing?.gatewayEntryState ??
-          gatewayEntryStateForTargetInternal(nextExecutionTarget),
-      workspaceRef:
-          workspaceRef ??
-          existing?.workspaceRef ??
-          defaultWorkspaceRefForSessionInternal(normalizedSessionKey),
-      workspaceRefKind:
-          workspaceRefKind ??
-          existing?.workspaceRefKind ??
-          defaultWorkspaceRefKindForTargetInternal(nextExecutionTarget),
     );
     assistantThreadRecordsInternal[normalizedSessionKey] = nextRecord;
     if (messages != null) {
@@ -340,7 +444,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
             return;
           }
           try {
-            await storeInternal.saveAssistantThreadRecords(snapshot);
+            await storeInternal.saveTaskThreads(snapshot);
           } catch (_) {
             // Assistant thread persistence is background best-effort. Keep the
             // in-memory session usable even when teardown or temp-directory

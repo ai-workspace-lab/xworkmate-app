@@ -38,6 +38,7 @@ import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
+import 'app_controller_desktop_thread_binding.dart';
 import 'app_controller_desktop_single_agent.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_actions.dart';
@@ -438,7 +439,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
           await skillDirectoryAccessServiceInternal.resolveUserHomeDirectory();
       await settingsControllerInternal.initialize();
       final storedAssistantThreads = await storeInternal
-          .loadAssistantThreadRecords();
+          .loadTaskThreads();
       if (disposedInternal) {
         return;
       }
@@ -508,6 +509,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       );
       await restoreInitialAssistantSessionSelectionInternal();
       await ensureActiveAssistantThreadInternal();
+      await ensureDesktopTaskThreadBindingInternal(currentSessionKey);
       unawaited(startupRefreshSharedSingleAgentLocalSkillsCacheInternal());
       if (isSingleAgentMode) {
         await refreshSingleAgentSkillsForSession(currentSessionKey);
@@ -721,7 +723,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     final sessionKey = normalizedAssistantSessionKeyInternal(
       sessionsControllerInternal.currentSessionKey,
     );
-    upsertAssistantThreadRecordInternal(
+    upsertTaskThreadInternal(
       sessionKey,
       executionTarget: target,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),

@@ -191,8 +191,8 @@ extension AppControllerDesktopSettings on AppController {
   Future<void> clearAssistantLocalState() async {
     await flushAssistantThreadPersistenceInternal();
     await storeInternal.clearAssistantLocalState();
-    await storeInternal.saveAssistantThreadRecords(
-      const <AssistantThreadRecord>[],
+    await storeInternal.saveTaskThreads(
+      const <TaskThread>[],
     );
     assistantThreadPersistQueueInternal = Future<void>.value();
     final defaults = SettingsSnapshot.defaults();

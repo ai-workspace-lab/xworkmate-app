@@ -47,6 +47,10 @@ extension AppControllerWebWorkspace on AppController {
       for (final record in records) {
         final sanitized = sanitizeRecordInternal(record);
         threadRecordsInternal[sanitized.sessionKey] = sanitized;
+        await ensureWebTaskThreadBindingInternal(
+          sanitized.sessionKey,
+          executionTarget: sanitized.executionTarget,
+        );
       }
       if (threadRecordsInternal.isEmpty) {
         final record = newRecordInternal(
@@ -54,6 +58,10 @@ extension AppControllerWebWorkspace on AppController {
           title: appText('新对话', 'New conversation'),
         );
         threadRecordsInternal[record.sessionKey] = record;
+        await ensureWebTaskThreadBindingInternal(
+          record.sessionKey,
+          executionTarget: record.executionTarget,
+        );
       }
       final preferredSession = normalizedSessionKeyInternal(
         settingsInternal.assistantLastSessionKey,

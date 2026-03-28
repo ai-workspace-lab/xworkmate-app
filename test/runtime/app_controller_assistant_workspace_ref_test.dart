@@ -11,9 +11,19 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 
 import '../test_support.dart';
 
+Future<void> waitForControllerInternal(AppController controller) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  while (controller.initializing) {
+    if (DateTime.now().isAfter(deadline)) {
+      fail('controller did not initialize in time');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
+}
+
 void main() {
   test(
-    'AppController keeps workspace refs aligned with assistant thread targets',
+    'AppController binds single-agent threads to local workspace directories',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final controller = AppController(
@@ -21,128 +31,61 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      final deadline = DateTime.now().add(const Duration(seconds: 5));
-      while (controller.initializing) {
-        if (DateTime.now().isAfter(deadline)) {
-          fail('controller did not initialize in time');
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      }
-
-      expect(
-        controller.assistantWorkspaceRefForSession(
-          controller.currentSessionKey,
-        ),
-        '${controller.settings.workspacePath}/.xworkmate/threads/main',
-      );
-      expect(
-        controller.assistantWorkspaceRefKindForSession(
-          controller.currentSessionKey,
-        ),
-        WorkspaceRefKind.remotePath,
-      );
-
+      await waitForControllerInternal(controller);
       await controller.setAssistantExecutionTarget(
-        AssistantExecutionTarget.remote,
+        AssistantExecutionTarget.singleAgent,
+      );
+
+      final workspacePath = controller.assistantWorkspaceRefForSession(
+        controller.currentSessionKey,
       );
       expect(
-        controller.assistantWorkspaceRefForSession(
-          controller.currentSessionKey,
-        ),
+        workspacePath,
         '${controller.settings.workspacePath}/.xworkmate/threads/main',
       );
       expect(
         controller.assistantWorkspaceRefKindForSession(
           controller.currentSessionKey,
         ),
-        WorkspaceRefKind.remotePath,
-      );
-
-      const draftKey = 'draft:artifact-thread';
-      controller.initializeAssistantThreadContext(
-        draftKey,
-        title: 'Artifact Thread',
-        executionTarget: AssistantExecutionTarget.singleAgent,
-      );
-      await controller.switchSession(draftKey);
-      final draftWorkspaceRef = controller.assistantWorkspaceRefForSession(
-        draftKey,
-      );
-      expect(
-        draftWorkspaceRef,
-        startsWith('${controller.settings.workspacePath}/.xworkmate/threads/'),
-      );
-      expect(draftWorkspaceRef, isNot(controller.settings.workspacePath));
-      expect(
-        controller.assistantWorkspaceRefKindForSession(draftKey),
         WorkspaceRefKind.localPath,
       );
     },
   );
 
   test(
-    'AppController migrates draft single-agent threads off the shared workspace root',
+    'AppController binds gateway threads to owner-scoped remote workspace paths',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-thread-workspace-migrate-',
+      final controller = AppController(
+        store: createIsolatedTestStore(enableSecureStorage: false),
       );
-      final workspaceRoot = Directory('${tempDirectory.path}/workspace');
-      await workspaceRoot.create(recursive: true);
-      addTearDown(() async {
-        if (await tempDirectory.exists()) {
-          try {
-            await tempDirectory.delete(recursive: true);
-          } catch (_) {}
-        }
-      });
-      final store = SecureConfigStore(
-        enableSecureStorage: false,
-        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
-        fallbackDirectoryPathResolver: () async => tempDirectory.path,
-      );
-      await store.initialize();
-      await store.saveSettingsSnapshot(
-        SettingsSnapshot.defaults().copyWith(workspacePath: workspaceRoot.path),
-      );
-      await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
-        AssistantThreadRecord(
-          sessionKey: 'draft:artifact-thread',
-          messages: const <GatewayChatMessage>[],
-          updatedAtMs: 1,
-          title: 'Artifact Thread',
-          archived: false,
-          executionTarget: AssistantExecutionTarget.singleAgent,
-          messageViewMode: AssistantMessageViewMode.rendered,
-          workspaceRef: workspaceRoot.path,
-          workspaceRefKind: WorkspaceRefKind.localPath,
-        ),
-      ]);
-
-      final controller = AppController(store: store);
       addTearDown(controller.dispose);
 
-      final deadline = DateTime.now().add(const Duration(seconds: 5));
-      while (controller.initializing) {
-        if (DateTime.now().isAfter(deadline)) {
-          fail('controller did not initialize in time');
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      }
+      await waitForControllerInternal(controller);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.remote,
+      );
 
-      final migratedWorkspace = controller.assistantWorkspaceRefForSession(
-        'draft:artifact-thread',
-      );
+      final record =
+          controller.assistantThreadRecordsInternal[controller.currentSessionKey]!;
+      expect(record.ownerScope.realm, ThreadRealm.local);
+      expect(record.ownerScope.subjectType, ThreadSubjectType.user);
+      expect(record.ownerScope.subjectId, isNotEmpty);
       expect(
-        migratedWorkspace,
-        '${workspaceRoot.path}/.xworkmate/threads/draft-artifact-thread',
+        record.workspacePath,
+        '/owners/${record.ownerScope.realm.name}/${record.ownerScope.subjectType.name}/${record.ownerScope.subjectId}/threads/${record.threadId}',
       );
-      expect(Directory(migratedWorkspace).existsSync(), isTrue);
+      expect(record.displayPath, record.workspacePath);
+      expect(record.workspaceKind, WorkspaceKind.remoteFs);
+      expect(
+        controller.assistantWorkspaceRefKindForSession(record.threadId),
+        WorkspaceRefKind.remotePath,
+      );
     },
   );
 
   test(
-    'AppController preserves recorded workspace refs when switching threads',
+    'AppController preserves recorded task workspace bindings across thread switches',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -173,41 +116,92 @@ void main() {
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
       );
       await store.initialize();
-      await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
-        AssistantThreadRecord(
-          sessionKey: 'main',
-          messages: const <GatewayChatMessage>[],
-          updatedAtMs: 1,
+      await store.saveTaskThreads(<TaskThread>[
+        TaskThread(
+          threadId: 'main',
           title: 'Main',
-          archived: false,
-          executionTarget: AssistantExecutionTarget.singleAgent,
-          messageViewMode: AssistantMessageViewMode.rendered,
-          workspaceRef: mainWorkspace.path,
-          workspaceRefKind: WorkspaceRefKind.localPath,
+          ownerScope: const ThreadOwnerScope(
+            realm: ThreadRealm.local,
+            subjectType: ThreadSubjectType.user,
+            subjectId: 'device-main',
+            displayName: 'device-main',
+          ),
+          workspaceBinding: WorkspaceBinding(
+            workspaceId: 'main',
+            workspaceKind: WorkspaceKind.localFs,
+            workspacePath: mainWorkspace.path,
+            displayPath: mainWorkspace.path,
+            writable: true,
+          ),
+          executionBinding: const ExecutionBinding(
+            executionMode: ThreadExecutionMode.localAgent,
+            executorId: 'auto',
+            providerId: 'auto',
+            endpointId: '',
+          ),
+          contextState: const ThreadContextState(
+            messages: <GatewayChatMessage>[],
+            selectedModelId: '',
+            selectedSkillKeys: <String>[],
+            importedSkills: <AssistantThreadSkillEntry>[],
+            permissionLevel: AssistantPermissionLevel.defaultAccess,
+            messageViewMode: AssistantMessageViewMode.rendered,
+            latestResolvedRuntimeModel: '',
+          ),
+          lifecycleState: const ThreadLifecycleState(
+            archived: false,
+            status: 'ready',
+            lastRunAtMs: null,
+            lastResultCode: null,
+          ),
+          createdAtMs: 1,
+          updatedAtMs: 1,
         ),
-        AssistantThreadRecord(
-          sessionKey: 'draft:artifact-thread',
-          messages: const <GatewayChatMessage>[],
-          updatedAtMs: 2,
+        TaskThread(
+          threadId: 'draft:artifact-thread',
           title: 'Artifact Thread',
-          archived: false,
-          executionTarget: AssistantExecutionTarget.singleAgent,
-          messageViewMode: AssistantMessageViewMode.rendered,
-          workspaceRef: taskWorkspace.path,
-          workspaceRefKind: WorkspaceRefKind.localPath,
+          ownerScope: const ThreadOwnerScope(
+            realm: ThreadRealm.local,
+            subjectType: ThreadSubjectType.user,
+            subjectId: 'device-task',
+            displayName: 'device-task',
+          ),
+          workspaceBinding: WorkspaceBinding(
+            workspaceId: 'draft:artifact-thread',
+            workspaceKind: WorkspaceKind.localFs,
+            workspacePath: taskWorkspace.path,
+            displayPath: taskWorkspace.path,
+            writable: true,
+          ),
+          executionBinding: const ExecutionBinding(
+            executionMode: ThreadExecutionMode.localAgent,
+            executorId: 'auto',
+            providerId: 'auto',
+            endpointId: '',
+          ),
+          contextState: const ThreadContextState(
+            messages: <GatewayChatMessage>[],
+            selectedModelId: '',
+            selectedSkillKeys: <String>[],
+            importedSkills: <AssistantThreadSkillEntry>[],
+            permissionLevel: AssistantPermissionLevel.defaultAccess,
+            messageViewMode: AssistantMessageViewMode.rendered,
+            latestResolvedRuntimeModel: '',
+          ),
+          lifecycleState: const ThreadLifecycleState(
+            archived: false,
+            status: 'ready',
+            lastRunAtMs: null,
+            lastResultCode: null,
+          ),
+          createdAtMs: 2,
+          updatedAtMs: 2,
         ),
       ]);
 
       final controller = AppController(store: store);
       addTearDown(controller.dispose);
-
-      final deadline = DateTime.now().add(const Duration(seconds: 5));
-      while (controller.initializing) {
-        if (DateTime.now().isAfter(deadline)) {
-          fail('controller did not initialize in time');
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      }
+      await waitForControllerInternal(controller);
 
       expect(
         controller.assistantWorkspaceRefForSession('main'),
@@ -233,69 +227,11 @@ void main() {
   );
 
   test(
-    'AppController rebinds default thread workspaces after bootstrap updates the workspace root',
+    'AppController keeps recorded single-agent bindings instead of migrating legacy paths',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-thread-workspace-bootstrap-migrate-',
-      );
-      addTearDown(() async {
-        if (await tempDirectory.exists()) {
-          try {
-            await tempDirectory.delete(recursive: true);
-          } catch (_) {}
-        }
-      });
-      final store = SecureConfigStore(
-        enableSecureStorage: false,
-        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
-        fallbackDirectoryPathResolver: () async => tempDirectory.path,
-      );
-      await store.initialize();
-      await store.saveSettingsSnapshot(SettingsSnapshot.defaults());
-      await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
-        AssistantThreadRecord(
-          sessionKey: 'draft:artifact-thread',
-          messages: const <GatewayChatMessage>[],
-          updatedAtMs: 1,
-          title: 'Artifact Thread',
-          archived: false,
-          executionTarget: AssistantExecutionTarget.singleAgent,
-          messageViewMode: AssistantMessageViewMode.rendered,
-          workspaceRef: '/opt/data/.xworkmate/threads/draft-artifact-thread',
-          workspaceRefKind: WorkspaceRefKind.localPath,
-        ),
-      ]);
-
-      final controller = AppController(store: store);
-      addTearDown(controller.dispose);
-
-      final deadline = DateTime.now().add(const Duration(seconds: 5));
-      while (controller.initializing) {
-        if (DateTime.now().isAfter(deadline)) {
-          fail('controller did not initialize in time');
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      }
-
-      expect(controller.settings.workspacePath, isNot('/opt/data'));
-      final migratedWorkspace = controller.assistantWorkspaceRefForSession(
-        'draft:artifact-thread',
-      );
-      expect(
-        migratedWorkspace,
-        '${controller.settings.workspacePath}/.xworkmate/threads/draft-artifact-thread',
-      );
-      expect(Directory(migratedWorkspace).existsSync(), isTrue);
-    },
-  );
-
-  test(
-    'AppController migrates missing draft workspace refs to isolated thread directories',
-    () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final tempDirectory = await Directory.systemTemp.createTemp(
-        'xworkmate-thread-workspace-missing-',
+        'xworkmate-thread-workspace-restore-',
       );
       final workspaceRoot = Directory('${tempDirectory.path}/workspace');
       await workspaceRoot.create(recursive: true);
@@ -315,39 +251,64 @@ void main() {
       await store.saveSettingsSnapshot(
         SettingsSnapshot.defaults().copyWith(workspacePath: workspaceRoot.path),
       );
-      await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
-        AssistantThreadRecord(
-          sessionKey: 'draft:missing-ref-thread',
-          messages: const <GatewayChatMessage>[],
+      await store.saveTaskThreads(<TaskThread>[
+        TaskThread(
+          threadId: 'draft:artifact-thread',
+          title: 'Artifact Thread',
+          ownerScope: const ThreadOwnerScope(
+            realm: ThreadRealm.local,
+            subjectType: ThreadSubjectType.user,
+            subjectId: 'device-task',
+            displayName: 'device-task',
+          ),
+          workspaceBinding: WorkspaceBinding(
+            workspaceId: 'draft:artifact-thread',
+            workspaceKind: WorkspaceKind.localFs,
+            workspacePath: workspaceRoot.path,
+            displayPath: workspaceRoot.path,
+            writable: true,
+          ),
+          executionBinding: const ExecutionBinding(
+            executionMode: ThreadExecutionMode.localAgent,
+            executorId: 'auto',
+            providerId: 'auto',
+            endpointId: '',
+          ),
+          contextState: const ThreadContextState(
+            messages: <GatewayChatMessage>[],
+            selectedModelId: '',
+            selectedSkillKeys: <String>[],
+            importedSkills: <AssistantThreadSkillEntry>[],
+            permissionLevel: AssistantPermissionLevel.defaultAccess,
+            messageViewMode: AssistantMessageViewMode.rendered,
+            latestResolvedRuntimeModel: '',
+          ),
+          lifecycleState: const ThreadLifecycleState(
+            archived: false,
+            status: 'ready',
+            lastRunAtMs: null,
+            lastResultCode: null,
+          ),
+          createdAtMs: 1,
           updatedAtMs: 1,
-          title: 'Missing Ref Thread',
-          archived: false,
-          executionTarget: AssistantExecutionTarget.singleAgent,
-          messageViewMode: AssistantMessageViewMode.rendered,
-          workspaceRef: '${workspaceRoot.path}/.xworkmate/threads/missing-dir',
-          workspaceRefKind: WorkspaceRefKind.localPath,
         ),
       ]);
 
       final controller = AppController(store: store);
       addTearDown(controller.dispose);
+      await waitForControllerInternal(controller);
 
-      final deadline = DateTime.now().add(const Duration(seconds: 5));
-      while (controller.initializing) {
-        if (DateTime.now().isAfter(deadline)) {
-          fail('controller did not initialize in time');
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      }
-
-      final migratedWorkspace = controller.assistantWorkspaceRefForSession(
-        'draft:missing-ref-thread',
+      expect(
+        controller.assistantWorkspaceRefForSession('draft:artifact-thread'),
+        workspaceRoot.path,
       );
       expect(
-        migratedWorkspace,
-        '${workspaceRoot.path}/.xworkmate/threads/draft-missing-ref-thread',
+        controller
+            .assistantThreadRecordsInternal['draft:artifact-thread']
+            ?.lifecycleState
+            .status,
+        'ready',
       );
-      expect(Directory(migratedWorkspace).existsSync(), isTrue);
     },
   );
 }

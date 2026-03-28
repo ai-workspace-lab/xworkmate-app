@@ -52,7 +52,7 @@ void registerAssistantPageSuiteCoreTestsInternal() {
   ) async {
     final controller = await createControllerWithThreadRecordsInternal(
       tester: tester,
-      records: const <AssistantThreadRecord>[],
+      records: const <TaskThread>[],
       useFakeGatewayRuntime: true,
     );
     addTearDown(controller.dispose);
@@ -139,7 +139,7 @@ void registerAssistantPageSuiteCoreTestsInternal() {
   ) async {
     final controller = await createControllerWithThreadRecordsInternal(
       tester: tester,
-      records: const <AssistantThreadRecord>[],
+      records: const <TaskThread>[],
       useFakeGatewayRuntime: true,
     );
     addTearDown(controller.dispose);

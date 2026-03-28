@@ -503,9 +503,10 @@ class WebAssistantPageStateInternal extends State<WebAssistantPage> {
                 child: AssistantArtifactSidebar(
                   sessionKey: controller.currentSessionKey,
                   threadTitle: controller.currentConversationTitle,
-                  workspaceRef: controller.assistantWorkspaceRefForSession(
-                    controller.currentSessionKey,
-                  ),
+                  workspaceRef: controller
+                      .assistantWorkspaceDisplayPathForSession(
+                        controller.currentSessionKey,
+                      ),
                   workspaceRefKind: controller
                       .assistantWorkspaceRefKindForSession(
                         controller.currentSessionKey,

@@ -87,8 +87,8 @@ void registerThreadSkillsAcpTests() {
             gatewayPort: acpServer.port,
           ),
         );
-        await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
-          AssistantThreadRecord(
+        await store.saveTaskThreads(<TaskThread>[
+          TaskThread(
             sessionKey: 'main',
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,
@@ -279,8 +279,8 @@ void registerThreadSkillsAcpTests() {
             workspacePath: '${tempDirectory.path}/missing-workspace',
           ),
         );
-        await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
-          AssistantThreadRecord(
+        await store.saveTaskThreads(<TaskThread>[
+          TaskThread(
             sessionKey: 'main',
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,

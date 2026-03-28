@@ -45,13 +45,12 @@ extension AppControllerWebSessionActions on AppController {
       importedSkills: inheritedRecord?.importedSkills ?? const [],
       selectedSkillKeys: inheritedRecord?.selectedSkillKeys ?? const [],
       gatewayEntryState: gatewayEntryStateForTargetInternal(inheritedTarget),
-      workspaceRef: inheritedRecord?.workspaceRef.trim().isNotEmpty == true
-          ? inheritedRecord!.workspaceRef
-          : defaultWorkspaceRefForSessionInternal(baseRecord.sessionKey),
-      workspaceRefKind:
-          inheritedRecord?.workspaceRefKind ?? WorkspaceRefKind.objectStore,
     );
     threadRecordsInternal[record.sessionKey] = record;
+    await ensureWebTaskThreadBindingInternal(
+      record.sessionKey,
+      executionTarget: inheritedTarget,
+    );
     currentSessionKeyInternal = record.sessionKey;
     lastAssistantErrorInternal = null;
     settingsInternal = settingsInternal.copyWith(
@@ -83,7 +82,7 @@ extension AppControllerWebSessionActions on AppController {
     settingsInternal = settingsInternal.copyWith(
       assistantLastSessionKey: normalizedSessionKey,
     );
-    syncThreadWorkspaceRefInternal(normalizedSessionKey);
+    await ensureWebTaskThreadBindingInternal(normalizedSessionKey);
     await persistSettingsInternal();
     notifyChangedInternal();
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
@@ -115,8 +114,10 @@ extension AppControllerWebSessionActions on AppController {
       executionTarget: resolvedTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       gatewayEntryState: gatewayEntryStateForTargetInternal(resolvedTarget),
-      workspaceRef: defaultWorkspaceRefForSessionInternal(sessionKey),
-      workspaceRefKind: WorkspaceRefKind.objectStore,
+    );
+    await ensureWebTaskThreadBindingInternal(
+      sessionKey,
+      executionTarget: resolvedTarget,
     );
     settingsInternal = settingsInternal.copyWith(
       assistantExecutionTarget: resolvedTarget,

@@ -30,19 +30,7 @@ class DesktopThreadArtifactService {
         changesMessage: 'No recorded working directory for this thread.',
       );
     }
-    if (workspaceRefKind == WorkspaceRefKind.objectStore) {
-      return AssistantArtifactSnapshot(
-        workspaceRef: normalizedRef,
-        workspaceRefKind: workspaceRefKind,
-        resultMessage:
-            'This thread workspace is recorded as object storage and is not browsable from desktop.',
-        filesMessage:
-            'This thread workspace is recorded as object storage and is not browsable from desktop.',
-        changesMessage:
-            'This thread workspace is recorded as object storage and is not browsable from desktop.',
-      );
-    }
-    if (workspaceRefKind == WorkspaceRefKind.remotePath) {
+    if (workspaceRefKind != WorkspaceRefKind.localPath) {
       return AssistantArtifactSnapshot(
         workspaceRef: normalizedRef,
         workspaceRefKind: workspaceRefKind,
@@ -106,13 +94,7 @@ class DesktopThreadArtifactService {
     required String workspaceRef,
     required WorkspaceRefKind workspaceRefKind,
   }) async {
-    if (workspaceRefKind == WorkspaceRefKind.objectStore) {
-      return const AssistantArtifactPreview.empty(
-        message:
-            'Object storage artifacts are not directly readable on desktop.',
-      );
-    }
-    if (workspaceRefKind == WorkspaceRefKind.remotePath) {
+    if (workspaceRefKind != WorkspaceRefKind.localPath) {
       return const AssistantArtifactPreview.empty(
         message: 'Remote agent artifacts are not directly readable on desktop.',
       );

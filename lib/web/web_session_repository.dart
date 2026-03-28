@@ -6,9 +6,9 @@ import '../runtime/runtime_models.dart';
 import 'web_store.dart';
 
 abstract class WebSessionRepository {
-  Future<List<AssistantThreadRecord>> loadThreadRecords();
+  Future<List<TaskThread>> loadThreadRecords();
 
-  Future<void> saveThreadRecords(List<AssistantThreadRecord> records);
+  Future<void> saveThreadRecords(List<TaskThread> records);
 }
 
 class BrowserWebSessionRepository implements WebSessionRepository {
@@ -17,13 +17,13 @@ class BrowserWebSessionRepository implements WebSessionRepository {
   final WebStore _store;
 
   @override
-  Future<List<AssistantThreadRecord>> loadThreadRecords() {
-    return _store.loadAssistantThreadRecords();
+  Future<List<TaskThread>> loadThreadRecords() {
+    return _store.loadTaskThreads();
   }
 
   @override
-  Future<void> saveThreadRecords(List<AssistantThreadRecord> records) {
-    return _store.saveAssistantThreadRecords(records);
+  Future<void> saveThreadRecords(List<TaskThread> records) {
+    return _store.saveTaskThreads(records);
   }
 }
 
@@ -46,13 +46,13 @@ class RemoteWebSessionRepository implements WebSessionRepository {
   static Uri? normalizeBaseUrl(String raw) => _normalizeBaseUri(raw);
 
   @override
-  Future<List<AssistantThreadRecord>> loadThreadRecords() async {
+  Future<List<TaskThread>> loadThreadRecords() async {
     final uri = _threadsUri();
     final response = await _client.get(uri, headers: _headers());
     _throwIfError(response, fallbackMessage: 'Remote session load failed');
     final body = response.body.trim();
     if (body.isEmpty) {
-      return const <AssistantThreadRecord>[];
+      return const <TaskThread>[];
     }
     final decoded = jsonDecode(body);
     final rawThreads = switch (decoded) {
@@ -64,13 +64,13 @@ class RemoteWebSessionRepository implements WebSessionRepository {
         .whereType<Map>()
         .map(
           (item) =>
-              AssistantThreadRecord.fromJson(item.cast<String, dynamic>()),
+              TaskThread.fromJson(item.cast<String, dynamic>()),
         )
         .toList(growable: false);
   }
 
   @override
-  Future<void> saveThreadRecords(List<AssistantThreadRecord> records) async {
+  Future<void> saveThreadRecords(List<TaskThread> records) async {
     final uri = _threadsUri();
     final response = await _client.put(
       uri,
