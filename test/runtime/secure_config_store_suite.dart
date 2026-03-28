@@ -11,3 +11,15 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
 part 'secure_config_store_suite_core.part.dart';
+part 'secure_config_store_suite_settings.part.dart';
+part 'secure_config_store_suite_secrets.part.dart';
+part 'secure_config_store_suite_compatibility.part.dart';
+part 'secure_config_store_suite_lifecycle.part.dart';
+part 'secure_config_store_suite_fixtures.part.dart';
+
+void main() {
+  _registerSecureConfigStoreSuiteSettingsTests();
+  _registerSecureConfigStoreSuiteSecretsTests();
+  _registerSecureConfigStoreSuiteCompatibilityTests();
+  _registerSecureConfigStoreSuiteLifecycleTests();
+}
