@@ -11,4 +11,7 @@ import 'aris_llm_chat_client.dart';
 import 'multi_agent_frameworks.dart';
 import 'runtime_models.dart';
 
+part 'multi_agent_orchestrator_protocol.part.dart';
+part 'multi_agent_orchestrator_workflow.part.dart';
+part 'multi_agent_orchestrator_support.part.dart';
 part 'multi_agent_orchestrator_core.part.dart';

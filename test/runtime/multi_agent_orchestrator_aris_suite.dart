@@ -12,6 +12,18 @@ import 'package:xworkmate/runtime/multi_agent_orchestrator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
+  test('multi-agent orchestrator core file stays split into focused parts', () {
+    final lines = File(
+      'lib/runtime/multi_agent_orchestrator_core.part.dart',
+    ).readAsLinesSync();
+
+    expect(
+      lines.length,
+      lessThanOrEqualTo(1000),
+      reason: 'The core file should stay under the target line budget.',
+    );
+  });
+
   test(
     'MultiAgentOrchestrator falls back to local Ollama + ARIS Go core chat runtime',
     () async {
