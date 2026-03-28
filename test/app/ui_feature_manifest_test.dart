@@ -137,4 +137,28 @@ web: {}
       throwsFormatException,
     );
   });
+
+  test('copyWithFeature keeps build mode sets isolated', () {
+    final manifest = UiFeatureManifest.fallback();
+    final originalFlag = manifest.lookup(
+      UiFeaturePlatform.desktop,
+      'assistant',
+      'direct_ai',
+    )!;
+
+    final copied = manifest.copyWithFeature(
+      platform: UiFeaturePlatform.desktop,
+      module: 'assistant',
+      feature: 'direct_ai',
+      enabled: false,
+    );
+    final copiedFlag = copied.lookup(
+      UiFeaturePlatform.desktop,
+      'assistant',
+      'direct_ai',
+    )!;
+
+    expect(identical(copiedFlag.buildModes, originalFlag.buildModes), isFalse);
+    expect(copiedFlag.buildModes, equals(originalFlag.buildModes));
+  });
 }
