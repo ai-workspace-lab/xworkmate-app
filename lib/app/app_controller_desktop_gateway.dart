@@ -41,7 +41,7 @@ extension AppControllerDesktopGateway on AppController {
           ? RuntimeConnectionMode.local
           : RuntimeConnectionMode.remote,
     );
-    await saveSettings(
+    await AppControllerDesktopSettings(this).saveSettings(
       settings
           .copyWithGatewayProfileAt(
             _gatewayProfileIndexForExecutionTarget(resolvedTarget),
@@ -55,7 +55,7 @@ extension AppControllerDesktopGateway on AppController {
       executionTarget: resolvedTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
-    await _connectProfile(
+    await AppControllerDesktopGateway(this)._connectProfile(
       nextProfile,
       profileIndex: resolvedProfileIndex,
       authTokenOverride: resolvedToken,
@@ -95,7 +95,7 @@ extension AppControllerDesktopGateway on AppController {
           port: resolvedPort <= 0 ? 443 : resolvedPort,
           tls: mode == RuntimeConnectionMode.local ? false : tls,
         );
-    await saveSettings(
+    await AppControllerDesktopSettings(this).saveSettings(
       settings
           .copyWithGatewayProfileAt(
             _gatewayProfileIndexForExecutionTarget(nextTarget),
@@ -109,7 +109,7 @@ extension AppControllerDesktopGateway on AppController {
       executionTarget: nextTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
-    await _connectProfile(
+    await AppControllerDesktopGateway(this)._connectProfile(
       nextProfile,
       profileIndex: nextProfileIndex,
       authTokenOverride: token.trim(),

@@ -21,14 +21,11 @@ extension AppControllerDesktopSettings on AppController {
   }
 
   void saveGatewayTokenDraft(String value, {required int profileIndex}) {
-    _saveSecretDraft(AppController._draftGatewayTokenKey(profileIndex), value);
+    _saveSecretDraft(_draftGatewayTokenKey(profileIndex), value);
   }
 
   void saveGatewayPasswordDraft(String value, {required int profileIndex}) {
-    _saveSecretDraft(
-      AppController._draftGatewayPasswordKey(profileIndex),
-      value,
-    );
+    _saveSecretDraft(_draftGatewayPasswordKey(profileIndex), value);
   }
 
   void saveAiGatewayApiKeyDraft(String value) {

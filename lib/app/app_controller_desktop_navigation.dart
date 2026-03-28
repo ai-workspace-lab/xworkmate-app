@@ -224,7 +224,7 @@ extension AppControllerDesktopNavigation on AppController {
       return;
     }
     setActiveAppLanguage(language);
-    await saveSettings(
+    await AppControllerDesktopSettings(this).saveSettings(
       settings.copyWith(appLanguage: language),
       refreshAfterSave: false,
     );
