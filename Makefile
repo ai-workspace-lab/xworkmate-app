@@ -7,8 +7,16 @@ PNPM ?= pnpm
 DART ?= dart
 DEVICE ?= macos
 APP_STORE_DART_DEFINE ?= --dart-define=XWORKMATE_APP_STORE=true
+PUBSPEC_VERSION_LINE := $(shell sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n 1)
+PUBSPEC_BUILD_DATE := $(shell sed -n 's/^build-date:[[:space:]]*//p' pubspec.yaml | head -n 1)
+PUBSPEC_BUILD_ID := $(shell sed -n 's/^build-id:[[:space:]]*//p' pubspec.yaml | head -n 1)
+APP_VERSION := $(firstword $(subst +, ,$(PUBSPEC_VERSION_LINE)))
+APP_BUILD_NUMBER_RAW := $(word 2,$(subst +, ,$(PUBSPEC_VERSION_LINE)))
+APP_BUILD_NUMBER := $(if $(APP_BUILD_NUMBER_RAW),$(APP_BUILD_NUMBER_RAW),1)
+APP_DART_DEFINE_VERSION ?= --dart-define=XWORKMATE_DISPLAY_VERSION=$(APP_VERSION)
+APP_DART_DEFINE_BUILD ?= --dart-define=XWORKMATE_BUILD_NUMBER=$(APP_BUILD_NUMBER)
 
-.PHONY: help deps analyze test check format run open-macos-xcode build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs check-export-compliance
+.PHONY: help deps analyze test check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs check-export-compliance
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -30,6 +38,12 @@ format: ## Format Dart sources
 render-release-docs: ## Render feature matrix, roadmap, release notes, and changelog docs
 	$(DART) run tool/render_release_docs.dart
 
+sync-version: ## Show the version/build metadata sourced from pubspec.yaml
+	@echo "version=$(APP_VERSION)"
+	@echo "build=$(APP_BUILD_NUMBER)"
+	@echo "build-date=$(PUBSPEC_BUILD_DATE)"
+	@echo "build-id=$(PUBSPEC_BUILD_ID)"
+
 run: ## Run the app on a device or desktop target (DEVICE=macos by default)
 	$(FLUTTER) run -d $(DEVICE)
 
@@ -40,11 +54,11 @@ build-linux: ## Build the Linux app in release mode
 	$(FLUTTER) build linux --release
 
 build-macos: ## Build the macOS app in release mode
-	$(FLUTTER) build macos --release $(APP_STORE_DART_DEFINE)
+	$(FLUTTER) build macos --release $(APP_STORE_DART_DEFINE) --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD)
 	bash scripts/check-apple-export-compliance.sh build/macos/Build/Products/Release/XWorkmate.app
 
 build-ios-sim: ## Build the iOS app for the simulator
-	$(FLUTTER) build ios --simulator $(APP_STORE_DART_DEFINE)
+	$(FLUTTER) build ios --simulator $(APP_STORE_DART_DEFINE) --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD)
 	bash scripts/check-apple-export-compliance.sh build/ios/iphonesimulator/Runner.app
 
 build-go-core: ## Build the Go core helper
