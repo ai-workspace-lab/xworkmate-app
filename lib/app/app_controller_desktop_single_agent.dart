@@ -94,7 +94,10 @@ extension AppControllerDesktopSingleAgent on AppController {
             model: assistantModelForSession(sessionKey),
             gatewayToken: gatewayToken,
             workingDirectory:
-                _resolveSingleAgentWorkingDirectoryForSession(sessionKey) ??
+                _resolveSingleAgentWorkingDirectoryForSession(
+                  sessionKey,
+                  provider: provider,
+                ) ??
                 Directory.current.path,
             attachments: localAttachments,
             selectedSkills: selectedSkills,
