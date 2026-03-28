@@ -265,6 +265,27 @@ AssistantThreadRecord fields that matter most:
 - assistantModelId
 - gatewayEntryState
 - messages
+- workspaceRef
+- workspaceRefKind
+
+Thread workspace resolution (Desktop current baseline):
+
+- All sessions (including `main`) resolve to:
+  `settings.workspacePath/.xworkmate/threads/<SessionKey>`
+- Session directory is created on demand when missing
+- Legacy records that point to shared root or missing directories are migrated
+  back to the per-session isolated path
+- `workspaceRefKind` is runtime-channel semantics, not path-layout semantics:
+  - `singleAgent` => `localPath`
+  - gateway-backed targets (`local` / `remote`) => `remotePath`
+  - both still use the same isolated thread directory path pattern above
+
+Important cleanup note:
+
+- `remoteProjectRoot` is no longer used as a separate thread workspace path
+  selector in Desktop thread workspace resolution.
+- Runtime-reported `resolvedWorkingDirectory` from single-agent execution
+  should not overwrite the canonical per-thread workspaceRef path.
 
 Responsibilities:
 - Hold per-thread overrides

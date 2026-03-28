@@ -96,7 +96,9 @@ class RuntimeBootstrapConfig {
       value.trim().isEmpty || value.trim() == '/opt/data';
 
   static bool _isDefaultRemoteRoot(String value) =>
-      value.trim().isEmpty || value.trim() == '/opt/data/workspace';
+      value.trim().isEmpty ||
+      value.trim() == '/opt/data/workspace' ||
+      value.trim() == '/opt/data';
 
   static bool _isDefaultCliPath(String value) =>
       value.trim().isEmpty || value.trim() == 'openclaw';

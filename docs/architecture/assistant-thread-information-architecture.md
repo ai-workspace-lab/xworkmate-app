@@ -144,6 +144,38 @@ flowchart LR
 | 发送前附件草稿 | 否 | 当前只有页面级 `_attachments` |
 | 导出 | 否 | 未实现 |
 
+## 线程工作目录与 WorkspaceRefKind（当前实现）
+
+### 统一线程工作目录规则
+
+当前 Desktop 实现中，所有线程（含 `main`）统一使用：
+
+`workspacePath/.xworkmate/threads/<SessionKey>`
+
+其中：
+
+- `<SessionKey>` 会经过目录名安全化（非法字符替换）
+- 目录不存在时会自动创建
+- 线程切换与恢复时，如发现旧记录目录缺失或仍指向共享根目录，会自动迁移到该统一目录
+
+### `workspaceRefKind` 的语义（与路径解耦）
+
+`workspaceRefKind` 用来表达运行通道语义，而不是决定目录拼接规则：
+
+- 本地 Agent（`singleAgent`）=> `localPath`
+- OpenClaw Gateway（`local` / `remote`）=> `remotePath`
+
+注意：即使 `workspaceRefKind = remotePath`，线程目录仍然按统一规则落在  
+`workspacePath/.xworkmate/threads/<SessionKey>`。
+
+### 已清理的旧行为
+
+以下旧行为不再作为当前实现：
+
+- `main` 线程直接使用 `workspacePath` 根目录
+- 通过 `remoteProjectRoot` 单独决定线程目录
+- Single Agent runner 返回 `resolvedWorkingDirectory` 后覆盖线程目录
+
 ## 当前交互规则
 
 ### 新建线程
@@ -204,5 +236,5 @@ flowchart LR
 
 ## 相关文档
 
-- [模式切换与线程连续追问](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/cases/thread_mode_switch_followup.md)
-- [XWorkmate 集成架构](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/architecture/xworkmate-integrations.md)
+- [模式切换与线程连续追问](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/cases/thread_mode_switch_followup.md)
+- [XWorkmate 集成架构](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/xworkmate-integrations.md)
