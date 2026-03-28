@@ -587,8 +587,6 @@ extension AppControllerDesktopThreadStorage on AppController {
       final titleFromSettings = assistantCustomTaskTitle(sessionKey);
       final shouldMigrateWorkspaceRef = _shouldMigrateWorkspaceRef(
         sessionKey,
-        executionTarget:
-            record.executionTarget ?? settings.assistantExecutionTarget,
         workspaceRef: record.workspaceRef,
         workspaceRefKind: record.workspaceRefKind,
       );

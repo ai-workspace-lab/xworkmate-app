@@ -603,7 +603,8 @@ class AssistantThreadRecord {
       if (workspaceRef.startsWith('object://')) {
         return WorkspaceRefKind.objectStore;
       }
-      if (executionTarget == AssistantExecutionTarget.remote) {
+      if (executionTarget != null &&
+          executionTarget != AssistantExecutionTarget.singleAgent) {
         return WorkspaceRefKind.remotePath;
       }
       return WorkspaceRefKind.localPath;

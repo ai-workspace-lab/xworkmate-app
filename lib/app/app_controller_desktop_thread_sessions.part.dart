@@ -717,19 +717,14 @@ extension AppControllerDesktopThreadSessions on AppController {
 
   String _defaultWorkspaceRefForSession(String sessionKey) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    final target = assistantExecutionTargetForSession(normalizedSessionKey);
-    return switch (target) {
-      AssistantExecutionTarget.remote => settings.remoteProjectRoot.trim(),
-      AssistantExecutionTarget.local || AssistantExecutionTarget.singleAgent =>
-        _defaultLocalWorkspaceRefForSession(normalizedSessionKey),
-    };
+    return _defaultLocalWorkspaceRefForSession(normalizedSessionKey);
   }
 
   String _defaultLocalWorkspaceRefForSession(String sessionKey) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
     final baseWorkspace = settings.workspacePath.trim();
-    if (baseWorkspace.isEmpty || normalizedSessionKey == 'main') {
-      return baseWorkspace;
+    if (baseWorkspace.isEmpty) {
+      return '';
     }
     final threadWorkspace =
         '${_trimTrailingPathSeparator(baseWorkspace)}/.xworkmate/threads/${_threadWorkspaceDirectoryName(normalizedSessionKey)}';
@@ -766,21 +761,9 @@ extension AppControllerDesktopThreadSessions on AppController {
   }
 
   bool _usesLegacySharedWorkspaceRef(
-    String sessionKey, {
-    AssistantExecutionTarget? executionTarget,
     String? workspaceRef,
     WorkspaceRefKind? workspaceRefKind,
-  }) {
-    final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    if (normalizedSessionKey == 'main') {
-      return false;
-    }
-    final resolvedTarget =
-        executionTarget ??
-        assistantExecutionTargetForSession(normalizedSessionKey);
-    if (resolvedTarget == AssistantExecutionTarget.remote) {
-      return false;
-    }
+  ) {
     final normalizedRef = workspaceRef?.trim() ?? '';
     if (normalizedRef.isEmpty) {
       return false;
@@ -791,17 +774,10 @@ extension AppControllerDesktopThreadSessions on AppController {
 
   bool _usesDefaultThreadWorkspaceRefFromAnotherRoot(
     String sessionKey, {
-    AssistantExecutionTarget? executionTarget,
     String? workspaceRef,
     WorkspaceRefKind? workspaceRefKind,
   }) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    final resolvedTarget =
-        executionTarget ??
-        assistantExecutionTargetForSession(normalizedSessionKey);
-    if (resolvedTarget == AssistantExecutionTarget.remote) {
-      return false;
-    }
     final normalizedRef = workspaceRef?.trim() ?? '';
     if (normalizedRef.isEmpty ||
         workspaceRefKind != WorkspaceRefKind.localPath) {
@@ -822,9 +798,6 @@ extension AppControllerDesktopThreadSessions on AppController {
     if (normalizedPath == normalizedExpected) {
       return false;
     }
-    if (normalizedSessionKey == 'main') {
-      return normalizedPath == SettingsSnapshot.defaults().workspacePath;
-    }
     final expectedSuffix =
         '/.xworkmate/threads/${_threadWorkspaceDirectoryName(normalizedSessionKey)}';
     return normalizedPath.endsWith(expectedSuffix);
@@ -832,7 +805,6 @@ extension AppControllerDesktopThreadSessions on AppController {
 
   bool _shouldMigrateWorkspaceRef(
     String sessionKey, {
-    AssistantExecutionTarget? executionTarget,
     String? workspaceRef,
     WorkspaceRefKind? workspaceRefKind,
   }) {
@@ -840,27 +812,40 @@ extension AppControllerDesktopThreadSessions on AppController {
     if (normalizedRef.isEmpty) {
       return true;
     }
-    return _usesLegacySharedWorkspaceRef(
-          sessionKey,
-          executionTarget: executionTarget,
-          workspaceRef: normalizedRef,
-          workspaceRefKind: workspaceRefKind,
-        ) ||
+    if (_usesMissingWorkspaceRef(sessionKey, workspaceRefKind, normalizedRef)) {
+      return true;
+    }
+    return _usesLegacySharedWorkspaceRef(normalizedRef, workspaceRefKind) ||
         _usesDefaultThreadWorkspaceRefFromAnotherRoot(
           sessionKey,
-          executionTarget: executionTarget,
           workspaceRef: normalizedRef,
           workspaceRefKind: workspaceRefKind,
         );
+  }
+
+  bool _usesMissingWorkspaceRef(
+    String sessionKey,
+    WorkspaceRefKind? workspaceRefKind,
+    String workspaceRef,
+  ) {
+    if (workspaceRefKind != WorkspaceRefKind.localPath) {
+      return false;
+    }
+    final normalizedPath = workspaceRef.trim();
+    if (normalizedPath.isEmpty) {
+      return true;
+    }
+    return FileSystemEntity.typeSync(normalizedPath) ==
+        FileSystemEntityType.notFound;
   }
 
   WorkspaceRefKind _defaultWorkspaceRefKindForTarget(
     AssistantExecutionTarget target,
   ) {
     return switch (target) {
-      AssistantExecutionTarget.remote => WorkspaceRefKind.remotePath,
-      AssistantExecutionTarget.local ||
       AssistantExecutionTarget.singleAgent => WorkspaceRefKind.localPath,
+      AssistantExecutionTarget.local ||
+      AssistantExecutionTarget.remote => WorkspaceRefKind.remotePath,
     };
   }
 
@@ -869,14 +854,12 @@ extension AppControllerDesktopThreadSessions on AppController {
     AssistantExecutionTarget? executionTarget,
   }) {
     final normalizedSessionKey = _normalizedAssistantSessionKey(sessionKey);
-    final resolvedTarget =
-        executionTarget ??
-        assistantExecutionTargetForSession(normalizedSessionKey);
     final nextWorkspaceRef = _defaultWorkspaceRefForSession(
       normalizedSessionKey,
     );
     final nextWorkspaceRefKind = _defaultWorkspaceRefKindForTarget(
-      resolvedTarget,
+      executionTarget ??
+          assistantExecutionTargetForSession(normalizedSessionKey),
     );
     final existing = _assistantThreadRecords[normalizedSessionKey];
     final existingWorkspaceRef = existing?.workspaceRef.trim() ?? '';
@@ -885,7 +868,6 @@ extension AppControllerDesktopThreadSessions on AppController {
         existing.workspaceRefKind == nextWorkspaceRefKind &&
         !_shouldMigrateWorkspaceRef(
           normalizedSessionKey,
-          executionTarget: resolvedTarget,
           workspaceRef: existingWorkspaceRef,
           workspaceRefKind: existing.workspaceRefKind,
         )) {
@@ -898,7 +880,9 @@ extension AppControllerDesktopThreadSessions on AppController {
     }
     _upsertAssistantThreadRecord(
       normalizedSessionKey,
-      executionTarget: resolvedTarget,
+      executionTarget:
+          executionTarget ??
+          assistantExecutionTargetForSession(normalizedSessionKey),
       workspaceRef: nextWorkspaceRef,
       workspaceRefKind: nextWorkspaceRefKind,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
