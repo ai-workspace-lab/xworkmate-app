@@ -14,4 +14,8 @@ import 'platform_environment.dart';
 import 'runtime_models.dart';
 import 'secure_config_store.dart';
 
+part 'gateway_runtime_protocol.part.dart';
+part 'gateway_runtime_events.part.dart';
+part 'gateway_runtime_errors.part.dart';
+part 'gateway_runtime_helpers.part.dart';
 part 'gateway_runtime_core.part.dart';
