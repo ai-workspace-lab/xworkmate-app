@@ -5,6 +5,10 @@ WORKDIR /app
 
 # Copy pubspec files for dependency caching
 COPY pubspec.yaml pubspec.lock ./
+
+# Copy local path dependencies
+COPY third_party/ ./third_party/
+
 RUN flutter pub get
 
 # Copy source code
