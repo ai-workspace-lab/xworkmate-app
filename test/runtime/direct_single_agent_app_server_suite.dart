@@ -11,6 +11,18 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   group('DirectSingleAgentAppServerClient', () {
+    test('direct single-agent app-server core file stays split into focused parts', () {
+      final lines = File(
+        'lib/runtime/direct_single_agent_app_server_client_core.part.dart',
+      ).readAsLinesSync();
+
+      expect(
+        lines.length,
+        lessThanOrEqualTo(1000),
+        reason: 'The core file should stay under the target line budget.',
+      );
+    });
+
     test('classifies the four endpoint modes', () {
       expect(
         DirectSingleAgentEndpointDescriptor.describe(
