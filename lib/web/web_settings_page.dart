@@ -15,3 +15,6 @@ import '../widgets/surface_card.dart';
 import '../widgets/top_bar.dart';
 
 part 'web_settings_page_core.part.dart';
+part 'web_settings_page_sections.part.dart';
+part 'web_settings_page_gateway.part.dart';
+part 'web_settings_page_support.part.dart';
