@@ -287,6 +287,33 @@ class AppController extends ChangeNotifier {
     );
   }
 
+  Future<void> prepareForExit() async {
+    // Web doesn't have native termination handling.
+    // Best effort flush if session persistence is configured.
+    if (usesRemoteSessionPersistence) {
+      // Remote sessions are persisted server-side.
+    }
+  }
+
+  Map<String, dynamic> desktopStatusSnapshot() {
+    final runningTasks = tasksControllerInternal.running.length;
+    final queuedTasks = tasksControllerInternal.queue.length;
+    final failedTasks = tasksControllerInternal.failed.length;
+    final scheduledTasks = tasksControllerInternal.scheduled.length;
+    return <String, dynamic>{
+      'connectionStatus': connection.status.name,
+      'connectionLabel': connection.status.label,
+      'runningTasks': runningTasks,
+      'pausedTasks': 0,
+      'timedOutTasks': 0,
+      'queuedTasks': queuedTasks,
+      'scheduledTasks': scheduledTasks,
+      'failedTasks': failedTasks,
+      'totalTasks': tasksControllerInternal.totalCount,
+      'badgeCount': runningTasks + queuedTasks,
+    };
+  }
+
   @override
   void dispose() {
     unawaited(relayEventsSubscriptionInternal.cancel());
