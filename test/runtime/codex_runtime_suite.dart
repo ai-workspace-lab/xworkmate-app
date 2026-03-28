@@ -224,7 +224,8 @@ void main() {
       final normalized = CodexRuntime.normalizeModelListErrorForTest(
         const CodexRpcError(
           code: 403,
-          message: 'Access blocked by Cloudflare. This usually happens when connecting from a restricted region (status 403 Forbidden)',
+          message:
+              'Access blocked by Cloudflare. This usually happens when connecting from a restricted region (status 403 Forbidden)',
         ),
       );
 

@@ -14,7 +14,7 @@ void main() {
   test(
     'MultiAgentOrchestrator launches first-batch external tools through ollama launch',
     () async {
-      final recorder = _CliInvocationRecorder();
+      final recorder = CliInvocationRecorderInternal();
       final orchestrator = MultiAgentOrchestrator(
         config: MultiAgentConfig.defaults().copyWith(
           enabled: true,
@@ -42,7 +42,7 @@ void main() {
           ),
         ),
         binaryExistsResolver: (command) async => command == 'ollama',
-        arisBundleRepository: _FakeArisBundleRepository(),
+        arisBundleRepository: FakeArisBundleRepositoryInternal(),
         processStarter: recorder.start,
       );
 
@@ -100,7 +100,7 @@ void main() {
         ]),
       );
 
-      for (final invocation in <_Invocation>[
+      for (final invocation in <InvocationInternal>[
         architectInvocation,
         engineerInvocation,
         workerInvocation,
@@ -127,7 +127,7 @@ void main() {
   test(
     'MultiAgentOrchestrator still injects Anthropic-compatible env for claude launches',
     () async {
-      final recorder = _CliInvocationRecorder();
+      final recorder = CliInvocationRecorderInternal();
       final orchestrator = MultiAgentOrchestrator(
         config: MultiAgentConfig.defaults().copyWith(
           enabled: true,
@@ -155,7 +155,7 @@ void main() {
           ),
         ),
         binaryExistsResolver: (command) async => command == 'ollama',
-        arisBundleRepository: _FakeArisBundleRepository(),
+        arisBundleRepository: FakeArisBundleRepositoryInternal(),
         processStarter: recorder.start,
       );
 
@@ -179,8 +179,8 @@ void main() {
   );
 }
 
-class _CliInvocationRecorder {
-  final List<_Invocation> invocations = <_Invocation>[];
+class CliInvocationRecorderInternal {
+  final List<InvocationInternal> invocations = <InvocationInternal>[];
 
   Future<Process> start(
     String executable,
@@ -189,7 +189,7 @@ class _CliInvocationRecorder {
     String? workingDirectory,
   }) async {
     invocations.add(
-      _Invocation(
+      InvocationInternal(
         executable: executable,
         arguments: List<String>.from(arguments),
         environment: Map<String, String>.from(
@@ -199,8 +199,7 @@ class _CliInvocationRecorder {
       ),
     );
     final prompt = arguments.isEmpty ? '' : arguments.last;
-    final stdout =
-        prompt.contains('任务架构师') || prompt.contains('多 Agent 协作调度者')
+    final stdout = prompt.contains('任务架构师') || prompt.contains('多 Agent 协作调度者')
         ? '''
 ## 概述
 实现 hello world。
@@ -224,10 +223,10 @@ class _CliInvocationRecorder {
 String helloWorld() => 'hello';
 ```
 ''';
-    return _FakeProcess(stdoutText: stdout);
+    return FakeProcessInternal(stdoutText: stdout);
   }
 
-  _Invocation lastLaunchFor(String tool) {
+  InvocationInternal lastLaunchFor(String tool) {
     final matches = invocations.where(
       (item) =>
           item.executable == 'ollama' &&
@@ -244,8 +243,8 @@ String helloWorld() => 'hello';
   }
 }
 
-class _FakeArisBundleRepository extends ArisBundleRepository {
-  _FakeArisBundleRepository();
+class FakeArisBundleRepositoryInternal extends ArisBundleRepository {
+  FakeArisBundleRepositoryInternal();
 
   @override
   Future<ResolvedArisBundle> ensureReady() async {
@@ -281,8 +280,8 @@ class _FakeArisBundleRepository extends ArisBundleRepository {
   }
 }
 
-class _Invocation {
-  const _Invocation({
+class InvocationInternal {
+  const InvocationInternal({
     required this.executable,
     required this.arguments,
     required this.environment,
@@ -295,37 +294,37 @@ class _Invocation {
   final String? workingDirectory;
 }
 
-class _FakeProcess implements Process {
-  _FakeProcess({
+class FakeProcessInternal implements Process {
+  FakeProcessInternal({
     required String stdoutText,
     String stderrText = '',
     int exitCode = 0,
-  }) : _stdout = Stream<List<int>>.value(utf8.encode(stdoutText)),
-       _stderr = Stream<List<int>>.value(utf8.encode(stderrText)),
-       _exitCode = Future<int>.value(exitCode),
-       _stdin = File(
+  }) : stdoutInternal = Stream<List<int>>.value(utf8.encode(stdoutText)),
+       stderrInternal = Stream<List<int>>.value(utf8.encode(stderrText)),
+       exitCodeInternal = Future<int>.value(exitCode),
+       stdinInternal = File(
          '${Directory.systemTemp.path}/fake-process-stdin-${DateTime.now().microsecondsSinceEpoch}.txt',
        ).openWrite();
 
-  final Stream<List<int>> _stdout;
-  final Stream<List<int>> _stderr;
-  final Future<int> _exitCode;
-  final IOSink _stdin;
+  final Stream<List<int>> stdoutInternal;
+  final Stream<List<int>> stderrInternal;
+  final Future<int> exitCodeInternal;
+  final IOSink stdinInternal;
 
   @override
-  Future<int> get exitCode => _exitCode;
+  Future<int> get exitCode => exitCodeInternal;
 
   @override
   int get pid => 1;
 
   @override
-  IOSink get stdin => _stdin;
+  IOSink get stdin => stdinInternal;
 
   @override
-  Stream<List<int>> get stderr => _stderr;
+  Stream<List<int>> get stderr => stderrInternal;
 
   @override
-  Stream<List<int>> get stdout => _stdout;
+  Stream<List<int>> get stdout => stdoutInternal;
 
   @override
   bool kill([ProcessSignal signal = ProcessSignal.sigterm]) => true;
