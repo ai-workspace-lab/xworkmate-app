@@ -98,7 +98,7 @@ extension AppControllerDesktopGateway on AppController {
           .copyWith(assistantExecutionTarget: resolvedTarget),
       refreshAfterSave: false,
     );
-    upsertAssistantThreadRecordInternal(
+    upsertTaskThreadInternal(
       sessionsControllerInternal.currentSessionKey,
       executionTarget: resolvedTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
@@ -156,7 +156,7 @@ extension AppControllerDesktopGateway on AppController {
           .copyWith(assistantExecutionTarget: nextTarget),
       refreshAfterSave: false,
     );
-    upsertAssistantThreadRecordInternal(
+    upsertTaskThreadInternal(
       sessionsControllerInternal.currentSessionKey,
       executionTarget: nextTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),

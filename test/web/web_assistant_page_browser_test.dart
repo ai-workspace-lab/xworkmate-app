@@ -70,8 +70,8 @@ class _BrowserArtifactSidebarHarnessState
   double _width = 360;
 
   late final AssistantArtifactSnapshot _snapshot = AssistantArtifactSnapshot(
-    workspaceRef: 'object://thread/browser-thread',
-    workspaceRefKind: WorkspaceRefKind.objectStore,
+    workspaceRef: '/owners/remote/user/browser-device/threads/browser-thread',
+    workspaceRefKind: WorkspaceRefKind.remotePath,
     resultEntries: <AssistantArtifactEntry>[
       const AssistantArtifactEntry(
         id: 'readme',
@@ -80,7 +80,7 @@ class _BrowserArtifactSidebarHarnessState
         kind: AssistantArtifactEntryKind.object,
         mimeType: 'text/markdown',
         previewable: true,
-        workspaceRef: 'object://thread/browser-thread',
+        workspaceRef: '/owners/remote/user/browser-device/threads/browser-thread',
       ),
     ],
     fileEntries: <AssistantArtifactEntry>[
@@ -91,7 +91,7 @@ class _BrowserArtifactSidebarHarnessState
         kind: AssistantArtifactEntryKind.object,
         mimeType: 'text/markdown',
         previewable: true,
-        workspaceRef: 'object://thread/browser-thread',
+        workspaceRef: '/owners/remote/user/browser-device/threads/browser-thread',
       ),
     ],
   );

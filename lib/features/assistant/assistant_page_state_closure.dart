@@ -317,9 +317,10 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                 child: AssistantArtifactSidebar(
                   sessionKey: controller.currentSessionKey,
                   threadTitle: currentTask.title,
-                  workspaceRef: controller.assistantWorkspaceRefForSession(
-                    controller.currentSessionKey,
-                  ),
+                  workspaceRef: controller
+                      .assistantWorkspaceDisplayPathForSession(
+                        controller.currentSessionKey,
+                      ),
                   workspaceRefKind: controller
                       .assistantWorkspaceRefKindForSession(
                         controller.currentSessionKey,

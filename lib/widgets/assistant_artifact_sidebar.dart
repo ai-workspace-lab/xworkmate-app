@@ -146,9 +146,9 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
                                 padding: const EdgeInsets.only(top: 1),
                                 child: Icon(
                                   widget.workspaceRefKind ==
-                                          WorkspaceRefKind.objectStore
-                                      ? Icons.storage_rounded
-                                      : Icons.folder_open_rounded,
+                                          WorkspaceRefKind.localPath
+                                      ? Icons.folder_open_rounded
+                                      : Icons.cloud_queue_rounded,
                                   size: 14,
                                   color: palette.textSecondary,
                                 ),
@@ -413,9 +413,6 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
     if (trimmed.isEmpty) {
       return appText('未设置', 'Not set');
     }
-    if (kind == WorkspaceRefKind.objectStore) {
-      return trimmed.replaceFirst('object://thread/', '');
-    }
     if (kind == WorkspaceRefKind.remotePath) {
       return trimmed;
     }
@@ -636,82 +633,6 @@ class _ArtifactEntryList extends StatelessWidget {
     final hour = date.hour.toString().padLeft(2, '0');
     final minute = date.minute.toString().padLeft(2, '0');
     return '${date.year}-$month-$day $hour:$minute';
-  }
-}
-
-class _ArtifactChangeList extends StatelessWidget {
-  const _ArtifactChangeList({
-    super.key,
-    required this.changes,
-    required this.emptyMessage,
-  });
-
-  final List<AssistantArtifactChangeEntry> changes;
-  final String emptyMessage;
-
-  @override
-  Widget build(BuildContext context) {
-    if (changes.isEmpty) {
-      return _SidebarEmptyState(
-        key: const Key('assistant-artifact-pane-empty'),
-        icon: Icons.change_circle_outlined,
-        title: appText('暂无变更', 'No changes'),
-        message: emptyMessage,
-      );
-    }
-    final palette = context.palette;
-    final theme = Theme.of(context);
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        0,
-        AppSpacing.md,
-        AppSpacing.md,
-      ),
-      itemCount: changes.length,
-      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.xs),
-      itemBuilder: (context, index) {
-        final change = changes[index];
-        return Container(
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          decoration: BoxDecoration(
-            color: palette.chromeSurface.withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(AppRadius.button),
-            border: Border.all(color: palette.chromeStroke),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xs,
-                  vertical: AppSpacing.xxs,
-                ),
-                decoration: BoxDecoration(
-                  color: palette.accentMuted,
-                  borderRadius: BorderRadius.circular(AppRadius.chip),
-                ),
-                child: Text(
-                  change.displayLabel,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: palette.accent,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  change.path,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 }
 

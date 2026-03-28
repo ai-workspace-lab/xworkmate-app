@@ -39,6 +39,8 @@ import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
 import 'app_controller_desktop_single_agent.dart';
+import 'app_controller_desktop_thread_binding.dart';
+import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_actions.dart';
 import 'app_controller_desktop_workspace_execution.dart';
 import 'app_controller_desktop_settings_runtime.dart';
@@ -90,6 +92,34 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
     final aiGatewayApiKey = await loadAiGatewayApiKeyThreadSessionInternal(
       controller,
     );
+    await controller.ensureDesktopTaskThreadBindingInternal(
+      sessionKey,
+      executionTarget: controller.assistantExecutionTargetForSession(sessionKey),
+    );
+    final workingDirectory =
+        controller.assistantWorkingDirectoryForSessionInternal(sessionKey);
+    if (workingDirectory == null || workingDirectory.trim().isEmpty) {
+      controller.appendLocalSessionMessageInternal(
+        sessionKey,
+        GatewayChatMessage(
+          id: controller.nextLocalMessageIdInternal(),
+          role: 'assistant',
+          text: appText(
+            '当前线程缺少工作路径，无法启动多 Agent 协作。',
+            'This thread has no workspace path, so multi-agent collaboration cannot start.',
+          ),
+          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          toolCallId: null,
+          toolName: 'Multi-Agent',
+          stopReason: null,
+          pending: false,
+          error: true,
+        ),
+      );
+      controller.recomputeTasksInternal();
+      controller.notifyIfActiveInternal();
+      return;
+    }
     controller.multiAgentRunPendingInternal = true;
     controller.appendLocalSessionMessageInternal(
       sessionKey,
@@ -112,11 +142,7 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
           sessionId: sessionKey,
           threadId: sessionKey,
           prompt: composedPrompt,
-          workingDirectory:
-              controller.assistantWorkingDirectoryForSessionInternal(
-                sessionKey,
-              ) ??
-              Directory.current.path,
+          workingDirectory: workingDirectory,
           attachments: attachments,
           selectedSkills: selectedSkillLabels,
           aiGatewayBaseUrl: controller.aiGatewayUrl,

@@ -57,21 +57,29 @@ extension AppControllerWebSessions on AppController {
 
   String assistantWorkspaceRefForSession(String sessionKey) {
     final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
-    final recordRef =
-        threadRecordsInternal[normalizedSessionKey]?.workspaceRef.trim() ?? '';
-    if (recordRef.isNotEmpty) {
-      return recordRef;
-    }
-    return defaultWorkspaceRefForSessionInternal(normalizedSessionKey);
+    return threadRecordsInternal[normalizedSessionKey]
+            ?.workspaceBinding
+            .workspacePath
+            .trim() ??
+        '';
   }
 
   WorkspaceRefKind assistantWorkspaceRefKindForSession(String sessionKey) {
     final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
     final record = threadRecordsInternal[normalizedSessionKey];
-    if (record != null && record.workspaceRef.trim().isNotEmpty) {
+    if (record != null) {
       return record.workspaceRefKind;
     }
-    return WorkspaceRefKind.objectStore;
+    return WorkspaceRefKind.remotePath;
+  }
+
+  String assistantWorkspaceDisplayPathForSession(String sessionKey) {
+    final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
+    return threadRecordsInternal[normalizedSessionKey]
+            ?.workspaceBinding
+            .displayPath
+            .trim() ??
+        '';
   }
 
   Future<AssistantArtifactSnapshot> loadAssistantArtifactSnapshot({
@@ -226,30 +234,6 @@ extension AppControllerWebSessions on AppController {
       ).length;
     }
     return assistantImportedSkillsForSession(currentSessionKeyInternal).length;
-  }
-
-  String defaultWorkspaceRefForSessionInternal(String sessionKey) {
-    final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
-    return 'object://thread/$normalizedSessionKey';
-  }
-
-  void syncThreadWorkspaceRefInternal(String sessionKey) {
-    final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
-    final nextWorkspaceRef = defaultWorkspaceRefForSessionInternal(
-      normalizedSessionKey,
-    );
-    final existing = threadRecordsInternal[normalizedSessionKey];
-    if (existing != null &&
-        existing.workspaceRef == nextWorkspaceRef &&
-        existing.workspaceRefKind == WorkspaceRefKind.objectStore) {
-      return;
-    }
-    upsertThreadRecordInternal(
-      normalizedSessionKey,
-      workspaceRef: nextWorkspaceRef,
-      workspaceRefKind: WorkspaceRefKind.objectStore,
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
   }
 
   List<GatewaySkillSummary> get skills => assistantImportedSkillsForSession(
@@ -562,7 +546,7 @@ extension AppControllerWebSessions on AppController {
   String get currentConversationTitle =>
       titleForRecordInternal(currentRecordInternal);
 
-  AssistantThreadRecord get currentRecordInternal {
+  TaskThread get currentRecordInternal {
     final existing = threadRecordsInternal[currentSessionKeyInternal];
     if (existing != null) {
       return existing;

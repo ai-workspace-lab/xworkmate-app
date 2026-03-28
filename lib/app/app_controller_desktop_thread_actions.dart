@@ -39,6 +39,7 @@ import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
 import 'app_controller_desktop_single_agent.dart';
+import 'app_controller_desktop_thread_binding.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_workspace_execution.dart';
 import 'app_controller_desktop_settings_runtime.dart';
@@ -218,13 +219,13 @@ extension AppControllerDesktopThreadActions on AppController {
     }
 
     await setCurrentAssistantSessionKeyInternal(nextSessionKey);
-    upsertAssistantThreadRecordInternal(
+    upsertTaskThreadInternal(
       nextSessionKey,
       executionTarget: nextTarget,
       messageViewMode: nextViewMode,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
-    syncAssistantWorkspaceRefForSessionInternal(
+    await ensureDesktopTaskThreadBindingInternal(
       nextSessionKey,
       executionTarget: nextTarget,
     );
@@ -249,9 +250,23 @@ extension AppControllerDesktopThreadActions on AppController {
     List<String> selectedSkillLabels = const <String>[],
   }) async {
     final currentSessionKey = sessionsControllerInternal.currentSessionKey;
-    if (!isSingleAgentMode ||
-        assistantWorkspaceRefForSession(currentSessionKey).trim().isEmpty) {
-      syncAssistantWorkspaceRefForSessionInternal(currentSessionKey);
+    await ensureDesktopTaskThreadBindingInternal(
+      currentSessionKey,
+      executionTarget: assistantExecutionTargetForSession(currentSessionKey),
+    );
+    if (assistantWorkspaceRefForSession(currentSessionKey).trim().isEmpty) {
+      appendAssistantThreadMessageInternal(
+        currentSessionKey,
+        assistantErrorMessageInternal(
+          appText(
+            '当前线程缺少工作路径，无法运行。请先配置工作区根目录后再试。',
+            'This thread has no workspace path, so it cannot run. Configure a workspace root and try again.',
+          ),
+        ),
+      );
+      await flushAssistantThreadPersistenceInternal();
+      recomputeTasksInternal();
+      return;
     }
     if (isSingleAgentMode) {
       await sendSingleAgentMessageInternal(

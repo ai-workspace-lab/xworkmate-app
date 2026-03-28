@@ -183,8 +183,8 @@ void registerSecureConfigStoreSuiteSettingsTestsInternal() {
               '/dev/null/xworkmate/secrets',
         );
 
-        await store.saveAssistantThreadRecords(const <AssistantThreadRecord>[
-          AssistantThreadRecord(
+        await store.saveTaskThreads(<TaskThread>[
+          TaskThread(
             sessionKey: 'draft:memory-only',
             title: 'Memory only',
             archived: false,
@@ -195,14 +195,14 @@ void registerSecureConfigStoreSuiteSettingsTestsInternal() {
           ),
         ]);
 
-        final loadedRecords = await store.loadAssistantThreadRecords();
+        final loadedRecords = await store.loadTaskThreads();
         final writeFailures = store.persistentWriteFailures;
 
         expect(loadedRecords, hasLength(1));
         expect(loadedRecords.first.sessionKey, 'draft:memory-only');
         expect(writeFailures.tasks, isNotNull);
         expect(writeFailures.tasks?.scope, PersistentStoreScope.tasks);
-        expect(writeFailures.tasks?.operation, 'saveAssistantThreadRecords');
+        expect(writeFailures.tasks?.operation, 'saveTaskThreads');
         expect(writeFailures.tasks?.message, contains('Persistent task path'));
       },
     );

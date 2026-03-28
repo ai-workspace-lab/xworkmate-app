@@ -52,8 +52,8 @@ void registerThreadSkillsWorkspaceFallbackTests() {
             workspacePath: '${tempDirectory.path}/unused-default-workspace',
           ),
         );
-        await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
-          AssistantThreadRecord(
+        await store.saveTaskThreads(<TaskThread>[
+          TaskThread(
             sessionKey: 'main',
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,
@@ -144,8 +144,8 @@ void registerThreadSkillsWorkspaceFallbackTests() {
         await store.saveSettingsSnapshot(
           singleAgentTestSettingsInternal(workspacePath: tempDirectory.path),
         );
-        await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
-          AssistantThreadRecord(
+        await store.saveTaskThreads(<TaskThread>[
+          TaskThread(
             sessionKey: 'main',
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,
@@ -233,8 +233,8 @@ void registerThreadSkillsWorkspaceFallbackTests() {
         await store.saveSettingsSnapshot(
           singleAgentTestSettingsInternal(workspacePath: tempDirectory.path),
         );
-        await store.saveAssistantThreadRecords(<AssistantThreadRecord>[
-          AssistantThreadRecord(
+        await store.saveTaskThreads(<TaskThread>[
+          TaskThread(
             sessionKey: 'main',
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,

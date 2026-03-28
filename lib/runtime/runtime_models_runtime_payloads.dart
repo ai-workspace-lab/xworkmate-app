@@ -443,44 +443,527 @@ class AssistantThreadSkillEntry {
   }
 }
 
-class AssistantThreadRecord {
-  const AssistantThreadRecord({
-    required this.sessionKey,
-    required this.messages,
-    required this.updatedAtMs,
-    required this.title,
-    required this.archived,
-    required this.executionTarget,
-    required this.messageViewMode,
-    this.importedSkills = const <AssistantThreadSkillEntry>[],
-    this.selectedSkillKeys = const <String>[],
-    this.assistantModelId = '',
-    this.singleAgentProvider = SingleAgentProvider.auto,
-    this.gatewayEntryState,
-    this.workspaceRef = '',
-    this.workspaceRefKind = WorkspaceRefKind.localPath,
+const int taskThreadSchemaVersion = 20260328;
+
+enum ThreadRealm { local, remote }
+
+extension ThreadRealmCopy on ThreadRealm {
+  static ThreadRealm fromJsonValue(String? value) {
+    return ThreadRealm.values.firstWhere(
+      (item) => item.name == value?.trim(),
+      orElse: () => ThreadRealm.local,
+    );
+  }
+}
+
+enum ThreadSubjectType { tenant, user }
+
+extension ThreadSubjectTypeCopy on ThreadSubjectType {
+  static ThreadSubjectType fromJsonValue(String? value) {
+    return ThreadSubjectType.values.firstWhere(
+      (item) => item.name == value?.trim(),
+      orElse: () => ThreadSubjectType.user,
+    );
+  }
+}
+
+enum WorkspaceKind { localFs, remoteFs }
+
+extension WorkspaceKindCopy on WorkspaceKind {
+  static WorkspaceKind fromJsonValue(String? value) {
+    final normalized = value?.trim();
+    switch (normalized) {
+      case 'localPath':
+      case 'local_fs':
+      case 'localFs':
+        return WorkspaceKind.localFs;
+      case 'remotePath':
+      case 'objectStore':
+      case 'remote_fs':
+      case 'remoteFs':
+        return WorkspaceKind.remoteFs;
+      default:
+        return WorkspaceKind.localFs;
+    }
+  }
+}
+
+enum ThreadExecutionMode { localAgent, gatewayLocal, gatewayRemote }
+
+extension ThreadExecutionModeCopy on ThreadExecutionMode {
+  static ThreadExecutionMode fromJsonValue(String? value) {
+    final normalized = value?.trim();
+    switch (normalized) {
+      case 'singleAgent':
+      case 'local_agent':
+      case 'localAgent':
+        return ThreadExecutionMode.localAgent;
+      case 'local':
+      case 'gateway_local':
+      case 'gatewayLocal':
+        return ThreadExecutionMode.gatewayLocal;
+      case 'remote':
+      case 'gateway_remote':
+      case 'gatewayRemote':
+        return ThreadExecutionMode.gatewayRemote;
+      default:
+        return ThreadExecutionMode.localAgent;
+    }
+  }
+}
+
+class ThreadOwnerScope {
+  const ThreadOwnerScope({
+    required this.realm,
+    required this.subjectType,
+    required this.subjectId,
+    required this.displayName,
   });
 
-  final String sessionKey;
-  final List<GatewayChatMessage> messages;
-  final double? updatedAtMs;
-  final String title;
-  final bool archived;
-  final AssistantExecutionTarget? executionTarget;
-  final AssistantMessageViewMode messageViewMode;
-  final List<AssistantThreadSkillEntry> importedSkills;
-  final List<String> selectedSkillKeys;
-  final String assistantModelId;
-  final SingleAgentProvider singleAgentProvider;
-  final String? gatewayEntryState;
-  final String workspaceRef;
-  final WorkspaceRefKind workspaceRefKind;
+  final ThreadRealm realm;
+  final ThreadSubjectType subjectType;
+  final String subjectId;
+  final String displayName;
 
-  AssistantThreadRecord copyWith({
-    String? sessionKey,
+  ThreadOwnerScope copyWith({
+    ThreadRealm? realm,
+    ThreadSubjectType? subjectType,
+    String? subjectId,
+    String? displayName,
+  }) {
+    return ThreadOwnerScope(
+      realm: realm ?? this.realm,
+      subjectType: subjectType ?? this.subjectType,
+      subjectId: subjectId ?? this.subjectId,
+      displayName: displayName ?? this.displayName,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'realm': realm.name,
+      'subjectType': subjectType.name,
+      'subjectId': subjectId,
+      'displayName': displayName,
+    };
+  }
+
+  factory ThreadOwnerScope.fromJson(Map<String, dynamic> json) {
+    return ThreadOwnerScope(
+      realm: ThreadRealmCopy.fromJsonValue(json['realm']?.toString()),
+      subjectType: ThreadSubjectTypeCopy.fromJsonValue(
+        json['subjectType']?.toString(),
+      ),
+      subjectId: json['subjectId']?.toString() ?? '',
+      displayName: json['displayName']?.toString() ?? '',
+    );
+  }
+}
+
+class WorkspaceBinding {
+  const WorkspaceBinding({
+    required this.workspaceId,
+    required this.workspaceKind,
+    required this.workspacePath,
+    required this.displayPath,
+    required this.writable,
+  });
+
+  final String workspaceId;
+  final WorkspaceKind workspaceKind;
+  final String workspacePath;
+  final String displayPath;
+  final bool writable;
+
+  WorkspaceBinding copyWith({
+    String? workspaceId,
+    WorkspaceKind? workspaceKind,
+    String? workspacePath,
+    String? displayPath,
+    bool? writable,
+  }) {
+    return WorkspaceBinding(
+      workspaceId: workspaceId ?? this.workspaceId,
+      workspaceKind: workspaceKind ?? this.workspaceKind,
+      workspacePath: workspacePath ?? this.workspacePath,
+      displayPath: displayPath ?? this.displayPath,
+      writable: writable ?? this.writable,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'workspaceId': workspaceId,
+      'workspaceKind': workspaceKind.name,
+      'workspacePath': workspacePath,
+      'displayPath': displayPath,
+      'writable': writable,
+    };
+  }
+
+  factory WorkspaceBinding.fromJson(Map<String, dynamic> json) {
+    final path = json['workspacePath']?.toString() ?? '';
+    return WorkspaceBinding(
+      workspaceId: json['workspaceId']?.toString() ?? '',
+      workspaceKind: WorkspaceKindCopy.fromJsonValue(
+        json['workspaceKind']?.toString(),
+      ),
+      workspacePath: path,
+      displayPath: json['displayPath']?.toString() ?? path,
+      writable: json['writable'] as bool? ?? true,
+    );
+  }
+}
+
+class ExecutionBinding {
+  const ExecutionBinding({
+    required this.executionMode,
+    required this.executorId,
+    required this.providerId,
+    required this.endpointId,
+  });
+
+  final ThreadExecutionMode executionMode;
+  final String executorId;
+  final String providerId;
+  final String endpointId;
+
+  ExecutionBinding copyWith({
+    ThreadExecutionMode? executionMode,
+    String? executorId,
+    String? providerId,
+    String? endpointId,
+  }) {
+    return ExecutionBinding(
+      executionMode: executionMode ?? this.executionMode,
+      executorId: executorId ?? this.executorId,
+      providerId: providerId ?? this.providerId,
+      endpointId: endpointId ?? this.endpointId,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'executionMode': executionMode.name,
+      'executorId': executorId,
+      'providerId': providerId,
+      'endpointId': endpointId,
+    };
+  }
+
+  factory ExecutionBinding.fromJson(Map<String, dynamic> json) {
+    return ExecutionBinding(
+      executionMode: ThreadExecutionModeCopy.fromJsonValue(
+        json['executionMode']?.toString(),
+      ),
+      executorId: json['executorId']?.toString() ?? '',
+      providerId: json['providerId']?.toString() ?? '',
+      endpointId: json['endpointId']?.toString() ?? '',
+    );
+  }
+}
+
+class ThreadContextState {
+  const ThreadContextState({
+    required this.messages,
+    required this.selectedModelId,
+    required this.selectedSkillKeys,
+    required this.importedSkills,
+    required this.permissionLevel,
+    required this.messageViewMode,
+    required this.latestResolvedRuntimeModel,
+    this.gatewayEntryState,
+  });
+
+  final List<GatewayChatMessage> messages;
+  final String selectedModelId;
+  final List<String> selectedSkillKeys;
+  final List<AssistantThreadSkillEntry> importedSkills;
+  final AssistantPermissionLevel permissionLevel;
+  final AssistantMessageViewMode messageViewMode;
+  final String latestResolvedRuntimeModel;
+  final String? gatewayEntryState;
+
+  ThreadContextState copyWith({
     List<GatewayChatMessage>? messages,
-    double? updatedAtMs,
+    String? selectedModelId,
+    List<String>? selectedSkillKeys,
+    List<AssistantThreadSkillEntry>? importedSkills,
+    AssistantPermissionLevel? permissionLevel,
+    AssistantMessageViewMode? messageViewMode,
+    String? latestResolvedRuntimeModel,
+    String? gatewayEntryState,
+    bool clearGatewayEntryState = false,
+  }) {
+    return ThreadContextState(
+      messages: messages ?? this.messages,
+      selectedModelId: selectedModelId ?? this.selectedModelId,
+      selectedSkillKeys: selectedSkillKeys ?? this.selectedSkillKeys,
+      importedSkills: importedSkills ?? this.importedSkills,
+      permissionLevel: permissionLevel ?? this.permissionLevel,
+      messageViewMode: messageViewMode ?? this.messageViewMode,
+      latestResolvedRuntimeModel:
+          latestResolvedRuntimeModel ?? this.latestResolvedRuntimeModel,
+      gatewayEntryState: clearGatewayEntryState
+          ? null
+          : (gatewayEntryState ?? this.gatewayEntryState),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'messages': messages.map((item) => item.toJson()).toList(growable: false),
+      'selectedModelId': selectedModelId,
+      'selectedSkillKeys': selectedSkillKeys,
+      'importedSkills': importedSkills
+          .map((item) => item.toJson())
+          .toList(growable: false),
+      'permissionLevel': permissionLevel.name,
+      'messageViewMode': messageViewMode.name,
+      'latestResolvedRuntimeModel': latestResolvedRuntimeModel,
+      'gatewayEntryState': gatewayEntryState,
+    };
+  }
+
+  factory ThreadContextState.fromJson(Map<String, dynamic> json) {
+    final rawMessages = json['messages'];
+    final messages = rawMessages is List
+        ? rawMessages
+              .whereType<Map>()
+              .map(
+                (item) =>
+                    GatewayChatMessage.fromJson(item.cast<String, dynamic>()),
+              )
+              .toList(growable: false)
+        : const <GatewayChatMessage>[];
+    final rawImportedSkills = json['importedSkills'];
+    final importedSkills = rawImportedSkills is List
+        ? rawImportedSkills
+              .whereType<Map>()
+              .map(
+                (item) => AssistantThreadSkillEntry.fromJson(
+                  item.cast<String, dynamic>(),
+                ),
+              )
+              .where((item) => item.key.trim().isNotEmpty)
+              .toList(growable: false)
+        : const <AssistantThreadSkillEntry>[];
+    final rawSelectedSkillKeys = json['selectedSkillKeys'];
+    final selectedSkillKeys = rawSelectedSkillKeys is List
+        ? rawSelectedSkillKeys
+              .map((item) => item?.toString().trim() ?? '')
+              .where((item) => item.isNotEmpty)
+              .toSet()
+              .toList(growable: false)
+        : const <String>[];
+    return ThreadContextState(
+      messages: messages,
+      selectedModelId: json['selectedModelId']?.toString() ?? '',
+      selectedSkillKeys: selectedSkillKeys,
+      importedSkills: importedSkills,
+      permissionLevel: AssistantPermissionLevelCopy.fromJsonValue(
+        json['permissionLevel']?.toString(),
+      ),
+      messageViewMode: AssistantMessageViewModeCopy.fromJsonValue(
+        json['messageViewMode']?.toString(),
+      ),
+      latestResolvedRuntimeModel:
+          json['latestResolvedRuntimeModel']?.toString() ?? '',
+      gatewayEntryState: json['gatewayEntryState']?.toString(),
+    );
+  }
+}
+
+class ThreadLifecycleState {
+  const ThreadLifecycleState({
+    required this.archived,
+    required this.status,
+    required this.lastRunAtMs,
+    required this.lastResultCode,
+  });
+
+  final bool archived;
+  final String status;
+  final double? lastRunAtMs;
+  final String? lastResultCode;
+
+  ThreadLifecycleState copyWith({
+    bool? archived,
+    String? status,
+    double? lastRunAtMs,
+    String? lastResultCode,
+    bool clearLastResultCode = false,
+  }) {
+    return ThreadLifecycleState(
+      archived: archived ?? this.archived,
+      status: status ?? this.status,
+      lastRunAtMs: lastRunAtMs ?? this.lastRunAtMs,
+      lastResultCode: clearLastResultCode
+          ? null
+          : (lastResultCode ?? this.lastResultCode),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'archived': archived,
+      'status': status,
+      'lastRunAtMs': lastRunAtMs,
+      'lastResultCode': lastResultCode,
+    };
+  }
+
+  factory ThreadLifecycleState.fromJson(Map<String, dynamic> json) {
+    double? asDouble(Object? value) {
+      if (value is num) {
+        return value.toDouble();
+      }
+      return double.tryParse(value?.toString() ?? '');
+    }
+
+    return ThreadLifecycleState(
+      archived: json['archived'] as bool? ?? false,
+      status: json['status']?.toString() ?? 'ready',
+      lastRunAtMs: asDouble(json['lastRunAtMs']),
+      lastResultCode: json['lastResultCode']?.toString(),
+    );
+  }
+}
+
+class TaskThread {
+  TaskThread({
+    String? threadId,
     String? title,
+    ThreadOwnerScope? ownerScope,
+    WorkspaceBinding? workspaceBinding,
+    ExecutionBinding? executionBinding,
+    ThreadContextState? contextState,
+    ThreadLifecycleState? lifecycleState,
+    double? createdAtMs,
+    this.updatedAtMs,
+    String? sessionKey,
+    List<GatewayChatMessage> messages = const <GatewayChatMessage>[],
+    bool archived = false,
+    AssistantExecutionTarget? executionTarget,
+    AssistantMessageViewMode messageViewMode =
+        AssistantMessageViewMode.rendered,
+    List<AssistantThreadSkillEntry> importedSkills =
+        const <AssistantThreadSkillEntry>[],
+    List<String> selectedSkillKeys = const <String>[],
+    String assistantModelId = '',
+    SingleAgentProvider singleAgentProvider = SingleAgentProvider.auto,
+    String? gatewayEntryState,
+    String workspaceRef = '',
+    WorkspaceRefKind workspaceRefKind = WorkspaceRefKind.localPath,
+    AssistantPermissionLevel permissionLevel =
+        AssistantPermissionLevel.defaultAccess,
+  }) : threadId = threadId ?? sessionKey ?? '',
+       title = title ?? '',
+       ownerScope =
+           ownerScope ??
+           const ThreadOwnerScope(
+             realm: ThreadRealm.local,
+             subjectType: ThreadSubjectType.user,
+             subjectId: '',
+             displayName: '',
+           ),
+       workspaceBinding =
+           workspaceBinding ??
+           WorkspaceBinding(
+             workspaceId: (threadId ?? sessionKey ?? '').trim(),
+             workspaceKind: workspaceRefKind == WorkspaceRefKind.localPath
+                 ? WorkspaceKind.localFs
+                 : WorkspaceKind.remoteFs,
+             workspacePath: workspaceRef,
+             displayPath: workspaceRef,
+             writable: true,
+           ),
+       executionBinding =
+           executionBinding ??
+           ExecutionBinding(
+             executionMode: switch (executionTarget) {
+               AssistantExecutionTarget.local =>
+                 ThreadExecutionMode.gatewayLocal,
+               AssistantExecutionTarget.remote =>
+                 ThreadExecutionMode.gatewayRemote,
+               _ => ThreadExecutionMode.localAgent,
+             },
+             executorId: singleAgentProvider.providerId,
+             providerId: singleAgentProvider.providerId,
+             endpointId: '',
+           ),
+       contextState =
+           contextState ??
+           ThreadContextState(
+             messages: messages,
+             selectedModelId: assistantModelId,
+             selectedSkillKeys: selectedSkillKeys,
+             importedSkills: importedSkills,
+             permissionLevel: permissionLevel,
+             messageViewMode: messageViewMode,
+             latestResolvedRuntimeModel: '',
+             gatewayEntryState: gatewayEntryState,
+           ),
+       lifecycleState =
+           lifecycleState ??
+           ThreadLifecycleState(
+             archived: archived,
+             status: workspaceRef.trim().isEmpty ? 'needs_workspace' : 'ready',
+             lastRunAtMs: null,
+             lastResultCode: null,
+           ),
+       createdAtMs = createdAtMs ?? updatedAtMs ?? 0.0;
+
+  final String threadId;
+  final String title;
+  final ThreadOwnerScope ownerScope;
+  final WorkspaceBinding workspaceBinding;
+  final ExecutionBinding executionBinding;
+  final ThreadContextState contextState;
+  final ThreadLifecycleState lifecycleState;
+  final double createdAtMs;
+  final double? updatedAtMs;
+
+  List<GatewayChatMessage> get messages => contextState.messages;
+  String get sessionKey => threadId;
+  List<AssistantThreadSkillEntry> get importedSkills =>
+      contextState.importedSkills;
+  List<String> get selectedSkillKeys => contextState.selectedSkillKeys;
+  String get assistantModelId => contextState.selectedModelId;
+  AssistantMessageViewMode get messageViewMode => contextState.messageViewMode;
+  String? get gatewayEntryState => contextState.gatewayEntryState;
+  String get latestResolvedRuntimeModel =>
+      contextState.latestResolvedRuntimeModel;
+  bool get archived => lifecycleState.archived;
+  String get workspaceRef => workspaceBinding.workspacePath;
+  String get workspacePath => workspaceBinding.workspacePath;
+  String get displayPath => workspaceBinding.displayPath;
+  WorkspaceKind get workspaceKind => workspaceBinding.workspaceKind;
+  WorkspaceRefKind get workspaceRefKind =>
+      workspaceBinding.workspaceKind == WorkspaceKind.localFs
+      ? WorkspaceRefKind.localPath
+      : WorkspaceRefKind.remotePath;
+  SingleAgentProvider get singleAgentProvider =>
+      SingleAgentProviderCopy.fromJsonValue(executionBinding.providerId);
+  AssistantExecutionTarget get executionTarget =>
+      switch (executionBinding.executionMode) {
+        ThreadExecutionMode.localAgent => AssistantExecutionTarget.singleAgent,
+        ThreadExecutionMode.gatewayLocal => AssistantExecutionTarget.local,
+        ThreadExecutionMode.gatewayRemote => AssistantExecutionTarget.remote,
+      };
+
+  TaskThread copyWith({
+    String? threadId,
+    String? sessionKey,
+    String? title,
+    ThreadOwnerScope? ownerScope,
+    WorkspaceBinding? workspaceBinding,
+    ExecutionBinding? executionBinding,
+    ThreadContextState? contextState,
+    ThreadLifecycleState? lifecycleState,
+    double? createdAtMs,
+    double? updatedAtMs,
+    List<GatewayChatMessage>? messages,
     bool? archived,
     AssistantExecutionTarget? executionTarget,
     bool clearExecutionTarget = false,
@@ -493,51 +976,81 @@ class AssistantThreadRecord {
     bool clearGatewayEntryState = false,
     String? workspaceRef,
     WorkspaceRefKind? workspaceRefKind,
-  }) {
-    return AssistantThreadRecord(
-      sessionKey: sessionKey ?? this.sessionKey,
-      messages: messages ?? this.messages,
-      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    String? workspacePath,
+    String? displayPath,
+    WorkspaceKind? workspaceKind,
+    bool? writable,
+    String? lifecycleStatus,
+    String? latestResolvedRuntimeModel,
+	  }) {
+    final nextExecutionBinding = executionBinding ?? this.executionBinding;
+    final nextExecutionMode = clearExecutionTarget
+        ? nextExecutionBinding.executionMode
+        : executionTarget == null
+        ? nextExecutionBinding.executionMode
+        : switch (executionTarget) {
+            AssistantExecutionTarget.singleAgent =>
+              ThreadExecutionMode.localAgent,
+            AssistantExecutionTarget.local =>
+              ThreadExecutionMode.gatewayLocal,
+            AssistantExecutionTarget.remote =>
+              ThreadExecutionMode.gatewayRemote,
+          };
+    return TaskThread(
+      threadId: threadId ?? sessionKey ?? this.threadId,
       title: title ?? this.title,
-      archived: archived ?? this.archived,
-      executionTarget: clearExecutionTarget
-          ? null
-          : (executionTarget ?? this.executionTarget),
-      messageViewMode: messageViewMode ?? this.messageViewMode,
-      importedSkills: importedSkills ?? this.importedSkills,
-      selectedSkillKeys: selectedSkillKeys ?? this.selectedSkillKeys,
-      assistantModelId: assistantModelId ?? this.assistantModelId,
-      singleAgentProvider: singleAgentProvider ?? this.singleAgentProvider,
-      gatewayEntryState: clearGatewayEntryState
-          ? null
-          : (gatewayEntryState ?? this.gatewayEntryState),
-      workspaceRef: workspaceRef ?? this.workspaceRef,
-      workspaceRefKind: workspaceRefKind ?? this.workspaceRefKind,
+      ownerScope: ownerScope ?? this.ownerScope,
+      workspaceBinding: (workspaceBinding ?? this.workspaceBinding).copyWith(
+        workspacePath: workspacePath ?? workspaceRef,
+        displayPath: displayPath,
+        workspaceKind:
+            workspaceKind ??
+            (workspaceRefKind == null
+                ? null
+                : (workspaceRefKind == WorkspaceRefKind.localPath
+                      ? WorkspaceKind.localFs
+                      : WorkspaceKind.remoteFs)),
+        writable: writable,
+      ),
+      executionBinding: nextExecutionBinding.copyWith(
+        executionMode: nextExecutionMode,
+        providerId: singleAgentProvider?.providerId,
+      ),
+      contextState: (contextState ?? this.contextState).copyWith(
+        messages: messages,
+        messageViewMode: messageViewMode,
+        importedSkills: importedSkills,
+        selectedSkillKeys: selectedSkillKeys,
+        selectedModelId: assistantModelId,
+        latestResolvedRuntimeModel: latestResolvedRuntimeModel,
+        gatewayEntryState: gatewayEntryState,
+        clearGatewayEntryState: clearGatewayEntryState,
+      ),
+      lifecycleState: (lifecycleState ?? this.lifecycleState).copyWith(
+        archived: archived,
+        status: lifecycleStatus,
+      ),
+      createdAtMs: createdAtMs ?? this.createdAtMs,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'sessionKey': sessionKey,
-      'messages': messages.map((item) => item.toJson()).toList(growable: false),
-      'updatedAtMs': updatedAtMs,
+    return <String, dynamic>{
+      'schemaVersion': taskThreadSchemaVersion,
+      'threadId': threadId,
       'title': title,
-      'archived': archived,
-      'executionTarget': executionTarget?.name,
-      'messageViewMode': messageViewMode.name,
-      'importedSkills': importedSkills
-          .map((item) => item.toJson())
-          .toList(growable: false),
-      'selectedSkillKeys': selectedSkillKeys,
-      'assistantModelId': assistantModelId,
-      'singleAgentProvider': singleAgentProvider.providerId,
-      'gatewayEntryState': gatewayEntryState,
-      'workspaceRef': workspaceRef,
-      'workspaceRefKind': workspaceRefKind.name,
+      'ownerScope': ownerScope.toJson(),
+      'workspaceBinding': workspaceBinding.toJson(),
+      'executionBinding': executionBinding.toJson(),
+      'contextState': contextState.toJson(),
+      'lifecycleState': lifecycleState.toJson(),
+      'createdAtMs': createdAtMs,
+      'updatedAtMs': updatedAtMs,
     };
   }
 
-  factory AssistantThreadRecord.fromJson(Map<String, dynamic> json) {
+  factory TaskThread.fromJson(Map<String, dynamic> json) {
     double? asDouble(Object? value) {
       if (value is num) {
         return value.toDouble();
@@ -545,115 +1058,34 @@ class AssistantThreadRecord {
       return double.tryParse(value?.toString() ?? '');
     }
 
-    final rawMessages = json['messages'];
-    final messages = rawMessages is List
-        ? rawMessages
-              .whereType<Map>()
-              .map(
-                (item) =>
-                    GatewayChatMessage.fromJson(item.cast<String, dynamic>()),
-              )
-              .toList(growable: false)
-        : const <GatewayChatMessage>[];
-    List<AssistantThreadSkillEntry> normalizeSkillEntries(Object? value) {
-      if (value is! List) {
-        return const <AssistantThreadSkillEntry>[];
-      }
-      final entries = <AssistantThreadSkillEntry>[];
-      final seen = <String>{};
-      for (final item in value.whereType<Map>()) {
-        final entry = AssistantThreadSkillEntry.fromJson(
-          item.cast<String, dynamic>(),
-        );
-        final normalizedKey = entry.key.trim();
-        if (normalizedKey.isEmpty || !seen.add(normalizedKey)) {
-          continue;
-        }
-        entries.add(entry);
-      }
-      return entries;
-    }
-
-    List<String> normalizeSkillKeys(Object? value) {
-      if (value is! List) {
-        return const <String>[];
-      }
-      final keys = <String>[];
-      final seen = <String>{};
-      for (final item in value) {
-        final normalized = item?.toString().trim() ?? '';
-        if (normalized.isEmpty || !seen.add(normalized)) {
-          continue;
-        }
-        keys.add(normalized);
-      }
-      return keys;
-    }
-
-    String? normalizeGatewayEntryState(Object? value) {
-      final normalized = value?.toString().trim() ?? '';
-      if (normalized.isEmpty) {
-        return null;
-      }
-      if (normalized == 'ai-gateway-only') {
-        return 'single-agent';
-      }
-      return normalized;
-    }
-
-    WorkspaceRefKind normalizeWorkspaceRefKind(
-      Object? value, {
-      required AssistantExecutionTarget? executionTarget,
-      required String workspaceRef,
-    }) {
-      final raw = value?.toString().trim();
-      if (raw != null && raw.isNotEmpty) {
-        return WorkspaceRefKindCopy.fromJsonValue(raw);
-      }
-      if (workspaceRef.startsWith('object://')) {
-        return WorkspaceRefKind.objectStore;
-      }
-      if (executionTarget != null &&
-          executionTarget != AssistantExecutionTarget.singleAgent) {
-        return WorkspaceRefKind.remotePath;
-      }
-      return WorkspaceRefKind.localPath;
-    }
-
-    // Keep tolerating legacy payloads that still contain discoveredSkills,
-    // but do not map the retired field back into the runtime model.
-    normalizeSkillEntries(json['discoveredSkills']);
-
-    final executionTarget = json['executionTarget'] == null
-        ? null
-        : AssistantExecutionTargetCopy.fromJsonValue(
-            json['executionTarget']?.toString(),
-          );
-    final workspaceRef = json['workspaceRef']?.toString() ?? '';
-
-    return AssistantThreadRecord(
-      sessionKey: json['sessionKey']?.toString() ?? '',
-      messages: messages,
-      updatedAtMs: asDouble(json['updatedAtMs']),
+    return TaskThread(
+      threadId: json['threadId']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
-      archived: json['archived'] as bool? ?? false,
-      executionTarget: executionTarget,
-      messageViewMode: AssistantMessageViewModeCopy.fromJsonValue(
-        json['messageViewMode']?.toString(),
+      ownerScope: ThreadOwnerScope.fromJson(
+        (json['ownerScope'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
       ),
-      importedSkills: normalizeSkillEntries(json['importedSkills']),
-      selectedSkillKeys: normalizeSkillKeys(json['selectedSkillKeys']),
-      assistantModelId: json['assistantModelId']?.toString() ?? '',
-      singleAgentProvider: SingleAgentProviderCopy.fromJsonValue(
-        json['singleAgentProvider']?.toString(),
+      workspaceBinding: WorkspaceBinding.fromJson(
+        (json['workspaceBinding'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
       ),
-      gatewayEntryState: normalizeGatewayEntryState(json['gatewayEntryState']),
-      workspaceRef: workspaceRef,
-      workspaceRefKind: normalizeWorkspaceRefKind(
-        json['workspaceRefKind'],
-        executionTarget: executionTarget,
-        workspaceRef: workspaceRef,
+      executionBinding: ExecutionBinding.fromJson(
+        (json['executionBinding'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
       ),
+      contextState: ThreadContextState.fromJson(
+        (json['contextState'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
+      ),
+      lifecycleState: ThreadLifecycleState.fromJson(
+        (json['lifecycleState'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
+      ),
+      createdAtMs:
+          asDouble(json['createdAtMs']) ??
+          asDouble(json['updatedAtMs']) ??
+          DateTime.now().millisecondsSinceEpoch.toDouble(),
+      updatedAtMs: asDouble(json['updatedAtMs']),
     );
   }
 }

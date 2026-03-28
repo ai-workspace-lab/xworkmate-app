@@ -131,6 +131,23 @@ extension AppControllerDesktopSingleAgent on AppController {
 
         appendSingleAgentRuntimeStatusMessageInternal(sessionKey, provider);
         singleAgentExternalCliPendingSessionKeysInternal.add(sessionKey);
+        final workingDirectory =
+            resolveSingleAgentWorkingDirectoryForSessionInternal(
+              sessionKey,
+              provider: provider,
+            );
+        if (workingDirectory == null || workingDirectory.trim().isEmpty) {
+          appendAssistantThreadMessageInternal(
+            sessionKey,
+            assistantErrorMessageInternal(
+              appText(
+                '当前线程缺少可运行的工作路径，无法启动单机智能体。',
+                'This thread does not have a runnable workspace path, so Single Agent cannot start.',
+              ),
+            ),
+          );
+          return;
+        }
 
         final result = await singleAgentRunnerInternal.run(
           SingleAgentRunRequest(
@@ -139,12 +156,7 @@ extension AppControllerDesktopSingleAgent on AppController {
             prompt: message,
             model: assistantModelForSession(sessionKey),
             gatewayToken: gatewayToken,
-            workingDirectory:
-                resolveSingleAgentWorkingDirectoryForSessionInternal(
-                  sessionKey,
-                  provider: provider,
-                ) ??
-                Directory.current.path,
+            workingDirectory: workingDirectory,
             attachments: localAttachments,
             selectedSkills: selectedSkills,
             aiGatewayBaseUrl: aiGatewayUrl,
@@ -163,10 +175,30 @@ extension AppControllerDesktopSingleAgent on AppController {
                     resolvedWorkingDirectory ||
                 assistantWorkspaceRefKindForSession(sessionKey) !=
                     resolvedWorkspaceRefKind)) {
-          upsertAssistantThreadRecordInternal(
+          final existingRecord = assistantThreadRecordsInternal[sessionKey];
+          upsertTaskThreadInternal(
             sessionKey,
-            workspaceRef: resolvedWorkingDirectory,
-            workspaceRefKind: resolvedWorkspaceRefKind,
+            workspaceBinding: (existingRecord?.workspaceBinding ??
+                    WorkspaceBinding(
+                      workspaceId: sessionKey,
+                      workspaceKind: WorkspaceKind.remoteFs,
+                      workspacePath: resolvedWorkingDirectory,
+                      displayPath: resolvedWorkingDirectory,
+                      writable: true,
+                    ))
+                .copyWith(
+                  workspaceKind: WorkspaceKind.remoteFs,
+                  workspacePath: resolvedWorkingDirectory,
+                  displayPath: resolvedWorkingDirectory,
+                ),
+            lifecycleState: (existingRecord?.lifecycleState ??
+                    const ThreadLifecycleState(
+                      archived: false,
+                      status: 'ready',
+                      lastRunAtMs: null,
+                      lastResultCode: null,
+                    ))
+                .copyWith(status: 'ready'),
             updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
           );
         }

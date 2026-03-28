@@ -83,8 +83,8 @@ class AppController extends ChangeNotifier {
   bool aiGatewayBusyInternal = false;
   bool acpBusyInternal = false;
   bool multiAgentRunPendingInternal = false;
-  final Map<String, AssistantThreadRecord> threadRecordsInternal =
-      <String, AssistantThreadRecord>{};
+  final Map<String, TaskThread> threadRecordsInternal =
+      <String, TaskThread>{};
   final Set<String> pendingSessionKeysInternal = <String>{};
   final Map<String, String> streamingTextBySessionInternal = <String, String>{};
   final Map<String, Future<void>> threadTurnQueuesInternal =
@@ -243,7 +243,7 @@ class AppController extends ChangeNotifier {
     if (threadRecordsInternal.isEmpty) {
       currentSessionKeyInternal = '';
       tasksControllerInternal.recompute(
-        threads: const <AssistantThreadRecord>[],
+        threads: const <TaskThread>[],
         cronJobs: relayCronJobsInternal,
         currentSessionKey: currentSessionKeyInternal,
         pendingSessionKeys: pendingSessionKeysInternal,
