@@ -18,7 +18,7 @@ typedef AssistantArtifactSnapshotLoader =
 typedef AssistantArtifactPreviewLoader =
     Future<AssistantArtifactPreview> Function(AssistantArtifactEntry entry);
 
-enum AssistantArtifactSidebarTab { results, files, changes, preview }
+enum AssistantArtifactSidebarTab { files, preview }
 
 class AssistantArtifactSidebar extends StatefulWidget {
   const AssistantArtifactSidebar({
@@ -46,7 +46,7 @@ class AssistantArtifactSidebar extends StatefulWidget {
 }
 
 class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
-  AssistantArtifactSidebarTab _activeTab = AssistantArtifactSidebarTab.results;
+  AssistantArtifactSidebarTab _activeTab = AssistantArtifactSidebarTab.files;
   AssistantArtifactSnapshot? _snapshot;
   AssistantArtifactEntry? _selectedEntry;
   AssistantArtifactPreview _preview = const AssistantArtifactPreview.empty();
@@ -66,7 +66,7 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
     if (oldWidget.sessionKey != widget.sessionKey ||
         oldWidget.workspaceRef != widget.workspaceRef ||
         oldWidget.workspaceRefKind != widget.workspaceRefKind) {
-      _activeTab = AssistantArtifactSidebarTab.results;
+      _activeTab = AssistantArtifactSidebarTab.files;
       _selectedEntry = null;
       _preview = const AssistantArtifactPreview.empty();
       unawaited(_refreshSnapshot());
@@ -181,7 +181,7 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
               onChanged: (value) {
                 final nextTab = AssistantArtifactSidebarTab.values.firstWhere(
                   (item) => _labelForTab(item) == value,
-                  orElse: () => AssistantArtifactSidebarTab.results,
+                  orElse: () => AssistantArtifactSidebarTab.files,
                 );
                 setState(() {
                   _activeTab = nextTab;
@@ -240,24 +240,12 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
       );
     }
     return switch (_activeTab) {
-      AssistantArtifactSidebarTab.results => _ArtifactEntryList(
-        key: const Key('assistant-artifact-tab-results'),
-        entries: snapshot.resultEntries,
-        emptyMessage: snapshot.resultMessage,
-        onSelectEntry: _selectEntry,
-        selectedEntry: _selectedEntry,
-      ),
       AssistantArtifactSidebarTab.files => _ArtifactEntryList(
         key: const Key('assistant-artifact-tab-files'),
-        entries: snapshot.fileEntries,
-        emptyMessage: snapshot.filesMessage,
+        entries: previewCandidates,
+        emptyMessage: _filesEmptyMessage(snapshot),
         onSelectEntry: _selectEntry,
         selectedEntry: _selectedEntry,
-      ),
-      AssistantArtifactSidebarTab.changes => _ArtifactChangeList(
-        key: const Key('assistant-artifact-tab-changes'),
-        changes: snapshot.changes,
-        emptyMessage: snapshot.changesMessage,
       ),
       AssistantArtifactSidebarTab.preview => _ArtifactPreviewPanel(
         key: const Key('assistant-artifact-tab-preview'),
@@ -284,6 +272,21 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
     return merged
         .where((item) => seen.add(item.relativePath))
         .toList(growable: false);
+  }
+
+  String _filesEmptyMessage(AssistantArtifactSnapshot snapshot) {
+    final filesMessage = snapshot.filesMessage.trim();
+    if (filesMessage.isNotEmpty) {
+      return filesMessage;
+    }
+    final resultsMessage = snapshot.resultMessage.trim();
+    if (resultsMessage.isNotEmpty) {
+      return resultsMessage;
+    }
+    return appText(
+      '当前线程里还没有可展示的文件。',
+      'No files are available for this thread yet.',
+    );
   }
 
   Future<void> _refreshSnapshot() async {
@@ -371,9 +374,7 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
 
   String _labelForTab(AssistantArtifactSidebarTab tab) {
     return switch (tab) {
-      AssistantArtifactSidebarTab.results => appText('结果', 'Results'),
       AssistantArtifactSidebarTab.files => appText('全部文件', 'All files'),
-      AssistantArtifactSidebarTab.changes => appText('变更', 'Changes'),
       AssistantArtifactSidebarTab.preview => appText('预览', 'Preview'),
     };
   }
@@ -709,8 +710,8 @@ class _ArtifactPreviewPanel extends StatelessWidget {
         icon: Icons.preview_outlined,
         title: appText('暂无预览对象', 'No preview target'),
         message: appText(
-          '从结果或全部文件里选择一个文件后，会在这里轻量渲染。',
-          'Select a file from results or all files to preview it here.',
+          '从全部文件里选择一个文件后，会在这里轻量预览。',
+          'Select a file from all files to preview it here.',
         ),
       );
     }
