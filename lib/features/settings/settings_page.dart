@@ -19,3 +19,12 @@ import '../../widgets/surface_card.dart';
 import '../../widgets/top_bar.dart';
 
 part 'settings_page_core.part.dart';
+part 'settings_page_sections.part.dart';
+part 'settings_page_gateway.part.dart';
+part 'settings_page_gateway_connection.part.dart';
+part 'settings_page_gateway_llm.part.dart';
+part 'settings_page_presentation.part.dart';
+part 'settings_page_multi_agent.part.dart';
+part 'settings_page_support.part.dart';
+part 'settings_page_device.part.dart';
+part 'settings_page_widgets.part.dart';
