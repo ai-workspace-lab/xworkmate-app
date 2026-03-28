@@ -23,8 +23,8 @@ void main() {
       'test/runtime/app_controller_assistant_flow_suite.dart': 800,
       'test/runtime/app_controller_thread_skills_suite.dart': 800,
 
-      // Baseline caps for legacy oversized closures; tighten after T2/T3.
-      'lib/features/assistant/assistant_page_main.dart': 2800,
+      // Tightened in T2 after assistant/composer closure split.
+      'lib/features/assistant/assistant_page_main.dart': 2200,
       'lib/app/app_controller_desktop_runtime_helpers.dart': 950,
       'lib/app/app_controller_desktop_thread_sessions.dart': 1050,
     };
