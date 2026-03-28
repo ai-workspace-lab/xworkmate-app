@@ -1,4 +1,50 @@
-part of 'app_controller_desktop.dart';
+// ignore_for_file: unused_import, unnecessary_import
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'app_metadata.dart';
+import 'app_capabilities.dart';
+import 'app_store_policy.dart';
+import 'ui_feature_manifest.dart';
+import '../i18n/app_language.dart';
+import '../models/app_models.dart';
+import '../runtime/device_identity_store.dart';
+import '../runtime/aris_bundle.dart';
+import '../runtime/go_core.dart';
+import '../runtime/runtime_bootstrap.dart';
+import '../runtime/desktop_platform_service.dart';
+import '../runtime/gateway_runtime.dart';
+import '../runtime/runtime_controllers.dart';
+import '../runtime/runtime_models.dart';
+import '../runtime/secure_config_store.dart';
+import '../runtime/embedded_agent_launch_policy.dart';
+import '../runtime/runtime_coordinator.dart';
+import '../runtime/direct_single_agent_app_server_client.dart';
+import '../runtime/gateway_acp_client.dart';
+import '../runtime/codex_runtime.dart';
+import '../runtime/codex_config_bridge.dart';
+import '../runtime/code_agent_node_orchestrator.dart';
+import '../runtime/assistant_artifacts.dart';
+import '../runtime/desktop_thread_artifact_service.dart';
+import '../runtime/mode_switcher.dart';
+import '../runtime/agent_registry.dart';
+import '../runtime/multi_agent_orchestrator.dart';
+import '../runtime/platform_environment.dart';
+import '../runtime/single_agent_runner.dart';
+import '../runtime/skill_directory_access.dart';
+import 'app_controller_desktop_core.dart';
+import 'app_controller_desktop_navigation.dart';
+import 'app_controller_desktop_settings.dart';
+import 'app_controller_desktop_single_agent.dart';
+import 'app_controller_desktop_thread_sessions.dart';
+import 'app_controller_desktop_thread_actions.dart';
+import 'app_controller_desktop_workspace_execution.dart';
+import 'app_controller_desktop_settings_runtime.dart';
+import 'app_controller_desktop_thread_storage.dart';
+import 'app_controller_desktop_skill_permissions.dart';
+import 'app_controller_desktop_runtime_helpers.dart';
 
 extension AppControllerDesktopGateway on AppController {
   Future<void> connectWithSetupCode({
@@ -13,22 +59,24 @@ extension AppControllerDesktopGateway on AppController {
     final resolvedPassword = password.trim().isNotEmpty
         ? password.trim()
         : (decoded?.password.trim() ?? '');
-    final resolvedProfileIndex = _gatewayProfileIndexForExecutionTarget(
-      _assistantExecutionTargetForMode(
-        _modeFromHost(
+    final resolvedProfileIndex = gatewayProfileIndexForExecutionTargetInternal(
+      assistantExecutionTargetForModeInternal(
+        modeFromHostInternal(
           decoded?.host ?? settings.primaryRemoteGatewayProfile.host,
         ),
       ),
     );
-    await _settingsController.saveGatewaySecrets(
+    await settingsControllerInternal.saveGatewaySecrets(
       profileIndex: resolvedProfileIndex,
       token: resolvedToken,
       password: resolvedPassword,
     );
-    final resolvedTarget = _assistantExecutionTargetForMode(
-      _modeFromHost(decoded?.host ?? settings.primaryRemoteGatewayProfile.host),
+    final resolvedTarget = assistantExecutionTargetForModeInternal(
+      modeFromHostInternal(
+        decoded?.host ?? settings.primaryRemoteGatewayProfile.host,
+      ),
     );
-    final currentProfile = _gatewayProfileForAssistantExecutionTarget(
+    final currentProfile = gatewayProfileForAssistantExecutionTargetInternal(
       resolvedTarget,
     );
     final nextProfile = currentProfile.copyWith(
@@ -44,24 +92,26 @@ extension AppControllerDesktopGateway on AppController {
     await AppControllerDesktopSettings(this).saveSettings(
       settings
           .copyWithGatewayProfileAt(
-            _gatewayProfileIndexForExecutionTarget(resolvedTarget),
+            gatewayProfileIndexForExecutionTargetInternal(resolvedTarget),
             nextProfile,
           )
           .copyWith(assistantExecutionTarget: resolvedTarget),
       refreshAfterSave: false,
     );
-    _upsertAssistantThreadRecord(
-      _sessionsController.currentSessionKey,
+    upsertAssistantThreadRecordInternal(
+      sessionsControllerInternal.currentSessionKey,
       executionTarget: resolvedTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
-    await AppControllerDesktopGateway(this)._connectProfile(
+    await AppControllerDesktopGateway(this).connectProfileInternal(
       nextProfile,
       profileIndex: resolvedProfileIndex,
       authTokenOverride: resolvedToken,
       authPasswordOverride: resolvedPassword,
     );
-    await _chatController.loadSession(_sessionsController.currentSessionKey);
+    await chatControllerInternal.loadSession(
+      sessionsControllerInternal.currentSessionKey,
+    );
   }
 
   Future<void> connectManual({
@@ -72,9 +122,11 @@ extension AppControllerDesktopGateway on AppController {
     String token = '',
     String password = '',
   }) async {
-    final nextTarget = _assistantExecutionTargetForMode(mode);
-    final nextProfileIndex = _gatewayProfileIndexForExecutionTarget(nextTarget);
-    await _settingsController.saveGatewaySecrets(
+    final nextTarget = assistantExecutionTargetForModeInternal(mode);
+    final nextProfileIndex = gatewayProfileIndexForExecutionTargetInternal(
+      nextTarget,
+    );
+    await settingsControllerInternal.saveGatewaySecrets(
       profileIndex: nextProfileIndex,
       token: token.trim(),
       password: password.trim(),
@@ -86,8 +138,8 @@ extension AppControllerDesktopGateway on AppController {
     final resolvedPort = mode == RuntimeConnectionMode.local && port <= 0
         ? 18789
         : port;
-    final nextProfile = _gatewayProfileForAssistantExecutionTarget(nextTarget)
-        .copyWith(
+    final nextProfile =
+        gatewayProfileForAssistantExecutionTargetInternal(nextTarget).copyWith(
           mode: mode,
           useSetupCode: false,
           setupCode: '',
@@ -98,49 +150,51 @@ extension AppControllerDesktopGateway on AppController {
     await AppControllerDesktopSettings(this).saveSettings(
       settings
           .copyWithGatewayProfileAt(
-            _gatewayProfileIndexForExecutionTarget(nextTarget),
+            gatewayProfileIndexForExecutionTargetInternal(nextTarget),
             nextProfile,
           )
           .copyWith(assistantExecutionTarget: nextTarget),
       refreshAfterSave: false,
     );
-    _upsertAssistantThreadRecord(
-      _sessionsController.currentSessionKey,
+    upsertAssistantThreadRecordInternal(
+      sessionsControllerInternal.currentSessionKey,
       executionTarget: nextTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
-    await AppControllerDesktopGateway(this)._connectProfile(
+    await AppControllerDesktopGateway(this).connectProfileInternal(
       nextProfile,
       profileIndex: nextProfileIndex,
       authTokenOverride: token.trim(),
       authPasswordOverride: password.trim(),
     );
-    await _chatController.loadSession(_sessionsController.currentSessionKey);
+    await chatControllerInternal.loadSession(
+      sessionsControllerInternal.currentSessionKey,
+    );
   }
 
   Future<void> disconnectGateway() async {
-    _clearCodexGatewayRegistration();
-    await _runtime.disconnect(clearDesiredProfile: false);
-    await _settingsController.refreshDerivedState();
-    await _agentsController.refresh();
-    await _sessionsController.refresh();
-    _chatController.clear();
-    await _instancesController.refresh();
-    await _skillsController.refresh();
-    await _connectorsController.refresh();
-    await _modelsController.refresh();
-    await _cronJobsController.refresh();
-    _devicesController.clear();
-    _recomputeTasks();
+    clearCodexGatewayRegistrationInternal();
+    await runtimeInternal.disconnect(clearDesiredProfile: false);
+    await settingsControllerInternal.refreshDerivedState();
+    await agentsControllerInternal.refresh();
+    await sessionsControllerInternal.refresh();
+    chatControllerInternal.clear();
+    await instancesControllerInternal.refresh();
+    await skillsControllerInternal.refresh();
+    await connectorsControllerInternal.refresh();
+    await modelsControllerInternal.refresh();
+    await cronJobsControllerInternal.refresh();
+    devicesControllerInternal.clear();
+    recomputeTasksInternal();
   }
 
-  Future<void> _connectProfile(
+  Future<void> connectProfileInternal(
     GatewayConnectionProfile profile, {
     int? profileIndex,
     String authTokenOverride = '',
     String authPasswordOverride = '',
   }) async {
-    await _runtime.connectProfile(
+    await runtimeInternal.connectProfile(
       profile,
       profileIndex: profileIndex,
       authTokenOverride: authTokenOverride,
@@ -149,18 +203,18 @@ extension AppControllerDesktopGateway on AppController {
     await refreshGatewayHealth();
     await refreshAgents();
     await refreshSessions();
-    await _instancesController.refresh();
-    await _skillsController.refresh(
-      agentId: _agentsController.selectedAgentId.isEmpty
+    await instancesControllerInternal.refresh();
+    await skillsControllerInternal.refresh(
+      agentId: agentsControllerInternal.selectedAgentId.isEmpty
           ? null
-          : _agentsController.selectedAgentId,
+          : agentsControllerInternal.selectedAgentId,
     );
-    await _connectorsController.refresh();
-    await _modelsController.refresh();
-    await _cronJobsController.refresh();
-    await _devicesController.refresh(quiet: true);
-    await _settingsController.refreshDerivedState();
-    await _ensureCodexGatewayRegistration();
-    _recomputeTasks();
+    await connectorsControllerInternal.refresh();
+    await modelsControllerInternal.refresh();
+    await cronJobsControllerInternal.refresh();
+    await devicesControllerInternal.refresh(quiet: true);
+    await settingsControllerInternal.refreshDerivedState();
+    await ensureCodexGatewayRegistrationInternal();
+    recomputeTasksInternal();
   }
 }

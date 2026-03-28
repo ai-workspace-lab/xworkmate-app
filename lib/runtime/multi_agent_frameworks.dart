@@ -46,9 +46,9 @@ $selected
 }
 
 class ArisFrameworkPreset extends FrameworkPreset {
-  ArisFrameworkPreset(this._bundleRepository);
+  ArisFrameworkPreset(this.bundleRepositoryInternal);
 
-  final ArisBundleRepository _bundleRepository;
+  final ArisBundleRepository bundleRepositoryInternal;
 
   @override
   String get id => MultiAgentFramework.aris.name;
@@ -62,19 +62,19 @@ class ArisFrameworkPreset extends FrameworkPreset {
     required String tool,
     required List<String> selectedSkills,
   }) async {
-    final bundle = await _bundleRepository.ensureReady();
+    final bundle = await bundleRepositoryInternal.ensureReady();
     final preferCodex = tool.trim().toLowerCase() == 'codex';
     final skillPaths = bundle.skillPathsForRole(role, preferCodex: preferCodex);
-    final skillDocs = await _bundleRepository.loadSkillContents(skillPaths);
+    final skillDocs = await bundleRepositoryInternal.loadSkillContents(
+      skillPaths,
+    );
     final selected = selectedSkills.isEmpty
         ? '- 无'
         : selectedSkills.map((item) => '- $item').join('\n');
     final excerpts = skillDocs.entries
         .map(
-          (entry) => _formatSkillExcerpt(
-            path: entry.key,
-            content: entry.value,
-          ),
+          (entry) =>
+              formatSkillExcerptInternal(path: entry.key, content: entry.value),
         )
         .join('\n\n');
     return '''
@@ -91,13 +91,13 @@ $excerpts
 ''';
   }
 
-  String _formatSkillExcerpt({
+  String formatSkillExcerptInternal({
     required String path,
     required String content,
   }) {
-    final label = File(path).parent.uri.pathSegments
-        .where((item) => item.isNotEmpty)
-        .last;
+    final label = File(
+      path,
+    ).parent.uri.pathSegments.where((item) => item.isNotEmpty).last;
     final lines = content
         .split('\n')
         .map((line) => line.trimRight())

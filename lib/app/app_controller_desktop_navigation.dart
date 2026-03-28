@@ -1,7 +1,52 @@
+// ignore_for_file: unused_import, unnecessary_import
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'app_metadata.dart';
+import 'app_capabilities.dart';
+import 'app_store_policy.dart';
+import 'ui_feature_manifest.dart';
+import '../i18n/app_language.dart';
+import '../models/app_models.dart';
+import '../runtime/device_identity_store.dart';
+import '../runtime/aris_bundle.dart';
+import '../runtime/go_core.dart';
+import '../runtime/runtime_bootstrap.dart';
+import '../runtime/desktop_platform_service.dart';
+import '../runtime/gateway_runtime.dart';
+import '../runtime/runtime_controllers.dart';
+import '../runtime/runtime_models.dart';
+import '../runtime/secure_config_store.dart';
+import '../runtime/embedded_agent_launch_policy.dart';
+import '../runtime/runtime_coordinator.dart';
+import '../runtime/direct_single_agent_app_server_client.dart';
+import '../runtime/gateway_acp_client.dart';
+import '../runtime/codex_runtime.dart';
+import '../runtime/codex_config_bridge.dart';
+import '../runtime/code_agent_node_orchestrator.dart';
+import '../runtime/assistant_artifacts.dart';
+import '../runtime/desktop_thread_artifact_service.dart';
+import '../runtime/mode_switcher.dart';
+import '../runtime/agent_registry.dart';
+import '../runtime/multi_agent_orchestrator.dart';
+import '../runtime/platform_environment.dart';
+import '../runtime/single_agent_runner.dart';
+import '../runtime/skill_directory_access.dart';
+import 'app_controller_desktop_core.dart';
+import 'app_controller_desktop_gateway.dart';
+import 'app_controller_desktop_settings.dart';
+import 'app_controller_desktop_single_agent.dart';
+import 'app_controller_desktop_thread_sessions.dart';
+import 'app_controller_desktop_thread_actions.dart';
+import 'app_controller_desktop_workspace_execution.dart';
+import 'app_controller_desktop_settings_runtime.dart';
+import 'app_controller_desktop_thread_storage.dart';
+import 'app_controller_desktop_skill_permissions.dart';
+import 'app_controller_desktop_runtime_helpers.dart';
+
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
-
-part of 'app_controller_desktop.dart';
-
 extension AppControllerDesktopNavigation on AppController {
   void navigateTo(WorkspaceDestination destination) {
     if (!capabilities.supportsDestination(destination)) {
@@ -15,30 +60,31 @@ extension AppControllerDesktopNavigation on AppController {
     final nextModulesTab = switch (destination) {
       WorkspaceDestination.nodes => ModulesTab.nodes,
       WorkspaceDestination.agents => ModulesTab.agents,
-      _ => _modulesTab,
+      _ => modulesTabInternal,
     };
     final shouldClearSettingsDrillIn =
-        _settingsDetail != null || _settingsNavigationContext != null;
+        settingsDetailInternal != null ||
+        settingsNavigationContextInternal != null;
     final changed =
-        _destination != destination ||
-        _detailPanel != null ||
+        destinationInternal != destination ||
+        detailPanelInternal != null ||
         shouldClearSettingsDrillIn ||
-        nextModulesTab != _modulesTab;
+        nextModulesTab != modulesTabInternal;
     if (!changed) {
       return;
     }
-    _destination = destination;
-    _modulesTab = nextModulesTab;
-    _settingsDetail = null;
-    _settingsNavigationContext = null;
-    _detailPanel = null;
+    destinationInternal = destination;
+    modulesTabInternal = nextModulesTab;
+    settingsDetailInternal = null;
+    settingsNavigationContextInternal = null;
+    detailPanelInternal = null;
     notifyListeners();
   }
 
   void navigateHome() {
     final mainSessionKey =
-        _runtime.snapshot.mainSessionKey?.trim().isNotEmpty == true
-        ? _runtime.snapshot.mainSessionKey!.trim()
+        runtimeInternal.snapshot.mainSessionKey?.trim().isNotEmpty == true
+        ? runtimeInternal.snapshot.mainSessionKey!.trim()
         : 'main';
     final homeDestination =
         capabilities.supportsDestination(WorkspaceDestination.assistant)
@@ -46,18 +92,19 @@ extension AppControllerDesktopNavigation on AppController {
         : (capabilities.allowedDestinations.isEmpty
               ? WorkspaceDestination.assistant
               : capabilities.allowedDestinations.first);
-    final destinationChanged = _destination != homeDestination;
-    final detailChanged = _detailPanel != null;
+    final destinationChanged = destinationInternal != homeDestination;
+    final detailChanged = detailPanelInternal != null;
     final settingsDrillInChanged =
-        _settingsDetail != null || _settingsNavigationContext != null;
-    _destination = homeDestination;
-    _settingsDetail = null;
-    _settingsNavigationContext = null;
-    _detailPanel = null;
+        settingsDetailInternal != null ||
+        settingsNavigationContextInternal != null;
+    destinationInternal = homeDestination;
+    settingsDetailInternal = null;
+    settingsNavigationContextInternal = null;
+    detailPanelInternal = null;
     if (destinationChanged || detailChanged || settingsDrillInChanged) {
       notifyListeners();
     }
-    if (_sessionsController.currentSessionKey != mainSessionKey) {
+    if (sessionsControllerInternal.currentSessionKey != mainSessionKey) {
       unawaited(switchSession(mainSessionKey));
     }
   }
@@ -74,27 +121,27 @@ extension AppControllerDesktopNavigation on AppController {
       return;
     }
     final changed =
-        _destination != destination ||
-        _modulesTab != tab ||
-        _detailPanel != null ||
-        _settingsDetail != null ||
-        _settingsNavigationContext != null;
+        destinationInternal != destination ||
+        modulesTabInternal != tab ||
+        detailPanelInternal != null ||
+        settingsDetailInternal != null ||
+        settingsNavigationContextInternal != null;
     if (!changed) {
       return;
     }
-    _destination = destination;
-    _modulesTab = tab;
-    _detailPanel = null;
-    _settingsDetail = null;
-    _settingsNavigationContext = null;
+    destinationInternal = destination;
+    modulesTabInternal = tab;
+    detailPanelInternal = null;
+    settingsDetailInternal = null;
+    settingsNavigationContextInternal = null;
     notifyListeners();
   }
 
   void setModulesTab(ModulesTab tab) {
-    if (_modulesTab == tab) {
+    if (modulesTabInternal == tab) {
       return;
     }
-    _modulesTab = tab;
+    modulesTabInternal = tab;
     notifyListeners();
   }
 
@@ -102,15 +149,15 @@ extension AppControllerDesktopNavigation on AppController {
     if (!capabilities.supportsDestination(WorkspaceDestination.settings)) {
       return;
     }
-    _secretsTab = tab;
+    secretsTabInternal = tab;
     openSettings(tab: SettingsTab.gateway);
   }
 
   void setSecretsTab(SecretsTab tab) {
-    if (_secretsTab == tab) {
+    if (secretsTabInternal == tab) {
       return;
     }
-    _secretsTab = tab;
+    secretsTabInternal = tab;
     notifyListeners();
   }
 
@@ -118,15 +165,15 @@ extension AppControllerDesktopNavigation on AppController {
     if (!capabilities.supportsDestination(WorkspaceDestination.settings)) {
       return;
     }
-    _aiGatewayTab = tab;
+    aiGatewayTabInternal = tab;
     openSettings(tab: SettingsTab.gateway);
   }
 
   void setAiGatewayTab(AiGatewayTab tab) {
-    if (_aiGatewayTab == tab) {
+    if (aiGatewayTabInternal == tab) {
       return;
     }
-    _aiGatewayTab = tab;
+    aiGatewayTabInternal = tab;
     notifyListeners();
   }
 
@@ -139,57 +186,59 @@ extension AppControllerDesktopNavigation on AppController {
       return;
     }
     final requestedTab = detail?.tab ?? tab;
-    final resolvedTab = _sanitizeSettingsTab(requestedTab);
+    final resolvedTab = sanitizeSettingsTabInternal(requestedTab);
     final resolvedDetail = detail != null && resolvedTab == detail.tab
         ? detail
         : null;
     final changed =
-        _destination != WorkspaceDestination.settings ||
-        _settingsTab != resolvedTab ||
-        _settingsDetail != resolvedDetail ||
-        _settingsNavigationContext != navigationContext ||
-        _detailPanel != null;
+        destinationInternal != WorkspaceDestination.settings ||
+        settingsTabInternal != resolvedTab ||
+        settingsDetailInternal != resolvedDetail ||
+        settingsNavigationContextInternal != navigationContext ||
+        detailPanelInternal != null;
     if (!changed) {
       return;
     }
-    _destination = WorkspaceDestination.settings;
-    _settingsTab = resolvedTab;
-    _settingsDetail = resolvedDetail;
-    _settingsNavigationContext = resolvedDetail == null
+    destinationInternal = WorkspaceDestination.settings;
+    settingsTabInternal = resolvedTab;
+    settingsDetailInternal = resolvedDetail;
+    settingsNavigationContextInternal = resolvedDetail == null
         ? null
         : navigationContext;
-    _detailPanel = null;
+    detailPanelInternal = null;
     notifyListeners();
   }
 
   void setSettingsTab(SettingsTab tab, {bool clearDetail = true}) {
-    final resolvedTab = _sanitizeSettingsTab(tab);
+    final resolvedTab = sanitizeSettingsTabInternal(tab);
     final changed =
-        _settingsTab != resolvedTab ||
+        settingsTabInternal != resolvedTab ||
         (clearDetail &&
-            (_settingsDetail != null || _settingsNavigationContext != null));
+            (settingsDetailInternal != null ||
+                settingsNavigationContextInternal != null));
     if (!changed) {
       return;
     }
-    _settingsTab = resolvedTab;
+    settingsTabInternal = resolvedTab;
     if (clearDetail) {
-      _settingsDetail = null;
-      _settingsNavigationContext = null;
+      settingsDetailInternal = null;
+      settingsNavigationContextInternal = null;
     }
     notifyListeners();
   }
 
   void closeSettingsDetail() {
-    if (_settingsDetail == null && _settingsNavigationContext == null) {
+    if (settingsDetailInternal == null &&
+        settingsNavigationContextInternal == null) {
       return;
     }
-    _settingsDetail = null;
-    _settingsNavigationContext = null;
+    settingsDetailInternal = null;
+    settingsNavigationContextInternal = null;
     notifyListeners();
   }
 
   void cycleSidebarState() {
-    _sidebarState = switch (_sidebarState) {
+    sidebarStateInternal = switch (sidebarStateInternal) {
       AppSidebarState.expanded => AppSidebarState.collapsed,
       AppSidebarState.collapsed => AppSidebarState.hidden,
       AppSidebarState.hidden => AppSidebarState.expanded,
@@ -198,18 +247,18 @@ extension AppControllerDesktopNavigation on AppController {
   }
 
   void setSidebarState(AppSidebarState state) {
-    if (_sidebarState == state) {
+    if (sidebarStateInternal == state) {
       return;
     }
-    _sidebarState = state;
+    sidebarStateInternal = state;
     notifyListeners();
   }
 
   void setThemeMode(ThemeMode mode) {
-    if (_themeMode == mode) {
+    if (themeModeInternal == mode) {
       return;
     }
-    _themeMode = mode;
+    themeModeInternal = mode;
     notifyListeners();
   }
 
@@ -231,15 +280,15 @@ extension AppControllerDesktopNavigation on AppController {
   }
 
   void openDetail(DetailPanelData detailPanel) {
-    _detailPanel = detailPanel;
+    detailPanelInternal = detailPanel;
     notifyListeners();
   }
 
   void closeDetail() {
-    if (_detailPanel == null) {
+    if (detailPanelInternal == null) {
       return;
     }
-    _detailPanel = null;
+    detailPanelInternal = null;
     notifyListeners();
   }
 }

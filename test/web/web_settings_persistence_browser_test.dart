@@ -12,85 +12,88 @@ import 'package:xworkmate/web/web_store.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('web controller persists single-agent and relay configuration', () async {
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    final remoteRecords = <AssistantThreadRecord>[];
+  test(
+    'web controller persists single-agent and relay configuration',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final remoteRecords = <AssistantThreadRecord>[];
 
-    final controller = AppController(
-      store: WebStore(),
-      remoteSessionRepositoryBuilder: (config, clientId, accessToken) =>
-          _MemoryRemoteSessionRepository(remoteRecords),
-    );
-    await _waitForReady(controller);
+      final controller = AppController(
+        store: WebStore(),
+        remoteSessionRepositoryBuilder: (config, clientId, accessToken) =>
+            MemoryRemoteSessionRepositoryInternal(remoteRecords),
+      );
+      await waitForReadyInternal(controller);
 
-    await controller.saveAiGatewayConfiguration(
-      name: 'Single Agent',
-      baseUrl: 'https://api.example.com/v1',
-      provider: 'openai-compatible',
-      apiKey: 'sk-test-web',
-      defaultModel: '',
-    );
-    await controller.saveRelayConfiguration(
-      host: 'relay.example.com',
-      port: 443,
-      tls: true,
-      token: 'relay-token',
-      password: 'relay-password',
-    );
-    await controller.saveWebSessionPersistenceConfiguration(
-      mode: WebSessionPersistenceMode.remote,
-      remoteBaseUrl: 'https://xworkmate.svc.plus/api/web-sessions',
-      apiToken: 'session-token',
-    );
-    await controller.setAssistantExecutionTarget(
-      AssistantExecutionTarget.remote,
-    );
-    await controller.createConversation(
-      target: AssistantExecutionTarget.singleAgent,
-    );
+      await controller.saveAiGatewayConfiguration(
+        name: 'Single Agent',
+        baseUrl: 'https://api.example.com/v1',
+        provider: 'openai-compatible',
+        apiKey: 'sk-test-web',
+        defaultModel: '',
+      );
+      await controller.saveRelayConfiguration(
+        host: 'relay.example.com',
+        port: 443,
+        tls: true,
+        token: 'relay-token',
+        password: 'relay-password',
+      );
+      await controller.saveWebSessionPersistenceConfiguration(
+        mode: WebSessionPersistenceMode.remote,
+        remoteBaseUrl: 'https://xworkmate.svc.plus/api/web-sessions',
+        apiToken: 'session-token',
+      );
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.remote,
+      );
+      await controller.createConversation(
+        target: AssistantExecutionTarget.singleAgent,
+      );
 
-    final reloaded = AppController(
-      store: WebStore(),
-      remoteSessionRepositoryBuilder: (config, clientId, accessToken) =>
-          _MemoryRemoteSessionRepository(remoteRecords),
-    );
-    await _waitForReady(reloaded);
+      final reloaded = AppController(
+        store: WebStore(),
+        remoteSessionRepositoryBuilder: (config, clientId, accessToken) =>
+            MemoryRemoteSessionRepositoryInternal(remoteRecords),
+      );
+      await waitForReadyInternal(reloaded);
 
-    expect(reloaded.settings.aiGateway.baseUrl, 'https://api.example.com/v1');
-    expect(reloaded.settings.defaultProvider, 'openai-compatible');
-    expect(
-      reloaded.settings.primaryRemoteGatewayProfile.host,
-      'relay.example.com',
-    );
-    expect(reloaded.settings.primaryRemoteGatewayProfile.port, 443);
-    expect(
-      reloaded.settings.webSessionPersistence.mode,
-      WebSessionPersistenceMode.remote,
-    );
-    expect(
-      reloaded.settings.webSessionPersistence.remoteBaseUrl,
-      'https://xworkmate.svc.plus/api/web-sessions',
-    );
-    expect(
-      reloaded.settings.assistantExecutionTarget,
-      AssistantExecutionTarget.remote,
-    );
-    expect(reloaded.storedAiGatewayApiKeyMask, isNotNull);
-    expect(reloaded.storedRelayTokenMask, isNotNull);
-    expect(controller.storedWebSessionApiTokenMask, isNotNull);
-    expect(reloaded.storedWebSessionApiTokenMask, isNull);
-    expect(remoteRecords, isNotEmpty);
-    expect(reloaded.conversations, isNotEmpty);
+      expect(reloaded.settings.aiGateway.baseUrl, 'https://api.example.com/v1');
+      expect(reloaded.settings.defaultProvider, 'openai-compatible');
+      expect(
+        reloaded.settings.primaryRemoteGatewayProfile.host,
+        'relay.example.com',
+      );
+      expect(reloaded.settings.primaryRemoteGatewayProfile.port, 443);
+      expect(
+        reloaded.settings.webSessionPersistence.mode,
+        WebSessionPersistenceMode.remote,
+      );
+      expect(
+        reloaded.settings.webSessionPersistence.remoteBaseUrl,
+        'https://xworkmate.svc.plus/api/web-sessions',
+      );
+      expect(
+        reloaded.settings.assistantExecutionTarget,
+        AssistantExecutionTarget.remote,
+      );
+      expect(reloaded.storedAiGatewayApiKeyMask, isNotNull);
+      expect(reloaded.storedRelayTokenMask, isNotNull);
+      expect(controller.storedWebSessionApiTokenMask, isNotNull);
+      expect(reloaded.storedWebSessionApiTokenMask, isNull);
+      expect(remoteRecords, isNotEmpty);
+      expect(reloaded.conversations, isNotEmpty);
 
-    controller.dispose();
-    reloaded.dispose();
-  });
+      controller.dispose();
+      reloaded.dispose();
+    },
+  );
 
   test('web controller rejects insecure remote session api urls', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
 
     final controller = AppController(store: WebStore());
-    await _waitForReady(controller);
+    await waitForReadyInternal(controller);
 
     await controller.saveWebSessionPersistenceConfiguration(
       mode: WebSessionPersistenceMode.remote,
@@ -141,9 +144,9 @@ void main() {
       final controller = AppController(
         store: store,
         remoteSessionRepositoryBuilder: (config, clientId, accessToken) =>
-            _MemoryRemoteSessionRepository(remoteRecords),
+            MemoryRemoteSessionRepositoryInternal(remoteRecords),
       );
-      await _waitForReady(controller);
+      await waitForReadyInternal(controller);
 
       expect(remoteRecords, isEmpty);
       expect(
@@ -163,25 +166,25 @@ void main() {
   );
 }
 
-class _MemoryRemoteSessionRepository implements WebSessionRepository {
-  _MemoryRemoteSessionRepository(this._records);
+class MemoryRemoteSessionRepositoryInternal implements WebSessionRepository {
+  MemoryRemoteSessionRepositoryInternal(this.recordsInternal);
 
-  final List<AssistantThreadRecord> _records;
+  final List<AssistantThreadRecord> recordsInternal;
 
   @override
   Future<List<AssistantThreadRecord>> loadThreadRecords() async {
-    return List<AssistantThreadRecord>.from(_records, growable: false);
+    return List<AssistantThreadRecord>.from(recordsInternal, growable: false);
   }
 
   @override
   Future<void> saveThreadRecords(List<AssistantThreadRecord> records) async {
-    _records
+    recordsInternal
       ..clear()
       ..addAll(records);
   }
 }
 
-Future<void> _waitForReady(
+Future<void> waitForReadyInternal(
   AppController controller, {
   Duration timeout = const Duration(seconds: 5),
 }) async {

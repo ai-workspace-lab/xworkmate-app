@@ -17,7 +17,7 @@ void main() {
       // Wave 2
       'lib/features/settings/settings_page.dart',
       'lib/features/assistant/assistant_page.dart',
-      'lib/features/assistant/assistant_page_components.part.dart',
+      'lib/features/assistant/assistant_page_components.dart',
       'lib/web/web_workspace_pages.dart',
       'lib/web/web_assistant_page.dart',
       'lib/web/web_settings_page.dart',
