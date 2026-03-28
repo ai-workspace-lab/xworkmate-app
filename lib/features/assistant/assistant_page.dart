@@ -3010,9 +3010,7 @@ class _ComposerBarState extends State<_ComposerBar> {
     final submitLabel = connected
         ? appText('提交', 'Submit')
         : singleAgent
-        ? singleAgentNeedsAiGateway
-              ? appText('配置 LLM API', 'Configure LLM API')
-              : appText('查看工具栏', 'Open toolbar')
+        ? appText('提交', 'Submit')
         : connecting
         ? appText('连接中…', 'Connecting…')
         : reconnectAvailable
@@ -3426,11 +3424,7 @@ class _ComposerBarState extends State<_ComposerBar> {
                       : connected
                       ? widget.onSend
                       : singleAgent
-                      ? singleAgentNeedsAiGateway
-                            ? widget.onOpenAiGatewaySettings
-                            : () {
-                                widget.focusNode.requestFocus();
-                              }
+                      ? widget.onSend
                       : reconnectAvailable
                       ? () async {
                           await widget.onReconnectGateway();
@@ -3453,9 +3447,7 @@ class _ComposerBarState extends State<_ComposerBar> {
                         connected
                             ? Icons.arrow_upward_rounded
                             : singleAgent
-                            ? singleAgentNeedsAiGateway
-                                  ? Icons.hub_outlined
-                                  : Icons.smart_toy_outlined
+                            ? Icons.arrow_upward_rounded
                             : reconnectAvailable
                             ? Icons.refresh_rounded
                             : Icons.link_rounded,
