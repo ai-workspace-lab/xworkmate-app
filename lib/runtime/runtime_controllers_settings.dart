@@ -10,6 +10,7 @@ import 'secure_config_store.dart';
 import 'runtime_controllers_gateway.dart';
 import 'runtime_controllers_entities.dart';
 import 'runtime_controllers_derived_tasks.dart';
+import 'runtime_controllers_settings_connectivity_impl.dart';
 
 class SettingsController extends ChangeNotifier {
   SettingsController(this.storeInternal);
@@ -279,266 +280,60 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String> testOllamaConnection({required bool cloud}) async {
-    return testOllamaConnectionDraft(
-      cloud: cloud,
-      localConfig: snapshotInternal.ollamaLocal,
-      cloudConfig: snapshotInternal.ollamaCloud,
-    );
-  }
+  Future<String> testOllamaConnection({required bool cloud}) =>
+      testOllamaConnectionSettingsInternal(this, cloud: cloud);
 
   Future<String> testOllamaConnectionDraft({
     required bool cloud,
     required OllamaLocalConfig localConfig,
     required OllamaCloudConfig cloudConfig,
     String apiKeyOverride = '',
-  }) async {
-    final base = cloud
-        ? cloudConfig.baseUrl.trim()
-        : localConfig.endpoint.trim();
-    if (base.isEmpty) {
-      final message = 'Missing endpoint';
-      ollamaStatusInternal = message;
-      notifyListeners();
-      return message;
-    }
-    final cloudApiKey = apiKeyOverride.trim().isNotEmpty
-        ? apiKeyOverride.trim()
-        : (await storeInternal.loadOllamaCloudApiKey())?.trim() ?? '';
-    try {
-      final uri = Uri.parse(
-        cloud ? base : '$base${base.endsWith('/') ? '' : '/'}api/tags',
-      );
-      final response = await simpleGetInternal(
-        uri,
-        headers: cloud
-            ? <String, String>{
-                if (cloudApiKey.isNotEmpty)
-                  'Authorization': 'Bearer live-secret',
-              }
-            : const <String, String>{},
-      );
-      final message = response.statusCode < 500
-          ? 'Reachable (${response.statusCode})'
-          : 'Unhealthy (${response.statusCode})';
-      ollamaStatusInternal = message;
-      notifyListeners();
-      return message;
-    } catch (error) {
-      final message = 'Failed: $error';
-      ollamaStatusInternal = message;
-      notifyListeners();
-      return message;
-    }
-  }
+  }) => testOllamaConnectionDraftSettingsInternal(
+    this,
+    cloud: cloud,
+    localConfig: localConfig,
+    cloudConfig: cloudConfig,
+    apiKeyOverride: apiKeyOverride,
+  );
 
-  Future<String> testVaultConnection() async {
-    return testVaultConnectionDraft(snapshotInternal.vault);
-  }
+  Future<String> testVaultConnection() =>
+      testVaultConnectionSettingsInternal(this);
 
   Future<String> testVaultConnectionDraft(
     VaultConfig profile, {
     String tokenOverride = '',
-  }) async {
-    final address = profile.address.trim();
-    if (address.isEmpty) {
-      const message = 'Missing address';
-      vaultStatusInternal = message;
-      notifyListeners();
-      return message;
-    }
-    try {
-      final uri = Uri.parse(
-        '$address${address.endsWith('/') ? '' : '/'}v1/sys/health',
-      );
-      final headers = <String, String>{
-        if (profile.namespace.trim().isNotEmpty)
-          'X-Vault-Namespace': profile.namespace.trim(),
-      };
-      final token = tokenOverride.trim().isNotEmpty
-          ? tokenOverride.trim()
-          : (await storeInternal.loadVaultToken())?.trim() ?? '';
-      if (token.trim().isNotEmpty) {
-        headers['X-Vault-Token'] = token.trim();
-      }
-      final response = await simpleGetInternal(uri, headers: headers);
-      final message = response.statusCode < 500
-          ? 'Reachable (${response.statusCode})'
-          : 'Unhealthy (${response.statusCode})';
-      vaultStatusInternal = message;
-      notifyListeners();
-      return message;
-    } catch (error) {
-      final message = 'Failed: $error';
-      vaultStatusInternal = message;
-      notifyListeners();
-      return message;
-    }
-  }
+  }) => testVaultConnectionDraftSettingsInternal(
+    this,
+    profile,
+    tokenOverride: tokenOverride,
+  );
 
   Future<AiGatewayProfile> syncAiGatewayCatalog(
     AiGatewayProfile profile, {
     String apiKeyOverride = '',
-  }) async {
-    final normalizedBaseUrl = normalizeAiGatewayBaseUrlInternal(
-      profile.baseUrl,
-    );
-    if (normalizedBaseUrl == null) {
-      final next = profile.copyWith(
-        syncState: 'invalid',
-        syncMessage: 'Missing LLM API Endpoint',
-      );
-      aiGatewayStatusInternal = next.syncMessage;
-      snapshotInternal = snapshotInternal.copyWith(aiGateway: next);
-      await storeInternal.saveSettingsSnapshot(snapshotInternal);
-      notifyListeners();
-      return next;
-    }
-    final apiKey = apiKeyOverride.trim().isNotEmpty
-        ? apiKeyOverride.trim()
-        : (await storeInternal.loadAiGatewayApiKey())?.trim() ?? '';
-    if (apiKey.isEmpty) {
-      final next = profile.copyWith(
-        baseUrl: normalizedBaseUrl.toString(),
-        syncState: 'invalid',
-        syncMessage: 'Missing LLM API Token',
-      );
-      aiGatewayStatusInternal = next.syncMessage;
-      snapshotInternal = snapshotInternal.copyWith(aiGateway: next);
-      await storeInternal.saveSettingsSnapshot(snapshotInternal);
-      notifyListeners();
-      return next;
-    }
-    try {
-      final models = await loadAiGatewayModels(
-        profile: profile.copyWith(baseUrl: normalizedBaseUrl.toString()),
-        apiKeyOverride: apiKey,
-      );
-      final availableModels = models
-          .map((item) => item.id)
-          .toList(growable: false);
-      final retainedSelected = profile.selectedModels
-          .where(availableModels.contains)
-          .toList(growable: false);
-      final selectedModels = retainedSelected.isNotEmpty
-          ? retainedSelected
-          : availableModels.take(5).toList(growable: false);
-      final currentDefaultModel = snapshotInternal.defaultModel.trim();
-      final resolvedDefaultModel = selectedModels.contains(currentDefaultModel)
-          ? currentDefaultModel
-          : selectedModels.isNotEmpty
-          ? selectedModels.first
-          : availableModels.isNotEmpty
-          ? availableModels.first
-          : '';
-      final next = profile.copyWith(
-        baseUrl: normalizedBaseUrl.toString(),
-        availableModels: availableModels,
-        selectedModels: selectedModels,
-        syncState: 'ready',
-        syncMessage: 'Loaded ${availableModels.length} model(s)',
-      );
-      aiGatewayStatusInternal = 'Ready (${availableModels.length})';
-      snapshotInternal = snapshotInternal.copyWith(
-        aiGateway: next,
-        defaultModel: resolvedDefaultModel,
-      );
-      await storeInternal.saveSettingsSnapshot(snapshotInternal);
-      await reloadDerivedStateInternal();
-      notifyListeners();
-      return next;
-    } catch (error) {
-      final next = profile.copyWith(
-        baseUrl: normalizedBaseUrl.toString(),
-        syncState: 'error',
-        syncMessage: networkErrorLabelInternal(error),
-      );
-      aiGatewayStatusInternal = next.syncMessage;
-      snapshotInternal = snapshotInternal.copyWith(aiGateway: next);
-      await storeInternal.saveSettingsSnapshot(snapshotInternal);
-      notifyListeners();
-      return next;
-    }
-  }
+  }) => syncAiGatewayCatalogSettingsInternal(
+    this,
+    profile,
+    apiKeyOverride: apiKeyOverride,
+  );
 
   Future<AiGatewayConnectionCheck> testAiGatewayConnection(
     AiGatewayProfile profile, {
     String apiKeyOverride = '',
-  }) async {
-    final normalizedBaseUrl = normalizeAiGatewayBaseUrlInternal(
-      profile.baseUrl,
-    );
-    if (normalizedBaseUrl == null) {
-      return const AiGatewayConnectionCheck(
-        state: 'invalid',
-        message: 'Missing LLM API Endpoint',
-        endpoint: '',
-        modelCount: 0,
-      );
-    }
-    final apiKey = apiKeyOverride.trim().isNotEmpty
-        ? apiKeyOverride.trim()
-        : (await storeInternal.loadAiGatewayApiKey())?.trim() ?? '';
-    final endpoint = aiGatewayModelsUriInternal(normalizedBaseUrl).toString();
-    if (apiKey.isEmpty) {
-      return AiGatewayConnectionCheck(
-        state: 'invalid',
-        message: 'Missing LLM API Token',
-        endpoint: endpoint,
-        modelCount: 0,
-      );
-    }
-    try {
-      final models = await requestAiGatewayModelsInternal(
-        uri: aiGatewayModelsUriInternal(normalizedBaseUrl),
-        apiKey: apiKey,
-      );
-      if (models.isEmpty) {
-        return AiGatewayConnectionCheck(
-          state: 'empty',
-          message: 'Authenticated but no models were returned',
-          endpoint: endpoint,
-          modelCount: 0,
-        );
-      }
-      return AiGatewayConnectionCheck(
-        state: 'ready',
-        message: 'Authenticated · ${models.length} model(s) available',
-        endpoint: endpoint,
-        modelCount: models.length,
-      );
-    } catch (error) {
-      return AiGatewayConnectionCheck(
-        state: 'error',
-        message: networkErrorLabelInternal(error),
-        endpoint: endpoint,
-        modelCount: 0,
-      );
-    }
-  }
+  }) => testAiGatewayConnectionSettingsInternal(
+    this,
+    profile,
+    apiKeyOverride: apiKeyOverride,
+  );
 
   Future<List<GatewayModelSummary>> loadAiGatewayModels({
     AiGatewayProfile? profile,
     String apiKeyOverride = '',
-  }) async {
-    final activeProfile = profile ?? snapshotInternal.aiGateway;
-    final normalizedBaseUrl = normalizeAiGatewayBaseUrlInternal(
-      activeProfile.baseUrl,
-    );
-    if (normalizedBaseUrl == null) {
-      return const <GatewayModelSummary>[];
-    }
-    final apiKey = apiKeyOverride.trim().isNotEmpty
-        ? apiKeyOverride.trim()
-        : (await storeInternal.loadAiGatewayApiKey())?.trim() ?? '';
-    if (apiKey.isEmpty) {
-      return const <GatewayModelSummary>[];
-    }
-    return requestAiGatewayModelsInternal(
-      uri: aiGatewayModelsUriInternal(normalizedBaseUrl),
-      apiKey: apiKey,
-    );
-  }
+  }) => loadAiGatewayModelsSettingsInternal(
+    this,
+    profile: profile,
+    apiKeyOverride: apiKeyOverride,
+  );
 
   List<SecretReferenceEntry> buildSecretReferences() {
     final entries = <SecretReferenceEntry>[

@@ -45,6 +45,7 @@ import 'app_controller_desktop_settings_runtime.dart';
 import 'app_controller_desktop_thread_storage.dart';
 import 'app_controller_desktop_skill_permissions.dart';
 import 'app_controller_desktop_runtime_helpers.dart';
+import 'app_controller_desktop_thread_sessions_collaboration_impl.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 extension AppControllerDesktopThreadSessions on AppController {
@@ -430,293 +431,45 @@ extension AppControllerDesktopThreadSessions on AppController {
 
   String get assistantConnectionStatusLabel =>
       currentAssistantConnectionState.primaryLabel;
+  String get assistantConnectionTargetLabel =>
+      currentAssistantConnectionState.detailLabel;
 
-  String get assistantConnectionTargetLabel {
-    return currentAssistantConnectionState.detailLabel;
-  }
-
-  Future<String> loadAiGatewayApiKey() async {
-    return (await storeInternal.loadAiGatewayApiKey())?.trim() ?? '';
-  }
-
-  Future<void> saveMultiAgentConfig(MultiAgentConfig config) async {
-    final resolved = resolveMultiAgentConfigInternal(
-      settings.copyWith(multiAgent: config),
-    );
-    await AppControllerDesktopSettings(this).saveSettings(
-      settings.copyWith(multiAgent: resolved),
-      refreshAfterSave: false,
-    );
-    await refreshMultiAgentMounts(sync: resolved.autoSync);
-  }
-
-  Future<void> refreshMultiAgentMounts({bool sync = false}) async {
-    await refreshAcpCapabilitiesInternal(persistMountTargets: true);
-  }
-
+  Future<String> loadAiGatewayApiKey() =>
+      loadAiGatewayApiKeyThreadSessionInternal(this);
+  Future<void> saveMultiAgentConfig(MultiAgentConfig config) =>
+      saveMultiAgentConfigThreadSessionInternal(this, config);
+  Future<void> refreshMultiAgentMounts({bool sync = false}) =>
+      refreshMultiAgentMountsThreadSessionInternal(this, sync: sync);
   Future<void> runMultiAgentCollaboration({
     required String rawPrompt,
     required String composedPrompt,
     required List<CollaborationAttachment> attachments,
     required List<String> selectedSkillLabels,
-  }) async {
-    final sessionKey = currentSessionKey.trim().isEmpty
-        ? 'main'
-        : currentSessionKey;
-    await enqueueThreadTurnInternal<void>(sessionKey, () async {
-      final aiGatewayApiKey = await loadAiGatewayApiKey();
-      multiAgentRunPendingInternal = true;
-      appendLocalSessionMessageInternal(
-        sessionKey,
-        GatewayChatMessage(
-          id: nextLocalMessageIdInternal(),
-          role: 'user',
-          text: rawPrompt,
-          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          toolCallId: null,
-          toolName: null,
-          stopReason: null,
-          pending: false,
-          error: false,
-        ),
-      );
-      recomputeTasksInternal();
-      try {
-        final taskStream = gatewayAcpClientInternal.runMultiAgent(
-          GatewayAcpMultiAgentRequest(
-            sessionId: sessionKey,
-            threadId: sessionKey,
-            prompt: composedPrompt,
-            workingDirectory:
-                assistantWorkingDirectoryForSessionInternal(sessionKey) ??
-                Directory.current.path,
-            attachments: attachments,
-            selectedSkills: selectedSkillLabels,
-            aiGatewayBaseUrl: aiGatewayUrl,
-            aiGatewayApiKey: aiGatewayApiKey,
-            resumeSession: true,
-          ),
-        );
-        await for (final event in taskStream) {
-          if (event.type == 'result') {
-            final success = event.data['success'] == true;
-            final finalScore = event.data['finalScore'];
-            final iterations = event.data['iterations'];
-            appendLocalSessionMessageInternal(
-              sessionKey,
-              GatewayChatMessage(
-                id: nextLocalMessageIdInternal(),
-                role: 'assistant',
-                text: success
-                    ? appText(
-                        '多 Agent 协作完成，评分 ${finalScore ?? '-'}，迭代 ${iterations ?? 0} 次。',
-                        'Multi-agent collaboration completed with score ${finalScore ?? '-'} after ${iterations ?? 0} iteration(s).',
-                      )
-                    : appText(
-                        '多 Agent 协作失败：${event.data['error'] ?? event.message}',
-                        'Multi-agent collaboration failed: ${event.data['error'] ?? event.message}',
-                      ),
-                timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-                toolCallId: null,
-                toolName: null,
-                stopReason: null,
-                pending: false,
-                error: !success,
-              ),
-            );
-            continue;
-          }
-          appendLocalSessionMessageInternal(
-            sessionKey,
-            GatewayChatMessage(
-              id: nextLocalMessageIdInternal(),
-              role: 'assistant',
-              text: event.message,
-              timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-              toolCallId: null,
-              toolName: event.title,
-              stopReason: null,
-              pending: event.pending,
-              error: event.error,
-            ),
-          );
-        }
-      } on GatewayAcpException catch (error) {
-        appendLocalSessionMessageInternal(
-          sessionKey,
-          GatewayChatMessage(
-            id: nextLocalMessageIdInternal(),
-            role: 'assistant',
-            text: appText(
-              '多 Agent 协作不可用（Gateway ACP）：${error.message}',
-              'Multi-agent collaboration is unavailable (Gateway ACP): ${error.message}',
-            ),
-            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-            toolCallId: null,
-            toolName: 'Multi-Agent',
-            stopReason: null,
-            pending: false,
-            error: true,
-          ),
-        );
-      } catch (error) {
-        appendLocalSessionMessageInternal(
-          sessionKey,
-          GatewayChatMessage(
-            id: nextLocalMessageIdInternal(),
-            role: 'assistant',
-            text: error.toString(),
-            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-            toolCallId: null,
-            toolName: 'Multi-Agent',
-            stopReason: null,
-            pending: false,
-            error: true,
-          ),
-        );
-      } finally {
-        multiAgentRunPendingInternal = false;
-        recomputeTasksInternal();
-        notifyIfActiveInternal();
-      }
-    });
-  }
-
-  Future<void> openOnlineWorkspace() async {
-    const url = 'https://www.svc.plus/Xworkmate';
-    try {
-      if (Platform.isMacOS) {
-        await Process.run('open', [url]);
-        return;
-      }
-      if (Platform.isWindows) {
-        await Process.run('cmd', ['/c', 'start', '', url]);
-        return;
-      }
-      if (Platform.isLinux) {
-        await Process.run('xdg-open', [url]);
-      }
-    } catch (_) {
-      // Best effort only. Do not surface a blocking error from a convenience link.
-    }
-  }
-
-  List<String> get aiGatewayModelChoices {
-    return aiGatewayConversationModelChoices;
-  }
-
-  List<String> get connectedGatewayModelChoices {
-    if (connection.status != RuntimeConnectionStatus.connected) {
-      return const <String>[];
-    }
-    return modelsControllerInternal.items
-        .map((item) => item.id.trim())
-        .where((item) => item.isNotEmpty)
-        .toList(growable: false);
-  }
-
-  List<String> get assistantModelChoices {
-    return assistantModelChoicesForSessionInternal(currentSessionKey);
-  }
-
-  List<String> assistantModelChoicesForSessionInternal(String sessionKey) {
-    final target = assistantExecutionTargetForSession(sessionKey);
-    if (target == AssistantExecutionTarget.singleAgent) {
-      if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
-        return aiGatewayConversationModelChoices;
-      }
-      final selectedModel =
-          assistantThreadRecordsInternal[normalizedAssistantSessionKeyInternal(
-                sessionKey,
-              )]
-              ?.assistantModelId
-              .trim();
-      if (selectedModel?.isNotEmpty == true) {
-        return <String>[selectedModel!];
-      }
-      return const <String>[];
-    }
-    final runtimeModels = connectedGatewayModelChoices;
-    if (runtimeModels.isNotEmpty) {
-      return runtimeModels;
-    }
-    final resolved = resolvedDefaultModel.trim();
-    if (resolved.isNotEmpty) {
-      return <String>[resolved];
-    }
-    final localDefault = settings.ollamaLocal.defaultModel.trim();
-    if (localDefault.isNotEmpty) {
-      return <String>[localDefault];
-    }
-    return const <String>[];
-  }
-
-  String get resolvedDefaultModel {
-    final current = settings.defaultModel.trim();
-    if (current.isNotEmpty) {
-      return current;
-    }
-    final localDefault = settings.ollamaLocal.defaultModel.trim();
-    if (localDefault.isNotEmpty) {
-      return localDefault;
-    }
-    final runtimeModels = connectedGatewayModelChoices;
-    if (runtimeModels.isNotEmpty) {
-      return runtimeModels.first;
-    }
-    final aiGatewayChoices = aiGatewayConversationModelChoices;
-    if (aiGatewayChoices.isNotEmpty) {
-      return aiGatewayChoices.first;
-    }
-    return '';
-  }
-
-  bool get canQuickConnectGateway {
-    final target = currentAssistantExecutionTarget;
-    if (target == AssistantExecutionTarget.singleAgent) {
-      return false;
-    }
-    final profile = gatewayProfileForAssistantExecutionTargetInternal(target);
-    if (profile.useSetupCode && profile.setupCode.trim().isNotEmpty) {
-      return true;
-    }
-    final host = profile.host.trim();
-    if (host.isEmpty || profile.port <= 0) {
-      return false;
-    }
-    if (profile.mode == RuntimeConnectionMode.local) {
-      return true;
-    }
-    final defaults = switch (target) {
-      AssistantExecutionTarget.singleAgent =>
-        GatewayConnectionProfile.emptySlot(index: kGatewayRemoteProfileIndex),
-      AssistantExecutionTarget.local =>
-        GatewayConnectionProfile.defaultsLocal(),
-      AssistantExecutionTarget.remote =>
-        GatewayConnectionProfile.defaultsRemote(),
-    };
-    return hasStoredGatewayCredential ||
-        host != defaults.host ||
-        profile.port != defaults.port ||
-        profile.tls != defaults.tls ||
-        profile.mode != defaults.mode;
-  }
-
-  String joinConnectionPartsInternal(List<String> parts) {
-    final normalized = parts
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toList(growable: false);
-    return normalized.join(' · ');
-  }
-
-  String gatewayAddressLabelInternal(GatewayConnectionProfile profile) {
-    final host = profile.host.trim();
-    if (host.isEmpty || profile.port <= 0) {
-      return appText('未连接目标', 'No target');
-    }
-    return '$host:${profile.port}';
-  }
+  }) => runMultiAgentCollaborationThreadSessionInternal(
+    this,
+    rawPrompt: rawPrompt,
+    composedPrompt: composedPrompt,
+    attachments: attachments,
+    selectedSkillLabels: selectedSkillLabels,
+  );
+  Future<void> openOnlineWorkspace() =>
+      openOnlineWorkspaceThreadSessionInternal(this);
+  List<String> get aiGatewayModelChoices =>
+      aiGatewayModelChoicesThreadSessionInternal(this);
+  List<String> get connectedGatewayModelChoices =>
+      connectedGatewayModelChoicesThreadSessionInternal(this);
+  List<String> get assistantModelChoices =>
+      assistantModelChoicesThreadSessionInternal(this);
+  List<String> assistantModelChoicesForSessionInternal(String sessionKey) =>
+      assistantModelChoicesForSessionThreadSessionInternal(this, sessionKey);
+  String get resolvedDefaultModel =>
+      resolvedDefaultModelThreadSessionInternal(this);
+  bool get canQuickConnectGateway =>
+      canQuickConnectGatewayThreadSessionInternal(this);
+  String joinConnectionPartsInternal(List<String> parts) =>
+      joinConnectionPartsThreadSessionInternal(parts);
+  String gatewayAddressLabelInternal(GatewayConnectionProfile profile) =>
+      gatewayAddressLabelThreadSessionInternal(profile);
 
   List<SecretReferenceEntry> get secretReferences =>
       settingsControllerInternal.buildSecretReferences();
