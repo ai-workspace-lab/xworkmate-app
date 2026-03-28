@@ -17,3 +17,12 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/runtime/single_agent_runner.dart';
 
 part 'app_controller_ai_gateway_chat_suite_core.part.dart';
+part 'app_controller_ai_gateway_chat_suite_chat.part.dart';
+part 'app_controller_ai_gateway_chat_suite_single_agent.part.dart';
+part 'app_controller_ai_gateway_chat_suite_fakes.part.dart';
+part 'app_controller_ai_gateway_chat_suite_fixtures.part.dart';
+
+void main() {
+  _registerAppControllerAiGatewayChatSuiteChatTests();
+  _registerAppControllerAiGatewayChatSuiteSingleAgentTests();
+}
