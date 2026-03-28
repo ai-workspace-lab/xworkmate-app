@@ -16,6 +16,10 @@
 This section defines the reusable refactor workflow for this repo.
 When trigger conditions are met, the workflow is executed by default without additional confirmation prompts.
 
+Normative source:
+- Use this section as the single enforcement source for refactor execution rules.
+- ADR documents only record decision background and must not introduce conflicting rules.
+
 ### Workflow Composition
 
 The standard combines:

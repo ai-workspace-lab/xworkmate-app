@@ -17,16 +17,20 @@ void main() {
       // Baseline cap for legacy oversized closure; tighten after T3.
       'lib/runtime/gateway_runtime_core.dart': 950,
       'lib/runtime/gateway_runtime_helpers.dart': 800,
-      // Baseline cap for legacy oversized closure; tighten after T3.
-      'lib/runtime/runtime_controllers_settings.dart': 960,
+      // Tightened after T3 closure convergence.
+      'lib/runtime/runtime_controllers_settings.dart': 800,
       'lib/features/settings/settings_page_gateway.dart': 800,
       'test/runtime/app_controller_assistant_flow_suite.dart': 800,
       'test/runtime/app_controller_thread_skills_suite.dart': 800,
 
-      // Tightened in T2 after assistant/composer closure split.
-      'lib/features/assistant/assistant_page_main.dart': 2200,
-      'lib/app/app_controller_desktop_runtime_helpers.dart': 950,
-      'lib/app/app_controller_desktop_thread_sessions.dart': 1050,
+      // Tightened in T2/T3 after assistant + app/runtime closure split.
+      'lib/features/assistant/assistant_page_main.dart': 1000,
+      'lib/app/app_controller_desktop_runtime_helpers.dart': 800,
+      'lib/app/app_controller_desktop_thread_sessions.dart': 800,
+      'lib/app/app_controller_desktop_runtime_coordination_impl.dart': 800,
+      'lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart':
+          800,
+      'lib/runtime/runtime_controllers_settings_connectivity_impl.dart': 800,
     };
     final violations = <String>[];
     for (final entry in targets.entries) {
