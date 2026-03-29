@@ -332,11 +332,21 @@ extension SettingsPageGatewayConnectionMixinInternal
   ) {
     final hasStoredVaultToken =
         controller.settingsController.secureRefs['vault_token'] != null;
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          appText(
+            '这里维护 Vault K/V 接入的服务地址与 root token。URL 进入设置草稿；root token 只会进入安全存储，不会写入普通 settings 持久层。',
+            'Manage the Vault K/V endpoint and root token here. The URL stays in the settings draft, while the root token is persisted only through secure storage.',
+          ),
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 16),
         EditableFieldInternal(
-          label: appText('地址', 'Address'),
+          fieldKey: const ValueKey('vault-server-url-field'),
+          label: 'VAULT_SERVER_URL',
           value: settings.vault.address,
           onSubmitted: (value) => saveSettingsInternal(
             controller,
@@ -344,33 +354,34 @@ extension SettingsPageGatewayConnectionMixinInternal
           ),
         ),
         EditableFieldInternal(
-          label: appText('命名空间', 'Namespace'),
+          fieldKey: const ValueKey('vault-namespace-field'),
+          label: appText('Namespace（可选）', 'Namespace (optional)'),
           value: settings.vault.namespace,
           onSubmitted: (value) => saveSettingsInternal(
             controller,
             settings.copyWith(vault: settings.vault.copyWith(namespace: value)),
           ),
         ),
-        EditableFieldInternal(
-          label: appText('认证模式', 'Auth Mode'),
-          value: settings.vault.authMode,
-          onSubmitted: (value) => saveSettingsInternal(
-            controller,
-            settings.copyWith(vault: settings.vault.copyWith(authMode: value)),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.only(bottom: 14),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(16),
           ),
-        ),
-        EditableFieldInternal(
-          label: appText('Token 引用', 'Token Ref'),
-          value: settings.vault.tokenRef,
-          onSubmitted: (value) => saveSettingsInternal(
-            controller,
-            settings.copyWith(vault: settings.vault.copyWith(tokenRef: value)),
+          child: Text(
+            appText(
+              '当前固定使用 token 模式，安全引用保持为 vault_token。',
+              'The current integration uses token auth, with the secure reference fixed to vault_token.',
+            ),
+            style: theme.textTheme.bodySmall,
           ),
         ),
         buildSecureFieldInternal(
+          fieldKey: const ValueKey('vault-root-access-token-field'),
           controller: vaultTokenControllerInternal,
-          label:
-              '${appText('Vault Token', 'Vault Token')} (${settings.vault.tokenRef})',
+          label: 'VAULT_SERVER_ROOT_ACCESS_TOKEN (${settings.vault.tokenRef})',
           hasStoredValue: hasStoredVaultToken,
           fieldState: vaultTokenStateInternal,
           onStateChanged: (value) =>
@@ -378,12 +389,12 @@ extension SettingsPageGatewayConnectionMixinInternal
           loadValue: controller.settingsController.loadVaultToken,
           onSubmitted: (value) async => controller.saveVaultTokenDraft(value),
           storedHelperText: appText(
-            '已安全保存，默认以 **** 显示，点击查看后读取真实值。',
-            'Stored securely. Shows as **** until you reveal it.',
+            '已安全保存；Vault root token 只会在测试连接或显式保存时使用。',
+            'Stored securely. The Vault root token is only used for test/apply flows.',
           ),
           emptyHelperText: appText(
-            '输入后先进入草稿；保存后才会写入安全存储。',
-            'Values stage into draft first and only persist to secure storage after Save.',
+            '输入后先进入草稿；点击 Save / Apply 后才会写入安全存储。',
+            'Values stage into draft first and only persist to secure storage after Save / Apply.',
           ),
         ),
         const SizedBox(height: 12),

@@ -30,11 +30,13 @@ import 'settings_page_device.dart';
 class EditableFieldInternal extends StatefulWidget {
   const EditableFieldInternal({
     super.key,
+    this.fieldKey,
     required this.label,
     required this.value,
     required this.onSubmitted,
   });
 
+  final Key? fieldKey;
   final String label;
   final String value;
   final ValueChanged<String> onSubmitted;
@@ -76,7 +78,7 @@ class EditableFieldStateInternal extends State<EditableFieldInternal> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: TextFormField(
-        key: ValueKey('${widget.label}:${widget.value}'),
+        key: widget.fieldKey ?? ValueKey('${widget.label}:${widget.value}'),
         controller: controllerInternal,
         decoration: InputDecoration(labelText: widget.label),
         onChanged: widget.onSubmitted,
