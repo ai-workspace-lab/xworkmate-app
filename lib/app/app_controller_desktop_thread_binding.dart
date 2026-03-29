@@ -58,8 +58,9 @@ extension AppControllerDesktopThreadBinding on AppController {
     }
     final threadWorkspace =
         '${trimTrailingPathSeparatorInternal(baseWorkspace)}/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
-    ensureLocalWorkspaceDirectoryInternal(threadWorkspace);
-    return threadWorkspace;
+    return ensureLocalWorkspaceDirectoryInternal(threadWorkspace)
+        ? threadWorkspace
+        : '';
   }
 
   String remoteThreadWorkspacePathInternal(
@@ -93,16 +94,17 @@ extension AppControllerDesktopThreadBinding on AppController {
     return path;
   }
 
-  void ensureLocalWorkspaceDirectoryInternal(String path) {
+  bool ensureLocalWorkspaceDirectoryInternal(String path) {
     final normalizedPath = path.trim();
     if (normalizedPath.isEmpty) {
-      return;
+      return false;
     }
     try {
       Directory(normalizedPath).createSync(recursive: true);
     } catch (_) {
       // Best effort only. The caller can still decide whether to fail fast.
     }
+    return Directory(normalizedPath).existsSync();
   }
 
   ThreadOwnerScope desktopThreadOwnerScopeFromIdentityInternal(
@@ -141,10 +143,13 @@ extension AppControllerDesktopThreadBinding on AppController {
       if (existingBinding != null &&
           existingBinding.workspacePath.trim().isNotEmpty) {
         if (existingBinding.workspaceKind == WorkspaceKind.localFs) {
-          ensureLocalWorkspaceDirectoryInternal(existingBinding.workspacePath);
-          return existingBinding.copyWith(
-            displayPath: existingBinding.workspacePath,
-          );
+          if (ensureLocalWorkspaceDirectoryInternal(
+            existingBinding.workspacePath,
+          )) {
+            return existingBinding.copyWith(
+              displayPath: existingBinding.workspacePath,
+            );
+          }
         }
         final defaultRemotePath = remoteThreadWorkspacePathInternal(
           sessionKey,
@@ -205,8 +210,7 @@ extension AppControllerDesktopThreadBinding on AppController {
           executionMode: switch (executionTarget) {
             AssistantExecutionTarget.singleAgent =>
               ThreadExecutionMode.localAgent,
-            AssistantExecutionTarget.local =>
-              ThreadExecutionMode.gatewayLocal,
+            AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
             AssistantExecutionTarget.remote =>
               ThreadExecutionMode.gatewayRemote,
           },
@@ -249,14 +253,15 @@ extension AppControllerDesktopThreadBinding on AppController {
             existing?.singleAgentProvider ?? SingleAgentProvider.auto,
         existingBinding: existing?.executionBinding,
       ),
-      lifecycleState: (existing?.lifecycleState ??
-              const ThreadLifecycleState(
-                archived: false,
-                status: 'ready',
-                lastRunAtMs: null,
-                lastResultCode: null,
-              ))
-          .copyWith(status: lifecycleStatus),
+      lifecycleState:
+          (existing?.lifecycleState ??
+                  const ThreadLifecycleState(
+                    archived: false,
+                    status: 'ready',
+                    lastRunAtMs: null,
+                    lastResultCode: null,
+                  ))
+              .copyWith(status: lifecycleStatus),
       executionTarget: resolvedExecutionTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
