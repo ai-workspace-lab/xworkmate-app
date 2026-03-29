@@ -31,6 +31,7 @@ void main() {
             onOpenThemeToggle: () {},
             accountName: 'Tester',
             accountSubtitle: 'Workspace',
+            onToggleAccountWorkspaceFollowed: () async {},
           ),
         ),
       ),
@@ -51,6 +52,7 @@ void main() {
     var themeToggled = 0;
     var sidebarCycled = 0;
     var accountOpened = 0;
+    var workspaceFollowToggled = 0;
     var favoriteToggled = 0;
 
     await tester.pumpWidget(
@@ -71,6 +73,9 @@ void main() {
             onOpenThemeToggle: () => themeToggled++,
             accountName: 'Tester',
             accountSubtitle: 'Workspace',
+            onToggleAccountWorkspaceFollowed: () async {
+              workspaceFollowToggled++;
+            },
             favoriteDestinations: const <AssistantFocusEntry>{
               AssistantFocusEntry.skills,
             },
@@ -113,6 +118,12 @@ void main() {
     await tester.tap(find.text('Tester'));
     await tester.pumpAndSettle();
     expect(accountOpened, 1);
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('sidebar-account-follow')),
+    );
+    await tester.pumpAndSettle();
+    expect(workspaceFollowToggled, 1);
   });
 
   testWidgets('SidebarNavigation toggles footer quick action favorites', (
@@ -138,6 +149,7 @@ void main() {
             onOpenThemeToggle: () {},
             accountName: 'Tester',
             accountSubtitle: 'Workspace',
+            onToggleAccountWorkspaceFollowed: () async {},
             favoriteDestinations: const <AssistantFocusEntry>{
               AssistantFocusEntry.language,
             },
@@ -187,6 +199,7 @@ void main() {
               onOpenThemeToggle: () {},
               accountName: 'Tester',
               accountSubtitle: 'Workspace',
+              onToggleAccountWorkspaceFollowed: () async {},
             ),
           ),
         ),
@@ -225,6 +238,7 @@ void main() {
             onOpenThemeToggle: () {},
             accountName: 'Tester',
             accountSubtitle: 'Workspace',
+            onToggleAccountWorkspaceFollowed: () async {},
           ),
         ),
       ),

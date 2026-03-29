@@ -22,6 +22,8 @@ class SidebarNavigation extends StatelessWidget {
     this.onOpenHome,
     required this.accountName,
     required this.accountSubtitle,
+    this.accountWorkspaceFollowed = false,
+    this.onToggleAccountWorkspaceFollowed,
     this.onOpenOnlineWorkspace,
     this.expandedWidthOverride,
     this.marginOverride,
@@ -44,6 +46,8 @@ class SidebarNavigation extends StatelessWidget {
   final VoidCallback? onOpenHome;
   final String accountName;
   final String accountSubtitle;
+  final bool accountWorkspaceFollowed;
+  final Future<void> Function()? onToggleAccountWorkspaceFollowed;
   final VoidCallback? onOpenOnlineWorkspace;
   final double? expandedWidthOverride;
   final EdgeInsetsGeometry? marginOverride;
@@ -184,6 +188,9 @@ class SidebarNavigation extends StatelessWidget {
                         ),
                     accountName: accountName,
                     accountSubtitle: accountSubtitle,
+                    accountWorkspaceFollowed: accountWorkspaceFollowed,
+                    onToggleAccountWorkspaceFollowed:
+                        onToggleAccountWorkspaceFollowed,
                     accountSelected:
                         currentSection == WorkspaceDestination.account,
                     showCollapseControl: showCollapseControl,
@@ -579,8 +586,10 @@ class SidebarFooter extends StatelessWidget {
     required this.showAccountButton,
     required this.accountName,
     required this.accountSubtitle,
+    required this.accountWorkspaceFollowed,
     required this.accountSelected,
     required this.showCollapseControl,
+    this.onToggleAccountWorkspaceFollowed,
     this.onOpenOnlineWorkspace,
   });
 
@@ -600,8 +609,10 @@ class SidebarFooter extends StatelessWidget {
   final bool showAccountButton;
   final String accountName;
   final String accountSubtitle;
+  final bool accountWorkspaceFollowed;
   final bool accountSelected;
   final bool showCollapseControl;
+  final Future<void> Function()? onToggleAccountWorkspaceFollowed;
   final VoidCallback? onOpenOnlineWorkspace;
 
   @override
@@ -677,6 +688,8 @@ class SidebarFooter extends StatelessWidget {
               onTap: onOpenAccount,
               name: accountName,
               subtitle: accountSubtitle,
+              workspaceFollowed: accountWorkspaceFollowed,
+              onToggleWorkspaceFollowed: onToggleAccountWorkspaceFollowed,
               onlineActionLabel: appText('在线版', 'Online'),
               onOpenOnlineWorkspace: onOpenOnlineWorkspace,
             ),
@@ -757,6 +770,8 @@ class SidebarFooter extends StatelessWidget {
             onTap: onOpenAccount,
             name: accountName,
             subtitle: accountSubtitle,
+            workspaceFollowed: accountWorkspaceFollowed,
+            onToggleWorkspaceFollowed: onToggleAccountWorkspaceFollowed,
             onlineActionLabel: appText('在线版', 'Online'),
             onOpenOnlineWorkspace: onOpenOnlineWorkspace,
           ),
@@ -789,6 +804,8 @@ class _SidebarAccountTile extends StatefulWidget {
     required this.onTap,
     required this.name,
     required this.subtitle,
+    required this.workspaceFollowed,
+    this.onToggleWorkspaceFollowed,
     this.onlineActionLabel,
     this.onOpenOnlineWorkspace,
   });
@@ -797,6 +814,8 @@ class _SidebarAccountTile extends StatefulWidget {
   final VoidCallback onTap;
   final String name;
   final String subtitle;
+  final bool workspaceFollowed;
+  final Future<void> Function()? onToggleWorkspaceFollowed;
   final String? onlineActionLabel;
   final VoidCallback? onOpenOnlineWorkspace;
 
@@ -819,12 +838,105 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
         ? 'X'
         : widget.name.trim().substring(0, 1).toUpperCase();
     final statusLabel = _statusLabel();
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Align(
-        alignment: Alignment.centerLeft,
+    final List<PopupMenuEntry<_AccountMenuAction>> accountMenuItems =
+        <PopupMenuEntry<_AccountMenuAction>>[];
+    accountMenuItems.addAll([
+      PopupMenuItem<_AccountMenuAction>(
+        enabled: false,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 220),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: palette.accentMuted,
+                    child: Text(
+                      initial,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          widget.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        _AccountStatusBadge(label: statusLabel),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: palette.chromeSurface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: palette.strokeSoft),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.subtitle.trim().isEmpty
+                            ? appText('体验版', 'Preview')
+                            : widget.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _AccountUpgradePill(label: appText('升级', 'Upgrade')),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      PopupMenuItem<_AccountMenuAction>(
+        value: _AccountMenuAction.account,
+        child: _AccountMenuItemRow(
+          icon: Icons.person_outline_rounded,
+          label: appText('打开账号页', 'Open account'),
+        ),
+      ),
+    ]);
+    if (widget.onOpenOnlineWorkspace != null &&
+        widget.onlineActionLabel != null) {
+      accountMenuItems.add(
+        PopupMenuItem<_AccountMenuAction>(
+          value: _AccountMenuAction.online,
+          child: _AccountMenuItemRow(
+            icon: Icons.open_in_new_rounded,
+            label: widget.onlineActionLabel!,
+          ),
+        ),
+      );
+    }
+    final tileChildren = <Widget>[
+      Expanded(
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           decoration: BoxDecoration(
@@ -849,186 +961,108 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
                     borderRadius: BorderRadius.circular(18),
                     side: BorderSide(color: palette.chromeStroke),
                   ),
-                  textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: palette.textPrimary,
-                  ),
+                  textStyle: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: palette.textPrimary),
                 ),
               ),
-              child: PopupMenuButton<_AccountMenuAction>(
-                tooltip: '',
-                padding: EdgeInsets.zero,
-                position: PopupMenuPosition.under,
-                offset: const Offset(0, 8),
-                elevation: 10,
-                splashRadius: 20,
-                onSelected: (action) {
-                  switch (action) {
-                    case _AccountMenuAction.account:
-                      widget.onTap();
-                    case _AccountMenuAction.online:
-                      widget.onOpenOnlineWorkspace?.call();
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem<_AccountMenuAction>(
-                    enabled: false,
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minWidth: 220),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 22,
-                                backgroundColor: palette.accentMuted,
-                                child: Text(
-                                  initial,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      widget.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleLarge
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    _AccountStatusBadge(label: statusLabel),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 12,
-                            ),
-                            decoration: BoxDecoration(
-                              color: palette.chromeSurface,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: palette.strokeSoft),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    widget.subtitle.trim().isEmpty
-                                        ? appText('体验版', 'Preview')
-                                        : widget.subtitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                _AccountUpgradePill(
-                                  label: appText('升级', 'Upgrade'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.button),
+                onTap: widget.onTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs,
+                    vertical: 8,
                   ),
-                  PopupMenuItem<_AccountMenuAction>(
-                    value: _AccountMenuAction.account,
-                    child: _AccountMenuItemRow(
-                      icon: Icons.person_outline_rounded,
-                      label: appText('打开账号页', 'Open account'),
-                    ),
-                  ),
-                  if (widget.onOpenOnlineWorkspace != null &&
-                      widget.onlineActionLabel != null)
-                    PopupMenuItem<_AccountMenuAction>(
-                      value: _AccountMenuAction.online,
-                      child: _AccountMenuItemRow(
-                        icon: Icons.open_in_new_rounded,
-                        label: widget.onlineActionLabel!,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.max,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 14,
+                        backgroundColor: palette.accentMuted,
+                        child: Text(initial),
                       ),
-                    ),
-                ],
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(AppRadius.button),
-                  onTap: null,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xs,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.max,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        CircleAvatar(
-                          radius: 14,
-                          backgroundColor: palette.accentMuted,
-                          child: Text(initial),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.subtitle.trim().isEmpty
+                                  ? statusLabel
+                                  : widget.subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                widget.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.labelLarge,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                widget.subtitle.trim().isEmpty
-                                    ? statusLabel
-                                    : widget.subtitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
+                      ),
+                      const SizedBox(width: 4),
+                      PopupMenuButton<_AccountMenuAction>(
+                        tooltip: appText('更多操作', 'More actions'),
+                        padding: EdgeInsets.zero,
+                        position: PopupMenuPosition.under,
+                        offset: const Offset(0, 8),
+                        elevation: 10,
+                        splashRadius: 18,
+                        onSelected: (action) {
+                          if (action == _AccountMenuAction.account) {
+                            widget.onTap();
+                            return;
+                          }
+                          widget.onOpenOnlineWorkspace?.call();
+                        },
+                        itemBuilder: (context) => accountMenuItems,
+                        child: _AccountCircleActionButton(
+                          icon: Icons.unfold_more_rounded,
+                          tooltip: appText('更多操作', 'More actions'),
+                          iconColor: palette.textMuted,
                         ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.unfold_more_rounded,
-                          size: 18,
-                          color: palette.textMuted,
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
           ),
         ),
+      ),
+    ];
+    if (widget.onToggleWorkspaceFollowed != null) {
+      tileChildren.add(const SizedBox(width: AppSpacing.xs));
+      tileChildren.add(
+        _AccountCircleActionButton(
+          key: const ValueKey<String>('sidebar-account-follow'),
+          icon: widget.workspaceFollowed
+              ? Icons.star_rounded
+              : Icons.star_outline_rounded,
+          tooltip: widget.workspaceFollowed
+              ? appText('取消关注工作区', 'Unfollow workspace')
+              : appText('关注工作区', 'Follow workspace'),
+          selected: widget.workspaceFollowed,
+          onTap: () {
+            widget.onToggleWorkspaceFollowed?.call();
+          },
+        ),
+      );
+    }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Row(children: tileChildren),
       ),
     );
   }
@@ -1042,6 +1076,92 @@ class _SidebarAccountTileState extends State<_SidebarAccountTile> {
     return isLocalIdentity
         ? appText('未登录', 'Not signed in')
         : appText('已登录', 'Signed in');
+  }
+}
+
+class _AccountCircleActionButton extends StatefulWidget {
+  const _AccountCircleActionButton({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    this.iconColor,
+    this.selected = false,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final Color? iconColor;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  State<_AccountCircleActionButton> createState() =>
+      _AccountCircleActionButtonState();
+}
+
+class _AccountCircleActionButtonState
+    extends State<_AccountCircleActionButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final resolvedBackground = _hovered
+        ? palette.chromeSurfacePressed
+        : palette.chromeSurface;
+
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                palette.chromeHighlight.withValues(
+                  alpha: _hovered || widget.selected ? 0.96 : 0.88,
+                ),
+                resolvedBackground,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: widget.selected ? palette.accent : palette.chromeStroke,
+            ),
+            boxShadow: [
+              _hovered || widget.selected
+                  ? palette.chromeShadowLift
+                  : palette.chromeShadowAmbient,
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: widget.onTap,
+              child: Center(
+                child: Icon(
+                  widget.icon,
+                  size: 17,
+                  color:
+                      widget.iconColor ??
+                      (widget.selected
+                          ? palette.accent
+                          : palette.textSecondary),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

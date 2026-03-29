@@ -248,6 +248,10 @@ class _AppShellState extends State<AppShell> {
                                     .isEmpty
                                 ? appText('账号', 'Account')
                                 : controller.settings.accountWorkspace,
+                            accountWorkspaceFollowed:
+                                controller.settings.accountWorkspaceFollowed,
+                            onToggleAccountWorkspaceFollowed:
+                                controller.toggleAccountWorkspaceFollowed,
                             onOpenOnlineWorkspace:
                                 controller.openOnlineWorkspace,
                             expandedWidthOverride:

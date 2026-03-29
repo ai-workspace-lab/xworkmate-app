@@ -210,6 +210,19 @@ extension AppControllerWebWorkspace on AppController {
     await persistSettingsInternal();
   }
 
+  Future<void> toggleAccountWorkspaceFollowed() async {
+    settingsInternal = settingsInternal.copyWith(
+      accountWorkspaceFollowed: !settings.accountWorkspaceFollowed,
+    );
+    if (settingsDraftInitializedInternal) {
+      settingsDraftInternal = settingsDraft.copyWith(
+        accountWorkspaceFollowed: settingsInternal.accountWorkspaceFollowed,
+      );
+    }
+    notifyChangedInternal();
+    await persistSettingsInternal();
+  }
+
   Future<void> setThemeMode(ThemeMode mode) async {
     if (themeModeInternal == mode) {
       return;

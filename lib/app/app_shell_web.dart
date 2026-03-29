@@ -179,6 +179,10 @@ class _AppShellState extends State<AppShell> {
                                 .isNotEmpty
                             ? controller.settings.accountWorkspace
                             : appText('Web 工作区', 'Web workspace'),
+                        accountWorkspaceFollowed:
+                            controller.settings.accountWorkspaceFollowed,
+                        onToggleAccountWorkspaceFollowed:
+                            controller.toggleAccountWorkspaceFollowed,
                         expandedWidthOverride:
                             _sidebarState == AppSidebarState.expanded
                             ? expandedSidebarWidth
