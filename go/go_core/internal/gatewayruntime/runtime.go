@@ -597,6 +597,19 @@ func (s *session) handleEvent(
 	case "seqGap":
 		s.appendLog("warn", "sync", "sequence gap detected")
 	}
+	if normalized := normalizeChatRunEvent(event, payload); len(normalized) > 0 {
+		s.emitNotification(
+			"xworkmate.gateway.push",
+			map[string]any{
+				"runtimeId": s.runtimeID,
+				"event": map[string]any{
+					"event":    "chat.run",
+					"payload":  normalized,
+					"sequence": intValue(decoded["seq"]),
+				},
+			},
+		)
+	}
 	s.emitNotification(
 		"xworkmate.gateway.push",
 		map[string]any{

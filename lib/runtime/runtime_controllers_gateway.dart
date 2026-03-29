@@ -293,6 +293,10 @@ class GatewayChatController extends ChangeNotifier {
   }
 
   void handleEvent(GatewayPushEvent event) {
+    if (event.event == 'chat.run') {
+      handleChatRunEventInternal(asMap(event.payload));
+      return;
+    }
     if (event.event == 'chat') {
       handleChatEventInternal(asMap(event.payload));
       return;
@@ -310,7 +314,7 @@ class GatewayChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void handleChatEventInternal(Map<String, dynamic> payload) {
+  void handleChatRunEventInternal(Map<String, dynamic> payload) {
     final runId = stringValue(payload['runId']);
     final state = stringValue(payload['state']) ?? '';
     final incomingSessionKey =
@@ -321,18 +325,20 @@ class GatewayChatController extends ChangeNotifier {
       return;
     }
 
-    final message = asMap(payload['message']);
-    final role = (stringValue(message['role']) ?? '').toLowerCase();
-    final text = extractMessageText(message);
-    if (role == 'assistant' &&
-        text.isNotEmpty &&
+    final assistantText = stringValue(payload['assistantText']) ?? '';
+    if (assistantText.isNotEmpty &&
         (state == 'delta' || state == 'final')) {
-      streamingAssistantTextInternal = text;
+      streamingAssistantTextInternal = assistantText;
     }
     if (state == 'error') {
       errorInternal = stringValue(payload['errorMessage']) ?? 'Chat failed';
     }
-    if (state == 'final' || state == 'aborted' || state == 'error') {
+    final terminal =
+        boolValue(payload['terminal']) ?? false ||
+        state == 'final' ||
+        state == 'aborted' ||
+        state == 'error';
+    if (terminal) {
       if (runId != null) {
         pendingRunsInternal.remove(runId);
       } else {
@@ -345,6 +351,19 @@ class GatewayChatController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void handleChatEventInternal(Map<String, dynamic> payload) {
+    final message = asMap(payload['message']);
+    final role = (stringValue(message['role']) ?? '').toLowerCase();
+    handleChatRunEventInternal(<String, dynamic>{
+      'runId': payload['runId'],
+      'sessionKey': payload['sessionKey'],
+      'state': payload['state'],
+      if (role == 'assistant') 'assistantText': extractMessageText(message),
+      'errorMessage': payload['errorMessage'],
+      'terminal': false,
+    });
+  }
+
   void handleAgentEventInternal(Map<String, dynamic> payload) {
     final runId = stringValue(payload['runId']);
     if (runId == null || !pendingRunsInternal.contains(runId)) {
@@ -355,8 +374,14 @@ class GatewayChatController extends ChangeNotifier {
     if (stream == 'assistant') {
       final nextText = stringValue(data['text']) ?? extractMessageText(data);
       if (nextText.isNotEmpty) {
-        streamingAssistantTextInternal = nextText;
-        notifyListeners();
+        handleChatRunEventInternal(<String, dynamic>{
+          'runId': runId,
+          'sessionKey': payload['sessionKey'] ?? data['sessionKey'],
+          'state': 'delta',
+          'assistantText': nextText,
+          'source': 'agent',
+          'terminal': false,
+        });
       }
     }
   }
