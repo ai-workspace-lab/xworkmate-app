@@ -150,6 +150,77 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
     );
 
     test(
+      'AppController bootstraps the current thread workspace from execution context before single-agent send',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-single-agent-workspace-bootstrap-',
+        );
+        final workspaceRoot = Directory('${tempDirectory.path}/thread-workspace');
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(workspacePath: ''),
+        );
+        final client = FakeGoAgentCoreClientInternal(
+          capabilities: GoAgentCoreCapabilities(
+            singleAgent: true,
+            multiAgent: false,
+            providers: <SingleAgentProvider>{SingleAgentProvider.opencode},
+            raw: <String, dynamic>{},
+          ),
+          result: const GoAgentCoreRunResult(
+            success: true,
+            message: 'WORKSPACE_OK',
+            turnId: 'turn-1',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: 'codex-sonnet',
+          ),
+        );
+        final controller = await createAppControllerInternal(
+          store: store,
+          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+            SingleAgentProvider.opencode,
+          ],
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+          goAgentCoreClient: client,
+        );
+
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.singleAgent,
+        );
+        await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
+
+        final initialWorkspacePath = controller.assistantWorkspacePathForSession(
+          controller.currentSessionKey,
+        );
+        expect(initialWorkspacePath, isNot(workspaceRoot.path));
+
+        await controller.sendChatMessage(
+          'Execution context:\n'
+          '- target: single-agent\n'
+          '- workspace_root: ${workspaceRoot.path}\n'
+          '- permission: full-access\n\n'
+          '请输出 WORKSPACE_OK',
+          thinking: 'low',
+        );
+
+        expect(client.executeCalls, 1);
+        expect(client.lastRequest?.workingDirectory, workspaceRoot.path);
+        expect(await workspaceRoot.exists(), isTrue);
+        expect(
+          controller.assistantWorkspacePathForSession(
+            controller.currentSessionKey,
+          ),
+          workspaceRoot.path,
+        );
+      },
+    );
+
+    test(
       'AppController keeps the thread provider strict when another external CLI is available',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
