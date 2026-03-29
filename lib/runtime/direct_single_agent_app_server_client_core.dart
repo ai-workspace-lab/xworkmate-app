@@ -107,13 +107,11 @@ class DirectSingleAgentAppServerClient {
       return transport.rest!.run(
         request,
         base: transport.endpoint,
-        workspaceRefKind: transport.workspaceRefKind,
       );
     }
     return transport.websocket!.run(
       request,
       endpoint: transport.endpoint,
-      workspaceRefKind: transport.workspaceRefKind,
     );
   }
 
@@ -160,9 +158,6 @@ class DirectSingleAgentAppServerClient {
         return ResolvedSingleAgentTransportInternal(
           kind: cachedKind,
           endpoint: cachedEndpoint,
-          workspaceRefKind: workspaceRefKindForEndpointModeInternal(
-            descriptor.mode,
-          ),
           websocket:
               cachedKind ==
                   DirectSingleAgentTransportKindInternal.websocketAppServer
@@ -189,9 +184,6 @@ class DirectSingleAgentAppServerClient {
       return ResolvedSingleAgentTransportInternal(
         kind: DirectSingleAgentTransportKindInternal.websocketAppServer,
         endpoint: endpoint,
-        workspaceRefKind: workspaceRefKindForEndpointModeInternal(
-          descriptor.mode,
-        ),
         websocket: webSocketTransportInternal,
       );
     }
@@ -206,9 +198,6 @@ class DirectSingleAgentAppServerClient {
         return ResolvedSingleAgentTransportInternal(
           kind: DirectSingleAgentTransportKindInternal.restSessionApi,
           endpoint: base,
-          workspaceRefKind: workspaceRefKindForEndpointModeInternal(
-            descriptor.mode,
-          ),
           rest: restTransportInternal,
         );
       } catch (_) {
@@ -223,9 +212,6 @@ class DirectSingleAgentAppServerClient {
         return ResolvedSingleAgentTransportInternal(
           kind: DirectSingleAgentTransportKindInternal.websocketAppServer,
           endpoint: websocket,
-          workspaceRefKind: workspaceRefKindForEndpointModeInternal(
-            descriptor.mode,
-          ),
           websocket: webSocketTransportInternal,
         );
       }

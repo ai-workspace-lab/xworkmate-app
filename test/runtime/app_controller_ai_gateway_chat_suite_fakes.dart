@@ -9,6 +9,7 @@ import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
+import 'package:xworkmate/runtime/go_agent_core_client.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
@@ -175,6 +176,89 @@ class FallbackOnlySingleAgentRunnerInternal
         resolvedProvider: null,
         fallbackReason: 'No supported external CLI provider is available.',
       );
+}
+
+class FakeGoAgentCoreClientInternal implements GoAgentCoreClient {
+  FakeGoAgentCoreClientInternal({
+    this.capabilities = const GoAgentCoreCapabilities.empty(),
+    this.result = const GoAgentCoreRunResult(
+      success: false,
+      message: '',
+      turnId: '',
+      raw: <String, dynamic>{},
+      errorMessage: 'no result configured',
+      resolvedModel: '',
+    ),
+  });
+
+  final GoAgentCoreCapabilities capabilities;
+  final GoAgentCoreRunResult result;
+
+  int capabilitiesCalls = 0;
+  int executeCalls = 0;
+  int cancelCalls = 0;
+  GoAgentCoreSessionRequest? lastRequest;
+  final List<GoAgentCoreSessionRequest> requests = <GoAgentCoreSessionRequest>[];
+
+  @override
+  Future<GoAgentCoreCapabilities> loadCapabilities({
+    required AssistantExecutionTarget target,
+    bool forceRefresh = false,
+  }) async {
+    capabilitiesCalls += 1;
+    return capabilities;
+  }
+
+  @override
+  Future<GoAgentCoreRunResult> executeSession(
+    GoAgentCoreSessionRequest request, {
+    required void Function(GoAgentCoreSessionUpdate update) onUpdate,
+  }) async {
+    executeCalls += 1;
+    lastRequest = request;
+    requests.add(request);
+    if (result.message.trim().isNotEmpty) {
+      onUpdate(
+        GoAgentCoreSessionUpdate(
+          sessionId: request.sessionId,
+          threadId: request.threadId,
+          turnId: result.turnId,
+          type: 'delta',
+          text: result.message,
+          message: '',
+          pending: false,
+          error: false,
+          payload: const <String, dynamic>{'type': 'delta'},
+        ),
+      );
+    }
+    return result;
+  }
+
+  @override
+  Future<void> cancelSession({
+    required AssistantExecutionTarget target,
+    required String sessionId,
+    required String threadId,
+  }) async {
+    cancelCalls += 1;
+  }
+
+  @override
+  Future<void> closeSession({
+    required AssistantExecutionTarget target,
+    required String sessionId,
+    required String threadId,
+  }) async {}
+
+  @override
+  Future<void> dispose() async {}
+}
+
+class FallbackOnlyGoAgentCoreClientInternal
+    extends FakeGoAgentCoreClientInternal {
+  FallbackOnlyGoAgentCoreClientInternal()
+    : super(capabilities: const GoAgentCoreCapabilities.empty());
 }
 
 class FakeAiGatewayServerInternal {

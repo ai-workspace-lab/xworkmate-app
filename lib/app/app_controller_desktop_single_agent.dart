@@ -28,6 +28,7 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
+import '../runtime/go_agent_core_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
@@ -82,20 +83,32 @@ extension AppControllerDesktopSingleAgent on AppController {
 
       try {
         final selection = singleAgentProviderForSession(sessionKey);
-        final selectedSkills = assistantSelectedSkillsForSession(sessionKey);
-        final gatewayToken = await settingsController.loadGatewayToken();
-        final resolution = await singleAgentRunnerInternal.resolveProvider(
-          selection: selection,
-          availableProviders: configuredSingleAgentProviders,
-          configuredCodexCliPath: configuredCodexCliPath,
-          gatewayToken: gatewayToken,
+        final capabilities = await goAgentCoreClientInternal.loadCapabilities(
+          target: AssistantExecutionTarget.singleAgent,
+          forceRefresh: true,
         );
-        final provider = resolution.resolvedProvider;
+        final availableProviders = configuredSingleAgentProviders
+            .where(capabilities.providers.contains)
+            .toList(growable: false);
+        final provider = selection == SingleAgentProvider.auto
+            ? (availableProviders.isEmpty ? null : availableProviders.first)
+            : (capabilities.providers.contains(selection) ? selection : null);
+        final fallbackReason = provider == null
+            ? (selection == SingleAgentProvider.auto
+                  ? appText(
+                      '当前没有可用的 Go Agent-core Provider。',
+                      'No Go Agent-core provider is currently available.',
+                    )
+                  : appText(
+                      '当前 Go Agent-core 不支持 ${selection.label}。',
+                      'Go Agent-core does not currently support ${selection.label}.',
+                    ))
+            : null;
         if (provider == null) {
           if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
             appendSingleAgentFallbackStatusMessageInternal(
               sessionKey,
-              resolution.fallbackReason,
+              fallbackReason,
             );
             await sendAiGatewayMessageInternal(
               message,
@@ -113,7 +126,7 @@ extension AppControllerDesktopSingleAgent on AppController {
                 role: 'assistant',
                 text: singleAgentUnavailableLabelInternal(
                   sessionKey,
-                  resolution.fallbackReason,
+                  fallbackReason,
                 ),
                 timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
                 toolCallId: null,
@@ -130,7 +143,6 @@ extension AppControllerDesktopSingleAgent on AppController {
         }
 
         appendSingleAgentRuntimeStatusMessageInternal(sessionKey, provider);
-        singleAgentExternalCliPendingSessionKeysInternal.add(sessionKey);
         final workingDirectory =
             resolveSingleAgentWorkingDirectoryForSessionInternal(
               sessionKey,
@@ -149,90 +161,59 @@ extension AppControllerDesktopSingleAgent on AppController {
           return;
         }
 
-        final result = await singleAgentRunnerInternal.run(
-          SingleAgentRunRequest(
+        final selectedSkills = assistantSelectedSkillsForSession(sessionKey)
+            .map((item) => item.label.trim().isNotEmpty ? item.label : item.key)
+            .where((item) => item.trim().isNotEmpty)
+            .toList(growable: false);
+        final result = await goAgentCoreClientInternal.executeSession(
+          GoAgentCoreSessionRequest(
             sessionId: sessionKey,
-            provider: provider,
+            threadId: sessionKey,
+            target: AssistantExecutionTarget.singleAgent,
             prompt: message,
-            model: assistantModelForSession(sessionKey),
-            gatewayToken: gatewayToken,
             workingDirectory: workingDirectory,
-            attachments: localAttachments,
+            model: assistantModelForSession(sessionKey),
+            thinking: thinking,
             selectedSkills: selectedSkills,
+            inlineAttachments: attachments,
+            localAttachments: localAttachments,
             aiGatewayBaseUrl: aiGatewayUrl,
             aiGatewayApiKey: await loadAiGatewayApiKey(),
-            config: settings.multiAgent,
-            onOutput: (text) =>
-                appendAiGatewayStreamingTextInternal(sessionKey, text),
-            configuredCodexCliPath: configuredCodexCliPath,
+            agentId: '',
+            metadata: const <String, dynamic>{},
+            provider: provider,
           ),
+          onUpdate: (update) {
+            if (update.isDelta) {
+              appendAiGatewayStreamingTextInternal(sessionKey, update.text);
+              notifyIfActiveInternal();
+            }
+          },
         );
-        final resolvedWorkingDirectory = result.resolvedWorkingDirectory.trim();
-        final resolvedWorkspaceRefKind = result.resolvedWorkspaceRefKind;
-        if (resolvedWorkingDirectory.isNotEmpty &&
-            resolvedWorkspaceRefKind == WorkspaceRefKind.remotePath &&
-            (assistantWorkspaceRefForSession(sessionKey) !=
-                    resolvedWorkingDirectory ||
-                assistantWorkspaceRefKindForSession(sessionKey) !=
-                    resolvedWorkspaceRefKind)) {
-          final existingRecord = assistantThreadRecordsInternal[sessionKey];
-          upsertTaskThreadInternal(
-            sessionKey,
-            workspaceBinding: (existingRecord?.workspaceBinding ??
-                    WorkspaceBinding(
-                      workspaceId: sessionKey,
-                      workspaceKind: WorkspaceKind.remoteFs,
-                      workspacePath: resolvedWorkingDirectory,
-                      displayPath: resolvedWorkingDirectory,
-                      writable: true,
-                    ))
-                .copyWith(
-                  workspaceKind: WorkspaceKind.remoteFs,
-                  workspacePath: resolvedWorkingDirectory,
-                  displayPath: resolvedWorkingDirectory,
-                ),
-            lifecycleState: (existingRecord?.lifecycleState ??
-                    const ThreadLifecycleState(
-                      archived: false,
-                      status: 'ready',
-                      lastRunAtMs: null,
-                      lastResultCode: null,
-                    ))
-                .copyWith(status: 'ready'),
-            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          );
-        }
         final resolvedRuntimeModel = result.resolvedModel.trim();
         if (resolvedRuntimeModel.isNotEmpty) {
           singleAgentRuntimeModelBySessionInternal[sessionKey] =
               resolvedRuntimeModel;
         }
-        clearAiGatewayStreamingTextInternal(sessionKey);
-        if (result.aborted) {
-          final partial = result.output.trim();
-          if (partial.isNotEmpty) {
-            appendAssistantThreadMessageInternal(
-              sessionKey,
-              GatewayChatMessage(
-                id: nextLocalMessageIdInternal(),
-                role: 'assistant',
-                text: partial,
-                timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-                toolCallId: null,
-                toolName: null,
-                stopReason: 'aborted',
-                pending: false,
-                error: false,
-              ),
-            );
-          }
-          return;
+        final resolvedWorkspaceKind = result.resolvedWorkspaceRefKind;
+        final resolvedWorkingDirectory = result.resolvedWorkingDirectory.trim();
+        if (resolvedWorkspaceKind != null &&
+            resolvedWorkingDirectory.isNotEmpty &&
+            resolvedWorkspaceKind != WorkspaceRefKind.localPath) {
+          upsertTaskThreadInternal(
+            sessionKey,
+            workspaceRef: resolvedWorkingDirectory,
+            workspaceRefKind: resolvedWorkspaceKind,
+            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          );
         }
-        if (result.shouldFallbackToAiChat) {
+        clearAiGatewayStreamingTextInternal(sessionKey);
+        if (!result.success &&
+            singleAgentUsesAiChatFallbackForSession(sessionKey)) {
           if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
             appendSingleAgentFallbackStatusMessageInternal(
               sessionKey,
-              result.fallbackReason ?? result.errorMessage,
+              result.errorMessage,
             );
             await sendAiGatewayMessageInternal(
               message,
@@ -250,7 +231,7 @@ extension AppControllerDesktopSingleAgent on AppController {
                 role: 'assistant',
                 text: singleAgentUnavailableLabelInternal(
                   sessionKey,
-                  result.fallbackReason ?? result.errorMessage,
+                  result.errorMessage,
                 ),
                 timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
                 toolCallId: null,
@@ -271,8 +252,21 @@ extension AppControllerDesktopSingleAgent on AppController {
             sessionKey,
             assistantErrorMessageInternal(
               appText(
-                '单机智能体执行失败：${result.errorMessage}',
-                'Single Agent execution failed: ${result.errorMessage}',
+                'Go Agent-core 执行失败：${result.errorMessage}',
+                'Go Agent-core execution failed: ${result.errorMessage}',
+              ),
+            ),
+          );
+          return;
+        }
+
+        if (result.message.trim().isEmpty) {
+          appendAssistantThreadMessageInternal(
+            sessionKey,
+            assistantErrorMessageInternal(
+              appText(
+                'Go Agent-core 没有返回可显示的输出。',
+                'Go Agent-core returned no displayable output.',
               ),
             ),
           );
@@ -284,7 +278,7 @@ extension AppControllerDesktopSingleAgent on AppController {
           GatewayChatMessage(
             id: nextLocalMessageIdInternal(),
             role: 'assistant',
-            text: result.output,
+            text: result.message,
             timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
             toolCallId: null,
             toolName: null,
@@ -300,7 +294,6 @@ extension AppControllerDesktopSingleAgent on AppController {
           assistantErrorMessageInternal(error.toString()),
         );
       } finally {
-        singleAgentExternalCliPendingSessionKeysInternal.remove(sessionKey);
         clearAiGatewayStreamingTextInternal(sessionKey);
         aiGatewayPendingSessionKeysInternal.remove(sessionKey);
         recomputeTasksInternal();

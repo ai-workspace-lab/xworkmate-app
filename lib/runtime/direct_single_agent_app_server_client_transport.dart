@@ -12,14 +12,12 @@ class ResolvedSingleAgentTransportInternal {
   const ResolvedSingleAgentTransportInternal({
     required this.kind,
     required this.endpoint,
-    required this.workspaceRefKind,
     this.websocket,
     this.rest,
   });
 
   final DirectSingleAgentTransportKindInternal kind;
   final Uri endpoint;
-  final WorkspaceRefKind workspaceRefKind;
   final DirectSingleAgentWebSocketTransportInternal? websocket;
   final DirectSingleAgentRestTransportInternal? rest;
 }
@@ -58,7 +56,6 @@ class DirectSingleAgentWebSocketTransportInternal {
   Future<DirectSingleAgentRunResult> run(
     DirectSingleAgentRunRequest request, {
     required Uri endpoint,
-    required WorkspaceRefKind workspaceRefKind,
   }) async {
     final normalizedSessionId = request.sessionId.trim();
     if (normalizedSessionId.isEmpty) {
@@ -114,7 +111,6 @@ class DirectSingleAgentWebSocketTransportInternal {
                 errorMessage: '',
                 resolvedModel: resolvedModel,
                 resolvedWorkingDirectory: resolvedWorkingDirectory,
-                resolvedWorkspaceRefKind: workspaceRefKind,
               ),
             );
             return;
@@ -134,7 +130,6 @@ class DirectSingleAgentWebSocketTransportInternal {
                 aborted: aborted,
                 resolvedModel: resolvedModel,
                 resolvedWorkingDirectory: resolvedWorkingDirectory,
-                resolvedWorkspaceRefKind: workspaceRefKind,
                 errorMessage:
                     params['message']?.toString() ??
                     params['error']?.toString() ??
@@ -153,7 +148,6 @@ class DirectSingleAgentWebSocketTransportInternal {
                 aborted: abortedSessionsInternal.contains(normalizedSessionId),
                 resolvedModel: resolvedModel,
                 resolvedWorkingDirectory: resolvedWorkingDirectory,
-                resolvedWorkspaceRefKind: workspaceRefKind,
               ),
             );
           }
@@ -171,7 +165,6 @@ class DirectSingleAgentWebSocketTransportInternal {
                 aborted: abortedSessionsInternal.contains(normalizedSessionId),
                 resolvedModel: resolvedModel,
                 resolvedWorkingDirectory: resolvedWorkingDirectory,
-                resolvedWorkspaceRefKind: workspaceRefKind,
               ),
             );
           }
@@ -204,7 +197,6 @@ class DirectSingleAgentWebSocketTransportInternal {
             aborted: abortedSessionsInternal.contains(normalizedSessionId),
             resolvedModel: resolvedModel,
             resolvedWorkingDirectory: resolvedWorkingDirectory,
-            resolvedWorkspaceRefKind: workspaceRefKind,
           ),
         );
       } finally {
@@ -218,7 +210,6 @@ class DirectSingleAgentWebSocketTransportInternal {
         aborted: abortedSessionsInternal.contains(normalizedSessionId),
         resolvedModel: '',
         resolvedWorkingDirectory: request.workingDirectory,
-        resolvedWorkspaceRefKind: workspaceRefKind,
       );
     } finally {
       activeConnectionsInternal.remove(normalizedSessionId);
@@ -350,7 +341,6 @@ class DirectSingleAgentRestTransportInternal {
   Future<DirectSingleAgentRunResult> run(
     DirectSingleAgentRunRequest request, {
     required Uri base,
-    required WorkspaceRefKind workspaceRefKind,
   }) async {
     final normalizedSessionId = request.sessionId.trim();
     if (normalizedSessionId.isEmpty) {
@@ -387,7 +377,6 @@ class DirectSingleAgentRestTransportInternal {
           aborted: abortedSessionsInternal.contains(normalizedSessionId),
           resolvedModel: request.model,
           resolvedWorkingDirectory: request.workingDirectory,
-          resolvedWorkspaceRefKind: workspaceRefKind,
         ),
       );
     }
@@ -418,7 +407,6 @@ class DirectSingleAgentRestTransportInternal {
           errorMessage: '',
           resolvedModel: request.model,
           resolvedWorkingDirectory: request.workingDirectory,
-          resolvedWorkspaceRefKind: workspaceRefKind,
         ),
       );
     }
@@ -561,7 +549,6 @@ class DirectSingleAgentRestTransportInternal {
           aborted: abortedSessionsInternal.contains(normalizedSessionId),
           resolvedModel: request.model,
           resolvedWorkingDirectory: request.workingDirectory,
-          resolvedWorkspaceRefKind: workspaceRefKind,
         ),
       );
     } catch (error) {
@@ -572,7 +559,6 @@ class DirectSingleAgentRestTransportInternal {
         aborted: abortedSessionsInternal.contains(normalizedSessionId),
         resolvedModel: request.model,
         resolvedWorkingDirectory: request.workingDirectory,
-        resolvedWorkspaceRefKind: workspaceRefKind,
       );
     } finally {
       unawaited(lineSubscription?.cancel());

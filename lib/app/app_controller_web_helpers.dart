@@ -143,16 +143,51 @@ extension AppControllerWebHelpers on AppController {
       AssistantExecutionTarget.local => 'local',
       AssistantExecutionTarget.remote => 'remote',
     };
+    final threadId = '$prefix:$timestamp';
     return TaskThread(
-      sessionKey: '$prefix:$timestamp',
-      messages: const <GatewayChatMessage>[],
+      threadId: threadId,
+      createdAtMs: timestamp.toDouble(),
       updatedAtMs: timestamp.toDouble(),
       title: title ?? appText('新对话', 'New conversation'),
-      archived: false,
-      executionTarget: target,
-      messageViewMode: AssistantMessageViewMode.rendered,
-      workspaceRef: '',
-      workspaceRefKind: WorkspaceRefKind.remotePath,
+      ownerScope: const ThreadOwnerScope(
+        realm: ThreadRealm.remote,
+        subjectType: ThreadSubjectType.user,
+        subjectId: '',
+        displayName: '',
+      ),
+      workspaceBinding: WorkspaceBinding(
+        workspaceId: threadId,
+        workspaceKind: WorkspaceKind.remoteFs,
+        workspacePath: '',
+        displayPath: '',
+        writable: true,
+      ),
+      executionBinding: ExecutionBinding(
+        executionMode: switch (target) {
+          AssistantExecutionTarget.singleAgent => ThreadExecutionMode.localAgent,
+          AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
+          AssistantExecutionTarget.remote => ThreadExecutionMode.gatewayRemote,
+        },
+        executorId: SingleAgentProvider.auto.providerId,
+        providerId: SingleAgentProvider.auto.providerId,
+        endpointId: '',
+      ),
+      contextState: const ThreadContextState(
+        messages: <GatewayChatMessage>[],
+        selectedModelId: '',
+        selectedSkillKeys: <String>[],
+        importedSkills: <AssistantThreadSkillEntry>[],
+        permissionLevel: AssistantPermissionLevel.defaultAccess,
+        messageViewMode: AssistantMessageViewMode.rendered,
+        latestResolvedRuntimeModel: '',
+        gatewayEntryState: null,
+      ),
+      lifecycleState: const ThreadLifecycleState(
+        archived: false,
+        status: 'needs_workspace',
+        lastRunAtMs: null,
+        lastResultCode: null,
+      ),
     );
   }
 
@@ -406,8 +441,8 @@ extension AppControllerWebHelpers on AppController {
     SingleAgentProvider? singleAgentProvider,
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
-    String? workspaceRef,
-    WorkspaceRefKind? workspaceRefKind,
+    String? workspacePath,
+    WorkspaceKind? workspaceKind,
   }) {
     final key = normalizedSessionKeyInternal(sessionKey);
     final resolvedTarget =
@@ -416,7 +451,7 @@ extension AppControllerWebHelpers on AppController {
     final existing =
         threadRecordsInternal[key] ?? newRecordInternal(target: resolvedTarget);
     threadRecordsInternal[key] = existing.copyWith(
-      sessionKey: key,
+      threadId: key,
       messages: messages ?? existing.messages,
       updatedAtMs: updatedAtMs ?? existing.updatedAtMs,
       title: title ?? existing.title,
@@ -429,8 +464,8 @@ extension AppControllerWebHelpers on AppController {
       singleAgentProvider: singleAgentProvider ?? existing.singleAgentProvider,
       gatewayEntryState: gatewayEntryState ?? existing.gatewayEntryState,
       clearGatewayEntryState: clearGatewayEntryState,
-      workspaceRef: workspaceRef ?? existing.workspaceRef,
-      workspaceRefKind: workspaceRefKind ?? existing.workspaceRefKind,
+      workspacePath: workspacePath ?? existing.workspacePath,
+      workspaceKind: workspaceKind ?? existing.workspaceKind,
     );
     recomputeDerivedWorkspaceStateInternal();
   }

@@ -9,10 +9,10 @@ import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
+import 'package:xworkmate/runtime/go_agent_core_client.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
-import 'package:xworkmate/runtime/single_agent_runner.dart';
 import 'app_controller_ai_gateway_chat_suite_core.dart';
 import 'app_controller_ai_gateway_chat_suite_chat.dart';
 import 'app_controller_ai_gateway_chat_suite_single_agent.dart';
@@ -23,14 +23,14 @@ Future<AppController> createAppControllerInternal({
   List<SingleAgentProvider> availableSingleAgentProvidersOverride =
       const <SingleAgentProvider>[],
   RuntimeCoordinator? runtimeCoordinator,
-  SingleAgentRunner? singleAgentRunner,
+  GoAgentCoreClient? goAgentCoreClient,
 }) async {
   final controller = AppController(
     store: store,
     availableSingleAgentProvidersOverride:
         availableSingleAgentProvidersOverride,
     runtimeCoordinator: runtimeCoordinator,
-    singleAgentRunner: singleAgentRunner,
+    goAgentCoreClient: goAgentCoreClient,
   );
   addTearDown(controller.dispose);
   await waitForInternal(() => !controller.initializing);

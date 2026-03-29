@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/runtime/go_agent_core_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
@@ -28,13 +29,23 @@ void main() {
         databasePathResolver: () async => '${tempDirectory.path}/settings.db',
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
       );
-      final controller = AppController(store: store);
+      final goCoreClient = _FakeGoAgentCoreClient(
+        onExecute: gateway.recordGoCoreTurn,
+      );
+      final controller = AppController(
+        store: store,
+        goAgentCoreClient: goCoreClient,
+      );
       addTearDown(() async {
         controller.dispose();
       });
       addTearDown(gateway.close);
 
       await _waitFor(() => !controller.initializing);
+      await controller.saveSettings(
+        controller.settings.copyWith(workspacePath: tempDirectory.path),
+        refreshAfterSave: false,
+      );
 
       await controller.connectManual(
         host: '127.0.0.1',
@@ -57,7 +68,6 @@ void main() {
               message.text.contains('XWORKMATE_OK'),
         ),
       );
-      await _waitFor(() => controller.tasksController.history.isNotEmpty);
 
       expect(
         controller.chatMessages.any(
@@ -67,20 +77,14 @@ void main() {
         ),
         isTrue,
       );
+      expect(goCoreClient.lastRequest?.agentId, 'main');
       expect(
-        controller.tasksController.history.any(
-          (task) => task.summary.contains('XWORKMATE_OK'),
-        ),
-        isTrue,
-      );
-      expect(gateway.lastChatSendParams?['agentId'], 'main');
-      expect(
-        ((gateway.lastChatSendParams?['metadata'] as Map?)?['node']
+        ((goCoreClient.lastRequest?.metadata as Map?)?['node']
             as Map?)?['kind'],
         'app-mediated-cooperative-node',
       );
       expect(
-        ((gateway.lastChatSendParams?['metadata'] as Map?)?['dispatch']
+        ((goCoreClient.lastRequest?.metadata as Map?)?['dispatch']
             as Map?)?['mode'],
         'gateway-only',
       );
@@ -103,7 +107,12 @@ void main() {
         databasePathResolver: () async => '${tempDirectory.path}/settings.db',
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
       );
-      final controller = AppController(store: store);
+      final controller = AppController(
+        store: store,
+        goAgentCoreClient: _FakeGoAgentCoreClient(
+          onExecute: gateway.recordGoCoreTurn,
+        ),
+      );
       addTearDown(() async {
         controller.dispose();
       });
@@ -133,7 +142,7 @@ void main() {
   );
 
   test(
-    'AppController hides gateway transcript after switching the thread to single-agent',
+    'AppController keeps the thread transcript after switching the thread to single-agent',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final gateway = await _FakeGatewayServer.start();
@@ -148,11 +157,20 @@ void main() {
         databasePathResolver: () async => '${tempDirectory.path}/settings.db',
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
       );
-      final controller = AppController(store: store);
+      final controller = AppController(
+        store: store,
+        goAgentCoreClient: _FakeGoAgentCoreClient(
+          onExecute: gateway.recordGoCoreTurn,
+        ),
+      );
       addTearDown(controller.dispose);
       addTearDown(gateway.close);
 
       await _waitFor(() => !controller.initializing);
+      await controller.saveSettings(
+        controller.settings.copyWith(workspacePath: tempDirectory.path),
+        refreshAfterSave: false,
+      );
 
       await controller.connectManual(
         host: '127.0.0.1',
@@ -183,7 +201,7 @@ void main() {
         controller.chatMessages.any(
           (message) => message.text.contains('XWORKMATE_OK'),
         ),
-        isFalse,
+        isTrue,
       );
     },
   );
@@ -224,11 +242,8 @@ class _FakeGatewayServer {
       }
       if (request.uri.path == '/acp' &&
           WebSocketTransformer.isUpgradeRequest(request)) {
-        final acpSocket = await WebSocketTransformer.upgrade(request);
-        await acpSocket.close(
-          WebSocketStatus.normalClosure,
-          'test gateway runtime only',
-        );
+        request.response.statusCode = HttpStatus.notFound;
+        await request.response.close();
         continue;
       }
       if (!WebSocketTransformer.isUpgradeRequest(request)) {
@@ -415,28 +430,73 @@ class _FakeGatewayServer {
     final envelope = (jsonDecode(body) as Map).cast<String, dynamic>();
     final id = envelope['id'];
     final method = envelope['method']?.toString() ?? '';
-    final response = <String, dynamic>{
-      'jsonrpc': '2.0',
-      'id': id,
-      'result': method == 'acp.capabilities'
-          ? <String, dynamic>{
-              'singleAgent': true,
-              'multiAgent': true,
-              'providers': <String>['claude', 'codex', 'gemini', 'opencode'],
-              'capabilities': <String, dynamic>{
-                'single_agent': true,
-                'multi_agent': true,
-                'providers': <String>['claude', 'codex', 'gemini', 'opencode'],
-              },
-            }
-          : const <String, dynamic>{},
-    };
+    final params =
+        (envelope['params'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{};
     request.response.headers.set(
       HttpHeaders.contentTypeHeader,
       'text/event-stream; charset=utf-8',
     );
+    if (method == 'session.start' || method == 'session.message') {
+      final payload = _startAcpSession(params);
+      request.response.write(
+        'data: ${jsonEncode(<String, dynamic>{'jsonrpc': '2.0', 'method': 'session.update', 'params': payload.notification})}\n\n',
+      );
+      request.response.write(
+        'data: ${jsonEncode(<String, dynamic>{'jsonrpc': '2.0', 'id': id, 'result': payload.result})}\n\n',
+      );
+      await request.response.close();
+      return;
+    }
+    final response = <String, dynamic>{
+      'jsonrpc': '2.0',
+      'id': id,
+      'result': switch (method) {
+        'acp.capabilities' => <String, dynamic>{
+          'singleAgent': true,
+          'multiAgent': true,
+          'providers': <String>['claude', 'codex', 'gemini', 'opencode'],
+          'capabilities': <String, dynamic>{
+            'single_agent': true,
+            'multi_agent': true,
+            'providers': <String>['claude', 'codex', 'gemini', 'opencode'],
+          },
+        },
+        'session.cancel' || 'session.close' => <String, dynamic>{'ok': true},
+        _ => const <String, dynamic>{},
+      },
+    };
     request.response.write('data: ${jsonEncode(response)}\n\n');
     await request.response.close();
+  }
+
+  _AcpSessionPayload _startAcpSession(Map<String, dynamic> params) {
+    lastChatSendParams = params;
+    final sessionKey = params['sessionId']?.toString().trim().isNotEmpty == true
+        ? params['sessionId'].toString().trim()
+        : params['threadId']?.toString().trim() ?? 'agent:main:main';
+    final prompt = params['taskPrompt']?.toString() ?? '';
+    const reply = 'XWORKMATE_OK';
+    _appendMessage(role: 'user', text: prompt);
+    _appendMessage(role: 'assistant', text: reply);
+    return _AcpSessionPayload(
+      notification: <String, dynamic>{
+        'sessionId': sessionKey,
+        'threadId': sessionKey,
+        'turnId': 'turn-1',
+        'type': 'delta',
+        'delta': reply,
+        'message': '',
+        'pending': true,
+        'error': false,
+      },
+      result: <String, dynamic>{
+        'success': true,
+        'message': reply,
+        'summary': reply,
+        'turnId': 'turn-1',
+      },
+    );
   }
 
   Future<void> _emitAssistantResult(
@@ -496,6 +556,89 @@ class _FakeGatewayServer {
   void _send(WebSocket socket, Map<String, dynamic> frame) {
     socket.add(jsonEncode(frame));
   }
+
+  void recordGoCoreTurn(GoAgentCoreSessionRequest request) {
+    lastChatSendParams = request.toAcpParams();
+    final prompt = request.prompt.trim();
+    if (prompt.isNotEmpty) {
+      _appendMessage(role: 'user', text: prompt);
+    }
+    _appendMessage(role: 'assistant', text: 'XWORKMATE_OK');
+  }
+}
+
+class _FakeGoAgentCoreClient implements GoAgentCoreClient {
+  _FakeGoAgentCoreClient({this.onExecute});
+
+  GoAgentCoreSessionRequest? lastRequest;
+  final void Function(GoAgentCoreSessionRequest request)? onExecute;
+
+  @override
+  Future<GoAgentCoreCapabilities> loadCapabilities({
+    required AssistantExecutionTarget target,
+    bool forceRefresh = false,
+  }) async {
+    return const GoAgentCoreCapabilities(
+      singleAgent: true,
+      multiAgent: true,
+      providers: <SingleAgentProvider>{},
+      raw: <String, dynamic>{},
+    );
+  }
+
+  @override
+  Future<GoAgentCoreRunResult> executeSession(
+    GoAgentCoreSessionRequest request, {
+    required void Function(GoAgentCoreSessionUpdate update) onUpdate,
+  }) async {
+    lastRequest = request;
+    onExecute?.call(request);
+    onUpdate(
+      GoAgentCoreSessionUpdate(
+        sessionId: request.sessionId,
+        threadId: request.threadId,
+        turnId: 'turn-1',
+        type: 'delta',
+        text: 'XWORKMATE_OK',
+        message: '',
+        pending: false,
+        error: false,
+        payload: const <String, dynamic>{'type': 'delta'},
+      ),
+    );
+    return const GoAgentCoreRunResult(
+      success: true,
+      message: 'XWORKMATE_OK',
+      turnId: 'turn-1',
+      raw: <String, dynamic>{},
+      errorMessage: '',
+      resolvedModel: '',
+    );
+  }
+
+  @override
+  Future<void> cancelSession({
+    required AssistantExecutionTarget target,
+    required String sessionId,
+    required String threadId,
+  }) async {}
+
+  @override
+  Future<void> closeSession({
+    required AssistantExecutionTarget target,
+    required String sessionId,
+    required String threadId,
+  }) async {}
+
+  @override
+  Future<void> dispose() async {}
+}
+
+class _AcpSessionPayload {
+  const _AcpSessionPayload({required this.notification, required this.result});
+
+  final Map<String, dynamic> notification;
+  final Map<String, dynamic> result;
 }
 
 Future<void> _deleteDirectoryWithRetry(Directory directory) async {

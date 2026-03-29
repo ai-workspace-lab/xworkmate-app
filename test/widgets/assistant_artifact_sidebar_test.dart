@@ -25,8 +25,8 @@ void main() {
             child: AssistantArtifactSidebar(
               sessionKey: 'thread-1',
               threadTitle: 'Artifact Thread',
-              workspaceRef: snapshot.workspaceRef,
-              workspaceRefKind: snapshot.workspaceRefKind,
+              workspacePath: snapshot.workspacePath,
+              workspaceKind: snapshot.workspaceKind,
               onCollapse: () {},
               loadSnapshot: () async => snapshot,
               loadPreview: (entry) async => previewForEntry(entry),
@@ -49,7 +49,7 @@ void main() {
       kind: AssistantArtifactEntryKind.file,
       mimeType: 'text/markdown',
       previewable: true,
-      workspaceRef: '/tmp/thread',
+      workspacePath: '/tmp/thread',
     );
     final htmlEntry = AssistantArtifactEntry(
       id: 'html',
@@ -58,11 +58,11 @@ void main() {
       kind: AssistantArtifactEntryKind.file,
       mimeType: 'text/html',
       previewable: true,
-      workspaceRef: '/tmp/thread',
+      workspacePath: '/tmp/thread',
     );
     final snapshot = AssistantArtifactSnapshot(
-      workspaceRef: '/tmp/thread',
-      workspaceRefKind: WorkspaceRefKind.localPath,
+      workspacePath: '/tmp/thread',
+      workspaceKind: WorkspaceRefKind.localPath,
       resultEntries: <AssistantArtifactEntry>[markdownEntry, htmlEntry],
       fileEntries: <AssistantArtifactEntry>[markdownEntry, htmlEntry],
     );
@@ -121,8 +121,8 @@ void main() {
     WidgetTester tester,
   ) async {
     final snapshot = AssistantArtifactSnapshot(
-      workspaceRef: '/tmp/thread',
-      workspaceRefKind: WorkspaceRefKind.localPath,
+      workspacePath: '/tmp/thread',
+      workspaceKind: WorkspaceRefKind.localPath,
       resultEntries: const <AssistantArtifactEntry>[],
       fileEntries: const <AssistantArtifactEntry>[],
     );
@@ -135,9 +135,7 @@ void main() {
     );
 
     final copyButton = tester.widget<IconButton>(
-      find.byKey(
-        const Key('assistant-artifact-pane-copy-workspace-ref'),
-      ),
+      find.byKey(const Key('assistant-artifact-pane-copy-workspace-ref')),
     );
     copyButton.onPressed!.call();
     expect(

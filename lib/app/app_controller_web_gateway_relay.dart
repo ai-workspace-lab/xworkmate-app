@@ -93,27 +93,74 @@ extension AppControllerWebGatewayRelay on AppController {
     for (final session in sessions) {
       final sessionKey = normalizedSessionKeyInternal(session.key);
       final existing = threadRecordsInternal[sessionKey];
+      final resolvedExecutionTarget = existing?.executionTarget ?? target;
+      final resolvedProvider =
+          existing?.singleAgentProvider ?? SingleAgentProvider.auto;
       final next = TaskThread(
-        sessionKey: sessionKey,
-        messages: existing?.messages ?? const <GatewayChatMessage>[],
+        threadId: sessionKey,
+        createdAtMs:
+            existing?.createdAtMs ??
+            DateTime.now().millisecondsSinceEpoch.toDouble(),
         updatedAtMs:
             session.updatedAtMs ??
             existing?.updatedAtMs ??
             DateTime.now().millisecondsSinceEpoch.toDouble(),
         title: (session.derivedTitle ?? session.displayName ?? session.key)
             .trim(),
-        archived: false,
-        executionTarget: existing?.executionTarget ?? target,
-        messageViewMode:
-            existing?.messageViewMode ?? AssistantMessageViewMode.rendered,
-        importedSkills: existing?.importedSkills ?? const [],
-        selectedSkillKeys: existing?.selectedSkillKeys ?? const [],
-        assistantModelId: existing?.assistantModelId ?? '',
-        singleAgentProvider:
-            existing?.singleAgentProvider ?? SingleAgentProvider.auto,
-        gatewayEntryState:
-            existing?.gatewayEntryState ??
-            gatewayEntryStateForTargetInternal(target),
+        ownerScope:
+            existing?.ownerScope ??
+            const ThreadOwnerScope(
+              realm: ThreadRealm.remote,
+              subjectType: ThreadSubjectType.user,
+              subjectId: '',
+              displayName: '',
+            ),
+        workspaceBinding:
+            existing?.workspaceBinding ??
+            WorkspaceBinding(
+              workspaceId: sessionKey,
+              workspaceKind: WorkspaceKind.remoteFs,
+              workspacePath: '',
+              displayPath: '',
+              writable: true,
+            ),
+        executionBinding:
+            existing?.executionBinding ??
+            ExecutionBinding(
+              executionMode: switch (resolvedExecutionTarget) {
+                AssistantExecutionTarget.singleAgent =>
+                  ThreadExecutionMode.localAgent,
+                AssistantExecutionTarget.local =>
+                  ThreadExecutionMode.gatewayLocal,
+                AssistantExecutionTarget.remote =>
+                  ThreadExecutionMode.gatewayRemote,
+              },
+              executorId: resolvedProvider.providerId,
+              providerId: resolvedProvider.providerId,
+              endpointId: '',
+            ),
+        contextState:
+            existing?.contextState ??
+            ThreadContextState(
+              messages: const <GatewayChatMessage>[],
+              selectedModelId: '',
+              selectedSkillKeys: const <String>[],
+              importedSkills: const <AssistantThreadSkillEntry>[],
+              permissionLevel: AssistantPermissionLevel.defaultAccess,
+              messageViewMode: AssistantMessageViewMode.rendered,
+              latestResolvedRuntimeModel: '',
+              gatewayEntryState: gatewayEntryStateForTargetInternal(
+                resolvedExecutionTarget,
+              ),
+            ),
+        lifecycleState:
+            existing?.lifecycleState ??
+            const ThreadLifecycleState(
+              archived: false,
+              status: 'needs_workspace',
+              lastRunAtMs: null,
+              lastResultCode: null,
+            ),
       );
       threadRecordsInternal[sessionKey] = next;
       await ensureWebTaskThreadBindingInternal(

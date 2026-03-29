@@ -1,240 +1,149 @@
-# Assistant 任务线程信息架构
+# Assistant TaskThread 信息架构
 
-本文分为两部分：
+本文描述当前 XWorkmate 中，线程信息如何围绕 `TaskThread` 进入 UI、进入 controller / runtime 的执行请求构造、再通过 `Go Agent-core` 回写到 UI。
 
-- 当前已实现的线程信息架构基线
-- 尚未落地、只应视为未来扩展方向的 IA 目标
+本文统一采用 `TaskThread` 聚合对象作为线程信息架构主语义。
 
-这份文档不再把未来目标写成“当前 UI 已实现”。
+## 1. TaskThread 作为线程信息主对象
 
-## 目标
+当前线程信息架构的主语义只有一个：`TaskThread`。
 
-`XWorkmate` 的 Assistant 已经采用“任务即线程”的基本模型，目标是让以下状态尽量按线程隔离：
+```text
+TaskThread
+- threadId
+- ownerScope
+- workspaceBinding
+- executionBinding
+- contextState
+- lifecycleState
+```
 
-- 会话历史
-- 执行模式
-- skills
-- 模型
-- 顶部连接状态
-- 线程标题 / 归档状态
+当前规则：
 
-同时需要明确哪些能力当前还没有做成线程级持久化。
+1. UI 当前选择的是 `TaskThread.threadId`。
+2. UI 选中线程后，读取的是完整 `TaskThread`。
+3. 主体区域显示、右栏显示、执行请求构造都围绕同一个 `TaskThread`。
+4. UI 保持现有结构，但不是线程信息的独立来源。
 
-## 当前已实现基线
+## 2. 线程信息结构
 
-### 核心原则
+### 2.1 ownerScope
 
-1. 一个任务对应一个 `AssistantThreadRecord`
-2. `executionTarget`、`selectedSkillKeys`、`assistantModelId`、`messageViewMode` 跟线程走
-3. 右上角 connection chip 只反映当前线程的解析结果，不直接沿用别的线程状态
-4. 全局设置只提供默认值，不直接覆盖已有线程
+负责：
 
-### 当前页面结构
+- 线程归属
+- owner 维度展示
+- remote owner path 推导上下文
+
+### 2.2 workspaceBinding
+
+负责：
+
+- `workspaceBinding.workspacePath`：执行工作空间
+- `workspaceBinding.displayPath`：右栏路径展示
+- `workspaceBinding.workspaceKind`：本地 / 远端工作空间语义
+
+约束：
+
+- `workspaceBinding` 是线程记录的一部分
+- 它只在必要时更新
+- 它不再承担运行前 fallback 猜测语义
+
+### 2.3 executionBinding
+
+负责：
+
+- 当前线程执行模式
+- provider / endpoint 绑定
+- 为 agent-core / runtime 协调层提供调度输入
+
+### 2.4 contextState
+
+负责：
+
+- 消息历史
+- 模型选择
+- 技能选择与导入
+- 权限等级
+- message view mode
+- 最近一次执行附加上下文
+
+### 2.5 lifecycleState
+
+负责：
+
+- `archived`
+- `status`
+- `lastRunAtMs`
+- `lastResultCode`
+
+它表达的是线程生命周期摘要，不是线程主对象的替代品。
+
+## 3. 信息流转图
 
 ```mermaid
 flowchart LR
-  A["左侧任务线程栏"] --> B["中间会话区"]
-  C["会话头部"] --> B
-  D["底部 composer 工具栏"] --> B
+  A["UI选择任务线程"] --> B["TaskThread.threadId"]
+  B --> C["读取 TaskThread"]
 
-  A1["分组：单机智能体 / 本地 / 远程"]
-  A2["新对话"]
-  A3["任务卡片"]
-  A4["归档动作"]
+  C --> D1["ownerScope"]
+  C --> D2["workspaceBinding"]
+  C --> D3["executionBinding"]
+  C --> D4["contextState"]
 
-  C1["标题"]
-  C2["任务状态"]
-  C3["owner / surface / session key"]
-  C4["message view mode"]
-  C5["connection chip"]
+  D1 --> E["构造执行请求"]
+  D2 --> E
+  D3 --> E
+  D4 --> E
 
-  D1["执行模式切换"]
-  D2["多 Agent toggle"]
-  D3["skills"]
-  D4["permission"]
-  D5["model"]
-  D6["thinking"]
-  D7["附件选择"]
-  D8["发送 / 重连 / 打开设置"]
+  E --> F["Go Agent-core\nDesktop: local bridge\nWeb: remote ACP / RPC"]
+  F --> G["执行结果"]
+
+  G --> H["回写线程上下文\n(主体区域 同步显示)"]
+  G --> I["必要时更新 workspaceBinding"]
+
+  H --> J["右栏显示"]
+  I --> J
 ```
 
-当前没有独立落地的右侧“线程上下文抽屉”。
+这张图表达的是当前线程信息架构，而不是旧的“工作目录 fallback 流程”：
 
-## 当前 UI 真实分布
+- `读取 TaskThread` 是 UI 与执行层共享的唯一线程信息入口
+- `构造执行请求` 在 agent-core / runtime 协调层完成
+- `右栏显示` 明确依赖 `TaskThread` 当前记录
+- `必要时更新 workspaceBinding` 是条件分支，不是固定步骤
 
-### 1. 左侧：任务线程栏
+## 4. UI 信息来源矩阵
 
-当前已实现：
-
-- 任务按 `AssistantExecutionTarget` 分组显示
-- 支持新建线程
-- 支持切换线程
-- 支持归档线程
-- 任务卡片显示标题、状态、更新时间
-
-当前未实现：
-
-- 线程导出
-- 线程模板
-- 线程级自动化入口
-
-### 2. 会话头部
-
-当前头部显示的是：
-
-- 当前线程标题
-- 当前任务状态 pill
-- owner
-- surface
-- session key
-- message view mode
-- connection chip
-
-当前没有把以下信息集中放到头部：
-
-- 单独的 skills 数
-- 单独的模型标签
-- 独立的模式标签字段
-
-这些能力目前主要在底部 composer 工具栏里呈现；模式语义则通过 connection chip 和执行模式按钮共同体现。
-
-### 3. 中间：会话内容区
-
-当前已实现：
-
-- 渲染当前线程的消息历史
-- 渲染本地任务卡片 / tool call / assistant message
-- 流式结果回到当前线程
-- 切线程后按当前线程重新解析内容来源
-
-### 4. 底部：输入与执行区
-
-当前已实现：
-
-- 执行模式切换
-- skills 选择
-- 模型选择
-- 权限等级
-- reasoning 选择
-- 附件选择
-- 提交 / 停止 / 重连 / 打开设置
-
-也就是说，当前“模型”和“skills”不是头部状态栏字段，而是 composer toolbar 字段。
-
-### 5. 右侧上下文抽屉
-
-当前状态：
-
-- 独立的“线程上下文抽屉”没有落地为已交付能力
-- 文档里提到的 `线程配置 / 已选技能 / 附件 / 运行历史 / 导出` 目前不应视为已实现 UI
-
-## 当前线程隔离矩阵
-
-| 维度 | 当前状态 | 说明 |
+| UI / 信息面 | 主来源字段 | 当前说明 |
 | --- | --- | --- |
-| 消息历史 | 是 | 每个线程独立保存 / 解析历史 |
-| 执行模式 | 是 | `Single Agent / Local / Remote` 跟线程绑定 |
-| Skills | 是 | 当前线程可用 / 已选 skills 跟线程绑定 |
-| 模型 | 是 | `assistantModelId` 跟线程绑定，没设时回退到默认模型 |
-| 顶部连接状态 | 是 | 只显示当前线程解析出的连接状态 |
-| message view mode | 是 | 跟线程绑定 |
-| 自定义标题 | 是 | 通过 settings 持久化 |
-| 归档状态 | 是 | 通过 settings 持久化 |
-| 草稿输入 | 否 | 当前只有页面级 `_inputController` |
-| 发送前附件草稿 | 否 | 当前只有页面级 `_attachments` |
-| 导出 | 否 | 未实现 |
+| 当前线程身份 | `threadId` | UI 按 `threadId` 选中线程，再读取完整 `TaskThread` |
+| owner 信息 | `ownerScope` | 线程归属、owner 展示与 remote owner path 推导 |
+| 工作空间路径展示 | `workspaceBinding.displayPath` | 右栏当前路径展示 |
+| 执行工作空间 | `workspaceBinding.workspacePath` | agent-core / runtime 构造执行请求时使用 |
+| 工作空间类型 | `workspaceBinding.workspaceKind` | 区分 `localFs / remoteFs` |
+| 执行模式 | `executionBinding.executionMode` | 映射 Go Agent-core 调度输入与 transport 选择 |
+| provider / endpoint | `executionBinding.providerId / endpointId` | 当前执行通道来源 |
+| 消息历史 | `contextState.messages` | 主体区域消息列表 |
+| 模型 | `contextState.selectedModelId` | 当前线程模型选择 |
+| 技能 | `contextState.importedSkills / selectedSkillKeys` | 当前线程技能上下文 |
+| 权限 | `contextState.permissionLevel` | 当前线程权限等级 |
+| message view mode | `contextState.messageViewMode` | 当前线程消息视图模式 |
+| 最近 runtime 模型 | `contextState.latestResolvedRuntimeModel` | 最近执行附加信息 |
+| 归档状态 | `lifecycleState.archived` | 列表可见性 / 激活资格 |
+| 生命周期状态 | `lifecycleState.status` | 当前线程生命周期摘要 |
+| 最近执行摘要 | `lifecycleState.lastRunAtMs / lastResultCode` | 右栏和列表可消费的最近结果信息 |
 
-## 线程工作目录与 WorkspaceRefKind（当前实现）
+## 5. 当前实现边界
 
-### 统一线程工作目录规则
+当前实现边界如下：
 
-当前 Desktop 实现中，所有线程（含 `main`）统一使用：
+- UI 仍保持现有结构与呈现方式
+- UI 不负责执行请求构造
+- controller / runtime 负责根据 `TaskThread` 构造请求并调用 `Go Agent-core`
+- 执行结果先回写线程上下文，主体区域同步显示
+- 右栏显示与预览结果来自当前 `TaskThread` 最新记录
+- Desktop / Web 共用同一套 session 语义，只保留 local bridge / remote ACP-RPC transport 差异
+- 不再定义新的 relay-only 执行协议
 
-`workspacePath/.xworkmate/threads/<SessionKey>`
-
-其中：
-
-- `<SessionKey>` 会经过目录名安全化（非法字符替换）
-- 目录不存在时会自动创建
-- 线程切换与恢复时，如发现旧记录目录缺失或仍指向共享根目录，会自动迁移到该统一目录
-
-### `workspaceRefKind` 的语义（与路径解耦）
-
-`workspaceRefKind` 用来表达运行通道语义，而不是决定目录拼接规则：
-
-- 本地 Agent（`singleAgent`）=> `localPath`
-- OpenClaw Gateway（`local` / `remote`）=> `remotePath`
-
-注意：即使 `workspaceRefKind = remotePath`，线程目录仍然按统一规则落在  
-`workspacePath/.xworkmate/threads/<SessionKey>`。
-
-### 已清理的旧行为
-
-以下旧行为不再作为当前实现：
-
-- `main` 线程直接使用 `workspacePath` 根目录
-- 通过 `remoteProjectRoot` 单独决定线程目录
-- Single Agent runner 返回 `resolvedWorkingDirectory` 后覆盖线程目录
-
-## 当前交互规则
-
-### 新建线程
-
-当前实现：
-
-- 新线程继承当前线程的 `executionTarget`
-- 新线程继承当前线程的 `messageViewMode`
-- 不继承上一线程的消息历史
-
-当前未实现：
-
-- 创建时可选继承当前线程已选 skills
-- 线程级输入草稿继承
-
-### 切换线程
-
-当前会同步切换：
-
-- 当前模式
-- 当前 skills
-- 当前模型
-- 当前顶部连接状态
-- 当前消息内容解析路径
-
-当前不会恢复线程级输入草稿，因为这项能力还没有实现。
-
-### 切模式
-
-当前实现：
-
-- 模式切换默认只影响当前线程
-- 同时允许更新 `settings.assistantExecutionTarget` 作为默认新线程模式
-- 切换后会按线程目标重连 / 断连 runtime，并刷新 skills / connection state
-
-## 当前实现与未来目标的边界
-
-下面这些描述只应视为未来扩展方向，不能再当成“当前 UI 已实现”：
-
-- 右侧线程上下文抽屉
-- 线程级输入草稿持久化
-- 发送前附件的线程级草稿隔离
-- 新线程可选继承当前线程已选 skills
-- 线程导出
-- 线程模板
-- 线程级自动化
-
-## 为什么仍然坚持线程优先
-
-虽然当前 UI 还没把所有线程信息都集中到一个面板里，但线程优先原则已经成立：
-
-- 当前线程决定执行模式
-- 当前线程决定模型
-- 当前线程决定 available / selected skills
-- 当前线程决定 connection chip 显示
-
-这也是后续继续扩展任务工作台能力的基础。
-
-## 相关文档
-
-- [模式切换与线程连续追问](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/cases/thread_mode_switch_followup.md)
-- [XWorkmate 集成架构](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/xworkmate-integrations.md)
+归档文档可以继续保留，但它们只提供历史背景，不再参与当前设计口径。

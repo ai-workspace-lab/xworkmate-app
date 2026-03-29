@@ -55,7 +55,7 @@ extension AppControllerWebSessions on AppController {
   AssistantMessageViewMode get currentAssistantMessageViewMode =>
       assistantMessageViewModeForSession(currentSessionKeyInternal);
 
-  String assistantWorkspaceRefForSession(String sessionKey) {
+  String assistantWorkspacePathForSession(String sessionKey) {
     final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
     return threadRecordsInternal[normalizedSessionKey]
             ?.workspaceBinding
@@ -64,11 +64,13 @@ extension AppControllerWebSessions on AppController {
         '';
   }
 
-  WorkspaceRefKind assistantWorkspaceRefKindForSession(String sessionKey) {
+  WorkspaceRefKind assistantWorkspaceKindForSession(String sessionKey) {
     final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
     final record = threadRecordsInternal[normalizedSessionKey];
     if (record != null) {
-      return record.workspaceRefKind;
+      return record.workspaceKind == WorkspaceKind.localFs
+          ? WorkspaceRefKind.localPath
+          : WorkspaceRefKind.remotePath;
     }
     return WorkspaceRefKind.remotePath;
   }
@@ -90,8 +92,8 @@ extension AppControllerWebSessions on AppController {
     );
     return artifactProxyClientInternal.loadSnapshot(
       sessionKey: resolvedSessionKey,
-      workspaceRef: assistantWorkspaceRefForSession(resolvedSessionKey),
-      workspaceRefKind: assistantWorkspaceRefKindForSession(resolvedSessionKey),
+      workspacePath: assistantWorkspacePathForSession(resolvedSessionKey),
+      workspaceKind: assistantWorkspaceKindForSession(resolvedSessionKey),
     );
   }
 
@@ -555,8 +557,8 @@ extension AppControllerWebSessions on AppController {
         sanitizeTargetInternal(settingsInternal.assistantExecutionTarget) ??
         AssistantExecutionTarget.singleAgent;
     final record = newRecordInternal(target: target);
-    threadRecordsInternal[record.sessionKey] = record;
-    currentSessionKeyInternal = record.sessionKey;
+    threadRecordsInternal[record.threadId] = record;
+    currentSessionKeyInternal = record.threadId;
     return record;
   }
 }

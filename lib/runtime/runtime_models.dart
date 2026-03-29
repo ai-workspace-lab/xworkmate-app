@@ -5,3 +5,4 @@ export 'runtime_models_settings_snapshot.dart';
 export 'runtime_models_runtime_payloads.dart';
 export 'runtime_models_gateway_entities.dart';
 export 'runtime_models_multi_agent.dart';
+export 'multi_agent_orchestrator_protocol.dart';

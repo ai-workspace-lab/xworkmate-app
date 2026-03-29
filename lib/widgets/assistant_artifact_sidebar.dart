@@ -27,8 +27,8 @@ class AssistantArtifactSidebar extends StatefulWidget {
     super.key,
     required this.sessionKey,
     required this.threadTitle,
-    required this.workspaceRef,
-    required this.workspaceRefKind,
+    required this.workspacePath,
+    required this.workspaceKind,
     required this.onCollapse,
     required this.loadSnapshot,
     required this.loadPreview,
@@ -37,8 +37,8 @@ class AssistantArtifactSidebar extends StatefulWidget {
 
   final String sessionKey;
   final String threadTitle;
-  final String workspaceRef;
-  final WorkspaceRefKind workspaceRefKind;
+  final String workspacePath;
+  final WorkspaceRefKind workspaceKind;
   final VoidCallback onCollapse;
   final AssistantArtifactSnapshotLoader loadSnapshot;
   final AssistantArtifactPreviewLoader loadPreview;
@@ -68,8 +68,8 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
   void didUpdateWidget(covariant AssistantArtifactSidebar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.sessionKey != widget.sessionKey ||
-        oldWidget.workspaceRef != widget.workspaceRef ||
-        oldWidget.workspaceRefKind != widget.workspaceRefKind) {
+        oldWidget.workspacePath != widget.workspacePath ||
+        oldWidget.workspaceKind != widget.workspaceKind) {
       _activeTab = AssistantArtifactSidebarTab.files;
       _selectedEntry = null;
       _preview = const AssistantArtifactPreview.empty();
@@ -84,11 +84,11 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
     final snapshot = _snapshot;
     final entriesForPreview = _previewCandidates(snapshot);
     final selectedEntry = _selectedEntry;
-    final workspaceRef = widget.workspaceRef.trim();
-    final canCopyWorkspace = workspaceRef.isNotEmpty;
+    final workspacePath = widget.workspacePath.trim();
+    final canCopyWorkspace = workspacePath.isNotEmpty;
     final canOpenWorkspace =
         canCopyWorkspace &&
-        widget.workspaceRefKind == WorkspaceRefKind.localPath &&
+        widget.workspaceKind == WorkspaceRefKind.localPath &&
         widget.onOpenWorkspace != null;
 
     return SurfaceCard(
@@ -133,7 +133,7 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
                       ),
                       const SizedBox(height: AppSpacing.xxs),
                       Tooltip(
-                        message: workspaceRef,
+                        message: workspacePath,
                         child: GestureDetector(
                           key: const Key(
                             'assistant-artifact-pane-workspace-ref-container',
@@ -162,7 +162,7 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
                                 Padding(
                                   padding: const EdgeInsets.only(top: 1),
                                   child: Icon(
-                                    widget.workspaceRefKind ==
+                                    widget.workspaceKind ==
                                             WorkspaceRefKind.localPath
                                         ? Icons.folder_open_rounded
                                         : Icons.cloud_queue_rounded,
@@ -174,8 +174,8 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
                                 Expanded(
                                   child: Text(
                                     _workspaceSummary(
-                                      widget.workspaceRef,
-                                      widget.workspaceRefKind,
+                                      widget.workspacePath,
+                                      widget.workspaceKind,
                                     ),
                                     key: const Key(
                                       'assistant-artifact-pane-workspace-ref',
@@ -283,19 +283,17 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
   }
 
   Future<void> _copyWorkspace() async {
-    final workspaceRef = widget.workspaceRef.trim();
-    if (workspaceRef.isEmpty) {
+    final workspacePath = widget.workspacePath.trim();
+    if (workspacePath.isEmpty) {
       return;
     }
-    await Clipboard.setData(ClipboardData(text: workspaceRef));
+    await Clipboard.setData(ClipboardData(text: workspacePath));
     if (!mounted) {
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          appText('工作路径已复制', 'Workspace path copied'),
-        ),
+        content: Text(appText('工作路径已复制', 'Workspace path copied')),
         duration: const Duration(milliseconds: 1200),
       ),
     );
@@ -475,8 +473,8 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
     };
   }
 
-  static String _workspaceSummary(String workspaceRef, WorkspaceRefKind kind) {
-    final trimmed = workspaceRef.trim();
+  static String _workspaceSummary(String workspacePath, WorkspaceRefKind kind) {
+    final trimmed = workspacePath.trim();
     if (trimmed.isEmpty) {
       return appText('未设置', 'Not set');
     }
@@ -585,7 +583,7 @@ class _ArtifactEntryList extends StatelessWidget {
         final entry = entries[index];
         final selected =
             selectedEntry?.relativePath == entry.relativePath &&
-            selectedEntry?.workspaceRef == entry.workspaceRef;
+            selectedEntry?.workspacePath == entry.workspacePath;
         return Material(
           color: Colors.transparent,
           child: InkWell(

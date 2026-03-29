@@ -1,5 +1,4 @@
 import 'direct_single_agent_app_server_client.dart';
-import 'multi_agent_orchestrator.dart';
 import 'runtime_models.dart';
 
 class SingleAgentProviderResolution {
@@ -57,7 +56,6 @@ class SingleAgentRunResult {
     this.fallbackReason,
     this.resolvedModel = '',
     this.resolvedWorkingDirectory = '',
-    this.resolvedWorkspaceRefKind,
   });
 
   final SingleAgentProvider provider;
@@ -69,7 +67,6 @@ class SingleAgentRunResult {
   final String? fallbackReason;
   final String resolvedModel;
   final String resolvedWorkingDirectory;
-  final WorkspaceRefKind? resolvedWorkspaceRefKind;
 }
 
 abstract class SingleAgentRunner {
@@ -180,7 +177,6 @@ class DefaultSingleAgentRunner implements SingleAgentRunner {
         aborted: result.aborted,
         resolvedModel: result.resolvedModel,
         resolvedWorkingDirectory: result.resolvedWorkingDirectory,
-        resolvedWorkspaceRefKind: result.resolvedWorkspaceRefKind,
         fallbackReason: !result.success
             ? 'Single-agent app-server run failed: ${result.errorMessage}'
             : null,
