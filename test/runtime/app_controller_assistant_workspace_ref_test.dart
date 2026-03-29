@@ -560,4 +560,63 @@ void main() {
       );
     },
   );
+
+  test(
+    'AppController keeps single-agent threads unbound when the workspace root cannot create thread directories',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-workspace-invalid-root-',
+      );
+      final invalidRootFile = File('${tempDirectory.path}/workspace-root-file');
+      await invalidRootFile.writeAsString('not-a-directory');
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          workspacePath: invalidRootFile.path,
+        ),
+      );
+
+      final controller = AppController(store: store);
+      addTearDown(controller.dispose);
+      await waitForControllerInternal(controller);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+
+      controller.initializeAssistantThreadContext(
+        'draft:invalid-root',
+        title: 'Invalid Root',
+        executionTarget: AssistantExecutionTarget.singleAgent,
+      );
+
+      final expectedThreadWorkspace = Directory(
+        '${invalidRootFile.path}/.xworkmate/threads/draft-invalid-root',
+      );
+      expect(await expectedThreadWorkspace.exists(), isFalse);
+      expect(
+        controller.assistantWorkspacePathForSession('draft:invalid-root'),
+        isEmpty,
+      );
+      expect(
+        controller
+            .assistantThreadRecordsInternal['draft:invalid-root']
+            ?.lifecycleState
+            .status,
+        'needs_workspace',
+      );
+    },
+  );
 }
