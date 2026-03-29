@@ -225,7 +225,7 @@ void main() {
   );
 
   test(
-    'GatewayRuntime falls back to direct websocket when go-core bridge is unavailable',
+    'GatewayRuntime does not silently fall back to direct websocket when go-core bridge is unavailable',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final store = createIsolatedTestStore();
@@ -238,6 +238,47 @@ void main() {
             code: 'GO_GATEWAY_RUNTIME_ENDPOINT_MISSING',
           ),
         ),
+      );
+      final server = await FakeGatewayRuntimeServerInternal.start();
+      addTearDown(runtime.dispose);
+      addTearDown(server.close);
+
+      await runtime.initialize();
+      await expectLater(
+        () => runtime.connectProfile(
+          GatewayConnectionProfile.defaults().copyWith(
+            mode: RuntimeConnectionMode.local,
+            host: '127.0.0.1',
+            port: server.port,
+            tls: false,
+            useSetupCode: false,
+          ),
+          authTokenOverride: 'shared-token-from-form',
+        ),
+        throwsA(isA<GatewayRuntimeException>()),
+      );
+
+      expect(server.connectAuth, isNull);
+      expect(runtime.snapshot.status, RuntimeConnectionStatus.error);
+      expect(runtime.snapshot.lastErrorCode, 'GO_GATEWAY_RUNTIME_ENDPOINT_MISSING');
+    },
+  );
+
+  test(
+    'GatewayRuntime can explicitly fall back to direct websocket when enabled',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final store = createIsolatedTestStore();
+      final runtime = GatewayRuntime(
+        store: store,
+        identityStore: DeviceIdentityStore(store),
+        sessionClient: _FakeGatewayRuntimeSessionClient(
+          connectError: GatewayRuntimeException(
+            'go bridge unavailable',
+            code: 'GO_GATEWAY_RUNTIME_ENDPOINT_MISSING',
+          ),
+        ),
+        allowDirectSocketFallbackOnSessionClientFailure: true,
       );
       final server = await FakeGatewayRuntimeServerInternal.start();
       addTearDown(runtime.dispose);
