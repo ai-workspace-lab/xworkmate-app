@@ -207,13 +207,13 @@ extension SettingsPageSectionsMixinInternal on SettingsPageStateInternal {
                       ? message
                       : hasDraft
                       ? appText(
-                          '当前存在未保存草稿。保存：仅保存配置，不立即生效。',
-                          'There are unsaved drafts. Save persists configuration only and does not apply it immediately.',
+                          '当前存在未保存草稿。保存并生效：按当前配置立即更新。',
+                          'There are unsaved drafts. Save & apply updates the current configuration immediately.',
                         )
                       : hasPendingApply
                       ? appText(
-                          '当前存在已保存但未应用的更改。应用：立即按当前配置生效。',
-                          'There are saved changes waiting to be applied. Apply makes the current configuration take effect immediately.',
+                          '当前存在待生效更改。保存并生效：立即按当前配置更新。',
+                          'There are saved changes waiting to be applied. Save & apply updates the current configuration immediately.',
                         )
                       : (message.isEmpty
                             ? appText(
@@ -231,19 +231,12 @@ extension SettingsPageSectionsMixinInternal on SettingsPageStateInternal {
             spacing: 10,
             runSpacing: 10,
             children: [
-              OutlinedButton(
-                key: const ValueKey('settings-global-save-button'),
-                onPressed: hasDraft
-                    ? () => handleTopLevelSaveInternal(controller)
-                    : null,
-                child: Text(appText('保存', 'Save')),
-              ),
               FilledButton.tonal(
                 key: const ValueKey('settings-global-apply-button'),
                 onPressed: (!hasDraft && !hasPendingApply)
                     ? null
                     : () => handleTopLevelApplyInternal(controller),
-                child: Text(appText('应用', 'Apply')),
+                child: Text(appText('保存并生效', 'Save & apply')),
               ),
             ],
           ),
@@ -531,10 +524,8 @@ extension SettingsPageSectionsMixinInternal on SettingsPageStateInternal {
             EditableFieldInternal(
               label: appText('工作区路径', 'Workspace Path'),
               value: settings.workspacePath,
-              onSubmitted: (value) => saveSettingsInternal(
-                controller,
-                settings.copyWith(workspacePath: value),
-              ),
+              submitOnChange: false,
+              onSubmitted: controller.saveWorkspacePath,
             ),
             EditableFieldInternal(
               label: appText('CLI 路径', 'CLI Path'),
