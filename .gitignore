@@ -16,6 +16,7 @@ null/
 migrate_working_dir/
 tmp/*
 !tmp/.gitkeep
+.worktrees/
 
 # IntelliJ related
 *.iml
