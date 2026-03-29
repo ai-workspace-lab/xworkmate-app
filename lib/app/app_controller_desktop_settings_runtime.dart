@@ -239,6 +239,15 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     );
   }
 
+  Future<void> toggleAccountWorkspaceFollowed() async {
+    await AppControllerDesktopSettings(this).saveSettings(
+      settings.copyWith(
+        accountWorkspaceFollowed: !settings.accountWorkspaceFollowed,
+      ),
+      refreshAfterSave: false,
+    );
+  }
+
   Future<String> testOllamaConnection({required bool cloud}) {
     return settingsControllerInternal.testOllamaConnection(cloud: cloud);
   }

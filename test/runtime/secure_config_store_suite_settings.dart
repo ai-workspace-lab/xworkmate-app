@@ -26,6 +26,7 @@ void registerSecureConfigStoreSuiteSettingsTestsInternal() {
         final snapshot = SettingsSnapshot.defaults().copyWith(
           accountUsername: 'tester',
           accountWorkspace: 'QA',
+          accountWorkspaceFollowed: true,
           codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
           codexCliPath: '/opt/homebrew/bin/codex',
           assistantNavigationDestinations: const <AssistantFocusEntry>[
@@ -53,6 +54,7 @@ void registerSecureConfigStoreSuiteSettingsTestsInternal() {
 
         expect(loadedSnapshot.accountUsername, 'tester');
         expect(loadedSnapshot.accountWorkspace, 'QA');
+        expect(loadedSnapshot.accountWorkspaceFollowed, isTrue);
         expect(
           loadedSnapshot.codeAgentRuntimeMode,
           CodeAgentRuntimeMode.externalCli,
