@@ -247,6 +247,13 @@ extension AppControllerDesktopThreadActions on AppController {
     List<String> selectedSkillLabels = const <String>[],
   }) async {
     final currentSessionKey = sessionsControllerInternal.currentSessionKey;
+    if (assistantExecutionTargetForSession(currentSessionKey) ==
+        AssistantExecutionTarget.singleAgent) {
+      await bootstrapThreadWorkspaceFromExecutionContextInternal(
+        currentSessionKey,
+        message,
+      );
+    }
     await ensureDesktopTaskThreadBindingInternal(
       currentSessionKey,
       executionTarget: assistantExecutionTargetForSession(currentSessionKey),
@@ -505,5 +512,62 @@ extension AppControllerDesktopThreadActions on AppController {
       case RuntimeConnectionStatus.offline:
         return 'disconnected';
     }
+  }
+
+  Future<void> bootstrapThreadWorkspaceFromExecutionContextInternal(
+    String sessionKey,
+    String message,
+  ) async {
+    final workspaceRoot = parseExecutionContextWorkspaceRootInternal(message);
+    if (workspaceRoot == null) {
+      return;
+    }
+    if (!ensureLocalWorkspaceDirectoryInternal(workspaceRoot)) {
+      return;
+    }
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final existing = assistantThreadRecordsInternal[normalizedSessionKey];
+    upsertTaskThreadInternal(
+      normalizedSessionKey,
+      workspaceBinding: WorkspaceBinding(
+        workspaceId: normalizedSessionKey,
+        workspaceKind: WorkspaceKind.localFs,
+        workspacePath: workspaceRoot,
+        displayPath: workspaceRoot,
+        writable: existing?.workspaceBinding.writable ?? true,
+      ),
+      lifecycleState:
+          (existing?.lifecycleState ??
+                  const ThreadLifecycleState(
+                    archived: false,
+                    status: 'ready',
+                    lastRunAtMs: null,
+                    lastResultCode: null,
+                  ))
+              .copyWith(status: 'ready'),
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+  }
+
+  String? parseExecutionContextWorkspaceRootInternal(String message) {
+    final match = RegExp(
+      r'^\s*-\s*workspace_root\s*:\s*(.+?)\s*$',
+      multiLine: true,
+      caseSensitive: false,
+    ).firstMatch(message);
+    if (match == null) {
+      return null;
+    }
+    var value = (match.group(1) ?? '').trim();
+    if (value.isEmpty) {
+      return null;
+    }
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.substring(1, value.length - 1).trim();
+    }
+    return value.isEmpty ? null : value;
   }
 }
