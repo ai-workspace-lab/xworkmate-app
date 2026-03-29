@@ -13,7 +13,6 @@ import 'package:xworkmate/runtime/go_agent_core_client.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
-import 'package:xworkmate/runtime/single_agent_runner.dart';
 import 'app_controller_ai_gateway_chat_suite_core.dart';
 import 'app_controller_ai_gateway_chat_suite_chat.dart';
 import 'app_controller_ai_gateway_chat_suite_single_agent.dart';
@@ -113,71 +112,6 @@ class FakeCodexRuntimeInternal extends CodexRuntime {
   Future<void> stop() async {}
 }
 
-class FakeSingleAgentRunnerInternal implements SingleAgentRunner {
-  FakeSingleAgentRunnerInternal({
-    required this.resolvedProvider,
-    this.result,
-    this.fallbackReason,
-  });
-
-  final SingleAgentProvider? resolvedProvider;
-  final SingleAgentRunResult? result;
-  final String? fallbackReason;
-
-  int resolveCalls = 0;
-  int runCalls = 0;
-  int abortCalls = 0;
-  SingleAgentRunRequest? lastRequest;
-  final List<SingleAgentRunRequest> requests = <SingleAgentRunRequest>[];
-
-  @override
-  Future<SingleAgentProviderResolution> resolveProvider({
-    required SingleAgentProvider selection,
-    required List<SingleAgentProvider> availableProviders,
-    required String configuredCodexCliPath,
-    required String gatewayToken,
-  }) async {
-    resolveCalls += 1;
-    return SingleAgentProviderResolution(
-      selection: selection,
-      resolvedProvider: resolvedProvider,
-      fallbackReason: fallbackReason,
-    );
-  }
-
-  @override
-  Future<SingleAgentRunResult> run(SingleAgentRunRequest request) async {
-    runCalls += 1;
-    lastRequest = request;
-    requests.add(request);
-    if (result?.output.isNotEmpty == true) {
-      request.onOutput?.call(result!.output);
-    }
-    return result ??
-        SingleAgentRunResult(
-          provider: request.provider,
-          output: '',
-          success: false,
-          errorMessage: 'no result configured',
-          shouldFallbackToAiChat: false,
-        );
-  }
-
-  @override
-  Future<void> abort(String sessionId) async {
-    abortCalls += 1;
-  }
-}
-
-class FallbackOnlySingleAgentRunnerInternal
-    extends FakeSingleAgentRunnerInternal {
-  FallbackOnlySingleAgentRunnerInternal()
-    : super(
-        resolvedProvider: null,
-        fallbackReason: 'No supported external CLI provider is available.',
-      );
-}
-
 class FakeGoAgentCoreClientInternal implements GoAgentCoreClient {
   FakeGoAgentCoreClientInternal({
     this.capabilities = const GoAgentCoreCapabilities.empty(),
@@ -198,7 +132,8 @@ class FakeGoAgentCoreClientInternal implements GoAgentCoreClient {
   int executeCalls = 0;
   int cancelCalls = 0;
   GoAgentCoreSessionRequest? lastRequest;
-  final List<GoAgentCoreSessionRequest> requests = <GoAgentCoreSessionRequest>[];
+  final List<GoAgentCoreSessionRequest> requests =
+      <GoAgentCoreSessionRequest>[];
 
   @override
   Future<GoAgentCoreCapabilities> loadCapabilities({
