@@ -38,6 +38,7 @@ class SettingsSnapshot {
     required this.accountBaseUrl,
     required this.accountUsername,
     required this.accountWorkspace,
+    required this.accountWorkspaceFollowed,
     required this.accountLocalMode,
     required this.linuxDesktop,
     required this.assistantExecutionTarget,
@@ -74,6 +75,7 @@ class SettingsSnapshot {
   final String accountBaseUrl;
   final String accountUsername;
   final String accountWorkspace;
+  final bool accountWorkspaceFollowed;
   final bool accountLocalMode;
   final LinuxDesktopConfig linuxDesktop;
   final AssistantExecutionTarget assistantExecutionTarget;
@@ -111,6 +113,7 @@ class SettingsSnapshot {
       accountBaseUrl: 'https://accounts.svc.plus',
       accountUsername: '',
       accountWorkspace: 'Default Workspace',
+      accountWorkspaceFollowed: false,
       accountLocalMode: true,
       linuxDesktop: LinuxDesktopConfig.defaults(),
       assistantExecutionTarget: AssistantExecutionTarget.local,
@@ -149,6 +152,7 @@ class SettingsSnapshot {
     String? accountBaseUrl,
     String? accountUsername,
     String? accountWorkspace,
+    bool? accountWorkspaceFollowed,
     bool? accountLocalMode,
     LinuxDesktopConfig? linuxDesktop,
     AssistantExecutionTarget? assistantExecutionTarget,
@@ -198,6 +202,8 @@ class SettingsSnapshot {
       accountBaseUrl: accountBaseUrl ?? this.accountBaseUrl,
       accountUsername: accountUsername ?? this.accountUsername,
       accountWorkspace: accountWorkspace ?? this.accountWorkspace,
+      accountWorkspaceFollowed:
+          accountWorkspaceFollowed ?? this.accountWorkspaceFollowed,
       accountLocalMode: accountLocalMode ?? this.accountLocalMode,
       linuxDesktop: linuxDesktop ?? this.linuxDesktop,
       assistantExecutionTarget:
@@ -250,6 +256,7 @@ class SettingsSnapshot {
       'accountBaseUrl': accountBaseUrl,
       'accountUsername': accountUsername,
       'accountWorkspace': accountWorkspace,
+      'accountWorkspaceFollowed': accountWorkspaceFollowed,
       'accountLocalMode': accountLocalMode,
       'linuxDesktop': linuxDesktop.toJson(),
       'assistantExecutionTarget': assistantExecutionTarget.name,
@@ -397,6 +404,8 @@ class SettingsSnapshot {
       accountWorkspace:
           json['accountWorkspace'] as String? ??
           SettingsSnapshot.defaults().accountWorkspace,
+      accountWorkspaceFollowed:
+          json['accountWorkspaceFollowed'] as bool? ?? false,
       accountLocalMode: json['accountLocalMode'] as bool? ?? true,
       linuxDesktop: LinuxDesktopConfig.fromJson(
         (json['linuxDesktop'] as Map?)?.cast<String, dynamic>() ?? const {},
