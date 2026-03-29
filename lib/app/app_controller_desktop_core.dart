@@ -30,9 +30,11 @@ import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/go_agent_core_client.dart';
 import '../runtime/go_agent_core_desktop_transport.dart';
+import '../runtime/go_multi_agent_mount_desktop_client.dart';
 import '../runtime/go_runtime_dispatch_desktop_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
+import '../runtime/multi_agent_mounts.dart';
 import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import '../runtime/single_agent_runner.dart';
@@ -122,6 +124,7 @@ class AppController extends ChangeNotifier {
     List<SingleAgentProvider>? availableSingleAgentProvidersOverride,
     ArisBundleRepository? arisBundleRepository,
     GoAgentCoreClient? goAgentCoreClient,
+    MultiAgentMountManager? multiAgentMountManager,
   }) {
     storeInternal = store ?? SecureConfigStore();
     uiFeatureManifestInternal =
@@ -212,6 +215,16 @@ class AppController extends ChangeNotifier {
       arisBundleRepository: arisBundleRepositoryInternal,
       goCoreLocator: goCoreLocatorInternal,
     );
+    multiAgentMountManagerInternal =
+        multiAgentMountManager ??
+        MultiAgentMountManager(
+          arisBundleRepository: arisBundleRepositoryInternal,
+          goCoreLocator: goCoreLocatorInternal,
+          resolver: GoMultiAgentMountDesktopClient(
+            acpClient: gatewayAcpClientInternal,
+            goCoreLocator: goCoreLocatorInternal,
+          ),
+        );
 
     attachChildListenersInternal();
     unawaited(initializeInternal());
@@ -240,6 +253,7 @@ class AppController extends ChangeNotifier {
     tasksControllerInternal.dispose();
     storeInternal.dispose();
     desktopPlatformServiceInternal.dispose();
+    unawaited(multiAgentMountManagerInternal.dispose());
     unawaited(goAgentCoreClientInternal.dispose());
     unawaited(gatewayAcpClientInternal.dispose());
     super.dispose();
@@ -273,6 +287,7 @@ class AppController extends ChangeNotifier {
   late final GoCoreLocator goCoreLocatorInternal;
   late final GoAgentCoreClient goAgentCoreClientInternal;
   late final MultiAgentOrchestrator multiAgentOrchestratorInternal;
+  late final MultiAgentMountManager multiAgentMountManagerInternal;
   Map<SingleAgentProvider, DirectSingleAgentCapabilities>
   singleAgentCapabilitiesByProviderInternal =
       const <SingleAgentProvider, DirectSingleAgentCapabilities>{};
@@ -411,6 +426,8 @@ class AppController extends ChangeNotifier {
       sessionsControllerInternal;
   MultiAgentOrchestrator get multiAgentOrchestrator =>
       multiAgentOrchestratorInternal;
+  MultiAgentMountManager get multiAgentMountManager =>
+      multiAgentMountManagerInternal;
   GatewayChatController get chatController => chatControllerInternal;
   InstancesController get instancesController => instancesControllerInternal;
   SkillsController get skillsController => skillsControllerInternal;

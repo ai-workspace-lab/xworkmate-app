@@ -4,6 +4,7 @@ import 'dart:io';
 import 'aris_bundle.dart';
 import 'go_core.dart';
 import 'codex_config_bridge.dart';
+import 'multi_agent_mount_resolver.dart';
 import 'opencode_config_bridge.dart';
 import 'runtime_models.dart';
 
@@ -13,6 +14,7 @@ class MultiAgentMountManager {
     OpencodeConfigBridge? opencodeConfigBridge,
     ArisBundleRepository? arisBundleRepository,
     GoCoreLocator? goCoreLocator,
+    MultiAgentMountResolver? resolver,
   }) : this._(
          arisAdapter: ArisMountAdapter(
            arisBundleRepository ?? ArisBundleRepository(),
@@ -20,13 +22,18 @@ class MultiAgentMountManager {
          ),
          codexConfigBridge: codexConfigBridge ?? CodexConfigBridge(),
          opencodeConfigBridge: opencodeConfigBridge ?? OpencodeConfigBridge(),
+         resolver: resolver,
        );
 
   MultiAgentMountManager._({
     required ArisMountAdapter arisAdapter,
     required CodexConfigBridge codexConfigBridge,
     required OpencodeConfigBridge opencodeConfigBridge,
+    MultiAgentMountResolver? resolver,
   }) : _arisAdapter = arisAdapter,
+       _codexConfigBridge = codexConfigBridge,
+       _opencodeConfigBridge = opencodeConfigBridge,
+       _resolver = resolver,
        _adapters = <CliMountAdapter>[
          arisAdapter,
          CodexMountAdapter(codexConfigBridge),
@@ -37,9 +44,54 @@ class MultiAgentMountManager {
        ];
 
   final ArisMountAdapter _arisAdapter;
+  final CodexConfigBridge _codexConfigBridge;
+  final OpencodeConfigBridge _opencodeConfigBridge;
+  final MultiAgentMountResolver? _resolver;
   final List<CliMountAdapter> _adapters;
 
   Future<MultiAgentConfig> reconcile({
+    required MultiAgentConfig config,
+    required String aiGatewayUrl,
+    String configuredCodexCliPath = '',
+  }) async {
+    final resolved = await _resolver?.reconcile(
+      config: config,
+      aiGatewayUrl: aiGatewayUrl,
+      configuredCodexCliPath: configuredCodexCliPath,
+      codexHome: _codexConfigBridge.codexHome,
+      opencodeHome: _opencodeConfigBridge.opencodeHome,
+      arisProbe: await _buildArisProbe(),
+    );
+    if (resolved != null) {
+      return resolved;
+    }
+    return _reconcileLocally(
+      config: config,
+      aiGatewayUrl: aiGatewayUrl,
+      configuredCodexCliPath: configuredCodexCliPath,
+    );
+  }
+
+  Future<void> dispose() async {
+    await _resolver?.dispose();
+  }
+
+  Future<ArisMountProbe> _buildArisProbe() async {
+    try {
+      final bundle = await _arisAdapter._bundleRepository.ensureReady();
+      return ArisMountProbe(
+        available: true,
+        bundleVersion: bundle.manifest.bundleVersion,
+        llmChatServerPath: bundle.manifest.llmChatServerPath.trim(),
+        skillCount: await _arisAdapter._bundleRepository.countSkillFiles(),
+        bridgeAvailable: await _arisAdapter._goCoreLocator.isAvailable(),
+      );
+    } catch (error) {
+      return ArisMountProbe.unavailable(error: error.toString());
+    }
+  }
+
+  Future<MultiAgentConfig> _reconcileLocally({
     required MultiAgentConfig config,
     required String aiGatewayUrl,
     String configuredCodexCliPath = '',

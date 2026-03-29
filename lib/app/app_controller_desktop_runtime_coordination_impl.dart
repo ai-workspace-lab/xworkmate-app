@@ -51,22 +51,21 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
   bool forceRefresh = false,
   bool persistMountTargets = false,
 }) async {
-  GatewayAcpCapabilities capabilities;
   try {
-    capabilities = await controller.gatewayAcpClientInternal.loadCapabilities(
+    await controller.gatewayAcpClientInternal.loadCapabilities(
       forceRefresh: forceRefresh,
     );
   } catch (_) {
-    capabilities = const GatewayAcpCapabilities.empty();
+    // Keep mount refresh resilient when ACP is temporarily unavailable.
   }
   if (persistMountTargets && !controller.disposedInternal) {
     final currentConfig = controller.settings.multiAgent;
-    final nextTargets = mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal(
-      controller,
-      currentConfig.mountTargets,
-      capabilities,
-    );
-    final nextConfig = currentConfig.copyWith(mountTargets: nextTargets);
+    final nextConfig = await controller.multiAgentMountManagerInternal
+        .reconcile(
+          config: currentConfig,
+          aiGatewayUrl: controller.aiGatewayUrl,
+          configuredCodexCliPath: controller.configuredCodexCliPath,
+        );
     if (jsonEncode(nextConfig.toJson()) != jsonEncode(currentConfig.toJson())) {
       await controller.settingsControllerInternal.saveSnapshot(
         controller.settings.copyWith(multiAgent: nextConfig),
