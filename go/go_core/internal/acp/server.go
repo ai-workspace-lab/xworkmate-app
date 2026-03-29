@@ -14,6 +14,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"xworkmate/go_core/internal/dispatch"
 	"xworkmate/go_core/internal/shared"
 )
 
@@ -266,12 +267,115 @@ func (s *Server) handleRequest(
 		}
 		closed := s.closeSession(sessionID)
 		return map[string]any{"accepted": true, "closed": closed}, nil
+	case "xworkmate.dispatch.resolve":
+		return handleDispatchResolve(request.Params), nil
 	default:
 		return nil, &shared.RPCError{
 			Code:    -32601,
 			Message: fmt.Sprintf("unknown method: %s", method),
 		}
 	}
+}
+
+func handleDispatchResolve(params map[string]any) map[string]any {
+	providers := parseDispatchProviders(params["providers"])
+	requiredCapabilities := parseStringSlice(params["requiredCapabilities"])
+	preferredProviderID := strings.TrimSpace(
+		shared.StringArg(params, "preferredProviderId", ""),
+	)
+	request := dispatch.Request{
+		Providers:            providers,
+		PreferredProviderID:  preferredProviderID,
+		RequiredCapabilities: requiredCapabilities,
+	}
+	if nodeState := parseDispatchNodeState(params["nodeState"]); nodeState != nil {
+		request.NodeState = nodeState
+	}
+	if nodeInfo := parseDispatchNodeInfo(params["nodeInfo"]); nodeInfo != nil {
+		request.NodeInfo = nodeInfo
+	}
+	return dispatch.ResultMap(dispatch.Resolve(request))
+}
+
+func parseDispatchProviders(raw any) []dispatch.Provider {
+	list, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	providers := make([]dispatch.Provider, 0, len(list))
+	for _, item := range list {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		id := strings.TrimSpace(shared.StringArg(entry, "id", ""))
+		if id == "" {
+			continue
+		}
+		providers = append(providers, dispatch.Provider{
+			ID:           id,
+			Name:         strings.TrimSpace(shared.StringArg(entry, "name", "")),
+			DefaultArgs:  parseStringSlice(entry["defaultArgs"]),
+			Capabilities: parseStringSlice(entry["capabilities"]),
+		})
+	}
+	return providers
+}
+
+func parseDispatchNodeState(raw any) *dispatch.NodeState {
+	entry, ok := raw.(map[string]any)
+	if !ok {
+		return nil
+	}
+	return &dispatch.NodeState{
+		SelectedAgentID: strings.TrimSpace(
+			shared.StringArg(entry, "selectedAgentId", ""),
+		),
+		GatewayConnected: shared.BoolArg(
+			fmt.Sprint(entry["gatewayConnected"]),
+			false,
+		),
+		ExecutionTarget: strings.TrimSpace(
+			shared.StringArg(entry, "executionTarget", ""),
+		),
+		RuntimeMode:   strings.TrimSpace(shared.StringArg(entry, "runtimeMode", "")),
+		BridgeEnabled: shared.BoolArg(fmt.Sprint(entry["bridgeEnabled"]), false),
+		BridgeState:   strings.TrimSpace(shared.StringArg(entry, "bridgeState", "")),
+		ResolvedCodexCLIPath: strings.TrimSpace(
+			shared.StringArg(entry, "resolvedCodexCliPath", ""),
+		),
+		ConfiguredCodexCLIPath: strings.TrimSpace(
+			shared.StringArg(entry, "configuredCodexCliPath", ""),
+		),
+	}
+}
+
+func parseDispatchNodeInfo(raw any) *dispatch.NodeInfo {
+	entry, ok := raw.(map[string]any)
+	if !ok {
+		return nil
+	}
+	return &dispatch.NodeInfo{
+		ID:      strings.TrimSpace(shared.StringArg(entry, "id", "")),
+		Name:    strings.TrimSpace(shared.StringArg(entry, "name", "")),
+		Version: strings.TrimSpace(shared.StringArg(entry, "version", "")),
+	}
+}
+
+func parseStringSlice(raw any) []string {
+	list, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	values := make([]string, 0, len(list))
+	for _, item := range list {
+		value := strings.TrimSpace(fmt.Sprint(item))
+		if value == "" {
+			continue
+		}
+		values = append(values, value)
+	}
+	return values
 }
 
 func (s *Server) enqueue(threadID string, task task) (map[string]any, *shared.RPCError) {

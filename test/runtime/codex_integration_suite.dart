@@ -221,7 +221,7 @@ void main() {
 
     test(
       'registerExternalCodeAgent supports capability-filtered discovery',
-      () {
+      () async {
         coordinator.registerExternalCodeAgent(
           const ExternalCodeAgentProvider(
             id: 'opencode',
@@ -248,12 +248,10 @@ void main() {
           containsAll(<String>['gemini', 'opencode']),
         );
         expect(
-          coordinator
-              .selectExternalCodeAgent(
-                preferredProviderId: 'opencode',
-                requiredCapabilities: const <String>['review'],
-              )
-              ?.id,
+          (await coordinator.selectExternalCodeAgent(
+            preferredProviderId: 'opencode',
+            requiredCapabilities: const <String>['review'],
+          ))?.id,
           equals('opencode'),
         );
       },

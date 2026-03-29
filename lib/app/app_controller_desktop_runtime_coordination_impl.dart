@@ -296,6 +296,7 @@ Future<void> ensureCodexGatewayRegistrationRuntimeInternal(
         .buildGatewayDispatch(
           buildCodeAgentNodeStateRuntimeInternal(controller),
         );
+    final resolvedDispatch = await dispatch;
     await controller.codeAgentBridgeRegistryInternal.register(
       agentType: 'code-agent-bridge',
       name: 'XWorkmate Codex Bridge',
@@ -316,7 +317,7 @@ Future<void> ensureCodexGatewayRegistrationRuntimeInternal(
         ),
       ],
       metadata: <String, dynamic>{
-        ...dispatch.metadata,
+        ...resolvedDispatch.metadata,
         'providerId': 'codex',
         'runtimeMode': controller.effectiveCodeAgentRuntimeMode.name,
         'gatewayMode': bridgeGatewayModeRuntimeInternal(controller).name,

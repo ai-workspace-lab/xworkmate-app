@@ -8,6 +8,7 @@ import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
 import 'package:xworkmate/runtime/mode_switcher.dart';
+import 'package:xworkmate/runtime/runtime_dispatch_resolver.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
@@ -153,6 +154,38 @@ class _FakeModeSwitcher extends ModeSwitcher {
   }) async {
     return preferRemote ? switchToRemote() : switchToLocal();
   }
+}
+
+class _FakeDispatchResolver implements RuntimeDispatchResolver {
+  _FakeDispatchResolver({this.selectedProviderId});
+
+  final String? selectedProviderId;
+
+  int selectCalls = 0;
+
+  @override
+  Future<String?> selectProviderId({
+    required List<ExternalCodeAgentProvider> providers,
+    String preferredProviderId = '',
+    Iterable<String> requiredCapabilities = const <String>[],
+  }) async {
+    selectCalls += 1;
+    return selectedProviderId;
+  }
+
+  @override
+  Future<RuntimeDispatchResolution> resolveGatewayDispatch({
+    required List<ExternalCodeAgentProvider> providers,
+    required String preferredProviderId,
+    required Iterable<String> requiredCapabilities,
+    required Map<String, dynamic> nodeState,
+    required Map<String, dynamic> nodeInfo,
+  }) async {
+    return const RuntimeDispatchResolution(metadata: <String, dynamic>{});
+  }
+
+  @override
+  Future<void> dispose() async {}
 }
 
 void main() {
@@ -316,7 +349,7 @@ void main() {
 
     test(
       'selects provider by preferred id then falls back deterministically',
-      () {
+      () async {
         coordinator.registerExternalCodeAgent(
           const ExternalCodeAgentProvider(
             id: 'codex',
@@ -334,13 +367,13 @@ void main() {
           ),
         );
 
-        final preferred = coordinator.selectExternalCodeAgent(
+        final preferred = await coordinator.selectExternalCodeAgent(
           preferredProviderId: 'qwen-cli',
           requiredCapabilities: const <String>['chat'],
         );
         expect(preferred?.id, 'qwen-cli');
 
-        final fallback = coordinator.selectExternalCodeAgent(
+        final fallback = await coordinator.selectExternalCodeAgent(
           preferredProviderId: 'qwen-cli',
           requiredCapabilities: const <String>['code-edit'],
         );
@@ -348,20 +381,55 @@ void main() {
       },
     );
 
-    test('returns null when no provider satisfies required capabilities', () {
-      coordinator.registerExternalCodeAgent(
-        const ExternalCodeAgentProvider(
-          id: 'qwen-cli',
-          name: 'Qwen CLI',
-          command: 'qwen',
-          capabilities: <String>['chat'],
-        ),
-      );
+    test(
+      'returns null when no provider satisfies required capabilities',
+      () async {
+        coordinator.registerExternalCodeAgent(
+          const ExternalCodeAgentProvider(
+            id: 'qwen-cli',
+            name: 'Qwen CLI',
+            command: 'qwen',
+            capabilities: <String>['chat'],
+          ),
+        );
 
-      final selected = coordinator.selectExternalCodeAgent(
-        requiredCapabilities: const <String>['memory-sync'],
-      );
-      expect(selected, isNull);
-    });
+        final selected = await coordinator.selectExternalCodeAgent(
+          requiredCapabilities: const <String>['memory-sync'],
+        );
+        expect(selected, isNull);
+      },
+    );
+
+    test(
+      'uses dispatch resolver when attached for provider selection',
+      () async {
+        final resolver = _FakeDispatchResolver(selectedProviderId: 'qwen-cli');
+        coordinator.attachDispatchResolver(resolver);
+        coordinator.registerExternalCodeAgent(
+          const ExternalCodeAgentProvider(
+            id: 'codex',
+            name: 'Codex CLI',
+            command: 'codex',
+            capabilities: <String>['chat', 'gateway-bridge'],
+          ),
+        );
+        coordinator.registerExternalCodeAgent(
+          const ExternalCodeAgentProvider(
+            id: 'qwen-cli',
+            name: 'Qwen CLI',
+            command: 'qwen',
+            capabilities: <String>['chat', 'gateway-bridge'],
+          ),
+        );
+
+        final selected = await coordinator.selectExternalCodeAgent(
+          preferredProviderId: 'codex',
+          requiredCapabilities: const <String>['gateway-bridge'],
+        );
+
+        expect(resolver.selectCalls, 1);
+        expect(selected?.id, 'qwen-cli');
+      },
+    );
   });
 }

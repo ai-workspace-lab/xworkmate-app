@@ -7,42 +7,14 @@ import 'codex_config_bridge.dart';
 import 'codex_runtime.dart';
 import 'gateway_runtime.dart';
 import 'mode_switcher.dart';
+import 'runtime_dispatch_resolver.dart';
+import 'runtime_external_code_agents.dart';
 import 'runtime_models.dart';
+
+export 'runtime_external_code_agents.dart';
 
 /// Coordination state for the runtime.
 enum CoordinatorState { disconnected, connecting, connected, ready, error }
-
-/// Descriptor for additional external Code Agent CLI integrations.
-enum ExternalAgentTransport { subprocess, websocketJsonRpc }
-
-extension ExternalAgentTransportCopy on ExternalAgentTransport {
-  static ExternalAgentTransport fromJsonValue(String? value) {
-    return ExternalAgentTransport.values.firstWhere(
-      (item) => item.name == value,
-      orElse: () => ExternalAgentTransport.subprocess,
-    );
-  }
-}
-
-class ExternalCodeAgentProvider {
-  const ExternalCodeAgentProvider({
-    required this.id,
-    required this.name,
-    required this.command,
-    this.transport = ExternalAgentTransport.subprocess,
-    this.endpoint = '',
-    this.defaultArgs = const <String>[],
-    this.capabilities = const <String>[],
-  });
-
-  final String id;
-  final String name;
-  final String command;
-  final ExternalAgentTransport transport;
-  final String endpoint;
-  final List<String> defaultArgs;
-  final List<String> capabilities;
-}
 
 /// Unified runtime coordinator for managing Gateway and Code Agent runtime.
 ///
@@ -59,6 +31,7 @@ class RuntimeCoordinator extends ChangeNotifier {
 
   final Map<String, ExternalCodeAgentProvider> _externalCodeAgents =
       <String, ExternalCodeAgentProvider>{};
+  RuntimeDispatchResolver? _dispatchResolver;
 
   CoordinatorState _state = CoordinatorState.disconnected;
   String? _lastError;
@@ -95,8 +68,10 @@ class RuntimeCoordinator extends ChangeNotifier {
     required this.codex,
     CodexConfigBridge? configBridge,
     ModeSwitcher? modeSwitcher,
+    RuntimeDispatchResolver? dispatchResolver,
   }) : configBridge = configBridge ?? CodexConfigBridge(),
-       modeSwitcher = modeSwitcher ?? ModeSwitcher(gateway);
+       modeSwitcher = modeSwitcher ?? ModeSwitcher(gateway),
+       _dispatchResolver = dispatchResolver;
 
   /// Register an external Code Agent CLI provider descriptor.
   ///
@@ -166,7 +141,38 @@ class RuntimeCoordinator extends ChangeNotifier {
   /// Scheduling policy is intentionally simple for phase 1:
   /// - honor preferred provider when it satisfies capability requirements
   /// - otherwise pick the first discovered provider in deterministic id order
-  ExternalCodeAgentProvider? selectExternalCodeAgent({
+  Future<ExternalCodeAgentProvider?> selectExternalCodeAgent({
+    String? preferredProviderId,
+    Iterable<String> requiredCapabilities = const <String>[],
+  }) async {
+    final available = externalCodeAgents;
+    final resolver = _dispatchResolver;
+    if (resolver != null && available.isNotEmpty) {
+      final selectedProviderId = await resolver.selectProviderId(
+        providers: available,
+        preferredProviderId: preferredProviderId?.trim() ?? '',
+        requiredCapabilities: requiredCapabilities,
+      );
+      if (selectedProviderId != null) {
+        final selected = _externalCodeAgents[selectedProviderId];
+        if (selected != null) {
+          return selected;
+        }
+      }
+    }
+    return _selectExternalCodeAgentLocally(
+      preferredProviderId: preferredProviderId,
+      requiredCapabilities: requiredCapabilities,
+    );
+  }
+
+  RuntimeDispatchResolver? get dispatchResolver => _dispatchResolver;
+
+  void attachDispatchResolver(RuntimeDispatchResolver resolver) {
+    _dispatchResolver = resolver;
+  }
+
+  ExternalCodeAgentProvider? _selectExternalCodeAgentLocally({
     String? preferredProviderId,
     Iterable<String> requiredCapabilities = const <String>[],
   }) {
@@ -393,6 +399,11 @@ class RuntimeCoordinator extends ChangeNotifier {
 
   @override
   void dispose() {
+    final resolver = _dispatchResolver;
+    _dispatchResolver = null;
+    if (resolver != null) {
+      unawaited(resolver.dispose());
+    }
     shutdown();
     super.dispose();
   }
