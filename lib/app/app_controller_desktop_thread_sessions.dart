@@ -123,7 +123,7 @@ extension AppControllerDesktopThreadSessions on AppController {
     return resolvedAssistantModelForTargetInternal(target);
   }
 
-  String assistantWorkspaceRefForSession(String sessionKey) {
+  String assistantWorkspacePathForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
@@ -134,13 +134,15 @@ extension AppControllerDesktopThreadSessions on AppController {
         '';
   }
 
-  WorkspaceRefKind assistantWorkspaceRefKindForSession(String sessionKey) {
+  WorkspaceRefKind assistantWorkspaceKindForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
     final record = assistantThreadRecordsInternal[normalizedSessionKey];
     if (record != null) {
-      return record.workspaceRefKind;
+      return record.workspaceKind == WorkspaceKind.localFs
+          ? WorkspaceRefKind.localPath
+          : WorkspaceRefKind.remotePath;
     }
     return defaultWorkspaceRefKindForTargetInternal(
       assistantExecutionTargetForSession(normalizedSessionKey),
@@ -165,8 +167,8 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey ?? currentSessionKey,
     );
     return threadArtifactServiceInternal.loadSnapshot(
-      workspaceRef: assistantWorkspaceRefForSession(resolvedSessionKey),
-      workspaceRefKind: assistantWorkspaceRefKindForSession(resolvedSessionKey),
+      workspacePath: assistantWorkspacePathForSession(resolvedSessionKey),
+      workspaceKind: assistantWorkspaceKindForSession(resolvedSessionKey),
     );
   }
 
@@ -179,8 +181,8 @@ extension AppControllerDesktopThreadSessions on AppController {
     );
     return threadArtifactServiceInternal.loadPreview(
       entry: entry,
-      workspaceRef: assistantWorkspaceRefForSession(resolvedSessionKey),
-      workspaceRefKind: assistantWorkspaceRefKindForSession(resolvedSessionKey),
+      workspacePath: assistantWorkspacePathForSession(resolvedSessionKey),
+      workspaceKind: assistantWorkspaceKindForSession(resolvedSessionKey),
     );
   }
 

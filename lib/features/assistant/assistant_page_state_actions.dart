@@ -109,7 +109,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       executionTarget: executionTarget,
       singleAgentProvider: controller.currentSingleAgentProvider,
       permissionLevel: settings.assistantPermissionLevel,
-      workspacePath: controller.assistantWorkspaceRefForSession(
+      workspacePath: controller.assistantWorkspacePathForSession(
         controller.currentSessionKey,
       ),
     );

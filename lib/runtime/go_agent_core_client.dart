@@ -1,0 +1,315 @@
+import 'runtime_models.dart';
+
+class GoAgentCoreCapabilities {
+  const GoAgentCoreCapabilities({
+    required this.singleAgent,
+    required this.multiAgent,
+    required this.providers,
+    required this.raw,
+  });
+
+  const GoAgentCoreCapabilities.empty()
+    : singleAgent = false,
+      multiAgent = false,
+      providers = const <SingleAgentProvider>{},
+      raw = const <String, dynamic>{};
+
+  final bool singleAgent;
+  final bool multiAgent;
+  final Set<SingleAgentProvider> providers;
+  final Map<String, dynamic> raw;
+}
+
+class GoAgentCoreSessionRequest {
+  const GoAgentCoreSessionRequest({
+    required this.sessionId,
+    required this.threadId,
+    required this.target,
+    required this.prompt,
+    required this.workingDirectory,
+    required this.model,
+    required this.thinking,
+    required this.selectedSkills,
+    required this.inlineAttachments,
+    required this.localAttachments,
+    required this.aiGatewayBaseUrl,
+    required this.aiGatewayApiKey,
+    required this.agentId,
+    required this.metadata,
+    this.provider = SingleAgentProvider.auto,
+    this.resumeSession = false,
+    this.multiAgent = false,
+  });
+
+  final String sessionId;
+  final String threadId;
+  final AssistantExecutionTarget target;
+  final String prompt;
+  final String workingDirectory;
+  final String model;
+  final String thinking;
+  final List<String> selectedSkills;
+  final List<GatewayChatAttachmentPayload> inlineAttachments;
+  final List<CollaborationAttachment> localAttachments;
+  final String aiGatewayBaseUrl;
+  final String aiGatewayApiKey;
+  final String agentId;
+  final Map<String, dynamic> metadata;
+  final SingleAgentProvider provider;
+  final bool resumeSession;
+  final bool multiAgent;
+
+  String get mode {
+    if (multiAgent) {
+      return 'multi-agent';
+    }
+    return switch (target) {
+      AssistantExecutionTarget.singleAgent => 'single-agent',
+      AssistantExecutionTarget.local => 'gateway-chat',
+      AssistantExecutionTarget.remote => 'gateway-chat',
+    };
+  }
+
+  bool get hasInlineAttachments => inlineAttachments.isNotEmpty;
+
+  Map<String, dynamic> toAcpParams() {
+    final params = <String, dynamic>{
+      'sessionId': sessionId,
+      'threadId': threadId,
+      'mode': mode,
+      'taskPrompt': prompt,
+      'workingDirectory': workingDirectory.trim(),
+      'selectedSkills': selectedSkills,
+      'attachments': <Map<String, dynamic>>[
+        ...localAttachments.map(
+          (item) => <String, dynamic>{
+            'name': item.name,
+            'description': item.description,
+            'path': item.path,
+          },
+        ),
+        ...inlineAttachments.map(
+          (item) => <String, dynamic>{
+            'name': item.fileName,
+            'description': item.mimeType,
+            'path': '',
+          },
+        ),
+      ],
+      if (inlineAttachments.isNotEmpty)
+        'inlineAttachments': inlineAttachments
+            .map(
+              (item) => <String, dynamic>{
+                'name': item.fileName,
+                'mimeType': item.mimeType,
+                'content': item.content,
+                'sizeBytes': goAgentCoreBase64Size(item.content),
+              },
+            )
+            .toList(growable: false),
+      if (provider != SingleAgentProvider.auto) 'provider': provider.providerId,
+      if (model.trim().isNotEmpty) 'model': model.trim(),
+      if (thinking.trim().isNotEmpty) 'thinking': thinking.trim(),
+      if (aiGatewayBaseUrl.trim().isNotEmpty)
+        'aiGatewayBaseUrl': aiGatewayBaseUrl.trim(),
+      if (aiGatewayApiKey.trim().isNotEmpty)
+        'aiGatewayApiKey': aiGatewayApiKey.trim(),
+      if (mode == 'gateway-chat') ...<String, dynamic>{
+        'executionTarget': target.promptValue,
+        if (agentId.trim().isNotEmpty) 'agentId': agentId.trim(),
+        if (metadata.isNotEmpty) 'metadata': metadata,
+      },
+    };
+    return params;
+  }
+}
+
+class GoAgentCoreSessionUpdate {
+  const GoAgentCoreSessionUpdate({
+    required this.sessionId,
+    required this.threadId,
+    required this.turnId,
+    required this.type,
+    required this.text,
+    required this.message,
+    required this.pending,
+    required this.error,
+    required this.payload,
+  });
+
+  final String sessionId;
+  final String threadId;
+  final String turnId;
+  final String type;
+  final String text;
+  final String message;
+  final bool pending;
+  final bool error;
+  final Map<String, dynamic> payload;
+
+  bool get isDelta => type == 'delta' && text.isNotEmpty;
+  bool get isDone => type == 'done' || payload['event'] == 'completed';
+}
+
+class GoAgentCoreRunResult {
+  const GoAgentCoreRunResult({
+    required this.success,
+    required this.message,
+    required this.turnId,
+    required this.raw,
+    required this.errorMessage,
+    required this.resolvedModel,
+  });
+
+  final bool success;
+  final String message;
+  final String turnId;
+  final Map<String, dynamic> raw;
+  final String errorMessage;
+  final String resolvedModel;
+
+  String get resolvedWorkingDirectory =>
+      raw['resolvedWorkingDirectory']?.toString().trim() ??
+      raw['workingDirectory']?.toString().trim() ??
+      '';
+
+  WorkspaceRefKind? get resolvedWorkspaceRefKind {
+    final rawValue = raw['resolvedWorkspaceRefKind']?.toString().trim() ?? '';
+    if (rawValue.isEmpty) {
+      return null;
+    }
+    return WorkspaceRefKindCopy.fromJsonValue(rawValue);
+  }
+}
+
+abstract class GoAgentCoreClient {
+  Future<GoAgentCoreCapabilities> loadCapabilities({
+    required AssistantExecutionTarget target,
+    bool forceRefresh = false,
+  });
+
+  Future<GoAgentCoreRunResult> executeSession(
+    GoAgentCoreSessionRequest request, {
+    required void Function(GoAgentCoreSessionUpdate update) onUpdate,
+  });
+
+  Future<void> cancelSession({
+    required AssistantExecutionTarget target,
+    required String sessionId,
+    required String threadId,
+  });
+
+  Future<void> closeSession({
+    required AssistantExecutionTarget target,
+    required String sessionId,
+    required String threadId,
+  });
+
+  Future<void> dispose();
+}
+
+GoAgentCoreSessionUpdate? goAgentCoreUpdateFromNotification(
+  Map<String, dynamic> notification,
+) {
+  final method = notification['method']?.toString().trim().toLowerCase() ?? '';
+  if (method != 'session.update' && method != 'acp.session.update') {
+    return null;
+  }
+  final params = _castMap(notification['params']);
+  final payload = params.isNotEmpty
+      ? params
+      : _castMap(notification['payload']);
+  final type =
+      payload['type']?.toString().trim().toLowerCase() ??
+      payload['state']?.toString().trim().toLowerCase() ??
+      payload['event']?.toString().trim().toLowerCase() ??
+      'status';
+  return GoAgentCoreSessionUpdate(
+    sessionId: payload['sessionId']?.toString().trim().isNotEmpty == true
+        ? payload['sessionId'].toString().trim()
+        : payload['threadId']?.toString().trim() ?? '',
+    threadId: payload['threadId']?.toString().trim() ?? '',
+    turnId: payload['turnId']?.toString().trim() ?? '',
+    type: type,
+    text:
+        payload['delta']?.toString() ??
+        payload['text']?.toString() ??
+        _castMap(payload['message'])['content']?.toString() ??
+        '',
+    message: payload['message']?.toString() ?? '',
+    pending: _boolValue(payload['pending']) ?? false,
+    error: _boolValue(payload['error']) ?? false,
+    payload: payload,
+  );
+}
+
+GoAgentCoreRunResult goAgentCoreRunResultFromResponse(
+  Map<String, dynamic> response, {
+  String streamedText = '',
+  String? completedMessage,
+}) {
+  final result = _castMap(response['result']);
+  final primaryText =
+      (completedMessage?.trim().isNotEmpty == true
+              ? completedMessage!.trim()
+              : streamedText.trim().isNotEmpty
+              ? streamedText.trim()
+              : (result['output']?.toString().trim().isNotEmpty == true
+                    ? result['output'].toString().trim()
+                    : result['summary']?.toString().trim().isNotEmpty == true
+                    ? result['summary'].toString().trim()
+                    : result['message']?.toString().trim() ?? ''))
+          .trim();
+  return GoAgentCoreRunResult(
+    success: _boolValue(result['success']) ?? true,
+    message: primaryText,
+    turnId: result['turnId']?.toString().trim() ?? '',
+    raw: result,
+    errorMessage: result['error']?.toString() ?? '',
+    resolvedModel:
+        result['model']?.toString().trim() ??
+        result['resolvedModel']?.toString().trim() ??
+        '',
+  );
+}
+
+int goAgentCoreBase64Size(String base64) {
+  final normalized = base64.trim().split(',').last.trim();
+  if (normalized.isEmpty) {
+    return 0;
+  }
+  final padding = normalized.endsWith('==')
+      ? 2
+      : (normalized.endsWith('=') ? 1 : 0);
+  return (normalized.length * 3 ~/ 4) - padding;
+}
+
+Map<String, dynamic> _castMap(Object? value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.cast<String, dynamic>();
+  }
+  return const <String, dynamic>{};
+}
+
+bool? _boolValue(Object? raw) {
+  if (raw is bool) {
+    return raw;
+  }
+  if (raw is num) {
+    return raw != 0;
+  }
+  final text = raw?.toString().trim().toLowerCase();
+  if (text == null || text.isEmpty) {
+    return null;
+  }
+  if (text == 'true' || text == '1' || text == 'yes') {
+    return true;
+  }
+  if (text == 'false' || text == '0' || text == 'no') {
+    return false;
+  }
+  return null;
+}

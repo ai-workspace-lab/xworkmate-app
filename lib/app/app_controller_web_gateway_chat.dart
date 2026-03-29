@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/assistant_artifacts.dart';
+import '../runtime/go_agent_core_client.dart';
 import '../runtime/runtime_models.dart';
 import '../web/web_acp_client.dart';
 import '../web/web_ai_gateway_client.dart';
@@ -37,9 +38,9 @@ extension AppControllerWebGatewayChat on AppController {
       return;
     }
     await ensureWebTaskThreadBindingInternal(currentSessionKeyInternal);
-    if (assistantWorkspaceRefForSession(currentSessionKeyInternal)
-        .trim()
-        .isEmpty) {
+    if (assistantWorkspacePathForSession(
+      currentSessionKeyInternal,
+    ).trim().isEmpty) {
       lastAssistantErrorInternal = appText(
         '当前线程缺少工作路径，无法运行。',
         'This thread has no workspace path, so it cannot run.',
@@ -135,9 +136,10 @@ extension AppControllerWebGatewayChat on AppController {
               error: false,
             );
           } else {
-            await sendSingleAgentViaAcpInternal(
+            await executeGoAgentCoreRunInternal(
               sessionKey: sessionKey,
               prompt: trimmed,
+              target: target,
               provider: provider,
               model: assistantModelForSession(sessionKey),
               thinking: thinking,
@@ -146,29 +148,15 @@ extension AppControllerWebGatewayChat on AppController {
             );
           }
         } else {
-          final expectedMode = target == AssistantExecutionTarget.local
-              ? RuntimeConnectionMode.local
-              : RuntimeConnectionMode.remote;
-          if (connection.status != RuntimeConnectionStatus.connected ||
-              connection.mode != expectedMode) {
-            throw Exception(
-              appText(
-                '当前线程目标网关未连接。',
-                'The gateway for this thread target is not connected.',
-              ),
-            );
-          }
-          await relayClientInternal.sendChat(
+          await executeGoAgentCoreRunInternal(
             sessionKey: sessionKey,
-            message: attachments.isEmpty
-                ? trimmed
-                : augmentPromptWithAttachmentsInternal(trimmed, attachments),
+            prompt: trimmed,
+            target: target,
+            provider: SingleAgentProvider.auto,
+            model: assistantModelForSession(sessionKey),
             thinking: thinking,
             attachments: attachments,
-            metadata: <String, dynamic>{
-              if (selectedSkillLabels.isNotEmpty)
-                'selectedSkills': selectedSkillLabels,
-            },
+            selectedSkillLabels: selectedSkillLabels,
           );
         }
       } catch (error) {
@@ -199,86 +187,37 @@ extension AppControllerWebGatewayChat on AppController {
       pendingSessionKeysInternal.add(sessionKey);
       notifyChangedInternal();
       try {
-        final target = assistantExecutionTargetForSession(sessionKey);
-        final endpoint = acpEndpointForTargetInternal(
-          target == AssistantExecutionTarget.singleAgent
-              ? AssistantExecutionTarget.remote
-              : target,
-        );
-        if (endpoint == null) {
-          throw Exception(
-            appText(
-              '当前线程的 ACP 端点不可用，请先配置并连接 Gateway。',
-              'ACP endpoint is unavailable for this thread. Configure and connect Gateway first.',
-            ),
-          );
-        }
-        await refreshAcpCapabilitiesInternal(endpoint);
-        final inlineAttachments = attachments
-            .map(
-              (item) => <String, dynamic>{
-                'name': item.fileName,
-                'mimeType': item.mimeType,
-                'content': item.content,
-                'sizeBytes': base64SizeInternal(item.content),
-              },
-            )
-            .toList(growable: false);
-        final params = <String, dynamic>{
-          'sessionId': sessionKey,
-          'threadId': sessionKey,
-          'mode': 'multi-agent',
-          'taskPrompt': composedPrompt,
-          'workingDirectory': '',
-          'selectedSkills': selectedSkillLabels,
-          'attachments': attachments
-              .map(
-                (item) => <String, dynamic>{
-                  'name': item.fileName,
-                  'description': item.mimeType,
-                  'path': '',
-                },
-              )
-              .toList(growable: false),
-          if (inlineAttachments.isNotEmpty)
-            'inlineAttachments': inlineAttachments,
-          'aiGatewayBaseUrl': settingsInternal.aiGateway.baseUrl.trim(),
-          'aiGatewayApiKey': aiGatewayApiKeyCacheInternal.trim(),
-        };
-        String? summary;
-        final response = await requestAcpSessionMessageInternal(
-          endpoint: endpoint,
-          params: params,
-          hasInlineAttachments: inlineAttachments.isNotEmpty,
-          onNotification: (notification) {
-            final update = acpSessionUpdateFromNotificationInternal(
-              notification,
-              sessionKey: sessionKey,
-            );
-            if (update == null) {
-              return;
-            }
-            if (update.type == 'delta' && update.text.isNotEmpty) {
+        final result = await goAgentCoreClientInternal.executeSession(
+          GoAgentCoreSessionRequest(
+            sessionId: sessionKey,
+            threadId: sessionKey,
+            target: assistantExecutionTargetForSession(sessionKey),
+            prompt: composedPrompt,
+            workingDirectory: assistantWorkspacePathForSession(sessionKey),
+            model: assistantModelForSession(sessionKey),
+            thinking: 'medium',
+            selectedSkills: selectedSkillLabels,
+            inlineAttachments: attachments,
+            localAttachments: const <CollaborationAttachment>[],
+            aiGatewayBaseUrl: settingsInternal.aiGateway.baseUrl.trim(),
+            aiGatewayApiKey: aiGatewayApiKeyCacheInternal.trim(),
+            agentId: selectedAgentId,
+            metadata: const <String, dynamic>{},
+            multiAgent: true,
+          ),
+          onUpdate: (update) {
+            if (update.isDelta) {
               appendStreamingTextInternal(sessionKey, update.text);
               notifyChangedInternal();
-              return;
-            }
-            if (update.error && update.message.isNotEmpty) {
-              summary = update.message;
-            }
-            if (update.type == 'done' &&
-                summary == null &&
-                update.message.isNotEmpty) {
-              summary = update.message;
             }
           },
         );
-        final result = castMapInternal(response['result']);
-        final summaryText = summary?.trim().isNotEmpty == true
-            ? summary!.trim()
-            : result['summary']?.toString().trim() ??
-                  result['message']?.toString().trim() ??
-                  appText('多智能体协作已完成。', 'Multi-agent collaboration completed.');
+        final summaryText = result.message.trim().isNotEmpty
+            ? result.message.trim()
+            : appText(
+                '多智能体协作已完成。',
+                'Multi-agent collaboration completed.',
+              );
         appendAssistantMessageInternal(
           sessionKey: sessionKey,
           text: summaryText,
@@ -313,123 +252,56 @@ extension AppControllerWebGatewayChat on AppController {
     notifyChangedInternal();
   }
 
-  Future<void> sendSingleAgentViaAcpInternal({
+  Future<void> executeGoAgentCoreRunInternal({
     required String sessionKey,
     required String prompt,
+    required AssistantExecutionTarget target,
     required SingleAgentProvider provider,
     required String model,
     required String thinking,
     required List<GatewayChatAttachmentPayload> attachments,
     required List<String> selectedSkillLabels,
   }) async {
-    final endpoint = acpEndpointForTargetInternal(
-      AssistantExecutionTarget.remote,
-    );
-    if (endpoint == null) {
-      throw Exception(
-        appText(
-          'Remote ACP 端点不可用，请先配置 Remote Gateway。',
-          'Remote ACP endpoint is unavailable. Configure Remote Gateway first.',
-        ),
-      );
-    }
-    await refreshAcpCapabilitiesInternal(endpoint);
-    if (acpCapabilitiesInternal.providers.isNotEmpty &&
-        !acpCapabilitiesInternal.providers.any(
-          (item) => item.providerId == provider.providerId,
-        )) {
-      throw Exception(
-        appText(
-          '当前 ACP 不支持所选 Provider：${provider.label}',
-          'Current ACP does not support provider: ${provider.label}',
-        ),
-      );
-    }
     final selectedSkills = selectedSkillLabels
         .map((item) => item.trim())
         .where((item) => item.isNotEmpty)
         .toList(growable: false);
-    final inlineAttachments = attachments
-        .map(
-          (item) => <String, dynamic>{
-            'name': item.fileName,
-            'mimeType': item.mimeType,
-            'content': item.content,
-            'sizeBytes': base64SizeInternal(item.content),
-          },
-        )
-        .toList(growable: false);
-    final params = <String, dynamic>{
-      'sessionId': sessionKey,
-      'threadId': sessionKey,
-      'mode': 'single-agent',
-      'provider': provider.providerId,
-      'model': model.trim(),
-      'thinking': thinking,
-      'taskPrompt': prompt,
-      'selectedSkills': selectedSkills,
-      'attachments': attachments
-          .map(
-            (item) => <String, dynamic>{
-              'name': item.fileName,
-              'description': item.mimeType,
-              'path': '',
-            },
-          )
-          .toList(growable: false),
-      if (inlineAttachments.isNotEmpty) 'inlineAttachments': inlineAttachments,
-      'aiGatewayBaseUrl': settingsInternal.aiGateway.baseUrl.trim(),
-      'aiGatewayApiKey': aiGatewayApiKeyCacheInternal.trim(),
-    };
-
-    String streamingText = '';
-    String? completionText;
-    String? errorText;
-    final response = await requestAcpSessionMessageInternal(
-      endpoint: endpoint,
-      params: params,
-      hasInlineAttachments: inlineAttachments.isNotEmpty,
-      onNotification: (notification) {
-        final update = acpSessionUpdateFromNotificationInternal(
-          notification,
-          sessionKey: sessionKey,
-        );
-        if (update == null) {
-          return;
-        }
-        if (update.type == 'delta' && update.text.isNotEmpty) {
-          streamingText += update.text;
+    final result = await goAgentCoreClientInternal.executeSession(
+      GoAgentCoreSessionRequest(
+        sessionId: sessionKey,
+        threadId: sessionKey,
+        target: target,
+        prompt: prompt,
+        workingDirectory: assistantWorkspacePathForSession(sessionKey),
+        model: model,
+        thinking: thinking,
+        selectedSkills: selectedSkills,
+        inlineAttachments: attachments,
+        localAttachments: const <CollaborationAttachment>[],
+        aiGatewayBaseUrl: settingsInternal.aiGateway.baseUrl.trim(),
+        aiGatewayApiKey: aiGatewayApiKeyCacheInternal.trim(),
+        agentId: selectedAgentId,
+        metadata: <String, dynamic>{
+          if (selectedSkills.isNotEmpty) 'selectedSkills': selectedSkills,
+        },
+        provider: provider,
+      ),
+      onUpdate: (update) {
+        if (update.isDelta) {
           appendStreamingTextInternal(sessionKey, update.text);
           notifyChangedInternal();
-          return;
-        }
-        if (update.error && update.message.isNotEmpty) {
-          errorText = update.message;
-          return;
-        }
-        if (update.type == 'done' && update.message.isNotEmpty) {
-          completionText = update.message;
         }
       },
     );
-
-    final result = castMapInternal(response['result']);
-    final message =
-        (completionText?.trim().isNotEmpty == true
-                ? completionText!.trim()
-                : (streamingText.trim().isNotEmpty
-                      ? streamingText.trim()
-                      : (result['message']?.toString().trim() ?? '')))
-            .trim();
-
-    if (errorText?.trim().isNotEmpty == true) {
-      throw Exception(errorText!.trim());
+    final message = result.message.trim();
+    if (!result.success && result.errorMessage.trim().isNotEmpty) {
+      throw Exception(result.errorMessage.trim());
     }
     if (message.isEmpty) {
       throw Exception(
         appText(
-          'Single Agent 没有返回可显示的输出。',
-          'Single Agent returned no displayable output.',
+          'Go Agent-core 没有返回可显示的输出。',
+          'Go Agent-core returned no displayable output.',
         ),
       );
     }

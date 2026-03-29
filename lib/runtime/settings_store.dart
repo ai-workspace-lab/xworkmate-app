@@ -187,7 +187,7 @@ class SettingsStore {
   ) async {
     await initialize();
     final normalized = records
-        .where((item) => item.sessionKey.trim().isNotEmpty)
+        .where((item) => item.threadId.trim().isNotEmpty)
         .toList(growable: false);
     _threadRecords = normalized;
     final layout = _layout;
@@ -202,7 +202,7 @@ class SettingsStore {
     final keptPaths = <String>{};
     try {
       for (final record in normalized) {
-        final taskFile = layout.taskFileForSessionKey(record.sessionKey);
+        final taskFile = layout.taskFileForSessionKey(record.threadId);
         keptPaths.add(taskFile.path);
         await atomicWriteString(taskFile, jsonEncode(record.toJson()));
       }
@@ -211,7 +211,7 @@ class SettingsStore {
         jsonEncode(<String, dynamic>{
           'version': taskThreadSchemaVersion,
           'sessions': normalized
-              .map((item) => item.sessionKey)
+              .map((item) => item.threadId)
               .toList(growable: false),
         }),
       );
@@ -447,8 +447,8 @@ class SettingsStore {
               return const <TaskThread>[];
             }
             final record = TaskThread.fromJson(decoded);
-            if (record.sessionKey.trim().isNotEmpty) {
-              recordsByKey[record.sessionKey] = record;
+            if (record.threadId.trim().isNotEmpty) {
+              recordsByKey[record.threadId] = record;
             }
           }
         } catch (_) {

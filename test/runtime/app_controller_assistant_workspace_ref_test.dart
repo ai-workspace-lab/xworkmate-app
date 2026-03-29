@@ -36,7 +36,7 @@ void main() {
         AssistantExecutionTarget.singleAgent,
       );
 
-      final workspacePath = controller.assistantWorkspaceRefForSession(
+      final workspacePath = controller.assistantWorkspacePathForSession(
         controller.currentSessionKey,
       );
       expect(
@@ -44,7 +44,7 @@ void main() {
         '${controller.settings.workspacePath}/.xworkmate/threads/main',
       );
       expect(
-        controller.assistantWorkspaceRefKindForSession(
+        controller.assistantWorkspaceKindForSession(
           controller.currentSessionKey,
         ),
         WorkspaceRefKind.localPath,
@@ -66,8 +66,8 @@ void main() {
         AssistantExecutionTarget.remote,
       );
 
-      final record =
-          controller.assistantThreadRecordsInternal[controller.currentSessionKey]!;
+      final record = controller
+          .assistantThreadRecordsInternal[controller.currentSessionKey]!;
       expect(record.ownerScope.realm, ThreadRealm.local);
       expect(record.ownerScope.subjectType, ThreadSubjectType.user);
       expect(record.ownerScope.subjectId, isNotEmpty);
@@ -78,7 +78,7 @@ void main() {
       expect(record.displayPath, record.workspacePath);
       expect(record.workspaceKind, WorkspaceKind.remoteFs);
       expect(
-        controller.assistantWorkspaceRefKindForSession(record.threadId),
+        controller.assistantWorkspaceKindForSession(record.threadId),
         WorkspaceRefKind.remotePath,
       );
     },
@@ -204,23 +204,23 @@ void main() {
       await waitForControllerInternal(controller);
 
       expect(
-        controller.assistantWorkspaceRefForSession('main'),
+        controller.assistantWorkspacePathForSession('main'),
         mainWorkspace.path,
       );
       expect(
-        controller.assistantWorkspaceRefForSession('draft:artifact-thread'),
+        controller.assistantWorkspacePathForSession('draft:artifact-thread'),
         taskWorkspace.path,
       );
 
       await controller.switchSession('draft:artifact-thread');
       expect(
-        controller.assistantWorkspaceRefForSession('draft:artifact-thread'),
+        controller.assistantWorkspacePathForSession('draft:artifact-thread'),
         taskWorkspace.path,
       );
 
       await controller.switchSession('main');
       expect(
-        controller.assistantWorkspaceRefForSession('main'),
+        controller.assistantWorkspacePathForSession('main'),
         mainWorkspace.path,
       );
     },
@@ -299,7 +299,7 @@ void main() {
       await waitForControllerInternal(controller);
 
       expect(
-        controller.assistantWorkspaceRefForSession('draft:artifact-thread'),
+        controller.assistantWorkspacePathForSession('draft:artifact-thread'),
         workspaceRoot.path,
       );
       expect(
@@ -389,7 +389,7 @@ void main() {
 
       expect(await missingThreadWorkspace.exists(), isTrue);
       expect(
-        controller.assistantWorkspaceRefForSession('draft:restored-thread'),
+        controller.assistantWorkspacePathForSession('draft:restored-thread'),
         missingThreadWorkspace.path,
       );
       expect(
@@ -445,7 +445,7 @@ void main() {
       );
       expect(await threadWorkspace.exists(), isTrue);
       expect(
-        controller.assistantWorkspaceRefForSession('draft:created-thread'),
+        controller.assistantWorkspacePathForSession('draft:created-thread'),
         threadWorkspace.path,
       );
       expect(
@@ -485,8 +485,8 @@ void main() {
       final controller = AppController(store: store);
       addTearDown(controller.dispose);
       await waitForControllerInternal(controller);
-      final existingMain =
-          controller.assistantThreadRecordsInternal[controller.currentSessionKey]!;
+      final existingMain = controller
+          .assistantThreadRecordsInternal[controller.currentSessionKey]!;
       controller.assistantThreadRecordsInternal[controller.currentSessionKey] =
           existingMain.copyWith(
             workspaceBinding: const WorkspaceBinding(
@@ -504,25 +504,27 @@ void main() {
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.singleAgent,
       );
-      controller.assistantThreadRecordsInternal[controller.currentSessionKey] =
-          controller
-              .assistantThreadRecordsInternal[controller.currentSessionKey]!
-              .copyWith(
-                workspaceBinding: const WorkspaceBinding(
-                  workspaceId: 'main',
-                  workspaceKind: WorkspaceKind.localFs,
-                  workspacePath: '',
-                  displayPath: '',
-                  writable: true,
-                ),
-                lifecycleState: controller
-                    .assistantThreadRecordsInternal[controller.currentSessionKey]!
-                    .lifecycleState
-                    .copyWith(status: 'needs_workspace'),
-              );
+      controller.assistantThreadRecordsInternal[controller
+          .currentSessionKey] = controller
+          .assistantThreadRecordsInternal[controller.currentSessionKey]!
+          .copyWith(
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: '',
+              displayPath: '',
+              writable: true,
+            ),
+            lifecycleState: controller
+                .assistantThreadRecordsInternal[controller.currentSessionKey]!
+                .lifecycleState
+                .copyWith(status: 'needs_workspace'),
+          );
 
       expect(
-        controller.assistantWorkspaceRefForSession(controller.currentSessionKey),
+        controller.assistantWorkspacePathForSession(
+          controller.currentSessionKey,
+        ),
         isEmpty,
       );
       expect(
@@ -538,7 +540,9 @@ void main() {
       );
 
       expect(
-        controller.assistantWorkspaceRefForSession(controller.currentSessionKey),
+        controller.assistantWorkspacePathForSession(
+          controller.currentSessionKey,
+        ),
         '${workspaceRoot.path}/.xworkmate/threads/main',
       );
       expect(

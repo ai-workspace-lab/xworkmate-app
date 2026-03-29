@@ -83,28 +83,24 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
   AppController controller, {
   bool forceRefresh = false,
 }) async {
-  final gatewayToken = await controller.settingsController.loadGatewayToken();
+  final capabilities = await controller.goAgentCoreClientInternal
+      .loadCapabilities(
+        target: AssistantExecutionTarget.singleAgent,
+        forceRefresh: forceRefresh,
+      );
   final next = <SingleAgentProvider, DirectSingleAgentCapabilities>{};
   for (final provider in controller.configuredSingleAgentProviders) {
-    final profile = controller.settings.externalAcpEndpointForProvider(provider);
-    if (!profile.enabled || profile.endpoint.trim().isEmpty) {
+    if (!capabilities.providers.contains(provider)) {
       next[provider] = const DirectSingleAgentCapabilities.unavailable(
         endpoint: '',
       );
       continue;
     }
-    try {
-      next[provider] = await controller.singleAgentAppServerClientInternal
-          .loadCapabilities(
-            provider: provider,
-            forceRefresh: forceRefresh,
-            gatewayToken: gatewayToken,
-          );
-    } catch (_) {
-      next[provider] = const DirectSingleAgentCapabilities.unavailable(
-        endpoint: '',
-      );
-    }
+    next[provider] = DirectSingleAgentCapabilities(
+      available: true,
+      supportedProviders: <SingleAgentProvider>[provider],
+      endpoint: 'go-agent-core',
+    );
   }
   controller.singleAgentCapabilitiesByProviderInternal = next;
   if (!controller.disposedInternal) {
@@ -112,13 +108,16 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
   }
 }
 
-List<ManagedMountTargetState> mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal(
+List<ManagedMountTargetState>
+mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal(
   AppController controller,
   List<ManagedMountTargetState> current,
   GatewayAcpCapabilities capabilities,
 ) {
   final source = current.isEmpty ? ManagedMountTargetState.defaults() : current;
-  final providers = capabilities.providers.map((item) => item.providerId).toSet();
+  final providers = capabilities.providers
+      .map((item) => item.providerId)
+      .toSet();
   return source
       .map((item) {
         final available = switch (item.targetId) {
@@ -152,7 +151,9 @@ String? assistantWorkingDirectoryForSessionRuntimeInternal(
   AppController controller,
   String sessionKey,
 ) {
-  final candidate = controller.assistantWorkspaceRefForSession(sessionKey).trim();
+  final candidate = controller
+      .assistantWorkspacePathForSession(sessionKey)
+      .trim();
   if (candidate.isEmpty) {
     return null;
   }
@@ -164,8 +165,9 @@ String? resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal(
   String sessionKey, {
   bool requireLocalExistence = true,
 }) {
-  final record = controller.assistantThreadRecordsInternal[
-      controller.normalizedAssistantSessionKeyInternal(sessionKey)];
+  final record =
+      controller.assistantThreadRecordsInternal[controller
+          .normalizedAssistantSessionKeyInternal(sessionKey)];
   if (record?.workspaceKind != WorkspaceKind.localFs) {
     return null;
   }
@@ -191,8 +193,9 @@ String? resolveSingleAgentWorkingDirectoryForSessionRuntimeInternal(
   String sessionKey, {
   SingleAgentProvider? provider,
 }) {
-  final record = controller.assistantThreadRecordsInternal[
-      controller.normalizedAssistantSessionKeyInternal(sessionKey)];
+  final record =
+      controller.assistantThreadRecordsInternal[controller
+          .normalizedAssistantSessionKeyInternal(sessionKey)];
   if (record?.workspaceKind == WorkspaceKind.remoteFs) {
     return assistantWorkingDirectoryForSessionRuntimeInternal(
       controller,
@@ -204,7 +207,10 @@ String? resolveSingleAgentWorkingDirectoryForSessionRuntimeInternal(
     sessionKey,
     requireLocalExistence:
         provider == null ||
-        singleAgentProviderRequiresLocalPathRuntimeInternal(controller, provider),
+        singleAgentProviderRequiresLocalPathRuntimeInternal(
+          controller,
+          provider,
+        ),
   );
 }
 
@@ -287,7 +293,9 @@ Future<void> ensureCodexGatewayRegistrationRuntimeInternal(
 
   try {
     final dispatch = controller.codeAgentNodeOrchestratorInternal
-        .buildGatewayDispatch(buildCodeAgentNodeStateRuntimeInternal(controller));
+        .buildGatewayDispatch(
+          buildCodeAgentNodeStateRuntimeInternal(controller),
+        );
     await controller.codeAgentBridgeRegistryInternal.register(
       agentType: 'code-agent-bridge',
       name: 'XWorkmate Codex Bridge',
@@ -313,7 +321,8 @@ Future<void> ensureCodexGatewayRegistrationRuntimeInternal(
         'runtimeMode': controller.effectiveCodeAgentRuntimeMode.name,
         'gatewayMode': bridgeGatewayModeRuntimeInternal(controller).name,
         'binaryConfigured':
-            (controller.resolvedCodexCliPath ?? controller.configuredCodexCliPath)
+            (controller.resolvedCodexCliPath ??
+                    controller.configuredCodexCliPath)
                 .trim()
                 .isNotEmpty,
         'capabilities': const <String>[
@@ -365,7 +374,9 @@ Uri? resolveSingleAgentEndpointRuntimeInternal(
   if (endpoint.isEmpty) {
     return null;
   }
-  final normalizedInput = endpoint.contains('://') ? endpoint : 'ws://$endpoint';
+  final normalizedInput = endpoint.contains('://')
+      ? endpoint
+      : 'ws://$endpoint';
   final uri = Uri.tryParse(normalizedInput);
   if (uri == null || uri.host.trim().isEmpty) {
     return null;

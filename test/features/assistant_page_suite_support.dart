@@ -231,7 +231,7 @@ class CaptureSendAppControllerInternal extends AppController {
     sendCallCount += 1;
     lastSentMessage = message;
     lastSessionKey = currentSessionKey;
-    lastWorkspaceRef = assistantWorkspaceRefForSession(currentSessionKey);
+    lastWorkspaceRef = assistantWorkspacePathForSession(currentSessionKey);
   }
 }
 

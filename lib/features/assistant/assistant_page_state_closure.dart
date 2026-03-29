@@ -132,22 +132,18 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                         : 0,
                     scrollController: conversationControllerInternal,
                     onOpenDetail: widget.onOpenDetail,
-                    onFocusComposer:
-                        AssistantPageStateActionsInternal(
-                          this,
-                        ).focusComposerInternal,
-                    onOpenGateway:
-                        AssistantPageStateActionsInternal(
-                          this,
-                        ).openGatewaySettingsInternal,
-                    onOpenAiGatewaySettings:
-                        AssistantPageStateActionsInternal(
-                          this,
-                        ).openAiGatewaySettingsInternal,
-                    onReconnectGateway:
-                        AssistantPageStateActionsInternal(
-                          this,
-                        ).connectFromSavedSettingsOrShowDialogInternal,
+                    onFocusComposer: AssistantPageStateActionsInternal(
+                      this,
+                    ).focusComposerInternal,
+                    onOpenGateway: AssistantPageStateActionsInternal(
+                      this,
+                    ).openGatewaySettingsInternal,
+                    onOpenAiGatewaySettings: AssistantPageStateActionsInternal(
+                      this,
+                    ).openAiGatewaySettingsInternal,
+                    onReconnectGateway: AssistantPageStateActionsInternal(
+                      this,
+                    ).connectFromSavedSettingsOrShowDialogInternal,
                     onMessageViewModeChanged:
                         controller.setAssistantMessageViewMode,
                   ),
@@ -193,14 +189,12 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                       : controller.resolvedAssistantModel,
                   modelOptions: controller.assistantModelChoices,
                   attachments: attachmentsInternal,
-                  availableSkills:
-                      AssistantPageStateActionsInternal(
-                        this,
-                      ).availableSkillOptionsInternal(controller),
-                  selectedSkillKeys:
-                      AssistantPageStateActionsInternal(
-                        this,
-                      ).selectedSkillKeysForInternal(controller),
+                  availableSkills: AssistantPageStateActionsInternal(
+                    this,
+                  ).availableSkillOptionsInternal(controller),
+                  selectedSkillKeys: AssistantPageStateActionsInternal(
+                    this,
+                  ).selectedSkillKeysForInternal(controller),
                   controller: controller,
                   onRemoveAttachment: (attachment) {
                     setState(() {
@@ -228,22 +222,18 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                         controller.currentSessionKey,
                         modelId,
                       ),
-                  onOpenGateway:
-                      AssistantPageStateActionsInternal(
-                        this,
-                      ).openGatewaySettingsInternal,
-                  onOpenAiGatewaySettings:
-                      AssistantPageStateActionsInternal(
-                        this,
-                      ).openAiGatewaySettingsInternal,
-                  onReconnectGateway:
-                      AssistantPageStateActionsInternal(
-                        this,
-                      ).connectFromSavedSettingsOrShowDialogInternal,
-                  onPickAttachments:
-                      AssistantPageStateActionsInternal(
-                        this,
-                      ).pickAttachmentsInternal,
+                  onOpenGateway: AssistantPageStateActionsInternal(
+                    this,
+                  ).openGatewaySettingsInternal,
+                  onOpenAiGatewaySettings: AssistantPageStateActionsInternal(
+                    this,
+                  ).openAiGatewaySettingsInternal,
+                  onReconnectGateway: AssistantPageStateActionsInternal(
+                    this,
+                  ).connectFromSavedSettingsOrShowDialogInternal,
+                  onPickAttachments: AssistantPageStateActionsInternal(
+                    this,
+                  ).pickAttachmentsInternal,
                   onAddAttachment: (attachment) {
                     setState(() {
                       attachmentsInternal = [
@@ -259,10 +249,9 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                       handleComposerContentHeightChangedInternal,
                   onComposerInputHeightChanged:
                       handleComposerInputHeightChangedInternal,
-                  onSend:
-                      AssistantPageStateActionsInternal(
-                        this,
-                      ).submitPromptInternal,
+                  onSend: AssistantPageStateActionsInternal(
+                    this,
+                  ).submitPromptInternal,
                 ),
               ),
             ],
@@ -317,14 +306,13 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                 child: AssistantArtifactSidebar(
                   sessionKey: controller.currentSessionKey,
                   threadTitle: currentTask.title,
-                  workspaceRef: controller
+                  workspacePath: controller
                       .assistantWorkspaceDisplayPathForSession(
                         controller.currentSessionKey,
                       ),
-                  workspaceRefKind: controller
-                      .assistantWorkspaceRefKindForSession(
-                        controller.currentSessionKey,
-                      ),
+                  workspaceKind: controller.assistantWorkspaceKindForSession(
+                    controller.currentSessionKey,
+                  ),
                   onCollapse: () {
                     setState(() {
                       artifactPaneCollapsedInternal = true;
@@ -332,7 +320,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                   },
                   onOpenWorkspace: () async {
                     final workspacePath = controller
-                        .assistantWorkspaceRefForSession(
+                        .assistantWorkspacePathForSession(
                           controller.currentSessionKey,
                         )
                         .trim();
@@ -348,7 +336,9 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                       return;
                     }
                     if (Platform.isWindows) {
-                      await Process.run('explorer.exe', <String>[workspacePath]);
+                      await Process.run('explorer.exe', <String>[
+                        workspacePath,
+                      ]);
                     }
                   },
                   loadSnapshot: () =>
@@ -395,10 +385,9 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
     List<GatewayChatMessage> messages,
   ) {
     final items = <TimelineItemInternal>[];
-    final ownerLabel =
-        AssistantPageStateActionsInternal(
-          this,
-        ).conversationOwnerLabelInternal(controller);
+    final ownerLabel = AssistantPageStateActionsInternal(
+      this,
+    ).conversationOwnerLabelInternal(controller);
 
     for (final message in messages) {
       if ((message.toolName ?? '').trim().isNotEmpty) {

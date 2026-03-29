@@ -92,11 +92,11 @@ void main() {
         AssistantExecutionTarget.singleAgent,
       );
       expect(
-        controller.assistantWorkspaceRefForSession(threadSingle),
+        controller.assistantWorkspacePathForSession(threadSingle),
         controller.threadRecordsInternal[threadSingle]!.workspacePath,
       );
       expect(
-        controller.assistantWorkspaceRefKindForSession(threadSingle),
+        controller.assistantWorkspaceKindForSession(threadSingle),
         WorkspaceRefKind.remotePath,
       );
       expect(
@@ -111,11 +111,11 @@ void main() {
 
       expect(controller.assistantModelForSession(threadLocal), 'local-model');
       expect(
-        controller.assistantWorkspaceRefForSession(threadLocal),
+        controller.assistantWorkspacePathForSession(threadLocal),
         controller.threadRecordsInternal[threadLocal]!.workspacePath,
       );
       expect(
-        controller.assistantWorkspaceRefKindForSession(threadLocal),
+        controller.assistantWorkspaceKindForSession(threadLocal),
         WorkspaceRefKind.remotePath,
       );
 
@@ -141,11 +141,11 @@ void main() {
         AssistantExecutionTarget.singleAgent,
       );
       expect(
-        reloaded.assistantWorkspaceRefForSession(threadSingle),
+        reloaded.assistantWorkspacePathForSession(threadSingle),
         reloaded.threadRecordsInternal[threadSingle]!.workspacePath,
       );
       expect(
-        reloaded.assistantWorkspaceRefKindForSession(threadSingle),
+        reloaded.assistantWorkspaceKindForSession(threadSingle),
         WorkspaceRefKind.remotePath,
       );
       expect(
@@ -159,11 +159,11 @@ void main() {
       expect(reloaded.assistantModelForSession(threadSingle), 'single-model');
       expect(reloaded.assistantModelForSession(threadLocal), 'local-model');
       expect(
-        reloaded.assistantWorkspaceRefForSession(threadRemote),
+        reloaded.assistantWorkspacePathForSession(threadRemote),
         reloaded.threadRecordsInternal[threadRemote]!.workspacePath,
       );
       expect(
-        reloaded.assistantWorkspaceRefKindForSession(threadRemote),
+        reloaded.assistantWorkspaceKindForSession(threadRemote),
         WorkspaceRefKind.remotePath,
       );
       expect(reloaded.isAssistantTaskArchived(threadRemote), isTrue);

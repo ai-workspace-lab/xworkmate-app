@@ -28,6 +28,7 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
+import '../runtime/go_agent_core_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
@@ -51,16 +52,12 @@ import 'app_controller_desktop_runtime_helpers.dart';
 extension AppControllerDesktopThreadActions on AppController {
   bool assistantSessionHasPendingRun(String sessionKey) {
     final normalized = normalizedAssistantSessionKeyInternal(sessionKey);
-    if (assistantExecutionTargetForSession(normalized) ==
-        AssistantExecutionTarget.singleAgent) {
-      return aiGatewayPendingSessionKeysInternal.contains(normalized);
-    }
-    return (chatControllerInternal.hasPendingRun ||
-            multiAgentRunPendingInternal) &&
-        matchesSessionKey(
-          normalized,
-          sessionsControllerInternal.currentSessionKey,
-        );
+    return aiGatewayPendingSessionKeysInternal.contains(normalized) ||
+        (multiAgentRunPendingInternal &&
+            matchesSessionKey(
+              normalized,
+              sessionsControllerInternal.currentSessionKey,
+            ));
   }
 
   Future<void> sendSingleAgentMessageInternal(
@@ -254,7 +251,7 @@ extension AppControllerDesktopThreadActions on AppController {
       currentSessionKey,
       executionTarget: assistantExecutionTargetForSession(currentSessionKey),
     );
-    if (assistantWorkspaceRefForSession(currentSessionKey).trim().isEmpty) {
+    if (assistantWorkspacePathForSession(currentSessionKey).trim().isEmpty) {
       appendAssistantThreadMessageInternal(
         currentSessionKey,
         assistantErrorMessageInternal(
@@ -279,16 +276,119 @@ extension AppControllerDesktopThreadActions on AppController {
       recomputeTasksInternal();
       return;
     }
-    final dispatch = codeAgentNodeOrchestratorInternal.buildGatewayDispatch(
-      buildCodeAgentNodeStateInternal(),
-    );
-    await chatControllerInternal.sendMessage(
-      sessionKey: sessionsControllerInternal.currentSessionKey,
-      message: message,
-      thinking: thinking,
-      attachments: attachments,
-      agentId: dispatch.agentId,
-      metadata: dispatch.metadata,
+    await enqueueThreadTurnInternal<void>(
+      normalizedAssistantSessionKeyInternal(currentSessionKey),
+      () async {
+        final sessionKey = normalizedAssistantSessionKeyInternal(
+          currentSessionKey,
+        );
+        final userText = message.trim().isEmpty ? 'See attached.' : message.trim();
+        appendLocalSessionMessageInternal(
+          sessionKey,
+          GatewayChatMessage(
+            id: nextLocalMessageIdInternal(),
+            role: 'user',
+            text: userText,
+            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            toolCallId: null,
+            toolName: null,
+            stopReason: null,
+            pending: false,
+            error: false,
+          ),
+          persistInThreadContext: true,
+        );
+        aiGatewayPendingSessionKeysInternal.add(sessionKey);
+        recomputeTasksInternal();
+        notifyIfActiveInternal();
+        try {
+          final dispatch = codeAgentNodeOrchestratorInternal.buildGatewayDispatch(
+            buildCodeAgentNodeStateInternal(),
+          );
+          final result = await goAgentCoreClientInternal.executeSession(
+            GoAgentCoreSessionRequest(
+              sessionId: sessionKey,
+              threadId: sessionKey,
+              target: assistantExecutionTargetForSession(sessionKey),
+              prompt: message,
+              workingDirectory:
+                  assistantWorkspacePathForSession(sessionKey).trim(),
+              model: assistantModelForSession(sessionKey),
+              thinking: thinking,
+              selectedSkills: selectedSkillLabels,
+              inlineAttachments: attachments,
+              localAttachments: localAttachments,
+              aiGatewayBaseUrl: aiGatewayUrl,
+              aiGatewayApiKey: await loadAiGatewayApiKey(),
+              agentId: dispatch.agentId ?? '',
+              metadata: dispatch.metadata,
+            ),
+            onUpdate: (update) {
+              if (update.isDelta) {
+                appendAiGatewayStreamingTextInternal(sessionKey, update.text);
+                notifyIfActiveInternal();
+              }
+            },
+          );
+          clearAiGatewayStreamingTextInternal(sessionKey);
+          if (!result.success) {
+            appendLocalSessionMessageInternal(
+              sessionKey,
+              assistantErrorMessageInternal(
+                result.errorMessage.trim().isEmpty
+                    ? appText(
+                        'Go Agent-core 执行失败。',
+                        'Go Agent-core execution failed.',
+                      )
+                    : result.errorMessage,
+              ),
+              persistInThreadContext: true,
+            );
+            return;
+          }
+          final assistantText = result.message.trim();
+          if (assistantText.isEmpty) {
+            appendLocalSessionMessageInternal(
+              sessionKey,
+              assistantErrorMessageInternal(
+                appText(
+                  'Go Agent-core 没有返回可显示的输出。',
+                  'Go Agent-core returned no displayable output.',
+                ),
+              ),
+              persistInThreadContext: true,
+            );
+            return;
+          }
+          appendLocalSessionMessageInternal(
+            sessionKey,
+            GatewayChatMessage(
+              id: nextLocalMessageIdInternal(),
+              role: 'assistant',
+              text: assistantText,
+              timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+              toolCallId: null,
+              toolName: null,
+              stopReason: null,
+              pending: false,
+              error: false,
+            ),
+            persistInThreadContext: true,
+          );
+        } catch (error) {
+          clearAiGatewayStreamingTextInternal(sessionKey);
+          appendLocalSessionMessageInternal(
+            sessionKey,
+            assistantErrorMessageInternal(error.toString()),
+            persistInThreadContext: true,
+          );
+        } finally {
+          aiGatewayPendingSessionKeysInternal.remove(sessionKey);
+          clearAiGatewayStreamingTextInternal(sessionKey);
+          recomputeTasksInternal();
+          notifyIfActiveInternal();
+        }
+      },
     );
     recomputeTasksInternal();
   }
@@ -315,23 +415,36 @@ extension AppControllerDesktopThreadActions on AppController {
       final sessionKey = normalizedAssistantSessionKeyInternal(
         sessionsControllerInternal.currentSessionKey,
       );
-      if (singleAgentExternalCliPendingSessionKeysInternal.contains(
-        sessionKey,
-      )) {
-        await singleAgentRunnerInternal.abort(sessionKey);
+      if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
+        await goAgentCoreClientInternal.cancelSession(
+          target: AssistantExecutionTarget.singleAgent,
+          sessionId: sessionKey,
+          threadId: sessionKey,
+        );
         aiGatewayPendingSessionKeysInternal.remove(sessionKey);
-        singleAgentExternalCliPendingSessionKeysInternal.remove(sessionKey);
         clearAiGatewayStreamingTextInternal(sessionKey);
         recomputeTasksInternal();
         notifyIfActiveInternal();
         return;
       }
-      await abortAiGatewayRunInternal(
-        sessionsControllerInternal.currentSessionKey,
-      );
+      await abortAiGatewayRunInternal(sessionKey);
       return;
     }
-    await chatControllerInternal.abortRun();
+    final sessionKey = normalizedAssistantSessionKeyInternal(
+      sessionsControllerInternal.currentSessionKey,
+    );
+    if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
+      await goAgentCoreClientInternal.cancelSession(
+        target: assistantExecutionTargetForSession(sessionKey),
+        sessionId: sessionKey,
+        threadId: sessionKey,
+      );
+      aiGatewayPendingSessionKeysInternal.remove(sessionKey);
+      clearAiGatewayStreamingTextInternal(sessionKey);
+      recomputeTasksInternal();
+      notifyIfActiveInternal();
+      return;
+    }
   }
 
   Future<void> prepareForExit() async {

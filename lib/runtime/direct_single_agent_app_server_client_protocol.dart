@@ -41,7 +41,7 @@ class DirectSingleAgentRunResult {
     this.aborted = false,
     this.resolvedModel = '',
     this.resolvedWorkingDirectory = '',
-    this.resolvedWorkspaceRefKind,
+    this.resolvedWorkspaceRefKind = WorkspaceRefKind.localPath,
   });
 
   final bool success;
@@ -50,7 +50,7 @@ class DirectSingleAgentRunResult {
   final bool aborted;
   final String resolvedModel;
   final String resolvedWorkingDirectory;
-  final WorkspaceRefKind? resolvedWorkspaceRefKind;
+  final WorkspaceRefKind resolvedWorkspaceRefKind;
 }
 
 class DirectSingleAgentRunRequest {

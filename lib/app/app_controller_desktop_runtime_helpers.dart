@@ -642,6 +642,17 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     );
   }
 
+  Uri? resolveGoAgentCoreEndpointForTargetInternal(
+    AssistantExecutionTarget target,
+  ) {
+    if (target == AssistantExecutionTarget.singleAgent) {
+      return null;
+    }
+    return gatewayProfileBaseUriInternal(
+      gatewayProfileForAssistantExecutionTargetInternal(target),
+    );
+  }
+
   Uri? gatewayProfileBaseUriInternal(GatewayConnectionProfile profile) {
     final host = profile.host.trim();
     if (host.isEmpty || profile.port <= 0) {

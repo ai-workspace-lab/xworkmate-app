@@ -70,8 +70,8 @@ class _BrowserArtifactSidebarHarnessState
   double _width = 360;
 
   late final AssistantArtifactSnapshot _snapshot = AssistantArtifactSnapshot(
-    workspaceRef: '/owners/remote/user/browser-device/threads/browser-thread',
-    workspaceRefKind: WorkspaceRefKind.remotePath,
+    workspacePath: '/owners/remote/user/browser-device/threads/browser-thread',
+    workspaceKind: WorkspaceRefKind.remotePath,
     resultEntries: <AssistantArtifactEntry>[
       const AssistantArtifactEntry(
         id: 'readme',
@@ -80,7 +80,8 @@ class _BrowserArtifactSidebarHarnessState
         kind: AssistantArtifactEntryKind.object,
         mimeType: 'text/markdown',
         previewable: true,
-        workspaceRef: '/owners/remote/user/browser-device/threads/browser-thread',
+        workspacePath:
+            '/owners/remote/user/browser-device/threads/browser-thread',
       ),
     ],
     fileEntries: <AssistantArtifactEntry>[
@@ -91,7 +92,8 @@ class _BrowserArtifactSidebarHarnessState
         kind: AssistantArtifactEntryKind.object,
         mimeType: 'text/markdown',
         previewable: true,
-        workspaceRef: '/owners/remote/user/browser-device/threads/browser-thread',
+        workspacePath:
+            '/owners/remote/user/browser-device/threads/browser-thread',
       ),
     ],
   );
@@ -128,8 +130,8 @@ class _BrowserArtifactSidebarHarnessState
                         child: AssistantArtifactSidebar(
                           sessionKey: 'browser-thread',
                           threadTitle: 'Browser thread',
-                          workspaceRef: _snapshot.workspaceRef,
-                          workspaceRefKind: _snapshot.workspaceRefKind,
+                          workspacePath: _snapshot.workspacePath,
+                          workspaceKind: _snapshot.workspaceKind,
                           onCollapse: () {
                             setState(() {
                               _collapsed = true;
