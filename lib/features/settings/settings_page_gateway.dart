@@ -34,6 +34,14 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
     SettingsSnapshot settings,
     UiFeatureAccess uiFeatures,
   ) {
+    if (!widget.showSectionTabs) {
+      return buildUnifiedGatewaySectionsInternal(
+        context,
+        controller,
+        settings,
+        uiFeatures,
+      );
+    }
     final tabLabel = switch (integrationSubTabInternal) {
       GatewayIntegrationSubTabInternal.gateway => 'OpenClaw Gateway',
       GatewayIntegrationSubTabInternal.vault => appText(
@@ -144,6 +152,59 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
           SkillDirectoryAuthorizationCard(controller: controller),
         ],
       },
+    ];
+  }
+
+  List<Widget> buildUnifiedGatewaySectionsInternal(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+    UiFeatureAccess uiFeatures,
+  ) {
+    return [
+      buildCollapsibleGatewaySectionInternal(
+        context: context,
+        title: 'OpenClaw Gateway',
+        expanded: openClawGatewayExpandedInternal,
+        onChanged: (value) => setStateInternal(() {
+          openClawGatewayExpandedInternal = value;
+        }),
+        child: buildOpenClawGatewayCardInternal(context, controller, settings),
+      ),
+      const SizedBox(height: 16),
+      if (uiFeatures.supportsVaultServer)
+        buildCollapsibleGatewaySectionInternal(
+          context: context,
+          title: appText('Vault Server', 'Vault Server'),
+          expanded: vaultServerExpandedInternal,
+          onChanged: (value) => setStateInternal(() {
+            vaultServerExpandedInternal = value;
+          }),
+          child: buildVaultProviderCardInternal(context, controller, settings),
+        )
+      else
+        SurfaceCard(
+          child: Text(
+            appText(
+              '当前发布配置未开放 Vault Server 参数。',
+              'Vault Server settings are disabled in this release configuration.',
+            ),
+          ),
+        ),
+      const SizedBox(height: 16),
+      buildCollapsibleGatewaySectionInternal(
+        context: context,
+        title: appText('LLM 接入点', 'LLM Endpoints'),
+        expanded: aiGatewayExpandedInternal,
+        onChanged: (value) => setStateInternal(() {
+          aiGatewayExpandedInternal = value;
+        }),
+        child: buildLlmEndpointManagerInternal(context, controller, settings),
+      ),
+      const SizedBox(height: 16),
+      buildExternalAcpEndpointManagerInternal(context, controller, settings),
+      const SizedBox(height: 16),
+      SkillDirectoryAuthorizationCard(controller: controller),
     ];
   }
 

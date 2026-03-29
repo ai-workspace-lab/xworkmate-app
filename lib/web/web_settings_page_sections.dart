@@ -18,6 +18,45 @@ import 'web_settings_page_gateway.dart';
 import 'web_settings_page_support.dart';
 
 extension WebSettingsPageSectionsMixinInternal on WebSettingsPageStateInternal {
+  List<Widget> buildTabContentInternal(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+    SettingsTab tab,
+  ) {
+    return switch (tab) {
+      SettingsTab.general => buildGeneralInternal(context, controller, settings),
+      SettingsTab.gateway => buildGatewayInternal(context, controller, settings),
+      SettingsTab.appearance => buildAppearanceInternal(context, controller),
+      _ => buildAboutInternal(context),
+    };
+  }
+
+  List<Widget> buildOverviewContentInternal(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+    List<SettingsTab> availableTabs,
+    SettingsTab currentTab,
+  ) {
+    final orderedTabs = <SettingsTab>[
+      currentTab,
+      ...availableTabs.where((item) => item != currentTab),
+    ];
+    final sections = <Widget>[];
+    for (final tab in orderedTabs) {
+      final content = buildTabContentInternal(context, controller, settings, tab);
+      if (content.isEmpty) {
+        continue;
+      }
+      if (sections.isNotEmpty) {
+        sections.add(const SizedBox(height: 24));
+      }
+      sections.addAll(content);
+    }
+    return sections;
+  }
+
   Widget buildGlobalApplyBarInternal(
     BuildContext context,
     AppController controller,
@@ -147,6 +186,15 @@ extension WebSettingsPageSectionsMixinInternal on WebSettingsPageStateInternal {
     AppController controller,
     SettingsSnapshot settings,
   ) {
+    if (!widget.showSectionTabs) {
+      return [
+        ...buildGatewayOverviewInternal(context, controller),
+        const SizedBox(height: 16),
+        ...buildLlmEndpointManagerInternal(context, controller, settings),
+        const SizedBox(height: 16),
+        buildExternalAcpEndpointManagerInternal(context, controller),
+      ];
+    }
     return [
       SectionTabs(
         items: <String>[

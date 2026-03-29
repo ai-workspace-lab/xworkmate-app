@@ -222,7 +222,16 @@ class _AppShellState extends State<AppShell> {
                             sidebarState: sidebarState,
                             appLanguage: controller.appLanguage,
                             themeMode: controller.themeMode,
-                            onSectionChanged: controller.navigateTo,
+                            onSectionChanged: (destination) {
+                              if (destination ==
+                                  WorkspaceDestination.settings) {
+                                controller.openSettings(
+                                  tab: SettingsTab.general,
+                                );
+                                return;
+                              }
+                              controller.navigateTo(destination);
+                            },
                             onToggleLanguage: controller.toggleAppLanguage,
                             onCycleSidebarState: controller.cycleSidebarState,
                             onExpandFromCollapsed: () => controller

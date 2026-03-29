@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/features/settings/settings_page.dart';
+import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
 import '../test_support.dart';
@@ -61,12 +62,8 @@ void main() {
         );
       });
 
+      controller.setSettingsTab(SettingsTab.gateway);
       await pumpPage(tester, child: SettingsPage(controller: controller));
-
-      await tester.tap(find.text('集成'));
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(find.text('LLM 接入点'));
-      await tester.pump(const Duration(milliseconds: 300));
 
       await tester.enterText(
         find.byKey(const ValueKey('ai-gateway-name-field')),
@@ -104,7 +101,7 @@ void main() {
       );
       expect(
         find.byKey(const ValueKey('settings-global-apply-button')),
-        findsNothing,
+        findsOneWidget,
       );
 
       expect(
