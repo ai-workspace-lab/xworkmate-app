@@ -236,21 +236,14 @@ void main() {
     expect(find.text('LLM 接入点'), findsOneWidget);
     expect(find.text('ACP 外部接入'), findsOneWidget);
     expect(find.text('Vault Server'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('vault-server-url-field')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('vault-server-url-field')), findsNothing);
     expect(
       find.byKey(const ValueKey('vault-root-access-token-field')),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.byKey(const ValueKey('ai-gateway-url-field')), findsNothing);
-    expect(find.byKey(const ValueKey('gateway-mode-field')), findsNothing);
-    expect(find.text('认证诊断'), findsNothing);
     expect(find.byKey(const ValueKey('gateway-test-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('gateway-save-button')), findsNothing);
     expect(find.byKey(const ValueKey('gateway-apply-button')), findsOneWidget);
-    expect(find.text('保存并生效'), findsWidgets);
     expect(
       find.byKey(const ValueKey('gateway-profile-chip-0')),
       findsOneWidget,
@@ -283,6 +276,22 @@ void main() {
       find.byKey(const ValueKey('gateway-device-security-card')),
       findsOneWidget,
     );
+
+    await tester.tap(find.text('Vault Server').first);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('vault-server-url-field')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('vault-root-access-token-field')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('ai-gateway-url-field')), findsNothing);
+    expect(find.byKey(const ValueKey('gateway-mode-field')), findsNothing);
+    expect(find.text('认证诊断'), findsNothing);
+    expect(find.text('保存并生效'), findsWidgets);
   });
 
   testWidgets('SettingsPage vault card exposes concrete K/V fields', (
@@ -298,8 +307,10 @@ void main() {
 
     await tester.tap(find.text('集成'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Vault Server').first);
+    await tester.pumpAndSettle();
 
-    expect(find.text('Vault Server'), findsOneWidget);
+    expect(find.text('Vault Server'), findsWidgets);
     expect(find.text('VAULT_SERVER_URL'), findsOneWidget);
     expect(
       find.textContaining('VAULT_SERVER_ROOT_ACCESS_TOKEN'),
