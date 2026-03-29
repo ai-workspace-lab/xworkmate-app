@@ -109,6 +109,35 @@ void registerSecureConfigStoreSuiteSecretsTestsInternal() {
     );
 
     test(
+      'SecureConfigStore keeps Vault root token out of the settings snapshot payload',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-config-store-vault-secret-',
+        );
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+        final snapshot = SettingsSnapshot.defaults().copyWith(
+          vault: SettingsSnapshot.defaults().vault.copyWith(
+            address: 'https://vault.example.com',
+            namespace: 'platform/team-a',
+          ),
+        );
+
+        await store.saveSettingsSnapshot(snapshot);
+        await store.saveVaultToken('vault-root-secret');
+
+        expect(await store.loadVaultToken(), 'vault-root-secret');
+        expect(
+          (await store.loadSecureRefs())['vault_token'],
+          'vault-root-secret',
+        );
+        expect(
+          (await store.loadSettingsSnapshot()).toJsonString(),
+          isNot(contains('vault-root-secret')),
+        );
+      },
+    );
+
+    test(
       'SecureConfigStore exposes an explicit secrets write failure when durable secret storage is unavailable',
       () async {
         SharedPreferences.setMockInitialValues(<String, Object>{});

@@ -199,23 +199,24 @@ void main() {
     expect(find.text('账号本地模式'), findsOneWidget);
   });
 
-  testWidgets('SettingsPage workspace tab no longer exposes remote project root', (
-    WidgetTester tester,
-  ) async {
-    final controller = await createTestController(tester);
+  testWidgets(
+    'SettingsPage workspace tab no longer exposes remote project root',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
 
-    await pumpPage(
-      tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
-    );
+      await pumpPage(
+        tester,
+        child: SettingsPage(controller: controller),
+        platform: TargetPlatform.macOS,
+      );
 
-    await tester.tap(find.text('工作区'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('工作区'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('远程项目根目录'), findsNothing);
-    expect(find.text('Remote Project Root'), findsNothing);
-  });
+      expect(find.text('远程项目根目录'), findsNothing);
+      expect(find.text('Remote Project Root'), findsNothing);
+    },
+  );
 
   testWidgets('SettingsPage integration tab exposes unified gateway controls', (
     WidgetTester tester,
@@ -234,7 +235,15 @@ void main() {
     expect(find.text('OpenClaw Gateway'), findsWidgets);
     expect(find.text('LLM 接入点'), findsOneWidget);
     expect(find.text('ACP 外部接入'), findsOneWidget);
-    expect(find.text('Vault Server'), findsNothing);
+    expect(find.text('Vault Server'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('vault-server-url-field')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('vault-root-access-token-field')),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('ai-gateway-url-field')), findsNothing);
     expect(find.byKey(const ValueKey('gateway-mode-field')), findsNothing);
     expect(find.text('认证诊断'), findsNothing);
@@ -275,20 +284,10 @@ void main() {
     );
   });
 
-  testWidgets('SettingsPage can expose vault section when feature enabled', (
+  testWidgets('SettingsPage vault card exposes concrete K/V fields', (
     WidgetTester tester,
   ) async {
-    final manifest = UiFeatureManifest.fallback().copyWithFeature(
-      platform: UiFeaturePlatform.desktop,
-      module: 'settings',
-      feature: 'vault_server',
-      enabled: true,
-      releaseTier: UiFeatureReleaseTier.experimental,
-    );
-    final controller = await createTestController(
-      tester,
-      uiFeatureManifest: manifest,
-    );
+    final controller = await createTestController(tester);
 
     await pumpPage(
       tester,
@@ -300,6 +299,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Vault Server'), findsOneWidget);
+    expect(find.text('VAULT_SERVER_URL'), findsOneWidget);
+    expect(
+      find.textContaining('VAULT_SERVER_ROOT_ACCESS_TOKEN'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('vault-save-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('vault-apply-button')), findsOneWidget);
   });
 
   testWidgets('SettingsPage integration tab exposes ACP provider endpoints', (

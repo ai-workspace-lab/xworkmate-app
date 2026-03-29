@@ -23,6 +23,10 @@ func handleChatTool(arguments map[string]any) (string, error) {
 	return shared.HandleChatTool(arguments)
 }
 
+func handleVaultKVTool(arguments map[string]any) (string, error) {
+	return shared.HandleVaultKVTool(arguments)
+}
+
 func runClaudeReview(
 	prompt,
 	model,

@@ -131,6 +131,21 @@ func handleRequest(request shared.RPCRequest) map[string]any {
 						"required": []string{"prompt"},
 					},
 				},
+				{
+					"name":        "vault_kv",
+					"description": "HashiCorp Vault K/V v2 bridge",
+					"inputSchema": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"operation": map[string]any{"type": "string"},
+							"mount":     map[string]any{"type": "string"},
+							"path":      map[string]any{"type": "string"},
+							"data":      map[string]any{"type": "object"},
+							"cas":       map[string]any{"type": "number"},
+						},
+						"required": []string{"operation", "path"},
+					},
+				},
 			},
 		})
 	case "tools/call":
@@ -152,6 +167,12 @@ func handleRequest(request shared.RPCRequest) map[string]any {
 			return shared.ToolTextResult(request.ID, content)
 		case "claude_review":
 			content, err := shared.HandleClaudeReviewTool(params.Arguments)
+			if err != nil {
+				return shared.ToolErrorResult(request.ID, err)
+			}
+			return shared.ToolTextResult(request.ID, content)
+		case "vault_kv":
+			content, err := shared.HandleVaultKVTool(params.Arguments)
 			if err != nil {
 				return shared.ToolErrorResult(request.ID, err)
 			}

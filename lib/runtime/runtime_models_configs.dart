@@ -383,7 +383,7 @@ class VaultConfig {
   factory VaultConfig.defaults() {
     return const VaultConfig(
       address: 'http://127.0.0.1:8200',
-      namespace: 'default',
+      namespace: '',
       authMode: 'token',
       tokenRef: 'vault_token',
     );
