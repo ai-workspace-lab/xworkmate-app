@@ -92,8 +92,8 @@ extension SettingsPageGatewayConnectionMixinInternal
       children: [
         Text(
           appText(
-            '这里维护外部 Gateway / ACP endpoint 连接源 profile。工作模式在会话区单独切换：single-agent 通过标准 ACP 协议直连外部 Agent；local/remote 继续走 Gateway。保存：仅保存配置，不立即生效。应用：立即按当前配置生效。',
-            'This card edits external Gateway / ACP endpoint profiles. Work mode is switched in the session UI: single-agent connects to an external Agent over the standard ACP protocol, while local/remote continue through Gateway. Save persists configuration only, while Apply makes it take effect immediately.',
+            '这里维护外部 Gateway / ACP endpoint 连接源 profile。工作模式在会话区单独切换：single-agent 通过标准 ACP 协议直连外部 Agent；local/remote 继续走 Gateway。保存并生效：立即按当前配置更新。',
+            'This card edits external Gateway / ACP endpoint profiles. Work mode is switched in the session UI: single-agent connects to an external Agent over the standard ACP protocol, while local/remote continue through Gateway. Save & apply updates the active configuration immediately.',
           ),
           style: theme.textTheme.bodyMedium,
         ),
@@ -251,12 +251,12 @@ extension SettingsPageGatewayConnectionMixinInternal
             profileIndex: selectedProfileIndex,
           ),
           storedHelperText: appText(
-            '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存/应用提交。',
-            'Stored securely. Test directly or submit with local Save / Apply actions.',
+            '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存并生效提交。',
+            'Stored securely. Test directly or submit with the local Save & apply action.',
           ),
           emptyHelperText: appText(
-            '输入后先进入草稿；通过本区保存/应用提交。',
-            'Values stage into draft first; submit with local Save / Apply actions.',
+            '输入后先进入草稿；通过本区保存并生效提交。',
+            'Values stage into draft first; submit with the local Save & apply action.',
           ),
         ),
         const SizedBox(height: 12),
@@ -277,23 +277,21 @@ extension SettingsPageGatewayConnectionMixinInternal
             profileIndex: selectedProfileIndex,
           ),
           storedHelperText: appText(
-            '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存/应用提交。',
-            'Stored securely. Test directly or submit with local Save / Apply actions.',
+            '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存并生效提交。',
+            'Stored securely. Test directly or submit with the local Save & apply action.',
           ),
           emptyHelperText: appText(
-            '输入后先进入草稿；通过本区保存/应用提交。',
-            'Values stage into draft first; submit with local Save / Apply actions.',
+            '输入后先进入草稿；通过本区保存并生效提交。',
+            'Values stage into draft first; submit with the local Save & apply action.',
           ),
         ),
         const SizedBox(height: 16),
         buildSettingsSectionActionsInternal(
           controller: controller,
           testKey: const ValueKey('gateway-test-button'),
-          saveKey: const ValueKey('gateway-save-button'),
           applyKey: const ValueKey('gateway-apply-button'),
           testing: gatewayTestingInternal,
           onTest: () => testGatewayConnectionInternal(controller, settings),
-          onSave: () => saveGatewayAndPersistInternal(controller, settings),
           onApply: () => saveGatewayAndApplyInternal(controller, settings),
         ),
         const SizedBox(height: 16),
@@ -390,21 +388,19 @@ extension SettingsPageGatewayConnectionMixinInternal
           onSubmitted: (value) async => controller.saveVaultTokenDraft(value),
           storedHelperText: appText(
             '已安全保存；Vault root token 只会在测试连接或显式保存时使用。',
-            'Stored securely. The Vault root token is only used for test/apply flows.',
+            'Stored securely. The Vault root token is only used for test or save-and-apply flows.',
           ),
           emptyHelperText: appText(
-            '输入后先进入草稿；点击 Save / Apply 后才会写入安全存储。',
-            'Values stage into draft first and only persist to secure storage after Save / Apply.',
+            '输入后先进入草稿；点击“保存并生效”后才会写入安全存储。',
+            'Values stage into draft first and only persist to secure storage after Save & apply.',
           ),
         ),
         const SizedBox(height: 12),
         buildSettingsSectionActionsInternal(
           controller: controller,
           testKey: const ValueKey('vault-test-button'),
-          saveKey: const ValueKey('vault-save-button'),
           applyKey: const ValueKey('vault-apply-button'),
           onTest: () => testVaultConnectionInternal(controller, settings),
-          onSave: () => handleTopLevelSaveInternal(controller),
           onApply: () => handleTopLevelApplyInternal(controller),
           testLabel:
               '${appText('测试连接', 'Test Connection')} · ${controller.settingsController.vaultStatus}',

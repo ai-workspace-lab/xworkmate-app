@@ -186,17 +186,6 @@ XWorkmate Privacy Policy
     return controller.saveSettingsDraft(snapshot);
   }
 
-  Future<void> handleTopLevelSaveInternal(AppController controller) async {
-    await captureVisibleSecretDraftsInternal(controller);
-    await controller.persistSettingsDraft();
-    if (!mounted) {
-      return;
-    }
-    setStateInternal(() {
-      resetSecureFieldUiAfterPersistInternal(controller);
-    });
-  }
-
   Future<void> handleTopLevelApplyInternal(AppController controller) async {
     await captureVisibleSecretDraftsInternal(controller);
     await controller.applySettingsDraft();
@@ -473,28 +462,12 @@ XWorkmate Privacy Policy
     await saveGatewayProfileInternal(controller, settings, profile);
   }
 
-  Future<void> saveGatewayAndPersistInternal(
-    AppController controller,
-    SettingsSnapshot settings,
-  ) async {
-    await saveGatewayDraftInternal(controller, settings);
-    await handleTopLevelSaveInternal(controller);
-  }
-
   Future<void> saveGatewayAndApplyInternal(
     AppController controller,
     SettingsSnapshot settings,
   ) async {
     await saveGatewayDraftInternal(controller, settings);
     await handleTopLevelApplyInternal(controller);
-  }
-
-  Future<void> saveAiGatewayAndPersistInternal(
-    AppController controller,
-    SettingsSnapshot settings,
-  ) async {
-    await saveAiGatewayDraftInternal(controller, settings);
-    await handleTopLevelSaveInternal(controller);
   }
 
   Future<void> saveAiGatewayAndApplyInternal(
@@ -674,10 +647,8 @@ XWorkmate Privacy Policy
   Widget buildSettingsSectionActionsInternal({
     required AppController controller,
     required Key testKey,
-    required Key saveKey,
     required Key applyKey,
     required Future<void> Function() onTest,
-    required Future<void> Function() onSave,
     required Future<void> Function() onApply,
     bool testing = false,
     String? testLabel,
@@ -695,15 +666,10 @@ XWorkmate Privacy Policy
                 : (testLabel ?? appText('测试连接', 'Test Connection')),
           ),
         ),
-        OutlinedButton(
-          key: saveKey,
-          onPressed: () => onSave(),
-          child: Text(appText('保存', 'Save')),
-        ),
         FilledButton.tonal(
           key: applyKey,
           onPressed: () => onApply(),
-          child: Text(appText('应用', 'Apply')),
+          child: Text(appText('保存并生效', 'Save & apply')),
         ),
       ],
     );
