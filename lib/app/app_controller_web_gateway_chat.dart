@@ -41,12 +41,15 @@ extension AppControllerWebGatewayChat on AppController {
     if (assistantWorkspacePathForSession(
       currentSessionKeyInternal,
     ).trim().isEmpty) {
-      lastAssistantErrorInternal = appText(
-        '当前线程缺少工作路径，无法运行。',
-        'This thread has no workspace path, so it cannot run.',
+      final error = StateError(
+        appText(
+          '当前线程缺少工作路径，无法运行。',
+          'This thread has no workspace path, so it cannot run.',
+        ),
       );
+      lastAssistantErrorInternal = error.message.toString();
       notifyChangedInternal();
-      return;
+      throw error;
     }
     const maxAttachmentBytes = 10 * 1024 * 1024;
     final totalAttachmentBytes = attachments.fold<int>(
