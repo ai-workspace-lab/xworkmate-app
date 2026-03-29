@@ -48,6 +48,8 @@ void main() {
 
       await tester.tap(find.text('集成'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Vault Server').first);
+      await tester.pumpAndSettle();
 
       expect(
         find.byKey(const ValueKey('vault-server-url-field')),

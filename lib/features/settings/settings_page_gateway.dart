@@ -36,6 +36,10 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
   ) {
     final tabLabel = switch (integrationSubTabInternal) {
       GatewayIntegrationSubTabInternal.gateway => 'OpenClaw Gateway',
+      GatewayIntegrationSubTabInternal.vault => appText(
+        'Vault Server',
+        'Vault Server',
+      ),
       GatewayIntegrationSubTabInternal.llm => appText(
         'LLM 接入点',
         'LLM Endpoints',
@@ -53,6 +57,7 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
       SectionTabs(
         items: <String>[
           'OpenClaw Gateway',
+          appText('Vault Server', 'Vault Server'),
           appText('LLM 接入点', 'LLM Endpoints'),
           appText('ACP 外部接入', 'External ACP'),
           appText('SKILLS 目录授权', 'SKILLS Directory Authorization'),
@@ -61,6 +66,8 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
         onChanged: (value) => setStateInternal(() {
           integrationSubTabInternal = switch (value) {
             'OpenClaw Gateway' => GatewayIntegrationSubTabInternal.gateway,
+            _ when value == appText('Vault Server', 'Vault Server') =>
+              GatewayIntegrationSubTabInternal.vault,
             _ when value == appText('LLM 接入点', 'LLM Endpoints') =>
               GatewayIntegrationSubTabInternal.llm,
             _ when value == appText('ACP 外部接入', 'External ACP') =>
@@ -85,8 +92,9 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
               settings,
             ),
           ),
-          if (uiFeatures.supportsVaultServer) ...[
-            const SizedBox(height: 16),
+        ],
+        GatewayIntegrationSubTabInternal.vault => <Widget>[
+          if (uiFeatures.supportsVaultServer)
             buildCollapsibleGatewaySectionInternal(
               context: context,
               title: appText('Vault Server', 'Vault Server'),
@@ -99,8 +107,16 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
                 controller,
                 settings,
               ),
+            )
+          else
+            SurfaceCard(
+              child: Text(
+                appText(
+                  '当前发布配置未开放 Vault Server 参数。',
+                  'Vault Server settings are disabled in this release configuration.',
+                ),
+              ),
             ),
-          ],
         ],
         GatewayIntegrationSubTabInternal.llm => <Widget>[
           buildCollapsibleGatewaySectionInternal(
