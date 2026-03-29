@@ -301,7 +301,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     final runtime = GatewayRuntime(
       store: temporaryStore,
       identityStore: DeviceIdentityStore(temporaryStore),
-      sessionClient: GoGatewayRuntimeDesktopClient(),
     );
     await runtime.initialize();
     try {

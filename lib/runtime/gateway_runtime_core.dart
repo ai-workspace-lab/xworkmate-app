@@ -26,10 +26,13 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
     required SecureConfigStore store,
     required DeviceIdentityStore identityStore,
     GatewayRuntimeSessionClient? sessionClient,
+    bool allowDirectSocketFallbackOnSessionClientFailure = false,
     String runtimeId = '',
   }) : storeInternal = store,
        identityStoreInternal = identityStore,
        sessionClientInternal = sessionClient,
+       allowDirectSocketFallbackOnSessionClientFailureInternal =
+           allowDirectSocketFallbackOnSessionClientFailure,
        runtimeIdInternal = runtimeId.trim().isNotEmpty
            ? runtimeId.trim()
            : randomIdInternal();
@@ -37,6 +40,7 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
   final SecureConfigStore storeInternal;
   final DeviceIdentityStore identityStoreInternal;
   final GatewayRuntimeSessionClient? sessionClientInternal;
+  final bool allowDirectSocketFallbackOnSessionClientFailureInternal;
   final String runtimeIdInternal;
   final StreamController<GatewayPushEvent> eventsInternal =
       StreamController<GatewayPushEvent>.broadcast();
@@ -292,7 +296,8 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
         notifyListeners();
         return;
       } on GatewayRuntimeException catch (error) {
-        if (_shouldFallbackToDirectRuntimeInternal(error)) {
+        if (allowDirectSocketFallbackOnSessionClientFailureInternal &&
+            _shouldFallbackToDirectRuntimeInternal(error)) {
           appendLogInternal(
             this,
             'warn',
