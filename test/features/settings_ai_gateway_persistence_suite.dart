@@ -92,7 +92,7 @@ void main() {
       );
       expect(
         find.byKey(const ValueKey('ai-gateway-save-button')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const ValueKey('ai-gateway-apply-button')),
@@ -113,24 +113,16 @@ void main() {
       );
       expect(controller.settings.aiGateway.baseUrl, isEmpty);
 
-      final saveButton = tester.widget<OutlinedButton>(
-        find.byKey(const ValueKey('ai-gateway-save-button')),
-      );
-      await tester.runAsync(() async {
-        saveButton.onPressed!.call();
-        await _waitFor(() => controller.hasPendingSettingsApply);
-      });
-      await tester.pump(const Duration(milliseconds: 300));
-
-      expect(controller.hasPendingSettingsApply, isTrue);
-      expect(controller.settings.aiGateway.baseUrl, 'https://api.svc.plus/v1');
-
       final applyButton = tester.widget<FilledButton>(
         find.byKey(const ValueKey('ai-gateway-apply-button')),
       );
       await tester.runAsync(() async {
         applyButton.onPressed!.call();
-        await _waitFor(() => !controller.hasPendingSettingsApply);
+        await _waitFor(
+          () =>
+              controller.settings.aiGateway.baseUrl ==
+              'https://api.svc.plus/v1',
+        );
       });
       await tester.pump(const Duration(milliseconds: 300));
 

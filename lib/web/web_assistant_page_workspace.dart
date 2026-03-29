@@ -96,8 +96,8 @@ class ConversationWorkspaceInternal extends StatelessWidget {
                                 'This thread is not ready. Check Single Agent configuration, or switch to a connected gateway target.',
                               )
                             : appText(
-                                '当前线程目标网关未连接。请先在 Settings 中 Test / Save / Apply。',
-                                'The gateway target for this thread is offline. Use Test / Save / Apply in Settings first.',
+                                '当前线程目标网关未连接。请先在 Settings 中测试并保存生效。',
+                                'The gateway target for this thread is offline. Test it in Settings and save it into effect first.',
                               ),
                       ),
                     ),
