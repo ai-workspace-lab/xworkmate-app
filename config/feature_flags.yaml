@@ -80,7 +80,7 @@ mobile:
       ui_surface: mobile_workspace_hub
     account:
       enabled: true
-      release_tier: beta
+      release_tier: stable
       build_modes: [debug, profile, release]
       description: Mobile workspace account launcher
       ui_surface: mobile_workspace_hub
@@ -142,13 +142,13 @@ mobile:
       ui_surface: settings_page
     account_access:
       enabled: true
-      release_tier: beta
+      release_tier: stable
       build_modes: [debug, profile, release]
       description: Mobile account access section
       ui_surface: settings_page
     vault_server:
       enabled: true
-      release_tier: beta
+      release_tier: stable
       build_modes: [debug, profile, release]
       description: Mobile Vault server integration section
       ui_surface: settings_page
@@ -271,7 +271,7 @@ desktop:
       ui_surface: sidebar_navigation
     account:
       enabled: true
-      release_tier: beta
+      release_tier: stable
       build_modes: [debug, profile, release]
       description: Desktop account destination
       ui_surface: sidebar_navigation
@@ -346,13 +346,13 @@ desktop:
       ui_surface: settings_page
     account_access:
       enabled: true
-      release_tier: beta
+      release_tier: stable
       build_modes: [debug, profile, release]
       description: Desktop account access section
       ui_surface: settings_page
     vault_server:
       enabled: true
-      release_tier: beta
+      release_tier: stable
       build_modes: [debug, profile, release]
       description: Desktop Vault server integration section
       ui_surface: settings_page
