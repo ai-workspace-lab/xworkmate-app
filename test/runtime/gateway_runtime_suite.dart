@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
 import 'package:xworkmate/runtime/gateway_runtime_session_client.dart';
+import 'package:xworkmate/runtime/runtime_controllers.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import '../test_support.dart';
 
@@ -221,6 +222,62 @@ void main() {
         isTrue,
       );
       expect(await nextEvent, isA<GatewayPushEvent>());
+    },
+  );
+
+  test(
+    'GatewayChatController applies normalized chat.run updates from go-core',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final store = createIsolatedTestStore();
+      final runtime = _FakeGatewayRuntimeForChatController(store: store);
+      final controller = GatewayChatController(runtime);
+      addTearDown(controller.dispose);
+
+      await controller.loadSession('agent:main:main');
+      await controller.sendMessage(
+        sessionKey: 'agent:main:main',
+        message: 'hello',
+        thinking: 'low',
+      );
+
+      expect(controller.hasPendingRun, isTrue);
+      runtime.addAssistantMessage('HELLO');
+      controller.handleEvent(
+        const GatewayPushEvent(
+          event: 'chat.run',
+          payload: <String, dynamic>{
+            'runId': 'run-1',
+            'sessionKey': 'agent:main:main',
+            'state': 'delta',
+            'assistantText': 'HELLO',
+            'terminal': false,
+          },
+        ),
+      );
+      expect(controller.streamingAssistantText, 'HELLO');
+
+      controller.handleEvent(
+        const GatewayPushEvent(
+          event: 'chat.run',
+          payload: <String, dynamic>{
+            'runId': 'run-1',
+            'sessionKey': 'agent:main:main',
+            'state': 'final',
+            'assistantText': 'HELLO',
+            'terminal': true,
+          },
+        ),
+      );
+
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.hasPendingRun, isFalse);
+      expect(
+        controller.messages.any(
+          (message) => message.role == 'assistant' && message.text == 'HELLO',
+        ),
+        isTrue,
+      );
     },
   );
 
@@ -517,6 +574,54 @@ class _FakeGatewayRuntimeSessionClient implements GatewayRuntimeSessionClient {
     Duration timeout = const Duration(seconds: 15),
   }) async {
     return const <String, dynamic>{};
+  }
+}
+
+class _FakeGatewayRuntimeForChatController extends GatewayRuntime {
+  _FakeGatewayRuntimeForChatController({required super.store})
+    : super(identityStore: DeviceIdentityStore(store));
+
+  final List<Map<String, dynamic>> _history = <Map<String, dynamic>>[];
+
+  @override
+  bool get isConnected => true;
+
+  void addAssistantMessage(String text) {
+    _history.add(<String, dynamic>{
+      'role': 'assistant',
+      'content': <Map<String, dynamic>>[
+        <String, dynamic>{'type': 'text', 'text': text},
+      ],
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  @override
+  Future<dynamic> request(
+    String method, {
+    Map<String, dynamic>? params,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    switch (method) {
+      case 'chat.history':
+        return <String, dynamic>{'messages': List<Object>.from(_history)};
+      case 'chat.send':
+        final text = params?['message']?.toString().trim() ?? '';
+        if (text.isNotEmpty) {
+          _history.add(<String, dynamic>{
+            'role': 'user',
+            'content': <Map<String, dynamic>>[
+              <String, dynamic>{'type': 'text', 'text': text},
+            ],
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+          });
+        }
+        return <String, dynamic>{'runId': 'run-1'};
+      case 'chat.abort':
+        return const <String, dynamic>{};
+      default:
+        return const <String, dynamic>{};
+    }
   }
 }
 
