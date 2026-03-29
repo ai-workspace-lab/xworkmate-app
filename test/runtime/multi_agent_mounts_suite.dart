@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/aris_bundle.dart';
 import 'package:xworkmate/runtime/go_core.dart';
 import 'package:xworkmate/runtime/codex_config_bridge.dart';
+import 'package:xworkmate/runtime/multi_agent_mount_resolver.dart';
 import 'package:xworkmate/runtime/multi_agent_mounts.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
@@ -137,6 +138,44 @@ void main() {
     expect(state.discoveryState, 'ready');
     expect(state.syncState, 'disabled');
   });
+
+  test('MultiAgentMountManager uses resolver result when attached', () async {
+    final manager = MultiAgentMountManager(
+      resolver: _FakeMountResolver(
+        config: MultiAgentConfig.defaults().copyWith(
+          arisBundleVersion: 'bundle-v1',
+          arisCompatStatus: 'ready',
+          mountTargets: const <ManagedMountTargetState>[
+            ManagedMountTargetState(
+              targetId: 'codex',
+              label: 'Codex',
+              available: true,
+              supportsSkills: true,
+              supportsMcp: true,
+              supportsAiGatewayInjection: true,
+              discoveryState: 'ready',
+              syncState: 'ready',
+              discoveredSkillCount: 0,
+              discoveredMcpCount: 2,
+              managedMcpCount: 1,
+              detail: 'resolver-backed',
+            ),
+          ],
+        ),
+      ),
+    );
+    addTearDown(manager.dispose);
+
+    final resolved = await manager.reconcile(
+      config: MultiAgentConfig.defaults(),
+      aiGatewayUrl: 'https://gateway.example.com',
+    );
+
+    expect(resolved.arisBundleVersion, 'bundle-v1');
+    expect(resolved.arisCompatStatus, 'ready');
+    expect(resolved.mountTargets, hasLength(1));
+    expect(resolved.mountTargets.single.detail, 'resolver-backed');
+  });
 }
 
 Future<ResolvedArisBundle> _writeFakeBundle(Directory root) async {
@@ -186,4 +225,23 @@ class _ThrowingArisBundleRepository extends ArisBundleRepository {
   Future<ResolvedArisBundle> ensureReady() async {
     throw StateError('missing bundle');
   }
+}
+
+class _FakeMountResolver implements MultiAgentMountResolver {
+  _FakeMountResolver({required this.config});
+
+  final MultiAgentConfig config;
+
+  @override
+  Future<MultiAgentConfig?> reconcile({
+    required MultiAgentConfig config,
+    required String aiGatewayUrl,
+    String configuredCodexCliPath = '',
+    required String codexHome,
+    required String opencodeHome,
+    required ArisMountProbe arisProbe,
+  }) async => this.config;
+
+  @override
+  Future<void> dispose() async {}
 }

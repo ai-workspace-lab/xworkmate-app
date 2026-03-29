@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"xworkmate/go_core/internal/dispatch"
+	"xworkmate/go_core/internal/mounts"
 	"xworkmate/go_core/internal/shared"
 )
 
@@ -269,6 +270,8 @@ func (s *Server) handleRequest(
 		return map[string]any{"accepted": true, "closed": closed}, nil
 	case "xworkmate.dispatch.resolve":
 		return handleDispatchResolve(request.Params), nil
+	case "xworkmate.mounts.reconcile":
+		return handleMountReconcile(request.Params), nil
 	default:
 		return nil, &shared.RPCError{
 			Code:    -32601,
@@ -376,6 +379,76 @@ func parseStringSlice(raw any) []string {
 		values = append(values, value)
 	}
 	return values
+}
+
+func handleMountReconcile(params map[string]any) map[string]any {
+	config := parseMountConfig(params["config"])
+	request := mounts.Request{
+		Config:                 config,
+		AIGatewayURL:           strings.TrimSpace(shared.StringArg(params, "aiGatewayUrl", "")),
+		ConfiguredCodexCLIPath: strings.TrimSpace(shared.StringArg(params, "configuredCodexCliPath", "")),
+		CodexHome:              strings.TrimSpace(shared.StringArg(params, "codexHome", "")),
+		OpencodeHome:           strings.TrimSpace(shared.StringArg(params, "opencodeHome", "")),
+		OpenClawHome:           strings.TrimSpace(shared.StringArg(params, "openclawHome", "")),
+		Aris:                   parseMountArisInput(params["aris"]),
+	}
+	return mounts.ResultMap(mounts.Reconcile(request))
+}
+
+func parseMountConfig(raw any) mounts.Config {
+	entry, ok := raw.(map[string]any)
+	if !ok {
+		return mounts.Config{}
+	}
+	managedMCPServers := parseMountManagedServers(entry["managedMcpServers"])
+	return mounts.Config{
+		AutoSync:          shared.BoolArg(fmt.Sprint(entry["autoSync"]), false),
+		UsesAris:          shared.BoolArg(fmt.Sprint(entry["usesAris"]), false),
+		ManagedMCPServers: managedMCPServers,
+	}
+}
+
+func parseMountManagedServers(raw any) []mounts.ManagedMCPServer {
+	list, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	servers := make([]mounts.ManagedMCPServer, 0, len(list))
+	for _, item := range list {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		id := strings.TrimSpace(shared.StringArg(entry, "id", ""))
+		if id == "" {
+			continue
+		}
+		servers = append(servers, mounts.ManagedMCPServer{
+			ID:        id,
+			Name:      strings.TrimSpace(shared.StringArg(entry, "name", "")),
+			Transport: strings.TrimSpace(shared.StringArg(entry, "transport", "")),
+			Command:   strings.TrimSpace(shared.StringArg(entry, "command", "")),
+			URL:       strings.TrimSpace(shared.StringArg(entry, "url", "")),
+			Args:      parseStringSlice(entry["args"]),
+			Enabled:   shared.BoolArg(fmt.Sprint(entry["enabled"]), true),
+		})
+	}
+	return servers
+}
+
+func parseMountArisInput(raw any) mounts.ArisInput {
+	entry, ok := raw.(map[string]any)
+	if !ok {
+		return mounts.ArisInput{}
+	}
+	return mounts.ArisInput{
+		Available:         shared.BoolArg(fmt.Sprint(entry["available"]), false),
+		BundleVersion:     strings.TrimSpace(shared.StringArg(entry, "bundleVersion", "")),
+		LLMChatServerPath: strings.TrimSpace(shared.StringArg(entry, "llmChatServerPath", "")),
+		SkillCount:        shared.IntArg(fmt.Sprint(entry["skillCount"]), 0),
+		BridgeAvailable:   shared.BoolArg(fmt.Sprint(entry["bridgeAvailable"]), false),
+		Error:             strings.TrimSpace(shared.StringArg(entry, "error", "")),
+	}
 }
 
 func (s *Server) enqueue(threadID string, task task) (map[string]any, *shared.RPCError) {

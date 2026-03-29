@@ -1,4 +1,4 @@
-// ignore_for_file: unused_import, unnecessary_import
+// ignore_for_file: unused_import, unnecessary_import, invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 
 import 'dart:async';
 import 'dart:convert';
@@ -75,7 +75,26 @@ Future<void> refreshMultiAgentMountsThreadSessionInternal(
   AppController controller, {
   bool sync = false,
 }) async {
-  await controller.refreshAcpCapabilitiesInternal(persistMountTargets: true);
+  final currentConfig = controller.settings.multiAgent;
+  final effectiveConfig = currentConfig.copyWith(autoSync: sync);
+  var nextConfig = await controller.multiAgentMountManagerInternal.reconcile(
+    config: effectiveConfig,
+    aiGatewayUrl: controller.aiGatewayUrl,
+    configuredCodexCliPath: controller.configuredCodexCliPath,
+  );
+  if (nextConfig.autoSync != currentConfig.autoSync) {
+    nextConfig = nextConfig.copyWith(autoSync: currentConfig.autoSync);
+  }
+  if (jsonEncode(nextConfig.toJson()) != jsonEncode(currentConfig.toJson())) {
+    await controller.settingsControllerInternal.saveSnapshot(
+      controller.settings.copyWith(multiAgent: nextConfig),
+    );
+    controller.multiAgentOrchestratorInternal.updateConfig(nextConfig);
+  }
+  await controller.refreshAcpCapabilitiesInternal(forceRefresh: true);
+  if (!controller.disposedInternal) {
+    controller.notifyListeners();
+  }
 }
 
 Future<void> runMultiAgentCollaborationThreadSessionInternal(
@@ -94,10 +113,12 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
     );
     await controller.ensureDesktopTaskThreadBindingInternal(
       sessionKey,
-      executionTarget: controller.assistantExecutionTargetForSession(sessionKey),
+      executionTarget: controller.assistantExecutionTargetForSession(
+        sessionKey,
+      ),
     );
-    final workingDirectory =
-        controller.assistantWorkingDirectoryForSessionInternal(sessionKey);
+    final workingDirectory = controller
+        .assistantWorkingDirectoryForSessionInternal(sessionKey);
     if (workingDirectory == null || workingDirectory.trim().isEmpty) {
       controller.appendLocalSessionMessageInternal(
         sessionKey,
@@ -291,7 +312,8 @@ List<String> assistantModelChoicesForSessionThreadSessionInternal(
     sessionKey,
   );
   final target = controller.sanitizeExecutionTargetInternal(
-    controller.assistantThreadRecordsInternal[normalizedSessionKey]
+    controller
+            .assistantThreadRecordsInternal[normalizedSessionKey]
             ?.executionTarget ??
         controller.settings.assistantExecutionTarget,
   );
@@ -368,8 +390,9 @@ bool canQuickConnectGatewayThreadSessionInternal(AppController controller) {
     return true;
   }
   final defaults = switch (target) {
-    AssistantExecutionTarget.singleAgent =>
-      GatewayConnectionProfile.emptySlot(index: kGatewayRemoteProfileIndex),
+    AssistantExecutionTarget.singleAgent => GatewayConnectionProfile.emptySlot(
+      index: kGatewayRemoteProfileIndex,
+    ),
     AssistantExecutionTarget.local => GatewayConnectionProfile.defaultsLocal(),
     AssistantExecutionTarget.remote =>
       GatewayConnectionProfile.defaultsRemote(),
