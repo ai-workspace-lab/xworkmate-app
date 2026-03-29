@@ -110,6 +110,71 @@ func TestManagerSuppressesReconnectForPairingRequired(t *testing.T) {
 	}
 }
 
+func TestSessionEmitsNormalizedChatRunPushEvents(t *testing.T) {
+	manager := NewManager()
+	session := newSession(manager, "runtime-1")
+	notifications := make([]map[string]any, 0, 8)
+	session.setNotify(func(message map[string]any) {
+		notifications = append(notifications, message)
+	})
+
+	session.handleEvent(
+		"chat",
+		map[string]any{"seq": 7},
+		map[string]any{
+			"runId":      "run-1",
+			"sessionKey": "agent:main:main",
+			"state":      "final",
+			"message": map[string]any{
+				"role": "assistant",
+				"content": []any{
+					map[string]any{"type": "text", "text": "XWORKMATE_OK"},
+				},
+			},
+		},
+	)
+	session.handleEvent(
+		"agent",
+		map[string]any{"seq": 8},
+		map[string]any{
+			"runId":  "run-1",
+			"stream": "assistant",
+			"data": map[string]any{
+				"text": "DELTA_TEXT",
+			},
+		},
+	)
+
+	normalized := make([]map[string]any, 0, 2)
+	for _, notification := range notifications {
+		if strings.TrimSpace(stringValue(notification["method"])) != "xworkmate.gateway.push" {
+			continue
+		}
+		params := asMap(notification["params"])
+		event := asMap(params["event"])
+		if strings.TrimSpace(stringValue(event["event"])) != "chat.run" {
+			continue
+		}
+		normalized = append(normalized, asMap(event["payload"]))
+	}
+
+	if len(normalized) != 2 {
+		t.Fatalf("expected 2 normalized chat.run notifications, got %#v", normalized)
+	}
+	if normalized[0]["runId"] != "run-1" || normalized[0]["state"] != "final" {
+		t.Fatalf("unexpected normalized chat payload %#v", normalized[0])
+	}
+	if normalized[0]["assistantText"] != "XWORKMATE_OK" {
+		t.Fatalf("expected final assistant text, got %#v", normalized[0])
+	}
+	if normalized[0]["terminal"] != true {
+		t.Fatalf("expected terminal final chat.run, got %#v", normalized[0])
+	}
+	if normalized[1]["assistantText"] != "DELTA_TEXT" || normalized[1]["state"] != "delta" {
+		t.Fatalf("unexpected normalized agent payload %#v", normalized[1])
+	}
+}
+
 type fakeGatewayServer struct {
 	server                 *http.Server
 	listener               net.Listener
