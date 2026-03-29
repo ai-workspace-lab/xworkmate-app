@@ -54,6 +54,12 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           ),
           goAgentCoreClient: client,
         );
+        await controller.saveSettings(
+          controller.settings.copyWith(
+            multiAgent: controller.settings.multiAgent.copyWith(autoSync: false),
+          ),
+          refreshAfterSave: false,
+        );
 
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.singleAgent,
@@ -188,6 +194,12 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           ),
           goAgentCoreClient: client,
         );
+        await controller.saveSettings(
+          controller.settings.copyWith(
+            multiAgent: controller.settings.multiAgent.copyWith(autoSync: false),
+          ),
+          refreshAfterSave: false,
+        );
 
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.singleAgent,
@@ -217,6 +229,83 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           ),
           workspaceRoot.path,
         );
+      },
+    );
+
+    test(
+      'AppController ignores placeholder workspace_root markers during single-agent send',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-single-agent-workspace-placeholder-',
+        );
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(
+            multiAgent: SettingsSnapshot.defaults().multiAgent.copyWith(
+              autoSync: false,
+            ),
+          ),
+        );
+        final client = FakeGoAgentCoreClientInternal(
+          capabilities: GoAgentCoreCapabilities(
+            singleAgent: true,
+            multiAgent: false,
+            providers: <SingleAgentProvider>{SingleAgentProvider.opencode},
+            raw: <String, dynamic>{},
+          ),
+          result: const GoAgentCoreRunResult(
+            success: true,
+            message: 'WORKSPACE_PLACEHOLDER_OK',
+            turnId: 'turn-1',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: 'codex-sonnet',
+          ),
+        );
+        final controller = await createAppControllerInternal(
+          store: store,
+          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+            SingleAgentProvider.opencode,
+          ],
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+          goAgentCoreClient: client,
+        );
+
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.singleAgent,
+        );
+
+        final beforeWorkspacePath = controller.assistantWorkspacePathForSession(
+          controller.currentSessionKey,
+        );
+        final placeholderDir = Directory(
+          '${Directory.current.path}/not-set',
+        );
+        if (await placeholderDir.exists()) {
+          await placeholderDir.delete(recursive: true);
+        }
+
+        await controller.sendChatMessage(
+          'Execution context:\n'
+          '- target: single-agent\n'
+          '- workspace_root: not-set\n'
+          '- permission: full-access\n\n'
+          '请输出 WORKSPACE_PLACEHOLDER_OK',
+          thinking: 'low',
+        );
+
+        expect(client.executeCalls, 1);
+        expect(
+          controller.assistantWorkspacePathForSession(
+            controller.currentSessionKey,
+          ),
+          beforeWorkspacePath,
+        );
+        expect(await placeholderDir.exists(), isFalse);
       },
     );
 

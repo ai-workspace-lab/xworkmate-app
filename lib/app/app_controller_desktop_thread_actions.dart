@@ -258,19 +258,23 @@ extension AppControllerDesktopThreadActions on AppController {
       currentSessionKey,
       executionTarget: assistantExecutionTargetForSession(currentSessionKey),
     );
-    if (assistantWorkspacePathForSession(currentSessionKey).trim().isEmpty) {
+    final workspacePath = assistantWorkspacePathForSession(
+      currentSessionKey,
+    ).trim();
+    if (workspacePath.isEmpty) {
+      final error = StateError(
+        appText(
+          '当前线程缺少工作路径，无法运行。请先配置工作区根目录后再试。',
+          'This thread has no workspace path, so it cannot run. Configure a workspace root and try again.',
+        ),
+      );
       appendAssistantThreadMessageInternal(
         currentSessionKey,
-        assistantErrorMessageInternal(
-          appText(
-            '当前线程缺少工作路径，无法运行。请先配置工作区根目录后再试。',
-            'This thread has no workspace path, so it cannot run. Configure a workspace root and try again.',
-          ),
-        ),
+        assistantErrorMessageInternal(error.message),
       );
       await flushAssistantThreadPersistenceInternal();
       recomputeTasksInternal();
-      return;
+      throw error;
     }
     if (isSingleAgentMode) {
       await sendSingleAgentMessageInternal(
@@ -567,6 +571,14 @@ extension AppControllerDesktopThreadActions on AppController {
     if ((value.startsWith('"') && value.endsWith('"')) ||
         (value.startsWith("'") && value.endsWith("'"))) {
       value = value.substring(1, value.length - 1).trim();
+    }
+    final normalized = value.toLowerCase();
+    if (normalized == 'not-set' ||
+        normalized == 'unset' ||
+        normalized == 'none' ||
+        normalized == 'null' ||
+        normalized == 'n/a') {
+      return null;
     }
     return value.isEmpty ? null : value;
   }

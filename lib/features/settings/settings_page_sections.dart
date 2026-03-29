@@ -524,30 +524,28 @@ extension SettingsPageSectionsMixinInternal on SettingsPageStateInternal {
             EditableFieldInternal(
               label: appText('工作区路径', 'Workspace Path'),
               value: settings.workspacePath,
-              submitOnChange: false,
-              onSubmitted: controller.saveWorkspacePath,
+              onSubmitted: (value) => controller.saveSettingsDraft(
+                settings.copyWith(workspacePath: value),
+              ),
             ),
             EditableFieldInternal(
               label: appText('CLI 路径', 'CLI Path'),
               value: settings.cliPath,
-              onSubmitted: (value) => saveSettingsInternal(
-                controller,
+              onSubmitted: (value) => controller.saveSettingsDraft(
                 settings.copyWith(cliPath: value),
               ),
             ),
             EditableFieldInternal(
               label: appText('默认模型', 'Default Model'),
               value: settings.defaultModel,
-              onSubmitted: (value) => saveSettingsInternal(
-                controller,
+              onSubmitted: (value) => controller.saveSettingsDraft(
                 settings.copyWith(defaultModel: value),
               ),
             ),
             EditableFieldInternal(
               label: appText('默认提供方', 'Default Provider'),
               value: settings.defaultProvider,
-              onSubmitted: (value) => saveSettingsInternal(
-                controller,
+              onSubmitted: (value) => controller.saveSettingsDraft(
                 settings.copyWith(defaultProvider: value),
               ),
             ),

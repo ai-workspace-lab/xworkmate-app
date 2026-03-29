@@ -120,15 +120,18 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
     final workingDirectory = controller
         .assistantWorkingDirectoryForSessionInternal(sessionKey);
     if (workingDirectory == null || workingDirectory.trim().isEmpty) {
+      final error = StateError(
+        appText(
+          '当前线程缺少工作路径，无法启动多 Agent 协作。',
+          'This thread has no workspace path, so multi-agent collaboration cannot start.',
+        ),
+      );
       controller.appendLocalSessionMessageInternal(
         sessionKey,
         GatewayChatMessage(
           id: controller.nextLocalMessageIdInternal(),
           role: 'assistant',
-          text: appText(
-            '当前线程缺少工作路径，无法启动多 Agent 协作。',
-            'This thread has no workspace path, so multi-agent collaboration cannot start.',
-          ),
+          text: error.message.toString(),
           timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
           toolCallId: null,
           toolName: 'Multi-Agent',
@@ -139,7 +142,7 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
       );
       controller.recomputeTasksInternal();
       controller.notifyIfActiveInternal();
-      return;
+      throw error;
     }
     controller.multiAgentRunPendingInternal = true;
     controller.appendLocalSessionMessageInternal(

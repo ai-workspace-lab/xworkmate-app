@@ -149,16 +149,17 @@ extension AppControllerDesktopSingleAgent on AppController {
               provider: provider,
             );
         if (workingDirectory == null || workingDirectory.trim().isEmpty) {
-          appendAssistantThreadMessageInternal(
-            sessionKey,
-            assistantErrorMessageInternal(
-              appText(
-                '当前线程缺少可运行的工作路径，无法启动单机智能体。',
-                'This thread does not have a runnable workspace path, so Single Agent cannot start.',
-              ),
+          final error = StateError(
+            appText(
+              '当前线程缺少可运行的工作路径，无法启动单机智能体。',
+              'This thread does not have a runnable workspace path, so Single Agent cannot start.',
             ),
           );
-          return;
+          appendAssistantThreadMessageInternal(
+            sessionKey,
+            assistantErrorMessageInternal(error.message),
+          );
+          throw error;
         }
 
         final selectedSkills = assistantSelectedSkillsForSession(sessionKey)

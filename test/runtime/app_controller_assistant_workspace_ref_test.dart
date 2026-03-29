@@ -21,14 +21,27 @@ Future<void> waitForControllerInternal(AppController controller) async {
   }
 }
 
+SettingsSnapshot seededSettingsSnapshot({
+  String? workspacePath,
+  String? remoteProjectRoot,
+}) {
+  final defaults = SettingsSnapshot.defaults();
+  return defaults.copyWith(
+    workspacePath: workspacePath ?? defaults.workspacePath,
+    remoteProjectRoot: remoteProjectRoot ?? defaults.remoteProjectRoot,
+    multiAgent: defaults.multiAgent.copyWith(autoSync: false),
+  );
+}
+
 void main() {
   test(
     'AppController binds single-agent threads to local workspace directories',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final controller = AppController(
-        store: createIsolatedTestStore(enableSecureStorage: false),
-      );
+      final store = createIsolatedTestStore(enableSecureStorage: false);
+      await store.initialize();
+      await store.saveSettingsSnapshot(seededSettingsSnapshot());
+      final controller = AppController(store: store);
       addTearDown(controller.dispose);
 
       await waitForControllerInternal(controller);
@@ -56,9 +69,10 @@ void main() {
     'AppController binds gateway threads to owner-scoped remote workspace paths',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final controller = AppController(
-        store: createIsolatedTestStore(enableSecureStorage: false),
-      );
+      final store = createIsolatedTestStore(enableSecureStorage: false);
+      await store.initialize();
+      await store.saveSettingsSnapshot(seededSettingsSnapshot());
+      final controller = AppController(store: store);
       addTearDown(controller.dispose);
 
       await waitForControllerInternal(controller);
@@ -249,7 +263,7 @@ void main() {
       );
       await store.initialize();
       await store.saveSettingsSnapshot(
-        SettingsSnapshot.defaults().copyWith(workspacePath: workspaceRoot.path),
+        seededSettingsSnapshot(workspacePath: workspaceRoot.path),
       );
       await store.saveTaskThreads(<TaskThread>[
         TaskThread(
@@ -338,7 +352,7 @@ void main() {
       );
       await store.initialize();
       await store.saveSettingsSnapshot(
-        SettingsSnapshot.defaults().copyWith(workspacePath: workspaceRoot.path),
+        seededSettingsSnapshot(workspacePath: workspaceRoot.path),
       );
       await store.saveTaskThreads(<TaskThread>[
         TaskThread(
@@ -424,7 +438,7 @@ void main() {
       );
       await store.initialize();
       await store.saveSettingsSnapshot(
-        SettingsSnapshot.defaults().copyWith(workspacePath: workspaceRoot.path),
+        seededSettingsSnapshot(workspacePath: workspaceRoot.path),
       );
 
       final controller = AppController(store: store);
@@ -480,7 +494,7 @@ void main() {
       );
       await store.initialize();
       await store.saveSettingsSnapshot(
-        SettingsSnapshot.defaults().copyWith(workspacePath: ''),
+        seededSettingsSnapshot(workspacePath: ''),
       );
       final controller = AppController(store: store);
       addTearDown(controller.dispose);
@@ -520,13 +534,11 @@ void main() {
                 .lifecycleState
                 .copyWith(status: 'needs_workspace'),
           );
-
-      expect(
-        controller.assistantWorkspacePathForSession(
-          controller.currentSessionKey,
-        ),
-        isEmpty,
+      final derivedBeforeSave = controller.assistantWorkspacePathForSession(
+        controller.currentSessionKey,
       );
+
+      expect(derivedBeforeSave, isNotEmpty);
       expect(
         controller
             .assistantThreadRecordsInternal[controller.currentSessionKey]
@@ -542,7 +554,7 @@ void main() {
         controller.assistantWorkspacePathForSession(
           controller.currentSessionKey,
         ),
-        isEmpty,
+        derivedBeforeSave,
       );
       expect(controller.hasSettingsDraftChanges, isTrue);
 
@@ -573,6 +585,63 @@ void main() {
   );
 
   test(
+    'AppController derives a thread workspace path when single-agent binding is empty but workspace root is configured',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-workspace-derived-root-',
+      );
+      final workspaceRoot = Directory('${tempDirectory.path}/workspace');
+      await workspaceRoot.create(recursive: true);
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        seededSettingsSnapshot(workspacePath: workspaceRoot.path),
+      );
+      final controller = AppController(store: store);
+      addTearDown(controller.dispose);
+      await waitForControllerInternal(controller);
+
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      final existingMain =
+          controller.assistantThreadRecordsInternal[controller.currentSessionKey]!;
+      controller.assistantThreadRecordsInternal[controller.currentSessionKey] =
+          existingMain.copyWith(
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: '',
+              displayPath: '',
+              writable: true,
+            ),
+            lifecycleState: existingMain.lifecycleState.copyWith(
+              status: 'needs_workspace',
+            ),
+          );
+
+      expect(
+        controller.assistantWorkspacePathForSession(
+          controller.currentSessionKey,
+        ),
+        '${workspaceRoot.path}/.xworkmate/threads/main',
+      );
+    },
+  );
+
+  test(
     'AppController keeps single-agent threads unbound when the workspace root cannot create thread directories',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -595,9 +664,7 @@ void main() {
       );
       await store.initialize();
       await store.saveSettingsSnapshot(
-        SettingsSnapshot.defaults().copyWith(
-          workspacePath: invalidRootFile.path,
-        ),
+        seededSettingsSnapshot(workspacePath: invalidRootFile.path),
       );
 
       final controller = AppController(store: store);
@@ -627,6 +694,11 @@ void main() {
             ?.lifecycleState
             .status,
         'needs_workspace',
+      );
+
+      await expectLater(
+        () => controller.sendChatMessage('请输出 SHOULD_NOT_RUN', thinking: 'low'),
+        throwsA(isA<StateError>()),
       );
     },
   );
