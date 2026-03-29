@@ -330,6 +330,27 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                       artifactPaneCollapsedInternal = true;
                     });
                   },
+                  onOpenWorkspace: () async {
+                    final workspacePath = controller
+                        .assistantWorkspaceRefForSession(
+                          controller.currentSessionKey,
+                        )
+                        .trim();
+                    if (workspacePath.isEmpty) {
+                      return;
+                    }
+                    if (Platform.isMacOS) {
+                      await Process.run('open', <String>[workspacePath]);
+                      return;
+                    }
+                    if (Platform.isLinux) {
+                      await Process.run('xdg-open', <String>[workspacePath]);
+                      return;
+                    }
+                    if (Platform.isWindows) {
+                      await Process.run('explorer.exe', <String>[workspacePath]);
+                    }
+                  },
                   loadSnapshot: () =>
                       controller.loadAssistantArtifactSnapshot(),
                   loadPreview: (entry) =>

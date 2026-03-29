@@ -1,124 +1,29 @@
-# Assistant 任务线程目标模型（2026-03-28）
+# Assistant TaskThread 当前模型（2026-03-28）
 
-本文定义新的 Assistant 任务线程目标模型，满足以下约束：
+本文以当前代码实现为准，描述 XWorkmate 里 `TaskThread` 的真实结构、主链路和状态语义。
 
-- 保持 UI 不变
-- 彻底移除全部旧数据兼容设计
-- 任务线程必须稳定、独立、可理解、原子化
-- 任务线程可归属于本地租户/用户、在线租户/用户
-- 任务线程可调度给不同工作模式执行
-- 最后对话上下文可交给本地 agent、OpenClaw Gateway（本地/远程）执行
+这份文档的目标不是描述“理想终态”，而是给现在的实现一份能直接对照代码的说明，避免旧的 `workspaceRef` 时代文档继续误导后续改动。
 
-本文不描述旧实现如何继续兼容；旧数据被视为一次性清理对象，不再进入主链路。
+## 0. 当前结论
 
-## 0. 硬约束
+1. `TaskThread` 是当前任务线程的持久化主对象，规范字段已经是：
+   - `ownerScope`
+   - `workspaceBinding`
+   - `executionBinding`
+   - `contextState`
+   - `lifecycleState`
+2. desktop 发送消息前会先执行一次 `ensureDesktopTaskThreadBindingInternal(...)`，然后检查 `workspaceBinding.workspacePath`；为空则直接 fail-fast，不允许运行。
+3. single-agent 本地线程会把工作目录落到：
+   - `<settings.workspacePath>/.xworkmate/threads/<sanitized-threadId>`
+4. 右侧边栏展示路径来自 `workspaceBinding.displayPath`；本地线程当前会把 `displayPath` 与 `workspacePath` 对齐，复制/打开也基于同一条绑定。
+5. 当前 `ThreadLifecycleState.status` 在 desktop 主链路里实际只使用：
+   - `needs_workspace`
+   - `ready`
+6. `archived` 是单独的布尔标记，不是第三个 `status` 枚举值。
 
-以下三条是新模型的不可退让约束：
+## 1. 当前结构
 
-1. 线程没有 `workspacePath` 就不能运行
-2. 运行时绝不再从全局配置推导线程目录
-3. UI 显示的工作路径必须和执行时使用的路径完全一致
-
-## 1. 目标模型（Mermaid）
-
-```mermaid
-flowchart LR
-  UI["UI 选择任务线程"] --> T["TaskThread"]
-
-  T --> ID["threadId"]
-  T --> OWNER["ownerScope"]
-  T --> WS["workspaceBinding"]
-  T --> EXEC["executionBinding"]
-  T --> CTX["contextState"]
-
-  OWNER --> OWNER2["realm + subjectType + subjectId"]
-  WS --> WS2["workspaceId + workspaceKind + workspacePath"]
-  EXEC --> EXEC2["executionMode + executorId + providerId"]
-  CTX --> CTX2["messages + model + skills + permission + viewMode"]
-
-  WS2 --> RUN["构造执行请求"]
-  EXEC2 --> RUN
-  CTX2 --> RUN
-
-  RUN --> LOCAL["本地 Agent"]
-  RUN --> GWL["OpenClaw Gateway（本地）"]
-  RUN --> GWR["OpenClaw Gateway（远程）"]
-
-  LOCAL --> RESULT["执行结果"]
-  GWL --> RESULT
-  GWR --> RESULT
-
-  RESULT --> UPDATE_CTX["回写 contextState"]
-  RESULT --> UPDATE_WS["必要时回写 workspaceBinding"]
-
-  UPDATE_CTX --> STORE["持久化 TaskThread"]
-  UPDATE_WS --> STORE
-
-  STORE --> SIDEBAR["右侧边栏显示当前任务工作路径"]
-  STORE --> CHAT["中间对话区"]
-```
-
-## 2. 设计原则
-
-### 2.1 线程是原子对象
-
-任务线程不是“会话 + 一些全局推导状态”的组合，而是一个完整的领域对象。
-
-一个线程必须自己拥有：
-
-- 明确的归属
-- 明确的工作目录
-- 明确的执行模式
-- 明确的上下文
-
-线程在运行时不再依赖：
-
-- `settings.workspacePath` 的动态推导
-- `Directory.current.path` 的运行兜底
-- 旧目录迁移分支
-- endpoint 形态决定线程目录来源
-
-### 2.2 线程归属与执行通道解耦
-
-线程归属决定“谁拥有这个线程”：
-
-- 本地租户
-- 本地用户
-- 在线租户
-- 在线用户
-
-执行通道决定“由谁执行这个线程上下文”：
-
-- 本地 agent
-- OpenClaw Gateway（本地）
-- OpenClaw Gateway（远程）
-
-这两个维度必须是并列字段，不能混成一个 mode。
-
-### 2.3 工作目录必须是线程状态，不是运行推导
-
-线程工作目录必须在创建线程时就固定为线程状态的一部分。
-
-运行时：
-
-- 只读取线程绑定的工作目录
-- 不再根据全局配置推导
-- 不再在解析失败时回退到进程 cwd
-
-### 2.4 UI 显示值与执行值必须同源
-
-右侧边栏显示的“当前任务工作路径”和 runner 使用的 cwd，必须来自同一个绑定对象：
-
-- `TaskThread.workspaceBinding`
-
-不允许出现：
-
-- UI 显示一个值
-- 实际执行又跑到另一个目录
-
-## 3. 目标结构变量文档
-
-### 3.1 顶层对象：TaskThread
+### 1.1 顶层对象：TaskThread
 
 ```text
 TaskThread
@@ -130,31 +35,38 @@ TaskThread
 - contextState: ThreadContextState
 - lifecycleState: ThreadLifecycleState
 - createdAtMs: double
-- updatedAtMs: double
+- updatedAtMs: double?
 ```
 
-### 3.2 归属结构：ThreadOwnerScope
+### 1.2 归属：ThreadOwnerScope
 
 ```text
 ThreadOwnerScope
-- realm: ThreadRealm        // local | remote
-- subjectType: ThreadSubjectType   // tenant | user
+- realm: ThreadRealm              // local | remote
+- subjectType: ThreadSubjectType // tenant | user
 - subjectId: String
 - displayName: String
 ```
 
-### 3.3 工作空间绑定：WorkspaceBinding
+### 1.3 工作空间绑定：WorkspaceBinding
 
 ```text
 WorkspaceBinding
 - workspaceId: String
-- workspaceKind: WorkspaceKind     // local_fs | remote_fs
+- workspaceKind: WorkspaceKind   // localFs | remoteFs
 - workspacePath: String
 - displayPath: String
 - writable: bool
 ```
 
-### 3.4 执行绑定：ExecutionBinding
+说明：
+
+- `workspacePath` 是执行时真正依赖的路径。
+- `displayPath` 是 UI 展示值。
+- 对当前 desktop 本地线程，二者应保持一致。
+- 对远端线程，`displayPath` 可以和 `workspacePath` 一样，也可以是更适合展示的字符串，但它们仍然来自同一个 `WorkspaceBinding`。
+
+### 1.4 执行绑定：ExecutionBinding
 
 ```text
 ExecutionBinding
@@ -164,7 +76,13 @@ ExecutionBinding
 - endpointId: String
 ```
 
-### 3.5 上下文状态：ThreadContextState
+当前 `executionMode` 与 UI 目标的映射关系：
+
+- `localAgent` -> `singleAgent`
+- `gatewayLocal` -> `local`
+- `gatewayRemote` -> `remote`
+
+### 1.5 上下文：ThreadContextState
 
 ```text
 ThreadContextState
@@ -175,84 +93,130 @@ ThreadContextState
 - permissionLevel: AssistantPermissionLevel
 - messageViewMode: AssistantMessageViewMode
 - latestResolvedRuntimeModel: String
+- gatewayEntryState: String?
 ```
 
-### 3.6 生命周期状态：ThreadLifecycleState
+### 1.6 生命周期：ThreadLifecycleState
 
 ```text
 ThreadLifecycleState
 - archived: bool
-- status: String
+- status: String                // 当前主链路只用 ready | needs_workspace
 - lastRunAtMs: double?
 - lastResultCode: String?
 ```
 
-## 4. 任务工作流（唯一主链路）
+说明：
 
-唯一主链路固定为：
+- `lastRunAtMs` / `lastResultCode` 已经是模型字段，但当前 desktop TaskThread 主链路还没有把它们扩展成更细的“运行中 / 成功 / 失败”状态机。
+- 现在真正决定“能不能发消息”的核心条件仍然是 `workspaceBinding.workspacePath` 是否为空。
 
-`UI 选择线程 -> 读取 TaskThread -> 校验可运行性 -> 构造执行请求 -> 派发执行 -> 执行结果 -> 回写线程 -> UI 显示`
+## 2. TaskThread 主流程图（Mermaid）
+
+下面这张图对应当前 desktop 的真实主链路，覆盖线程初始化、工作目录绑定、运行前校验、执行与回写。
 
 ```mermaid
-flowchart LR
-  UI["UI 选择线程"] --> READ["读取 TaskThread"]
-  READ --> ID["threadId"]
-  READ --> OWNER["ownerScope"]
-  READ --> WS["workspaceBinding"]
-  READ --> EXEC["executionBinding"]
-  READ --> CTX["contextState"]
+flowchart TD
+  A["新建线程 / 切换线程"] --> B["upsertTaskThreadInternal(threadId, ...)"]
+  B --> C["ensureDesktopTaskThreadBindingInternal(threadId)"]
 
-  ID --> CHECK["校验可运行性"]
-  OWNER --> CHECK
-  WS --> CHECK
-  EXEC --> REQ["构造执行请求"]
-  CTX --> REQ
-  CHECK --> REQ
+  C --> D{"executionTarget"}
+  D -->|singleAgent| E["构造本地 WorkspaceBinding<br/>workspacePath = workspaceRoot/.xworkmate/threads/<threadId><br/>createSync(recursive: true)"]
+  D -->|local / remote gateway| F["构造远端 WorkspaceBinding<br/>/owners/<realm>/<subjectType>/<subjectId>/threads/<threadId>"]
 
-  REQ --> RUN["派发执行"]
-  RUN --> RESULT["执行结果"]
-  RESULT --> WRITE["回写线程"]
-  WRITE --> VIEW["UI 显示"]
+  E --> G["持久化 TaskThread"]
+  F --> G
+  G --> H["右栏读取 workspaceBinding.displayPath"]
+
+  H --> I["用户发送消息"]
+  I --> J["再次 ensureDesktopTaskThreadBindingInternal(threadId)"]
+  J --> K{"workspaceBinding.workspacePath 为空?"}
+
+  K -->|yes| L["追加错误消息<br/>当前线程缺少工作路径，无法运行"]
+  K -->|no| M["按 TaskThread 构造执行请求<br/>workspaceBinding + executionBinding + contextState"]
+
+  M --> N{"executionMode"}
+  N -->|localAgent| O["singleAgentRunner.run(...)"]
+  N -->|gatewayLocal / gatewayRemote| P["Gateway / ACP 会话执行"]
+
+  O --> Q["执行结果 / 消息 / resolvedWorkingDirectory"]
+  P --> Q
+
+  Q --> R{"返回新的远端 workingDirectory?"}
+  R -->|yes| S["回写 workspaceBinding<br/>workspaceKind=remoteFs<br/>status=ready"]
+  R -->|no| T["回写 contextState / updatedAtMs"]
+
+  S --> T
+  T --> U["持久化当前 TaskThread"]
+  U --> V["对话区 / 右栏 / 文件面板刷新"]
 ```
 
-8 步行为说明：
+这张图里有三点最重要：
 
-1. UI 只负责选中 `threadId`
-2. controller/runtime 只读取该 `TaskThread`
-3. 运行前先检查 `workspaceBinding.workspacePath`
-4. 没有 `workspacePath` 直接失败，不允许运行
-5. 执行请求只从 `workspaceBinding`、`executionBinding`、`contextState` 构造
-6. runner / gateway 按请求执行，不再推导线程目录
-7. 执行结果只允许回写当前线程的 `contextState` / `workspaceBinding`
-8. UI 展示只读取当前线程绑定对象，显示值与执行值同源
+1. `TaskThread` 先绑定，再运行，不是运行时临时猜目录。
+2. `workspaceBinding.workspacePath` 为空会直接失败，不会继续执行。
+3. UI 展示路径和执行路径都来自同一个 `WorkspaceBinding`。
 
-本节三条硬约束直接适用于主链路：
+## 3. TaskThread 状态图（Mermaid）
 
-- 无 `workspacePath` 不运行
-- 运行时不推导目录
-- UI 显示值与执行值同源
+下面这张图刻画的是当前实现真正存在的状态，不再把它画成一个比代码更复杂的“理想状态机”。
 
-## 5. 彻底去掉的旧设计
+```mermaid
+stateDiagram-v2
+  state "Needs Workspace (status=needs_workspace)" as NeedsWorkspace
+  state "Ready (status=ready)" as Ready
 
-以下旧实现不再属于主模型描述，只保留为待删除旧实现或考古材料：
+  [*] --> Created
 
-- `workspaceRef` / `workspaceRefKind` 作为主导模型
-- `defaultWorkspaceRefForSessionInternal(...)`
-- `defaultLocalWorkspaceRefForSessionInternal(...)`
-- `syncAssistantWorkspaceRefForSessionInternal(...)`
-- `shouldMigrateWorkspaceRefInternal(...)`
-- `usesLegacySharedWorkspaceRefInternal(...)`
-- `usesDefaultThreadWorkspaceRefFromAnotherRootInternal(...)`
-- `usesMissingWorkspaceRefInternal(...)`
-- `Directory.current.path` 作为线程 cwd fallback
-- web `object://thread/...` 线程目录语义
+  Created --> NeedsWorkspace: workspacePath == ""
+  Created --> Ready: workspacePath != ""
 
-这些旧设计只允许出现在归档文档中，不再作为运行主链路的一部分。
+  NeedsWorkspace --> Ready: initialize / rebind 写入 workspaceBinding.workspacePath
+  Ready --> NeedsWorkspace: workspacePath 被清空或无法建立有效绑定
 
-## 6. 强约束
+  NeedsWorkspace --> NeedsWorkspace: sendChatMessage fail-fast\n追加缺少工作路径错误消息
+  Ready --> Ready: 切换模型 / 技能 / provider / message 回写 / 远端路径回写
 
-1. 线程没有 `workspaceBinding.workspacePath` 不允许运行
-2. 线程切换只切换 `threadId`，不做目录推导
-3. 线程创建必须一次性写入 owner、workspace、execution、context 默认值
-4. 运行结果只能回写当前线程，不允许写全局默认目录
-5. 右栏展示路径与 runner 使用路径必须来自同一线程绑定对象，且保持完全一致
+  Ready --> Archived: saveAssistantTaskArchived(true)
+  NeedsWorkspace --> Archived: saveAssistantTaskArchived(true)
+
+  Archived --> Ready: saveAssistantTaskArchived(false)\nworkspacePath != ""
+  Archived --> NeedsWorkspace: saveAssistantTaskArchived(false)\nworkspacePath == ""
+
+  note right of Archived
+    archived 对应 ThreadLifecycleState.archived。
+    它是独立的归档标记，不等价于 lifecycle.status。
+  end note
+```
+
+状态图里的关键现实约束：
+
+1. 当前 desktop 链路没有单独维护 `running / succeeded / failed` 这些 TaskThread 生命周期状态。
+2. “能不能运行”由 `workspacePath` 是否有效决定，所以 `needs_workspace` / `ready` 才是当前最重要的主状态。
+3. `Archived` 更像“列表可见性 / 激活资格”开关，而不是替代 `status` 的主生命周期状态。
+
+## 4. 当前实现里仍然存在的兼容痕迹
+
+虽然持久化 canonical schema 已经是 `workspaceBinding` / `executionBinding` 这一套，但当前代码里仍然保留了少量旧入口作为适配层，例如：
+
+- `TaskThread(...)` 构造器仍接受 `workspaceRef`
+- `TaskThread(...)` 构造器仍接受 `workspaceRefKind`
+- `TaskThread(...)` 构造器仍接受 `sessionKey`
+
+这些字段现在主要用于：
+
+- 老测试夹具
+- 旧调用点平滑过渡
+- 构造器内部映射到新结构
+
+因此，当前最准确的理解方式是：
+
+1. 运行时主对象已经是新结构。
+2. 构造器层还残留少量旧参数适配。
+3. 文档和后续重构都应以 `workspaceBinding` / `executionBinding` / `contextState` / `lifecycleState` 为主。
+
+## 5. 文档边界
+
+本文只描述当前 TaskThread 的主模型与主链路。
+
+历史上那套以 `workspaceRef` / `workspaceRefKind` / fallback cwd 为中心的说明，已经降级为归档材料，不应再作为新改动的设计依据。

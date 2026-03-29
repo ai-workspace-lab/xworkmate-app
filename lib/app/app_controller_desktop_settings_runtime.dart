@@ -707,6 +707,16 @@ extension AppControllerDesktopSettingsRuntime on AppController {
         await refreshSingleAgentSkillsForSession(currentSessionKey);
       }
     }
+    if (previous.workspacePath != current.workspacePath) {
+      await ensureDesktopTaskThreadBindingInternal(currentSessionKey);
+      if (disposedInternal) {
+        return;
+      }
+      if (assistantExecutionTargetForSession(currentSessionKey) ==
+          AssistantExecutionTarget.singleAgent) {
+        await refreshSingleAgentSkillsForSession(currentSessionKey);
+      }
+    }
     if (refreshAfterSave) {
       recomputeTasksInternal();
     }

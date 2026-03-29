@@ -272,10 +272,26 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     final resolvedTarget =
         executionTarget ??
         assistantExecutionTargetForSession(currentSessionKey);
+    final initialWorkspaceBinding =
+        resolvedTarget == AssistantExecutionTarget.singleAgent
+        ? (() {
+            final localPath = localThreadWorkspacePathInternal(
+              normalizedSessionKey,
+            );
+            return WorkspaceBinding(
+              workspaceId: normalizedSessionKey,
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: localPath,
+              displayPath: localPath,
+              writable: true,
+            );
+          })()
+        : null;
     upsertTaskThreadInternal(
       normalizedSessionKey,
       title: title.trim(),
       executionTarget: resolvedTarget,
+      workspaceBinding: initialWorkspaceBinding,
       messageViewMode:
           messageViewMode ??
           assistantMessageViewModeForSession(currentSessionKey),

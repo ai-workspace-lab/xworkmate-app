@@ -208,7 +208,7 @@ extension AppControllerDesktopSettings on AppController {
     assistantThreadTurnQueuesInternal.clear();
     multiAgentRunPendingInternal = false;
     setActiveAppLanguage(defaults.appLanguage);
-    await settingsControllerInternal.resetSnapshot(defaults);
+    await settingsControllerInternal.saveSnapshot(defaults);
     multiAgentOrchestratorInternal.updateConfig(defaults.multiAgent);
     agentsControllerInternal.restoreSelection(
       defaults.primaryRemoteGatewayProfile.selectedAgentId,
