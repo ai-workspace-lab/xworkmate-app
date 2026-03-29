@@ -19,7 +19,7 @@ void main() {
         ];
         const guardedFiles = <String>[
           'lib/app/app_controller_desktop.dart',
-          'lib/runtime/single_agent_runner.dart',
+          'lib/runtime/go_agent_core_client.dart',
           'lib/runtime/runtime_coordinator.dart',
           'lib/runtime/gateway_acp_client.dart',
         ];
@@ -53,5 +53,27 @@ void main() {
         }
       },
     );
+
+    test('legacy direct single-agent runtime implementation stays removed', () {
+      const removedFiles = <String>[
+        'lib/runtime/direct_single_agent_app_server_client_core.dart',
+        'lib/runtime/direct_single_agent_app_server_client_helpers.dart',
+        'lib/runtime/direct_single_agent_app_server_client_transport.dart',
+      ];
+
+      for (final relativePath in removedFiles) {
+        expect(
+          File(relativePath).existsSync(),
+          isFalse,
+          reason: '$relativePath should stay removed after GoAgentCore cutover',
+        );
+      }
+
+      final runnerShim = File('lib/runtime/single_agent_runner.dart');
+      expect(runnerShim.existsSync(), isTrue);
+      final shimContent = runnerShim.readAsStringSync();
+      expect(shimContent.contains('DefaultSingleAgentRunner'), isFalse);
+      expect(shimContent.contains('DirectSingleAgentAppServerClient'), isFalse);
+    });
   });
 }
