@@ -6,6 +6,7 @@ import 'package:xworkmate/runtime/code_agent_node_orchestrator.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
+import 'package:xworkmate/runtime/runtime_dispatch_resolver.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
@@ -43,6 +44,35 @@ class _FakeGatewayRuntime extends GatewayRuntime {
 
 class _FakeCodexRuntime extends CodexRuntime {}
 
+class _FakeDispatchResolver implements RuntimeDispatchResolver {
+  _FakeDispatchResolver(this.resolution);
+
+  final RuntimeDispatchResolution resolution;
+
+  @override
+  Future<String?> selectProviderId({
+    required List<ExternalCodeAgentProvider> providers,
+    String preferredProviderId = '',
+    Iterable<String> requiredCapabilities = const <String>[],
+  }) async {
+    return resolution.providerId;
+  }
+
+  @override
+  Future<RuntimeDispatchResolution> resolveGatewayDispatch({
+    required List<ExternalCodeAgentProvider> providers,
+    required String preferredProviderId,
+    required Iterable<String> requiredCapabilities,
+    required Map<String, dynamic> nodeState,
+    required Map<String, dynamic> nodeInfo,
+  }) async {
+    return resolution;
+  }
+
+  @override
+  Future<void> dispose() async {}
+}
+
 void main() {
   group('CodeAgentNodeOrchestrator', () {
     late RuntimeCoordinator coordinator;
@@ -56,7 +86,7 @@ void main() {
       orchestrator = CodeAgentNodeOrchestrator(coordinator);
     });
 
-    test('builds cooperative node metadata for an external provider', () {
+    test('builds cooperative node metadata for an external provider', () async {
       coordinator.registerExternalCodeAgent(
         const ExternalCodeAgentProvider(
           id: 'codex',
@@ -67,7 +97,7 @@ void main() {
         ),
       );
 
-      final dispatch = orchestrator.buildGatewayDispatch(
+      final dispatch = await orchestrator.buildGatewayDispatch(
         const CodeAgentNodeState(
           selectedAgentId: 'main',
           gatewayConnected: true,
@@ -102,7 +132,7 @@ void main() {
       );
     });
 
-    test('omits provider metadata when bridge is disabled', () {
+    test('omits provider metadata when bridge is disabled', () async {
       coordinator.registerExternalCodeAgent(
         const ExternalCodeAgentProvider(
           id: 'codex',
@@ -112,7 +142,7 @@ void main() {
         ),
       );
 
-      final dispatch = orchestrator.buildGatewayDispatch(
+      final dispatch = await orchestrator.buildGatewayDispatch(
         const CodeAgentNodeState(
           selectedAgentId: '',
           gatewayConnected: true,
@@ -130,6 +160,43 @@ void main() {
         containsPair('mode', 'gateway-only'),
       );
       expect(dispatch.metadata.containsKey('provider'), isFalse);
+    });
+
+    test('uses dispatch resolver metadata when available', () async {
+      coordinator.attachDispatchResolver(
+        _FakeDispatchResolver(
+          const RuntimeDispatchResolution(
+            agentId: 'main',
+            providerId: 'codex',
+            metadata: <String, dynamic>{
+              'dispatch': <String, dynamic>{
+                'mode': 'cooperative',
+                'executionTarget': 'local',
+              },
+              'provider': <String, dynamic>{'id': 'codex'},
+            },
+          ),
+        ),
+      );
+
+      final dispatch = await orchestrator.buildGatewayDispatch(
+        const CodeAgentNodeState(
+          selectedAgentId: 'main',
+          gatewayConnected: true,
+          executionTarget: AssistantExecutionTarget.local,
+          runtimeMode: CodeAgentRuntimeMode.externalCli,
+          bridgeEnabled: true,
+          bridgeState: 'registered',
+          preferredProviderId: 'codex',
+        ),
+      );
+
+      expect(dispatch.agentId, 'main');
+      expect(
+        dispatch.metadata['dispatch'],
+        containsPair('mode', 'cooperative'),
+      );
+      expect(dispatch.metadata['provider'], containsPair('id', 'codex'));
     });
   });
 }
