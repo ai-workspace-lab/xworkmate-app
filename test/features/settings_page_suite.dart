@@ -248,8 +248,9 @@ void main() {
     expect(find.byKey(const ValueKey('gateway-mode-field')), findsNothing);
     expect(find.text('认证诊断'), findsNothing);
     expect(find.byKey(const ValueKey('gateway-test-button')), findsOneWidget);
-    expect(find.byKey(const ValueKey('gateway-save-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('gateway-save-button')), findsNothing);
     expect(find.byKey(const ValueKey('gateway-apply-button')), findsOneWidget);
+    expect(find.text('保存并生效'), findsWidgets);
     expect(
       find.byKey(const ValueKey('gateway-profile-chip-0')),
       findsOneWidget,
@@ -304,7 +305,7 @@ void main() {
       find.textContaining('VAULT_SERVER_ROOT_ACCESS_TOKEN'),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('vault-save-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('vault-save-button')), findsNothing);
     expect(find.byKey(const ValueKey('vault-apply-button')), findsOneWidget);
   });
 

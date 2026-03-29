@@ -44,13 +44,13 @@ extension WebSettingsPageSectionsMixinInternal on WebSettingsPageStateInternal {
                       ? message
                       : hasDraft
                       ? appText(
-                          '当前存在未保存草稿。保存：仅保存配置，不立即生效。',
-                          'There are unsaved drafts. Save persists configuration only and does not apply it immediately.',
+                          '当前存在未保存草稿。保存并生效：按当前配置立即更新。',
+                          'There are unsaved drafts. Save & apply updates the current configuration immediately.',
                         )
                       : hasPendingApply
                       ? appText(
-                          '当前存在已保存但未应用的更改。应用：立即按当前配置生效。',
-                          'There are saved changes waiting to be applied. Apply makes the current configuration take effect immediately.',
+                          '当前存在待生效更改。保存并生效：立即按当前配置更新。',
+                          'There are saved changes waiting to be applied. Save & apply updates the current configuration immediately.',
                         )
                       : appText(
                           '当前没有待提交更改。',
@@ -65,16 +65,6 @@ extension WebSettingsPageSectionsMixinInternal on WebSettingsPageStateInternal {
             spacing: 10,
             runSpacing: 10,
             children: [
-              OutlinedButton(
-                key: const ValueKey('settings-global-save-button'),
-                onPressed:
-                    hasDraft ||
-                        gatewaySubTabInternal ==
-                            WebGatewaySettingsSubTabInternal.acp
-                    ? () => handleTopLevelSaveInternal(controller)
-                    : null,
-                child: Text(appText('保存', 'Save')),
-              ),
               FilledButton.tonal(
                 key: const ValueKey('settings-global-apply-button'),
                 onPressed:
@@ -84,7 +74,7 @@ extension WebSettingsPageSectionsMixinInternal on WebSettingsPageStateInternal {
                             WebGatewaySettingsSubTabInternal.acp)
                     ? () => handleTopLevelApplyInternal(controller)
                     : null,
-                child: Text(appText('应用', 'Apply')),
+                child: Text(appText('保存并生效', 'Save & apply')),
               ),
             ],
           ),
@@ -234,8 +224,8 @@ extension WebSettingsPageSectionsMixinInternal on WebSettingsPageStateInternal {
             const SizedBox(height: 8),
             Text(
               appText(
-                '这里维护 Local / Remote Gateway 与浏览器会话持久化配置。保存：仅保存配置，不立即生效。应用：立即按当前配置生效。',
-                'Maintain Local / Remote Gateway and browser session persistence here. Save persists configuration only, while Apply makes it take effect immediately.',
+                '这里维护 Local / Remote Gateway 与浏览器会话持久化配置。保存并生效：立即按当前配置更新。',
+                'Maintain Local / Remote Gateway and browser session persistence here. Save & apply updates the active configuration immediately.',
               ),
             ),
           ],
@@ -363,24 +353,6 @@ extension WebSettingsPageSectionsMixinInternal on WebSettingsPageStateInternal {
               spacing: 10,
               runSpacing: 10,
               children: [
-                FilledButton(
-                  onPressed: () async {
-                    await controller.saveWebSessionPersistenceConfiguration(
-                      mode: sessionPersistenceModeInternal,
-                      remoteBaseUrl:
-                          sessionRemoteBaseUrlControllerInternal.text,
-                      apiToken: sessionApiTokenControllerInternal.text,
-                    );
-                    if (!mounted) {
-                      return;
-                    }
-                    setStateInternal(() {
-                      sessionPersistenceMessageInternal =
-                          controller.sessionPersistenceStatusMessage;
-                    });
-                  },
-                  child: Text(appText('Save', 'Save')),
-                ),
                 FilledButton.tonal(
                   onPressed: () async {
                     await controller.saveWebSessionPersistenceConfiguration(
@@ -394,12 +366,12 @@ extension WebSettingsPageSectionsMixinInternal on WebSettingsPageStateInternal {
                     }
                     setStateInternal(() {
                       sessionPersistenceMessageInternal = appText(
-                        '会话存储配置已应用到当前浏览器会话。',
-                        'Session persistence settings are now applied to this browser session.',
+                        '会话存储配置已保存并生效。',
+                        'Session persistence settings are saved and applied.',
                       );
                     });
                   },
-                  child: Text(appText('Apply', 'Apply')),
+                  child: Text(appText('保存并生效', 'Save & apply')),
                 ),
               ],
             ),

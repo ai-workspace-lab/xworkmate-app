@@ -117,23 +117,21 @@ extension SettingsPageGatewayLlmMixinInternal on SettingsPageStateInternal {
           onSubmitted: (value) async =>
               controller.saveAiGatewayApiKeyDraft(value),
           storedHelperText: appText(
-            '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存/应用提交。',
-            'Stored securely. Test directly or submit it with the local Save / Apply actions.',
+            '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存并生效提交。',
+            'Stored securely. Test directly or submit it with the local Save & apply action.',
           ),
           emptyHelperText: appText(
-            '输入后可直接测试，也可通过本区保存/应用提交。',
-            'Test it now, or submit it with the local Save / Apply actions.',
+            '输入后可直接测试，也可通过本区保存并生效提交。',
+            'Test it now, or submit it with the local Save & apply action.',
           ),
         ),
         const SizedBox(height: 12),
         buildSettingsSectionActionsInternal(
           controller: controller,
           testKey: const ValueKey('ai-gateway-test-button'),
-          saveKey: const ValueKey('ai-gateway-save-button'),
           applyKey: const ValueKey('ai-gateway-apply-button'),
           testing: aiGatewayTestingInternal,
           onTest: () => testAiGatewayConnectionInternal(controller, settings),
-          onSave: () => saveAiGatewayAndPersistInternal(controller, settings),
           onApply: () => saveAiGatewayAndApplyInternal(controller, settings),
         ),
         const SizedBox(height: 12),
@@ -384,12 +382,12 @@ extension SettingsPageGatewayLlmMixinInternal on SettingsPageStateInternal {
           onSubmitted: (value) async =>
               controller.saveOllamaCloudApiKeyDraft(value),
           storedHelperText: appText(
-            '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存/应用提交。',
-            'Stored securely. Test directly or submit it with the local Save / Apply actions.',
+            '已安全保存，默认以 **** 显示；可直接测试，也可通过本区保存并生效提交。',
+            'Stored securely. Test directly or submit it with the local Save & apply action.',
           ),
           emptyHelperText: appText(
-            '输入后可直接测试，也可通过本区保存/应用提交。',
-            'Test it now, or submit it with the local Save / Apply actions.',
+            '输入后可直接测试，也可通过本区保存并生效提交。',
+            'Test it now, or submit it with the local Save & apply action.',
           ),
         ),
         const SizedBox(height: 12),

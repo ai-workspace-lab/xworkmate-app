@@ -155,31 +155,6 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
                               },
                         child: Text(appText('测试连接', 'Test')),
                       ),
-                      FilledButton(
-                        onPressed: controller.aiGatewayBusy
-                            ? null
-                            : () async {
-                                await controller.saveAiGatewayConfiguration(
-                                  name: directNameControllerInternal.text,
-                                  baseUrl: directBaseUrlControllerInternal.text,
-                                  provider:
-                                      directProviderControllerInternal.text,
-                                  apiKey: directApiKeyControllerInternal.text,
-                                  defaultModel:
-                                      controller.resolvedAiGatewayModel,
-                                );
-                                if (!mounted) {
-                                  return;
-                                }
-                                setStateInternal(() {
-                                  directMessageInternal = appText(
-                                    '配置已保存，尚未同步模型目录。',
-                                    'Configuration saved; model catalog not synced yet.',
-                                  );
-                                });
-                              },
-                        child: Text(appText('保存', 'Save')),
-                      ),
                       FilledButton.icon(
                         onPressed: controller.aiGatewayBusy
                             ? null
@@ -229,7 +204,7 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
                                 ),
                               )
                             : const Icon(Icons.play_circle_outline_rounded),
-                        label: Text(appText('应用', 'Apply')),
+                        label: Text(appText('保存并生效', 'Save & apply')),
                       ),
                     ],
                   ),
@@ -385,11 +360,6 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
         ],
       ),
     );
-  }
-
-  Future<void> handleTopLevelSaveInternal(AppController controller) async {
-    stageExternalAcpDraftInternal(controller);
-    await controller.persistSettingsDraft();
   }
 
   Future<void> handleTopLevelApplyInternal(AppController controller) async {
@@ -684,33 +654,6 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
                       },
                 child: Text(appText('Test', 'Test')),
               ),
-              FilledButton(
-                onPressed: controller.relayBusy
-                    ? null
-                    : () async {
-                        await controller.saveRelayConfiguration(
-                          profileIndex: profileIndex,
-                          host: hostController.text,
-                          port: parsePortInternal(
-                            portController.text,
-                            fallback: 443,
-                          ),
-                          tls: tls,
-                          token: tokenController.text,
-                          password: passwordController.text,
-                        );
-                        if (!mounted) {
-                          return;
-                        }
-                        onMessageChanged(
-                          appText(
-                            '配置已保存，尚未应用到当前线程连接。',
-                            'Configuration saved but not applied to active thread connections yet.',
-                          ),
-                        );
-                      },
-                child: Text(appText('Save', 'Save')),
-              ),
               FilledButton.icon(
                 onPressed: controller.relayBusy
                     ? null
@@ -750,7 +693,7 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.play_circle_outline_rounded),
-                label: Text(appText('Apply', 'Apply')),
+                label: Text(appText('保存并生效', 'Save & apply')),
               ),
             ],
           ),
