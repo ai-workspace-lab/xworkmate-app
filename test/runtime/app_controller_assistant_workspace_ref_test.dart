@@ -535,9 +535,18 @@ void main() {
         'needs_workspace',
       );
 
-      await controller.saveSettings(
-        controller.settings.copyWith(workspacePath: workspaceRoot.path),
+      await controller.saveSettingsDraft(
+        controller.settingsDraft.copyWith(workspacePath: workspaceRoot.path),
       );
+      expect(
+        controller.assistantWorkspacePathForSession(
+          controller.currentSessionKey,
+        ),
+        isEmpty,
+      );
+      expect(controller.hasSettingsDraftChanges, isTrue);
+
+      await controller.saveWorkspacePath(workspaceRoot.path);
 
       expect(
         controller.assistantWorkspacePathForSession(
@@ -545,6 +554,8 @@ void main() {
         ),
         '${workspaceRoot.path}/.xworkmate/threads/main',
       );
+      expect(controller.hasPendingSettingsApply, isFalse);
+      expect(controller.hasSettingsDraftChanges, isFalse);
       expect(
         controller
             .assistantThreadRecordsInternal[controller.currentSessionKey]

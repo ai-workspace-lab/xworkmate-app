@@ -34,12 +34,14 @@ class EditableFieldInternal extends StatefulWidget {
     required this.label,
     required this.value,
     required this.onSubmitted,
+    this.submitOnChange = true,
   });
 
   final Key? fieldKey;
   final String label;
   final String value;
   final ValueChanged<String> onSubmitted;
+  final bool submitOnChange;
 
   @override
   State<EditableFieldInternal> createState() => EditableFieldStateInternal();
@@ -81,8 +83,9 @@ class EditableFieldStateInternal extends State<EditableFieldInternal> {
         key: widget.fieldKey ?? ValueKey('${widget.label}:${widget.value}'),
         controller: controllerInternal,
         decoration: InputDecoration(labelText: widget.label),
-        onChanged: widget.onSubmitted,
+        onChanged: widget.submitOnChange ? widget.onSubmitted : null,
         onFieldSubmitted: widget.onSubmitted,
+        onTapOutside: (_) => widget.onSubmitted(controllerInternal.text),
       ),
     );
   }

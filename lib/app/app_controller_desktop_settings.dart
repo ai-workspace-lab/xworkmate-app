@@ -61,8 +61,8 @@ extension AppControllerDesktopSettings on AppController {
     );
     settingsDraftInitializedInternal = true;
     settingsDraftStatusMessageInternal = appText(
-      '草稿已更新，点击顶部保存持久化。',
-      'Draft updated. Use the top Save button to persist it.',
+      '草稿已更新，点击顶部保存并生效。',
+      'Draft updated. Use the top button to save and apply it.',
     );
     notifyListeners();
   }
@@ -93,6 +93,42 @@ extension AppControllerDesktopSettings on AppController {
     saveSecretDraftInternal(AppController.draftOllamaApiKeyKeyInternal, value);
   }
 
+  Future<void> saveWorkspacePath(String value) async {
+    if (disposedInternal) {
+      return;
+    }
+    final trimmed = value.trim();
+    if (settings.workspacePath.trim() == trimmed) {
+      if (settingsDraftInitializedInternal) {
+        settingsDraftInternal = settingsDraft.copyWith(workspacePath: trimmed);
+      }
+      notifyListeners();
+      return;
+    }
+    final previous = settings;
+    await persistSettingsSnapshotInternal(
+      settings.copyWith(workspacePath: trimmed),
+    );
+    if (disposedInternal) {
+      return;
+    }
+    await applyPersistedSettingsSideEffectsInternal(
+      previous: previous,
+      current: settings,
+      refreshAfterSave: true,
+    );
+    lastAppliedSettingsInternal = settings;
+    settingsDraftInternal = settingsDraftInitializedInternal
+        ? settingsDraftInternal.copyWith(workspacePath: settings.workspacePath)
+        : settings;
+    settingsDraftInitializedInternal = true;
+    settingsDraftStatusMessageInternal = appText(
+      '工作区路径已保存并立即生效。',
+      'Workspace path saved and applied immediately.',
+    );
+    notifyListeners();
+  }
+
   Future<void> persistSettingsDraft() async {
     if (disposedInternal) {
       return;
@@ -115,8 +151,8 @@ extension AppControllerDesktopSettings on AppController {
     settingsDraftInitializedInternal = true;
     pendingSettingsApplyInternal = true;
     settingsDraftStatusMessageInternal = appText(
-      '已保存配置，不立即生效。',
-      'Settings saved. They do not take effect until Apply.',
+      '已保存配置，等待立即生效。',
+      'Settings saved and waiting to be applied.',
     );
     notifyListeners();
   }
@@ -191,9 +227,7 @@ extension AppControllerDesktopSettings on AppController {
   Future<void> clearAssistantLocalState() async {
     await flushAssistantThreadPersistenceInternal();
     await storeInternal.clearAssistantLocalState();
-    await storeInternal.saveTaskThreads(
-      const <TaskThread>[],
-    );
+    await storeInternal.saveTaskThreads(const <TaskThread>[]);
     assistantThreadPersistQueueInternal = Future<void>.value();
     final defaults = SettingsSnapshot.defaults();
     assistantThreadRecordsInternal.clear();
@@ -232,7 +266,7 @@ extension AppControllerDesktopSettings on AppController {
     }
     settingsDraftStatusMessageInternal = appText(
       '草稿已更新，点击顶部保存持久化。',
-      'Draft updated. Use the top Save button to persist it.',
+      'Draft updated. Use the top button to save and apply it.',
     );
     notifyListeners();
   }
