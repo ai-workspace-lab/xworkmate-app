@@ -282,7 +282,9 @@ extension AppControllerDesktopThreadActions on AppController {
         final sessionKey = normalizedAssistantSessionKeyInternal(
           currentSessionKey,
         );
-        final userText = message.trim().isEmpty ? 'See attached.' : message.trim();
+        final userText = message.trim().isEmpty
+            ? 'See attached.'
+            : message.trim();
         appendLocalSessionMessageInternal(
           sessionKey,
           GatewayChatMessage(
@@ -302,17 +304,17 @@ extension AppControllerDesktopThreadActions on AppController {
         recomputeTasksInternal();
         notifyIfActiveInternal();
         try {
-          final dispatch = codeAgentNodeOrchestratorInternal.buildGatewayDispatch(
-            buildCodeAgentNodeStateInternal(),
-          );
+          final dispatch = await codeAgentNodeOrchestratorInternal
+              .buildGatewayDispatch(buildCodeAgentNodeStateInternal());
           final result = await goAgentCoreClientInternal.executeSession(
             GoAgentCoreSessionRequest(
               sessionId: sessionKey,
               threadId: sessionKey,
               target: assistantExecutionTargetForSession(sessionKey),
               prompt: message,
-              workingDirectory:
-                  assistantWorkspacePathForSession(sessionKey).trim(),
+              workingDirectory: assistantWorkspacePathForSession(
+                sessionKey,
+              ).trim(),
               model: assistantModelForSession(sessionKey),
               thinking: thinking,
               selectedSkills: selectedSkillLabels,

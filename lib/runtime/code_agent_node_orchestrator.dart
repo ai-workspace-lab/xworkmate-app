@@ -42,9 +42,41 @@ class CodeAgentNodeOrchestrator {
 
   final RuntimeCoordinator _runtimeCoordinator;
 
-  CodeAgentGatewayDispatch buildGatewayDispatch(CodeAgentNodeState state) {
+  Future<CodeAgentGatewayDispatch> buildGatewayDispatch(
+    CodeAgentNodeState state,
+  ) async {
+    final resolver = _runtimeCoordinator.dispatchResolver;
+    if (resolver != null) {
+      final resolution = await resolver.resolveGatewayDispatch(
+        providers: _runtimeCoordinator.externalCodeAgents,
+        preferredProviderId: state.preferredProviderId,
+        requiredCapabilities: const <String>['gateway-bridge'],
+        nodeState: <String, dynamic>{
+          'selectedAgentId': state.selectedAgentId,
+          'gatewayConnected': state.gatewayConnected,
+          'executionTarget': state.executionTarget.promptValue,
+          'runtimeMode': state.runtimeMode.name,
+          'bridgeEnabled': state.bridgeEnabled,
+          'bridgeState': state.bridgeState,
+          'resolvedCodexCliPath': state.resolvedCodexCliPath?.trim() ?? '',
+          'configuredCodexCliPath': state.configuredCodexCliPath.trim(),
+        },
+        nodeInfo: const <String, dynamic>{
+          'id': 'xworkmate-app',
+          'name': kSystemAppName,
+          'version': kAppVersion,
+        },
+      );
+      if (resolution.metadata.isNotEmpty) {
+        return CodeAgentGatewayDispatch(
+          agentId: resolution.agentId,
+          metadata: resolution.metadata,
+        );
+      }
+    }
+
     final provider = state.bridgeEnabled
-        ? _runtimeCoordinator.selectExternalCodeAgent(
+        ? await _runtimeCoordinator.selectExternalCodeAgent(
             preferredProviderId: state.preferredProviderId,
             requiredCapabilities: const <String>['gateway-bridge'],
           )

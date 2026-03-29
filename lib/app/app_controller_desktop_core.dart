@@ -30,6 +30,7 @@ import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/go_agent_core_client.dart';
 import '../runtime/go_agent_core_desktop_transport.dart';
+import '../runtime/go_runtime_dispatch_desktop_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
@@ -191,6 +192,12 @@ class AppController extends ChangeNotifier {
     arisBundleRepositoryInternal =
         arisBundleRepository ?? ArisBundleRepository();
     goCoreLocatorInternal = GoCoreLocator();
+    runtimeCoordinatorInternal.attachDispatchResolver(
+      GoRuntimeDispatchDesktopClient(
+        acpClient: gatewayAcpClientInternal,
+        goCoreLocator: goCoreLocatorInternal,
+      ),
+    );
     goAgentCoreClientInternal =
         goAgentCoreClient ??
         GoAgentCoreDesktopTransport(
