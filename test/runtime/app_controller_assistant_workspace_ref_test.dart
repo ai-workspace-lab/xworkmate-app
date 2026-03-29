@@ -66,8 +66,8 @@ void main() {
         AssistantExecutionTarget.remote,
       );
 
-      final record =
-          controller.assistantThreadRecordsInternal[controller.currentSessionKey]!;
+      final record = controller
+          .assistantThreadRecordsInternal[controller.currentSessionKey]!;
       expect(record.ownerScope.realm, ThreadRealm.local);
       expect(record.ownerScope.subjectType, ThreadSubjectType.user);
       expect(record.ownerScope.subjectId, isNotEmpty);
@@ -485,8 +485,8 @@ void main() {
       final controller = AppController(store: store);
       addTearDown(controller.dispose);
       await waitForControllerInternal(controller);
-      final existingMain =
-          controller.assistantThreadRecordsInternal[controller.currentSessionKey]!;
+      final existingMain = controller
+          .assistantThreadRecordsInternal[controller.currentSessionKey]!;
       controller.assistantThreadRecordsInternal[controller.currentSessionKey] =
           existingMain.copyWith(
             workspaceBinding: const WorkspaceBinding(
@@ -504,25 +504,27 @@ void main() {
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.singleAgent,
       );
-      controller.assistantThreadRecordsInternal[controller.currentSessionKey] =
-          controller
-              .assistantThreadRecordsInternal[controller.currentSessionKey]!
-              .copyWith(
-                workspaceBinding: const WorkspaceBinding(
-                  workspaceId: 'main',
-                  workspaceKind: WorkspaceKind.localFs,
-                  workspacePath: '',
-                  displayPath: '',
-                  writable: true,
-                ),
-                lifecycleState: controller
-                    .assistantThreadRecordsInternal[controller.currentSessionKey]!
-                    .lifecycleState
-                    .copyWith(status: 'needs_workspace'),
-              );
+      controller.assistantThreadRecordsInternal[controller
+          .currentSessionKey] = controller
+          .assistantThreadRecordsInternal[controller.currentSessionKey]!
+          .copyWith(
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: '',
+              displayPath: '',
+              writable: true,
+            ),
+            lifecycleState: controller
+                .assistantThreadRecordsInternal[controller.currentSessionKey]!
+                .lifecycleState
+                .copyWith(status: 'needs_workspace'),
+          );
 
       expect(
-        controller.assistantWorkspaceRefForSession(controller.currentSessionKey),
+        controller.assistantWorkspaceRefForSession(
+          controller.currentSessionKey,
+        ),
         isEmpty,
       );
       expect(
@@ -538,7 +540,9 @@ void main() {
       );
 
       expect(
-        controller.assistantWorkspaceRefForSession(controller.currentSessionKey),
+        controller.assistantWorkspaceRefForSession(
+          controller.currentSessionKey,
+        ),
         '${workspaceRoot.path}/.xworkmate/threads/main',
       );
       expect(
@@ -553,6 +557,65 @@ void main() {
             ?.lifecycleState
             .status,
         'ready',
+      );
+    },
+  );
+
+  test(
+    'AppController keeps single-agent threads unbound when the workspace root cannot create thread directories',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-workspace-invalid-root-',
+      );
+      final invalidRootFile = File('${tempDirectory.path}/workspace-root-file');
+      await invalidRootFile.writeAsString('not-a-directory');
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          workspacePath: invalidRootFile.path,
+        ),
+      );
+
+      final controller = AppController(store: store);
+      addTearDown(controller.dispose);
+      await waitForControllerInternal(controller);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+
+      controller.initializeAssistantThreadContext(
+        'draft:invalid-root',
+        title: 'Invalid Root',
+        executionTarget: AssistantExecutionTarget.singleAgent,
+      );
+
+      final expectedThreadWorkspace = Directory(
+        '${invalidRootFile.path}/.xworkmate/threads/draft-invalid-root',
+      );
+      expect(await expectedThreadWorkspace.exists(), isFalse);
+      expect(
+        controller.assistantWorkspaceRefForSession('draft:invalid-root'),
+        isEmpty,
+      );
+      expect(
+        controller
+            .assistantThreadRecordsInternal['draft:invalid-root']
+            ?.lifecycleState
+            .status,
+        'needs_workspace',
       );
     },
   );
