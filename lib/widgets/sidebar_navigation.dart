@@ -629,6 +629,16 @@ class SidebarFooter extends StatelessWidget {
             color: palette.chromeStroke.withValues(alpha: 0.9),
           ),
           const SizedBox(height: 6),
+          if (showAccountButton) ...[
+            ChromeIconActionButton(
+              icon: currentSection == WorkspaceDestination.account
+                  ? Icons.account_circle_rounded
+                  : Icons.account_circle_outlined,
+              tooltip: appText('打开账号页', 'Open account'),
+              onPressed: onOpenAccount,
+            ),
+            const SizedBox(height: 6),
+          ],
           ChromeLanguageActionButton(
             appLanguage: appLanguage,
             compact: true,
@@ -706,6 +716,18 @@ class SidebarFooter extends StatelessWidget {
           color: palette.chromeStroke.withValues(alpha: 0.9),
         ),
         const SizedBox(height: AppSpacing.xs),
+        if (showAccountButton) ...[
+          _SidebarNavItem(
+            section: WorkspaceDestination.account,
+            selected: currentSection == WorkspaceDestination.account,
+            collapsed: false,
+            emphasis: _SidebarItemEmphasis.secondary,
+            favorite: false,
+            showFavoriteToggle: false,
+            onTap: onOpenAccount,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
         if (showSettingsButton) ...[
           _SidebarNavItem(
             section: WorkspaceDestination.settings,
