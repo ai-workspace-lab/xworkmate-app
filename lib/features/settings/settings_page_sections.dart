@@ -118,8 +118,8 @@ extension SettingsPageSectionsMixinInternal on SettingsPageStateInternal {
           context,
           title: detail.label,
           description: appText(
-            '只在这里维护 Vault 地址、命名空间和安全 token 引用。',
-            'Maintain Vault endpoint, namespace, and secure token references here.',
+            '在这里维护 Vault 服务地址、可选 namespace，以及只进入安全存储的 root token。',
+            'Maintain the Vault server URL, optional namespace, and the root token that only persists in secure storage here.',
           ),
         ),
         const SizedBox(height: 16),

@@ -362,8 +362,8 @@ desktop:
       description: Desktop account access section
       ui_surface: settings_page
     vault_server:
-      enabled: false
-      release_tier: experimental
+      enabled: true
+      release_tier: stable
       build_modes: [debug, profile, release]
       description: Desktop Vault server integration section
       ui_surface: settings_page
