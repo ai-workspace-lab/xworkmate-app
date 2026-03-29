@@ -1,29 +1,20 @@
 # Assistant TaskThread 当前模型（2026-03-28）
 
-本文以当前代码实现为准，描述 XWorkmate 里 `TaskThread` 的真实结构、主链路和状态语义。
+本文以当前设计基准描述 XWorkmate 中 `TaskThread` 的当前模型、主执行链路与字段职责。
 
-这份文档的目标不是描述“理想终态”，而是给现在的实现一份能直接对照代码的说明，避免旧的 `workspaceRef` 时代文档继续误导后续改动。
+本文只说明当前主模型，不再沿用旧线程字段集合与旧工作目录叙事。
 
-## 0. 当前结论
+## 1. 当前结论
 
-1. `TaskThread` 是当前任务线程的持久化主对象，规范字段已经是：
-   - `ownerScope`
-   - `workspaceBinding`
-   - `executionBinding`
-   - `contextState`
-   - `lifecycleState`
-2. desktop 发送消息前会先执行一次 `ensureDesktopTaskThreadBindingInternal(...)`，然后检查 `workspaceBinding.workspacePath`；为空则直接 fail-fast，不允许运行。
-3. single-agent 本地线程会把工作目录落到：
-   - `<settings.workspacePath>/.xworkmate/threads/<sanitized-threadId>`
-4. 右侧边栏展示路径来自 `workspaceBinding.displayPath`；本地线程当前会把 `displayPath` 与 `workspacePath` 对齐，复制/打开也基于同一条绑定。
-5. 当前 `ThreadLifecycleState.status` 在 desktop 主链路里实际只使用：
-   - `needs_workspace`
-   - `ready`
-6. `archived` 是单独的布尔标记，不是第三个 `status` 枚举值。
+1. `TaskThread` 是任务线程的唯一主对象。
+2. UI 保持现有结构不变，但线程选择的唯一键是 `TaskThread.threadId`。
+3. UI 选中线程后，系统必须读取完整 `TaskThread`，而不是从页面状态拼装线程信息。
+4. `TaskThread` 持久化 schema 保持不变；本轮只迁移 runtime 解释层与执行链路。
+5. 执行请求由 controller / runtime 根据 `ownerScope / workspaceBinding / executionBinding / contextState` 构造。
+6. controller / runtime 统一通过 `Go Agent-core` 调度执行：Desktop 走 App 内 local bridge，Web 走远端 ACP / RPC endpoint。
+7. 执行结果先回写 `TaskThread.contextState`，主体区域同步显示；只有必要时才更新 `workspaceBinding`；右栏展示读取的是当前 `TaskThread` 最新记录。
 
-## 1. 当前结构
-
-### 1.1 顶层对象：TaskThread
+## 2. TaskThread 结构
 
 ```text
 TaskThread
@@ -38,35 +29,41 @@ TaskThread
 - updatedAtMs: double?
 ```
 
-### 1.2 归属：ThreadOwnerScope
+### 2.1 ownerScope
 
 ```text
 ThreadOwnerScope
-- realm: ThreadRealm              // local | remote
-- subjectType: ThreadSubjectType // tenant | user
+- realm: ThreadRealm
+- subjectType: ThreadSubjectType
 - subjectId: String
 - displayName: String
 ```
 
-### 1.3 工作空间绑定：WorkspaceBinding
+职责：
+
+- 定义线程归属
+- 提供 owner 维度展示信息
+- 为 remote owner path 推导提供上下文
+
+### 2.2 workspaceBinding
 
 ```text
 WorkspaceBinding
 - workspaceId: String
-- workspaceKind: WorkspaceKind   // localFs | remoteFs
+- workspaceKind: WorkspaceKind
 - workspacePath: String
 - displayPath: String
 - writable: bool
 ```
 
-说明：
+职责：
 
-- `workspacePath` 是执行时真正依赖的路径。
-- `displayPath` 是 UI 展示值。
-- 对当前 desktop 本地线程，二者应保持一致。
-- 对远端线程，`displayPath` 可以和 `workspacePath` 一样，也可以是更适合展示的字符串，但它们仍然来自同一个 `WorkspaceBinding`。
+- `workspacePath`：线程执行时使用的工作空间路径
+- `displayPath`：右栏显示路径
+- `workspaceKind`：本地 / 远端工作空间语义
+- `writable`：当前工作空间是否允许写入
 
-### 1.4 执行绑定：ExecutionBinding
+### 2.3 executionBinding
 
 ```text
 ExecutionBinding
@@ -76,13 +73,13 @@ ExecutionBinding
 - endpointId: String
 ```
 
-当前 `executionMode` 与 UI 目标的映射关系：
+职责：
 
-- `localAgent` -> `singleAgent`
-- `gatewayLocal` -> `local`
-- `gatewayRemote` -> `remote`
+- 定义线程当前执行模式
+- 定义 provider / endpoint 绑定
+- 为 agent-core / runtime 协调层提供调度输入
 
-### 1.5 上下文：ThreadContextState
+### 2.4 contextState
 
 ```text
 ThreadContextState
@@ -96,127 +93,92 @@ ThreadContextState
 - gatewayEntryState: String?
 ```
 
-### 1.6 生命周期：ThreadLifecycleState
+职责：
+
+- 保存线程消息历史
+- 保存模型、技能、权限、message view mode
+- 保存最近一次运行解析得到的 runtime 附加信息
+
+### 2.5 lifecycleState
 
 ```text
 ThreadLifecycleState
 - archived: bool
-- status: String                // 当前主链路只用 ready | needs_workspace
+- status: String
 - lastRunAtMs: double?
 - lastResultCode: String?
 ```
 
-说明：
+职责：
 
-- `lastRunAtMs` / `lastResultCode` 已经是模型字段，但当前 desktop TaskThread 主链路还没有把它们扩展成更细的“运行中 / 成功 / 失败”状态机。
-- 现在真正决定“能不能发消息”的核心条件仍然是 `workspaceBinding.workspacePath` 是否为空。
+- `archived`：归档标记
+- `status`：线程生命周期摘要，例如 `needs_workspace / ready`
+- `lastRunAtMs / lastResultCode`：最近执行摘要
 
-## 2. TaskThread 主流程图（Mermaid）
-
-下面这张图对应当前 desktop 的真实主链路，覆盖线程初始化、工作目录绑定、运行前校验、执行与回写。
-
-```mermaid
-flowchart TD
-  A["新建线程 / 切换线程"] --> B["upsertTaskThreadInternal(threadId, ...)"]
-  B --> C["ensureDesktopTaskThreadBindingInternal(threadId)"]
-
-  C --> D{"executionTarget"}
-  D -->|singleAgent| E["构造本地 WorkspaceBinding<br/>workspacePath = workspaceRoot/.xworkmate/threads/<threadId><br/>createSync(recursive: true)"]
-  D -->|local / remote gateway| F["构造远端 WorkspaceBinding<br/>/owners/<realm>/<subjectType>/<subjectId>/threads/<threadId>"]
-
-  E --> G["持久化 TaskThread"]
-  F --> G
-  G --> H["右栏读取 workspaceBinding.displayPath"]
-
-  H --> I["用户发送消息"]
-  I --> J["再次 ensureDesktopTaskThreadBindingInternal(threadId)"]
-  J --> K{"workspaceBinding.workspacePath 为空?"}
-
-  K -->|yes| L["追加错误消息<br/>当前线程缺少工作路径，无法运行"]
-  K -->|no| M["按 TaskThread 构造执行请求<br/>workspaceBinding + executionBinding + contextState"]
-
-  M --> N{"executionMode"}
-  N -->|localAgent| O["singleAgentRunner.run(...)"]
-  N -->|gatewayLocal / gatewayRemote| P["Gateway / ACP 会话执行"]
-
-  O --> Q["执行结果 / 消息 / resolvedWorkingDirectory"]
-  P --> Q
-
-  Q --> R{"返回新的远端 workingDirectory?"}
-  R -->|yes| S["回写 workspaceBinding<br/>workspaceKind=remoteFs<br/>status=ready"]
-  R -->|no| T["回写 contextState / updatedAtMs"]
-
-  S --> T
-  T --> U["持久化当前 TaskThread"]
-  U --> V["对话区 / 右栏 / 文件面板刷新"]
-```
-
-这张图里有三点最重要：
-
-1. `TaskThread` 先绑定，再运行，不是运行时临时猜目录。
-2. `workspaceBinding.workspacePath` 为空会直接失败，不会继续执行。
-3. UI 展示路径和执行路径都来自同一个 `WorkspaceBinding`。
-
-## 3. TaskThread 状态图（Mermaid）
-
-下面这张图刻画的是当前实现真正存在的状态，不再把它画成一个比代码更复杂的“理想状态机”。
+## 3. TaskThread 生命周期主链
 
 ```mermaid
-stateDiagram-v2
-  state "Needs Workspace (status=needs_workspace)" as NeedsWorkspace
-  state "Ready (status=ready)" as Ready
+flowchart LR
+  A["UI选择任务线程"] --> B["TaskThread.threadId"]
+  B --> C["读取 TaskThread"]
 
-  [*] --> Created
+  C --> D1["ownerScope"]
+  C --> D2["workspaceBinding"]
+  C --> D3["executionBinding"]
+  C --> D4["contextState"]
 
-  Created --> NeedsWorkspace: workspacePath == ""
-  Created --> Ready: workspacePath != ""
+  D1 --> E["构造执行请求"]
+  D2 --> E
+  D3 --> E
+  D4 --> E
 
-  NeedsWorkspace --> Ready: initialize / rebind 写入 workspaceBinding.workspacePath
-  Ready --> NeedsWorkspace: workspacePath 被清空或无法建立有效绑定
+  E --> F["Go Agent-core\nDesktop: local bridge\nWeb: remote ACP / RPC"]
+  F --> G["执行结果"]
 
-  NeedsWorkspace --> NeedsWorkspace: sendChatMessage fail-fast\n追加缺少工作路径错误消息
-  Ready --> Ready: 切换模型 / 技能 / provider / message 回写 / 远端路径回写
+  G --> H["回写线程上下文\n(主体区域 同步显示)"]
+  G --> I["必要时更新 workspaceBinding"]
 
-  Ready --> Archived: saveAssistantTaskArchived(true)
-  NeedsWorkspace --> Archived: saveAssistantTaskArchived(true)
-
-  Archived --> Ready: saveAssistantTaskArchived(false)\nworkspacePath != ""
-  Archived --> NeedsWorkspace: saveAssistantTaskArchived(false)\nworkspacePath == ""
-
-  note right of Archived
-    archived 对应 ThreadLifecycleState.archived。
-    它是独立的归档标记，不等价于 lifecycle.status。
-  end note
+  H --> J["右栏显示"]
+  I --> J
 ```
 
-状态图里的关键现实约束：
+这条链路是当前唯一生命周期基准：
 
-1. 当前 desktop 链路没有单独维护 `running / succeeded / failed` 这些 TaskThread 生命周期状态。
-2. “能不能运行”由 `workspacePath` 是否有效决定，所以 `needs_workspace` / `ready` 才是当前最重要的主状态。
-3. `Archived` 更像“列表可见性 / 激活资格”开关，而不是替代 `status` 的主生命周期状态。
+1. UI 仍保持现有形态，但只负责选择 `threadId` 与消费回写结果。
+2. 线程的执行输入来自完整 `TaskThread`。
+3. `构造执行请求` 属于 agent-core / runtime 协调层，不属于 UI。
+4. `Go Agent-core` 是唯一执行调度面；Desktop / Web 共用同一套 session 语义，只在 transport 上有差异。
+5. `回写线程上下文` 是执行结束后的第一落点；主体区域同步显示依赖这一回写。
+6. `必要时更新 workspaceBinding` 是条件分支，不是固定每次都发生的回写步骤。
+7. `右栏显示` 读取的是当前 `TaskThread` 最新记录，因此它与主体区域共享同一线程事实来源。
 
-## 4. 当前实现里仍然存在的兼容痕迹
+## 4. 当前设计约束
 
-虽然持久化 canonical schema 已经是 `workspaceBinding` / `executionBinding` 这一套，但当前代码里仍然保留了少量旧入口作为适配层，例如：
+### 4.1 UI 约束
 
-- `TaskThread(...)` 构造器仍接受 `workspaceRef`
-- `TaskThread(...)` 构造器仍接受 `workspaceRefKind`
-- `TaskThread(...)` 构造器仍接受 `sessionKey`
+- 现有 UI 结构保持不变。
+- UI 不是执行请求构造者。
+- UI 不是工作空间推断器。
+- UI 不是线程状态的独立真相源。
 
-这些字段现在主要用于：
+### 4.2 agent-core / runtime 协调层约束
 
-- 老测试夹具
-- 旧调用点平滑过渡
-- 构造器内部映射到新结构
+- 根据 `ownerScope / workspaceBinding / executionBinding / contextState` 构造执行请求。
+- 负责把线程请求调度到 `Go Agent-core`，而不是让 Flutter UI 直接承担 runtime 职责。
+- 接收执行结果并驱动 `TaskThread` 回写。
 
-因此，当前最准确的理解方式是：
+### 4.3 TaskThread 约束
 
-1. 运行时主对象已经是新结构。
-2. 构造器层还残留少量旧参数适配。
-3. 文档和后续重构都应以 `workspaceBinding` / `executionBinding` / `contextState` / `lifecycleState` 为主。
+- `threadId` 是线程身份唯一键。
+- `workspaceBinding` 是线程生命周期字段，不再承担 fallback 猜测语义。
+- `contextState` 是线程上下文真相源。
+- `lifecycleState` 只表达归档与生命周期摘要，不替代线程主体模型。
 
-## 5. 文档边界
+## 5. 与其他文档的边界
 
-本文只描述当前 TaskThread 的主模型与主链路。
+- [assistant-thread-information-architecture.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-taskthread-docs-naming-cleanup/docs/architecture/assistant-thread-information-architecture.md)
+  说明线程信息如何进入 UI、agent-core / runtime 请求构造、结果回写和右栏展示。
+- [xworkmate-internal-state-architecture.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-taskthread-docs-naming-cleanup/docs/architecture/xworkmate-internal-state-architecture.md)
+  说明控制器、状态存储和派生 UI 状态如何围绕 `TaskThread` 组织。
 
-历史上那套以 `workspaceRef` / `workspaceRefKind` / fallback cwd 为中心的说明，已经降级为归档材料，不应再作为新改动的设计依据。
+归档文档仍可保留作为历史背景，但不再参与当前设计说明。

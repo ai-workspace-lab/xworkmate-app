@@ -33,8 +33,8 @@ void main() {
       await binaryFile.writeAsBytes(const <int>[1, 2, 3, 4]);
 
       final snapshot = await service.loadSnapshot(
-        workspaceRef: root.path,
-        workspaceRefKind: WorkspaceRefKind.localPath,
+        workspacePath: root.path,
+        workspaceKind: WorkspaceRefKind.localPath,
       );
 
       expect(
@@ -54,16 +54,16 @@ void main() {
 
       final markdownPreview = await service.loadPreview(
         entry: markdownEntry,
-        workspaceRef: root.path,
-        workspaceRefKind: WorkspaceRefKind.localPath,
+        workspacePath: root.path,
+        workspaceKind: WorkspaceRefKind.localPath,
       );
       expect(markdownPreview.kind, AssistantArtifactPreviewKind.markdown);
       expect(markdownPreview.content, contains('artifact preview'));
 
       final htmlPreview = await service.loadPreview(
         entry: htmlEntry,
-        workspaceRef: root.path,
-        workspaceRefKind: WorkspaceRefKind.localPath,
+        workspacePath: root.path,
+        workspaceKind: WorkspaceRefKind.localPath,
       );
       expect(htmlPreview.kind, AssistantArtifactPreviewKind.html);
       expect(htmlPreview.content, contains('<h1>Preview</h1>'));
@@ -71,8 +71,8 @@ void main() {
 
       final binaryPreview = await service.loadPreview(
         entry: binaryEntry,
-        workspaceRef: root.path,
-        workspaceRefKind: WorkspaceRefKind.localPath,
+        workspacePath: root.path,
+        workspaceKind: WorkspaceRefKind.localPath,
       );
       expect(binaryPreview.kind, AssistantArtifactPreviewKind.unsupported);
     },
@@ -97,8 +97,8 @@ void main() {
       await File('${root.path}/outside.txt').writeAsString('ignore me');
 
       final snapshot = await service.loadSnapshot(
-        workspaceRef: workspace.path,
-        workspaceRefKind: WorkspaceRefKind.localPath,
+        workspacePath: workspace.path,
+        workspaceKind: WorkspaceRefKind.localPath,
       );
 
       expect(snapshot.changes, isNotEmpty);
@@ -119,8 +119,8 @@ void main() {
     'DesktopThreadArtifactService reports remote workspaces as non-browsable',
     () async {
       final snapshot = await service.loadSnapshot(
-        workspaceRef: '/opt/data/.xworkmate/threads/draft-remote-thread',
-        workspaceRefKind: WorkspaceRefKind.remotePath,
+        workspacePath: '/opt/data/.xworkmate/threads/draft-remote-thread',
+        workspaceKind: WorkspaceRefKind.remotePath,
       );
 
       expect(snapshot.resultEntries, isEmpty);

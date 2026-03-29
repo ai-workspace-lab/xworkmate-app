@@ -9,13 +9,13 @@ class WebArtifactProxyClient {
 
   Future<AssistantArtifactSnapshot> loadSnapshot({
     required String sessionKey,
-    required String workspaceRef,
-    required WorkspaceRefKind workspaceRefKind,
+    required String workspacePath,
+    required WorkspaceRefKind workspaceKind,
   }) async {
-    if (workspaceRef.trim().isEmpty) {
+    if (workspacePath.trim().isEmpty) {
       return AssistantArtifactSnapshot(
-        workspaceRef: workspaceRef,
-        workspaceRefKind: workspaceRefKind,
+        workspacePath: workspacePath,
+        workspaceKind: workspaceKind,
         resultMessage: 'No recorded workspace for this thread.',
         filesMessage: 'No recorded workspace for this thread.',
         changesMessage: 'No recorded workspace for this thread.',
@@ -28,21 +28,24 @@ class WebArtifactProxyClient {
             'artifacts.list',
             params: <String, dynamic>{
               'sessionKey': sessionKey,
-              'workspaceRef': workspaceRef,
+              'workspaceRef': workspacePath,
+              'workspacePath': workspacePath,
             },
           ),
           _requestPayload(
             'artifacts.files',
             params: <String, dynamic>{
               'sessionKey': sessionKey,
-              'workspaceRef': workspaceRef,
+              'workspaceRef': workspacePath,
+              'workspacePath': workspacePath,
             },
           ),
           _requestPayload(
             'artifacts.changes',
             params: <String, dynamic>{
               'sessionKey': sessionKey,
-              'workspaceRef': workspaceRef,
+              'workspaceRef': workspacePath,
+              'workspacePath': workspacePath,
             },
           ),
         ],
@@ -51,19 +54,19 @@ class WebArtifactProxyClient {
       final filesPayload = responses[1];
       final changesPayload = responses[2];
       return AssistantArtifactSnapshot(
-        workspaceRef: workspaceRef,
-        workspaceRefKind: workspaceRefKind,
+        workspacePath: workspacePath,
+        workspaceKind: workspaceKind,
         resultEntries: _decodeEntries(
           resultPayload['entries'] ??
               resultPayload['items'] ??
               resultPayload['files'],
-          workspaceRef: workspaceRef,
+          workspacePath: workspacePath,
         ),
         fileEntries: _decodeEntries(
           filesPayload['entries'] ??
               filesPayload['items'] ??
               filesPayload['files'],
-          workspaceRef: workspaceRef,
+          workspacePath: workspacePath,
         ),
         changes: _decodeChanges(
           changesPayload['changes'] ?? changesPayload['items'],
@@ -80,8 +83,8 @@ class WebArtifactProxyClient {
       );
     } on WebRelayGatewayException catch (error) {
       return AssistantArtifactSnapshot(
-        workspaceRef: workspaceRef,
-        workspaceRefKind: workspaceRefKind,
+        workspacePath: workspacePath,
+        workspaceKind: workspaceKind,
         resultMessage: _messageFor(error),
         filesMessage: _messageFor(error),
         changesMessage: _messageFor(error),
@@ -98,7 +101,8 @@ class WebArtifactProxyClient {
         'artifacts.preview',
         params: <String, dynamic>{
           'sessionKey': sessionKey,
-          'workspaceRef': entry.workspaceRef,
+          'workspaceRef': entry.workspacePath,
+          'workspacePath': entry.workspacePath,
           'path': entry.relativePath,
         },
       );
@@ -121,7 +125,8 @@ class WebArtifactProxyClient {
         'artifacts.read',
         params: <String, dynamic>{
           'sessionKey': sessionKey,
-          'workspaceRef': entry.workspaceRef,
+          'workspaceRef': entry.workspacePath,
+          'workspacePath': entry.workspacePath,
           'path': entry.relativePath,
         },
       );
@@ -181,7 +186,7 @@ class WebArtifactProxyClient {
 
   static List<AssistantArtifactEntry> _decodeEntries(
     Object? value, {
-    required String workspaceRef,
+    required String workspacePath,
   }) {
     if (value is! List) {
       return const <AssistantArtifactEntry>[];
@@ -197,7 +202,7 @@ class WebArtifactProxyClient {
           return AssistantArtifactEntry.fromJson(<String, dynamic>{
             'id': json['id']?.toString().trim().isNotEmpty == true
                 ? json['id']
-                : '$workspaceRef::$relativePath',
+                : '$workspacePath::$relativePath',
             'label': json['label']?.toString().trim().isNotEmpty == true
                 ? json['label']
                 : _baseName(relativePath),
@@ -211,10 +216,12 @@ class WebArtifactProxyClient {
             'previewable':
                 json['previewable'] as bool? ??
                 _isPreviewableExtension(_extensionFor(relativePath)),
-            'workspaceRef':
-                json['workspaceRef']?.toString().trim().isNotEmpty == true
-                ? json['workspaceRef']
-                : workspaceRef,
+            'workspacePath':
+                json['workspacePath']?.toString().trim().isNotEmpty == true
+                ? json['workspacePath']
+                : (json['workspaceRef']?.toString().trim().isNotEmpty == true
+                      ? json['workspaceRef']
+                      : workspacePath),
           });
         })
         .where((item) => item.relativePath.trim().isNotEmpty)

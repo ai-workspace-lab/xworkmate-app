@@ -17,23 +17,23 @@ class DesktopThreadArtifactService {
   };
 
   Future<AssistantArtifactSnapshot> loadSnapshot({
-    required String workspaceRef,
-    required WorkspaceRefKind workspaceRefKind,
+    required String workspacePath,
+    required WorkspaceRefKind workspaceKind,
   }) async {
-    final normalizedRef = workspaceRef.trim();
+    final normalizedRef = workspacePath.trim();
     if (normalizedRef.isEmpty) {
       return AssistantArtifactSnapshot(
-        workspaceRef: normalizedRef,
-        workspaceRefKind: workspaceRefKind,
+        workspacePath: normalizedRef,
+        workspaceKind: workspaceKind,
         resultMessage: 'No recorded working directory for this thread.',
         filesMessage: 'No recorded working directory for this thread.',
         changesMessage: 'No recorded working directory for this thread.',
       );
     }
-    if (workspaceRefKind != WorkspaceRefKind.localPath) {
+    if (workspaceKind != WorkspaceRefKind.localPath) {
       return AssistantArtifactSnapshot(
-        workspaceRef: normalizedRef,
-        workspaceRefKind: workspaceRefKind,
+        workspacePath: normalizedRef,
+        workspaceKind: workspaceKind,
         resultMessage:
             'This thread workspace is recorded on a remote agent and is not browsable from desktop.',
         filesMessage:
@@ -45,8 +45,8 @@ class DesktopThreadArtifactService {
     final root = Directory(normalizedRef);
     if (!await root.exists()) {
       return AssistantArtifactSnapshot(
-        workspaceRef: normalizedRef,
-        workspaceRefKind: workspaceRefKind,
+        workspacePath: normalizedRef,
+        workspaceKind: workspaceKind,
         resultMessage:
             'This thread workspace is recorded but is not available on the current machine.',
         filesMessage:
@@ -62,7 +62,7 @@ class DesktopThreadArtifactService {
     final results = await buildResultEntriesInternal(
       changes: changes,
       fileEntries: fileEntries,
-      workspaceRef: normalizedRef,
+      workspacePath: normalizedRef,
     );
 
     final resultMessage = results.isEmpty
@@ -78,8 +78,8 @@ class DesktopThreadArtifactService {
         : '';
 
     return AssistantArtifactSnapshot(
-      workspaceRef: normalizedRef,
-      workspaceRefKind: workspaceRefKind,
+      workspacePath: normalizedRef,
+      workspaceKind: workspaceKind,
       resultEntries: results,
       fileEntries: fileEntries,
       changes: changes,
@@ -91,15 +91,15 @@ class DesktopThreadArtifactService {
 
   Future<AssistantArtifactPreview> loadPreview({
     required AssistantArtifactEntry entry,
-    required String workspaceRef,
-    required WorkspaceRefKind workspaceRefKind,
+    required String workspacePath,
+    required WorkspaceRefKind workspaceKind,
   }) async {
-    if (workspaceRefKind != WorkspaceRefKind.localPath) {
+    if (workspaceKind != WorkspaceRefKind.localPath) {
       return const AssistantArtifactPreview.empty(
         message: 'Remote agent artifacts are not directly readable on desktop.',
       );
     }
-    final root = Directory(workspaceRef.trim());
+    final root = Directory(workspacePath.trim());
     if (!await root.exists()) {
       return const AssistantArtifactPreview.empty(
         message:
@@ -107,7 +107,7 @@ class DesktopThreadArtifactService {
       );
     }
     final targetPath = resolveAbsolutePathInternal(
-      workspaceRef,
+      workspacePath,
       entry.relativePath,
     );
     final file = File(targetPath);
@@ -173,18 +173,18 @@ class DesktopThreadArtifactService {
 
   Future<List<AssistantArtifactEntry>> buildEntriesInternal(
     List<File> files,
-    String workspaceRef,
+    String workspacePath,
   ) async {
     final entries = <AssistantArtifactEntry>[];
     for (final file in files) {
       try {
         final stat = await file.stat();
         final relativePath =
-            relativePathInternal(workspaceRef, file.path) ?? file.path;
+            relativePathInternal(workspacePath, file.path) ?? file.path;
         final extension = fileExtensionInternal(relativePath);
         entries.add(
           AssistantArtifactEntry(
-            id: '$workspaceRef::$relativePath',
+            id: '$workspacePath::$relativePath',
             label: baseNameInternal(relativePath),
             relativePath: relativePath,
             kind: AssistantArtifactEntryKind.file,
@@ -192,7 +192,7 @@ class DesktopThreadArtifactService {
             sizeBytes: stat.size,
             updatedAtMs: stat.modified.millisecondsSinceEpoch.toDouble(),
             previewable: isPreviewableExtensionInternal(extension),
-            workspaceRef: workspaceRef,
+            workspacePath: workspacePath,
           ),
         );
       } on FileSystemException {
@@ -212,7 +212,7 @@ class DesktopThreadArtifactService {
   Future<List<AssistantArtifactEntry>> buildResultEntriesInternal({
     required List<AssistantArtifactChangeEntry> changes,
     required List<AssistantArtifactEntry> fileEntries,
-    required String workspaceRef,
+    required String workspacePath,
   }) async {
     final filesByPath = <String, AssistantArtifactEntry>{
       for (final entry in fileEntries) entry.relativePath: entry,
@@ -232,7 +232,7 @@ class DesktopThreadArtifactService {
 
   Future<List<AssistantArtifactChangeEntry>> readGitChangesInternal(
     Directory workspaceRoot,
-    String workspaceRef,
+    String workspacePath,
   ) async {
     String? repositoryRoot;
     try {
@@ -275,7 +275,7 @@ class DesktopThreadArtifactService {
             ? rawPath.split(' -> ').last.trim()
             : rawPath;
         final absolutePath = joinPathInternal(repositoryRoot, path);
-        final relativePath = relativePathInternal(workspaceRef, absolutePath);
+        final relativePath = relativePathInternal(workspacePath, absolutePath);
         if (relativePath == null || relativePath.isEmpty) {
           continue;
         }

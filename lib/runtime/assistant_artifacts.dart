@@ -30,7 +30,7 @@ class AssistantArtifactEntry {
     required this.kind,
     required this.mimeType,
     required this.previewable,
-    required this.workspaceRef,
+    required this.workspacePath,
     this.sizeBytes,
     this.updatedAtMs,
   });
@@ -43,7 +43,7 @@ class AssistantArtifactEntry {
   final int? sizeBytes;
   final double? updatedAtMs;
   final bool previewable;
-  final String workspaceRef;
+  final String workspacePath;
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
@@ -55,7 +55,8 @@ class AssistantArtifactEntry {
       'sizeBytes': sizeBytes,
       'updatedAtMs': updatedAtMs,
       'previewable': previewable,
-      'workspaceRef': workspaceRef,
+      'workspacePath': workspacePath,
+      'workspaceRef': workspacePath,
     };
   }
 
@@ -77,7 +78,10 @@ class AssistantArtifactEntry {
         _ => null,
       },
       previewable: json['previewable'] as bool? ?? false,
-      workspaceRef: json['workspaceRef']?.toString() ?? '',
+      workspacePath:
+          json['workspacePath']?.toString() ??
+          json['workspaceRef']?.toString() ??
+          '',
     );
   }
 }
@@ -158,8 +162,8 @@ class AssistantArtifactPreview {
 
 class AssistantArtifactSnapshot {
   const AssistantArtifactSnapshot({
-    required this.workspaceRef,
-    required this.workspaceRefKind,
+    required this.workspacePath,
+    required this.workspaceKind,
     this.resultEntries = const <AssistantArtifactEntry>[],
     this.fileEntries = const <AssistantArtifactEntry>[],
     this.changes = const <AssistantArtifactChangeEntry>[],
@@ -168,8 +172,8 @@ class AssistantArtifactSnapshot {
     this.changesMessage = '',
   });
 
-  final String workspaceRef;
-  final WorkspaceRefKind workspaceRefKind;
+  final String workspacePath;
+  final WorkspaceRefKind workspaceKind;
   final List<AssistantArtifactEntry> resultEntries;
   final List<AssistantArtifactEntry> fileEntries;
   final List<AssistantArtifactChangeEntry> changes;
@@ -182,8 +186,10 @@ class AssistantArtifactSnapshot {
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
-      'workspaceRef': workspaceRef,
-      'workspaceRefKind': workspaceRefKind.name,
+      'workspacePath': workspacePath,
+      'workspaceRef': workspacePath,
+      'workspaceKind': workspaceKind.name,
+      'workspaceRefKind': workspaceKind.name,
       'resultEntries': resultEntries.map((item) => item.toJson()).toList(),
       'fileEntries': fileEntries.map((item) => item.toJson()).toList(),
       'changes': changes.map((item) => item.toJson()).toList(),
@@ -208,9 +214,13 @@ class AssistantArtifactSnapshot {
     }
 
     return AssistantArtifactSnapshot(
-      workspaceRef: json['workspaceRef']?.toString() ?? '',
-      workspaceRefKind: WorkspaceRefKindCopy.fromJsonValue(
-        json['workspaceRefKind']?.toString(),
+      workspacePath:
+          json['workspacePath']?.toString() ??
+          json['workspaceRef']?.toString() ??
+          '',
+      workspaceKind: WorkspaceRefKindCopy.fromJsonValue(
+        json['workspaceKind']?.toString() ??
+            json['workspaceRefKind']?.toString(),
       ),
       resultEntries: decodeList(
         json['resultEntries'],

@@ -280,13 +280,28 @@ extension AppControllerDesktopThreadStorage on AppController {
 
   void appendLocalSessionMessageInternal(
     String sessionKey,
-    GatewayChatMessage message,
+    GatewayChatMessage message, {
+    bool persistInThreadContext = false,
+  }
   ) {
     final key = normalizedAssistantSessionKeyInternal(sessionKey);
     final next = List<GatewayChatMessage>.from(
       localSessionMessagesInternal[key] ?? const <GatewayChatMessage>[],
     )..add(message);
     localSessionMessagesInternal[key] = next;
+    if (persistInThreadContext) {
+      final threadMessages = List<GatewayChatMessage>.from(
+        assistantThreadRecordsInternal[key]?.messages ??
+            const <GatewayChatMessage>[],
+      )..add(message);
+      upsertTaskThreadInternal(
+        key,
+        messages: threadMessages,
+        updatedAtMs:
+            message.timestampMs ??
+            DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
+    }
     notifyIfActiveInternal();
   }
 
@@ -514,7 +529,7 @@ extension AppControllerDesktopThreadStorage on AppController {
 
   Future<List<AssistantThreadSkillEntry>>
   scanSingleAgentWorkspaceSkillEntriesInternal(String sessionKey) {
-    if (assistantWorkspaceRefKindForSession(sessionKey) !=
+    if (assistantWorkspaceKindForSession(sessionKey) !=
         WorkspaceRefKind.localPath) {
       return Future<List<AssistantThreadSkillEntry>>.value(
         const <AssistantThreadSkillEntry>[],
@@ -522,7 +537,7 @@ extension AppControllerDesktopThreadStorage on AppController {
     }
     return scanSingleAgentSkillEntriesInternal(
       AppController.defaultSingleAgentWorkspaceSkillScanRootsInternal,
-      workspaceRef: assistantWorkspaceRefForSession(sessionKey),
+      workspaceRef: assistantWorkspacePathForSession(sessionKey),
     );
   }
 
@@ -669,15 +684,11 @@ extension AppControllerDesktopThreadStorage on AppController {
             )
             .toList(growable: false),
         assistantModelId: record.assistantModelId.trim().isEmpty
-            ? resolvedAssistantModelForTargetInternal(
-                record.executionTarget,
-              )
+            ? resolvedAssistantModelForTargetInternal(record.executionTarget)
             : record.assistantModelId.trim(),
         singleAgentProvider: record.singleAgentProvider,
         gatewayEntryState: (record.gatewayEntryState ?? '').trim().isEmpty
-            ? gatewayEntryStateForTargetInternal(
-                record.executionTarget,
-              )
+            ? gatewayEntryStateForTargetInternal(record.executionTarget)
             : record.gatewayEntryState,
         workspacePath: record.workspacePath.trim(),
         displayPath: record.workspaceKind == WorkspaceKind.localFs
@@ -693,9 +704,7 @@ extension AppControllerDesktopThreadStorage on AppController {
       if (normalizedRecord.workspaceKind == WorkspaceKind.localFs &&
           normalizedRecord.workspacePath.trim().isNotEmpty) {
         try {
-          Directory(normalizedRecord.workspacePath).createSync(
-            recursive: true,
-          );
+          Directory(normalizedRecord.workspacePath).createSync(recursive: true);
         } catch (_) {
           // Best effort only. The thread should still restore even when the
           // directory cannot be recreated immediately.

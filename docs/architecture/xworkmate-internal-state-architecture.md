@@ -1,777 +1,293 @@
-XWorkmate App Internal State Architecture
-Last Updated: 2026-03-22
+# XWorkmate App Internal State Architecture
 
-Purpose
+Last Updated: 2026-03-29
 
-This document defines the current internal state model of XWorkmate with a
-focus on the relationship between:
+## Purpose
 
-- Settings center configuration state
-- Current assistant session state
-- Task thread state
-- Skill state
-- Execution target / work mode
-- Model selection
-- Conversation content
+本文定义当前 XWorkmate 的内部状态组织，重点说明以下对象之间的关系：
 
-This file is intended to be the plain-text baseline for future AI-assisted
-changes. If a new implementation conflicts with this document, the change
-should be treated as suspicious until the ownership and data flow are clarified.
+- Settings 中心配置状态
+- 当前 `TaskThread` 状态
+- agent-core / runtime 协调状态
+- 派生 UI 状态
+- 技能、模型、执行通道与会话内容
 
-Scope note
+本文以 Desktop 为主说明，因为 Desktop 控制器拥有最完整的运行时与持久化路径；Web 保持同一 `TaskThread` 与 session 语义，但 transport 走远端 ACP / RPC。
 
-This document is written from the Desktop implementation first, because the
-Desktop controller currently owns the richest runtime and persistence path.
-Where Web has a parallel implementation with the same state semantics, that
-mapping is called out explicitly instead of being treated as an afterthought.
+## 1. Core Rule
 
-Platform runtime matrix
+当前内部状态只有两层主状态和一层派生状态：
 
-- Desktop runtime:
-  - Platforms: macOS, Windows, Linux
-  - Linux desktop shell support: GTK-based (GNOME/KDE/XFCE etc.);
-    KDE Plasma (Qt) integration is a future direction, not yet implemented in
-    runtime code
-  - Fixed work modes: AI Gateway, Local OpenClaw Gateway, Remote OpenClaw
-    Gateway
-- Mobile runtime:
-  - Platforms: iOS, Android
-  - Fixed work modes: Remote OpenClaw Gateway only
-- Web runtime:
-  - Platform: standard browser runtime
-  - Fixed work modes: AI Gateway, Remote OpenClaw Gateway
+- Layer A: Settings 中心配置状态
+- Layer B: `TaskThread` 线程状态
+- Layer C: 派生 UI 状态
 
-Persistence guardrails (v0.6.1)
+最重要的规则是：
 
-- Desktop persistence path is stable at `~/Library/Application Support/plus.svc.xworkmate/xworkmate`.
-- `SettingsStore` and `SecretStore` initialize durable directories/files on first install.
-- Path/DB resolution failure defaults to fail-fast instead of silent in-memory persistence.
-- In explicit test fallback mode, temporary in-memory state will attempt best-effort sync back to durable storage when possible.
+Settings 不是当前线程状态。
 
-These work-mode arrays come from feature-manifest capabilities. They are not
-derived from gateway profile data.
+Settings 负责默认值、集成配置和持久化快照。
+`TaskThread` 负责当前线程真实使用的工作空间、执行通道、上下文和生命周期。
+UI 必须从解析后的 `TaskThread` 渲染，而不是只从 Settings 渲染。
 
-========================================================================
-1. Core Rule
-========================================================================
-
-There are two primary state layers and one derived UI layer.
-
-Layer A: Settings center configuration state
-Layer B: Current assistant session state
-Layer C: Derived UI state
-
-The most important rule is:
-
-Settings center state is not the same thing as current session state.
-
-Settings defines defaults and persisted app-level configuration.
-Session state defines what the currently selected task thread is actually using.
-UI should render from the resolved session state, not from settings alone.
-
-------------------------------------------------------------------------
-Architecture Diagram
-------------------------------------------------------------------------
+## 2. Internal State Diagram
 
 ```mermaid
 graph TB
-    subgraph P["④ Persistence Layer"]
+    subgraph P["Persistence Layer"]
         SettingsStore["SettingsStore"]
         SecretStore["SecretStore"]
         SecureConfigStore["SecureConfigStore"]
+        ThreadRepository["TaskThread Repository"]
     end
 
-    subgraph C_D["②a AppControllerDesktop (Desktop)"]
-        settings["settings<br/>(persisted snapshot)"]
-        settingsDraft["settingsDraft<br/>(in-memory draft)"]
-        _draftSecretValues["_draftSecretValues"]
-        _pendingApply["_pendingSettingsApply<br/>_pendingGatewayApply<br/>_pendingAiGatewayApply"]
-        _assistantThreadRecords["_assistantThreadRecords[sessionKey]<br/><AssistantThreadRecord>"]
-        _assistantThreadMessages["_assistantThreadMessages[sessionKey]"]
-        _gatewayHistoryCache["_gatewayHistoryCache[sessionKey]"]
-        _localSessionMessages["_localSessionMessages[sessionKey]"]
-        _aiGatewayStreaming["_aiGatewayStreamingTextBySession[sessionKey]"]
+    subgraph C_D["AppControllerDesktop"]
+        settings["settings"]
+        settingsDraft["settingsDraft"]
+        draftSecrets["_draftSecretValues"]
+        pendingApply["_pendingSettingsApply"]
+        threadRecords["_assistantThreadRecords[threadId]\n<TaskThread>"]
+        currentThreadId["_currentAssistantThreadId"]
+        runtimeCaches["runtime message / streaming / preview caches"]
     end
 
-    subgraph C_W["②b AppControllerWeb (Web, parallel)"]
-        settings_W["_settings"]
-        settingsDraft_W["_settingsDraft"]
-        _threadRecords["_threadRecords[sessionKey]<br/><AssistantThreadRecord>"]
+    subgraph C_W["AppControllerWeb"]
+        webSettings["_settings"]
+        webDraft["_settingsDraft"]
+        webThreadRecords["_threadRecords[threadId]\n<TaskThread>"]
+        webCurrentThreadId["_currentThreadId"]
     end
 
-    subgraph R["③ Resolver / Accessor Layer"]
-        executionTargetResolver["assistantExecutionTargetForSession(sessionKey)"]
-        modelResolver["assistantModelForSession(sessionKey)"]
-        availableSkillsR["assistantImportedSkillsForSession(sessionKey)"]
-        selectedSkillsR["assistantSelectedSkillKeysForSession(sessionKey)"]
-        connectionStateR["assistantConnectionStateForSession(sessionKey)"]
+    subgraph R["Agent-Core / Runtime Coordination"]
+        threadReader["read TaskThread by threadId"]
+        requestBuilder["build execution request"]
+        dispatcher["dispatch to Go Agent-core\nDesktop: local bridge\nWeb: remote ACP / RPC"]
+        resultWriter["write result back to TaskThread"]
     end
 
-    subgraph U["④ UI Layer (Derived, not authoritative)"]
-        subgraph AP["AssistantPage"]
-            _taskSeeds["_taskSeeds<br/>(rendering cache)"]
-            connectionChip["connection chip"]
-            execSelector["execution target selector"]
-            skillPanel["skill panel"]
-            modelLabel["model label"]
-            taskList["task list"]
-        end
-        subgraph SP["SettingsPage"]
-            draftEditor["settingsDraft editor"]
-            saveApply["Save / Apply buttons"]
-        end
+    subgraph U["Derived UI State"]
+        assistantPage["AssistantPage"]
+        sidebar["right sidebar / preview"]
+        taskList["task list"]
+        settingsPage["SettingsPage"]
     end
 
-    %% Persistence writes
-    SecretStore -->|"secure secrets"| _draftSecretValues
-    SecureConfigStore -->|"config refs"| settings
-    SettingsStore -->|"persisted snapshot"| settings
+    SettingsStore --> settings
+    SecureConfigStore --> settings
+    SecretStore --> draftSecrets
+    ThreadRepository --> threadRecords
+    ThreadRepository --> webThreadRecords
 
-    %% Settings draft flow
-    settingsDraft -.->|"_settingsDraftInitialized<br/>? draft : settings"| settings
-    _draftSecretValues -->|flush on Apply| SecretStore
-    _pendingApply -->|Apply triggers| settings
+    settings --> settingsDraft
+    draftSecrets --> settingsDraft
+    pendingApply --> settings
 
-    %% Thread record is the per-session state core
-    _assistantThreadRecords -->|executionTarget<br/>assistantModelId<br/>selectedSkillKeys<br/>importedSkills<br/>messageViewMode| R
-    _assistantThreadMessages -->|gateway-backed messages| R
-    _gatewayHistoryCache -->|gateway history| R
-    _localSessionMessages -->|local messages| R
-    _aiGatewayStreaming -->|streaming text| R
+    currentThreadId --> threadReader
+    threadRecords --> threadReader
+    webCurrentThreadId --> threadReader
+    webThreadRecords --> threadReader
 
-    %% Resolver output feeds UI
-    executionTargetResolver -->|currentAssistantExecutionTarget| execSelector
-    executionTargetResolver -->|connection state| connectionChip
-    modelResolver -->|resolved model| modelLabel
-    availableSkillsR -->|available skills| skillPanel
-    selectedSkillsR -->|selected keys| skillPanel
-    connectionStateR -->|connection state| connectionChip
+    threadReader --> requestBuilder
+    requestBuilder --> dispatcher
+    dispatcher --> resultWriter
+    resultWriter --> threadRecords
+    resultWriter --> webThreadRecords
 
-    %% Task list from thread records
-    _assistantThreadRecords -.->|"title / preview<br/>/ status"| _taskSeeds
-    _taskSeeds --> taskList
-    settings -.->|grouping defaults| taskList
-
-    %% Settings page drives draft and apply
-    draftEditor --> settingsDraft
-    saveApply -->|Save = persist| settingsDraft
-    saveApply -->|Apply = runtime sync| _assistantThreadRecords
-    saveApply -->|Apply = runtime sync| settings
-
-    %% Web parallel — same schema, isolated instance
-    C_W -.->|"same AssistantThreadRecord<br/>schema as Desktop"| C_D
-
-    style P fill:#e8f4f8,stroke:#4a90a4,stroke-width:1px
-    style C_D fill:#f0f0f0,stroke:#666,stroke-width:2px
-    style C_W fill:#f9f9f9,stroke:#999,stroke-width:1px,stroke-dasharray:4
-    style R fill:#fff8e1,stroke:#f9a825,stroke-width:1px
-    style U fill:#e8f5e9,stroke:#43a047,stroke-width:1px
+    threadReader --> assistantPage
+    threadReader --> sidebar
+    threadRecords --> taskList
+    webThreadRecords --> taskList
+    settingsDraft --> settingsPage
 ```
 
-**How to read this diagram:**
+读图规则：
 
-- **Solid arrows** (`-->`) = authoritative data flow / ownership
-- **Dashed arrows** (`-.->`) = derived / recomputed read
-- **Resolver layer** implements the resolution order: thread record field → settings fallback
-- **Web (`AppControllerWeb`)** maintains its own isolated `_threadRecords` instance; it has the same `AssistantThreadRecord` schema but is a separate runtime copy
-- **Persistence layer** never flows upward — settings are loaded at bootstrap, drafts are written back on Save, runtime never directly mutates persisted state
+- `TaskThread` 是线程主状态，不再由散落 session 字段共同充当
+- `threadId` 是读取线程状态的唯一入口键
+- `build execution request` 属于 agent-core / runtime 协调层
+- UI 只消费当前 `TaskThread` 与派生状态
 
-========================================================================
-2. State Ownership
-========================================================================
+## 3. State Ownership
 
-2.1 Settings center configuration state
+### 3.1 Settings 中心配置状态
 
 Primary owners:
-- lib/app/app_controller_desktop.dart
-- lib/app/app_controller_web.dart
+
+- `lib/app/app_controller_desktop.dart`
+- `lib/app/app_controller_web.dart`
 
 Primary fields:
-- settings
-- settingsDraft
-- _settingsDraftInitialized
-- _draftSecretValues
-- _pendingSettingsApply
-- _pendingGatewayApply
-- _pendingAiGatewayApply
-- settings.gatewayProfiles
-- settings.assistantExecutionTarget
-- settings.assistantCustomTaskTitles
-- settings.assistantArchivedTaskKeys
-- settings.assistantLastSessionKey
 
-Sources:
-- settings
-  Persisted global snapshot from SettingsController.snapshot
-- settingsDraft
-  In-memory draft used by Settings page before save/apply
-- _settingsDraftInitialized
-  Gate that decides whether settingsDraft should return the in-memory draft or
-  fall back to the persisted settings snapshot
-- _draftSecretValues
-  Temporary secret draft values before they are persisted into secure storage
+- `settings`
+- `settingsDraft`
+- `_settingsDraftInitialized`
+- `_draftSecretValues`
+- `_pendingSettingsApply`
+- `settings.gatewayProfiles`
+- `settings.assistantExecutionTarget`
+- `settings.assistantLastThreadId`
 
 Responsibilities:
-- Store global default configuration
-- Persist app-level settings
-- Persist secure secrets
-- Persist OpenClaw connection source profiles
-- Persist the default work mode for newly created threads
-- Persist assistant task metadata that is not owned by `AssistantThreadRecord`
-  - custom task titles
-  - archived task keys
-  - last restored session key
-- Make the saved configuration take effect only when Apply is executed
 
-Important APIs:
-- saveSettingsDraft(...)
-- persistSettingsDraft()
-- applySettingsDraft()
-- saveSettings(...)
+- 保存全局默认配置
+- 保存集成配置与安全引用
+- 保存新线程创建时要继承的默认执行配置
+- 保存不属于单个线程的 app 级偏好
 
-Important rule:
-Settings center should define defaults, integrations, and persisted config.
-It should not be treated as the only truth for the current task thread.
-It also must not collapse `assistantExecutionTarget` and `gatewayProfiles`
-into the same field.
+重要规则：
 
-2.2 Current assistant session state
+- Settings 负责默认值，不负责当前线程的真实运行状态
+- Settings 不应被当作主体区域、右栏或线程执行的事实来源
+
+### 3.2 TaskThread 线程状态
 
 Primary owners:
-- Desktop: lib/app/app_controller_desktop.dart
-- Web: lib/app/app_controller_web.dart
 
-Primary in-memory store:
-- Desktop:
-  - _assistantThreadRecords[sessionKey]
-  - _assistantThreadMessages[sessionKey]
-  - _gatewayHistoryCache[sessionKey]
-  - _aiGatewayStreamingTextBySession[sessionKey]
-  - _localSessionMessages[sessionKey]
-- Web:
-  - _threadRecords[sessionKey]
-  - _streamingTextBySession[sessionKey]
-  - current record fallback through _currentRecord
+- Desktop: `lib/app/app_controller_desktop.dart`
+- Web: `lib/app/app_controller_web.dart`
+
+Primary in-memory stores:
+
+- Desktop: `_assistantThreadRecords[threadId]`
+- Web: `_threadRecords[threadId]`
 
 Primary schema:
-lib/runtime/runtime_models.dart
-AssistantThreadRecord
 
-AssistantThreadRecord fields that matter most:
-- executionTarget
-- messageViewMode
-- importedSkills
-- selectedSkillKeys
-- assistantModelId
-- gatewayEntryState
-- messages
-- workspaceRef
-- workspaceRefKind
+- `TaskThread`
 
-Thread workspace resolution (Desktop current baseline):
+Current authoritative fields:
 
-- All sessions (including `main`) resolve to:
-  `settings.workspacePath/.xworkmate/threads/<SessionKey>`
-- Session directory is created on demand when missing
-- Legacy records that point to shared root or missing directories are migrated
-  back to the per-session isolated path
-- `workspaceRefKind` is runtime-channel semantics, not path-layout semantics:
-  - `singleAgent` => `localPath`
-  - gateway-backed targets (`local` / `remote`) => `remotePath`
-  - both still use the same isolated thread directory path pattern above
+- `threadId`
+- `ownerScope`
+- `workspaceBinding`
+- `executionBinding`
+- `contextState`
+- `lifecycleState`
 
-Important cleanup note:
+Ownership summary:
 
-- `remoteProjectRoot` is no longer used as a separate thread workspace path
-  selector in Desktop thread workspace resolution.
-- Runtime-reported `resolvedWorkingDirectory` from single-agent execution
-  should not overwrite the canonical per-thread workspaceRef path.
+- `ownerScope`
+  - 线程归属与 owner 维度信息
+- `workspaceBinding.workspacePath / displayPath / workspaceKind`
+  - 执行空间与右栏路径信息
+- `executionBinding.executionMode / providerId / endpointId`
+  - 执行通道与连接目标
+- `contextState.messages / selectedModelId / importedSkills / selectedSkillKeys / permissionLevel / messageViewMode`
+  - 线程上下文与主体区域内容
+- `lifecycleState.archived / status / lastRunAtMs / lastResultCode`
+  - 生命周期摘要与结果摘要
 
-Responsibilities:
-- Hold per-thread overrides
-- Isolate thread behavior from other threads
-- Preserve per-thread mode, skills, model, and content
-- Allow thread state to differ from global default settings
-- Carry the authoritative `messages` list for the session (the primary
-  conversation content; see also Section 3.4 for all content sources)
+重要规则：
 
-Important rule:
-If a value exists in AssistantThreadRecord for a session, that thread-level
-value wins over the global settings default.
+- 如果值已经存在于 `TaskThread`，则线程值优先于 Settings 默认值
+- `TaskThread` 是当前线程展示与执行的唯一主对象
 
-Web note:
-The Web controller uses the same AssistantThreadRecord schema and the same
-basic ownership rule, but the runtime-backed data sources are simpler than
-Desktop. In Web, relay/direct-AI conversation state is resolved through
-_threadRecords, _currentRecord, and browser/session repositories rather than
-Desktop runtime controllers.
+### 3.3 Agent-Core / Runtime 协调状态
 
-2.3 Derived UI state
+Primary responsibilities:
+
+- 根据 `threadId` 读取完整 `TaskThread`
+- 基于 `ownerScope / workspaceBinding / executionBinding / contextState` 构造执行请求
+- 调度到 `Go Agent-core`
+- 接收执行结果并回写 `TaskThread`
+
+重要规则：
+
+- 请求构造不属于 UI
+- Flutter UI 不直接承担 runtime dispatch 职责
+- 工作空间选择不再通过旧式运行前猜测获得
+- 结果回写先更新线程上下文，再驱动主体区域与右栏刷新
+- Desktop / Web 共用相同 session 生命周期；不再单独发明 relay-only 执行协议
+
+### 3.4 Derived UI State
 
 Primary owners:
-- lib/features/assistant/assistant_page.dart
-- lib/features/settings/settings_page.dart
+
+- `lib/features/assistant/assistant_page.dart`
+- `lib/features/settings/settings_page.dart`
 
 Examples:
-- task list groups
-- top-right connection chip
-- bottom execution target selector
-- empty-state card
+
+- task list
+- 主体区域消息显示
+- 右栏路径、预览与结果面板
+- connection chip
 - skill panel
 - model label
-- task row labels
-
-Responsibilities:
-- Display resolved state
-- Never become the authoritative source of truth
-
-Important rule:
-UI must render from resolved state, not invent its own parallel mode/model/skill
-state.
-
-========================================================================
-3. Resolution Priority
-========================================================================
-
-3.1 Execution target / work mode
-
-Meaning:
-- Single Agent
-- Local OpenClaw Gateway
-- Remote OpenClaw Gateway
-
-Platform availability:
-- Desktop: singleAgent, local, remote
-- Mobile: remote
-- Web: singleAgent, remote
-
-Primary resolver:
-assistantExecutionTargetForSession(sessionKey)
-
-Resolution order:
-1. AssistantThreadRecord.executionTarget for that session
-2. settings.assistantExecutionTarget
-
-Interpretation:
-- settings.assistantExecutionTarget is the default
-- thread.executionTarget is the actual current-session override
-
-Consequence:
-Changing settings alone does not automatically mean the current thread display
-has changed unless the current thread record is also synchronized.
-
-Important separation:
-- `assistantExecutionTarget` is the work-mode default / thread override axis
-- it is not a pointer into `gatewayProfiles`
-- Single Agent has no OpenClaw profile
-- there is no implicit local-to-remote or AI-to-remote profile fallback
-
-3.1.1 OpenClaw gateway profile list
-
-Primary owner:
-- SettingsSnapshot.gatewayProfiles
-
-Meaning:
-- OpenClaw connection sources saved in Settings center
-
-Fixed structure:
-- index 0: fixed Local OpenClaw profile
-- index 1: fixed Remote OpenClaw profile
-- index 2: custom slot
-- index 3: custom slot
-- index 4: custom slot
-
-Rules:
-- `gatewayProfiles` is a list, not a single gateway field
-- first two slots are reserved and normalized on load
-- Desktop may use both fixed OpenClaw profiles
-- Mobile only consumes the fixed remote profile
-- Web only consumes the fixed remote profile
-- custom slots are saved configuration only; they do not expand the platform
-  work-mode array by themselves
-
-Ownership rule:
-- work mode selects whether the current thread is AI, Local OpenClaw, or Remote
-  OpenClaw
-- profile selection provides connection parameters for OpenClaw-backed modes
-- changing a profile does not by itself change the current thread mode
-
-3.2 Model
-
-Primary resolver:
-assistantModelForSession(sessionKey)
-
-Resolution order:
-1. AssistantThreadRecord.assistantModelId
-2. resolved model for current execution target
-
-Fallback rules:
-- If target is singleAgent, use resolvedAiGatewayModel
-- If target is local or remote, use resolvedDefaultModel
-
-Interpretation:
-Model selection is thread-bound when explicitly set, otherwise inherited from
-target-specific defaults.
-
-3.3 Skills
-
-Primary owner:
-AssistantThreadRecord
-
-Fields:
-- importedSkills
-- selectedSkillKeys
-
-Resolution rule:
-- The available and selected skills shown in UI belong to the current session
-  thread
-- Settings center must not be treated as the source of selected thread skills
-
-3.4 Conversation content
-
-Primary sources:
-- _chatController.messages
-- _gatewayHistoryCache[sessionKey]
-- _assistantThreadMessages[sessionKey]
-- _localSessionMessages[sessionKey]
-- _aiGatewayStreamingTextBySession[sessionKey]
-
-Resolution rule:
-- Gateway-backed thread content and AI-Gateway-only thread content do not come
-  from the same runtime path
-- The UI composes the final visible conversation from multiple stores depending
-  on the current thread target
-
-3.5 Task thread list
-
-Primary source:
-- assistantSessions
-- _taskSeeds in AssistantPage as a rendering cache
-- settings.assistantCustomTaskTitles
-- settings.assistantArchivedTaskKeys
-
-Important rule:
-Task list is a derived representation of thread/session state.
-Task list must not become the owner of mode, model, or skill state.
-
-Important companion rule:
-Task titles, archive membership, and last-session recovery are not owned only by
-`AssistantThreadRecord`. Part of that metadata is persisted in `SettingsSnapshot`
-and must be considered when reconstructing the task list.
-
-Implementation note:
-_taskSeeds is still a cache of derived values such as title, preview, status,
-owner, surface, and executionTarget. It is not an authoritative source, but it
-can become stale if source mutations do not eventually trigger task
-recomputation.
-
-========================================================================
-4. Data Flow
-========================================================================
-
-4.1 Settings center flow
-
-Edit in Settings page
-  -> settingsDraft changes
-  -> Save
-  -> persisted settings + secure secrets update
-  -> Apply
-  -> current configuration takes effect immediately
-
-Meaning of buttons:
-- Save
-  Persist configuration only
-  Do not trigger runtime connection or model sync
-- Apply
-  Make the current saved configuration take effect immediately
-  This may connect a gateway, switch execution behavior, or sync AI Gateway
-  catalog
-
-4.2 Session flow
-
-Select thread
-  -> switchSession(sessionKey)
-  -> resolve thread executionTarget
-  -> resolve thread model
-  -> resolve thread skills
-  -> apply thread execution target
-  -> reload conversation content for the chosen thread
-
-Create new thread
-  -> inherit current thread executionTarget
-  -> inherit current thread messageViewMode
-  -> initialize AssistantThreadRecord
-  -> switch to the new thread
-
-Change execution target from Assistant page
-  -> update current thread record.executionTarget
-  -> optionally persist new global default selection
-  -> reconnect / disconnect runtime as needed
-  -> refresh skills and derived UI
-
-========================================================================
-5. Dependency Graph
-========================================================================
-
-5.1 Settings center depends on
-
-- SettingsController snapshot and secure refs
-- SecureConfigStore / SettingsStore / SecretStore
-- Runtime side-effect handlers in AppController
-
-5.2 Current assistant session depends on
-
-- _assistantThreadRecords
-- runtime snapshot / gateway runtime
-- current selected session key
-- persisted thread records restored during bootstrap
-
-5.3 Task list depends on
-
-- assistantSessions
-- current session key
-- thread executionTarget
-- per-thread preview / title / status
-
-5.4 Skill panel depends on
-
-- current session key
-- assistantImportedSkillsForSession(sessionKey)
-- assistantSelectedSkillKeysForSession(sessionKey)
-
-5.5 Top-right status chip depends on
-
-- current session key
-- assistantConnectionStateForSession(currentSessionKey)
-- runtime connection snapshot
-- session executionTarget
-
-5.6 Bottom execution target selector depends on
-
-- currentAssistantExecutionTarget
-- thread executionTarget for current session
-
-5.7 Model label depends on
-
-- assistantModelForSession(currentSessionKey)
-- resolvedAiGatewayModel
-- resolvedDefaultModel
-
-========================================================================
-6. Correct Sync Rules
-========================================================================
-
-6.1 What Save should update
-
-Save should update:
-- persisted settings snapshot
-- persisted secure secrets
-- persisted gatewayProfiles
-- pending apply markers
-
-Save should not update:
-- live runtime connection by itself
-- current thread execution target by itself
-- task list grouping by itself unless the task list is explicitly reading the
-  global defaults
 
-6.2 What Apply must update when execution behavior changes
+重要规则：
 
-If Apply changes assistant execution behavior, it must synchronize:
+- UI 是派生状态，不是线程事实源
+- UI 保持现有结构不变，但所有线程显示都应从当前 `TaskThread` 派生
 
-- settings.assistantExecutionTarget
-- current thread AssistantThreadRecord.executionTarget
-- the exact OpenClaw profile used by that execution target, if the target is
-  local or remote
-- runtime connection / disconnection path
-- session-specific skill visibility if mode changes
-- derived UI:
-  - top-right chip
-  - bottom selector
-  - empty-state card
-  - task list grouping
+## 4. Resolution Priority
 
-6.3 What thread switching must update
+### 4.1 当前线程读取优先级
 
-switchSession(sessionKey) must synchronize:
+1. UI 选择 `threadId`
+2. 控制器 / runtime 读取 `TaskThread`
+3. 若线程字段缺失，才回退到 Settings 中心默认值用于初始化或补全
 
-- current thread executionTarget
-- current thread message view mode
-- current thread model
-- current thread available / selected skills
-- current thread conversation content source
-- current thread connection label
+这意味着：
 
-6.4 What must never happen implicitly
+- Settings 是默认值来源，不是当前线程真相源
+- 当前线程的执行模式、模型、技能、工作空间都以 `TaskThread` 为准
 
-- local OpenClaw selectedAgentId must not silently fall back to remote
-- Single Agent mode must not silently borrow a gateway profile
-- gatewayProfiles changes must not silently overwrite the current thread mode
-- platform capability filtering must not invent unsupported work modes
+### 4.2 执行请求构造优先级
 
-6.5 Integration cards share one action contract
+1. `ownerScope`
+2. `workspaceBinding`
+3. `executionBinding`
+4. `contextState`
 
-Gateway-family cards (`OpenClaw Gateway` / `Vault` / `AI Gateway`) and future
-extensions must keep the same contract:
+然后由 agent-core / runtime 协调层构造执行请求并调度运行。
 
-- Test = validate current draft only (including temporary secret overrides), no
-  persistence side effects
-- Save = persist draft + secure secrets only
-- Apply = make saved draft effective in runtime/session state
+### 4.3 结果回写优先级
 
-To avoid semantic duplication, the Gateway settings tab uses local card actions
-and does not render another global Save/Apply action row.
+1. 回写 `contextState`
+2. 主体区域同步显示
+3. 必要时更新 `workspaceBinding`
+4. 右栏读取最新 `TaskThread` 记录并刷新
 
-6.6 What task list must never do
+## 5. Lifecycle Baseline
 
-Task list must never:
-- own executionTarget
-- own model selection
-- own selected skills
-- become the source of truth for session state
+```mermaid
+flowchart LR
+  A["UI选择任务线程"] --> B["TaskThread.threadId"]
+  B --> C["读取 TaskThread"]
 
-Task list should only display resolved session state.
+  C --> D1["ownerScope"]
+  C --> D2["workspaceBinding"]
+  C --> D3["executionBinding"]
+  C --> D4["contextState"]
 
-========================================================================
-7. Known Failure Modes
-========================================================================
+  D1 --> E["构造执行请求"]
+  D2 --> E
+  D3 --> E
+  D4 --> E
 
-7.1 Settings center and current session diverge
+  E --> F["Go Agent-core\nDesktop: local bridge\nWeb: remote ACP / RPC"]
+  F --> G["执行结果"]
 
-Symptom:
-- User saves/applies a new mode in Settings
-- Top-right chip still shows old mode
-- Bottom selector still shows old mode
+  G --> H["回写线程上下文\n(主体区域 同步显示)"]
+  G --> I["必要时更新 workspaceBinding"]
 
-Typical cause:
-- settings.assistantExecutionTarget updated
-- current session AssistantThreadRecord.executionTarget not updated
+  H --> J["右栏显示"]
+  I --> J
+```
 
-7.2 Task list grouping is wrong
+这条主链同时约束：
 
-Symptom:
-- Task appears under the wrong mode group
-- Group count does not match the visible current thread target
+- 控制器的线程读取逻辑
+- runtime 的请求构造与调度逻辑
+- 主体区域消息刷新逻辑
+- 右栏预览与结果展示逻辑
 
-Typical cause:
-- task seed / task entry is rendering stale thread executionTarget
-- _taskSeeds still holds stale derived values because the mutation path did not
-  trigger task recomputation
+## 6. 文档边界
 
-7.3 Skill panel leaks across threads
+- [assistant-thread-target-model-20260328.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-taskthread-docs-naming-cleanup/docs/architecture/assistant-thread-target-model-20260328.md)
+  负责说明 `TaskThread` 当前模型与生命周期主链。
+- [assistant-thread-information-architecture.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-taskthread-docs-naming-cleanup/docs/architecture/assistant-thread-information-architecture.md)
+  负责说明线程信息如何进入 UI、请求构造与结果回写。
 
-Symptom:
-- A skill selected in one task appears selected in another unrelated task
-
-Typical cause:
-- selectedSkillKeys not isolated to AssistantThreadRecord
-- UI reading global or shared state instead of current session record
-
-7.4 Model label is stale
-
-Symptom:
-- Current thread changed, but header/composer still shows previous model
-
-Typical cause:
-- UI not recomputed from assistantModelForSession(currentSessionKey)
-
-7.5 Conversation content source mismatch
-
-Symptom:
-- Thread switches, but visible content still reflects previous mode/path
-
-Typical cause:
-- current session switched
-- content source not switched between gateway-backed history and AI-Gateway-only
-  cache
-
-========================================================================
-8. Canonical Ownership Table
-========================================================================
-
-Field: settingsDraft
-Owner: Settings center
-Scope: global draft
-
-Field: settings
-Owner: persisted settings snapshot
-Scope: global persisted config
-
-Field: secret drafts
-Owner: Settings center
-Scope: global draft, secure persistence path
-
-Field: executionTarget
-Owner: AssistantThreadRecord first, settings fallback second
-Scope: thread
-
-Field: assistantModelId
-Owner: AssistantThreadRecord first, target-specific fallback second
-Scope: thread
-
-Field: selectedSkillKeys
-Owner: AssistantThreadRecord
-Scope: thread
-
-Field: importedSkills
-Owner: AssistantThreadRecord
-Scope: thread
-
-Field: messageViewMode
-Owner: AssistantThreadRecord
-Scope: thread
-
-Field: conversation messages
-Owner: runtime/message stores depending on target
-Scope: thread
-
-Field: task list group
-Owner: derived UI only
-Scope: visual grouping
-
-========================================================================
-9. Modification Rules For Future AI Changes
-========================================================================
-
-Before changing Assistant, Settings, or Gateway behavior, check:
-
-1. Is this a settings default or a thread override?
-2. If a setting is applied, should the current thread record be synchronized?
-3. If a thread changes, which derived UI surfaces must refresh?
-4. Is the task list only displaying state, or accidentally owning it?
-5. Does the change preserve per-thread isolation for:
-   - mode
-   - model
-   - skills
-   - content
-
-If a proposed change cannot answer those five questions clearly, the
-implementation is not ready.
-
-========================================================================
-10. Relevant Files
-========================================================================
-
-Global settings and apply flow:
-- lib/app/app_controller_desktop.dart
-- lib/app/app_controller_web.dart
-- lib/features/settings/settings_page.dart
-
-Session/thread state:
-- lib/runtime/runtime_models.dart
-- lib/app/app_controller_desktop.dart
-- lib/app/app_controller_web.dart
-
-Assistant UI:
-- lib/features/assistant/assistant_page.dart
-
-Persistence:
-- lib/runtime/secure_config_store.dart
-- lib/runtime/settings_store.dart
-- lib/runtime/secret_store.dart
-
-Supporting architecture docs:
-- docs/architecture/assistant-thread-information-architecture.md
-- docs/architecture/xworkmate-integrations.md
-
-End of document.
+归档文档只保留为历史背景，不再作为当前内部状态设计依据。

@@ -28,6 +28,8 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
+import '../runtime/go_agent_core_client.dart';
+import '../runtime/go_agent_core_desktop_transport.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
@@ -118,7 +120,7 @@ class AppController extends ChangeNotifier {
     List<String>? singleAgentSharedSkillScanRootOverrides,
     List<SingleAgentProvider>? availableSingleAgentProvidersOverride,
     ArisBundleRepository? arisBundleRepository,
-    SingleAgentRunner? singleAgentRunner,
+    GoAgentCoreClient? goAgentCoreClient,
   }) {
     storeInternal = store ?? SecureConfigStore();
     uiFeatureManifestInternal =
@@ -184,18 +186,17 @@ class AppController extends ChangeNotifier {
     gatewayAcpClientInternal = GatewayAcpClient(
       endpointResolver: resolveGatewayAcpEndpointInternal,
     );
-    singleAgentAppServerClientInternal = DirectSingleAgentAppServerClient(
-      endpointResolver: resolveSingleAgentEndpointInternal,
-    );
     availableSingleAgentProvidersOverrideInternal =
         availableSingleAgentProvidersOverride;
     arisBundleRepositoryInternal =
         arisBundleRepository ?? ArisBundleRepository();
     goCoreLocatorInternal = GoCoreLocator();
-    singleAgentRunnerInternal =
-        singleAgentRunner ??
-        DefaultSingleAgentRunner(
-          appServerClient: singleAgentAppServerClientInternal,
+    goAgentCoreClientInternal =
+        goAgentCoreClient ??
+        GoAgentCoreDesktopTransport(
+          acpClient: gatewayAcpClientInternal,
+          endpointResolver: resolveGoAgentCoreEndpointForTargetInternal,
+          goCoreLocator: goCoreLocatorInternal,
         );
     multiAgentOrchestratorInternal = MultiAgentOrchestrator(
       config: resolveMultiAgentConfigInternal(
@@ -232,8 +233,8 @@ class AppController extends ChangeNotifier {
     tasksControllerInternal.dispose();
     storeInternal.dispose();
     desktopPlatformServiceInternal.dispose();
+    unawaited(goAgentCoreClientInternal.dispose());
     unawaited(gatewayAcpClientInternal.dispose());
-    unawaited(singleAgentAppServerClientInternal.dispose());
     super.dispose();
   }
 
@@ -259,13 +260,11 @@ class AppController extends ChangeNotifier {
   late final SkillDirectoryAccessService skillDirectoryAccessServiceInternal;
   late final List<String>? singleAgentSharedSkillScanRootOverridesInternal;
   late final GatewayAcpClient gatewayAcpClientInternal;
-  late final DirectSingleAgentAppServerClient
-  singleAgentAppServerClientInternal;
   late final List<SingleAgentProvider>?
   availableSingleAgentProvidersOverrideInternal;
   late final ArisBundleRepository arisBundleRepositoryInternal;
   late final GoCoreLocator goCoreLocatorInternal;
-  late final SingleAgentRunner singleAgentRunnerInternal;
+  late final GoAgentCoreClient goAgentCoreClientInternal;
   late final MultiAgentOrchestrator multiAgentOrchestratorInternal;
   Map<SingleAgentProvider, DirectSingleAgentCapabilities>
   singleAgentCapabilitiesByProviderInternal =

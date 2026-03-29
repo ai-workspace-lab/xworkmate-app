@@ -147,7 +147,7 @@ void registerExecutionTargetSwitchConnectionTests() {
         expect(controller.assistantConnectionStatusLabel, '单机智能体');
         expect(
           controller.assistantConnectionTargetLabel,
-          '没有可用的外部 Agent ACP 端点，请配置 LLM API fallback。',
+          SingleAgentProvider.opencode.label,
         );
         expect(
           gateway.connectedProfiles,

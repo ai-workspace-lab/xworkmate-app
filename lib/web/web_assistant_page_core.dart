@@ -503,14 +503,13 @@ class WebAssistantPageStateInternal extends State<WebAssistantPage> {
                 child: AssistantArtifactSidebar(
                   sessionKey: controller.currentSessionKey,
                   threadTitle: controller.currentConversationTitle,
-                  workspaceRef: controller
+                  workspacePath: controller
                       .assistantWorkspaceDisplayPathForSession(
                         controller.currentSessionKey,
                       ),
-                  workspaceRefKind: controller
-                      .assistantWorkspaceRefKindForSession(
-                        controller.currentSessionKey,
-                      ),
+                  workspaceKind: controller.assistantWorkspaceKindForSession(
+                    controller.currentSessionKey,
+                  ),
                   onCollapse: () {
                     setState(() {
                       artifactPaneCollapsedInternal = true;

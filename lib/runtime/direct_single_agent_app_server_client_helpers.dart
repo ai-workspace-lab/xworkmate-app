@@ -177,15 +177,3 @@ bool isLocalHostInternal(String host) {
   final address = InternetAddress.tryParse(normalized);
   return address?.isLoopback ?? false;
 }
-
-WorkspaceRefKind workspaceRefKindForEndpointModeInternal(
-  DirectSingleAgentEndpointMode mode,
-) {
-  return switch (mode) {
-    DirectSingleAgentEndpointMode.wsLocal ||
-    DirectSingleAgentEndpointMode.httpLocal => WorkspaceRefKind.localPath,
-    DirectSingleAgentEndpointMode.wss ||
-    DirectSingleAgentEndpointMode.https => WorkspaceRefKind.remotePath,
-    DirectSingleAgentEndpointMode.unsupported => WorkspaceRefKind.localPath,
-  };
-}

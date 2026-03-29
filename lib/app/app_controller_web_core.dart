@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/assistant_artifacts.dart';
+import '../runtime/go_agent_core_client.dart';
 import '../runtime/runtime_models.dart';
 import '../web/web_acp_client.dart';
+import '../web/go_agent_core_web_transport.dart';
 import '../web/web_ai_gateway_client.dart';
 import '../web/web_artifact_proxy_client.dart';
 import '../web/web_relay_gateway_client.dart';
@@ -35,6 +37,7 @@ class AppController extends ChangeNotifier {
     WebStore? store,
     WebAiGatewayClient? aiGatewayClient,
     WebAcpClient? acpClient,
+    GoAgentCoreClient? goAgentCoreClient,
     WebRelayGatewayClient? relayClient,
     RemoteWebSessionRepositoryBuilder? remoteSessionRepositoryBuilder,
     UiFeatureManifest? uiFeatureManifest,
@@ -47,6 +50,12 @@ class AppController extends ChangeNotifier {
            remoteSessionRepositoryBuilder ??
            defaultRemoteSessionRepositoryInternal {
     relayClientInternal = relayClient ?? WebRelayGatewayClient(storeInternal);
+    goAgentCoreClientInternal =
+        goAgentCoreClient ??
+        GoAgentCoreWebTransport(
+          acpClient: acpClientInternal,
+          endpointResolver: acpEndpointForTargetInternal,
+        );
     artifactProxyClientInternal = WebArtifactProxyClient(relayClientInternal);
     relayEventsSubscriptionInternal = relayClientInternal.events.listen(
       handleRelayEventInternal,
@@ -58,6 +67,7 @@ class AppController extends ChangeNotifier {
   final UiFeatureManifest uiFeatureManifestInternal;
   final WebAiGatewayClient aiGatewayClientInternal;
   final WebAcpClient acpClientInternal;
+  late final GoAgentCoreClient goAgentCoreClientInternal;
   final RemoteWebSessionRepositoryBuilder
   remoteSessionRepositoryBuilderInternal;
   late final WebRelayGatewayClient relayClientInternal;
@@ -317,6 +327,7 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     unawaited(relayEventsSubscriptionInternal.cancel());
+    unawaited(goAgentCoreClientInternal.dispose());
     unawaited(relayClientInternal.dispose());
     super.dispose();
   }

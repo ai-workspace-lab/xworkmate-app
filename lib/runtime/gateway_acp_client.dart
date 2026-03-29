@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'multi_agent_orchestrator.dart';
 import 'runtime_models.dart';
 
 class GatewayAcpException implements Exception {
@@ -94,6 +93,7 @@ class GatewayAcpClient {
 
   Future<GatewayAcpCapabilities> loadCapabilities({
     bool forceRefresh = false,
+    Uri? endpointOverride,
   }) async {
     if (!forceRefresh &&
         _capabilitiesRefreshedAt != null &&
@@ -109,6 +109,7 @@ class GatewayAcpClient {
         params: const <String, dynamic>{},
       ),
       onNotification: (_) {},
+      endpointOverride: endpointOverride,
     );
     final result = asMap(response['result']);
     final caps = asMap(result['capabilities']);
@@ -239,6 +240,7 @@ class GatewayAcpClient {
   Future<void> cancelSession({
     required String sessionId,
     required String threadId,
+    Uri? endpointOverride,
   }) async {
     await _requestWithFallback(
       _GatewayAcpRpcRequest(
@@ -247,12 +249,14 @@ class GatewayAcpClient {
         params: <String, dynamic>{'sessionId': sessionId, 'threadId': threadId},
       ),
       onNotification: (_) {},
+      endpointOverride: endpointOverride,
     );
   }
 
   Future<void> closeSession({
     required String sessionId,
     required String threadId,
+    Uri? endpointOverride,
   }) async {
     await _requestWithFallback(
       _GatewayAcpRpcRequest(
@@ -261,12 +265,15 @@ class GatewayAcpClient {
         params: <String, dynamic>{'sessionId': sessionId, 'threadId': threadId},
       ),
       onNotification: (_) {},
+      endpointOverride: endpointOverride,
     );
   }
 
   Future<Map<String, dynamic>> request({
     required String method,
     required Map<String, dynamic> params,
+    void Function(Map<String, dynamic>)? onNotification,
+    Uri? endpointOverride,
   }) async {
     return _requestWithFallback(
       _GatewayAcpRpcRequest(
@@ -274,7 +281,8 @@ class GatewayAcpClient {
         method: method,
         params: params,
       ),
-      onNotification: (_) {},
+      onNotification: onNotification ?? (_) {},
+      endpointOverride: endpointOverride,
     );
   }
 
@@ -283,22 +291,29 @@ class GatewayAcpClient {
   Future<Map<String, dynamic>> _requestWithFallback(
     _GatewayAcpRpcRequest request, {
     required void Function(Map<String, dynamic>) onNotification,
+    Uri? endpointOverride,
   }) async {
     try {
       return await _requestViaWebSocket(
         request,
         onNotification: onNotification,
+        endpointOverride: endpointOverride,
       );
     } catch (_) {
-      return _requestViaHttp(request, onNotification: onNotification);
+      return _requestViaHttp(
+        request,
+        onNotification: onNotification,
+        endpointOverride: endpointOverride,
+      );
     }
   }
 
   Future<Map<String, dynamic>> _requestViaWebSocket(
     _GatewayAcpRpcRequest request, {
     required void Function(Map<String, dynamic>) onNotification,
+    Uri? endpointOverride,
   }) async {
-    final endpoint = _resolveWebSocketRpcEndpoint();
+    final endpoint = _resolveWebSocketRpcEndpoint(endpointOverride);
     if (endpoint == null) {
       throw const GatewayAcpException(
         'Missing ACP endpoint',
@@ -374,8 +389,9 @@ class GatewayAcpClient {
   Future<Map<String, dynamic>> _requestViaHttp(
     _GatewayAcpRpcRequest request, {
     required void Function(Map<String, dynamic>) onNotification,
+    Uri? endpointOverride,
   }) async {
-    final endpoint = _resolveHttpRpcEndpoint();
+    final endpoint = _resolveHttpRpcEndpoint(endpointOverride);
     if (endpoint == null) {
       throw const GatewayAcpException(
         'Missing ACP HTTP endpoint',
@@ -624,8 +640,8 @@ class GatewayAcpClient {
     return const <String, dynamic>{};
   }
 
-  Uri? _resolveWebSocketRpcEndpoint() {
-    final base = endpointResolver();
+  Uri? _resolveWebSocketRpcEndpoint([Uri? endpointOverride]) {
+    final base = endpointOverride ?? endpointResolver();
     if (base == null) {
       return null;
     }
@@ -638,8 +654,8 @@ class GatewayAcpClient {
     );
   }
 
-  Uri? _resolveHttpRpcEndpoint() {
-    final base = endpointResolver();
+  Uri? _resolveHttpRpcEndpoint([Uri? endpointOverride]) {
+    final base = endpointOverride ?? endpointResolver();
     if (base == null) {
       return null;
     }
