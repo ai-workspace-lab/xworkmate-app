@@ -79,8 +79,8 @@ mobile:
       description: Mobile workspace AI Gateway launcher
       ui_surface: mobile_workspace_hub
     account:
-      enabled: false
-      release_tier: experimental
+      enabled: true
+      release_tier: beta
       build_modes: [debug, profile, release]
       description: Mobile workspace account launcher
       ui_surface: mobile_workspace_hub
@@ -141,14 +141,14 @@ mobile:
       description: Mobile settings gateway tab
       ui_surface: settings_page
     account_access:
-      enabled: false
-      release_tier: experimental
+      enabled: true
+      release_tier: beta
       build_modes: [debug, profile, release]
       description: Mobile account access section
       ui_surface: settings_page
     vault_server:
-      enabled: false
-      release_tier: experimental
+      enabled: true
+      release_tier: beta
       build_modes: [debug, profile, release]
       description: Mobile Vault server integration section
       ui_surface: settings_page
@@ -270,8 +270,8 @@ desktop:
       description: Desktop settings destination
       ui_surface: sidebar_navigation
     account:
-      enabled: false
-      release_tier: experimental
+      enabled: true
+      release_tier: beta
       build_modes: [debug, profile, release]
       description: Desktop account destination
       ui_surface: sidebar_navigation
@@ -345,14 +345,14 @@ desktop:
       description: Desktop settings gateway tab
       ui_surface: settings_page
     account_access:
-      enabled: false
-      release_tier: experimental
+      enabled: true
+      release_tier: beta
       build_modes: [debug, profile, release]
       description: Desktop account access section
       ui_surface: settings_page
     vault_server:
-      enabled: false
-      release_tier: experimental
+      enabled: true
+      release_tier: beta
       build_modes: [debug, profile, release]
       description: Desktop Vault server integration section
       ui_surface: settings_page
@@ -506,14 +506,14 @@ web:
       description: Web settings gateway tab
       ui_surface: web_settings_page
     account_access:
-      enabled: false
-      release_tier: experimental
+      enabled: true
+      release_tier: beta
       build_modes: []
       description: Web does not expose account access section
       ui_surface: web_settings_page
     vault_server:
-      enabled: false
-      release_tier: experimental
+      enabled: true
+      release_tier: beta
       build_modes: []
       description: Web does not expose vault server integration
       ui_surface: web_settings_page
