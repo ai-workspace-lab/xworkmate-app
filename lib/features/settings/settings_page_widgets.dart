@@ -496,7 +496,7 @@ class WorkflowStepInternal extends StatelessWidget {
   }
 }
 
-enum GatewayIntegrationSubTabInternal { gateway, llm, acp, skills }
+enum GatewayIntegrationSubTabInternal { gateway, vault, llm, acp, skills }
 
 enum LlmEndpointSlotInternal { aiGateway, ollamaLocal, ollamaCloud }
 
