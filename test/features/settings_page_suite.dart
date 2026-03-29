@@ -218,6 +218,35 @@ void main() {
     },
   );
 
+  testWidgets('SettingsPage workspace edits enable the top save-and-apply flow', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
+
+    await tester.tap(find.text('工作区'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byType(TextFormField).first,
+      '/tmp/xworkmate-workspace',
+    );
+    await tester.pump();
+
+    expect(controller.settingsDraft.workspacePath, '/tmp/xworkmate-workspace');
+    expect(controller.hasSettingsDraftChanges, isTrue);
+
+    final applyButton = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('settings-global-apply-button')),
+    );
+    expect(applyButton.onPressed, isNotNull);
+  });
+
   testWidgets('SettingsPage integration tab exposes unified gateway controls', (
     WidgetTester tester,
   ) async {

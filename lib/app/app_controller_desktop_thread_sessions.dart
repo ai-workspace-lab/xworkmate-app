@@ -39,6 +39,7 @@ import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
 import 'app_controller_desktop_single_agent.dart';
+import 'app_controller_desktop_thread_binding.dart';
 import 'app_controller_desktop_thread_actions.dart';
 import 'app_controller_desktop_workspace_execution.dart';
 import 'app_controller_desktop_settings_runtime.dart';
@@ -127,11 +128,19 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    return assistantThreadRecordsInternal[normalizedSessionKey]
+    final existing = assistantThreadRecordsInternal[normalizedSessionKey]
             ?.workspaceBinding
             .workspacePath
             .trim() ??
         '';
+    if (existing.isNotEmpty) {
+      return existing;
+    }
+    if (assistantExecutionTargetForSession(normalizedSessionKey) ==
+        AssistantExecutionTarget.singleAgent) {
+      return localThreadWorkspacePathInternal(normalizedSessionKey);
+    }
+    return '';
   }
 
   WorkspaceRefKind assistantWorkspaceKindForSession(String sessionKey) {
