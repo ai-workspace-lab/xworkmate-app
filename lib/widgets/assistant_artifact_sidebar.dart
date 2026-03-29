@@ -211,28 +211,6 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
                                     size: 14,
                                   ),
                                 ),
-                                if (canOpenWorkspace)
-                                  IconButton(
-                                    key: const Key(
-                                      'assistant-artifact-pane-open-workspace-ref',
-                                    ),
-                                    tooltip: appText(
-                                      '在文件浏览器中打开',
-                                      'Open in file browser',
-                                    ),
-                                    visualDensity: VisualDensity.compact,
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(
-                                      minWidth: 24,
-                                      minHeight: 24,
-                                    ),
-                                    onPressed: () =>
-                                        unawaited(_openWorkspace()),
-                                    icon: const Icon(
-                                      Icons.open_in_new_rounded,
-                                      size: 14,
-                                    ),
-                                  ),
                               ],
                             ),
                           ),

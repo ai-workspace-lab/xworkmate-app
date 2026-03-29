@@ -117,10 +117,9 @@ void main() {
     expect(find.text('HTML Preview'), findsOneWidget);
   });
 
-  testWidgets('AssistantArtifactSidebar copies and opens local workspace paths', (
+  testWidgets('AssistantArtifactSidebar copies local workspace paths', (
     WidgetTester tester,
   ) async {
-    var openCount = 0;
     final snapshot = AssistantArtifactSnapshot(
       workspaceRef: '/tmp/thread',
       workspaceRefKind: WorkspaceRefKind.localPath,
@@ -132,9 +131,7 @@ void main() {
       tester,
       snapshot: snapshot,
       previewForEntry: (_) => const AssistantArtifactPreview.empty(),
-      onOpenWorkspace: () async {
-        openCount += 1;
-      },
+      onOpenWorkspace: () async {},
     );
 
     final copyButton = tester.widget<IconButton>(
@@ -143,13 +140,9 @@ void main() {
       ),
     );
     copyButton.onPressed!.call();
-
-    final openButton = tester.widget<IconButton>(
-      find.byKey(
-        const Key('assistant-artifact-pane-open-workspace-ref'),
-      ),
+    expect(
+      find.byKey(const Key('assistant-artifact-pane-open-workspace-ref')),
+      findsNothing,
     );
-    openButton.onPressed!.call();
-    expect(openCount, 1);
   });
 }
