@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/features/settings/settings_page.dart';
+import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
 import '../test_support.dart';
@@ -40,16 +41,12 @@ void main() {
         }
       });
 
+      controller.setSettingsTab(SettingsTab.gateway);
       await pumpPage(
         tester,
         child: SettingsPage(controller: controller),
         platform: TargetPlatform.macOS,
       );
-
-      await tester.tap(find.text('集成'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Vault Server').first);
-      await tester.pumpAndSettle();
 
       expect(
         find.byKey(const ValueKey('vault-server-url-field')),

@@ -18,9 +18,14 @@ import 'web_settings_page_gateway.dart';
 import 'web_settings_page_support.dart';
 
 class WebSettingsPage extends StatefulWidget {
-  const WebSettingsPage({super.key, required this.controller});
+  const WebSettingsPage({
+    super.key,
+    required this.controller,
+    this.showSectionTabs = false,
+  });
 
   final AppController controller;
+  final bool showSectionTabs;
 
   @override
   State<WebSettingsPage> createState() => WebSettingsPageStateInternal();
@@ -243,6 +248,7 @@ class WebSettingsPageStateInternal extends State<WebSettingsPage> {
           controller.settingsTab,
         );
         final showGlobalApplyBar =
+            !widget.showSectionTabs ||
             currentTab != SettingsTab.gateway ||
             gatewaySubTabInternal == WebGatewaySettingsSubTabInternal.acp;
         return DesktopWorkspaceScaffold(
@@ -285,34 +291,33 @@ class WebSettingsPageStateInternal extends State<WebSettingsPage> {
                   buildGlobalApplyBarInternal(context, controller),
                   const SizedBox(height: 16),
                 ],
-                SectionTabs(
-                  items: availableTabs.map((item) => item.label).toList(),
-                  value: currentTab.label,
-                  onChanged: (label) {
-                    final tab = availableTabs.firstWhere(
-                      (item) => item.label == label,
-                    );
-                    controller.setSettingsTab(tab);
-                  },
-                ),
-                const SizedBox(height: 24),
-                ...switch (currentTab) {
-                  SettingsTab.general => buildGeneralInternal(
-                    context,
-                    controller,
-                    controller.settingsDraft,
+                if (widget.showSectionTabs) ...[
+                  SectionTabs(
+                    items: availableTabs.map((item) => item.label).toList(),
+                    value: currentTab.label,
+                    onChanged: (label) {
+                      final tab = availableTabs.firstWhere(
+                        (item) => item.label == label,
+                      );
+                      controller.setSettingsTab(tab);
+                    },
                   ),
-                  SettingsTab.gateway => buildGatewayInternal(
-                    context,
-                    controller,
-                    controller.settingsDraft,
-                  ),
-                  SettingsTab.appearance => buildAppearanceInternal(
-                    context,
-                    controller,
-                  ),
-                  _ => buildAboutInternal(context),
-                },
+                  const SizedBox(height: 24),
+                ],
+                ...(widget.showSectionTabs
+                    ? buildTabContentInternal(
+                        context,
+                        controller,
+                        controller.settingsDraft,
+                        currentTab,
+                      )
+                    : buildOverviewContentInternal(
+                        context,
+                        controller,
+                        controller.settingsDraft,
+                        availableTabs,
+                        currentTab,
+                      )),
               ],
             ),
           ),

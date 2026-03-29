@@ -10,6 +10,7 @@ import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/skill_directory_access.dart';
+import 'package:xworkmate/widgets/section_tabs.dart';
 
 import '../test_support.dart';
 
@@ -133,20 +134,36 @@ class _FakeSkillDirectoryAccessService implements SkillDirectoryAccessService {
   }
 }
 
+Future<void> _pumpSettingsPage(
+  WidgetTester tester,
+  AppController controller, {
+  SettingsTab tab = SettingsTab.general,
+  TargetPlatform platform = TargetPlatform.macOS,
+}) async {
+  controller.setSettingsTab(tab);
+  await pumpPage(
+    tester,
+    child: SettingsPage(controller: controller),
+    platform: platform,
+  );
+}
+
+Future<void> _ensureVisible(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder.first);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('SettingsPage theme chips update controller theme mode', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
 
-    await pumpPage(
+    await _pumpSettingsPage(
       tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
+      controller,
+      tab: SettingsTab.appearance,
     );
-
-    await tester.tap(find.text('外观'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('深色'));
     await tester.pumpAndSettle();
 
@@ -204,33 +221,52 @@ void main() {
     (WidgetTester tester) async {
       final controller = await createTestController(tester);
 
-      await pumpPage(
+      await _pumpSettingsPage(
         tester,
-        child: SettingsPage(controller: controller),
-        platform: TargetPlatform.macOS,
+        controller,
+        tab: SettingsTab.workspace,
       );
-
-      await tester.tap(find.text('工作区'));
-      await tester.pumpAndSettle();
 
       expect(find.text('远程项目根目录'), findsNothing);
       expect(find.text('Remote Project Root'), findsNothing);
     },
   );
 
-  testWidgets('SettingsPage workspace edits enable the top save-and-apply flow', (
+  testWidgets('SettingsPage can render as a unified page without internal tabs', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
 
     await pumpPage(
       tester,
-      child: SettingsPage(controller: controller),
+      child: SettingsPage(
+        controller: controller,
+        showSectionTabs: false,
+      ),
       platform: TargetPlatform.macOS,
     );
 
-    await tester.tap(find.text('工作区'));
-    await tester.pumpAndSettle();
+    expect(find.byType(SectionTabs), findsNothing);
+    expect(find.text('Application'), findsOneWidget);
+    expect(find.text('工作区'), findsWidgets);
+    expect(find.text('OpenClaw Gateway'), findsWidgets);
+    expect(find.text('LLM 接入点'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('external-acp-provider-add-button')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('SettingsPage workspace edits enable the top save-and-apply flow', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await _pumpSettingsPage(
+      tester,
+      controller,
+      tab: SettingsTab.workspace,
+    );
 
     await tester.enterText(
       find.byType(TextFormField).first,
@@ -252,24 +288,15 @@ void main() {
   ) async {
     final controller = await createTestController(tester);
 
-    await pumpPage(
+    await _pumpSettingsPage(
       tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
+      controller,
+      tab: SettingsTab.gateway,
     );
-
-    await tester.tap(find.text('集成'));
-    await tester.pumpAndSettle();
 
     expect(find.text('OpenClaw Gateway'), findsWidgets);
     expect(find.text('LLM 接入点'), findsOneWidget);
-    expect(find.text('ACP 外部接入'), findsOneWidget);
-    expect(find.text('Vault Server'), findsOneWidget);
-    expect(find.byKey(const ValueKey('vault-server-url-field')), findsNothing);
-    expect(
-      find.byKey(const ValueKey('vault-root-access-token-field')),
-      findsNothing,
-    );
+    expect(find.text('Vault Server'), findsAtLeastNWidgets(1));
     expect(find.byKey(const ValueKey('gateway-test-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('gateway-save-button')), findsNothing);
     expect(find.byKey(const ValueKey('gateway-apply-button')), findsOneWidget);
@@ -306,9 +333,6 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Vault Server').first);
-    await tester.pumpAndSettle();
-
     expect(
       find.byKey(const ValueKey('vault-server-url-field')),
       findsOneWidget,
@@ -317,9 +341,13 @@ void main() {
       find.byKey(const ValueKey('vault-root-access-token-field')),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('ai-gateway-url-field')), findsNothing);
+    expect(find.byKey(const ValueKey('ai-gateway-url-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('gateway-mode-field')), findsNothing);
-    expect(find.text('认证诊断'), findsNothing);
+    expect(find.text('认证诊断'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('external-acp-provider-add-button')),
+      findsOneWidget,
+    );
     expect(find.text('保存并生效'), findsWidgets);
   });
 
@@ -328,18 +356,13 @@ void main() {
   ) async {
     final controller = await createTestController(tester);
 
-    await pumpPage(
+    await _pumpSettingsPage(
       tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
+      controller,
+      tab: SettingsTab.gateway,
     );
 
-    await tester.tap(find.text('集成'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Vault Server').first);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Vault Server'), findsWidgets);
+    expect(find.text('Vault Server'), findsAtLeastNWidgets(1));
     expect(find.text('VAULT_SERVER_URL'), findsOneWidget);
     expect(
       find.textContaining('VAULT_SERVER_ROOT_ACCESS_TOKEN'),
@@ -354,16 +377,11 @@ void main() {
   ) async {
     final controller = await createTestController(tester);
 
-    await pumpPage(
+    await _pumpSettingsPage(
       tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
+      controller,
+      tab: SettingsTab.gateway,
     );
-
-    await tester.tap(find.text('集成'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('ACP 外部接入').first);
-    await tester.pumpAndSettle();
 
     expect(find.text('外部 ACP Server Endpoint'), findsOneWidget);
     expect(find.textContaining('Codex'), findsWidgets);
@@ -386,7 +404,7 @@ void main() {
       find.byKey(const ValueKey('settings-global-apply-button')),
       findsOneWidget,
     );
-    expect(find.text('保存并生效'), findsOneWidget);
+    expect(find.text('保存并生效'), findsWidgets);
   });
 
   testWidgets('SettingsPage ACP wizard adds a custom provider card', (
@@ -394,17 +412,16 @@ void main() {
   ) async {
     final controller = await createTestController(tester);
 
-    await pumpPage(
+    await _pumpSettingsPage(
       tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
+      controller,
+      tab: SettingsTab.gateway,
     );
 
-    await tester.tap(find.text('集成'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('ACP 外部接入').first);
-    await tester.pumpAndSettle();
-
+    await _ensureVisible(
+      tester,
+      find.byKey(const ValueKey('external-acp-provider-add-button')),
+    );
     await tester.tap(
       find.byKey(const ValueKey('external-acp-provider-add-button')),
     );
@@ -435,16 +452,11 @@ void main() {
       _FakeSkillDirectoryAccessService(userHomeDirectory: '/Users/tester'),
     );
 
-    await pumpPage(
+    await _pumpSettingsPage(
       tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
+      controller,
+      tab: SettingsTab.gateway,
     );
-
-    await tester.tap(find.text('集成'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('SKILLS 目录授权'));
-    await tester.pumpAndSettle();
 
     expect(find.text('~/.agents/skills'), findsOneWidget);
     expect(find.text('/Users/tester/.agents/skills'), findsOneWidget);
@@ -474,16 +486,15 @@ void main() {
       ),
     );
 
-    await pumpPage(
+    await _pumpSettingsPage(
       tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
+      controller,
+      tab: SettingsTab.gateway,
     );
-
-    await tester.tap(find.text('集成'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('SKILLS 目录授权'));
-    await tester.pumpAndSettle();
+    await _ensureVisible(
+      tester,
+      find.byKey(const ValueKey('skill-directory-batch-add-button')),
+    );
     await tester.tap(
       find.byKey(const ValueKey('skill-directory-batch-add-button')),
     );
@@ -536,16 +547,15 @@ paths:
       ),
     );
 
-    await pumpPage(
+    await _pumpSettingsPage(
       tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
+      controller,
+      tab: SettingsTab.gateway,
     );
-
-    await tester.tap(find.text('集成'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('SKILLS 目录授权'));
-    await tester.pumpAndSettle();
+    await _ensureVisible(
+      tester,
+      find.byKey(const ValueKey('skill-directory-batch-add-button')),
+    );
     await tester.tap(
       find.byKey(const ValueKey('skill-directory-batch-add-button')),
     );
@@ -581,16 +591,15 @@ paths:
         _FakeSkillDirectoryAccessService(userHomeDirectory: '/Users/tester'),
       );
 
-      await pumpPage(
+      await _pumpSettingsPage(
         tester,
-        child: SettingsPage(controller: controller),
-        platform: TargetPlatform.macOS,
+        controller,
+        tab: SettingsTab.gateway,
       );
-
-      await tester.tap(find.text('集成'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('SKILLS 目录授权'));
-      await tester.pumpAndSettle();
+      await _ensureVisible(
+        tester,
+        find.byKey(const ValueKey('skill-directory-batch-add-button')),
+      );
       await tester.tap(
         find.byKey(const ValueKey('skill-directory-batch-add-button')),
       );
@@ -627,14 +636,11 @@ paths:
   ) async {
     final controller = await createTestController(tester);
 
-    await pumpPage(
+    await _pumpSettingsPage(
       tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
+      controller,
+      tab: SettingsTab.gateway,
     );
-
-    await tester.tap(find.text('集成'));
-    await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('折叠').first);
     await tester.pumpAndSettle();
@@ -665,11 +671,7 @@ paths:
       desktopPlatformService: _DesktopServiceStub(),
     );
 
-    await pumpPage(
-      tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
-    );
+    await _pumpSettingsPage(tester, controller);
 
     expect(
       find.byKey(const ValueKey('linux-desktop-integration-card')),
@@ -700,6 +702,7 @@ paths:
       child: const SizedBox(width: 1100, height: 900, child: Placeholder()),
       platform: TargetPlatform.macOS,
     );
+    controller.setSettingsTab(SettingsTab.agents);
     await pumpPage(
       tester,
       child: SizedBox(
@@ -709,9 +712,6 @@ paths:
       ),
       platform: TargetPlatform.macOS,
     );
-
-    await tester.tap(find.text('多 Agent'));
-    await tester.pumpAndSettle();
 
     final titleFinder = find.text('多 Agent 协作');
     expect(titleFinder, findsOneWidget);
@@ -728,14 +728,11 @@ paths:
   ) async {
     final controller = await createTestController(tester);
 
-    await pumpPage(
+    await _pumpSettingsPage(
       tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
+      controller,
+      tab: SettingsTab.gateway,
     );
-
-    await tester.tap(find.text('集成'));
-    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('gateway-profile-chip-1')));
     await tester.pumpAndSettle();
 
@@ -762,10 +759,12 @@ paths:
       message: 'pairing required',
     );
 
-    await pumpPage(tester, child: SettingsPage(controller: controller));
-
-    await tester.tap(find.text('诊断'));
-    await tester.pumpAndSettle();
+    await _pumpSettingsPage(
+      tester,
+      controller,
+      tab: SettingsTab.diagnostics,
+      platform: TargetPlatform.android,
+    );
 
     expect(find.byKey(const ValueKey('runtime-log-card')), findsOneWidget);
     expect(find.textContaining('connected remote gateway'), findsOneWidget);
@@ -807,11 +806,7 @@ paths:
       uiFeatureManifest: manifest,
     );
 
-    await pumpPage(
-      tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
-    );
+    await _pumpSettingsPage(tester, controller);
 
     expect(find.text('诊断'), findsNothing);
     expect(find.text('实验特性'), findsNothing);
@@ -822,10 +817,11 @@ paths:
     (WidgetTester tester) async {
       final controller = await createTestController(tester);
 
-      await pumpPage(tester, child: SettingsPage(controller: controller));
-
-      await tester.tap(find.text('诊断'));
-      await tester.pump(const Duration(milliseconds: 300));
+      await _pumpSettingsPage(
+        tester,
+        controller,
+        tab: SettingsTab.diagnostics,
+      );
 
       expect(
         find.byKey(const ValueKey('assistant-local-state-card')),
@@ -887,6 +883,33 @@ paths:
 
     expect(controller.settingsDetail, isNull);
     expect(find.text('搜索设置'), findsOneWidget);
+  });
+
+  testWidgets('Sidebar settings entry resets to general overview', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+    controller.openSettings(tab: SettingsTab.workspace);
+
+    controller.navigateTo(WorkspaceDestination.assistant);
+    controller.openSettings(tab: SettingsTab.general);
+
+    expect(controller.destination, WorkspaceDestination.settings);
+    expect(controller.settingsTab, SettingsTab.general);
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(
+        controller: controller,
+        initialTab: controller.settingsTab,
+        initialDetail: controller.settingsDetail,
+        navigationContext: controller.settingsNavigationContext,
+      ),
+      platform: TargetPlatform.macOS,
+    );
+
+    expect(find.byType(SectionTabs), findsNothing);
+    expect(find.text('Application'), findsOneWidget);
   });
 
   testWidgets('SettingsPage expands optional LLM endpoints with add button', (

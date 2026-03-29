@@ -152,7 +152,13 @@ class _AppShellState extends State<AppShell> {
                         sidebarState: _sidebarState,
                         appLanguage: controller.appLanguage,
                         themeMode: controller.themeMode,
-                        onSectionChanged: controller.navigateTo,
+                        onSectionChanged: (destination) {
+                          if (destination == WorkspaceDestination.settings) {
+                            controller.openSettings(tab: SettingsTab.general);
+                            return;
+                          }
+                          controller.navigateTo(destination);
+                        },
                         onToggleLanguage: controller.toggleAppLanguage,
                         onCycleSidebarState: _cycleSidebarState,
                         onExpandFromCollapsed: () {
@@ -238,7 +244,10 @@ class _AppShellState extends State<AppShell> {
       WorkspaceDestination.aiGateway => WebAiGatewayPage(
         controller: controller,
       ),
-      WorkspaceDestination.settings => WebSettingsPage(controller: controller),
+      WorkspaceDestination.settings => WebSettingsPage(
+        controller: controller,
+        showSectionTabs: false,
+      ),
       _ => WebAssistantPage(controller: controller),
     };
   }

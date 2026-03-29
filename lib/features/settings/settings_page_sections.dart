@@ -28,6 +28,67 @@ import 'settings_page_device.dart';
 import 'settings_page_widgets.dart';
 
 extension SettingsPageSectionsMixinInternal on SettingsPageStateInternal {
+  List<SettingsTab> orderedOverviewTabsInternal(
+    AppController controller,
+    UiFeatureAccess uiFeatures,
+  ) {
+    final availableTabs = uiFeatures.availableSettingsTabs;
+    final current = uiFeatures.sanitizeSettingsTab(controller.settingsTab);
+    return <SettingsTab>[
+      current,
+      ...availableTabs.where((item) => item != current),
+    ];
+  }
+
+  List<Widget> buildOverviewContentInternal(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+    UiFeatureAccess uiFeatures,
+  ) {
+    final orderedTabs = orderedOverviewTabsInternal(controller, uiFeatures);
+    final sections = <Widget>[];
+    for (final tab in orderedTabs) {
+      final content = switch (tab) {
+        SettingsTab.general => buildGeneralInternal(
+          context,
+          controller,
+          settings,
+          uiFeatures,
+        ),
+        SettingsTab.workspace => buildWorkspaceInternal(
+          context,
+          controller,
+          settings,
+        ),
+        SettingsTab.gateway => buildGatewayInternal(
+          context,
+          controller,
+          settings,
+          uiFeatures,
+        ),
+        SettingsTab.agents => buildAgentsInternal(context, controller, settings),
+        SettingsTab.appearance => buildAppearanceInternal(context, controller),
+        SettingsTab.diagnostics => buildDiagnosticsInternal(context, controller),
+        SettingsTab.experimental => buildExperimentalInternal(
+          context,
+          controller,
+          settings,
+          uiFeatures,
+        ),
+        SettingsTab.about => buildAboutInternal(context, controller),
+      };
+      if (content.isEmpty) {
+        continue;
+      }
+      if (sections.isNotEmpty) {
+        sections.add(const SizedBox(height: 24));
+      }
+      sections.addAll(content);
+    }
+    return sections;
+  }
+
   List<Widget> buildContentForCurrentStateInternal(
     BuildContext context,
     AppController controller,

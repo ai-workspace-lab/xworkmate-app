@@ -36,12 +36,14 @@ class SettingsPage extends StatefulWidget {
     this.initialTab = SettingsTab.general,
     this.initialDetail,
     this.navigationContext,
+    this.showSectionTabs = false,
   });
 
   final AppController controller;
   final SettingsTab initialTab;
   final SettingsDetailPage? initialDetail;
   final SettingsNavigationContext? navigationContext;
+  final bool showSectionTabs;
 
   @override
   State<SettingsPage> createState() => SettingsPageStateInternal();
@@ -214,8 +216,11 @@ class SettingsPageStateInternal extends State<SettingsPage> {
         final settings = controller.settingsDraft;
         final showingDetail = detailInternal != null;
         final showGlobalApplyBar =
-            tabInternal != SettingsTab.gateway ||
-            integrationSubTabInternal == GatewayIntegrationSubTabInternal.acp;
+            !showingDetail &&
+            (!widget.showSectionTabs ||
+                tabInternal != SettingsTab.gateway ||
+                integrationSubTabInternal ==
+                    GatewayIntegrationSubTabInternal.acp);
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
           child: Column(
@@ -265,7 +270,7 @@ class SettingsPageStateInternal extends State<SettingsPage> {
                 buildGlobalApplyBarInternal(context, controller),
                 const SizedBox(height: 16),
               ],
-              if (!showingDetail) ...[
+              if (!showingDetail && widget.showSectionTabs) ...[
                 SectionTabs(
                   items: availableTabs.map((item) => item.label).toList(),
                   value: tabInternal.label,
@@ -280,12 +285,26 @@ class SettingsPageStateInternal extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 24),
               ],
-              ...buildContentForCurrentStateInternal(
-                context,
-                controller,
-                settings,
-                uiFeatures,
-              ),
+              ...(showingDetail
+                  ? buildContentForCurrentStateInternal(
+                      context,
+                      controller,
+                      settings,
+                      uiFeatures,
+                    )
+                  : widget.showSectionTabs
+                  ? buildContentForCurrentStateInternal(
+                      context,
+                      controller,
+                      settings,
+                      uiFeatures,
+                    )
+                  : buildOverviewContentInternal(
+                      context,
+                      controller,
+                      settings,
+                      uiFeatures,
+                    )),
             ],
           ),
         );
