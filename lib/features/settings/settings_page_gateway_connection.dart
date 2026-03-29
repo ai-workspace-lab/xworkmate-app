@@ -137,23 +137,56 @@ extension SettingsPageGatewayConnectionMixinInternal
         if (selectedProfileIndex != kGatewayLocalProfileIndex &&
             !forceSetupCodeMode &&
             setupCodeFeatureEnabled) ...[
-          SectionTabs(
-            items: [appText('配置码', 'Setup Code'), appText('手动配置', 'Manual')],
-            value: useSetupCode
-                ? appText('配置码', 'Setup Code')
-                : appText('手动配置', 'Manual'),
-            size: SectionTabsSize.small,
-            onChanged: (value) {
-              final nextUseSetupCode = value == appText('配置码', 'Setup Code');
-              unawaited(
-                saveGatewayProfileInternal(
-                  controller,
-                  settings,
-                  gatewayProfile.copyWith(useSetupCode: nextUseSetupCode),
-                ).catchError((_) {}),
-              );
-            },
-          ),
+          if (widget.showSectionTabs)
+            SectionTabs(
+              items: [
+                appText('配置码', 'Setup Code'),
+                appText('手动配置', 'Manual'),
+              ],
+              value: useSetupCode
+                  ? appText('配置码', 'Setup Code')
+                  : appText('手动配置', 'Manual'),
+              size: SectionTabsSize.small,
+              onChanged: (value) {
+                final nextUseSetupCode = value == appText('配置码', 'Setup Code');
+                unawaited(
+                  saveGatewayProfileInternal(
+                    controller,
+                    settings,
+                    gatewayProfile.copyWith(useSetupCode: nextUseSetupCode),
+                  ).catchError((_) {}),
+                );
+              },
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilterChip(
+                  label: Text(appText('配置码', 'Setup Code')),
+                  selected: useSetupCode,
+                  onSelected: (_) => unawaited(
+                    saveGatewayProfileInternal(
+                      controller,
+                      settings,
+                      gatewayProfile.copyWith(useSetupCode: true),
+                    ).catchError((_) {}),
+                  ),
+                ),
+                FilterChip(
+                  label: Text(appText('手动配置', 'Manual')),
+                  selected: !useSetupCode,
+                  onSelected: (_) => unawaited(
+                    saveGatewayProfileInternal(
+                      controller,
+                      settings,
+                      gatewayProfile.copyWith(useSetupCode: false),
+                    ).catchError((_) {}),
+                  ),
+                ),
+              ],
+            ),
           const SizedBox(height: 12),
         ],
         if (selectedProfileIndex != kGatewayLocalProfileIndex &&
