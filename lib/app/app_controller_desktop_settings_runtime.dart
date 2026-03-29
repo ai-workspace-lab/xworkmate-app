@@ -28,6 +28,7 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
+import '../runtime/go_gateway_runtime_desktop_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
@@ -300,6 +301,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     final runtime = GatewayRuntime(
       store: temporaryStore,
       identityStore: DeviceIdentityStore(temporaryStore),
+      sessionClient: GoGatewayRuntimeDesktopClient(),
     );
     await runtime.initialize();
     try {
@@ -438,8 +440,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       resolvedUserHomeDirectoryInternal =
           await skillDirectoryAccessServiceInternal.resolveUserHomeDirectory();
       await settingsControllerInternal.initialize();
-      final storedAssistantThreads = await storeInternal
-          .loadTaskThreads();
+      final storedAssistantThreads = await storeInternal.loadTaskThreads();
       if (disposedInternal) {
         return;
       }

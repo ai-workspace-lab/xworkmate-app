@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
+import 'package:xworkmate/runtime/gateway_runtime_session_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import '../test_support.dart';
 
@@ -121,6 +122,141 @@ void main() {
       expect(runtime.snapshot.connectAuthSources, const <String>[
         'device:store',
       ]);
+    },
+  );
+
+  test(
+    'GatewayRuntime persists returned device token and applies go-core session notifications',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final store = createIsolatedTestStore();
+      final identityStore = DeviceIdentityStore(store);
+      final fakeClient = _FakeGatewayRuntimeSessionClient(
+        connectResult: GatewayRuntimeSessionConnectResult(
+          snapshot:
+              GatewayConnectionSnapshot.initial(
+                mode: RuntimeConnectionMode.remote,
+              ).copyWith(
+                status: RuntimeConnectionStatus.connected,
+                statusText: 'Connected',
+                remoteAddress: '127.0.0.1:8787',
+                deviceId: 'device-1',
+                authRole: 'operator',
+                authScopes: const <String>['operator.admin'],
+                connectAuthMode: 'shared-token',
+                connectAuthFields: const <String>['token'],
+                connectAuthSources: const <String>['shared:form'],
+                hasSharedAuth: true,
+                hasDeviceToken: true,
+              ),
+          auth: const <String, dynamic>{'role': 'operator'},
+          returnedDeviceToken: 'go-device-token',
+          raw: const <String, dynamic>{},
+        ),
+      );
+      final runtime = GatewayRuntime(
+        store: store,
+        identityStore: identityStore,
+        sessionClient: fakeClient,
+      );
+      addTearDown(runtime.dispose);
+
+      await runtime.initialize();
+      await runtime.connectProfile(
+        GatewayConnectionProfile.defaults().copyWith(
+          mode: RuntimeConnectionMode.remote,
+          host: '127.0.0.1',
+          port: 8787,
+          tls: false,
+          useSetupCode: false,
+        ),
+        authTokenOverride: 'shared-token-from-form',
+      );
+
+      final identity = await identityStore.loadOrCreate();
+      expect(
+        await store.loadDeviceToken(
+          deviceId: identity.deviceId,
+          role: 'operator',
+        ),
+        'go-device-token',
+      );
+      expect(fakeClient.lastConnectRequest, isNotNull);
+      expect(
+        fakeClient.lastConnectRequest!.authToken,
+        'shared-token-from-form',
+      );
+      expect(runtime.snapshot.status, RuntimeConnectionStatus.connected);
+
+      final nextEvent = runtime.events.firstWhere(
+        (event) => event.event == 'health',
+      );
+      fakeClient.emit(
+        GatewayRuntimeSessionUpdate(
+          runtimeId: fakeClient.lastConnectRequest!.runtimeId,
+          type: GatewayRuntimeSessionUpdateType.log,
+          log: const RuntimeLogEntry(
+            timestampMs: 42,
+            level: 'info',
+            category: 'socket',
+            message: 'reconnect firing',
+          ),
+        ),
+      );
+      fakeClient.emit(
+        GatewayRuntimeSessionUpdate(
+          runtimeId: fakeClient.lastConnectRequest!.runtimeId,
+          type: GatewayRuntimeSessionUpdateType.push,
+          push: const GatewayPushEvent(
+            event: 'health',
+            payload: <String, dynamic>{'ok': true},
+            sequence: 7,
+          ),
+        ),
+      );
+
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        runtime.logs.any((entry) => entry.message == 'reconnect firing'),
+        isTrue,
+      );
+      expect(await nextEvent, isA<GatewayPushEvent>());
+    },
+  );
+
+  test(
+    'GatewayRuntime falls back to direct websocket when go-core bridge is unavailable',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final store = createIsolatedTestStore();
+      final runtime = GatewayRuntime(
+        store: store,
+        identityStore: DeviceIdentityStore(store),
+        sessionClient: _FakeGatewayRuntimeSessionClient(
+          connectError: GatewayRuntimeException(
+            'go bridge unavailable',
+            code: 'GO_GATEWAY_RUNTIME_ENDPOINT_MISSING',
+          ),
+        ),
+      );
+      final server = await FakeGatewayRuntimeServerInternal.start();
+      addTearDown(runtime.dispose);
+      addTearDown(server.close);
+
+      await runtime.initialize();
+      await runtime.connectProfile(
+        GatewayConnectionProfile.defaults().copyWith(
+          mode: RuntimeConnectionMode.local,
+          host: '127.0.0.1',
+          port: server.port,
+          tls: false,
+          useSetupCode: false,
+        ),
+        authTokenOverride: 'shared-token-from-form',
+      );
+
+      expect(server.connectAuth?['token'], 'shared-token-from-form');
+      expect(runtime.snapshot.status, RuntimeConnectionStatus.connected);
     },
   );
 
@@ -289,6 +425,58 @@ void main() {
       );
     },
   );
+}
+
+class _FakeGatewayRuntimeSessionClient implements GatewayRuntimeSessionClient {
+  _FakeGatewayRuntimeSessionClient({this.connectResult, this.connectError});
+
+  final GatewayRuntimeSessionConnectResult? connectResult;
+  final GatewayRuntimeException? connectError;
+  final StreamController<GatewayRuntimeSessionUpdate> _updates =
+      StreamController<GatewayRuntimeSessionUpdate>.broadcast();
+  GatewayRuntimeSessionConnectRequest? lastConnectRequest;
+
+  @override
+  Stream<GatewayRuntimeSessionUpdate> get updates => _updates.stream;
+
+  void emit(GatewayRuntimeSessionUpdate update) {
+    _updates.add(update);
+  }
+
+  @override
+  Future<GatewayRuntimeSessionConnectResult> connect(
+    GatewayRuntimeSessionConnectRequest request,
+  ) async {
+    lastConnectRequest = request;
+    if (connectError != null) {
+      throw connectError!;
+    }
+    return connectResult ??
+        GatewayRuntimeSessionConnectResult(
+          snapshot: GatewayConnectionSnapshot.initial(mode: request.mode),
+          auth: const <String, dynamic>{},
+          returnedDeviceToken: '',
+          raw: const <String, dynamic>{},
+        );
+  }
+
+  @override
+  Future<void> disconnect({required String runtimeId}) async {}
+
+  @override
+  Future<void> dispose() async {
+    await _updates.close();
+  }
+
+  @override
+  Future<dynamic> request({
+    required String runtimeId,
+    required String method,
+    Map<String, dynamic>? params,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    return const <String, dynamic>{};
+  }
 }
 
 class FakeGatewayRuntimeServerInternal {
