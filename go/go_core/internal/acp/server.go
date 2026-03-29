@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"xworkmate/go_core/internal/dispatch"
+	"xworkmate/go_core/internal/gatewayruntime"
 	"xworkmate/go_core/internal/mounts"
 	"xworkmate/go_core/internal/shared"
 )
@@ -45,6 +46,7 @@ type Server struct {
 	mu       sync.Mutex
 	sessions map[string]*session
 	queues   map[string]chan task
+	gateway  *gatewayruntime.Manager
 }
 
 var wsUpgrader = websocket.Upgrader{
@@ -88,6 +90,7 @@ func NewServer() *Server {
 	return &Server{
 		sessions: make(map[string]*session),
 		queues:   make(map[string]chan task),
+		gateway:  gatewayruntime.NewManager(),
 	}
 }
 
@@ -272,6 +275,12 @@ func (s *Server) handleRequest(
 		return handleDispatchResolve(request.Params), nil
 	case "xworkmate.mounts.reconcile":
 		return handleMountReconcile(request.Params), nil
+	case "xworkmate.gateway.connect":
+		return handleGatewayConnect(s, request.Params, notify), nil
+	case "xworkmate.gateway.request":
+		return handleGatewayRequest(s, request.Params, notify), nil
+	case "xworkmate.gateway.disconnect":
+		return handleGatewayDisconnect(s, request.Params, notify), nil
 	default:
 		return nil, &shared.RPCError{
 			Code:    -32601,
