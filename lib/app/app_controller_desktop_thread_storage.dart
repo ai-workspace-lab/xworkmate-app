@@ -680,14 +680,27 @@ extension AppControllerDesktopThreadStorage on AppController {
               )
             : record.gatewayEntryState,
         workspacePath: record.workspacePath.trim(),
-        displayPath: record.displayPath.trim().isEmpty
+        displayPath: record.workspaceKind == WorkspaceKind.localFs
             ? record.workspacePath.trim()
-            : record.displayPath.trim(),
+            : (record.displayPath.trim().isEmpty
+                  ? record.workspacePath.trim()
+                  : record.displayPath.trim()),
         workspaceKind: record.workspaceKind,
         lifecycleStatus: record.workspacePath.trim().isEmpty
             ? 'needs_workspace'
             : record.lifecycleState.status,
       );
+      if (normalizedRecord.workspaceKind == WorkspaceKind.localFs &&
+          normalizedRecord.workspacePath.trim().isNotEmpty) {
+        try {
+          Directory(normalizedRecord.workspacePath).createSync(
+            recursive: true,
+          );
+        } catch (_) {
+          // Best effort only. The thread should still restore even when the
+          // directory cannot be recreated immediately.
+        }
+      }
       assistantThreadRecordsInternal[sessionKey] = normalizedRecord;
       if (normalizedRecord.messages.isNotEmpty) {
         assistantThreadMessagesInternal[sessionKey] =

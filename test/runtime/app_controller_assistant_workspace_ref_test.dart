@@ -311,4 +311,249 @@ void main() {
       );
     },
   );
+
+  test(
+    'AppController recreates recorded local thread directories during restore',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-workspace-restore-create-',
+      );
+      final workspaceRoot = Directory('${tempDirectory.path}/workspace');
+      await workspaceRoot.create(recursive: true);
+      final missingThreadWorkspace = Directory(
+        '${workspaceRoot.path}/.xworkmate/threads/draft-restored-thread',
+      );
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(workspacePath: workspaceRoot.path),
+      );
+      await store.saveTaskThreads(<TaskThread>[
+        TaskThread(
+          threadId: 'draft:restored-thread',
+          title: 'Restored Thread',
+          ownerScope: const ThreadOwnerScope(
+            realm: ThreadRealm.local,
+            subjectType: ThreadSubjectType.user,
+            subjectId: 'device-task',
+            displayName: 'device-task',
+          ),
+          workspaceBinding: WorkspaceBinding(
+            workspaceId: 'draft:restored-thread',
+            workspaceKind: WorkspaceKind.localFs,
+            workspacePath: missingThreadWorkspace.path,
+            displayPath: '/stale/display/path',
+            writable: true,
+          ),
+          executionBinding: const ExecutionBinding(
+            executionMode: ThreadExecutionMode.localAgent,
+            executorId: 'auto',
+            providerId: 'auto',
+            endpointId: '',
+          ),
+          contextState: const ThreadContextState(
+            messages: <GatewayChatMessage>[],
+            selectedModelId: '',
+            selectedSkillKeys: <String>[],
+            importedSkills: <AssistantThreadSkillEntry>[],
+            permissionLevel: AssistantPermissionLevel.defaultAccess,
+            messageViewMode: AssistantMessageViewMode.rendered,
+            latestResolvedRuntimeModel: '',
+          ),
+          lifecycleState: const ThreadLifecycleState(
+            archived: false,
+            status: 'ready',
+            lastRunAtMs: null,
+            lastResultCode: null,
+          ),
+          createdAtMs: 1,
+          updatedAtMs: 1,
+        ),
+      ]);
+
+      final controller = AppController(store: store);
+      addTearDown(controller.dispose);
+      await waitForControllerInternal(controller);
+
+      expect(await missingThreadWorkspace.exists(), isTrue);
+      expect(
+        controller.assistantWorkspaceRefForSession('draft:restored-thread'),
+        missingThreadWorkspace.path,
+      );
+      expect(
+        controller.assistantWorkspaceDisplayPathForSession(
+          'draft:restored-thread',
+        ),
+        missingThreadWorkspace.path,
+      );
+    },
+  );
+
+  test(
+    'AppController creates the local thread workspace immediately when initializing a new task thread',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-workspace-new-thread-',
+      );
+      final workspaceRoot = Directory('${tempDirectory.path}/workspace');
+      await workspaceRoot.create(recursive: true);
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(workspacePath: workspaceRoot.path),
+      );
+
+      final controller = AppController(store: store);
+      addTearDown(controller.dispose);
+      await waitForControllerInternal(controller);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+
+      controller.initializeAssistantThreadContext(
+        'draft:created-thread',
+        title: 'Created Thread',
+        executionTarget: AssistantExecutionTarget.singleAgent,
+      );
+
+      final threadWorkspace = Directory(
+        '${workspaceRoot.path}/.xworkmate/threads/draft-created-thread',
+      );
+      expect(await threadWorkspace.exists(), isTrue);
+      expect(
+        controller.assistantWorkspaceRefForSession('draft:created-thread'),
+        threadWorkspace.path,
+      );
+      expect(
+        controller.assistantWorkspaceDisplayPathForSession(
+          'draft:created-thread',
+        ),
+        threadWorkspace.path,
+      );
+    },
+  );
+
+  test(
+    'AppController rebinds the current single-agent thread after configuring a workspace root',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-workspace-configure-root-',
+      );
+      final workspaceRoot = Directory('${tempDirectory.path}/workspace');
+      await workspaceRoot.create(recursive: true);
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(workspacePath: ''),
+      );
+      final controller = AppController(store: store);
+      addTearDown(controller.dispose);
+      await waitForControllerInternal(controller);
+      final existingMain =
+          controller.assistantThreadRecordsInternal[controller.currentSessionKey]!;
+      controller.assistantThreadRecordsInternal[controller.currentSessionKey] =
+          existingMain.copyWith(
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: '',
+              displayPath: '',
+              writable: true,
+            ),
+            lifecycleState: existingMain.lifecycleState.copyWith(
+              status: 'needs_workspace',
+            ),
+            executionTarget: AssistantExecutionTarget.singleAgent,
+          );
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      controller.assistantThreadRecordsInternal[controller.currentSessionKey] =
+          controller
+              .assistantThreadRecordsInternal[controller.currentSessionKey]!
+              .copyWith(
+                workspaceBinding: const WorkspaceBinding(
+                  workspaceId: 'main',
+                  workspaceKind: WorkspaceKind.localFs,
+                  workspacePath: '',
+                  displayPath: '',
+                  writable: true,
+                ),
+                lifecycleState: controller
+                    .assistantThreadRecordsInternal[controller.currentSessionKey]!
+                    .lifecycleState
+                    .copyWith(status: 'needs_workspace'),
+              );
+
+      expect(
+        controller.assistantWorkspaceRefForSession(controller.currentSessionKey),
+        isEmpty,
+      );
+      expect(
+        controller
+            .assistantThreadRecordsInternal[controller.currentSessionKey]
+            ?.lifecycleState
+            .status,
+        'needs_workspace',
+      );
+
+      await controller.saveSettings(
+        controller.settings.copyWith(workspacePath: workspaceRoot.path),
+      );
+
+      expect(
+        controller.assistantWorkspaceRefForSession(controller.currentSessionKey),
+        '${workspaceRoot.path}/.xworkmate/threads/main',
+      );
+      expect(
+        controller
+            .assistantThreadRecordsInternal[controller.currentSessionKey]
+            ?.displayPath,
+        '${workspaceRoot.path}/.xworkmate/threads/main',
+      );
+      expect(
+        controller
+            .assistantThreadRecordsInternal[controller.currentSessionKey]
+            ?.lifecycleState
+            .status,
+        'ready',
+      );
+    },
+  );
 }

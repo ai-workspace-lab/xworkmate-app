@@ -537,14 +537,6 @@ extension SettingsPageSectionsMixinInternal on SettingsPageStateInternal {
               ),
             ),
             EditableFieldInternal(
-              label: appText('远程项目根目录', 'Remote Project Root'),
-              value: settings.remoteProjectRoot,
-              onSubmitted: (value) => saveSettingsInternal(
-                controller,
-                settings.copyWith(remoteProjectRoot: value),
-              ),
-            ),
-            EditableFieldInternal(
               label: appText('CLI 路径', 'CLI Path'),
               value: settings.cliPath,
               onSubmitted: (value) => saveSettingsInternal(

@@ -302,13 +302,11 @@ List<String> assistantModelChoicesForSessionThreadSessionInternal(
     if (singleAgentUsesAiGatewayFallback) {
       return controller.aiGatewayConversationModelChoices;
     }
-    final selectedModel =
-        controller
-            .assistantThreadRecordsInternal[normalizedSessionKey]
-            ?.assistantModelId
-            .trim();
-    if (selectedModel?.isNotEmpty == true) {
-      return <String>[selectedModel!];
+    final runtimeModel = controller.singleAgentRuntimeModelForSession(
+      normalizedSessionKey,
+    );
+    if (runtimeModel.isNotEmpty) {
+      return <String>[runtimeModel];
     }
     return const <String>[];
   }
