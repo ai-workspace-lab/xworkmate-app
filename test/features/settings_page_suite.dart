@@ -339,12 +339,13 @@ void main() {
     expect(find.text('Badge'), findsNothing);
     expect(
       find.byKey(const ValueKey('settings-global-save-button')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey('settings-global-apply-button')),
       findsOneWidget,
     );
+    expect(find.text('保存并生效'), findsOneWidget);
   });
 
   testWidgets('SettingsPage ACP wizard adds a custom provider card', (
