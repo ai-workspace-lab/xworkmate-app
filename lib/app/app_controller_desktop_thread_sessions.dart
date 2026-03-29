@@ -113,7 +113,11 @@ extension AppControllerDesktopThreadSessions on AppController {
         assistantThreadRecordsInternal[normalizedSessionKey]?.assistantModelId
             .trim() ??
         '';
-    if (recordModel.isNotEmpty) {
+    final availableChoices = assistantModelChoicesForSessionInternal(
+      normalizedSessionKey,
+    );
+    if (recordModel.isNotEmpty &&
+        (availableChoices.isEmpty || availableChoices.contains(recordModel))) {
       return recordModel;
     }
     return resolvedAssistantModelForTargetInternal(target);

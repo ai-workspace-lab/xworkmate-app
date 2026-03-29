@@ -199,6 +199,24 @@ void main() {
     expect(find.text('账号本地模式'), findsOneWidget);
   });
 
+  testWidgets('SettingsPage workspace tab no longer exposes remote project root', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await pumpPage(
+      tester,
+      child: SettingsPage(controller: controller),
+      platform: TargetPlatform.macOS,
+    );
+
+    await tester.tap(find.text('工作区'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('远程项目根目录'), findsNothing);
+    expect(find.text('Remote Project Root'), findsNothing);
+  });
+
   testWidgets('SettingsPage integration tab exposes unified gateway controls', (
     WidgetTester tester,
   ) async {
@@ -301,8 +319,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('外部 ACP Server Endpoint'), findsOneWidget);
-    expect(find.text('Codex'), findsWidgets);
-    expect(find.text('OpenCode'), findsWidgets);
+    expect(find.textContaining('Codex'), findsWidgets);
+    expect(find.textContaining('OpenCode'), findsWidgets);
     expect(find.text('Claude'), findsNothing);
     expect(find.text('Gemini'), findsNothing);
     expect(

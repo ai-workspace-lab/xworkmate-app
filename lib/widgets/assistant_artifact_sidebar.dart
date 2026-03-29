@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -17,6 +18,7 @@ typedef AssistantArtifactSnapshotLoader =
     Future<AssistantArtifactSnapshot> Function();
 typedef AssistantArtifactPreviewLoader =
     Future<AssistantArtifactPreview> Function(AssistantArtifactEntry entry);
+typedef AssistantArtifactOpenWorkspace = Future<void> Function();
 
 enum AssistantArtifactSidebarTab { files, preview }
 
@@ -30,6 +32,7 @@ class AssistantArtifactSidebar extends StatefulWidget {
     required this.onCollapse,
     required this.loadSnapshot,
     required this.loadPreview,
+    this.onOpenWorkspace,
   });
 
   final String sessionKey;
@@ -39,6 +42,7 @@ class AssistantArtifactSidebar extends StatefulWidget {
   final VoidCallback onCollapse;
   final AssistantArtifactSnapshotLoader loadSnapshot;
   final AssistantArtifactPreviewLoader loadPreview;
+  final AssistantArtifactOpenWorkspace? onOpenWorkspace;
 
   @override
   State<AssistantArtifactSidebar> createState() =>
@@ -80,6 +84,12 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
     final snapshot = _snapshot;
     final entriesForPreview = _previewCandidates(snapshot);
     final selectedEntry = _selectedEntry;
+    final workspaceRef = widget.workspaceRef.trim();
+    final canCopyWorkspace = workspaceRef.isNotEmpty;
+    final canOpenWorkspace =
+        canCopyWorkspace &&
+        widget.workspaceRefKind == WorkspaceRefKind.localPath &&
+        widget.onOpenWorkspace != null;
 
     return SurfaceCard(
       key: const Key('assistant-artifact-pane'),
@@ -123,55 +133,108 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
                       ),
                       const SizedBox(height: AppSpacing.xxs),
                       Tooltip(
-                        message: widget.workspaceRef.trim(),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.xs,
-                            vertical: AppSpacing.xxs,
+                        message: workspaceRef,
+                        child: GestureDetector(
+                          key: const Key(
+                            'assistant-artifact-pane-workspace-ref-container',
                           ),
-                          decoration: BoxDecoration(
-                            color: palette.chromeSurface.withValues(
-                              alpha: 0.72,
+                          onDoubleTap: canOpenWorkspace
+                              ? () => unawaited(_openWorkspace())
+                              : null,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.xs,
+                              vertical: AppSpacing.xxs,
                             ),
-                            borderRadius: BorderRadius.circular(
-                              AppRadius.button,
-                            ),
-                            border: Border.all(color: palette.chromeStroke),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(top: 1),
-                                child: Icon(
-                                  widget.workspaceRefKind ==
-                                          WorkspaceRefKind.localPath
-                                      ? Icons.folder_open_rounded
-                                      : Icons.cloud_queue_rounded,
-                                  size: 14,
-                                  color: palette.textSecondary,
-                                ),
+                            decoration: BoxDecoration(
+                              color: palette.chromeSurface.withValues(
+                                alpha: 0.72,
                               ),
-                              const SizedBox(width: AppSpacing.xxs),
-                              Expanded(
-                                child: Text(
-                                  _workspaceSummary(
-                                    widget.workspaceRef,
-                                    widget.workspaceRefKind,
-                                  ),
-                                  key: const Key(
-                                    'assistant-artifact-pane-workspace-ref',
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall?.copyWith(
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.button,
+                              ),
+                              border: Border.all(color: palette.chromeStroke),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 1),
+                                  child: Icon(
+                                    widget.workspaceRefKind ==
+                                            WorkspaceRefKind.localPath
+                                        ? Icons.folder_open_rounded
+                                        : Icons.cloud_queue_rounded,
+                                    size: 14,
                                     color: palette.textSecondary,
-                                    height: 1.25,
                                   ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: AppSpacing.xxs),
+                                Expanded(
+                                  child: Text(
+                                    _workspaceSummary(
+                                      widget.workspaceRef,
+                                      widget.workspaceRefKind,
+                                    ),
+                                    key: const Key(
+                                      'assistant-artifact-pane-workspace-ref',
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: palette.textSecondary,
+                                      height: 1.25,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.xxs),
+                                IconButton(
+                                  key: const Key(
+                                    'assistant-artifact-pane-copy-workspace-ref',
+                                  ),
+                                  tooltip: appText(
+                                    '复制工作路径',
+                                    'Copy workspace path',
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 24,
+                                    minHeight: 24,
+                                  ),
+                                  onPressed: canCopyWorkspace
+                                      ? _copyWorkspace
+                                      : null,
+                                  icon: const Icon(
+                                    Icons.content_copy_rounded,
+                                    size: 14,
+                                  ),
+                                ),
+                                if (canOpenWorkspace)
+                                  IconButton(
+                                    key: const Key(
+                                      'assistant-artifact-pane-open-workspace-ref',
+                                    ),
+                                    tooltip: appText(
+                                      '在文件浏览器中打开',
+                                      'Open in file browser',
+                                    ),
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 24,
+                                      minHeight: 24,
+                                    ),
+                                    onPressed: () =>
+                                        unawaited(_openWorkspace()),
+                                    icon: const Icon(
+                                      Icons.open_in_new_rounded,
+                                      size: 14,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -239,6 +302,32 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
         ],
       ),
     );
+  }
+
+  Future<void> _copyWorkspace() async {
+    final workspaceRef = widget.workspaceRef.trim();
+    if (workspaceRef.isEmpty) {
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: workspaceRef));
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          appText('工作路径已复制', 'Workspace path copied'),
+        ),
+        duration: const Duration(milliseconds: 1200),
+      ),
+    );
+  }
+
+  Future<void> _openWorkspace() async {
+    if (widget.onOpenWorkspace == null) {
+      return;
+    }
+    await widget.onOpenWorkspace!.call();
   }
 
   Widget _buildTabBody(

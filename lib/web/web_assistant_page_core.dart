@@ -516,6 +516,7 @@ class WebAssistantPageStateInternal extends State<WebAssistantPage> {
                       artifactPaneCollapsedInternal = true;
                     });
                   },
+                  onOpenWorkspace: null,
                   loadSnapshot: () =>
                       controller.loadAssistantArtifactSnapshot(),
                   loadPreview: (entry) =>

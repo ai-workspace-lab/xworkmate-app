@@ -49,7 +49,7 @@ void main() {
   );
 
   test(
-    'AppController switches assistant model source with the execution mode',
+    'AppController keeps the current thread model source when only the global default target changes',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -94,8 +94,16 @@ void main() {
         ),
       );
 
-      expect(controller.resolvedAssistantModel, 'gpt-5.4');
-      expect(controller.assistantModelChoices, const <String>['gpt-5.4']);
+      expect(
+        controller.assistantExecutionTargetForSession(
+          controller.currentSessionKey,
+        ),
+        AssistantExecutionTarget.singleAgent,
+      );
+      expect(controller.resolvedAssistantModel, 'qwen2.5-coder:latest');
+      expect(controller.assistantModelChoices, const <String>[
+        'qwen2.5-coder:latest',
+      ]);
     },
   );
 

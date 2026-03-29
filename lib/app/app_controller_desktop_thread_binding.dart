@@ -139,13 +139,24 @@ extension AppControllerDesktopThreadBinding on AppController {
   }) {
     if (executionTarget == AssistantExecutionTarget.singleAgent) {
       if (existingBinding != null &&
-          existingBinding.workspaceKind == WorkspaceKind.localFs &&
           existingBinding.workspacePath.trim().isNotEmpty) {
-        return existingBinding.copyWith(
-          displayPath: existingBinding.displayPath.trim().isEmpty
-              ? existingBinding.workspacePath
-              : null,
+        if (existingBinding.workspaceKind == WorkspaceKind.localFs) {
+          ensureLocalWorkspaceDirectoryInternal(existingBinding.workspacePath);
+          return existingBinding.copyWith(
+            displayPath: existingBinding.workspacePath,
+          );
+        }
+        final defaultRemotePath = remoteThreadWorkspacePathInternal(
+          sessionKey,
+          ownerScope,
         );
+        if (existingBinding.workspacePath.trim() != defaultRemotePath) {
+          return existingBinding.copyWith(
+            displayPath: existingBinding.displayPath.trim().isEmpty
+                ? existingBinding.workspacePath
+                : null,
+          );
+        }
       }
       final localPath = localThreadWorkspacePathInternal(sessionKey);
       return WorkspaceBinding(

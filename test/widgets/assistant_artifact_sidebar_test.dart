@@ -14,6 +14,7 @@ void main() {
     required AssistantArtifactSnapshot snapshot,
     required AssistantArtifactPreview Function(AssistantArtifactEntry entry)
     previewForEntry,
+    Future<void> Function()? onOpenWorkspace,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -29,6 +30,7 @@ void main() {
               onCollapse: () {},
               loadSnapshot: () async => snapshot,
               loadPreview: (entry) async => previewForEntry(entry),
+              onOpenWorkspace: onOpenWorkspace,
             ),
           ),
         ),
@@ -113,5 +115,41 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('HTML Preview'), findsOneWidget);
+  });
+
+  testWidgets('AssistantArtifactSidebar copies and opens local workspace paths', (
+    WidgetTester tester,
+  ) async {
+    var openCount = 0;
+    final snapshot = AssistantArtifactSnapshot(
+      workspaceRef: '/tmp/thread',
+      workspaceRefKind: WorkspaceRefKind.localPath,
+      resultEntries: const <AssistantArtifactEntry>[],
+      fileEntries: const <AssistantArtifactEntry>[],
+    );
+
+    await pumpSidebar(
+      tester,
+      snapshot: snapshot,
+      previewForEntry: (_) => const AssistantArtifactPreview.empty(),
+      onOpenWorkspace: () async {
+        openCount += 1;
+      },
+    );
+
+    final copyButton = tester.widget<IconButton>(
+      find.byKey(
+        const Key('assistant-artifact-pane-copy-workspace-ref'),
+      ),
+    );
+    copyButton.onPressed!.call();
+
+    final openButton = tester.widget<IconButton>(
+      find.byKey(
+        const Key('assistant-artifact-pane-open-workspace-ref'),
+      ),
+    );
+    openButton.onPressed!.call();
+    expect(openCount, 1);
   });
 }
