@@ -115,6 +115,8 @@ class SidebarNavigation extends StatelessWidget {
                       child: SidebarTaskSection(
                         items: taskItems,
                         skillCount: assistantSkillCount,
+                        showCollapseControl: showCollapseControl,
+                        onCycleSidebarState: onCycleSidebarState,
                         onRefreshTasks: onRefreshTasks,
                         onCreateTask: onCreateTask,
                         onSelectTask: onSelectTask,
@@ -149,7 +151,7 @@ class SidebarNavigation extends StatelessWidget {
                         ),
                     accountSelected:
                         currentSection == WorkspaceDestination.account,
-                    showCollapseControl: showCollapseControl,
+                    showCollapseControl: showCollapseControl && isCollapsed,
                   ),
                 ],
               ),

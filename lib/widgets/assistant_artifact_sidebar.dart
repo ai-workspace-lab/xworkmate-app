@@ -507,45 +507,39 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
 class AssistantArtifactSidebarRevealButton extends StatelessWidget {
   const AssistantArtifactSidebarRevealButton({super.key, required this.onTap});
 
-  static const double _buttonWidth = 32;
-  static const double _buttonHeight = 36;
-  static const double _buttonRadius = 8;
+  static const double _buttonSize = 28;
 
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
+    return Tooltip(
+      message: appText('展开右侧栏', 'Expand sidebar'),
+      child: IconButton(
         key: const Key('assistant-artifact-pane-toggle'),
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(_buttonRadius),
-        child: Container(
-          width: _buttonWidth,
-          height: _buttonHeight,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                palette.chromeHighlight.withValues(alpha: 0.96),
-                palette.chromeSurface,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(_buttonRadius),
-            border: Border.all(
-              color: palette.chromeStroke.withValues(alpha: 0.88),
-              width: 0.9,
-            ),
-            boxShadow: [palette.chromeShadowAmbient],
-          ),
-          child: Icon(
-            Icons.keyboard_double_arrow_left_rounded,
-            size: 20,
-            color: palette.textPrimary,
-          ),
+        onPressed: onTap,
+        visualDensity: VisualDensity.compact,
+        splashRadius: 18,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(
+          width: _buttonSize,
+          height: _buttonSize,
+        ),
+        style: IconButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(_buttonSize, _buttonSize),
+          maximumSize: const Size(_buttonSize, _buttonSize),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          backgroundColor: Colors.transparent,
+          foregroundColor: palette.textSecondary,
+          overlayColor: palette.chromeSurfacePressed,
+          side: BorderSide.none,
+          shape: const CircleBorder(),
+        ),
+        icon: const Icon(
+          Icons.keyboard_double_arrow_left_rounded,
+          size: 20,
         ),
       ),
     );
