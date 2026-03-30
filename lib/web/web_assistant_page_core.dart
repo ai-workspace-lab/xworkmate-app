@@ -372,6 +372,7 @@ class WebAssistantPageStateInternal extends State<WebAssistantPage> {
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final palette = context.palette;
         final maxPaneWidth = math.min(
           520.0,
           math.max(
@@ -386,22 +387,25 @@ class WebAssistantPageStateInternal extends State<WebAssistantPage> {
           children: [
             Expanded(child: child),
             if (!artifactPaneCollapsedInternal) ...[
-              SizedBox(
-                key: const Key('assistant-artifact-pane-resize-handle'),
-                width: 8,
-                child: PaneResizeHandle(
-                  axis: Axis.horizontal,
-                  onDelta: (delta) {
-                    setState(() {
-                      artifactPaneWidthInternal =
-                          (artifactPaneWidthInternal - delta)
-                              .clamp(
-                                webAssistantArtifactPaneMinWidthInternal,
-                                maxPaneWidth,
-                              )
-                              .toDouble();
-                    });
-                  },
+              DecoratedBox(
+                decoration: BoxDecoration(color: palette.chromeBackground),
+                child: SizedBox(
+                  key: const Key('assistant-artifact-pane-resize-handle'),
+                  width: 8,
+                  child: PaneResizeHandle(
+                    axis: Axis.horizontal,
+                    onDelta: (delta) {
+                      setState(() {
+                        artifactPaneWidthInternal =
+                            (artifactPaneWidthInternal - delta)
+                                .clamp(
+                                  webAssistantArtifactPaneMinWidthInternal,
+                                  maxPaneWidth,
+                                )
+                                .toDouble();
+                      });
+                    },
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
