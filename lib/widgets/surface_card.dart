@@ -12,6 +12,7 @@ class SurfaceCard extends StatefulWidget {
     this.padding = const EdgeInsets.all(AppSpacing.md),
     this.onTap,
     this.borderRadius = AppRadius.card,
+    this.borderWidth = 1,
     this.color,
     this.tone = SurfaceCardTone.standard,
   });
@@ -20,6 +21,7 @@ class SurfaceCard extends StatefulWidget {
   final EdgeInsetsGeometry padding;
   final VoidCallback? onTap;
   final double borderRadius;
+  final double borderWidth;
   final Color? color;
   final SurfaceCardTone tone;
 
@@ -49,7 +51,7 @@ class _SurfaceCardState extends State<SurfaceCard> {
       SurfaceCardTone.standard => BoxDecoration(
         color: (_hovered && widget.onTap != null ? hoveredColor : baseColor)
             .withValues(alpha: 0.98),
-        border: Border.all(color: borderColor),
+        border: Border.all(color: borderColor, width: widget.borderWidth),
         borderRadius: BorderRadius.circular(widget.borderRadius),
         boxShadow: widget.onTap != null && _hovered
             ? [palette.chromeShadowAmbient]
@@ -58,7 +60,7 @@ class _SurfaceCardState extends State<SurfaceCard> {
       SurfaceCardTone.chrome => BoxDecoration(
         color: (_hovered && widget.onTap != null ? hoveredColor : baseColor)
             .withValues(alpha: 0.98),
-        border: Border.all(color: borderColor),
+        border: Border.all(color: borderColor, width: widget.borderWidth),
         borderRadius: BorderRadius.circular(widget.borderRadius),
         boxShadow: [
           if (_hovered && widget.onTap != null) palette.chromeShadowAmbient,
