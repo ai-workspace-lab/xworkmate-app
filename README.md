@@ -66,8 +66,8 @@ All download buttons currently point to the latest GitHub release page.
 
 - [Release Notes](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/releases/xworkmate-release-notes.md)
 - [Changelog](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/releases/xworkmate-changelog.md)
-- [Feature Matrix](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/planning/xworkmate-ui-feature-matrix.md)
-- [Roadmap](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/planning/xworkmate-ui-feature-roadmap.md)
+- [Feature Matrix](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/plans/xworkmate-ui-feature-matrix.md)
+- [Roadmap](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/plans/xworkmate-ui-feature-roadmap.md)
 - [Gateway Dev Runbook](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/runbooks/gateway-dev-runbook.md)
 - [Web Deployment](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/web-deployment.md)
 - [Security Rules](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/security/secure-development-rules.md)
