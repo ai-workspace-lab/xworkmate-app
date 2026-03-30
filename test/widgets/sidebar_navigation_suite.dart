@@ -52,7 +52,6 @@ void main() {
     var themeToggled = 0;
     var sidebarCycled = 0;
     var accountOpened = 0;
-    var workspaceFollowToggled = 0;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -72,152 +71,58 @@ void main() {
             onOpenThemeToggle: () => themeToggled++,
             accountName: 'Tester',
             accountSubtitle: 'Workspace',
-            onToggleAccountWorkspaceFollowed: () async {
-              workspaceFollowToggled++;
-            },
-            favoriteDestinations: const <AssistantFocusEntry>{
-              AssistantFocusEntry.skills,
-            },
-            onToggleFavorite: (_) async {},
+            onToggleAccountWorkspaceFollowed: () async {},
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('工具'), findsOneWidget);
-    expect(find.text('MCP Hub'), findsOneWidget);
+    expect(find.text('工具'), findsNothing);
+    expect(find.text('工作区'), findsNothing);
+    expect(find.text('自动化'), findsNothing);
+    expect(find.text('MCP Hub'), findsNothing);
+    expect(find.text('ClawHub'), findsNothing);
+    expect(find.text('回到 APP首页'), findsNothing);
+    expect(find.text('设置'), findsOneWidget);
+    expect(find.text('账户'), findsOneWidget);
+    expect(find.text('语言'), findsOneWidget);
+    expect(find.text('主题'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('自动化'));
-    await tester.tap(find.text('自动化').hitTestable());
-    await tester.pumpAndSettle();
-    expect(selected, WorkspaceDestination.tasks);
-
-    expect(
-      find.byKey(const ValueKey<String>('sidebar-favorite-skills')),
-      findsNothing,
+    await tester.tap(
+      find.byKey(const ValueKey<String>('sidebar-footer-settings')),
     );
+    await tester.pumpAndSettle();
+    expect(selected, WorkspaceDestination.settings);
 
-    await tester.tap(find.byTooltip('切换语言'));
+    await tester.tap(
+      find.byKey(const ValueKey<String>('sidebar-footer-language')),
+    );
     await tester.pumpAndSettle();
     expect(languageToggled, 1);
 
-    await tester.tap(find.byTooltip('切换深色'));
+    await tester.tap(
+      find.byKey(const ValueKey<String>('sidebar-footer-theme')),
+    );
     await tester.pumpAndSettle();
     expect(themeToggled, 1);
 
-    await tester.tap(find.byTooltip('收起侧边栏'));
-    await tester.pumpAndSettle();
-    expect(sidebarCycled, 1);
-
-    await tester.tap(find.text('Tester'));
+    await tester.tap(
+      find.byKey(const ValueKey<String>('sidebar-footer-account')),
+    );
     await tester.pumpAndSettle();
     expect(accountOpened, 1);
 
     await tester.tap(
-      find.byKey(const ValueKey<String>('sidebar-account-follow')),
+      find.byKey(const ValueKey<String>('sidebar-footer-collapse')),
     );
     await tester.pumpAndSettle();
-    expect(workspaceFollowToggled, 1);
+    expect(sidebarCycled, 1);
   });
 
-  testWidgets('SidebarNavigation toggles footer quick action favorites', (
+  testWidgets('SidebarNavigation no longer expands settings sub navigation in sidebar', (
     WidgetTester tester,
   ) async {
-    final toggled = <AssistantFocusEntry>[];
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light(),
-        home: Scaffold(
-          body: SidebarNavigation(
-            currentSection: WorkspaceDestination.assistant,
-            sidebarState: AppSidebarState.expanded,
-            appLanguage: AppLanguage.zh,
-            themeMode: ThemeMode.light,
-            onSectionChanged: (_) {},
-            onToggleLanguage: () {},
-            onCycleSidebarState: () {},
-            onExpandFromCollapsed: () {},
-            onOpenHome: () {},
-            onOpenAccount: () {},
-            onOpenThemeToggle: () {},
-            accountName: 'Tester',
-            accountSubtitle: 'Workspace',
-            onToggleAccountWorkspaceFollowed: () async {},
-            favoriteDestinations: const <AssistantFocusEntry>{
-              AssistantFocusEntry.language,
-            },
-            onToggleFavorite: (value) async => toggled.add(value),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(
-      find.byKey(const ValueKey<String>('sidebar-favorite-language')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey<String>('sidebar-favorite-theme')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(toggled, const <AssistantFocusEntry>[
-      AssistantFocusEntry.language,
-      AssistantFocusEntry.theme,
-    ]);
-  });
-
-  testWidgets(
-    'SidebarNavigation shows app home shortcut copy on settings page',
-    (WidgetTester tester) async {
-      var selected = WorkspaceDestination.settings;
-      var homeOpened = 0;
-
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.light(),
-          home: Scaffold(
-            body: SidebarNavigation(
-              currentSection: selected,
-              sidebarState: AppSidebarState.expanded,
-              appLanguage: AppLanguage.zh,
-              themeMode: ThemeMode.light,
-              onSectionChanged: (value) => selected = value,
-              onToggleLanguage: () {},
-              onCycleSidebarState: () {},
-              onExpandFromCollapsed: () {},
-              onOpenHome: () => homeOpened++,
-              onOpenAccount: () {},
-              onOpenThemeToggle: () {},
-              accountName: 'Tester',
-              accountSubtitle: 'Workspace',
-              onToggleAccountWorkspaceFollowed: () async {},
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('回到 APP首页'), findsOneWidget);
-      expect(find.text('新对话'), findsWidgets);
-
-      await tester.ensureVisible(find.text('回到 APP首页'));
-      await tester.tap(find.text('回到 APP首页').hitTestable());
-      await tester.pumpAndSettle();
-
-      expect(homeOpened, 1);
-      expect(selected, WorkspaceDestination.settings);
-    },
-  );
-
-  testWidgets('SidebarNavigation exposes settings sub navigation in sidebar', (
-    WidgetTester tester,
-  ) async {
-    final changedTabs = <SettingsTab>[];
-
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light(),
@@ -227,13 +132,6 @@ void main() {
             sidebarState: AppSidebarState.expanded,
             appLanguage: AppLanguage.zh,
             themeMode: ThemeMode.light,
-            currentSettingsTab: SettingsTab.general,
-            availableSettingsTabs: const <SettingsTab>[
-              SettingsTab.general,
-              SettingsTab.workspace,
-              SettingsTab.gateway,
-            ],
-            onSettingsTabChanged: changedTabs.add,
             onSectionChanged: (_) {},
             onToggleLanguage: () {},
             onCycleSidebarState: () {},
@@ -252,23 +150,16 @@ void main() {
 
     expect(
       find.byKey(const ValueKey<String>('sidebar-settings-tab-general')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey<String>('sidebar-settings-tab-workspace')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey<String>('sidebar-settings-tab-gateway')),
-      findsOneWidget,
+      findsNothing,
     );
-
-    await tester.tap(
-      find.byKey(const ValueKey<String>('sidebar-settings-tab-gateway')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(changedTabs, <SettingsTab>[SettingsTab.gateway]);
   });
 
   testWidgets('SidebarNavigation merges task controls into the global left bar', (
@@ -321,7 +212,83 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('任务列表'), findsOneWidget);
-    expect(find.text('自动化'), findsOneWidget);
+    expect(find.text('自动化'), findsNothing);
+    expect(find.text('MCP Hub'), findsNothing);
     expect(find.text('新的任务'), findsOneWidget);
+    expect(
+      find.byKey(
+        const ValueKey<String>('workspace-sidebar-task-group-singleAgent'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('SidebarNavigation keeps footer pinned while task list scrolls', (
+    WidgetTester tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final items = List<SidebarTaskItem>.generate(
+      18,
+      (index) => SidebarTaskItem(
+        sessionKey: 'session-$index',
+        title: '任务 $index',
+        preview: '预览 $index',
+        updatedAtMs: 1710000000000 + index.toDouble(),
+        executionTarget: AssistantExecutionTarget.singleAgent,
+        isCurrent: index == 0,
+        pending: false,
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 320,
+              height: 560,
+              child: SidebarNavigation(
+                currentSection: WorkspaceDestination.assistant,
+                sidebarState: AppSidebarState.expanded,
+                appLanguage: AppLanguage.zh,
+                themeMode: ThemeMode.light,
+                onSectionChanged: (_) {},
+                onToggleLanguage: () {},
+                onCycleSidebarState: () {},
+                onExpandFromCollapsed: () {},
+                onOpenHome: () {},
+                onOpenAccount: () {},
+                onOpenThemeToggle: () {},
+                accountName: 'Tester',
+                accountSubtitle: 'Workspace',
+                onToggleAccountWorkspaceFollowed: () async {},
+                taskItems: items,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final footerBefore = tester.getTopLeft(
+      find.byKey(const ValueKey<String>('sidebar-footer-settings')),
+    );
+
+    await tester.drag(find.byType(ListView), const Offset(0, -240));
+    await tester.pumpAndSettle();
+
+    final footerAfter = tester.getTopLeft(
+      find.byKey(const ValueKey<String>('sidebar-footer-settings')),
+    );
+
+    expect(footerAfter.dy, footerBefore.dy);
   });
 }
