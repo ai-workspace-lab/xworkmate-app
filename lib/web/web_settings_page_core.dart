@@ -10,6 +10,7 @@ import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
 import '../widgets/desktop_workspace_scaffold.dart';
+import '../widgets/settings_page_shell.dart';
 import '../widgets/surface_card.dart';
 import '../widgets/top_bar.dart';
 import 'web_settings_page_sections.dart';
@@ -249,52 +250,43 @@ class WebSettingsPageStateInternal extends State<WebSettingsPage> {
             currentTab != SettingsTab.gateway ||
             gatewaySubTabInternal == WebGatewaySettingsSubTabInternal.acp;
         return DesktopWorkspaceScaffold(
-          child: SingleChildScrollView(
+          child: SettingsPageBodyShell(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TopBar(
-                  breadcrumbs: <AppBreadcrumbItem>[
-                    AppBreadcrumbItem(
-                      label: appText('主页', 'Home'),
-                      icon: Icons.home_rounded,
-                      onTap: controller.navigateHome,
-                    ),
-                    AppBreadcrumbItem(
-                      label: appText('设置', 'Settings'),
-                      onTap: () => controller.openSettings(tab: currentTab),
-                    ),
-                    AppBreadcrumbItem(label: currentTab.label),
-                  ],
-                  title: appText('设置', 'Settings'),
-                  subtitle: appText(
-                    '配置 XWorkmate Web 工作区、网关默认项、界面与诊断选项',
-                    'Configure workspace, gateway defaults, appearance, and diagnostics for XWorkmate Web.',
-                  ),
-                  trailing: SizedBox(
-                    width: 260,
-                    child: TextField(
-                      key: const ValueKey('web-settings-search-field'),
-                      decoration: InputDecoration(
-                        hintText: appText('搜索设置', 'Search settings'),
-                        prefixIcon: const Icon(Icons.search_rounded),
-                      ),
-                    ),
-                  ),
+            breadcrumbs: <AppBreadcrumbItem>[
+              AppBreadcrumbItem(
+                label: appText('主页', 'Home'),
+                icon: Icons.home_rounded,
+                onTap: controller.navigateHome,
+              ),
+              AppBreadcrumbItem(
+                label: appText('设置', 'Settings'),
+                onTap: () => controller.openSettings(tab: currentTab),
+              ),
+              AppBreadcrumbItem(label: currentTab.label),
+            ],
+            title: appText('设置', 'Settings'),
+            subtitle: appText(
+              '配置 XWorkmate Web 工作区、网关默认项、界面与诊断选项',
+              'Configure workspace, gateway defaults, appearance, and diagnostics for XWorkmate Web.',
+            ),
+            trailing: SizedBox(
+              width: 260,
+              child: TextField(
+                key: const ValueKey('web-settings-search-field'),
+                decoration: InputDecoration(
+                  hintText: appText('搜索设置', 'Search settings'),
+                  prefixIcon: const Icon(Icons.search_rounded),
                 ),
-                const SizedBox(height: 24),
-                if (showGlobalApplyBar) ...[
-                  buildGlobalApplyBarInternal(context, controller),
-                  const SizedBox(height: 16),
-                ],
-                ...buildTabContentInternal(
-                  context,
-                  controller,
-                  controller.settingsDraft,
-                  currentTab,
-                ),
-              ],
+              ),
+            ),
+            globalApplyBar: showGlobalApplyBar
+                ? buildGlobalApplyBarInternal(context, controller)
+                : null,
+            bodyChildren: buildTabContentInternal(
+              context,
+              controller,
+              controller.settingsDraft,
+              currentTab,
             ),
           ),
         );
