@@ -27,6 +27,8 @@ import 'settings_page_multi_agent.dart';
 import 'settings_page_support.dart';
 import 'settings_page_device.dart';
 
+const double settingsHairlineBorderWidthInternal = 0.55;
+
 class EditableFieldInternal extends StatefulWidget {
   const EditableFieldInternal({
     super.key,
