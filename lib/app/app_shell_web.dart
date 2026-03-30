@@ -10,6 +10,7 @@ import '../web/web_workspace_pages.dart';
 import '../widgets/pane_resize_handle.dart';
 import '../widgets/sidebar_navigation.dart';
 import 'app_controller_web.dart';
+import 'ui_feature_manifest.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.controller});
@@ -60,6 +61,7 @@ class _AppShellState extends State<AppShell> {
       animation: widget.controller,
       builder: (context, _) {
         final controller = widget.controller;
+        final uiFeatures = controller.featuresFor(UiFeaturePlatform.web);
         final availableDestinations =
             <WorkspaceDestination>[
                   WorkspaceDestination.assistant,
@@ -200,6 +202,11 @@ class _AppShellState extends State<AppShell> {
                             controller.toggleAssistantNavigationDestination,
                         availableDestinations:
                             controller.capabilities.allowedDestinations,
+                        currentSettingsTab: controller.settingsTab,
+                        availableSettingsTabs:
+                            uiFeatures.availableSettingsTabs,
+                        onSettingsTabChanged: (tab) =>
+                            controller.openSettings(tab: tab),
                       ),
                     if (showWorkspaceSidebar &&
                         _sidebarState == AppSidebarState.expanded)

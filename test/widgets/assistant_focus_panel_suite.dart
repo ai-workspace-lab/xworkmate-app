@@ -16,7 +16,8 @@ void main() {
   test('assistant focus panel core files stay within 800 lines', () {
     const targets = <String>[
       'lib/widgets/assistant_focus_panel_core.dart',
-      'lib/web/web_focus_panel_core.dart',
+      'lib/widgets/assistant_focus_panel_previews.dart',
+      'lib/widgets/assistant_focus_panel_support.dart',
     ];
 
     for (final path in targets) {

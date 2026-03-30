@@ -10,6 +10,7 @@ import '../widgets/detail_drawer.dart';
 import '../widgets/pane_resize_handle.dart';
 import '../widgets/sidebar_navigation.dart';
 import 'app_controller.dart';
+import 'ui_feature_manifest.dart';
 import 'workspace_page_registry.dart';
 
 class AppShell extends StatefulWidget {
@@ -70,6 +71,9 @@ class _AppShellState extends State<AppShell> {
                 final isMobile = constraints.maxWidth < 900;
                 final sidebarState = controller.sidebarState;
                 final showSidebar = sidebarState != AppSidebarState.hidden;
+                final uiFeatures = controller.featuresFor(
+                  resolveUiFeaturePlatformFromContext(context),
+                );
                 final embedSidebarIntoAssistant =
                     controller.destination == WorkspaceDestination.assistant &&
                     showSidebar;
@@ -274,6 +278,11 @@ class _AppShellState extends State<AppShell> {
                                 controller.toggleAssistantNavigationDestination,
                             availableDestinations:
                                 controller.capabilities.allowedDestinations,
+                            currentSettingsTab: controller.settingsTab,
+                            availableSettingsTabs:
+                                uiFeatures.availableSettingsTabs,
+                            onSettingsTabChanged: (tab) =>
+                                controller.openSettings(tab: tab),
                           ),
                         if (sidebarState == AppSidebarState.expanded &&
                             !embedSidebarIntoAssistant)

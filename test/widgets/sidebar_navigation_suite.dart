@@ -217,6 +217,64 @@ void main() {
     },
   );
 
+  testWidgets('SidebarNavigation exposes settings sub navigation in sidebar', (
+    WidgetTester tester,
+  ) async {
+    final changedTabs = <SettingsTab>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: SidebarNavigation(
+            currentSection: WorkspaceDestination.settings,
+            sidebarState: AppSidebarState.expanded,
+            appLanguage: AppLanguage.zh,
+            themeMode: ThemeMode.light,
+            currentSettingsTab: SettingsTab.general,
+            availableSettingsTabs: const <SettingsTab>[
+              SettingsTab.general,
+              SettingsTab.workspace,
+              SettingsTab.gateway,
+            ],
+            onSettingsTabChanged: changedTabs.add,
+            onSectionChanged: (_) {},
+            onToggleLanguage: () {},
+            onCycleSidebarState: () {},
+            onExpandFromCollapsed: () {},
+            onOpenHome: () {},
+            onOpenAccount: () {},
+            onOpenThemeToggle: () {},
+            accountName: 'Tester',
+            accountSubtitle: 'Workspace',
+            onToggleAccountWorkspaceFollowed: () async {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey<String>('sidebar-settings-tab-general')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('sidebar-settings-tab-workspace')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('sidebar-settings-tab-gateway')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('sidebar-settings-tab-gateway')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(changedTabs, <SettingsTab>[SettingsTab.gateway]);
+  });
+
   testWidgets('SidebarNavigation header uses chevron instead of brand logo', (
     WidgetTester tester,
   ) async {

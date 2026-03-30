@@ -14,7 +14,6 @@ import '../../runtime/runtime_controllers.dart';
 import '../../runtime/runtime_models.dart';
 import 'codex_integration_card.dart';
 import 'skill_directory_authorization_card.dart';
-import '../../widgets/section_tabs.dart';
 import '../../widgets/surface_card.dart';
 import '../../widgets/top_bar.dart';
 import 'settings_page_sections.dart';
@@ -208,7 +207,6 @@ class SettingsPageStateInternal extends State<SettingsPage> {
       builder: (context, _) {
         final featurePlatform = resolveUiFeaturePlatformFromContext(context);
         final uiFeatures = controller.featuresFor(featurePlatform);
-        final availableTabs = uiFeatures.availableSettingsTabs;
         tabInternal = uiFeatures.sanitizeSettingsTab(controller.settingsTab);
         detailInternal = controller.settingsDetail;
         navigationContextInternal = controller.settingsNavigationContext;
@@ -217,8 +215,7 @@ class SettingsPageStateInternal extends State<SettingsPage> {
         final showingDetail = detailInternal != null;
         final showGlobalApplyBar =
             !showingDetail &&
-            (!widget.showSectionTabs ||
-                tabInternal != SettingsTab.gateway ||
+            (tabInternal != SettingsTab.gateway ||
                 integrationSubTabInternal ==
                     GatewayIntegrationSubTabInternal.acp);
         return SingleChildScrollView(
@@ -270,41 +267,12 @@ class SettingsPageStateInternal extends State<SettingsPage> {
                 buildGlobalApplyBarInternal(context, controller),
                 const SizedBox(height: 16),
               ],
-              if (!showingDetail && widget.showSectionTabs) ...[
-                SectionTabs(
-                  items: availableTabs.map((item) => item.label).toList(),
-                  value: tabInternal.label,
-                  onChanged: (value) => setState(() {
-                    tabInternal = availableTabs.firstWhere(
-                      (item) => item.label == value,
-                    );
-                    detailInternal = null;
-                    navigationContextInternal = null;
-                    controller.setSettingsTab(tabInternal);
-                  }),
-                ),
-                const SizedBox(height: 24),
-              ],
-              ...(showingDetail
-                  ? buildContentForCurrentStateInternal(
-                      context,
-                      controller,
-                      settings,
-                      uiFeatures,
-                    )
-                  : widget.showSectionTabs
-                  ? buildContentForCurrentStateInternal(
-                      context,
-                      controller,
-                      settings,
-                      uiFeatures,
-                    )
-                  : buildOverviewContentInternal(
-                      context,
-                      controller,
-                      settings,
-                      uiFeatures,
-                    )),
+              ...buildContentForCurrentStateInternal(
+                context,
+                controller,
+                settings,
+                uiFeatures,
+              ),
             ],
           ),
         );
