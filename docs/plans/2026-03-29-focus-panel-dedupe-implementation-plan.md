@@ -14,7 +14,7 @@
 
 **Files:**
 - Modify: `docs/plans/2026-03-29-settings-assistant-ui-component-matrix.md`
-- Create: `docs/plans/2026-03-29-focus-panel-dedupe-implementation-plan.md`
+- Modify: `docs/plans/2026-03-29-focus-panel-dedupe-implementation-plan.md`
 
 **Step 1: 追加“可合并 / 可清理分析”**
 
