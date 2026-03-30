@@ -1,6 +1,8 @@
 @TestOn('vm')
 library;
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
@@ -41,6 +43,18 @@ void main() {
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(mobileScannerChannel, null);
+  });
+
+  test('mobile shell keeps a single active entrypoint', () {
+    expect(File('lib/features/mobile/mobile_shell.dart').existsSync(), isTrue);
+    expect(
+      File('lib/features/mobile/mobile_shell_core.dart').existsSync(),
+      isTrue,
+    );
+    expect(
+      File('lib/features/mobile/ios_mobile_shell.dart').existsSync(),
+      isFalse,
+    );
   });
 
   Future<void> pumpMobileShell(

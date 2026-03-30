@@ -31,6 +31,23 @@ void main() {
     }
   });
 
+  test('legacy web focus panel duplicates stay removed', () {
+    const removedTargets = <String>[
+      'lib/web/web_focus_panel.dart',
+      'lib/web/web_focus_panel_core.dart',
+      'lib/web/web_focus_panel_previews.dart',
+      'lib/web/web_focus_panel_support.dart',
+    ];
+
+    for (final path in removedTargets) {
+      expect(
+        File(path).existsSync(),
+        isFalse,
+        reason: 'legacy file should stay removed: $path',
+      );
+    }
+  });
+
   testWidgets(
     'Settings focused preview reuses language and theme quick actions',
     (WidgetTester tester) async {
