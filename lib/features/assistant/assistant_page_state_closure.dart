@@ -268,6 +268,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final palette = context.palette;
         final maxPaneWidth = math.min(
           560.0,
           math.max(
@@ -282,22 +283,25 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
           children: [
             Expanded(child: child),
             if (!artifactPaneCollapsedInternal) ...[
-              SizedBox(
-                key: const Key('assistant-artifact-pane-resize-handle'),
-                width: assistantHorizontalResizeHandleWidthInternal,
-                child: PaneResizeHandle(
-                  axis: Axis.horizontal,
-                  onDelta: (delta) {
-                    setState(() {
-                      artifactPaneWidthInternal =
-                          (artifactPaneWidthInternal - delta)
-                              .clamp(
-                                assistantArtifactPaneMinWidthInternal,
-                                maxPaneWidth,
-                              )
-                              .toDouble();
-                    });
-                  },
+              DecoratedBox(
+                decoration: BoxDecoration(color: palette.chromeBackground),
+                child: SizedBox(
+                  key: const Key('assistant-artifact-pane-resize-handle'),
+                  width: assistantHorizontalResizeHandleWidthInternal,
+                  child: PaneResizeHandle(
+                    axis: Axis.horizontal,
+                    onDelta: (delta) {
+                      setState(() {
+                        artifactPaneWidthInternal =
+                            (artifactPaneWidthInternal - delta)
+                                .clamp(
+                                  assistantArtifactPaneMinWidthInternal,
+                                  maxPaneWidth,
+                                )
+                                .toDouble();
+                      });
+                    },
+                  ),
                 ),
               ),
               const SizedBox(width: assistantHorizontalPaneGapInternal),
