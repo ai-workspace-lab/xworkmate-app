@@ -73,6 +73,7 @@ class SettingsPageStateInternal extends State<SettingsPage> {
   bool openClawGatewayExpandedInternal = true;
   bool vaultServerExpandedInternal = true;
   bool aiGatewayExpandedInternal = true;
+  bool externalAcpExpandedInternal = true;
   int selectedGatewayProfileIndexInternal = kGatewayLocalProfileIndex;
   String gatewaySetupCodeSyncedValueInternal = '';
   String gatewayHostSyncedValueInternal = '';
