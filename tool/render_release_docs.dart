@@ -11,11 +11,11 @@ void main() {
   final git = GitSnapshot.capture();
 
   _writeDoc(
-    'docs/planning/xworkmate-ui-feature-matrix.md',
+    'docs/plans/xworkmate-ui-feature-matrix.md',
     _renderFeatureMatrix(manifest, git),
   );
   _writeDoc(
-    'docs/planning/xworkmate-ui-feature-roadmap.md',
+    'docs/plans/xworkmate-ui-feature-roadmap.md',
     _renderFeatureRoadmap(manifest, git),
   );
   _writeDoc(
@@ -25,8 +25,8 @@ void main() {
   _writeDoc('docs/releases/xworkmate-changelog.md', _renderChangelog(git));
 
   stdout.writeln(
-    'Rendered docs/planning/xworkmate-ui-feature-matrix.md, '
-    'docs/planning/xworkmate-ui-feature-roadmap.md, '
+    'Rendered docs/plans/xworkmate-ui-feature-matrix.md, '
+    'docs/plans/xworkmate-ui-feature-roadmap.md, '
     'docs/releases/xworkmate-release-notes.md, '
     'and docs/releases/xworkmate-changelog.md',
   );
