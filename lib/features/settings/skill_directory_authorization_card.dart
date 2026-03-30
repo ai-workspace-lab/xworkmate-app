@@ -9,9 +9,14 @@ import '../../widgets/surface_card.dart';
 enum _SkillDirectoryAuthorizationMode { direct, picker }
 
 class SkillDirectoryAuthorizationCard extends StatefulWidget {
-  const SkillDirectoryAuthorizationCard({super.key, required this.controller});
+  const SkillDirectoryAuthorizationCard({
+    super.key,
+    required this.controller,
+    this.showHeader = true,
+  });
 
   final AppController controller;
+  final bool showHeader;
 
   @override
   State<SkillDirectoryAuthorizationCard> createState() =>
@@ -48,11 +53,13 @@ class _SkillDirectoryAuthorizationCardState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            appText('SKILLS 目录授权', 'SKILLS Directory Authorization'),
-            style: theme.textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
+          if (widget.showHeader) ...[
+            Text(
+              appText('SKILLS 目录授权', 'SKILLS Directory Authorization'),
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+          ],
           Text(
             appText(
               '预设目录支持直接按路径加入；也可以把终端输出里的目录或单个技能包路径直接贴进来批量导入。系统目录选择器保留在同行旁侧，作为可选授权方式。设置中心修改会写入 settings.yaml。',
