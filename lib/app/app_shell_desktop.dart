@@ -397,7 +397,7 @@ class _AppShellState extends State<AppShell> {
                     if (!showSidebar)
                       Positioned(
                         left: 8,
-                        bottom: 8,
+                        top: 8,
                         child: _SidebarRevealRail(
                           onExpand: () => _toggleSidebarVisibility(controller),
                         ),
