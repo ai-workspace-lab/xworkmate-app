@@ -21,13 +21,13 @@ class SimpleSpacing {
 class SimpleRadius {
   SimpleRadius._();
 
-  static const double card = 16.0;
+  static const double card = 12.0;
   static const double button = 12.0;
-  static const double input = 14.0;
+  static const double input = 12.0;
   static const double chip = 12.0;
   static const double badge = 12.0;
-  static const double dialog = 18.0;
-  static const double sidebar = 20.0;
+  static const double dialog = 12.0;
+  static const double sidebar = 12.0;
   static const double icon = 12.0;
 }
 

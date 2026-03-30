@@ -38,9 +38,9 @@ void main() {
   });
 
   test('AppTheme matches calm compact workspace baseline tokens', () {
-    expect(AppRadius.card, 16);
-    expect(AppRadius.input, 14);
-    expect(AppRadius.dialog, 18);
+    expect(AppRadius.card, 12);
+    expect(AppRadius.input, 12);
+    expect(AppRadius.dialog, 12);
     expect(AppRadius.chip, 12);
     expect(AppTypography.sectionSize, 13);
     expect(AppTypography.bodySize, 13);
