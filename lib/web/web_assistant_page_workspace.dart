@@ -14,7 +14,6 @@ import '../widgets/assistant_artifact_sidebar.dart';
 import '../widgets/desktop_workspace_scaffold.dart';
 import '../widgets/pane_resize_handle.dart';
 import '../widgets/surface_card.dart';
-import 'web_focus_panel.dart';
 import 'web_assistant_page_core.dart';
 import 'web_assistant_page_chrome.dart';
 import 'web_assistant_page_helpers.dart';
