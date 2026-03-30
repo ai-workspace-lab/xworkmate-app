@@ -359,14 +359,19 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
             Positioned.fill(child: panel),
             if (artifactPaneCollapsedInternal)
               Positioned(
-                right: 0,
-                top: 0,
-                child: AssistantArtifactSidebarRevealButton(
-                  onTap: () {
-                    setState(() {
-                      artifactPaneCollapsedInternal = false;
-                    });
-                  },
+                right: 10,
+                top: 10,
+                child: SizedBox(
+                  height: 40,
+                  child: Center(
+                    child: AssistantArtifactSidebarRevealButton(
+                      onTap: () {
+                        setState(() {
+                          artifactPaneCollapsedInternal = false;
+                        });
+                      },
+                    ),
+                  ),
                 ),
               ),
           ],
