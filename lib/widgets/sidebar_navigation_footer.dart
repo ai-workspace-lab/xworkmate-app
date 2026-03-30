@@ -264,7 +264,9 @@ class _SidebarFooterButtonState extends State<_SidebarFooterButton> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: palette.surfacePrimary,
-                                  borderRadius: BorderRadius.circular(999),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.badge,
+                                  ),
                                   border: Border.all(color: palette.strokeSoft),
                                 ),
                                 child: Text(
