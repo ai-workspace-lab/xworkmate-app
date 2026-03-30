@@ -16,6 +16,7 @@ import '../runtime/go_core.dart';
 import '../runtime/runtime_bootstrap.dart';
 import '../runtime/desktop_platform_service.dart';
 import '../runtime/gateway_runtime.dart';
+import '../runtime/account_runtime_client.dart';
 import '../runtime/runtime_controllers.dart';
 import '../runtime/runtime_models.dart';
 import '../runtime/secure_config_store.dart';
@@ -121,6 +122,7 @@ class AppController extends ChangeNotifier {
     DesktopPlatformService? desktopPlatformService,
     UiFeatureManifest? uiFeatureManifest,
     SkillDirectoryAccessService? skillDirectoryAccessService,
+    AccountRuntimeClient Function(String baseUrl)? accountClientFactory,
     List<String>? singleAgentSharedSkillScanRootOverrides,
     List<SingleAgentProvider>? availableSingleAgentProvidersOverride,
     ArisBundleRepository? arisBundleRepository,
@@ -153,7 +155,10 @@ class AppController extends ChangeNotifier {
     codeAgentBridgeRegistryInternal = AgentRegistry(
       runtimeCoordinatorInternal.gateway,
     );
-    settingsControllerInternal = SettingsController(storeInternal);
+    settingsControllerInternal = SettingsController(
+      storeInternal,
+      accountClientFactory: accountClientFactory,
+    );
     agentsControllerInternal = GatewayAgentsController(
       runtimeCoordinatorInternal.gateway,
     );
@@ -499,9 +504,10 @@ class AppController extends ChangeNotifier {
       hasStoredGatewayTokenForProfile(activeGatewayProfileIndexInternal);
   String? get storedGatewayTokenMask =>
       storedGatewayTokenMaskForProfile(activeGatewayProfileIndexInternal);
-  String get aiGatewayUrl => settings.aiGateway.baseUrl.trim();
+  String get aiGatewayUrl =>
+      settingsControllerInternal.effectiveAiGatewayBaseUrl.trim();
   bool get hasStoredAiGatewayApiKey =>
-      settingsControllerInternal.secureRefs.containsKey('ai_gateway_api_key');
+      settingsControllerInternal.hasEffectiveAiGatewayApiKey;
   bool get isSingleAgentMode =>
       currentAssistantExecutionTarget == AssistantExecutionTarget.singleAgent;
   bool get isCodexBridgeBusy => isCodexBridgeBusyInternal;
@@ -605,18 +611,16 @@ class AppController extends ChangeNotifier {
   }
 
   List<String> get aiGatewayConversationModelChoices {
+    final availableModels =
+        settingsControllerInternal.effectiveAiGatewayAvailableModels;
     final selected = settings.aiGateway.selectedModels
         .map((item) => item.trim())
-        .where(
-          (item) =>
-              item.isNotEmpty &&
-              settings.aiGateway.availableModels.contains(item),
-        )
+        .where((item) => item.isNotEmpty && availableModels.contains(item))
         .toList(growable: false);
     if (selected.isNotEmpty) {
       return selected;
     }
-    final available = settings.aiGateway.availableModels
+    final available = availableModels
         .map((item) => item.trim())
         .where((item) => item.isNotEmpty)
         .toList(growable: false);

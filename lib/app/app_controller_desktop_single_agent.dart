@@ -319,9 +319,7 @@ extension AppControllerDesktopSingleAgent on AppController {
       return;
     }
 
-    final baseUrl = normalizeAiGatewayBaseUrlInternal(
-      settings.aiGateway.baseUrl,
-    );
+    final baseUrl = normalizeAiGatewayBaseUrlInternal(aiGatewayUrl);
     if (baseUrl == null) {
       appendAssistantThreadMessageInternal(
         sessionKey,

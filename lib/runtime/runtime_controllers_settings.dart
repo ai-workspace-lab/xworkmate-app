@@ -4,18 +4,27 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'account_runtime_client.dart';
 import 'gateway_runtime.dart';
 import 'runtime_models.dart';
 import 'secure_config_store.dart';
 import 'runtime_controllers_gateway.dart';
 import 'runtime_controllers_entities.dart';
 import 'runtime_controllers_derived_tasks.dart';
+import 'runtime_controllers_settings_account_impl.dart';
 import 'runtime_controllers_settings_connectivity_impl.dart';
 
+part 'runtime_controllers_settings_account.dart';
+
 class SettingsController extends ChangeNotifier {
-  SettingsController(this.storeInternal);
+  SettingsController(
+    this.storeInternal, {
+    AccountRuntimeClient Function(String baseUrl)? accountClientFactory,
+  }) : accountClientFactoryInternal = accountClientFactory;
 
   final SecureConfigStore storeInternal;
+  final AccountRuntimeClient Function(String baseUrl)?
+  accountClientFactoryInternal;
   bool disposedInternal = false;
   final List<StreamSubscription<FileSystemEvent>>
   settingsWatchSubscriptionsInternal = <StreamSubscription<FileSystemEvent>>[];
@@ -30,6 +39,13 @@ class SettingsController extends ChangeNotifier {
   String ollamaStatusInternal = 'Idle';
   String vaultStatusInternal = 'Idle';
   String aiGatewayStatusInternal = 'Idle';
+  String accountSessionTokenInternal = '';
+  AccountSessionSummary? accountSessionInternal;
+  AccountRemoteProfile? accountProfileInternal;
+  bool accountBusyInternal = false;
+  String accountStatusInternal = 'Signed out';
+  String pendingAccountMfaTicketInternal = '';
+  String pendingAccountBaseUrlInternal = '';
 
   SettingsSnapshot get snapshot => snapshotInternal;
   Map<String, String> get secureRefs => secureRefsInternal;
@@ -186,7 +202,12 @@ class SettingsController extends ChangeNotifier {
       secureRefsInternal.containsKey(
         SecretStore.gatewayTokenRefKey(profileIndex),
       ) ||
-      secureRefsInternal.containsKey('gateway_token');
+      secureRefsInternal.containsKey('gateway_token') ||
+      (!snapshotInternal.accountLocalMode &&
+          profileIndex == kGatewayRemoteProfileIndex &&
+          secureRefsInternal.containsKey(
+            kAccountManagedSecretTargetOpenclawGatewayToken,
+          ));
 
   bool hasStoredGatewayPasswordForProfile(int profileIndex) =>
       secureRefsInternal.containsKey(
@@ -196,7 +217,11 @@ class SettingsController extends ChangeNotifier {
 
   String? storedGatewayTokenMaskForProfile(int profileIndex) =>
       secureRefsInternal[SecretStore.gatewayTokenRefKey(profileIndex)] ??
-      secureRefsInternal['gateway_token'];
+      secureRefsInternal['gateway_token'] ??
+      (!snapshotInternal.accountLocalMode &&
+              profileIndex == kGatewayRemoteProfileIndex
+          ? secureRefsInternal[kAccountManagedSecretTargetOpenclawGatewayToken]
+          : null);
 
   String? storedGatewayPasswordMaskForProfile(int profileIndex) =>
       secureRefsInternal[SecretStore.gatewayPasswordRefKey(profileIndex)] ??
@@ -274,6 +299,12 @@ class SettingsController extends ChangeNotifier {
     return (await storeInternal.loadAiGatewayApiKey())?.trim() ?? '';
   }
 
+  Future<void> clearAiGatewayApiKey() async {
+    await storeInternal.clearAiGatewayApiKey();
+    await reloadDerivedStateInternal();
+    notifyListeners();
+  }
+
   Future<void> appendAudit(SecretAuditEntry entry) async {
     await storeInternal.appendAudit(entry);
     auditTrailInternal = await storeInternal.loadAuditTrail();
@@ -334,71 +365,6 @@ class SettingsController extends ChangeNotifier {
     profile: profile,
     apiKeyOverride: apiKeyOverride,
   );
-
-  List<SecretReferenceEntry> buildSecretReferences() {
-    final entries = <SecretReferenceEntry>[
-      ...secureRefsInternal.entries.map(
-        (entry) => SecretReferenceEntry(
-          name: entry.key,
-          provider: providerNameForSecretInternal(entry.key),
-          module: moduleForSecretInternal(entry.key),
-          maskedValue: entry.value,
-          status: 'In Use',
-        ),
-      ),
-      SecretReferenceEntry(
-        name: snapshotInternal.aiGateway.name,
-        provider: 'LLM API',
-        module: 'Settings',
-        maskedValue: snapshotInternal.aiGateway.baseUrl.trim().isEmpty
-            ? 'Not set'
-            : snapshotInternal.aiGateway.baseUrl,
-        status: snapshotInternal.aiGateway.syncState,
-      ),
-    ];
-    return entries;
-  }
-
-  Future<void> reloadDerivedStateInternal() async {
-    final refs = await storeInternal.loadSecureRefs();
-    secureRefsInternal = {
-      for (final entry in refs.entries)
-        entry.key: SecureConfigStore.maskValue(entry.value),
-    };
-    auditTrailInternal = await storeInternal.loadAuditTrail();
-  }
-
-  String providerNameForSecretInternal(String key) {
-    if (key.contains('vault')) {
-      return 'Vault';
-    }
-    if (key.contains('ollama')) {
-      return 'Ollama Cloud';
-    }
-    if (key.contains('ai_gateway')) {
-      return 'LLM API';
-    }
-    if (key.contains('gateway')) {
-      return 'Gateway';
-    }
-    return 'Local Store';
-  }
-
-  String moduleForSecretInternal(String key) {
-    if (key.contains('gateway')) {
-      return key.contains('device_token') ? 'Devices' : 'Assistant';
-    }
-    if (key.contains('ollama')) {
-      return 'Settings';
-    }
-    if (key.contains('ai_gateway')) {
-      return 'Settings';
-    }
-    if (key.contains('vault')) {
-      return 'Secrets';
-    }
-    return 'Workspace';
-  }
 
   Uri? normalizeAiGatewayBaseUrlInternal(String raw) {
     final trimmed = raw.trim();

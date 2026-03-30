@@ -195,6 +195,63 @@ void registerSecureConfigStoreSuiteSecretsTestsInternal() {
     );
 
     test(
+      'SecureConfigStore persists account-managed session, profile, and secrets outside the settings snapshot',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-account-managed-store-',
+        );
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+
+        await store.saveAccountSessionToken('account-session-token');
+        await store.saveAccountSessionSummary(
+          const AccountSessionSummary(
+            userId: 'user-1',
+            email: 'user@example.com',
+            name: 'Demo User',
+            role: 'user',
+            mfaEnabled: false,
+          ),
+        );
+        await store.saveAccountProfile(
+          AccountRemoteProfile.defaults().copyWith(
+            openclawUrl: 'https://openclaw.account.example',
+            apisixUrl: 'https://apisix.account.example/v1',
+            syncState: 'ready',
+            syncMessage: 'Synced 3 secret(s)',
+            aiGatewayAvailableModels: const <String>['gpt-5.4'],
+          ),
+        );
+        await store.saveAccountManagedSecret(
+          target: kAccountManagedSecretTargetAIGatewayAccessToken,
+          value: 'remote-ai-token',
+        );
+
+        expect(await store.loadAccountSessionToken(), 'account-session-token');
+        expect(await store.loadAccountSessionSummary(), isNotNull);
+        expect(await store.loadAccountProfile(), isNotNull);
+        expect(
+          await store.loadAccountManagedSecret(
+            target: kAccountManagedSecretTargetAIGatewayAccessToken,
+          ),
+          'remote-ai-token',
+        );
+        expect(
+          (await store.loadSecureRefs())[
+              kAccountManagedSecretTargetAIGatewayAccessToken],
+          'remote-ai-token',
+        );
+        expect(
+          (await store.loadSettingsSnapshot()).toJsonString(),
+          allOf(
+            isNot(contains('account-session-token')),
+            isNot(contains('remote-ai-token')),
+            isNot(contains('apisix.account.example')),
+          ),
+        );
+      },
+    );
+
+    test(
       'SecureConfigStore falls back to file-backed device identity and token across instances',
       () async {
         final tempDirectory = await createTempDirectoryInternal(

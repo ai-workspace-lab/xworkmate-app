@@ -165,6 +165,46 @@ class SecureConfigStore {
 
   Future<void> clearAiGatewayApiKey() => _secretStore.clearAiGatewayApiKey();
 
+  Future<String?> loadAccountSessionToken() =>
+      _secretStore.loadAccountSessionToken();
+
+  Future<void> saveAccountSessionToken(String value) =>
+      _secretStore.saveAccountSessionToken(value);
+
+  Future<void> clearAccountSessionToken() =>
+      _secretStore.clearAccountSessionToken();
+
+  Future<AccountSessionSummary?> loadAccountSessionSummary() =>
+      _secretStore.loadAccountSessionSummary();
+
+  Future<void> saveAccountSessionSummary(AccountSessionSummary value) =>
+      _secretStore.saveAccountSessionSummary(value);
+
+  Future<void> clearAccountSessionSummary() =>
+      _secretStore.clearAccountSessionSummary();
+
+  Future<AccountRemoteProfile?> loadAccountProfile() =>
+      _secretStore.loadAccountProfile();
+
+  Future<void> saveAccountProfile(AccountRemoteProfile value) =>
+      _secretStore.saveAccountProfile(value);
+
+  Future<void> clearAccountProfile() => _secretStore.clearAccountProfile();
+
+  Future<String?> loadAccountManagedSecret({required String target}) =>
+      _secretStore.loadAccountManagedSecret(target: target);
+
+  Future<void> saveAccountManagedSecret({
+    required String target,
+    required String value,
+  }) => _secretStore.saveAccountManagedSecret(target: target, value: value);
+
+  Future<void> clearAccountManagedSecret({required String target}) =>
+      _secretStore.clearAccountManagedSecret(target: target);
+
+  Future<void> clearAccountManagedSecrets() =>
+      _secretStore.clearAccountManagedSecrets();
+
   Future<LocalDeviceIdentity?> loadDeviceIdentity() {
     return _secretStore.loadDeviceIdentity();
   }
