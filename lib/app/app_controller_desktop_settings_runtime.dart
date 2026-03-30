@@ -482,6 +482,11 @@ extension AppControllerDesktopSettingsRuntime on AppController {
           return;
         }
       }
+      try {
+        await settingsControllerInternal.restoreAccountSession();
+      } catch (_) {
+        // Keep initialization resilient when remote account restore fails.
+      }
       restoreAssistantThreadsInternal(storedAssistantThreads);
       await restoreSharedSingleAgentLocalSkillsCacheInternal();
       if (disposedInternal) {

@@ -88,6 +88,11 @@ class SecretStore {
   static const String _ollamaCloudApiKeyKey = 'xworkmate.ollama.cloud.api_key';
   static const String _vaultTokenKey = 'xworkmate.vault.token';
   static const String _aiGatewayApiKeyKey = 'xworkmate.ai_gateway.api_key';
+  static const String _accountSessionTokenKey =
+      'xworkmate.account.session.token';
+  static const String _accountSessionSummaryKey =
+      'xworkmate.account.session.summary';
+  static const String _accountProfileKey = 'xworkmate.account.profile';
 
   final StoreLayoutResolver _layoutResolver;
   final SecureStorageClient? _secureStorageOverride;
@@ -212,6 +217,69 @@ class SecretStore {
 
   Future<void> clearAiGatewayApiKey() => _deleteSecure(_aiGatewayApiKeyKey);
 
+  Future<String?> loadAccountSessionToken() => _readSecure(_accountSessionTokenKey);
+
+  Future<void> saveAccountSessionToken(String value) =>
+      _writeSecure(_accountSessionTokenKey, value);
+
+  Future<void> clearAccountSessionToken() => _deleteSecure(_accountSessionTokenKey);
+
+  Future<AccountSessionSummary?> loadAccountSessionSummary() async {
+    final raw = await _readSecure(_accountSessionSummaryKey);
+    if ((raw ?? '').trim().isEmpty) {
+      return null;
+    }
+    try {
+      return AccountSessionSummary.fromJson(
+        (jsonDecode(raw!) as Map).cast<String, dynamic>(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveAccountSessionSummary(AccountSessionSummary value) =>
+      _writeSecure(_accountSessionSummaryKey, jsonEncode(value.toJson()));
+
+  Future<void> clearAccountSessionSummary() =>
+      _deleteSecure(_accountSessionSummaryKey);
+
+  Future<AccountRemoteProfile?> loadAccountProfile() async {
+    final raw = await _readSecure(_accountProfileKey);
+    if ((raw ?? '').trim().isEmpty) {
+      return null;
+    }
+    try {
+      return AccountRemoteProfile.fromJson(
+        (jsonDecode(raw!) as Map).cast<String, dynamic>(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveAccountProfile(AccountRemoteProfile value) =>
+      _writeSecure(_accountProfileKey, jsonEncode(value.toJson()));
+
+  Future<void> clearAccountProfile() => _deleteSecure(_accountProfileKey);
+
+  Future<String?> loadAccountManagedSecret({required String target}) =>
+      _readSecure(_accountManagedSecretKey(target));
+
+  Future<void> saveAccountManagedSecret({
+    required String target,
+    required String value,
+  }) => _writeSecure(_accountManagedSecretKey(target), value);
+
+  Future<void> clearAccountManagedSecret({required String target}) =>
+      _deleteSecure(_accountManagedSecretKey(target));
+
+  Future<void> clearAccountManagedSecrets() async {
+    for (final target in kAccountManagedSecretTargets) {
+      await clearAccountManagedSecret(target: target);
+    }
+  }
+
   Future<Map<String, String>> loadSecureRefs() async {
     await initialize();
     final secureRefs = <String, String>{};
@@ -256,6 +324,12 @@ class SecretStore {
     }
     if (aiGatewayApiKey case final value?) {
       secureRefs['ai_gateway_api_key'] = value;
+    }
+    for (final target in kAccountManagedSecretTargets) {
+      final managedValue = await loadAccountManagedSecret(target: target);
+      if (managedValue case final value?) {
+        secureRefs[target] = value;
+      }
     }
     return secureRefs;
   }
@@ -354,6 +428,9 @@ class SecretStore {
     3,
     4,
   ];
+
+  static String _accountManagedSecretKey(String target) =>
+      'xworkmate.account.managed.${target.trim()}';
 
   Future<String?> _readSecure(String key) async {
     await initialize();
