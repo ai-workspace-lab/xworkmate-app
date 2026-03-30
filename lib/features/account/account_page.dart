@@ -4,6 +4,7 @@ import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
+import '../../runtime/runtime_controllers.dart';
 import '../../runtime/runtime_models.dart';
 import '../../widgets/section_tabs.dart';
 import '../../widgets/surface_card.dart';
@@ -22,6 +23,8 @@ class _AccountPageState extends State<AccountPage> {
   AccountTab _tab = AccountTab.profile;
   late final TextEditingController _accountBaseUrlController;
   late final TextEditingController _accountUsernameController;
+  late final TextEditingController _accountPasswordController;
+  late final TextEditingController _accountMfaCodeController;
   late final TextEditingController _accountWorkspaceController;
   String _lastSavedAccountBaseUrl = '';
   String _lastSavedAccountUsername = '';
@@ -40,6 +43,8 @@ class _AccountPageState extends State<AccountPage> {
     _accountUsernameController = TextEditingController(
       text: _lastSavedAccountUsername,
     );
+    _accountPasswordController = TextEditingController();
+    _accountMfaCodeController = TextEditingController();
     _accountWorkspaceController = TextEditingController(
       text: _lastSavedAccountWorkspace,
     );
@@ -49,6 +54,8 @@ class _AccountPageState extends State<AccountPage> {
   void dispose() {
     _accountBaseUrlController.dispose();
     _accountUsernameController.dispose();
+    _accountPasswordController.dispose();
+    _accountMfaCodeController.dispose();
     _accountWorkspaceController.dispose();
     super.dispose();
   }
@@ -89,14 +96,65 @@ class _AccountPageState extends State<AccountPage> {
     _lastSavedAccountWorkspace = nextSettings.accountWorkspace;
   }
 
+  Future<void> _loginAccount(SettingsSnapshot settings) async {
+    await _saveProfile(settings);
+    await widget.controller.settingsController.loginAccount(
+      baseUrl: _accountBaseUrlController.text.trim(),
+      identifier: _accountUsernameController.text.trim(),
+      password: _accountPasswordController.text,
+    );
+  }
+
+  Future<void> _verifyAccountMfa() async {
+    await widget.controller.settingsController.verifyAccountMfa(
+      baseUrl: _accountBaseUrlController.text.trim(),
+      code: _accountMfaCodeController.text.trim(),
+    );
+  }
+
+  Future<void> _syncAccountManagedSecrets(SettingsSnapshot settings) async {
+    await _saveProfile(settings);
+    await widget.controller.settingsController.syncAccountManagedSecrets(
+      baseUrl: _accountBaseUrlController.text.trim(),
+    );
+  }
+
+  Future<void> _logoutAccount() async {
+    await widget.controller.settingsController.logoutAccount();
+    _accountPasswordController.clear();
+    _accountMfaCodeController.clear();
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
-    final settings = controller.settings;
-    _syncControllers(settings);
     return AnimatedBuilder(
-      animation: controller,
+      animation: Listenable.merge(<Listenable>[
+        controller,
+        controller.settingsController,
+      ]),
       builder: (context, _) {
+        final settings = controller.settings;
+        final settingsController = controller.settingsController;
+        _syncControllers(settings);
+        final accountSession = settingsController.accountSession;
+        final accountProfile = settingsController.accountProfile;
+        final accountBusy = settingsController.accountBusy;
+        final accountSignedIn = settingsController.accountSignedIn;
+        final accountMfaRequired = settingsController.accountMfaRequired;
+        final signedInLabel = accountSession?.email.trim().isNotEmpty == true
+            ? accountSession!.email.trim()
+            : accountSession?.name.trim().isNotEmpty == true
+            ? accountSession!.name.trim()
+            : appText('当前账号', 'Current account');
+        final sessionStatusText = accountSignedIn
+            ? appText('已登录：$signedInLabel', 'Signed in: $signedInLabel')
+            : accountMfaRequired
+            ? appText('等待双重验证', 'Waiting for MFA verification')
+            : appText('未登录', 'Signed out');
+        final syncStatusText = accountProfile == null
+            ? appText('idle · 尚未同步远程配置', 'idle · Remote config not synced yet')
+            : '${accountProfile.syncState} · ${accountProfile.syncMessage}';
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
           child: Column(
@@ -154,6 +212,18 @@ class _AccountPageState extends State<AccountPage> {
                               ),
                       ),
                       const SizedBox(height: 16),
+                      Text(
+                        sessionStatusText,
+                        key: const ValueKey('account-session-status'),
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        syncStatusText,
+                        key: const ValueKey('account-sync-status'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 16),
                       TextFormField(
                         key: const ValueKey('account-base-url-field'),
                         controller: _accountBaseUrlController,
@@ -170,6 +240,63 @@ class _AccountPageState extends State<AccountPage> {
                           labelText: appText('邮箱 / 用户名', 'Email / Username'),
                         ),
                         onFieldSubmitted: (_) => _saveProfile(settings),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        key: const ValueKey('account-password-field'),
+                        controller: _accountPasswordController,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: appText('密码', 'Password'),
+                        ),
+                        onFieldSubmitted: (_) => _loginAccount(settings),
+                      ),
+                      if (accountMfaRequired) ...[
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          key: const ValueKey('account-mfa-code-field'),
+                          controller: _accountMfaCodeController,
+                          decoration: InputDecoration(
+                            labelText: appText('双重验证代码', 'MFA Code'),
+                          ),
+                          onFieldSubmitted: (_) => _verifyAccountMfa(),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          FilledButton(
+                            key: const ValueKey('account-login-button'),
+                            onPressed: accountBusy
+                                ? null
+                                : () => _loginAccount(settings),
+                            child: Text(appText('登录', 'Log In')),
+                          ),
+                          if (accountMfaRequired)
+                            FilledButton.tonal(
+                              key: const ValueKey('account-verify-mfa-button'),
+                              onPressed: accountBusy ? null : _verifyAccountMfa,
+                              child: Text(appText('验证 MFA', 'Verify MFA')),
+                            ),
+                          if (accountSignedIn)
+                            FilledButton.tonal(
+                              key: const ValueKey('account-sync-button'),
+                              onPressed: accountBusy
+                                  ? null
+                                  : () => _syncAccountManagedSecrets(settings),
+                              child: Text(
+                                appText('同步远程配置', 'Sync Remote Config'),
+                              ),
+                            ),
+                          if (accountSignedIn)
+                            FilledButton.tonal(
+                              key: const ValueKey('account-logout-button'),
+                              onPressed: accountBusy ? null : _logoutAccount,
+                              child: Text(appText('退出登录', 'Log Out')),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       Align(

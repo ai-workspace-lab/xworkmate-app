@@ -51,7 +51,7 @@ import 'app_controller_desktop_runtime_helpers.dart';
 Future<String> loadAiGatewayApiKeyThreadSessionInternal(
   AppController controller,
 ) async {
-  return (await controller.storeInternal.loadAiGatewayApiKey())?.trim() ?? '';
+  return controller.settingsControllerInternal.loadEffectiveAiGatewayApiKey();
 }
 
 Future<void> saveMultiAgentConfigThreadSessionInternal(

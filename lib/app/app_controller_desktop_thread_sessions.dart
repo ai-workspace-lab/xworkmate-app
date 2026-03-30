@@ -128,7 +128,8 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final existing = assistantThreadRecordsInternal[normalizedSessionKey]
+    final existing =
+        assistantThreadRecordsInternal[normalizedSessionKey]
             ?.workspaceBinding
             .workspacePath
             .trim() ??
@@ -382,7 +383,7 @@ extension AppControllerDesktopThreadSessions on AppController {
       final fallbackReady = singleAgentUsesAiChatFallbackForSession(
         normalizedSessionKey,
       );
-      final host = aiGatewayHostLabelInternal(settings.aiGateway.baseUrl);
+      final host = aiGatewayHostLabelInternal(aiGatewayUrl);
       final providerReady = resolvedProvider != null;
       final detail = providerReady
           ? joinConnectionPartsInternal(<String>[resolvedProvider.label, model])

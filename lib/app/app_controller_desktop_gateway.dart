@@ -194,10 +194,20 @@ extension AppControllerDesktopGateway on AppController {
     String authTokenOverride = '',
     String authPasswordOverride = '',
   }) async {
+    final resolvedProfileIndex =
+        profileIndex ??
+        gatewayProfileIndexForExecutionTargetInternal(
+          assistantExecutionTargetForModeInternal(profile.mode),
+        );
+    final effectiveAuthTokenOverride = authTokenOverride.trim().isNotEmpty
+        ? authTokenOverride.trim()
+        : await settingsControllerInternal.loadEffectiveGatewayToken(
+            profileIndex: resolvedProfileIndex,
+          );
     await runtimeInternal.connectProfile(
       profile,
-      profileIndex: profileIndex,
-      authTokenOverride: authTokenOverride,
+      profileIndex: resolvedProfileIndex,
+      authTokenOverride: effectiveAuthTokenOverride,
       authPasswordOverride: authPasswordOverride,
     );
     await refreshGatewayHealth();

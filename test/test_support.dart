@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/ui_feature_manifest.dart';
+import 'package:xworkmate/runtime/account_runtime_client.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
@@ -46,6 +47,7 @@ Future<AppController> createTestController(
   WidgetTester tester, {
   DesktopPlatformService? desktopPlatformService,
   UiFeatureManifest? uiFeatureManifest,
+  AccountRuntimeClient Function(String baseUrl)? accountClientFactory,
   List<String>? singleAgentSharedSkillScanRootOverrides,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -59,6 +61,7 @@ Future<AppController> createTestController(
     ),
     desktopPlatformService: desktopPlatformService,
     uiFeatureManifest: uiFeatureManifest,
+    accountClientFactory: accountClientFactory,
     singleAgentSharedSkillScanRootOverrides:
         singleAgentSharedSkillScanRootOverrides,
   );

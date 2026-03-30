@@ -22,6 +22,7 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 import 'package:xworkmate/widgets/pane_resize_handle.dart';
 import '../test_support.dart';
+import '../runtime/app_controller_thread_skills_suite_fixtures.dart';
 import 'assistant_page_suite_core.dart';
 import 'assistant_page_suite_composer.dart';
 
@@ -173,6 +174,150 @@ Future<void> waitForConditionInternal(bool Function() predicate) async {
     }
     await Future<void>.delayed(const Duration(milliseconds: 20));
   }
+}
+
+class InstalledSkillE2ECaseInternal {
+  const InstalledSkillE2ECaseInternal({
+    required this.skillKey,
+    required this.skillLabel,
+    required this.prompt,
+    required this.outputRelativePath,
+  });
+
+  final String skillKey;
+  final String skillLabel;
+  final String prompt;
+  final String outputRelativePath;
+}
+
+const List<InstalledSkillE2ECaseInternal> installedSkillE2ECasesInternal =
+    <InstalledSkillE2ECaseInternal>[
+      InstalledSkillE2ECaseInternal(
+        skillKey: 'pptx',
+        skillLabel: 'pptx',
+        prompt: 'installed-skill harness: exercise pptx handoff',
+        outputRelativePath: 'artifacts/pptx/result.md',
+      ),
+      InstalledSkillE2ECaseInternal(
+        skillKey: 'docx',
+        skillLabel: 'docx',
+        prompt: 'installed-skill harness: exercise docx handoff',
+        outputRelativePath: 'artifacts/docx/result.md',
+      ),
+      InstalledSkillE2ECaseInternal(
+        skillKey: 'xlsx',
+        skillLabel: 'xlsx',
+        prompt: 'installed-skill harness: exercise xlsx handoff',
+        outputRelativePath: 'artifacts/xlsx/result.md',
+      ),
+      InstalledSkillE2ECaseInternal(
+        skillKey: 'pdf',
+        skillLabel: 'pdf',
+        prompt: 'installed-skill harness: exercise pdf handoff',
+        outputRelativePath: 'artifacts/pdf/result.md',
+      ),
+    ];
+
+const List<String> installedSkillE2EDeferredCoverageInternal = <String>[
+  'image-cog',
+  'wan-image-video-generation-editting',
+  'video-translator',
+  'image-resizer',
+];
+
+Future<void> seedInstalledSkillE2ERootInternal(Directory root) async {
+  for (final testCase in installedSkillE2ECasesInternal) {
+    await writeSkillInternal(
+      root,
+      testCase.skillKey,
+      skillName: testCase.skillLabel,
+      description: 'Installed skill ${testCase.skillLabel}',
+    );
+  }
+}
+
+class InstalledSkillE2EAppControllerInternal extends AppController {
+  InstalledSkillE2EAppControllerInternal({
+    required SecureConfigStore store,
+    required this.sendGate,
+    super.singleAgentSharedSkillScanRootOverrides,
+  }) : super(
+         store: store,
+         runtimeCoordinator: RuntimeCoordinator(
+           gateway: FakeGatewayRuntimeInternal(store: store),
+           codex: FakeCodexRuntimeInternal(),
+         ),
+       );
+
+  final Completer<void> sendGate;
+  int sendCallCount = 0;
+  String lastPromptInternal = '';
+  List<String> lastSelectedSkillLabelsInternal = <String>[];
+  String lastWorkspacePathInternal = '';
+
+  @override
+  Future<void> sendChatMessage(
+    String message, {
+    String thinking = 'off',
+    List<GatewayChatAttachmentPayload> attachments =
+        const <GatewayChatAttachmentPayload>[],
+    List<CollaborationAttachment> localAttachments =
+        const <CollaborationAttachment>[],
+    List<String> selectedSkillLabels = const <String>[],
+  }) async {
+    sendCallCount += 1;
+    lastPromptInternal = message;
+    lastSelectedSkillLabelsInternal = selectedSkillLabels.toList(
+      growable: false,
+    );
+    lastWorkspacePathInternal = assistantWorkspacePathForSession(
+      currentSessionKey,
+    );
+    if (lastWorkspacePathInternal.trim().isEmpty) {
+      throw StateError('Installed-skill harness did not resolve a workspace.');
+    }
+
+    final selectedLabel = selectedSkillLabels.isEmpty
+        ? 'unselected'
+        : selectedSkillLabels.first;
+    final artifactFile = File(
+      '$lastWorkspacePathInternal/artifacts/$selectedLabel/result.md',
+    );
+    await artifactFile.parent.create(recursive: true);
+    await artifactFile.writeAsString(
+      [
+        '# $selectedLabel',
+        '',
+        'prompt: $message',
+        'thinking: $thinking',
+        'selected: ${selectedSkillLabels.join(', ')}',
+        'session: $currentSessionKey',
+      ].join('\n'),
+    );
+
+    await sendGate.future;
+  }
+}
+
+Future<InstalledSkillE2EAppControllerInternal>
+createInstalledSkillE2EControllerInternal({
+  required Directory tempDirectory,
+  required Directory skillsRoot,
+}) async {
+  SharedPreferences.setMockInitialValues(<String, Object>{});
+  final controller = InstalledSkillE2EAppControllerInternal(
+    store: await createStoreInternal(tempDirectory.path),
+    sendGate: Completer<void>(),
+    singleAgentSharedSkillScanRootOverrides: <String>[skillsRoot.path],
+  );
+  addTearDown(controller.dispose);
+  await waitForConditionInternal(() => !controller.initializing);
+  await waitForConditionInternal(
+    () => controller
+        .assistantImportedSkillsForSession(controller.currentSessionKey)
+        .isNotEmpty,
+  );
+  return controller;
 }
 
 class PendingSendAppControllerInternal extends AppController {
