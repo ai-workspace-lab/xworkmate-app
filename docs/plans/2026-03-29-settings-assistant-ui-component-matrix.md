@@ -88,3 +88,132 @@ Desktop 与 Web 设置页当前已共用：
 
 - 文档和测试应只引用当前仍存在的 UI 文件
 - 不再记录已经删除的旧 Web Focus Panel 副本路径
+
+---
+
+## 第二阶段评估：Web 页面分层哪些还值得继续收口
+
+### A. `web_assistant_page_*`
+
+当前文件规模：
+
+- `lib/web/web_assistant_page_core.dart`：458 行
+- `lib/web/web_assistant_page_chrome.dart`：471 行
+- `lib/web/web_assistant_page_workspace.dart`：685 行
+- `lib/web/web_assistant_page_helpers.dart`：277 行
+
+#### 值得继续收口
+
+1. `lib/web/web_assistant_page_workspace.dart`
+
+- 这是当前最值得继续拆的文件。
+- 同时承载：
+  - 会话区主体
+  - composer 区
+  - session settings sheet
+  - empty state
+  - message bubble
+  - side tab button
+- 属于单文件内职责过多，但仍是纯 Web UI 视图层，适合继续按界面职责拆小。
+
+建议下一步拆分：
+
+- `web_assistant_page_messages.dart`
+- `web_assistant_page_composer.dart`
+- `web_assistant_page_session_sheet.dart`
+
+2. `lib/web/web_assistant_page_chrome.dart`
+
+- 值得做第二优先级收口。
+- 当前同时承载：
+  - 顶部 chrome
+  - connection chip
+  - 左侧任务 pane
+  - conversation group 列表
+- 这些部分都属于同一页面的 chrome 层，但已经接近“一个文件内多个子域”的边界。
+
+建议下一步拆分：
+
+- 保留 `web_assistant_page_chrome.dart` 作为组装入口
+- 把 task pane / conversation group 提成独立子文件
+
+#### 暂时不建议继续收口
+
+1. `lib/web/web_assistant_page_core.dart`
+
+- 虽然是状态 owner，但当前职责清晰：
+  - controller 绑定
+  - attachments
+  - prompt submit
+  - rename / action dialog
+  - artifact pane 宽度与可见性
+- 这部分是页面 orchestrator，不适合和 Desktop Assistant 强行合并。
+
+2. `lib/web/web_assistant_page_helpers.dart`
+
+- 文件规模适中，职责也比较稳定。
+- 主要是 UI 原子和小模型定义，目前没有明显继续拆分收益。
+
+#### 结论
+
+- `web_assistant_page_*` 值得继续收口，但方向应是“Web 页面内部再拆职责”，不是“强行向 Desktop Assistant 页面合并”。
+
+### B. `web_settings_page_*`
+
+当前文件规模：
+
+- `lib/web/web_settings_page_core.dart`：296 行
+- `lib/web/web_settings_page_sections.dart`：403 行
+- `lib/web/web_settings_page_gateway.dart`：813 行
+- `lib/web/web_settings_page_support.dart`：92 行
+
+#### 值得继续收口
+
+1. `lib/web/web_settings_page_gateway.dart`
+
+- 这是第二阶段里最值得继续动的文件。
+- 已经超过 800 行，而且同时承载：
+  - gateway overview
+  - direct / local / remote gateway card
+  - external ACP provider card
+  - top-level apply 行为
+  - wizard 逻辑
+- 这是典型的“业务闭包过大但仍可按职责拆分”的目标。
+
+建议下一步拆分：
+
+- `web_settings_page_gateway_cards.dart`
+- `web_settings_page_gateway_acp.dart`
+- `web_settings_page_gateway_actions.dart`
+
+2. `lib/web/web_settings_page_sections.dart`
+
+- 值得轻量收口，但不是最高优先级。
+- 现在已经共享了 shell 层，剩下的是 tab 内容组织和一些 overview 卡片。
+- 更适合在 `web_settings_page_gateway.dart` 拆完后再回头看哪些 section 能继续下沉到共享层。
+
+#### 暂时不建议继续收口
+
+1. `lib/web/web_settings_page_core.dart`
+
+- 这是 Web settings 的状态 owner。
+- 当前规模不大，controller 同步逻辑和页面 frame 都还在合理范围内。
+- 不建议为了“看起来统一”而和 Desktop `SettingsPage` 硬合。
+
+2. `lib/web/web_settings_page_support.dart`
+
+- 只有少量 support 工具和状态 chip。
+- 保持现状即可。
+
+#### 结论
+
+- `web_settings_page_*` 里真正值得继续收口的是 `web_settings_page_gateway.dart`。
+- `WebSettingsPage` 不值得直接向 `SettingsPage` 硬合；更合理的方向是继续抽共享 section/card 结构，而不是统一 controller。
+
+### 第二阶段建议执行顺序
+
+1. 先拆 `lib/web/web_settings_page_gateway.dart`
+2. 再拆 `lib/web/web_assistant_page_workspace.dart`
+3. 最后评估 `lib/web/web_assistant_page_chrome.dart` 和 `lib/web/web_settings_page_sections.dart`
+
+这样收益最高，也最不容易碰到跨平台状态耦合。
