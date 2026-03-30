@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
-import '../theme/app_theme.dart';
 import '../web/web_assistant_page.dart';
 import '../web/web_settings_page.dart';
 import '../web/web_workspace_pages.dart';
@@ -25,6 +24,7 @@ class _AppShellState extends State<AppShell> {
   static const _sidebarMinWidth = 56.0;
   static const _sidebarViewportPadding = 72.0;
   static const _mainContentMinWidth = 760.0;
+  static const _sidebarExpandedBaseWidth = 336.0;
 
   AppSidebarState _sidebarState = AppSidebarState.expanded;
   double? _sidebarExpandedWidth;
@@ -39,20 +39,32 @@ class _AppShellState extends State<AppShell> {
   }
 
   double _defaultSidebarWidth(AppLanguage language, double viewportWidth) {
-    final baseWidth = language == AppLanguage.zh
-        ? AppSizes.sidebarExpandedWidthZh
-        : AppSizes.sidebarExpandedWidthEn;
-    return _clampSidebarWidth(baseWidth, viewportWidth);
+    return _clampSidebarWidth(_sidebarExpandedBaseWidth, viewportWidth);
   }
 
-  void _cycleSidebarState() {
+  void _toggleSidebarVisibility() {
     setState(() {
-      _sidebarState = switch (_sidebarState) {
-        AppSidebarState.expanded => AppSidebarState.collapsed,
-        AppSidebarState.collapsed => AppSidebarState.hidden,
-        AppSidebarState.hidden => AppSidebarState.expanded,
-      };
+      _sidebarState = _sidebarState == AppSidebarState.hidden
+          ? AppSidebarState.expanded
+          : AppSidebarState.hidden;
     });
+  }
+
+  List<SidebarTaskItem> _buildSidebarTaskItems(AppController controller) {
+    return controller.conversations
+        .map(
+          (item) => SidebarTaskItem(
+            sessionKey: item.sessionKey,
+            title: item.title,
+            preview: item.preview,
+            updatedAtMs: item.updatedAtMs,
+            executionTarget: item.executionTarget,
+            isCurrent: item.current,
+            pending: item.pending,
+            draft: item.sessionKey.startsWith('draft:'),
+          ),
+        )
+        .toList(growable: false);
   }
 
   @override
@@ -86,6 +98,7 @@ class _AppShellState extends State<AppShell> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final isMobile = constraints.maxWidth < 900;
+                final sidebarTaskItems = _buildSidebarTaskItems(controller);
                 final expandedSidebarWidth = _clampSidebarWidth(
                   _sidebarExpandedWidth ??
                       _defaultSidebarWidth(
@@ -143,88 +156,127 @@ class _AppShellState extends State<AppShell> {
                   );
                 }
 
-                return Row(
+                return Stack(
                   children: [
-                    if (_sidebarState != AppSidebarState.hidden)
-                      SidebarNavigation(
-                        currentSection: currentDestination,
-                        sidebarState: _sidebarState,
-                        appLanguage: controller.appLanguage,
-                        themeMode: controller.themeMode,
-                        onSectionChanged: (destination) {
-                          if (destination == WorkspaceDestination.settings) {
-                            controller.openSettings(tab: SettingsTab.general);
-                            return;
-                          }
-                          controller.navigateTo(destination);
-                        },
-                        onToggleLanguage: controller.toggleAppLanguage,
-                        onCycleSidebarState: _cycleSidebarState,
-                        onExpandFromCollapsed: () {
-                          setState(() {
-                            _sidebarState = AppSidebarState.expanded;
-                          });
-                        },
-                        onOpenHome: controller.navigateHome,
-                        onOpenAccount: () {},
-                        onOpenThemeToggle: () => controller.setThemeMode(
-                          controller.themeMode == ThemeMode.dark
-                              ? ThemeMode.light
-                              : ThemeMode.dark,
+                    Row(
+                      children: [
+                        if (_sidebarState != AppSidebarState.hidden)
+                          SidebarNavigation(
+                            currentSection: currentDestination,
+                            sidebarState: _sidebarState,
+                            appLanguage: controller.appLanguage,
+                            themeMode: controller.themeMode,
+                            onSectionChanged: (destination) {
+                              if (destination ==
+                                  WorkspaceDestination.settings) {
+                                controller.openSettings(
+                                  tab: SettingsTab.general,
+                                );
+                                return;
+                              }
+                              controller.navigateTo(destination);
+                            },
+                            onToggleLanguage: controller.toggleAppLanguage,
+                            onCycleSidebarState: _toggleSidebarVisibility,
+                            onExpandFromCollapsed: _toggleSidebarVisibility,
+                            onOpenHome: controller.navigateHome,
+                            onOpenAccount: () {},
+                            onOpenThemeToggle: () => controller.setThemeMode(
+                              controller.themeMode == ThemeMode.dark
+                                  ? ThemeMode.light
+                                  : ThemeMode.dark,
+                            ),
+                            accountName:
+                                controller.settings.accountUsername
+                                    .trim()
+                                    .isNotEmpty
+                                ? controller.settings.accountUsername
+                                : appText('Web 操作员', 'Web operator'),
+                            accountSubtitle:
+                                controller.settings.accountWorkspace
+                                    .trim()
+                                    .isNotEmpty
+                                ? controller.settings.accountWorkspace
+                                : appText('Web 工作区', 'Web workspace'),
+                            accountWorkspaceFollowed:
+                                controller.settings.accountWorkspaceFollowed,
+                            onToggleAccountWorkspaceFollowed:
+                                controller.toggleAccountWorkspaceFollowed,
+                            expandedWidthOverride:
+                                _sidebarState == AppSidebarState.expanded
+                                ? expandedSidebarWidth
+                                : null,
+                            favoriteDestinations: controller
+                                .assistantNavigationDestinations
+                                .toSet(),
+                            onToggleFavorite:
+                                controller.toggleAssistantNavigationDestination,
+                            availableDestinations:
+                                controller.capabilities.allowedDestinations,
+                            currentSettingsTab: controller.settingsTab,
+                            availableSettingsTabs:
+                                uiFeatures.availableSettingsTabs,
+                            onSettingsTabChanged: (tab) =>
+                                controller.openSettings(tab: tab),
+                            taskItems: sidebarTaskItems,
+                            assistantSkillCount:
+                                controller.currentAssistantSkillCount,
+                            onRefreshTasks: controller.refreshSessions,
+                            onCreateTask: () async {
+                              await controller.createConversation(
+                                target: controller.assistantExecutionTarget,
+                              );
+                              controller.navigateTo(
+                                WorkspaceDestination.assistant,
+                              );
+                            },
+                            onSelectTask: (sessionKey) async {
+                              controller.navigateTo(
+                                WorkspaceDestination.assistant,
+                              );
+                              await controller.switchConversation(sessionKey);
+                            },
+                            onArchiveTask: (sessionKey) =>
+                                controller.saveAssistantTaskArchived(
+                                  sessionKey,
+                                  true,
+                                ),
+                            onRenameTask: (sessionKey, title) =>
+                                controller.saveAssistantTaskTitle(
+                                  sessionKey,
+                                  title,
+                                ),
+                          ),
+                        if (_sidebarState == AppSidebarState.expanded)
+                          PaneResizeHandle(
+                            axis: Axis.horizontal,
+                            onDelta: (delta) {
+                              setState(() {
+                                _sidebarExpandedWidth = _clampSidebarWidth(
+                                  expandedSidebarWidth + delta,
+                                  constraints.maxWidth,
+                                );
+                              });
+                            },
+                          ),
+                        Expanded(
+                          child: _WebShellBody(
+                            child: _buildPage(
+                              controller,
+                              destination: currentDestination,
+                            ),
+                          ),
                         ),
-                        accountName:
-                            controller.settings.accountUsername
-                                .trim()
-                                .isNotEmpty
-                            ? controller.settings.accountUsername
-                            : appText('Web 操作员', 'Web operator'),
-                        accountSubtitle:
-                            controller.settings.accountWorkspace
-                                .trim()
-                                .isNotEmpty
-                            ? controller.settings.accountWorkspace
-                            : appText('Web 工作区', 'Web workspace'),
-                        accountWorkspaceFollowed:
-                            controller.settings.accountWorkspaceFollowed,
-                        onToggleAccountWorkspaceFollowed:
-                            controller.toggleAccountWorkspaceFollowed,
-                        expandedWidthOverride:
-                            _sidebarState == AppSidebarState.expanded
-                            ? expandedSidebarWidth
-                            : null,
-                        favoriteDestinations: controller
-                            .assistantNavigationDestinations
-                            .toSet(),
-                        onToggleFavorite:
-                            controller.toggleAssistantNavigationDestination,
-                        availableDestinations:
-                            controller.capabilities.allowedDestinations,
-                        currentSettingsTab: controller.settingsTab,
-                        availableSettingsTabs:
-                            uiFeatures.availableSettingsTabs,
-                        onSettingsTabChanged: (tab) =>
-                            controller.openSettings(tab: tab),
-                      ),
-                    if (_sidebarState == AppSidebarState.expanded)
-                      PaneResizeHandle(
-                        axis: Axis.horizontal,
-                        onDelta: (delta) {
-                          setState(() {
-                            _sidebarExpandedWidth = _clampSidebarWidth(
-                              expandedSidebarWidth + delta,
-                              constraints.maxWidth,
-                            );
-                          });
-                        },
-                      ),
-                    Expanded(
-                      child: _WebShellBody(
-                        child: _buildPage(
-                          controller,
-                          destination: currentDestination,
-                        ),
-                      ),
+                      ],
                     ),
+                    if (_sidebarState == AppSidebarState.hidden)
+                      Positioned(
+                        left: 8,
+                        bottom: 8,
+                        child: _SidebarRevealRail(
+                          onExpand: _toggleSidebarVisibility,
+                        ),
+                      ),
                   ],
                 );
               },
@@ -253,6 +305,49 @@ class _AppShellState extends State<AppShell> {
       ),
       _ => WebAssistantPage(controller: controller),
     };
+  }
+}
+
+class _SidebarRevealRail extends StatefulWidget {
+  const _SidebarRevealRail({required this.onExpand});
+
+  final VoidCallback onExpand;
+
+  @override
+  State<_SidebarRevealRail> createState() => _SidebarRevealRailState();
+}
+
+class _SidebarRevealRailState extends State<_SidebarRevealRail> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Tooltip(
+        message: appText('展开左栏', 'Expand sidebar'),
+        child: GestureDetector(
+          onTap: widget.onExpand,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: _hovered ? 40 : 32,
+            height: _hovered ? 40 : 32,
+            decoration: BoxDecoration(
+              color: _hovered ? palette.surfacePrimary : palette.chromeSurface,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: palette.strokeSoft),
+            ),
+            child: Icon(
+              Icons.keyboard_double_arrow_right_rounded,
+              size: 18,
+              color: palette.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
