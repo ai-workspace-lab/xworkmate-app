@@ -13,7 +13,7 @@
 
 ---
 
-## 在用的组件
+## 保留中的在用组件
 
 | 名称 | 路径 | Desktop | Web | Mobile |
 | --- | --- | --- | --- | --- |
@@ -44,18 +44,22 @@
 | Skill Directory Authorization Card | `lib/features/settings/skill_directory_authorization_card.dart` | Yes | No | Yes |
 | Settings Shell wrapper | `lib/widgets/settings_page_shell.dart` | Yes | Yes | Yes |
 
+## 已清理 / 已收口的 UI 组件
+
+| 名称 | 路径 | 状态 | 说明 |
+| --- | --- | --- | --- |
+| Web Focus Panel 副本 | `lib/web/web_focus_panel.dart`、`lib/web/web_focus_panel_core.dart` | 已删除 | 共享版 `AssistantFocusPanel` 已接管，不再保留 Web 侧重复实现。 |
+| Web Focus Panel previews/support | `lib/web/web_focus_panel_previews.dart`、`lib/web/web_focus_panel_support.dart` | 已删除 | 已并入共享 Focus Panel 体系，不再保留旧副本。 |
+| iOS 兼容壳 | `lib/features/mobile/ios_mobile_shell.dart` | 已删除 | 旧兼容壳只做转发，现已收口为 `MobileShell` 唯一正式入口。 |
+
 ---
 
-## 可以删除的 UI 组件
+## 后续候选组件
 
-| 名称 | 路径 | 原因 |
-| --- | --- | --- |
-| 旧 Web Assistant 页面分层 | `lib/web/web_assistant_page_*` 中重复的局部壳层 | 只有在 Web Assistant 进一步向共享页面收口时才继续删。 |
-| 旧设置页 Web 分层 | `lib/web/web_settings_page_*` 中重复的局部壳层 | 只有在 Web 设置页完全收口到共享 `SettingsPage` 后才建议删。 |
-
-说明：
-
-- 旧 Web Focus Panel 副本已经删除，不再列入候选池。
+| 名称 | 路径 | 当前状态 | 后续条件 |
+| --- | --- | --- | --- |
+| 旧 Web Assistant 页面分层 | `lib/web/web_assistant_page_*` 中重复的局部壳层 | 保留中 | 只有在 Web Assistant 进一步向共享页面收口时才继续删。 |
+| 旧设置页 Web 分层 | `lib/web/web_settings_page_*` 中重复的局部壳层 | 保留中 | 只有在 Web 设置页完全收口到共享 `SettingsPage` 后才建议删。 |
 
 ---
 
