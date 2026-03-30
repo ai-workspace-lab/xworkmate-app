@@ -162,7 +162,7 @@ class _BreadcrumbChip extends StatelessWidget {
 
     return InkWell(
       onTap: item.onTap,
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(AppRadius.chip),
       child: body,
     );
   }

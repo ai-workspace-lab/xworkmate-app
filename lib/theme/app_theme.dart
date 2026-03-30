@@ -21,12 +21,12 @@ class SimpleSpacing {
 class SimpleRadius {
   SimpleRadius._();
 
-  static const double card = 18.0;
+  static const double card = 16.0;
   static const double button = 12.0;
-  static const double input = 20.0;
-  static const double chip = 999.0;
-  static const double badge = 999.0;
-  static const double dialog = 20.0;
+  static const double input = 14.0;
+  static const double chip = 12.0;
+  static const double badge = 12.0;
+  static const double dialog = 18.0;
   static const double sidebar = 20.0;
   static const double icon = 12.0;
 }
@@ -35,28 +35,28 @@ class SimpleTypography {
   SimpleTypography._();
 
   static const double displaySize = 28.0;
-  static const FontWeight displayWeight = FontWeight.w600;
+  static const FontWeight displayWeight = FontWeight.w700;
   static const double displayHeight = 32 / 28;
 
   static const double titleSize = 20.0;
   static const FontWeight titleWeight = FontWeight.w600;
   static const double titleHeight = 24 / 20;
 
-  static const double sectionSize = 15.0;
+  static const double sectionSize = 13.0;
   static const FontWeight sectionWeight = FontWeight.w600;
-  static const double sectionHeight = 20 / 15;
+  static const double sectionHeight = 14 / 13;
 
-  static const double bodySize = 15.0;
+  static const double bodySize = 13.0;
   static const FontWeight bodyWeight = FontWeight.w400;
-  static const double bodyHeight = 24 / 15;
+  static const double bodyHeight = 15 / 13;
 
-  static const double compactBodySize = 14.0;
+  static const double compactBodySize = 13.0;
   static const FontWeight compactBodyWeight = FontWeight.w400;
-  static const double compactBodyHeight = 22 / 14;
+  static const double compactBodyHeight = 15 / 13;
 
   static const double emphasizedBodySize = 13.0;
   static const FontWeight emphasizedBodyWeight = FontWeight.w600;
-  static const double emphasizedBodyHeight = 18 / 13;
+  static const double emphasizedBodyHeight = 14 / 13;
 
   static const double captionSize = 12.0;
   static const FontWeight captionWeight = FontWeight.w400;
@@ -66,7 +66,7 @@ class SimpleTypography {
 class SimpleSizes {
   SimpleSizes._();
 
-  static const double sidebarItemHeight = 34.0;
+  static const double sidebarItemHeight = 32.0;
   static const double sidebarIconSize = 18.0;
   static const double sidebarTextSize = 13.0;
   static const double sidebarExpandedWidthZh = 152.0;
@@ -78,7 +78,7 @@ class SimpleSizes {
   static const double toolbarHeight = 40.0;
 
   static const double inputHeight = 40.0;
-  static const double buttonHeightDesktop = 34.0;
+  static const double buttonHeightDesktop = 30.0;
   static const double buttonHeightMobile = 36.0;
 }
 
