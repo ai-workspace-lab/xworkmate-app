@@ -464,7 +464,6 @@ class _SidebarRevealRailState extends State<_SidebarRevealRail> {
             decoration: BoxDecoration(
               color: _hovered ? palette.surfacePrimary : palette.chromeSurface,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: palette.strokeSoft),
             ),
             child: Icon(
               Icons.keyboard_double_arrow_right_rounded,
