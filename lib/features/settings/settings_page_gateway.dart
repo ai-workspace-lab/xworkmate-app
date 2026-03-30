@@ -118,6 +118,7 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
             )
           else
             SurfaceCard(
+              borderWidth: settingsHairlineBorderWidthInternal,
               child: Text(
                 appText(
                   '当前发布配置未开放 Vault Server 参数。',
@@ -195,6 +196,7 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
         )
       else
         SurfaceCard(
+          borderWidth: settingsHairlineBorderWidthInternal,
           child: Text(
             appText(
               '当前发布配置未开放 Vault Server 参数。',
@@ -650,6 +652,7 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
   }) {
     final theme = Theme.of(context);
     return SurfaceCard(
+      borderWidth: settingsHairlineBorderWidthInternal,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

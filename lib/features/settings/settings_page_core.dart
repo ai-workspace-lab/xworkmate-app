@@ -12,6 +12,8 @@ import '../../models/app_models.dart';
 import '../../runtime/gateway_runtime.dart';
 import '../../runtime/runtime_controllers.dart';
 import '../../runtime/runtime_models.dart';
+import '../../theme/app_palette.dart';
+import '../../theme/app_theme.dart';
 import 'codex_integration_card.dart';
 import 'skill_directory_authorization_card.dart';
 import '../../widgets/settings_page_shell.dart';
@@ -207,6 +209,8 @@ class SettingsPageStateInternal extends State<SettingsPage> {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
+        final theme = Theme.of(context);
+        final palette = context.palette;
         final featurePlatform = resolveUiFeaturePlatformFromContext(context);
         final uiFeatures = controller.featuresFor(featurePlatform);
         tabInternal = uiFeatures.sanitizeSettingsTab(controller.settingsTab);
@@ -220,53 +224,80 @@ class SettingsPageStateInternal extends State<SettingsPage> {
             (tabInternal != SettingsTab.gateway ||
                 integrationSubTabInternal ==
                     GatewayIntegrationSubTabInternal.acp);
-        return SettingsPageBodyShell(
-          padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
-          breadcrumbs: buildSettingsBreadcrumbs(
-            controller,
-            tab: tabInternal,
-            detail: detailInternal,
-            navigationContext: navigationContextInternal,
-          ),
-          title: appText('设置', 'Settings'),
-          subtitle: showingDetail
-              ? appText(
-                  '当前正在编辑详细设置参数，保存后会回写到对应状态页。',
-                  'You are editing detailed settings. Saved values flow back to the related status page.',
-                )
-              : appText(
-                  '配置 $kProductBrandName 工作区、网关默认项、界面与诊断选项',
-                  'Configure workspace, gateway defaults, appearance, and diagnostics for $kProductBrandName.',
+        return Theme(
+          data: theme.copyWith(
+            inputDecorationTheme: theme.inputDecorationTheme.copyWith(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.input),
+                borderSide: BorderSide(
+                  color: palette.strokeSoft,
+                  width: settingsHairlineBorderWidthInternal,
                 ),
-          trailing: SizedBox(
-            width: showingDetail ? 168 : 220,
-            child: showingDetail
-                ? OutlinedButton.icon(
-                    onPressed: () {
-                      controller.closeSettingsDetail();
-                      setState(() {
-                        detailInternal = null;
-                        navigationContextInternal = null;
-                      });
-                    },
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    label: Text(appText('返回概览', 'Back to overview')),
-                  )
-                : TextField(
-                    decoration: InputDecoration(
-                      hintText: appText('搜索设置', 'Search settings'),
-                      prefixIcon: Icon(Icons.search_rounded),
-                    ),
-                  ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.input),
+                borderSide: BorderSide(
+                  color: palette.strokeSoft,
+                  width: settingsHairlineBorderWidthInternal,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.input),
+                borderSide: BorderSide(
+                  color: palette.accent.withValues(alpha: 0.32),
+                  width: settingsHairlineBorderWidthInternal,
+                ),
+              ),
+            ),
           ),
-          globalApplyBar: showGlobalApplyBar
-              ? buildGlobalApplyBarInternal(context, controller)
-              : null,
-          bodyChildren: buildContentForCurrentStateInternal(
-            context,
-            controller,
-            settings,
-            uiFeatures,
+          child: SettingsPageBodyShell(
+            padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
+            breadcrumbs: buildSettingsBreadcrumbs(
+              controller,
+              tab: tabInternal,
+              detail: detailInternal,
+              navigationContext: navigationContextInternal,
+            ),
+            title: appText('设置', 'Settings'),
+            subtitle: showingDetail
+                ? appText(
+                    '当前正在编辑详细设置参数，保存后会回写到对应状态页。',
+                    'You are editing detailed settings. Saved values flow back to the related status page.',
+                  )
+                : appText(
+                    '配置 $kProductBrandName 工作区、网关默认项、界面与诊断选项',
+                    'Configure workspace, gateway defaults, appearance, and diagnostics for $kProductBrandName.',
+                  ),
+            trailing: SizedBox(
+              width: showingDetail ? 168 : 220,
+              child: showingDetail
+                  ? OutlinedButton.icon(
+                      onPressed: () {
+                        controller.closeSettingsDetail();
+                        setState(() {
+                          detailInternal = null;
+                          navigationContextInternal = null;
+                        });
+                      },
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      label: Text(appText('返回概览', 'Back to overview')),
+                    )
+                  : TextField(
+                      decoration: InputDecoration(
+                        hintText: appText('搜索设置', 'Search settings'),
+                        prefixIcon: Icon(Icons.search_rounded),
+                      ),
+                    ),
+            ),
+            globalApplyBar: showGlobalApplyBar
+                ? buildGlobalApplyBarInternal(context, controller)
+                : null,
+            bodyChildren: buildContentForCurrentStateInternal(
+              context,
+              controller,
+              settings,
+              uiFeatures,
+            ),
           ),
         );
       },

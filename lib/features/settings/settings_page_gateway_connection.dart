@@ -35,6 +35,7 @@ extension SettingsPageGatewayConnectionMixinInternal
     SettingsSnapshot settings,
   ) {
     return SurfaceCard(
+      borderWidth: settingsHairlineBorderWidthInternal,
       child: buildOpenClawGatewayCardBodyInternal(
         context,
         controller,
@@ -352,6 +353,7 @@ extension SettingsPageGatewayConnectionMixinInternal
     SettingsSnapshot settings,
   ) {
     return SurfaceCard(
+      borderWidth: settingsHairlineBorderWidthInternal,
       child: buildVaultProviderCardBodyInternal(context, controller, settings),
     );
   }
