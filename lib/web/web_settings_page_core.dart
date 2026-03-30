@@ -10,7 +10,6 @@ import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
 import '../widgets/desktop_workspace_scaffold.dart';
-import '../widgets/section_tabs.dart';
 import '../widgets/surface_card.dart';
 import '../widgets/top_bar.dart';
 import 'web_settings_page_sections.dart';
@@ -243,12 +242,10 @@ class WebSettingsPageStateInternal extends State<WebSettingsPage> {
       animation: controller,
       builder: (context, _) {
         final uiFeatures = controller.featuresFor(UiFeaturePlatform.web);
-        final availableTabs = uiFeatures.availableSettingsTabs;
         final currentTab = uiFeatures.sanitizeSettingsTab(
           controller.settingsTab,
         );
         final showGlobalApplyBar =
-            !widget.showSectionTabs ||
             currentTab != SettingsTab.gateway ||
             gatewaySubTabInternal == WebGatewaySettingsSubTabInternal.acp;
         return DesktopWorkspaceScaffold(
@@ -291,33 +288,12 @@ class WebSettingsPageStateInternal extends State<WebSettingsPage> {
                   buildGlobalApplyBarInternal(context, controller),
                   const SizedBox(height: 16),
                 ],
-                if (widget.showSectionTabs) ...[
-                  SectionTabs(
-                    items: availableTabs.map((item) => item.label).toList(),
-                    value: currentTab.label,
-                    onChanged: (label) {
-                      final tab = availableTabs.firstWhere(
-                        (item) => item.label == label,
-                      );
-                      controller.setSettingsTab(tab);
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                ],
-                ...(widget.showSectionTabs
-                    ? buildTabContentInternal(
-                        context,
-                        controller,
-                        controller.settingsDraft,
-                        currentTab,
-                      )
-                    : buildOverviewContentInternal(
-                        context,
-                        controller,
-                        controller.settingsDraft,
-                        availableTabs,
-                        currentTab,
-                      )),
+                ...buildTabContentInternal(
+                  context,
+                  controller,
+                  controller.settingsDraft,
+                  currentTab,
+                ),
               ],
             ),
           ),

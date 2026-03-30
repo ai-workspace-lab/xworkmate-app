@@ -1,7 +1,7 @@
 // ignore_for_file: unused_import, unnecessary_import
 
 import 'package:flutter/material.dart';
-import '../app/app_controller.dart';
+import '../app/app_controller.dart' as app;
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
@@ -12,10 +12,16 @@ import 'surface_card.dart';
 import 'assistant_focus_panel_previews.dart';
 import 'assistant_focus_panel_support.dart';
 
+typedef AssistantFocusControllerInternal = Object;
+
+app.AppController castAssistantFocusControllerInternal(
+  AssistantFocusControllerInternal controller,
+) => controller as app.AppController;
+
 class AssistantFocusPanel extends StatefulWidget {
   const AssistantFocusPanel({super.key, required this.controller});
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
 
   @override
   State<AssistantFocusPanel> createState() =>
@@ -31,7 +37,7 @@ class AssistantFocusDestinationCard extends StatelessWidget {
     required this.onRemoveFavorite,
   });
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
   final AssistantFocusEntry destination;
   final VoidCallback onOpenPage;
   final Future<void> Function() onRemoveFavorite;
@@ -50,11 +56,12 @@ class AssistantFocusDestinationCard extends StatelessWidget {
 class AssistantFocusPanelStateInternal extends State<AssistantFocusPanel> {
   @override
   Widget build(BuildContext context) {
+    final controller = castAssistantFocusControllerInternal(widget.controller);
     final theme = Theme.of(context);
     final palette = context.palette;
-    final favorites = widget.controller.assistantNavigationDestinations;
+    final favorites = controller.assistantNavigationDestinations;
     final available = kAssistantNavigationDestinationCandidates
-        .where(widget.controller.supportsAssistantFocusEntry)
+        .where(controller.supportsAssistantFocusEntry)
         .where((item) => !favorites.contains(item))
         .toList(growable: false);
 
@@ -157,9 +164,9 @@ class AssistantFocusPanelStateInternal extends State<AssistantFocusPanel> {
                     itemBuilder: (context, index) {
                       final destination = favorites[index];
                       return AssistantFocusDestinationCard(
-                        controller: widget.controller,
+                        controller: controller,
                         destination: destination,
-                        onOpenPage: () => widget.controller.navigateTo(
+                        onOpenPage: () => controller.navigateTo(
                           destination.destination ??
                               WorkspaceDestination.settings,
                         ),
@@ -175,14 +182,16 @@ class AssistantFocusPanelStateInternal extends State<AssistantFocusPanel> {
   }
 
   Future<void> addFavoriteInternal(AssistantFocusEntry destination) async {
-    await widget.controller.toggleAssistantNavigationDestination(destination);
+    final controller = castAssistantFocusControllerInternal(widget.controller);
+    await controller.toggleAssistantNavigationDestination(destination);
     if (mounted) {
       setState(() {});
     }
   }
 
   Future<void> removeFavoriteInternal(AssistantFocusEntry destination) async {
-    await widget.controller.toggleAssistantNavigationDestination(destination);
+    final controller = castAssistantFocusControllerInternal(widget.controller);
+    await controller.toggleAssistantNavigationDestination(destination);
     if (mounted) {
       setState(() {});
     }
@@ -198,7 +207,7 @@ class AssistantFocusWorkbenchInternal extends StatelessWidget {
     required this.onRemoveFavorite,
   });
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
   final AssistantFocusEntry destination;
   final VoidCallback onOpenPage;
   final Future<void> Function() onRemoveFavorite;
@@ -303,7 +312,7 @@ class AssistantFocusPreviewInternal extends StatelessWidget {
     required this.destination,
   });
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
   final AssistantFocusEntry destination;
 
   @override

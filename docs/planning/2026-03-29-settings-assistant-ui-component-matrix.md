@@ -328,3 +328,167 @@ Mobile 当前不是截图 A / B 的直接缩放版，而是“能力对应、布
 3. `cross-platform-ui-parity.md`
    专门记录 Desktop / Web / Mobile 的同构与差异
 
+---
+
+## 可合并 / 可清理分析
+
+在保持三栏布局骨架不变的前提下，当前最值得处理的不是页面骨架，而是页面骨架内部已经重复的“焦点卡片层”和“预览内容层”。
+
+### A. 第一优先级：可直接合并复用
+
+#### 1. Focus Panel Core
+
+- Desktop: `lib/widgets/assistant_focus_panel_core.dart`
+- Web: `lib/web/web_focus_panel_core.dart`
+
+这两份文件当前为同构重复实现。
+
+判断依据：
+
+- 文件长度完全一致，均为 `347` 行
+- 代码 diff 主要只剩：
+  - `app_controller.dart` vs `app_controller_web.dart`
+  - 相对 import 路径差异
+  - widget 命名前缀 `Assistant*` vs `WebAssistant*`
+
+合并建议：
+
+- 保留 `lib/widgets/assistant_focus_panel*.dart` 作为唯一实现
+- Web 端直接复用共享 widget
+- 删除 Web 侧同构副本，或先退化为兼容导出薄壳
+
+#### 2. Focus Panel Previews
+
+- Desktop: `lib/widgets/assistant_focus_panel_previews.dart`
+- Web: `lib/web/web_focus_panel_previews.dart`
+
+这两份文件当前也为同构重复实现。
+
+判断依据：
+
+- 文件长度完全一致，均为 `636` 行
+- diff 也只剩 controller import 和路径差异
+- `SettingsFocusPreviewInternal`、`LanguageFocusPreviewInternal`、`ThemeFocusPreviewInternal` 等实现一致
+
+合并建议：
+
+- 收敛到 `lib/widgets/assistant_focus_panel_previews.dart`
+- Web Assistant 通过共享导出的 `AssistantFocusPanel` 直接复用
+
+#### 3. Focus Panel Support
+
+- Desktop: `lib/widgets/assistant_focus_panel_support.dart`
+- Web: `lib/web/web_focus_panel_support.dart`
+
+这两份 support 文件同样是同构副本，可和 core / previews 一起收口。
+
+### B. 第二优先级：可抽公共层，但不建议整页硬合并
+
+#### 1. Settings Page Core
+
+- Desktop: `lib/features/settings/settings_page_core.dart`
+- Web: `lib/web/web_settings_page_core.dart`
+
+不建议直接合成一个页面类。
+
+原因：
+
+- Desktop settings 还承载 `SettingsDetailPage` drill-down、`initialDetail`、`navigationContext`
+- Web settings 重点维护浏览器会话持久化、Local/Remote Gateway、External ACP
+- 二者状态模型明显不对称
+
+建议做法：
+
+- 抽共享壳层和 section 编排逻辑
+- 保留 Desktop / Web 两个 page container
+
+#### 2. Settings Page Sections
+
+- Desktop: `lib/features/settings/settings_page_sections.dart`
+- Web: `lib/web/web_settings_page_sections.dart`
+
+这里适合抽：
+
+- `buildGlobalApplyBarInternal`
+- overview tab 排布
+- section 级 SurfaceCard 组织方式
+
+但不适合一步到位强合并所有业务 section。
+
+### C. 可标记清理
+
+#### 1. Web Focus Panel 重复文件
+
+以下文件可以标记为第一批清理对象：
+
+- `lib/web/web_focus_panel_core.dart`
+- `lib/web/web_focus_panel_previews.dart`
+- `lib/web/web_focus_panel_support.dart`
+
+清理前提：
+
+- Web Assistant 全部切回共享 `lib/widgets/assistant_focus_panel.dart`
+- 相关测试与 import 路径同步调整
+
+#### 2. 已废弃 iOS 壳别名
+
+- `lib/features/mobile/ios_mobile_shell.dart`
+
+该文件已标注：
+
+- `@Deprecated('Use MobileShell instead.')`
+
+功能上只是直接转发到 `MobileShell`，可以标记为后续兼容清理对象。
+
+#### 3. 不在这两张图主链路中的 settings detail 旁路
+
+以下内容不属于截图 B 的 overview 主链路，建议后续拆出：
+
+- `buildDetailContentInternal`
+- `buildDetailIntroInternal`
+- `SettingsDetailPage.*`
+
+对应文件：
+
+- `lib/features/settings/settings_page_sections.dart`
+
+这些应独立成 detail flow 文件，而不是继续和 overview 同居在一个大文件里。
+
+#### 4. settings 目录中的大面积冗余 import
+
+当前以下文件头部都带有较重的 `unused_import` / 互相引用信号：
+
+- `lib/features/settings/settings_page_core.dart`
+- `lib/features/settings/settings_page_sections.dart`
+- `lib/features/settings/settings_page_widgets.dart`
+- `lib/features/settings/settings_page_gateway_connection.dart`
+- `lib/features/settings/settings_page_gateway_llm.dart`
+- `lib/features/settings/settings_page_multi_agent.dart`
+- `lib/features/settings/settings_page_presentation.dart`
+- `lib/features/settings/settings_page_device.dart`
+
+这些不是“立即删除”对象，但可以明确标记为依赖清理范围。
+
+### D. 本轮推荐执行顺序
+
+在不动三栏布局骨架前提下，推荐按这个顺序执行：
+
+1. 合并 Desktop / Web 的 Focus Panel Core / Previews / Support
+2. 抽 Settings 页的共享 section 壳层
+3. 拆 Settings detail flow，避免与 overview 混杂
+4. 清理 deprecated mobile 壳与 settings 冗余 imports
+
+### E. 当前基线测试记录
+
+本轮开始前的最小基线如下：
+
+- `flutter test test/widgets/assistant_focus_panel_suite.dart`
+  - 结果：通过
+- `flutter test --platform chrome test/web/web_ui_browser_test.dart`
+  - 结果：失败
+  - 当前已知失败点：测试找不到 “集成” tab
+
+因此后续重构验证需要区分：
+
+- 共享 Focus Panel 的 widget 层回归
+- Web 端已有基线失败，不能误判为本轮新引入问题

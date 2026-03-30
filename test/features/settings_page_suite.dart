@@ -232,7 +232,7 @@ void main() {
     },
   );
 
-  testWidgets('SettingsPage can render as a unified page without internal tabs', (
+  testWidgets('SettingsPage renders only the active section without internal tabs', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
@@ -248,12 +248,12 @@ void main() {
 
     expect(find.byType(SectionTabs), findsNothing);
     expect(find.text('Application'), findsOneWidget);
-    expect(find.text('工作区'), findsWidgets);
-    expect(find.text('OpenClaw Gateway'), findsWidgets);
-    expect(find.text('LLM 接入点'), findsWidgets);
+    expect(find.text('OpenClaw Gateway'), findsNothing);
+    expect(find.text('LLM 接入点'), findsNothing);
+    expect(find.text('工作区路径'), findsNothing);
     expect(
       find.byKey(const ValueKey('external-acp-provider-add-button')),
-      findsOneWidget,
+      findsNothing,
     );
   });
 
@@ -343,12 +343,12 @@ void main() {
     );
     expect(find.byKey(const ValueKey('ai-gateway-url-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('gateway-mode-field')), findsNothing);
-    expect(find.text('认证诊断'), findsOneWidget);
+    expect(find.text('认证诊断'), findsNothing);
     expect(
       find.byKey(const ValueKey('external-acp-provider-add-button')),
       findsOneWidget,
     );
-    expect(find.text('保存并生效'), findsWidgets);
+    expect(find.byKey(const ValueKey('settings-global-apply-button')), findsNothing);
   });
 
   testWidgets('SettingsPage vault card exposes concrete K/V fields', (
@@ -402,9 +402,8 @@ void main() {
     );
     expect(
       find.byKey(const ValueKey('settings-global-apply-button')),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.text('保存并生效'), findsWidgets);
   });
 
   testWidgets('SettingsPage ACP wizard adds a custom provider card', (

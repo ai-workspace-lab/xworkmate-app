@@ -31,6 +31,9 @@ class SidebarNavigation extends StatelessWidget {
     this.availableDestinations,
     this.favoriteDestinations = const <AssistantFocusEntry>{},
     this.onToggleFavorite,
+    this.currentSettingsTab,
+    this.availableSettingsTabs = const <SettingsTab>[],
+    this.onSettingsTabChanged,
   });
 
   final WorkspaceDestination currentSection;
@@ -55,6 +58,9 @@ class SidebarNavigation extends StatelessWidget {
   final Set<WorkspaceDestination>? availableDestinations;
   final Set<AssistantFocusEntry> favoriteDestinations;
   final Future<void> Function(AssistantFocusEntry section)? onToggleFavorite;
+  final SettingsTab? currentSettingsTab;
+  final List<SettingsTab> availableSettingsTabs;
+  final ValueChanged<SettingsTab>? onSettingsTabChanged;
 
   static const _primarySections = <WorkspaceDestination>[
     WorkspaceDestination.assistant,
@@ -193,6 +199,9 @@ class SidebarNavigation extends StatelessWidget {
                         onToggleAccountWorkspaceFollowed,
                     accountSelected:
                         currentSection == WorkspaceDestination.account,
+                    currentSettingsTab: currentSettingsTab,
+                    availableSettingsTabs: availableSettingsTabs,
+                    onSettingsTabChanged: onSettingsTabChanged,
                     showCollapseControl: showCollapseControl,
                     onOpenOnlineWorkspace: onOpenOnlineWorkspace,
                   ),
@@ -588,6 +597,9 @@ class SidebarFooter extends StatelessWidget {
     required this.accountSubtitle,
     required this.accountWorkspaceFollowed,
     required this.accountSelected,
+    required this.currentSettingsTab,
+    required this.availableSettingsTabs,
+    this.onSettingsTabChanged,
     required this.showCollapseControl,
     this.onToggleAccountWorkspaceFollowed,
     this.onOpenOnlineWorkspace,
@@ -611,9 +623,19 @@ class SidebarFooter extends StatelessWidget {
   final String accountSubtitle;
   final bool accountWorkspaceFollowed;
   final bool accountSelected;
+  final SettingsTab? currentSettingsTab;
+  final List<SettingsTab> availableSettingsTabs;
+  final ValueChanged<SettingsTab>? onSettingsTabChanged;
   final bool showCollapseControl;
   final Future<void> Function()? onToggleAccountWorkspaceFollowed;
   final VoidCallback? onOpenOnlineWorkspace;
+
+  bool get showSettingsRail =>
+      showSettingsButton &&
+      currentSection == WorkspaceDestination.settings &&
+      currentSettingsTab != null &&
+      availableSettingsTabs.isNotEmpty &&
+      onSettingsTabChanged != null;
 
   @override
   Widget build(BuildContext context) {
@@ -684,6 +706,18 @@ class SidebarFooter extends StatelessWidget {
             ),
             const SizedBox(height: 6),
           ],
+          if (showSettingsRail) ...[
+            ...availableSettingsTabs.map(
+              (tab) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: _SidebarSettingsCompactButton(
+                  tab: tab,
+                  selected: tab == currentSettingsTab,
+                  onPressed: () => onSettingsTabChanged!(tab),
+                ),
+              ),
+            ),
+          ],
           if (onOpenOnlineWorkspace != null) ...[
             ChromeIconActionButton(
               icon: Icons.open_in_new_rounded,
@@ -739,6 +773,32 @@ class SidebarFooter extends StatelessWidget {
             onTap: onOpenSettings,
           ),
           const SizedBox(height: AppSpacing.xs),
+        ],
+        if (showSettingsRail) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+            padding: const EdgeInsets.all(AppSpacing.xxs),
+            decoration: BoxDecoration(
+              color: palette.chromeSurface,
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              border: Border.all(color: palette.strokeSoft),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: availableSettingsTabs
+                  .map(
+                    (tab) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
+                      child: _SidebarSettingsNavItem(
+                        tab: tab,
+                        selected: tab == currentSettingsTab,
+                        onTap: () => onSettingsTabChanged!(tab),
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
+            ),
+          ),
         ],
         Row(
           children: [
@@ -819,6 +879,185 @@ class SidebarFooter extends StatelessWidget {
 }
 
 enum _SidebarItemEmphasis { primary, secondary }
+
+IconData _sidebarSettingsTabIcon(SettingsTab tab) {
+  return switch (tab) {
+    SettingsTab.general => Icons.tune_rounded,
+    SettingsTab.workspace => Icons.folder_open_rounded,
+    SettingsTab.gateway => Icons.settings_ethernet_rounded,
+    SettingsTab.agents => Icons.smart_toy_rounded,
+    SettingsTab.appearance => Icons.palette_outlined,
+    SettingsTab.diagnostics => Icons.monitor_heart_outlined,
+    SettingsTab.experimental => Icons.science_outlined,
+    SettingsTab.about => Icons.info_outline_rounded,
+  };
+}
+
+class _SidebarSettingsCompactButton extends StatefulWidget {
+  const _SidebarSettingsCompactButton({
+    required this.tab,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final SettingsTab tab;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  State<_SidebarSettingsCompactButton> createState() =>
+      _SidebarSettingsCompactButtonState();
+}
+
+class _SidebarSettingsCompactButtonState
+    extends State<_SidebarSettingsCompactButton> {
+  bool hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final active = widget.selected || hovered;
+    final background = active
+        ? palette.chromeSurfacePressed
+        : palette.chromeSurface;
+
+    return Tooltip(
+      message: widget.tab.label,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => hovered = true),
+        onExit: (_) => setState(() => hovered = false),
+        child: AnimatedContainer(
+          key: ValueKey<String>('sidebar-settings-tab-${widget.tab.name}'),
+          duration: const Duration(milliseconds: 160),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                palette.chromeHighlight.withValues(alpha: active ? 0.95 : 0.88),
+                background,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(AppRadius.button),
+            border: Border.all(
+              color: active ? palette.chromeStroke : palette.strokeSoft,
+            ),
+            boxShadow: [
+              active ? palette.chromeShadowLift : palette.chromeShadowAmbient,
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.button),
+              onTap: widget.onPressed,
+              child: SizedBox(
+                height: AppSizes.sidebarItemHeight,
+                child: Center(
+                  child: Icon(
+                    _sidebarSettingsTabIcon(widget.tab),
+                    size: AppSizes.sidebarIconSize,
+                    color: active
+                        ? palette.textPrimary
+                        : palette.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarSettingsNavItem extends StatefulWidget {
+  const _SidebarSettingsNavItem({
+    required this.tab,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final SettingsTab tab;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_SidebarSettingsNavItem> createState() => _SidebarSettingsNavItemState();
+}
+
+class _SidebarSettingsNavItemState extends State<_SidebarSettingsNavItem> {
+  bool hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    final active = widget.selected || hovered;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => hovered = true),
+      onExit: (_) => setState(() => hovered = false),
+      child: AnimatedContainer(
+        key: ValueKey<String>('sidebar-settings-tab-${widget.tab.name}'),
+        duration: const Duration(milliseconds: 160),
+        decoration: BoxDecoration(
+          gradient: active
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    palette.chromeHighlight.withValues(alpha: 0.95),
+                    palette.chromeSurface,
+                  ],
+                )
+              : null,
+          color: active ? null : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.button),
+          border: Border.all(
+            color: active ? palette.chromeStroke : Colors.transparent,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.button),
+            onTap: widget.onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.compact,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _sidebarSettingsTabIcon(widget.tab),
+                    size: 18,
+                    color: active
+                        ? palette.textPrimary
+                        : palette.textSecondary,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      widget.tab.label,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: active
+                            ? palette.textPrimary
+                            : palette.textSecondary,
+                        fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _SidebarAccountTile extends StatefulWidget {
   const _SidebarAccountTile({

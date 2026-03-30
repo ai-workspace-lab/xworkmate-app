@@ -156,22 +156,22 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('集成'));
+    await tester.tap(
+      find.byKey(const ValueKey<String>('sidebar-settings-tab-gateway')),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('OpenClaw Gateway'), findsWidgets);
     expect(find.text('LLM 接入点'), findsWidgets);
-    expect(find.text('ACP 外部接入'), findsWidgets);
     expect(find.textContaining('浏览器本地存储'), findsOneWidget);
     expect(find.textContaining('Local Gateway'), findsWidgets);
     expect(find.textContaining('Remote Gateway'), findsWidgets);
 
-    await tester.tap(find.text('ACP 外部接入').last);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('web-external-acp-provider-add-button')),
+    );
     await tester.pumpAndSettle();
 
-    expect(find.text('设置提交流程'), findsOneWidget);
-    expect(find.text('Codex'), findsWidgets);
-    expect(find.text('OpenCode'), findsWidgets);
     expect(find.text('Claude'), findsNothing);
     expect(find.text('Gemini'), findsNothing);
     expect(
