@@ -11,6 +11,7 @@ import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
 import '../widgets/desktop_workspace_scaffold.dart';
 import '../widgets/section_tabs.dart';
+import '../widgets/settings_page_shell.dart';
 import '../widgets/surface_card.dart';
 import '../widgets/top_bar.dart';
 import 'web_settings_page_core.dart';
@@ -39,86 +40,45 @@ extension WebSettingsPageSectionsMixinInternal on WebSettingsPageStateInternal {
     List<SettingsTab> availableTabs,
     SettingsTab currentTab,
   ) {
-    final orderedTabs = <SettingsTab>[
-      currentTab,
-      ...availableTabs.where((item) => item != currentTab),
-    ];
-    final sections = <Widget>[];
-    for (final tab in orderedTabs) {
-      final content = buildTabContentInternal(context, controller, settings, tab);
-      if (content.isEmpty) {
-        continue;
-      }
-      if (sections.isNotEmpty) {
-        sections.add(const SizedBox(height: 24));
-      }
-      sections.addAll(content);
-    }
-    return sections;
+    return buildOrderedSettingsSections(
+      availableTabs: availableTabs,
+      currentTab: currentTab,
+      buildTabContent: (tab) =>
+          buildTabContentInternal(context, controller, settings, tab),
+    );
   }
 
   Widget buildGlobalApplyBarInternal(
     BuildContext context,
     AppController controller,
   ) {
-    final theme = Theme.of(context);
     final hasDraft = controller.hasSettingsDraftChanges;
     final hasPendingApply = controller.hasPendingSettingsApply;
     final message = controller.settingsDraftStatusMessage;
-    return SurfaceCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  appText('设置提交流程', 'Settings Submission'),
-                  style: theme.textTheme.titleMedium,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  message.isNotEmpty
-                      ? message
-                      : hasDraft
-                      ? appText(
-                          '当前存在未保存草稿。保存并生效：按当前配置立即更新。',
-                          'There are unsaved drafts. Save & apply updates the current configuration immediately.',
-                        )
-                      : hasPendingApply
-                      ? appText(
-                          '当前存在待生效更改。保存并生效：立即按当前配置更新。',
-                          'There are saved changes waiting to be applied. Save & apply updates the current configuration immediately.',
-                        )
-                      : appText(
-                          '当前没有待提交更改。',
-                          'There are no pending settings changes.',
-                        ),
-                ),
-              ],
+    return SettingsGlobalApplyCard(
+      title: appText('设置提交流程', 'Settings Submission'),
+      message: message.isNotEmpty
+          ? message
+          : hasDraft
+          ? appText(
+              '当前存在未保存草稿。保存并生效：按当前配置立即更新。',
+              'There are unsaved drafts. Save & apply updates the current configuration immediately.',
+            )
+          : hasPendingApply
+          ? appText(
+              '当前存在待生效更改。保存并生效：立即按当前配置更新。',
+              'There are saved changes waiting to be applied. Save & apply updates the current configuration immediately.',
+            )
+          : appText(
+              '当前没有待提交更改。',
+              'There are no pending settings changes.',
             ),
-          ),
-          const SizedBox(width: 16),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              FilledButton.tonal(
-                key: const ValueKey('settings-global-apply-button'),
-                onPressed:
-                    (hasDraft ||
-                        hasPendingApply ||
-                        gatewaySubTabInternal ==
-                            WebGatewaySettingsSubTabInternal.acp)
-                    ? () => handleTopLevelApplyInternal(controller)
-                    : null,
-                child: Text(appText('保存并生效', 'Save & apply')),
-              ),
-            ],
-          ),
-        ],
-      ),
+      applyLabel: appText('保存并生效', 'Save & apply'),
+      onApply: (hasDraft ||
+              hasPendingApply ||
+              gatewaySubTabInternal == WebGatewaySettingsSubTabInternal.acp)
+          ? () => handleTopLevelApplyInternal(controller)
+          : null,
     );
   }
 
