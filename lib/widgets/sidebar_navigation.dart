@@ -358,13 +358,7 @@ class _SidebarSectionGroup extends StatelessWidget {
               favorite:
                   focusEntry != null &&
                   favoriteDestinations.contains(focusEntry),
-              showFavoriteToggle:
-                  !collapsed &&
-                  focusEntry != null &&
-                  onToggleFavorite != null &&
-                  kAssistantNavigationDestinationCandidates.contains(
-                    focusEntry,
-                  ),
+              showFavoriteToggle: false,
               labelOverride: useHomeShortcut
                   ? appText('回到 APP首页', 'Back to app home')
                   : null,

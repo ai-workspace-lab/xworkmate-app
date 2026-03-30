@@ -382,7 +382,7 @@ void registerAssistantPageSuiteCoreTestsInternal() {
     );
   });
 
-  testWidgets('AssistantPage can switch unified side pane tabs and collapse', (
+  testWidgets('AssistantPage ignores legacy navigation panel injection', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
@@ -396,26 +396,17 @@ void registerAssistantPageSuiteCoreTestsInternal() {
           key: Key('assistant-nav-panel-probe'),
           color: Colors.red,
         ),
-        showStandaloneTaskRail: false,
       ),
     );
 
-    expect(find.byKey(const Key('assistant-side-pane')), findsOneWidget);
     expect(find.byKey(const Key('assistant-task-rail')), findsOneWidget);
     expect(find.byKey(const Key('assistant-nav-panel-probe')), findsNothing);
-
-    await tester.tap(
+    expect(find.byKey(const Key('assistant-side-pane')), findsNothing);
+    expect(
       find.byKey(const Key('assistant-side-pane-tab-navigation')),
+      findsNothing,
     );
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('assistant-nav-panel-probe')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('assistant-side-pane-toggle')));
-    await tester.pumpAndSettle();
-
     expect(find.byKey(const Key('assistant-nav-panel-probe')), findsNothing);
-    expect(find.byKey(const Key('assistant-side-pane')), findsOneWidget);
   });
 
   testWidgets(
