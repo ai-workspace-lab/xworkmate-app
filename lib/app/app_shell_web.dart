@@ -206,6 +206,12 @@ class _AppShellState extends State<AppShell> {
                                 _sidebarState == AppSidebarState.expanded
                                 ? expandedSidebarWidth
                                 : null,
+                            marginOverride: const EdgeInsets.fromLTRB(
+                              4,
+                              4,
+                              8,
+                              0,
+                            ),
                             favoriteDestinations: controller
                                 .assistantNavigationDestinations
                                 .toSet(),
@@ -250,6 +256,7 @@ class _AppShellState extends State<AppShell> {
                         if (_sidebarState == AppSidebarState.expanded)
                           PaneResizeHandle(
                             axis: Axis.horizontal,
+                            extent: 8,
                             onDelta: (delta) {
                               setState(() {
                                 _sidebarExpandedWidth = _clampSidebarWidth(
@@ -360,7 +367,7 @@ class _WebShellBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+      padding: const EdgeInsets.fromLTRB(0, 4, 4, 0),
       child: DecoratedBox(
         decoration: BoxDecoration(color: palette.canvas),
         child: child,

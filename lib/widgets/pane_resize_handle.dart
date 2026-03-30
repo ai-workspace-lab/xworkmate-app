@@ -7,10 +7,12 @@ class PaneResizeHandle extends StatefulWidget {
     super.key,
     required this.axis,
     required this.onDelta,
+    this.extent,
   });
 
   final Axis axis;
   final ValueChanged<double> onDelta;
+  final double? extent;
 
   @override
   State<PaneResizeHandle> createState() => _PaneResizeHandleState();
@@ -25,6 +27,7 @@ class _PaneResizeHandleState extends State<PaneResizeHandle> {
     final palette = context.palette;
     final isHorizontalDrag = widget.axis == Axis.horizontal;
     final highlight = _dragging || _hovered;
+    final extent = widget.extent ?? 12;
 
     return MouseRegion(
       cursor: isHorizontalDrag
@@ -41,8 +44,8 @@ class _PaneResizeHandleState extends State<PaneResizeHandle> {
           isHorizontalDrag ? details.delta.dx : details.delta.dy,
         ),
         child: SizedBox(
-          width: isHorizontalDrag ? 12 : double.infinity,
-          height: isHorizontalDrag ? double.infinity : 12,
+          width: isHorizontalDrag ? extent : double.infinity,
+          height: isHorizontalDrag ? double.infinity : extent,
           child: Center(
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 140),
