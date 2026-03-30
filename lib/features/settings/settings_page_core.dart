@@ -14,6 +14,7 @@ import '../../runtime/runtime_controllers.dart';
 import '../../runtime/runtime_models.dart';
 import 'codex_integration_card.dart';
 import 'skill_directory_authorization_card.dart';
+import '../../widgets/settings_page_shell.dart';
 import '../../widgets/surface_card.dart';
 import '../../widgets/top_bar.dart';
 import 'settings_page_sections.dart';
@@ -218,62 +219,53 @@ class SettingsPageStateInternal extends State<SettingsPage> {
             (tabInternal != SettingsTab.gateway ||
                 integrationSubTabInternal ==
                     GatewayIntegrationSubTabInternal.acp);
-        return SingleChildScrollView(
+        return SettingsPageBodyShell(
           padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TopBar(
-                breadcrumbs: buildSettingsBreadcrumbs(
-                  controller,
-                  tab: tabInternal,
-                  detail: detailInternal,
-                  navigationContext: navigationContextInternal,
+          breadcrumbs: buildSettingsBreadcrumbs(
+            controller,
+            tab: tabInternal,
+            detail: detailInternal,
+            navigationContext: navigationContextInternal,
+          ),
+          title: appText('设置', 'Settings'),
+          subtitle: showingDetail
+              ? appText(
+                  '当前正在编辑详细设置参数，保存后会回写到对应状态页。',
+                  'You are editing detailed settings. Saved values flow back to the related status page.',
+                )
+              : appText(
+                  '配置 $kProductBrandName 工作区、网关默认项、界面与诊断选项',
+                  'Configure workspace, gateway defaults, appearance, and diagnostics for $kProductBrandName.',
                 ),
-                title: appText('设置', 'Settings'),
-                subtitle: showingDetail
-                    ? appText(
-                        '当前正在编辑详细设置参数，保存后会回写到对应状态页。',
-                        'You are editing detailed settings. Saved values flow back to the related status page.',
-                      )
-                    : appText(
-                        '配置 $kProductBrandName 工作区、网关默认项、界面与诊断选项',
-                        'Configure workspace, gateway defaults, appearance, and diagnostics for $kProductBrandName.',
-                      ),
-                trailing: SizedBox(
-                  width: showingDetail ? 168 : 220,
-                  child: showingDetail
-                      ? OutlinedButton.icon(
-                          onPressed: () {
-                            controller.closeSettingsDetail();
-                            setState(() {
-                              detailInternal = null;
-                              navigationContextInternal = null;
-                            });
-                          },
-                          icon: const Icon(Icons.arrow_back_rounded),
-                          label: Text(appText('返回概览', 'Back to overview')),
-                        )
-                      : TextField(
-                          decoration: InputDecoration(
-                            hintText: appText('搜索设置', 'Search settings'),
-                            prefixIcon: Icon(Icons.search_rounded),
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              if (showGlobalApplyBar) ...[
-                buildGlobalApplyBarInternal(context, controller),
-                const SizedBox(height: 16),
-              ],
-              ...buildContentForCurrentStateInternal(
-                context,
-                controller,
-                settings,
-                uiFeatures,
-              ),
-            ],
+          trailing: SizedBox(
+            width: showingDetail ? 168 : 220,
+            child: showingDetail
+                ? OutlinedButton.icon(
+                    onPressed: () {
+                      controller.closeSettingsDetail();
+                      setState(() {
+                        detailInternal = null;
+                        navigationContextInternal = null;
+                      });
+                    },
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    label: Text(appText('返回概览', 'Back to overview')),
+                  )
+                : TextField(
+                    decoration: InputDecoration(
+                      hintText: appText('搜索设置', 'Search settings'),
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                  ),
+          ),
+          globalApplyBar: showGlobalApplyBar
+              ? buildGlobalApplyBarInternal(context, controller)
+              : null,
+          bodyChildren: buildContentForCurrentStateInternal(
+            context,
+            controller,
+            settings,
+            uiFeatures,
           ),
         );
       },
