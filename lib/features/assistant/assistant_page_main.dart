@@ -186,11 +186,7 @@ class AssistantPageStateInternal extends State<AssistantPage> {
           padding: EdgeInsets.zero,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final showUnifiedSidePane =
-                  widget.navigationPanelBuilder != null &&
-                  constraints.maxWidth >= 860;
               final showThreadRail =
-                  !showUnifiedSidePane &&
                   widget.showStandaloneTaskRail &&
                   constraints.maxWidth >= 860;
               final mainWorkspace = buildMainWorkspaceInternal(
@@ -204,7 +200,7 @@ class AssistantPageStateInternal extends State<AssistantPage> {
                     currentTask: currentTask,
                     child: mainWorkspace,
                   );
-              if (!showThreadRail && !showUnifiedSidePane) {
+              if (!showThreadRail) {
                 return workspaceWithArtifacts;
               }
 
@@ -214,163 +210,6 @@ class AssistantPageStateInternal extends State<AssistantPage> {
               final threadRailWidth = threadRailWidthInternal
                   .clamp(sidePaneMinWidthInternal, maxThreadRailWidth)
                   .toDouble();
-
-              if (showUnifiedSidePane) {
-                final favoriteDestinations =
-                    controller.assistantNavigationDestinations;
-                final activeFocusedDestination =
-                    resolveFocusedDestinationInternal(favoriteDestinations);
-                final effectiveActiveSidePane =
-                    activeSidePaneInternal ==
-                            AssistantSidePaneInternal.focused &&
-                        activeFocusedDestination == null
-                    ? AssistantSidePaneInternal.navigation
-                    : activeSidePaneInternal;
-                final sidePanelContentWidth =
-                    (threadRailWidth - sideTabRailWidthInternal - 2)
-                        .clamp(sidePaneContentMinWidthInternal, threadRailWidth)
-                        .toDouble();
-                return Row(
-                  children: [
-                    AnimatedContainer(
-                      key: const Key('assistant-unified-side-pane-shell'),
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      width: sidePaneCollapsedInternal
-                          ? sideTabRailWidthInternal
-                          : threadRailWidth,
-                      child: AssistantUnifiedSidePaneInternal(
-                        activePane: effectiveActiveSidePane,
-                        activeFocusedDestination: activeFocusedDestination,
-                        collapsed: sidePaneCollapsedInternal,
-                        favoriteDestinations: favoriteDestinations,
-                        taskPanel: AssistantTaskRailInternal(
-                          key: const Key('assistant-task-rail'),
-                          controller: controller,
-                          tasks: visibleTasks,
-                          query: threadQueryInternal,
-                          searchController: threadSearchControllerInternal,
-                          onQueryChanged: (value) {
-                            setState(() {
-                              threadQueryInternal = value.trim();
-                            });
-                          },
-                          onClearQuery: () {
-                            threadSearchControllerInternal.clear();
-                            setState(() {
-                              threadQueryInternal = '';
-                            });
-                          },
-                          onRefreshTasks: refreshTasksWithRetryInternal,
-                          onCreateTask: createNewThreadInternal,
-                          onSelectTask: switchSessionWithRetryInternal,
-                          onArchiveTask: archiveTaskInternal,
-                          onRenameTask: renameTaskInternal,
-                        ),
-                        navigationPanel: widget.navigationPanelBuilder!(
-                          sidePanelContentWidth,
-                        ),
-                        focusedPanel: activeFocusedDestination == null
-                            ? null
-                            : SingleChildScrollView(
-                                padding: const EdgeInsets.all(6),
-                                child: AssistantFocusDestinationCard(
-                                  controller: controller,
-                                  destination: activeFocusedDestination,
-                                  onOpenPage: () => controller.navigateTo(
-                                    activeFocusedDestination.destination ??
-                                        WorkspaceDestination.settings,
-                                  ),
-                                  onRemoveFavorite: () async {
-                                    await controller
-                                        .toggleAssistantNavigationDestination(
-                                          activeFocusedDestination,
-                                        );
-                                    if (!mounted) {
-                                      return;
-                                    }
-                                    setState(() {
-                                      activeFocusedDestinationInternal =
-                                          resolveFocusedDestinationInternal(
-                                            controller
-                                                .assistantNavigationDestinations,
-                                          );
-                                      activeSidePaneInternal =
-                                          activeFocusedDestinationInternal ==
-                                              null
-                                          ? AssistantSidePaneInternal.navigation
-                                          : AssistantSidePaneInternal.focused;
-                                    });
-                                  },
-                                ),
-                              ),
-                        onSelectPane: (pane) {
-                          setState(() {
-                            final normalizedPane =
-                                pane == AssistantSidePaneInternal.focused
-                                ? AssistantSidePaneInternal.navigation
-                                : pane;
-                            if (effectiveActiveSidePane == normalizedPane) {
-                              sidePaneCollapsedInternal =
-                                  !sidePaneCollapsedInternal;
-                              return;
-                            }
-                            activeSidePaneInternal = normalizedPane;
-                            if (normalizedPane !=
-                                AssistantSidePaneInternal.focused) {
-                              activeFocusedDestinationInternal = null;
-                            }
-                            sidePaneCollapsedInternal = false;
-                          });
-                        },
-                        onSelectFocusedDestination: (destination) {
-                          setState(() {
-                            final isSameSelection =
-                                effectiveActiveSidePane ==
-                                    AssistantSidePaneInternal.focused &&
-                                activeFocusedDestination == destination;
-                            if (isSameSelection) {
-                              sidePaneCollapsedInternal =
-                                  !sidePaneCollapsedInternal;
-                              return;
-                            }
-                            activeFocusedDestinationInternal = destination;
-                            activeSidePaneInternal =
-                                AssistantSidePaneInternal.focused;
-                            sidePaneCollapsedInternal = false;
-                          });
-                        },
-                        onToggleCollapsed: () {
-                          setState(() {
-                            sidePaneCollapsedInternal =
-                                !sidePaneCollapsedInternal;
-                          });
-                        },
-                      ),
-                    ),
-                    if (!sidePaneCollapsedInternal)
-                      SizedBox(
-                        width: assistantHorizontalResizeHandleWidthInternal,
-                        child: PaneResizeHandle(
-                          axis: Axis.horizontal,
-                          onDelta: (delta) {
-                            setState(() {
-                              threadRailWidthInternal =
-                                  (threadRailWidthInternal + delta)
-                                      .clamp(
-                                        sidePaneMinWidthInternal,
-                                        maxThreadRailWidth,
-                                      )
-                                      .toDouble();
-                            });
-                          },
-                        ),
-                      ),
-                    const SizedBox(width: assistantHorizontalPaneGapInternal),
-                    Expanded(child: workspaceWithArtifacts),
-                  ],
-                );
-              }
 
               return Row(
                 children: [

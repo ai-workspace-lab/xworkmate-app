@@ -53,7 +53,6 @@ void main() {
     var sidebarCycled = 0;
     var accountOpened = 0;
     var workspaceFollowToggled = 0;
-    var favoriteToggled = 0;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -79,11 +78,7 @@ void main() {
             favoriteDestinations: const <AssistantFocusEntry>{
               AssistantFocusEntry.skills,
             },
-            onToggleFavorite: (value) async {
-              if (value == AssistantFocusEntry.skills) {
-                favoriteToggled++;
-              }
-            },
+            onToggleFavorite: (_) async {},
           ),
         ),
       ),
@@ -97,11 +92,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(selected, WorkspaceDestination.tasks);
 
-    await tester.tap(
+    expect(
       find.byKey(const ValueKey<String>('sidebar-favorite-skills')),
+      findsNothing,
     );
-    await tester.pumpAndSettle();
-    expect(favoriteToggled, 1);
 
     await tester.tap(find.byTooltip('切换语言'));
     await tester.pumpAndSettle();

@@ -9,7 +9,6 @@ import '../features/settings/settings_page.dart';
 import '../features/skills/skills_page.dart';
 import '../features/tasks/tasks_page.dart';
 import '../models/app_models.dart';
-import '../widgets/assistant_focus_panel.dart';
 import 'app_controller.dart';
 
 enum WorkspacePageSurface { desktop, mobile }
@@ -39,12 +38,6 @@ workspacePageSpecsInternal = <WorkspaceDestination, WorkspacePageSpec>{
     desktopBuilder: (controller, onOpenDetail) => AssistantPage(
       controller: controller,
       onOpenDetail: onOpenDetail,
-      navigationPanelBuilder: controller.sidebarState == AppSidebarState.hidden
-          ? null
-          : (_) => AssistantFocusPanel(controller: controller),
-      showStandaloneTaskRail: false,
-      unifiedPaneStartsCollapsed:
-          controller.sidebarState == AppSidebarState.collapsed,
     ),
     mobileBuilder: (controller, onOpenDetail) => AssistantPage(
       controller: controller,
