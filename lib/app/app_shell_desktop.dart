@@ -310,6 +310,12 @@ class _AppShellState extends State<AppShell> {
                                 sidebarState == AppSidebarState.expanded
                                 ? expandedSidebarWidth
                                 : null,
+                            marginOverride: const EdgeInsets.fromLTRB(
+                              4,
+                              4,
+                              8,
+                              0,
+                            ),
                             favoriteDestinations: controller
                                 .assistantNavigationDestinations
                                 .toSet(),
@@ -346,6 +352,7 @@ class _AppShellState extends State<AppShell> {
                         if (sidebarState == AppSidebarState.expanded)
                           PaneResizeHandle(
                             axis: Axis.horizontal,
+                            extent: 8,
                             onDelta: (delta) {
                               setState(() {
                                 _sidebarExpandedWidth = _clampSidebarWidth(
@@ -357,7 +364,7 @@ class _AppShellState extends State<AppShell> {
                           ),
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+                            padding: const EdgeInsets.fromLTRB(0, 4, 4, 0),
                             child: AnimatedPadding(
                               duration: const Duration(milliseconds: 220),
                               curve: Curves.easeOutCubic,
