@@ -310,12 +310,7 @@ class _AppShellState extends State<AppShell> {
                                 sidebarState == AppSidebarState.expanded
                                 ? expandedSidebarWidth
                                 : null,
-                            marginOverride: const EdgeInsets.fromLTRB(
-                              4,
-                              4,
-                              8,
-                              0,
-                            ),
+                            marginOverride: const EdgeInsets.fromLTRB(4, 4, 4, 0),
                             favoriteDestinations: controller
                                 .assistantNavigationDestinations
                                 .toSet(),
