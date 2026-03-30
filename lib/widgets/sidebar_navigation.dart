@@ -106,6 +106,13 @@ class SidebarNavigation extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 4),
+            if (isCollapsed && showCollapseControl) ...[
+              SidebarHeader(
+                isCollapsed: true,
+                onTap: onExpandFromCollapsed,
+              ),
+              const SizedBox(height: AppSpacing.xs),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -151,7 +158,7 @@ class SidebarNavigation extends StatelessWidget {
                         ),
                     accountSelected:
                         currentSection == WorkspaceDestination.account,
-                    showCollapseControl: showCollapseControl && isCollapsed,
+                    showCollapseControl: false,
                   ),
                 ],
               ),
@@ -189,6 +196,7 @@ class SidebarHeader extends StatelessWidget {
       child: Align(
         alignment: Alignment.centerRight,
         child: InkWell(
+          key: const Key('sidebar-header-expand-button'),
           borderRadius: BorderRadius.circular(AppRadius.button),
           onTap: onTap,
           child: Padding(padding: EdgeInsets.zero, child: content),
