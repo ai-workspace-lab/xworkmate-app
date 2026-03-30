@@ -19,8 +19,6 @@ import 'web_assistant_page_chrome.dart';
 import 'web_assistant_page_workspace.dart';
 import 'web_assistant_page_helpers.dart';
 
-const double webAssistantSidePaneMinWidthInternal = 304;
-const double webAssistantSidePaneMaxWidthInternal = 420;
 const double webAssistantMainWorkspaceMinWidthInternal = 700;
 const double webAssistantComposerMinHeightInternal = 164;
 const double webAssistantConversationMinHeightInternal = 200;
@@ -49,7 +47,6 @@ class WebAssistantPageStateInternal extends State<WebAssistantPage> {
       AssistantPermissionLevel.defaultAccess;
   bool useMultiAgentInternal = false;
   bool workspaceChromeCollapsedInternal = false;
-  double sidePaneWidthInternal = 344;
   bool artifactPaneCollapsedInternal = true;
   double artifactPaneWidthInternal =
       webAssistantArtifactPaneDefaultWidthInternal;
@@ -88,19 +85,6 @@ class WebAssistantPageStateInternal extends State<WebAssistantPage> {
         return DesktopWorkspaceScaffold(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final maxSidePaneWidth = math.min(
-                webAssistantSidePaneMaxWidthInternal,
-                math.max(
-                  webAssistantSidePaneMinWidthInternal,
-                  constraints.maxWidth -
-                      webAssistantMainWorkspaceMinWidthInternal,
-                ),
-              );
-              final sidePaneWidth = sidePaneWidthInternal.clamp(
-                webAssistantSidePaneMinWidthInternal,
-                maxSidePaneWidth,
-              );
-
               return Column(
                 children: [
                   AssistantWorkspaceChromeInternal(
@@ -115,113 +99,38 @@ class WebAssistantPageStateInternal extends State<WebAssistantPage> {
                   ),
                   const SizedBox(height: 8),
                   Expanded(
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: sidePaneWidth,
-                          child: AssistantTaskPaneInternal(
-                            controller: controller,
-                            query: queryInternal,
-                            searchController: searchControllerInternal,
-                            onQueryChanged: (value) {
-                              setState(
-                                () =>
-                                    queryInternal = value.trim().toLowerCase(),
-                              );
-                            },
-                            onClearQuery: () {
-                              searchControllerInternal.clear();
-                              setState(() => queryInternal = '');
-                            },
-                            showSingle: controller
-                                .featuresFor(UiFeaturePlatform.web)
-                                .supportsDirectAi,
-                            showLocal: controller
-                                .featuresFor(UiFeaturePlatform.web)
-                                .supportsLocalGateway,
-                            showRemote: controller
-                                .featuresFor(UiFeaturePlatform.web)
-                                .supportsRelayGateway,
-                            single: filterConversationsInternal(
-                              controller.conversationsForTarget(
-                                AssistantExecutionTarget.singleAgent,
-                              ),
-                              queryInternal,
-                            ),
-                            local: filterConversationsInternal(
-                              controller.conversationsForTarget(
-                                AssistantExecutionTarget.local,
-                              ),
-                              queryInternal,
-                            ),
-                            remote: filterConversationsInternal(
-                              controller.conversationsForTarget(
-                                AssistantExecutionTarget.remote,
-                              ),
-                              queryInternal,
-                            ),
-                            onRename: renameConversationInternal,
-                            onArchive: (sessionKey) => controller
-                                .saveAssistantTaskArchived(sessionKey, true),
-                            onOpenActions: openConversationActionsInternal,
-                          ),
-                        ),
-                        SizedBox(
-                          width: 8,
-                          child: PaneResizeHandle(
-                            axis: Axis.horizontal,
-                            onDelta: (delta) {
-                              setState(() {
-                                sidePaneWidthInternal =
-                                    (sidePaneWidthInternal + delta)
-                                        .clamp(
-                                          webAssistantSidePaneMinWidthInternal,
-                                          maxSidePaneWidth,
-                                        )
-                                        .toDouble();
-                              });
-                            },
-                          ),
-                        ),
-                        Expanded(
-                          child: buildWorkspaceWithArtifactsInternal(
-                            controller: controller,
-                            child: ConversationWorkspaceInternal(
-                              controller: controller,
-                              scrollController: scrollControllerInternal,
-                              inputController: inputControllerInternal,
-                              currentMessages: currentMessages,
-                              connectionState: connectionState,
-                              thinkingLevel: thinkingLevelInternal,
-                              permissionLevel: permissionLevelInternal,
-                              useMultiAgent: useMultiAgentInternal,
-                              attachments: attachmentsInternal,
-                              composerHeight: composerHeightInternal,
-                              onComposerHeightChanged: (value) {
-                                setState(() => composerHeightInternal = value);
-                              },
-                              onThinkingChanged: (value) {
-                                setState(() => thinkingLevelInternal = value);
-                              },
-                              onPermissionChanged: (value) {
-                                setState(() => permissionLevelInternal = value);
-                              },
-                              onToggleMultiAgent: (value) {
-                                setState(() => useMultiAgentInternal = value);
-                              },
-                              onAddAttachment: pickAttachmentsInternal,
-                              onRemoveAttachment: (index) {
-                                setState(
-                                  () => attachmentsInternal.removeAt(index),
-                                );
-                              },
-                              onOpenSessionSettings:
-                                  openSessionSettingsInternal,
-                              onSubmit: submitPromptInternal,
-                            ),
-                          ),
-                        ),
-                      ],
+                    child: buildWorkspaceWithArtifactsInternal(
+                      controller: controller,
+                      child: ConversationWorkspaceInternal(
+                        controller: controller,
+                        scrollController: scrollControllerInternal,
+                        inputController: inputControllerInternal,
+                        currentMessages: currentMessages,
+                        connectionState: connectionState,
+                        thinkingLevel: thinkingLevelInternal,
+                        permissionLevel: permissionLevelInternal,
+                        useMultiAgent: useMultiAgentInternal,
+                        attachments: attachmentsInternal,
+                        composerHeight: composerHeightInternal,
+                        onComposerHeightChanged: (value) {
+                          setState(() => composerHeightInternal = value);
+                        },
+                        onThinkingChanged: (value) {
+                          setState(() => thinkingLevelInternal = value);
+                        },
+                        onPermissionChanged: (value) {
+                          setState(() => permissionLevelInternal = value);
+                        },
+                        onToggleMultiAgent: (value) {
+                          setState(() => useMultiAgentInternal = value);
+                        },
+                        onAddAttachment: pickAttachmentsInternal,
+                        onRemoveAttachment: (index) {
+                          setState(() => attachmentsInternal.removeAt(index));
+                        },
+                        onOpenSessionSettings: openSessionSettingsInternal,
+                        onSubmit: submitPromptInternal,
+                      ),
                     ),
                   ),
                 ],

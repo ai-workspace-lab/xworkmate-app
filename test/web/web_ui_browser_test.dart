@@ -22,7 +22,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('助手'), findsWidgets);
-    expect(find.byKey(const Key('assistant-task-rail')), findsOneWidget);
+    expect(find.byKey(const Key('assistant-task-rail')), findsNothing);
+    expect(
+      find.byKey(const Key('workspace-sidebar-task-search')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('workspace-sidebar-new-task-button')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const Key('assistant-workspace-chrome-toggle')),
       findsOneWidget,
@@ -88,7 +96,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(SidebarNavigation), findsOneWidget);
-    await tester.tap(find.text('自动化'));
+    await tester.ensureVisible(find.text('自动化'));
+    await tester.tap(find.text('自动化').hitTestable());
     await tester.pumpAndSettle();
 
     expect(find.text('任务工作台'), findsOneWidget);

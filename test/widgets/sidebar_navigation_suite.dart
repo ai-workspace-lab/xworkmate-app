@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/i18n/app_language.dart';
 import 'package:xworkmate/models/app_models.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/theme/app_theme.dart';
-import 'package:xworkmate/widgets/app_brand_logo.dart';
 import 'package:xworkmate/widgets/sidebar_navigation.dart';
 
 void main() {
@@ -88,7 +88,8 @@ void main() {
     expect(find.text('工具'), findsOneWidget);
     expect(find.text('MCP Hub'), findsOneWidget);
 
-    await tester.tap(find.text('自动化'));
+    await tester.ensureVisible(find.text('自动化'));
+    await tester.tap(find.text('自动化').hitTestable());
     await tester.pumpAndSettle();
     expect(selected, WorkspaceDestination.tasks);
 
@@ -201,9 +202,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('回到 APP首页'), findsOneWidget);
-      expect(find.text('新对话'), findsNothing);
+      expect(find.text('新对话'), findsWidgets);
 
-      await tester.tap(find.text('回到 APP首页'));
+      await tester.ensureVisible(find.text('回到 APP首页'));
+      await tester.tap(find.text('回到 APP首页').hitTestable());
       await tester.pumpAndSettle();
 
       expect(homeOpened, 1);
@@ -269,7 +271,7 @@ void main() {
     expect(changedTabs, <SettingsTab>[SettingsTab.gateway]);
   });
 
-  testWidgets('SidebarNavigation header uses chevron instead of brand logo', (
+  testWidgets('SidebarNavigation merges task controls into the global left bar', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -291,13 +293,35 @@ void main() {
             accountName: 'Tester',
             accountSubtitle: 'Workspace',
             onToggleAccountWorkspaceFollowed: () async {},
+            assistantSkillCount: 3,
+            taskItems: const <SidebarTaskItem>[
+              SidebarTaskItem(
+                sessionKey: 'draft:1',
+                title: '新的任务',
+                preview: '等待输入',
+                updatedAtMs: 1710000000000,
+                executionTarget: AssistantExecutionTarget.singleAgent,
+                isCurrent: true,
+                pending: false,
+                draft: true,
+              ),
+            ],
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
-    expect(find.byType(AppBrandLogo), findsNothing);
+    expect(
+      find.byKey(const Key('workspace-sidebar-task-search')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('workspace-sidebar-new-task-button')),
+      findsOneWidget,
+    );
+    expect(find.text('任务列表'), findsOneWidget);
+    expect(find.text('自动化'), findsOneWidget);
+    expect(find.text('新的任务'), findsOneWidget);
   });
 }
