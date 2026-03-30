@@ -86,8 +86,6 @@ class _AppShellState extends State<AppShell> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final isMobile = constraints.maxWidth < 900;
-                final showWorkspaceSidebar =
-                    currentDestination != WorkspaceDestination.assistant;
                 final expandedSidebarWidth = _clampSidebarWidth(
                   _sidebarExpandedWidth ??
                       _defaultSidebarWidth(
@@ -147,8 +145,7 @@ class _AppShellState extends State<AppShell> {
 
                 return Row(
                   children: [
-                    if (showWorkspaceSidebar &&
-                        _sidebarState != AppSidebarState.hidden)
+                    if (_sidebarState != AppSidebarState.hidden)
                       SidebarNavigation(
                         currentSection: currentDestination,
                         sidebarState: _sidebarState,
@@ -208,8 +205,7 @@ class _AppShellState extends State<AppShell> {
                         onSettingsTabChanged: (tab) =>
                             controller.openSettings(tab: tab),
                       ),
-                    if (showWorkspaceSidebar &&
-                        _sidebarState == AppSidebarState.expanded)
+                    if (_sidebarState == AppSidebarState.expanded)
                       PaneResizeHandle(
                         axis: Axis.horizontal,
                         onDelta: (delta) {

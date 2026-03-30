@@ -42,7 +42,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('连接设置'), findsNothing);
-    expect(find.byType(SidebarNavigation), findsNothing);
+    expect(find.byType(SidebarNavigation), findsOneWidget);
 
     await tester.tap(
       find.byKey(const Key('assistant-workspace-chrome-toggle')),
@@ -81,67 +81,13 @@ void main() {
     await tester.tapAt(const Offset(24, 24));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('assistant-side-pane-tab-quick')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('assistant-side-pane-tab-quick')), findsNothing);
+    expect(find.byKey(const Key('assistant-focus-panel-title')), findsNothing);
 
-    expect(
-      find.byKey(const Key('assistant-focus-panel-title')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey<String>('assistant-focus-add-settings')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey<String>('assistant-focus-add-tasks')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey<String>('assistant-focus-add-skills')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey<String>('assistant-focus-add-nodes')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey<String>('assistant-focus-add-secrets')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey<String>('assistant-focus-add-aiGateway')),
-      findsOneWidget,
-    );
-
-    await tester.tap(
-      find.byKey(const ValueKey<String>('assistant-focus-add-settings')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byKey(const ValueKey<String>('assistant-focus-open-page-settings')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('assistant-focus-settings-language-toggle')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('assistant-focus-settings-theme-toggle')),
-      findsOneWidget,
-    );
-
-    await tester.tap(
-      find.byKey(const ValueKey<String>('assistant-focus-open-page-settings')),
-    );
+    await tester.tap(find.text('设置').last);
     await tester.pumpAndSettle();
 
     expect(find.byType(SidebarNavigation), findsOneWidget);
-    await tester.tap(
-      find.byKey(const ValueKey<String>('sidebar-favorite-tasks')),
-    );
-    await tester.pumpAndSettle();
-
     await tester.tap(find.text('自动化'));
     await tester.pumpAndSettle();
 

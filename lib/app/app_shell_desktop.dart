@@ -74,9 +74,6 @@ class _AppShellState extends State<AppShell> {
                 final uiFeatures = controller.featuresFor(
                   resolveUiFeaturePlatformFromContext(context),
                 );
-                final embedSidebarIntoAssistant =
-                    controller.destination == WorkspaceDestination.assistant &&
-                    showSidebar;
                 final expandedSidebarWidth = _clampSidebarWidth(
                   _sidebarExpandedWidth ??
                       _defaultSidebarWidth(
@@ -220,7 +217,7 @@ class _AppShellState extends State<AppShell> {
                   children: [
                     Row(
                       children: [
-                        if (showSidebar && !embedSidebarIntoAssistant)
+                        if (showSidebar)
                           SidebarNavigation(
                             currentSection: controller.destination,
                             sidebarState: sidebarState,
@@ -284,8 +281,7 @@ class _AppShellState extends State<AppShell> {
                             onSettingsTabChanged: (tab) =>
                                 controller.openSettings(tab: tab),
                           ),
-                        if (sidebarState == AppSidebarState.expanded &&
-                            !embedSidebarIntoAssistant)
+                        if (sidebarState == AppSidebarState.expanded)
                           PaneResizeHandle(
                             axis: Axis.horizontal,
                             onDelta: (delta) {

@@ -19,7 +19,6 @@ import 'web_assistant_page_chrome.dart';
 import 'web_assistant_page_workspace.dart';
 import 'web_assistant_page_helpers.dart';
 
-const double webAssistantSideTabRailWidthInternal = 46;
 const double webAssistantSidePaneMinWidthInternal = 304;
 const double webAssistantSidePaneMaxWidthInternal = 420;
 const double webAssistantMainWorkspaceMinWidthInternal = 700;
@@ -38,8 +37,6 @@ class WebAssistantPage extends StatefulWidget {
   State<WebAssistantPage> createState() => WebAssistantPageStateInternal();
 }
 
-enum WebAssistantPaneInternal { tasks, quick }
-
 class WebAssistantPageStateInternal extends State<WebAssistantPage> {
   final TextEditingController inputControllerInternal = TextEditingController();
   final TextEditingController searchControllerInternal =
@@ -52,13 +49,11 @@ class WebAssistantPageStateInternal extends State<WebAssistantPage> {
       AssistantPermissionLevel.defaultAccess;
   bool useMultiAgentInternal = false;
   bool workspaceChromeCollapsedInternal = false;
-  bool sidePaneCollapsedInternal = false;
   double sidePaneWidthInternal = 344;
   bool artifactPaneCollapsedInternal = true;
   double artifactPaneWidthInternal =
       webAssistantArtifactPaneDefaultWidthInternal;
   double composerHeightInternal = 196;
-  WebAssistantPaneInternal activePaneInternal = WebAssistantPaneInternal.tasks;
   final List<WebComposerAttachmentInternal> attachmentsInternal =
       <WebComposerAttachmentInternal>[];
 
@@ -105,7 +100,6 @@ class WebAssistantPageStateInternal extends State<WebAssistantPage> {
                 webAssistantSidePaneMinWidthInternal,
                 maxSidePaneWidth,
               );
-              final collapsedWidth = webAssistantSideTabRailWidthInternal;
 
               return Column(
                 children: [
@@ -123,19 +117,12 @@ class WebAssistantPageStateInternal extends State<WebAssistantPage> {
                   Expanded(
                     child: Row(
                       children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                          width: sidePaneCollapsedInternal
-                              ? collapsedWidth
-                              : sidePaneWidth,
-                          child: AssistantSidePaneInternal(
-                            collapsed: sidePaneCollapsedInternal,
-                            activePane: activePaneInternal,
+                        SizedBox(
+                          width: sidePaneWidth,
+                          child: AssistantTaskPaneInternal(
                             controller: controller,
                             query: queryInternal,
                             searchController: searchControllerInternal,
-                            permissionLevel: permissionLevelInternal,
                             onQueryChanged: (value) {
                               setState(
                                 () =>
@@ -146,45 +133,56 @@ class WebAssistantPageStateInternal extends State<WebAssistantPage> {
                               searchControllerInternal.clear();
                               setState(() => queryInternal = '');
                             },
-                            onToggleCollapsed: () {
-                              setState(() {
-                                sidePaneCollapsedInternal =
-                                    !sidePaneCollapsedInternal;
-                              });
-                            },
-                            onPaneChanged: (pane) {
-                              setState(() {
-                                activePaneInternal = pane;
-                                sidePaneCollapsedInternal = false;
-                              });
-                            },
-                            onPermissionChanged: (value) {
-                              setState(() => permissionLevelInternal = value);
-                            },
+                            showSingle: controller
+                                .featuresFor(UiFeaturePlatform.web)
+                                .supportsDirectAi,
+                            showLocal: controller
+                                .featuresFor(UiFeaturePlatform.web)
+                                .supportsLocalGateway,
+                            showRemote: controller
+                                .featuresFor(UiFeaturePlatform.web)
+                                .supportsRelayGateway,
+                            single: filterConversationsInternal(
+                              controller.conversationsForTarget(
+                                AssistantExecutionTarget.singleAgent,
+                              ),
+                              queryInternal,
+                            ),
+                            local: filterConversationsInternal(
+                              controller.conversationsForTarget(
+                                AssistantExecutionTarget.local,
+                              ),
+                              queryInternal,
+                            ),
+                            remote: filterConversationsInternal(
+                              controller.conversationsForTarget(
+                                AssistantExecutionTarget.remote,
+                              ),
+                              queryInternal,
+                            ),
                             onRename: renameConversationInternal,
                             onArchive: (sessionKey) => controller
                                 .saveAssistantTaskArchived(sessionKey, true),
                             onOpenActions: openConversationActionsInternal,
                           ),
                         ),
-                        if (!sidePaneCollapsedInternal)
-                          SizedBox(
-                            width: 8,
-                            child: PaneResizeHandle(
-                              axis: Axis.horizontal,
-                              onDelta: (delta) {
-                                setState(() {
-                                  sidePaneWidthInternal =
-                                      (sidePaneWidthInternal + delta)
-                                          .clamp(
-                                            webAssistantSidePaneMinWidthInternal,
-                                            maxSidePaneWidth,
-                                          )
-                                          .toDouble();
-                                });
-                              },
-                            ),
+                        SizedBox(
+                          width: 8,
+                          child: PaneResizeHandle(
+                            axis: Axis.horizontal,
+                            onDelta: (delta) {
+                              setState(() {
+                                sidePaneWidthInternal =
+                                    (sidePaneWidthInternal + delta)
+                                        .clamp(
+                                          webAssistantSidePaneMinWidthInternal,
+                                          maxSidePaneWidth,
+                                        )
+                                        .toDouble();
+                              });
+                            },
                           ),
+                        ),
                         Expanded(
                           child: buildWorkspaceWithArtifactsInternal(
                             controller: controller,
