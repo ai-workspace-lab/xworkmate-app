@@ -76,6 +76,7 @@ class SettingsPageStateInternal extends State<SettingsPage> {
   bool vaultServerExpandedInternal = true;
   bool aiGatewayExpandedInternal = true;
   bool externalAcpExpandedInternal = true;
+  bool skillsDirectoryAuthorizationExpandedInternal = true;
   int selectedGatewayProfileIndexInternal = kGatewayLocalProfileIndex;
   String gatewaySetupCodeSyncedValueInternal = '';
   String gatewayHostSyncedValueInternal = '';
@@ -251,7 +252,7 @@ class SettingsPageStateInternal extends State<SettingsPage> {
             ),
           ),
           child: SettingsPageBodyShell(
-            padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
             breadcrumbs: buildSettingsBreadcrumbs(
               controller,
               tab: tabInternal,

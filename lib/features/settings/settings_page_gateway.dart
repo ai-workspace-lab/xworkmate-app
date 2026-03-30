@@ -161,7 +161,21 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
           ),
         ],
         GatewayIntegrationSubTabInternal.skills => <Widget>[
-          SkillDirectoryAuthorizationCard(controller: controller),
+          buildCollapsibleGatewaySectionInternal(
+            context: context,
+            title: appText(
+              'SKILLS 目录授权',
+              'SKILLS Directory Authorization',
+            ),
+            expanded: skillsDirectoryAuthorizationExpandedInternal,
+            onChanged: (value) => setStateInternal(() {
+              skillsDirectoryAuthorizationExpandedInternal = value;
+            }),
+            child: SkillDirectoryAuthorizationCard(
+              controller: controller,
+              showHeader: false,
+            ),
+          ),
         ],
       },
     ];
@@ -232,7 +246,21 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
         ),
       ),
       const SizedBox(height: 16),
-      SkillDirectoryAuthorizationCard(controller: controller),
+      buildCollapsibleGatewaySectionInternal(
+        context: context,
+        title: appText(
+          'SKILLS 目录授权',
+          'SKILLS Directory Authorization',
+        ),
+        expanded: skillsDirectoryAuthorizationExpandedInternal,
+        onChanged: (value) => setStateInternal(() {
+          skillsDirectoryAuthorizationExpandedInternal = value;
+        }),
+        child: SkillDirectoryAuthorizationCard(
+          controller: controller,
+          showHeader: false,
+        ),
+      ),
     ];
   }
 
@@ -651,45 +679,40 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
     required Widget child,
   }) {
     final theme = Theme.of(context);
-    return SurfaceCard(
-      borderWidth: settingsHairlineBorderWidthInternal,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: () => onChanged(!expanded),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(title, style: theme.textTheme.titleLarge),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => onChanged(!expanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
+                IconButton(
+                  tooltip: expanded
+                      ? appText('折叠', 'Collapse')
+                      : appText('展开', 'Expand'),
+                  onPressed: () => onChanged(!expanded),
+                  icon: AnimatedRotation(
+                    turns: expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    child: const Icon(Icons.expand_more_rounded),
                   ),
-                  IconButton(
-                    tooltip: expanded
-                        ? appText('折叠', 'Collapse')
-                        : appText('展开', 'Expand'),
-                    onPressed: () => onChanged(!expanded),
-                    icon: AnimatedRotation(
-                      turns: expanded ? 0.5 : 0,
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeOut,
-                      child: const Icon(Icons.expand_more_rounded),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOut,
-            alignment: Alignment.topCenter,
-            child: expanded ? child : const SizedBox.shrink(),
-          ),
-        ],
-      ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          alignment: Alignment.topCenter,
+          child: expanded ? child : const SizedBox.shrink(),
+        ),
+      ],
     );
   }
 }
