@@ -36,4 +36,21 @@ void main() {
       AppSizes.buttonHeightDesktop,
     );
   });
+
+  test('AppTheme matches calm compact workspace baseline tokens', () {
+    expect(AppRadius.card, 16);
+    expect(AppRadius.input, 14);
+    expect(AppRadius.dialog, 18);
+    expect(AppRadius.chip, 12);
+    expect(AppTypography.sectionSize, 13);
+    expect(AppTypography.bodySize, 13);
+    expect(AppTypography.compactBodySize, 13);
+    expect(AppSizes.buttonHeightDesktop, 30);
+
+    expect(AppTheme.light().colorScheme.primary, const Color(0xFF0058BD));
+    expect(
+      AppTheme.dark().scaffoldBackgroundColor,
+      const Color(0xFF141422),
+    );
+  });
 }

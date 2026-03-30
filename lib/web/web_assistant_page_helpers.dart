@@ -10,6 +10,7 @@ import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 import '../widgets/assistant_artifact_sidebar.dart';
 import '../widgets/desktop_workspace_scaffold.dart';
 import '../widgets/pane_resize_handle.dart';
@@ -43,7 +44,7 @@ class ChromePillInternal extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: emphasized ? palette.surfacePrimary : palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.chip),
         border: Border.all(color: palette.strokeSoft),
       ),
       child: Row(
@@ -73,7 +74,7 @@ class HeaderDropdownShellInternal extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: context.palette.surfacePrimary,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.chip),
         border: Border.all(color: context.palette.strokeSoft),
       ),
       child: child,
