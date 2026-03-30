@@ -31,6 +31,9 @@ void main() {
       find.byKey(const Key('workspace-sidebar-new-task-button')),
       findsOneWidget,
     );
+    expect(find.text('自动化'), findsNothing);
+    expect(find.text('MCP Hub'), findsNothing);
+    expect(find.text('ClawHub'), findsNothing);
     expect(
       find.byKey(const Key('assistant-workspace-chrome-toggle')),
       findsOneWidget,
@@ -92,49 +95,20 @@ void main() {
     expect(find.byKey(const Key('assistant-side-pane-tab-quick')), findsNothing);
     expect(find.byKey(const Key('assistant-focus-panel-title')), findsNothing);
 
-    await tester.tap(find.text('设置').last);
+    await tester.tap(
+      find.byKey(const ValueKey<String>('sidebar-footer-settings')),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(SidebarNavigation), findsOneWidget);
-    await tester.ensureVisible(find.text('自动化'));
-    await tester.tap(find.text('自动化').hitTestable());
-    await tester.pumpAndSettle();
-
-    expect(find.text('任务工作台'), findsOneWidget);
-
-    await tester.tap(find.text('设置').last);
-    await tester.pumpAndSettle();
-
     expect(find.text('设置'), findsWidgets);
     expect(
       find.byKey(const ValueKey('web-settings-search-field')),
       findsOneWidget,
     );
-
-    await tester.tap(
-      find.byKey(const ValueKey<String>('sidebar-settings-tab-gateway')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('OpenClaw Gateway'), findsWidgets);
-    expect(find.text('LLM 接入点'), findsWidgets);
-    expect(find.textContaining('浏览器本地存储'), findsOneWidget);
-    expect(find.textContaining('Local Gateway'), findsWidgets);
-    expect(find.textContaining('Remote Gateway'), findsWidgets);
-
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('web-external-acp-provider-add-button')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Claude'), findsNothing);
-    expect(find.text('Gemini'), findsNothing);
     expect(
-      find.byKey(const ValueKey('web-external-acp-provider-add-button')),
-      findsOneWidget,
+      find.byKey(const ValueKey<String>('sidebar-settings-tab-gateway')),
+      findsNothing,
     );
-    expect(find.text('添加更多自定义配置'), findsOneWidget);
-    expect(find.text('标志'), findsNothing);
-    expect(find.text('Badge'), findsNothing);
   });
 }
