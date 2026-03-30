@@ -102,10 +102,13 @@ void main() {
 
     expect(find.byType(SidebarNavigation), findsOneWidget);
     expect(find.text('设置'), findsWidgets);
+    expect(find.text('集成'), findsWidgets);
     expect(
       find.byKey(const ValueKey('web-settings-search-field')),
       findsOneWidget,
     );
+    expect(find.text('OpenClaw Gateway'), findsWidgets);
+    expect(find.text('账号访问'), findsNothing);
     expect(
       find.byKey(const ValueKey<String>('sidebar-settings-tab-gateway')),
       findsNothing,

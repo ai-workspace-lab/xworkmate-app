@@ -268,7 +268,7 @@ class _AppShellState extends State<AppShell> {
                               if (destination ==
                                   WorkspaceDestination.settings) {
                                 controller.openSettings(
-                                  tab: SettingsTab.general,
+                                  tab: SettingsTab.gateway,
                                 );
                                 return;
                               }
