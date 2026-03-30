@@ -376,6 +376,17 @@ class AssistantSideTabRailInternal extends StatelessWidget {
       ),
       child: Column(
         children: [
+          AssistantSideTabButtonInternal(
+            key: const Key('assistant-side-pane-toggle'),
+            icon: collapsed
+                ? Icons.keyboard_double_arrow_right_rounded
+                : Icons.keyboard_double_arrow_left_rounded,
+            selected: false,
+            tooltip: collapsed
+                ? appText('展开侧板', 'Expand side pane')
+                : appText('收起侧板', 'Collapse side pane'),
+            onTap: onToggleCollapsed,
+          ),
           const SizedBox(height: 4),
           AssistantSideTabButtonInternal(
             key: const Key('assistant-side-pane-tab-tasks'),
@@ -425,28 +436,6 @@ class AssistantSideTabRailInternal extends StatelessWidget {
             ),
           ] else
             const Spacer(),
-          IconButton(
-            key: const Key('assistant-side-pane-toggle'),
-            tooltip: collapsed
-                ? appText('展开侧板', 'Expand side pane')
-                : appText('收起侧板', 'Collapse side pane'),
-            onPressed: onToggleCollapsed,
-            style: IconButton.styleFrom(
-              backgroundColor: palette.surfacePrimary,
-              foregroundColor: palette.textSecondary,
-              side: BorderSide(color: palette.strokeSoft),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            icon: Icon(
-              collapsed
-                  ? Icons.keyboard_double_arrow_right_rounded
-                  : Icons.keyboard_double_arrow_left_rounded,
-              size: 18,
-            ),
-          ),
-          const SizedBox(height: 4),
         ],
       ),
     );

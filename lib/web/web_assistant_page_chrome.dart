@@ -54,6 +54,10 @@ class AssistantWorkspaceChromeInternal extends StatelessWidget {
                   IconButton(
                     key: const Key('assistant-workspace-chrome-toggle'),
                     tooltip: appText('展开顶部导航', 'Expand top navigation'),
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(40, 40),
+                      maximumSize: const Size(40, 40),
+                    ),
                     onPressed: onToggleCollapsed,
                     icon: const Icon(Icons.keyboard_arrow_down_rounded),
                   ),
@@ -75,6 +79,10 @@ class AssistantWorkspaceChromeInternal extends StatelessWidget {
                             tooltip: appText(
                               '折叠顶部导航',
                               'Collapse top navigation',
+                            ),
+                            style: IconButton.styleFrom(
+                              minimumSize: const Size(40, 40),
+                              maximumSize: const Size(40, 40),
                             ),
                             onPressed: onToggleCollapsed,
                             icon: const Icon(Icons.keyboard_arrow_up_rounded),
@@ -162,9 +170,10 @@ class ChromeConnectionChipInternal extends StatelessWidget {
       constraints: BoxConstraints(maxWidth: compact ? 280 : 360),
       child: Container(
         key: const Key('assistant-workspace-status-chip'),
+        constraints: const BoxConstraints(minHeight: 40),
         padding: EdgeInsets.symmetric(
           horizontal: compact ? 10 : 12,
-          vertical: compact ? 6 : 7,
+          vertical: compact ? 7 : 8,
         ),
         decoration: BoxDecoration(
           color: tone.$1,

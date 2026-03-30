@@ -38,9 +38,10 @@ class ChromePillInternal extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     return Container(
+      constraints: const BoxConstraints(minHeight: 40),
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 10 : 14,
-        vertical: compact ? 8 : 10,
+        vertical: compact ? 7 : 8,
       ),
       decoration: BoxDecoration(
         color: emphasized ? palette.surfacePrimary : palette.surfaceSecondary,
@@ -71,6 +72,7 @@ class HeaderDropdownShellInternal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: const BoxConstraints(minHeight: 40),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: context.palette.surfacePrimary,
