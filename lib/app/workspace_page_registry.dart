@@ -38,6 +38,7 @@ workspacePageSpecsInternal = <WorkspaceDestination, WorkspacePageSpec>{
     desktopBuilder: (controller, onOpenDetail) => AssistantPage(
       controller: controller,
       onOpenDetail: onOpenDetail,
+      showStandaloneTaskRail: false,
     ),
     mobileBuilder: (controller, onOpenDetail) => AssistantPage(
       controller: controller,

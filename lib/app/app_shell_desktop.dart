@@ -5,7 +5,6 @@ import '../features/mobile/mobile_shell.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../theme/app_palette.dart';
-import '../theme/app_theme.dart';
 import '../widgets/detail_drawer.dart';
 import '../widgets/pane_resize_handle.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -25,6 +24,7 @@ class _AppShellState extends State<AppShell> {
   static const _sidebarMinWidth = 56.0;
   static const _sidebarViewportPadding = 72.0;
   static const _mainContentMinWidth = 640.0;
+  static const _sidebarExpandedBaseWidth = 336.0;
   double? _sidebarExpandedWidth;
 
   static const _mobileDestinations = [
@@ -45,10 +45,50 @@ class _AppShellState extends State<AppShell> {
   }
 
   double _defaultSidebarWidth(AppLanguage language, double viewportWidth) {
-    final baseWidth = language == AppLanguage.zh
-        ? AppSizes.sidebarExpandedWidthZh
-        : AppSizes.sidebarExpandedWidthEn;
-    return _clampSidebarWidth(baseWidth, viewportWidth);
+    return _clampSidebarWidth(_sidebarExpandedBaseWidth, viewportWidth);
+  }
+
+  List<SidebarTaskItem> _buildSidebarTaskItems(AppController controller) {
+    final currentSessionKey = controller.currentSessionKey.trim().isEmpty
+        ? 'main'
+        : controller.currentSessionKey.trim();
+    return controller.assistantSessions.map((session) {
+      final sessionKey = session.key.trim().isEmpty ? 'main' : session.key.trim();
+      final preview = session.lastMessagePreview?.trim() ?? '';
+      return SidebarTaskItem(
+        sessionKey: sessionKey,
+        title: session.label.trim().isEmpty
+            ? appText('新对话', 'New conversation')
+            : session.label.trim(),
+        preview: preview,
+        updatedAtMs: session.updatedAtMs,
+        executionTarget: controller.assistantExecutionTargetForSession(sessionKey),
+        isCurrent: sessionKey == currentSessionKey,
+        pending: controller.assistantSessionHasPendingRun(sessionKey),
+        draft: sessionKey.startsWith('draft:'),
+      );
+    }).toList(growable: false);
+  }
+
+  Future<void> _createSidebarConversation(AppController controller) async {
+    final sessionKey = 'draft:${DateTime.now().millisecondsSinceEpoch}';
+    controller.initializeAssistantThreadContext(
+      sessionKey,
+      title: appText('新对话', 'New conversation'),
+      executionTarget: controller.currentAssistantExecutionTarget,
+      messageViewMode: controller.currentAssistantMessageViewMode,
+      singleAgentProvider: controller.currentSingleAgentProvider,
+    );
+    controller.navigateTo(WorkspaceDestination.assistant);
+    await controller.switchSession(sessionKey);
+  }
+
+  void _toggleSidebarVisibility(AppController controller) {
+    controller.setSidebarState(
+      controller.sidebarState == AppSidebarState.hidden
+          ? AppSidebarState.expanded
+          : AppSidebarState.hidden,
+    );
   }
 
   @override
@@ -74,6 +114,7 @@ class _AppShellState extends State<AppShell> {
                 final uiFeatures = controller.featuresFor(
                   resolveUiFeaturePlatformFromContext(context),
                 );
+                final sidebarTaskItems = _buildSidebarTaskItems(controller);
                 final expandedSidebarWidth = _clampSidebarWidth(
                   _sidebarExpandedWidth ??
                       _defaultSidebarWidth(
@@ -234,9 +275,10 @@ class _AppShellState extends State<AppShell> {
                               controller.navigateTo(destination);
                             },
                             onToggleLanguage: controller.toggleAppLanguage,
-                            onCycleSidebarState: controller.cycleSidebarState,
-                            onExpandFromCollapsed: () => controller
-                                .setSidebarState(AppSidebarState.expanded),
+                            onCycleSidebarState: () =>
+                                _toggleSidebarVisibility(controller),
+                            onExpandFromCollapsed: () =>
+                                _toggleSidebarVisibility(controller),
                             onOpenHome: controller.navigateHome,
                             onOpenAccount: () => controller.navigateTo(
                               WorkspaceDestination.account,
@@ -280,6 +322,26 @@ class _AppShellState extends State<AppShell> {
                                 uiFeatures.availableSettingsTabs,
                             onSettingsTabChanged: (tab) =>
                                 controller.openSettings(tab: tab),
+                            taskItems: sidebarTaskItems,
+                            assistantSkillCount:
+                                controller.currentAssistantSkillCount,
+                            onRefreshTasks: controller.refreshSessions,
+                            onCreateTask: () =>
+                                _createSidebarConversation(controller),
+                            onSelectTask: (sessionKey) async {
+                              controller.navigateTo(WorkspaceDestination.assistant);
+                              await controller.switchSession(sessionKey);
+                            },
+                            onArchiveTask: (sessionKey) =>
+                                controller.saveAssistantTaskArchived(
+                                  sessionKey,
+                                  true,
+                                ),
+                            onRenameTask: (sessionKey, title) =>
+                                controller.saveAssistantTaskTitle(
+                                  sessionKey,
+                                  title,
+                                ),
                           ),
                         if (sidebarState == AppSidebarState.expanded)
                           PaneResizeHandle(
@@ -332,13 +394,10 @@ class _AppShellState extends State<AppShell> {
                       ),
                     if (!showSidebar)
                       Positioned(
-                        left: 0,
-                        top: 8,
-                        bottom: 0,
+                        left: 8,
+                        bottom: 8,
                         child: _SidebarRevealRail(
-                          onExpand: () => controller.setSidebarState(
-                            AppSidebarState.expanded,
-                          ),
+                          onExpand: () => _toggleSidebarVisibility(controller),
                         ),
                       ),
                   ],
@@ -398,23 +457,18 @@ class _SidebarRevealRailState extends State<_SidebarRevealRail> {
           onTap: widget.onExpand,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            width: _hovered ? 22 : 10,
+            width: _hovered ? 40 : 32,
+            height: _hovered ? 40 : 32,
             decoration: BoxDecoration(
-              color: _hovered ? palette.surfacePrimary : Colors.transparent,
-              borderRadius: const BorderRadius.horizontal(
-                right: Radius.circular(14),
-              ),
-              border: Border.all(
-                color: _hovered ? palette.strokeSoft : Colors.transparent,
-              ),
+              color: _hovered ? palette.surfacePrimary : palette.chromeSurface,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: palette.strokeSoft),
             ),
-            child: _hovered
-                ? Icon(
-                    Icons.chevron_right_rounded,
-                    size: 16,
-                    color: palette.textMuted,
-                  )
-                : null,
+            child: Icon(
+              Icons.keyboard_double_arrow_right_rounded,
+              size: 18,
+              color: palette.textSecondary,
+            ),
           ),
         ),
       ),
