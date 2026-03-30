@@ -142,10 +142,21 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
           ),
         ],
         GatewayIntegrationSubTabInternal.acp => <Widget>[
-          buildExternalAcpEndpointManagerInternal(
-            context,
-            controller,
-            settings,
+          buildCollapsibleGatewaySectionInternal(
+            context: context,
+            title: appText(
+              '外部 ACP Server Endpoint',
+              'External ACP Server Endpoints',
+            ),
+            expanded: externalAcpExpandedInternal,
+            onChanged: (value) => setStateInternal(() {
+              externalAcpExpandedInternal = value;
+            }),
+            child: buildExternalAcpEndpointManagerInternal(
+              context,
+              controller,
+              settings,
+            ),
           ),
         ],
         GatewayIntegrationSubTabInternal.skills => <Widget>[
@@ -202,7 +213,22 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
         child: buildLlmEndpointManagerInternal(context, controller, settings),
       ),
       const SizedBox(height: 16),
-      buildExternalAcpEndpointManagerInternal(context, controller, settings),
+      buildCollapsibleGatewaySectionInternal(
+        context: context,
+        title: appText(
+          '外部 ACP Server Endpoint',
+          'External ACP Server Endpoints',
+        ),
+        expanded: externalAcpExpandedInternal,
+        onChanged: (value) => setStateInternal(() {
+          externalAcpExpandedInternal = value;
+        }),
+        child: buildExternalAcpEndpointManagerInternal(
+          context,
+          controller,
+          settings,
+        ),
+      ),
       const SizedBox(height: 16),
       SkillDirectoryAuthorizationCard(controller: controller),
     ];
@@ -214,52 +240,45 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
     SettingsSnapshot settings,
   ) {
     final theme = Theme.of(context);
-    return SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            appText('外部 ACP Server Endpoint', 'External ACP Server Endpoints'),
-            style: theme.textTheme.titleLarge,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          appText(
+            '这里保留 Codex、OpenCode 作为内建接入。更多 Provider 请通过向导新增自定义 ACP Server Endpoint；历史上真正配置过的 Claude / Gemini 会迁移为自定义条目，空白旧预设会自动清理。',
+            'Codex and OpenCode stay here as built-in integrations. Add more providers through the custom ACP endpoint wizard; configured legacy Claude and Gemini entries are migrated into custom entries, while empty legacy presets are cleaned up automatically.',
           ),
-          const SizedBox(height: 8),
-          Text(
-            appText(
-              '这里保留 Codex、OpenCode 作为内建接入。更多 Provider 请通过向导新增自定义 ACP Server Endpoint；历史上真正配置过的 Claude / Gemini 会迁移为自定义条目，空白旧预设会自动清理。',
-              'Codex and OpenCode stay here as built-in integrations. Add more providers through the custom ACP endpoint wizard; configured legacy Claude and Gemini entries are migrated into custom entries, while empty legacy presets are cleaned up automatically.',
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.tonalIcon(
+            key: const ValueKey('external-acp-provider-add-button'),
+            onPressed: () => showAddExternalAcpProviderWizardInternal(
+              context,
+              controller,
+              settings,
             ),
-            style: theme.textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton.tonalIcon(
-              key: const ValueKey('external-acp-provider-add-button'),
-              onPressed: () => showAddExternalAcpProviderWizardInternal(
-                context,
-                controller,
-                settings,
-              ),
-              icon: const Icon(Icons.add_rounded),
-              label: Text(
-                appText('添加更多自定义配置', 'Add more custom configurations'),
-              ),
+            icon: const Icon(Icons.add_rounded),
+            label: Text(
+              appText('添加更多自定义配置', 'Add more custom configurations'),
             ),
           ),
-          const SizedBox(height: 16),
-          ...settings.externalAcpEndpoints.map(
-            (profile) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: buildExternalAcpProviderCardInternal(
-                context,
-                controller,
-                settings,
-                profile,
-              ),
+        ),
+        const SizedBox(height: 16),
+        ...settings.externalAcpEndpoints.map(
+          (profile) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: buildExternalAcpProviderCardInternal(
+              context,
+              controller,
+              settings,
+              profile,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

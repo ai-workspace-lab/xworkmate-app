@@ -662,6 +662,37 @@ paths:
     );
   });
 
+  testWidgets('SettingsPage external ACP section can collapse independently', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+
+    await _pumpSettingsPage(
+      tester,
+      controller,
+      tab: SettingsTab.gateway,
+    );
+
+    await _ensureVisible(tester, find.text('外部 ACP Server Endpoint'));
+    await tester.tap(find.text('外部 ACP Server Endpoint').first);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('external-acp-provider-add-button')),
+      findsNothing,
+    );
+    expect(find.textContaining('OpenCode'), findsNothing);
+
+    await tester.tap(find.text('外部 ACP Server Endpoint').first);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('external-acp-provider-add-button')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('OpenCode'), findsWidgets);
+  });
+
   testWidgets('SettingsPage shows Linux desktop integration controls', (
     WidgetTester tester,
   ) async {
