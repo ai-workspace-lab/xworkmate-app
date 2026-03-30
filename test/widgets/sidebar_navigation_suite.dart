@@ -113,9 +113,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(accountOpened, 1);
 
-    await tester.tap(
-      find.byKey(const ValueKey<String>('sidebar-footer-collapse')),
-    );
+    await tester.tap(find.byKey(const Key('workspace-sidebar-collapse-button')));
     await tester.pumpAndSettle();
     expect(sidebarCycled, 1);
   });

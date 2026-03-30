@@ -27,6 +27,8 @@ class SidebarTaskSection extends StatefulWidget {
     super.key,
     required this.items,
     required this.skillCount,
+    required this.showCollapseControl,
+    required this.onCycleSidebarState,
     this.onRefreshTasks,
     this.onCreateTask,
     this.onSelectTask,
@@ -36,6 +38,8 @@ class SidebarTaskSection extends StatefulWidget {
 
   final List<SidebarTaskItem> items;
   final int skillCount;
+  final bool showCollapseControl;
+  final VoidCallback onCycleSidebarState;
   final Future<void> Function()? onRefreshTasks;
   final Future<void> Function()? onCreateTask;
   final Future<void> Function(String sessionKey)? onSelectTask;
@@ -84,30 +88,69 @@ class _SidebarTaskSectionState extends State<SidebarTaskSection> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-          child: TextField(
-            key: const Key('workspace-sidebar-task-search'),
-            controller: _searchController,
-            onChanged: (value) {
-              setState(() {
-                _query = value.trim().toLowerCase();
-              });
-            },
-            decoration: InputDecoration(
-              hintText: appText('搜索任务', 'Search tasks'),
-              prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: _query.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: appText('清除搜索', 'Clear search'),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() {
-                          _query = '';
-                        });
-                      },
-                      icon: const Icon(Icons.close_rounded),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: TextField(
+                  key: const Key('workspace-sidebar-task-search'),
+                  controller: _searchController,
+                  onChanged: (value) {
+                    setState(() {
+                      _query = value.trim().toLowerCase();
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: appText('搜索任务', 'Search tasks'),
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: appText('清除搜索', 'Clear search'),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _query = '';
+                              });
+                            },
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                  ),
+                ),
+              ),
+              if (widget.showCollapseControl) ...[
+                const SizedBox(width: AppSpacing.xs),
+                Tooltip(
+                  message: appText('收起侧边栏', 'Collapse sidebar'),
+                  child: IconButton(
+                    key: const Key('workspace-sidebar-collapse-button'),
+                    onPressed: widget.onCycleSidebarState,
+                    visualDensity: VisualDensity.compact,
+                    splashRadius: 18,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 28,
+                      height: 28,
                     ),
-            ),
+                    style: IconButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(28, 28),
+                      maximumSize: const Size(28, 28),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: palette.textSecondary,
+                      overlayColor: palette.chromeSurfacePressed,
+                      side: BorderSide.none,
+                      shape: const CircleBorder(),
+                    ),
+                    icon: const Icon(
+                      Icons.keyboard_double_arrow_left_rounded,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
         Padding(
