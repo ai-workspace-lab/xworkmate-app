@@ -55,11 +55,7 @@
 
 说明：
 
-- `web_focus_panel_core.dart`
-- `web_focus_panel_previews.dart`
-- `web_focus_panel_support.dart`
-
-这三份旧 Web Focus Panel 副本已经不再存在，不再列入候选池。
+- 旧 Web Focus Panel 副本已经删除，不再列入候选池。
 
 ---
 
@@ -68,7 +64,7 @@
 ### 第一批：已完成
 
 - Web Focus Panel 共享化已收口到 `lib/widgets/assistant_focus_panel*.dart`
-- Web Assistant 不再通过单独的 `web_focus_panel.dart` 兼容壳间接引用共享组件
+- Web Assistant 已直接引用共享 Focus Panel 实现，不再保留旧兼容入口
 
 ### 第二批：已完成公共壳层收口
 
@@ -82,12 +78,12 @@ Desktop 与 Web 设置页当前已共用：
 
 ### 第三批：本轮完成
 
-- `IosMobileShell` 兼容壳删除后，以 `MobileShell` 作为唯一正式入口
+- 旧 iOS 移动兼容壳已删除，以 `MobileShell` 作为唯一正式入口
 
 ### 第四批：持续维护
 
 - 文档和测试应只引用当前仍存在的 UI 文件
-- 不再记录已经删除的旧 Web Focus Panel 副本路径
+- 守护测试应阻止旧兼容壳和旧副本路径回流
 
 ---
 

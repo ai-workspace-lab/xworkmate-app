@@ -11,8 +11,8 @@
   - `lib/widgets/assistant_focus_panel_core.dart`
   - `lib/widgets/assistant_focus_panel_previews.dart`
   - `lib/widgets/assistant_focus_panel_support.dart`
-- Web 侧旧的 `web_focus_panel_core.dart`、`web_focus_panel_previews.dart`、`web_focus_panel_support.dart` 已不再存在。
-- 本轮进一步移除了 `lib/web/web_focus_panel.dart` 这一层兼容导出，Web Assistant 侧不再保留旧入口。
+- Web 侧旧 Focus Panel 副本与兼容入口已全部删除。
+- Web Assistant 侧已直接依赖共享 Focus Panel 实现。
 
 ## 验收关注点
 
