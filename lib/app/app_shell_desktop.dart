@@ -21,7 +21,7 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  static const _sidebarMinWidth = 56.0;
+  static const _sidebarMinWidth = 280.0;
   static const _sidebarViewportPadding = 72.0;
   static const _mainContentMinWidth = 640.0;
   static const _sidebarExpandedBaseWidth = 336.0;
@@ -357,7 +357,7 @@ class _AppShellState extends State<AppShell> {
                           ),
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.only(top: 4, right: 4),
+                            padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
                             child: AnimatedPadding(
                               duration: const Duration(milliseconds: 220),
                               curve: Curves.easeOutCubic,
