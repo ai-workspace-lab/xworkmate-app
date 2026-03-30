@@ -3,6 +3,23 @@ import 'package:flutter/material.dart';
 
 import 'app_palette.dart';
 
+enum AppThemeSurface { desktop, web, mobile }
+
+AppThemeSurface resolveAppThemeSurface({
+  TargetPlatform? platform,
+  bool isWeb = kIsWeb,
+}) {
+  if (isWeb) {
+    return AppThemeSurface.web;
+  }
+  final resolvedPlatform = platform ?? defaultTargetPlatform;
+  if (resolvedPlatform == TargetPlatform.iOS ||
+      resolvedPlatform == TargetPlatform.android) {
+    return AppThemeSurface.mobile;
+  }
+  return AppThemeSurface.desktop;
+}
+
 // Default theme token set: simple
 class SimpleSpacing {
   SimpleSpacing._();
@@ -166,31 +183,36 @@ class AppSizes {
 }
 
 class AppTheme {
-  static ThemeData light({TargetPlatform? platform}) => _theme(
+  static ThemeData light({
+    TargetPlatform? platform,
+    AppThemeSurface? surface,
+  }) => _theme(
     brightness: Brightness.light,
     palette: AppPalette.light,
     platform: platform,
+    surface: surface,
   );
 
-  static ThemeData dark({TargetPlatform? platform}) => _theme(
+  static ThemeData dark({
+    TargetPlatform? platform,
+    AppThemeSurface? surface,
+  }) => _theme(
     brightness: Brightness.dark,
     palette: AppPalette.dark,
     platform: platform,
+    surface: surface,
   );
 
   static ThemeData _theme({
     required Brightness brightness,
     required AppPalette palette,
     TargetPlatform? platform,
+    AppThemeSurface? surface,
   }) {
     final resolvedPlatform = platform ?? defaultTargetPlatform;
-    final isDesktop =
-        resolvedPlatform == TargetPlatform.macOS ||
-        resolvedPlatform == TargetPlatform.windows ||
-        resolvedPlatform == TargetPlatform.linux;
-    final isMobile =
-        resolvedPlatform == TargetPlatform.iOS ||
-        resolvedPlatform == TargetPlatform.android;
+    final resolvedSurface =
+        surface ?? resolveAppThemeSurface(platform: resolvedPlatform);
+    final scene = _AppThemeSceneConfig.fromSurface(resolvedSurface);
     final colorScheme =
         ColorScheme.fromSeed(
           seedColor: palette.accent,
@@ -229,16 +251,14 @@ class AppTheme {
     final tunedTextTheme = _textTheme(
       base.textTheme,
       palette: palette,
-      isMobile: isMobile,
+      useCompactDisplay: scene.useCompactDisplay,
     );
 
     return base.copyWith(
       platform: resolvedPlatform,
       splashFactory: NoSplash.splashFactory,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      visualDensity: isDesktop
-          ? const VisualDensity(horizontal: -1, vertical: -1)
-          : VisualDensity.standard,
+      visualDensity: scene.visualDensity,
       dividerColor: palette.strokeSoft,
       hoverColor: palette.hover,
       textTheme: tunedTextTheme,
@@ -285,9 +305,7 @@ class AppTheme {
           minimumSize: WidgetStatePropertyAll(
             Size(
               0,
-              isDesktop
-                  ? AppSizes.buttonHeightDesktop
-                  : AppSizes.buttonHeightMobile,
+              scene.buttonHeight,
             ),
           ),
           padding: const WidgetStatePropertyAll(
@@ -318,9 +336,7 @@ class AppTheme {
           ),
           minimumSize: Size(
             0,
-            isDesktop
-                ? AppSizes.buttonHeightDesktop
-                : AppSizes.buttonHeightMobile,
+            scene.buttonHeight,
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
           shape: RoundedRectangleBorder(
@@ -337,9 +353,7 @@ class AppTheme {
           ),
           minimumSize: Size(
             0,
-            isDesktop
-                ? AppSizes.buttonHeightDesktop
-                : AppSizes.buttonHeightMobile,
+            scene.buttonHeight,
           ),
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.sm,
@@ -446,7 +460,7 @@ class AppTheme {
   static TextTheme _textTheme(
     TextTheme base, {
     required AppPalette palette,
-    required bool isMobile,
+    required bool useCompactDisplay,
   }) {
     TextStyle withUiFont(TextStyle? style) {
       return (style ?? const TextStyle()).copyWith(
@@ -459,10 +473,10 @@ class AppTheme {
     return base.copyWith(
       displaySmall: withUiFont(
         base.displaySmall?.copyWith(
-          fontSize: isMobile ? 24 : AppTypography.displaySize,
+          fontSize: useCompactDisplay ? 24 : AppTypography.displaySize,
           fontWeight: AppTypography.displayWeight,
-          letterSpacing: isMobile ? -0.24 : -0.32,
-          height: isMobile ? 28 / 24 : AppTypography.displayHeight,
+          letterSpacing: useCompactDisplay ? -0.24 : -0.32,
+          height: useCompactDisplay ? 28 / 24 : AppTypography.displayHeight,
           color: palette.textPrimary,
         ),
       ),
@@ -551,5 +565,37 @@ class AppTheme {
         ),
       ),
     );
+  }
+}
+
+class _AppThemeSceneConfig {
+  const _AppThemeSceneConfig({
+    required this.visualDensity,
+    required this.buttonHeight,
+    required this.useCompactDisplay,
+  });
+
+  final VisualDensity visualDensity;
+  final double buttonHeight;
+  final bool useCompactDisplay;
+
+  factory _AppThemeSceneConfig.fromSurface(AppThemeSurface surface) {
+    return switch (surface) {
+      AppThemeSurface.desktop => const _AppThemeSceneConfig(
+        visualDensity: VisualDensity(horizontal: -1, vertical: -1),
+        buttonHeight: AppSizes.buttonHeightDesktop,
+        useCompactDisplay: false,
+      ),
+      AppThemeSurface.web => const _AppThemeSceneConfig(
+        visualDensity: VisualDensity(horizontal: -1, vertical: -1),
+        buttonHeight: AppSizes.buttonHeightDesktop,
+        useCompactDisplay: false,
+      ),
+      AppThemeSurface.mobile => const _AppThemeSceneConfig(
+        visualDensity: VisualDensity.standard,
+        buttonHeight: AppSizes.buttonHeightMobile,
+        useCompactDisplay: true,
+      ),
+    };
   }
 }

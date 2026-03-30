@@ -25,10 +25,12 @@ class _XWorkmateAppState extends State<XWorkmateApp> {
   );
 
   late final AppController _controller;
+  late final AppThemeSurface _themeSurface;
 
   @override
   void initState() {
     super.initState();
+    _themeSurface = resolveAppThemeSurface();
     _controller = AppController(
       uiFeatureManifest: widget.featureManifest ?? UiFeatureManifest.fallback(),
     );
@@ -88,8 +90,8 @@ class _XWorkmateAppState extends State<XWorkmateApp> {
           supportedLocales: const [Locale('zh'), Locale('en')],
           localizationsDelegates: GlobalMaterialLocalizations.delegates,
           themeMode: _controller.themeMode,
-          theme: AppTheme.light(),
-          darkTheme: AppTheme.dark(),
+          theme: AppTheme.light(surface: _themeSurface),
+          darkTheme: AppTheme.dark(surface: _themeSurface),
           home: AppShell(controller: _controller),
         );
       },
