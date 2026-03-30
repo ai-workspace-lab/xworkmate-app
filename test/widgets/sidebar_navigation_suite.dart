@@ -160,6 +160,47 @@ void main() {
     );
   });
 
+  testWidgets('SidebarNavigation shows collapsed expand button at the top', (
+    WidgetTester tester,
+  ) async {
+    var expanded = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: SidebarNavigation(
+            currentSection: WorkspaceDestination.assistant,
+            sidebarState: AppSidebarState.collapsed,
+            appLanguage: AppLanguage.zh,
+            themeMode: ThemeMode.light,
+            onSectionChanged: (_) {},
+            onToggleLanguage: () {},
+            onCycleSidebarState: () {},
+            onExpandFromCollapsed: () => expanded++,
+            onOpenHome: () {},
+            onOpenAccount: () {},
+            onOpenThemeToggle: () {},
+            accountName: 'Tester',
+            accountSubtitle: 'Workspace',
+            onToggleAccountWorkspaceFollowed: () async {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('sidebar-header-expand-button')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey<String>('sidebar-footer-collapse')),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const Key('sidebar-header-expand-button')));
+    await tester.pumpAndSettle();
+    expect(expanded, 1);
+  });
+
   testWidgets('SidebarNavigation merges task controls into the global left bar', (
     WidgetTester tester,
   ) async {
