@@ -510,7 +510,7 @@ class AssistantQuickPaneInternal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return WebAssistantFocusPanel(controller: controller);
+    return AssistantFocusPanel(controller: controller);
   }
 }
 

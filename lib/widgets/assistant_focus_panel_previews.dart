@@ -15,14 +15,15 @@ import 'assistant_focus_panel_support.dart';
 class TasksFocusPreviewInternal extends StatelessWidget {
   const TasksFocusPreviewInternal({super.key, required this.controller});
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
 
   @override
   Widget build(BuildContext context) {
+    final typedController = castAssistantFocusControllerInternal(controller);
     final items = <DerivedTaskItem>[
-      ...controller.tasksController.running.take(2),
-      ...controller.tasksController.queue.take(2),
-      ...controller.tasksController.history.take(1),
+      ...typedController.tasksController.running.take(2),
+      ...typedController.tasksController.queue.take(2),
+      ...typedController.tasksController.history.take(1),
     ].take(4).toList(growable: false);
 
     return Column(
@@ -34,20 +35,20 @@ class TasksFocusPreviewInternal extends StatelessWidget {
           children: [
             FocusPillInternal(
               label: appText(
-                '运行中 ${controller.tasksController.running.length}',
-                'Running ${controller.tasksController.running.length}',
+                '运行中 ${typedController.tasksController.running.length}',
+                'Running ${typedController.tasksController.running.length}',
               ),
             ),
             FocusPillInternal(
               label: appText(
-                '队列 ${controller.tasksController.queue.length}',
-                'Queue ${controller.tasksController.queue.length}',
+                '队列 ${typedController.tasksController.queue.length}',
+                'Queue ${typedController.tasksController.queue.length}',
               ),
             ),
             FocusPillInternal(
               label: appText(
-                '计划 ${controller.tasksController.scheduled.length}',
-                'Scheduled ${controller.tasksController.scheduled.length}',
+                '计划 ${typedController.tasksController.scheduled.length}',
+                'Scheduled ${typedController.tasksController.scheduled.length}',
               ),
             ),
           ],
@@ -56,7 +57,7 @@ class TasksFocusPreviewInternal extends StatelessWidget {
         if (items.isEmpty)
           PreviewEmptyStateInternal(
             message:
-                controller.connection.status ==
+                typedController.connection.status ==
                     RuntimeConnectionStatus.connected
                 ? appText('当前没有任务摘要。', 'No task summary yet.')
                 : appText(
@@ -83,13 +84,16 @@ class TasksFocusPreviewInternal extends StatelessWidget {
 class SkillsFocusPreviewInternal extends StatelessWidget {
   const SkillsFocusPreviewInternal({super.key, required this.controller});
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
 
   @override
   Widget build(BuildContext context) {
-    final items = controller.isSingleAgentMode
-        ? controller
-              .assistantImportedSkillsForSession(controller.currentSessionKey)
+    final typedController = castAssistantFocusControllerInternal(controller);
+    final items = typedController.isSingleAgentMode
+        ? typedController
+              .assistantImportedSkillsForSession(
+                typedController.currentSessionKey,
+              )
               .take(4)
               .map(
                 (skill) => GatewaySkillSummary(
@@ -106,11 +110,11 @@ class SkillsFocusPreviewInternal extends StatelessWidget {
                 ),
               )
               .toList(growable: false)
-        : controller.skills.take(4).toList(growable: false);
+        : typedController.skills.take(4).toList(growable: false);
     if (items.isEmpty) {
       return PreviewEmptyStateInternal(
-        message: controller.isSingleAgentMode
-            ? (controller.currentSingleAgentNeedsAiGatewayConfiguration
+        message: typedController.isSingleAgentMode
+            ? (typedController.currentSingleAgentNeedsAiGatewayConfiguration
                   ? appText(
                       '当前没有可用的外部 Agent ACP 端点，请先配置 LLM API fallback。',
                       'No external Agent ACP endpoint is available. Configure LLM API fallback first.',
@@ -119,7 +123,7 @@ class SkillsFocusPreviewInternal extends StatelessWidget {
                       '当前线程还没有已加载技能。切换 provider 后会读取该线程自己的 skills 列表。',
                       'No skills are loaded for this thread yet. Switching the provider reloads the thread-owned skills list.',
                     ))
-            : controller.connection.status == RuntimeConnectionStatus.connected
+            : typedController.connection.status == RuntimeConnectionStatus.connected
             ? appText(
                 '当前代理没有已加载技能。',
                 'No skills are loaded for the active agent.',
@@ -152,11 +156,12 @@ class SkillsFocusPreviewInternal extends StatelessWidget {
 class NodesFocusPreviewInternal extends StatelessWidget {
   const NodesFocusPreviewInternal({super.key, required this.controller});
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
 
   @override
   Widget build(BuildContext context) {
-    final items = controller.instances.take(4).toList(growable: false);
+    final typedController = castAssistantFocusControllerInternal(controller);
+    final items = typedController.instances.take(4).toList(growable: false);
     if (items.isEmpty) {
       return PreviewEmptyStateInternal(
         message: appText('当前没有节点可显示。', 'No nodes are available right now.'),
@@ -188,11 +193,12 @@ class NodesFocusPreviewInternal extends StatelessWidget {
 class AgentsFocusPreviewInternal extends StatelessWidget {
   const AgentsFocusPreviewInternal({super.key, required this.controller});
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
 
   @override
   Widget build(BuildContext context) {
-    final items = controller.agents.take(5).toList(growable: false);
+    final typedController = castAssistantFocusControllerInternal(controller);
+    final items = typedController.agents.take(5).toList(growable: false);
     if (items.isEmpty) {
       return PreviewEmptyStateInternal(
         message: appText('当前没有代理摘要。', 'No agents are available right now.'),
@@ -206,7 +212,7 @@ class AgentsFocusPreviewInternal extends StatelessWidget {
               child: FocusListTileInternal(
                 title: '${agent.emoji} ${agent.name}',
                 subtitle: agent.id,
-                trailing: agent.name == controller.activeAgentName
+                trailing: agent.name == typedController.activeAgentName
                     ? appText('当前', 'Active')
                     : agent.theme,
               ),
@@ -220,11 +226,12 @@ class AgentsFocusPreviewInternal extends StatelessWidget {
 class McpFocusPreviewInternal extends StatelessWidget {
   const McpFocusPreviewInternal({super.key, required this.controller});
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
 
   @override
   Widget build(BuildContext context) {
-    final items = controller.connectors.take(4).toList(growable: false);
+    final typedController = castAssistantFocusControllerInternal(controller);
+    final items = typedController.connectors.take(4).toList(growable: false);
     if (items.isEmpty) {
       return PreviewEmptyStateInternal(
         message: appText(
@@ -253,13 +260,14 @@ class McpFocusPreviewInternal extends StatelessWidget {
 class ClawHubFocusPreviewInternal extends StatelessWidget {
   const ClawHubFocusPreviewInternal({super.key, required this.controller});
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
 
   @override
   Widget build(BuildContext context) {
-    final skillCount = controller.isSingleAgentMode
-        ? controller.currentAssistantSkillCount
-        : controller.skills.length;
+    final typedController = castAssistantFocusControllerInternal(controller);
+    final skillCount = typedController.isSingleAgentMode
+        ? typedController.currentAssistantSkillCount
+        : typedController.skills.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -272,8 +280,8 @@ class ClawHubFocusPreviewInternal extends StatelessWidget {
             ),
             FocusPillInternal(
               label: appText(
-                '关注入口 ${controller.assistantNavigationDestinations.length}',
-                'Pinned ${controller.assistantNavigationDestinations.length}',
+                '关注入口 ${typedController.assistantNavigationDestinations.length}',
+                'Pinned ${typedController.assistantNavigationDestinations.length}',
               ),
             ),
           ],
@@ -293,11 +301,12 @@ class ClawHubFocusPreviewInternal extends StatelessWidget {
 class SecretsFocusPreviewInternal extends StatelessWidget {
   const SecretsFocusPreviewInternal({super.key, required this.controller});
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
 
   @override
   Widget build(BuildContext context) {
-    final items = controller.secretReferences.take(4).toList(growable: false);
+    final typedController = castAssistantFocusControllerInternal(controller);
+    final items = typedController.secretReferences.take(4).toList(growable: false);
     if (items.isEmpty) {
       return PreviewEmptyStateInternal(
         message: appText(
@@ -326,11 +335,12 @@ class SecretsFocusPreviewInternal extends StatelessWidget {
 class AiGatewayFocusPreviewInternal extends StatelessWidget {
   const AiGatewayFocusPreviewInternal({super.key, required this.controller});
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
 
   @override
   Widget build(BuildContext context) {
-    final items = controller.models.take(4).toList(growable: false);
+    final typedController = castAssistantFocusControllerInternal(controller);
+    final items = typedController.models.take(4).toList(growable: false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -338,11 +348,11 @@ class AiGatewayFocusPreviewInternal extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            FocusPillInternal(label: controller.connection.status.label),
+            FocusPillInternal(label: typedController.connection.status.label),
             FocusPillInternal(
               label: appText(
-                '模型 ${controller.models.length}',
-                'Models ${controller.models.length}',
+                '模型 ${typedController.models.length}',
+                'Models ${typedController.models.length}',
               ),
             ),
           ],
@@ -374,14 +384,16 @@ class AiGatewayFocusPreviewInternal extends StatelessWidget {
 class SettingsFocusPreviewInternal extends StatelessWidget {
   const SettingsFocusPreviewInternal({super.key, required this.controller});
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
 
   @override
   Widget build(BuildContext context) {
-    final languageLabel = controller.appLanguage == AppLanguage.zh
+    final typedController = castAssistantFocusControllerInternal(controller);
+    final themeMode = typedController.themeMode;
+    final languageLabel = typedController.appLanguage == AppLanguage.zh
         ? appText('中文', 'Chinese')
         : 'English';
-    final themeLabel = switch (controller.themeMode) {
+    final themeLabel = switch (themeMode) {
       ThemeMode.dark => appText('深色', 'Dark'),
       ThemeMode.light => appText('浅色', 'Light'),
       ThemeMode.system => appText('跟随系统', 'System'),
@@ -391,14 +403,12 @@ class SettingsFocusPreviewInternal extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SettingsFocusQuickActions(
-          appLanguage: controller.appLanguage,
-          themeMode: controller.themeMode,
-          onToggleLanguage: controller.toggleAppLanguage,
+          appLanguage: typedController.appLanguage,
+          themeMode: themeMode,
+          onToggleLanguage: typedController.toggleAppLanguage,
           onToggleTheme: () {
-            controller.setThemeMode(
-              controller.themeMode == ThemeMode.dark
-                  ? ThemeMode.light
-                  : ThemeMode.dark,
+            typedController.setThemeMode(
+              themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark,
             );
           },
           languageButtonKey: const Key(
@@ -425,7 +435,7 @@ class SettingsFocusPreviewInternal extends StatelessWidget {
             'Assistant 默认运行位置',
             'Default assistant execution target',
           ),
-          trailing: controller.assistantExecutionTarget.label,
+          trailing: typedController.assistantExecutionTarget.label,
         ),
         const SizedBox(height: 8),
         FocusListTileInternal(
@@ -434,7 +444,7 @@ class SettingsFocusPreviewInternal extends StatelessWidget {
             'Assistant 默认权限级别',
             'Default assistant permission level',
           ),
-          trailing: controller.assistantPermissionLevel.label,
+          trailing: typedController.assistantPermissionLevel.label,
         ),
       ],
     );
@@ -444,11 +454,12 @@ class SettingsFocusPreviewInternal extends StatelessWidget {
 class LanguageFocusPreviewInternal extends StatelessWidget {
   const LanguageFocusPreviewInternal({super.key, required this.controller});
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
 
   @override
   Widget build(BuildContext context) {
-    final currentLabel = controller.appLanguage == AppLanguage.zh
+    final typedController = castAssistantFocusControllerInternal(controller);
+    final currentLabel = typedController.appLanguage == AppLanguage.zh
         ? appText('中文', 'Chinese')
         : 'English';
 
@@ -457,10 +468,10 @@ class LanguageFocusPreviewInternal extends StatelessWidget {
       children: [
         ChromeLanguageActionButton(
           key: const Key('assistant-focus-language-toggle'),
-          appLanguage: controller.appLanguage,
+          appLanguage: typedController.appLanguage,
           compact: false,
           tooltip: appText('切换语言', 'Toggle language'),
-          onPressed: controller.toggleAppLanguage,
+          onPressed: typedController.toggleAppLanguage,
         ),
         const SizedBox(height: 12),
         FocusListTileInternal(
@@ -479,11 +490,13 @@ class LanguageFocusPreviewInternal extends StatelessWidget {
 class ThemeFocusPreviewInternal extends StatelessWidget {
   const ThemeFocusPreviewInternal({super.key, required this.controller});
 
-  final AppController controller;
+  final AssistantFocusControllerInternal controller;
 
   @override
   Widget build(BuildContext context) {
-    final themeLabel = switch (controller.themeMode) {
+    final typedController = castAssistantFocusControllerInternal(controller);
+    final themeMode = typedController.themeMode;
+    final themeLabel = switch (themeMode) {
       ThemeMode.dark => appText('深色', 'Dark'),
       ThemeMode.light => appText('浅色', 'Light'),
       ThemeMode.system => appText('跟随系统', 'System'),
@@ -494,13 +507,11 @@ class ThemeFocusPreviewInternal extends StatelessWidget {
       children: [
         ChromeIconActionButton(
           key: const Key('assistant-focus-theme-toggle'),
-          icon: chromeThemeToggleIcon(controller.themeMode),
-          tooltip: chromeThemeToggleTooltip(controller.themeMode),
+          icon: chromeThemeToggleIcon(themeMode),
+          tooltip: chromeThemeToggleTooltip(themeMode),
           onPressed: () {
-            controller.setThemeMode(
-              controller.themeMode == ThemeMode.dark
-                  ? ThemeMode.light
-                  : ThemeMode.dark,
+            typedController.setThemeMode(
+              themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark,
             );
           },
         ),
