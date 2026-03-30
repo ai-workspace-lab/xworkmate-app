@@ -222,6 +222,10 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
                 IconButton(
                   key: const Key('assistant-artifact-pane-refresh'),
                   tooltip: appText('刷新产物', 'Refresh artifacts'),
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(40, 40),
+                    maximumSize: const Size(40, 40),
+                  ),
                   onPressed: _loadingSnapshot ? null : _refreshSnapshot,
                   icon: _loadingSnapshot
                       ? const SizedBox(
@@ -234,6 +238,10 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
                 IconButton(
                   key: const Key('assistant-artifact-pane-collapse'),
                   tooltip: appText('收起右侧栏', 'Collapse sidebar'),
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(40, 40),
+                    maximumSize: const Size(40, 40),
+                  ),
                   onPressed: widget.onCollapse,
                   icon: const Icon(Icons.keyboard_double_arrow_right_rounded),
                 ),
