@@ -69,7 +69,6 @@ jobs:
         run: bash ./scripts/ci/compute_release_metadata.sh
 
   verify:
-    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout source
@@ -89,25 +88,49 @@ jobs:
         run: bash ./scripts/ci/run_code_analysis.sh
 
   build:
+    name: Build ${{ matrix.platform }} ${{ matrix.package }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: linux
             arch: amd64
+            package: deb-rpm
             runs_on: ubuntu-22.04
+            artifact_name: build-linux-amd64-deb-rpm
+            artifact_paths: |
+              dist/linux/*.deb
+              dist/linux/*.rpm
           - platform: windows
             arch: amd64
+            package: msi
             runs_on: windows-2022
+            artifact_name: build-windows-amd64-msi
+            artifact_paths: |
+              dist/windows/*.msi
+              dist/windows/*.zip
           - platform: macos
             arch: arm64
+            package: dmg
             runs_on: macos-14
+            artifact_name: build-macos-arm64-dmg
+            artifact_paths: |
+              dist/macos/*.dmg
           - platform: ios
             arch: arm64
+            package: ipa
             runs_on: macos-14
+            artifact_name: build-ios-arm64-ipa
+            artifact_paths: |
+              dist/ios/*.ipa
+              dist/ios/*.zip
           - platform: android
             arch: arm64
+            package: apk
             runs_on: ubuntu-22.04
+            artifact_name: build-android-arm64-apk
+            artifact_paths: |
+              dist/android/*.apk
     runs-on: ${{ matrix.runs_on }}
     needs:
       - prepare
@@ -155,16 +178,8 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: build-${{ matrix.platform }}-${{ matrix.arch }}
-          path: |
-            dist/linux/*.deb
-            dist/linux/*.rpm
-            dist/macos/*.dmg
-            dist/windows/*.msi
-            dist/windows/*.zip
-            dist/ios/*.ipa
-            dist/ios/*.zip
-            dist/android/*.apk
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_paths }}
           if-no-files-found: error
 
   release:
