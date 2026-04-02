@@ -43,7 +43,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilledButton, '保存本地入口'));
+    await tester.tap(find.byKey(const ValueKey('account-save-local-button')));
     await tester.pumpAndSettle();
 
     expect(
