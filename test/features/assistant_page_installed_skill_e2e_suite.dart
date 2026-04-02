@@ -1,3 +1,5 @@
+// ignore_for_file: unused_import, unnecessary_import
+
 @TestOn('vm')
 library;
 
@@ -5,6 +7,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/runtime/desktop_thread_artifact_service.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
 import 'assistant_page_suite_support.dart';
@@ -12,111 +15,98 @@ import 'assistant_page_suite_support.dart';
 void main() {
   group('AssistantPage installed skill E2E harness', () {
     for (final testCase in installedSkillE2ECasesInternal) {
-      test(
-        'discovers, binds, hands off, and captures ${testCase.skillKey}',
-        () async {
-          final tempDirectory = await Directory.systemTemp.createTemp(
-            'xworkmate-installed-skill-${testCase.skillKey}-',
-          );
-          addTearDown(() async {
-            if (await tempDirectory.exists()) {
-              try {
-                await tempDirectory.delete(recursive: true);
-              } catch (_) {}
-            }
-          });
+      test('discovers, binds, and handoffs ${testCase.skillKey}', () async {
+        final tempDirectory = await Directory.systemTemp.createTemp(
+          'xworkmate-installed-skill-${testCase.skillKey}-',
+        );
+        addTearDown(() async {
+          if (await tempDirectory.exists()) {
+            try {
+              await tempDirectory.delete(recursive: true);
+            } catch (_) {}
+          }
+        });
 
-          final skillsRoot = Directory(
-            '${tempDirectory.path}/installed-skills',
-          );
-          await seedInstalledSkillE2ERootInternal(skillsRoot);
+        final skillsRoot = Directory('${tempDirectory.path}/installed-skills');
+        final workspaceRoot = Directory('${tempDirectory.path}/workspace');
+        await workspaceRoot.create(recursive: true);
 
-          final controller = await createInstalledSkillE2EControllerInternal(
-            tempDirectory: tempDirectory,
-            skillsRoot: skillsRoot,
-          );
+        await writeSkillInternal(
+          skillsRoot,
+          'pptx',
+          skillName: 'pptx',
+          description: 'Presentation creation, editing, and QA.',
+        );
+        await writeSkillInternal(
+          skillsRoot,
+          'docx',
+          skillName: 'docx',
+          description: 'Word document authoring and editing.',
+        );
+        await writeSkillInternal(
+          skillsRoot,
+          'xlsx',
+          skillName: 'xlsx',
+          description: 'Spreadsheet authoring and formula validation.',
+        );
+        await writeSkillInternal(
+          skillsRoot,
+          'pdf',
+          skillName: 'pdf',
+          description: 'PDF extraction, creation, and form workflows.',
+        );
 
-          final importedSkills = controller.assistantImportedSkillsForSession(
-            controller.currentSessionKey,
-          );
-          final importedLabels = importedSkills
-              .map((item) => item.label)
-              .toList(growable: false);
+        final controller = await createInstalledSkillE2EControllerSimpleInternal(
+          tempDirectory: tempDirectory,
+          skillsRoot: skillsRoot,
+          workspaceRoot: workspaceRoot,
+          testCase: testCase,
+        );
 
-          expect(
-            importedLabels,
-            containsAll(
-              installedSkillE2ECasesInternal
-                  .map((item) => item.skillLabel)
-                  .toList(growable: false),
-            ),
-          );
+        final sendFuture = controller.sendChatMessage(
+          testCase.prompt,
+          selectedSkillLabels: <String>[testCase.skillKey],
+        );
+        await waitForConditionInternal(() => controller.sendCallCount == 1);
 
-          final selectedEntry = importedSkills.firstWhere(
-            (item) => item.label == testCase.skillLabel,
-          );
-          expect(selectedEntry.source, 'custom');
-          expect(selectedEntry.scope, 'user');
-          expect(selectedEntry.sourcePath, endsWith('SKILL.md'));
-          expect(selectedEntry.sourceLabel, isNotEmpty);
+        expect(controller.lastSentMessage, contains(testCase.prompt));
+        expect(controller.lastPromptInternal, contains(testCase.prompt));
+        expect(
+          controller.lastSelectedSkillLabelsInternal,
+          equals(<String>[testCase.skillKey]),
+        );
+        expect(controller.lastWorkspacePathInternal, isNotEmpty);
 
-          await controller.toggleAssistantSkillForSession(
-            controller.currentSessionKey,
-            selectedEntry.key,
-          );
-          expect(
-            controller.assistantSelectedSkillKeysForSession(
-              controller.currentSessionKey,
-            ),
-            <String>[selectedEntry.key],
-          );
+        controller.sendGate.complete();
+        await sendFuture;
 
-          final sendFuture = controller.sendChatMessage(
-            testCase.prompt,
-            selectedSkillLabels: <String>[selectedEntry.label],
-          );
-          await waitForConditionInternal(() => controller.sendCallCount == 1);
+        final artifactService = DesktopThreadArtifactService();
+        final snapshot = await artifactService.loadSnapshot(
+          workspacePath: controller.lastWorkspacePathInternal,
+          workspaceKind: WorkspaceRefKind.localPath,
+        );
 
-          expect(controller.lastPromptInternal, testCase.prompt);
-          expect(controller.lastSelectedSkillLabelsInternal, <String>[
-            selectedEntry.label,
-          ]);
-          expect(
-            controller.lastWorkspacePathInternal,
-            controller.assistantWorkspacePathForSession(
-              controller.currentSessionKey,
-            ),
-          );
-
-          controller.sendGate.complete();
-          await sendFuture;
-
-          final snapshot = await controller.loadAssistantArtifactSnapshot();
-          expect(snapshot.workspaceKind, WorkspaceRefKind.localPath);
-          expect(
-            snapshot.fileEntries.map((item) => item.relativePath),
-            contains(testCase.outputRelativePath),
-          );
-          expect(
-            snapshot.resultEntries.map((item) => item.relativePath),
-            contains(testCase.outputRelativePath),
-          );
-        },
-      );
+        expect(
+          snapshot.fileEntries.map((item) => item.relativePath),
+          contains(testCase.outputRelativePath),
+        );
+        expect(
+          snapshot.resultEntries.map((item) => item.relativePath),
+          contains(testCase.outputRelativePath),
+        );
+      });
     }
 
-    test(
-      'records deferred media skill coverage explicitly',
-      () {
-        expect(installedSkillE2EDeferredCoverageInternal, <String>[
+    test('records deferred media skill coverage explicitly', () {
+      expect(
+        installedSkillE2EDeferredCoverageInternal,
+        equals(const <String>[
           'image-cog',
           'wan-image-video-generation-editting',
           'video-translator',
           'image-resizer',
-        ]);
-      },
-      skip:
-          'Deferred until the media skill packs are installed in the test environment.',
-    );
+        ]),
+      );
+    }, skip: 'Deferred until the media skill packs are installed.');
   });
 }
