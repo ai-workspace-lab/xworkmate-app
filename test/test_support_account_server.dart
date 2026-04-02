@@ -64,6 +64,11 @@ class FakeAccountVaultServer {
         await _handleSession(request);
         continue;
       }
+      if (request.method == 'DELETE' && path == '/api/auth/session') {
+        request.response.statusCode = HttpStatus.noContent;
+        await request.response.close();
+        continue;
+      }
       if (request.method == 'GET' && path == '/api/auth/xworkmate/profile') {
         await _handleProfile(request);
         continue;
@@ -118,6 +123,7 @@ class FakeAccountVaultServer {
         'message': 'login successful',
         'token': sessionToken,
         'access_token': sessionToken,
+        'expiresAt': DateTime.utc(2030, 1, 1).toIso8601String(),
         'mfaRequired': false,
         'mfa_required': false,
         'user': _userPayload(),
@@ -149,6 +155,7 @@ class FakeAccountVaultServer {
         'message': 'login successful',
         'token': sessionToken,
         'access_token': sessionToken,
+        'expiresAt': DateTime.utc(2030, 1, 1).toIso8601String(),
         'mfaRequired': false,
         'mfa_required': false,
         'user': _userPayload(mfaEnabled: true),
@@ -229,6 +236,12 @@ class FakeAccountVaultServer {
           'vaultSecretKey': 'OPENCLAW_GATEWAY_TOKEN',
           'apisixUrl': aiGatewayBaseUrl,
           'secretLocators': secretLocators,
+        },
+        'profileScope': 'user',
+        'tokenConfigured': <String, Object?>{
+          'openclaw': true,
+          'vault': false,
+          'apisix': true,
         },
       },
     );

@@ -41,7 +41,7 @@ class SettingsController extends ChangeNotifier {
   String aiGatewayStatusInternal = 'Idle';
   String accountSessionTokenInternal = '';
   AccountSessionSummary? accountSessionInternal;
-  AccountRemoteProfile? accountProfileInternal;
+  AccountSyncState? accountSyncStateInternal;
   bool accountBusyInternal = false;
   String accountStatusInternal = 'Signed out';
   String pendingAccountMfaTicketInternal = '';
@@ -89,10 +89,21 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> saveSnapshot(SettingsSnapshot snapshot) async {
+  Future<void> saveSnapshot(
+    SettingsSnapshot snapshot, {
+    bool recordAccountOverrides = true,
+  }) async {
+    final previousSnapshot = snapshotInternal;
     snapshotInternal = snapshot;
     lastSnapshotJsonInternal = snapshotInternal.toJsonString();
     await storeInternal.saveSettingsSnapshot(snapshot);
+    if (recordAccountOverrides) {
+      await recordAccountOverridesForSnapshotChangeSettingsInternal(
+        this,
+        previous: previousSnapshot,
+        current: snapshotInternal,
+      );
+    }
     await refreshSettingsFileStampInternal();
     await reloadDerivedStateInternal();
     notifyListeners();

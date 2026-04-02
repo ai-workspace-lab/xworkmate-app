@@ -18,11 +18,6 @@ void main() {
       tester,
       accountClientFactory: (_) => _FakeAccountRuntimeClient(requireMfa: false),
     );
-    await tester.runAsync(() async {
-      await controller.settingsController.saveVaultToken(
-        _FakeAccountRuntimeClient.expectedVaultToken,
-      );
-    });
 
     await pumpPage(tester, child: AccountPage(controller: controller));
 
@@ -38,7 +33,9 @@ void main() {
       find.byKey(const ValueKey('account-password-field')),
       _FakeAccountRuntimeClient.loginPassword,
     );
+
     expect(find.byKey(const ValueKey('account-login-button')), findsOneWidget);
+
     await tester.runAsync(() async {
       await controller.settingsController.loginAccount(
         baseUrl: _FakeAccountRuntimeClient.accountBaseUrl,
@@ -57,6 +54,8 @@ void main() {
 
     expect(sessionStatus.data, contains(_FakeAccountRuntimeClient.loginEmail));
     expect(syncStatus.data, contains('ready'));
+    expect(find.byKey(const ValueKey('account-login-button')), findsNothing);
+    expect(find.byKey(const ValueKey('account-sync-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('account-logout-button')), findsOneWidget);
   });
 
@@ -67,11 +66,6 @@ void main() {
       tester,
       accountClientFactory: (_) => _FakeAccountRuntimeClient(requireMfa: true),
     );
-    await tester.runAsync(() async {
-      await controller.settingsController.saveVaultToken(
-        _FakeAccountRuntimeClient.expectedVaultToken,
-      );
-    });
 
     await pumpPage(tester, child: AccountPage(controller: controller));
 
@@ -87,7 +81,7 @@ void main() {
       find.byKey(const ValueKey('account-password-field')),
       _FakeAccountRuntimeClient.loginPassword,
     );
-    expect(find.byKey(const ValueKey('account-login-button')), findsOneWidget);
+
     await tester.runAsync(() async {
       await controller.settingsController.loginAccount(
         baseUrl: _FakeAccountRuntimeClient.accountBaseUrl,
@@ -101,6 +95,7 @@ void main() {
       find.byKey(const ValueKey('account-verify-mfa-button')),
       findsOneWidget,
     );
+    expect(find.byKey(const ValueKey('account-password-field')), findsNothing);
 
     await tester.enterText(
       find.byKey(const ValueKey('account-mfa-code-field')),
@@ -114,6 +109,7 @@ void main() {
     });
     await tester.pump();
 
+    expect(find.byKey(const ValueKey('account-sync-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('account-logout-button')), findsOneWidget);
 
     await tester.runAsync(() async {
@@ -138,10 +134,6 @@ class _FakeAccountRuntimeClient extends AccountRuntimeClient {
   static const String loginCode = '123456';
   static const String sessionToken = 'account-session-token';
   static const String mfaTicket = 'account-mfa-ticket';
-  static const String expectedVaultToken = 'vault-root-token';
-  static const String openclawGatewayToken = 'remote-openclaw-token';
-  static const String aiGatewayAccessToken = 'remote-ai-gateway-token';
-  static const String ollamaCloudApiKey = 'remote-ollama-api-key';
 
   final bool requireMfa;
 
@@ -170,6 +162,7 @@ class _FakeAccountRuntimeClient extends AccountRuntimeClient {
       'message': 'login successful',
       'token': sessionToken,
       'access_token': sessionToken,
+      'expiresAt': DateTime.utc(2030, 1, 1).toIso8601String(),
       'mfaRequired': false,
       'mfa_required': false,
       'user': _userPayload(mfaEnabled: false),
@@ -192,6 +185,7 @@ class _FakeAccountRuntimeClient extends AccountRuntimeClient {
       'message': 'login successful',
       'token': sessionToken,
       'access_token': sessionToken,
+      'expiresAt': DateTime.utc(2030, 1, 1).toIso8601String(),
       'mfaRequired': false,
       'mfa_required': false,
       'user': _userPayload(mfaEnabled: true),
@@ -217,7 +211,7 @@ class _FakeAccountRuntimeClient extends AccountRuntimeClient {
   }
 
   @override
-  Future<AccountRemoteProfile> loadProfile({required String token}) async {
+  Future<AccountProfileResponse> loadProfile({required String token}) async {
     if (token != sessionToken) {
       throw const AccountRuntimeException(
         statusCode: 401,
@@ -225,66 +219,47 @@ class _FakeAccountRuntimeClient extends AccountRuntimeClient {
         message: 'session not found',
       );
     }
-    return AccountRemoteProfile.defaults().copyWith(
-      openclawUrl: 'https://openclaw.account.example',
-      openclawOrigin: 'https://openclaw.account.example',
-      vaultUrl: accountBaseUrl,
-      vaultNamespace: 'team-a',
-      apisixUrl: '$accountBaseUrl/v1',
-      secretLocators: const <AccountSecretLocator>[
-        AccountSecretLocator(
-          id: 'locator-openclaw',
-          provider: 'vault',
-          secretPath: 'kv/openclaw',
-          secretKey: 'OPENCLAW_GATEWAY_TOKEN',
-          target: kAccountManagedSecretTargetOpenclawGatewayToken,
-          required: true,
-        ),
-        AccountSecretLocator(
-          id: 'locator-ai-gateway',
-          provider: 'vault',
-          secretPath: 'kv/apisix',
-          secretKey: 'AI_GATEWAY_ACCESS_TOKEN',
-          target: kAccountManagedSecretTargetAIGatewayAccessToken,
-          required: true,
-        ),
-        AccountSecretLocator(
-          id: 'locator-ollama',
-          provider: 'vault',
-          secretPath: 'kv/ollama',
-          secretKey: 'OLLAMA_API_KEY',
-          target: kAccountManagedSecretTargetOllamaCloudApiKey,
-          required: false,
-        ),
-      ],
-    );
-  }
-
-  @override
-  Future<String> readVaultSecretValue({
-    required String vaultUrl,
-    required String namespace,
-    required String vaultToken,
-    required String secretPath,
-    required String secretKey,
-  }) async {
-    if (vaultToken != expectedVaultToken) {
-      throw const AccountRuntimeException(
-        statusCode: 403,
-        errorCode: 'invalid_vault_token',
-        message: 'invalid vault token',
-      );
-    }
-    return switch ('$secretPath::$secretKey') {
-      'kv/openclaw::OPENCLAW_GATEWAY_TOKEN' => openclawGatewayToken,
-      'kv/apisix::AI_GATEWAY_ACCESS_TOKEN' => aiGatewayAccessToken,
-      'kv/ollama::OLLAMA_API_KEY' => ollamaCloudApiKey,
-      _ => throw const AccountRuntimeException(
-        statusCode: 404,
-        errorCode: 'secret_not_found',
-        message: 'secret not found',
+    return AccountProfileResponse(
+      profile: AccountRemoteProfile.defaults().copyWith(
+        openclawUrl: 'https://openclaw.account.example',
+        openclawOrigin: 'https://openclaw.account.example',
+        vaultUrl: accountBaseUrl,
+        vaultNamespace: 'team-a',
+        apisixUrl: '$accountBaseUrl/v1',
+        secretLocators: const <AccountSecretLocator>[
+          AccountSecretLocator(
+            id: 'locator-openclaw',
+            provider: 'vault',
+            secretPath: 'kv/openclaw',
+            secretKey: 'OPENCLAW_GATEWAY_TOKEN',
+            target: kAccountManagedSecretTargetOpenclawGatewayToken,
+            required: true,
+          ),
+          AccountSecretLocator(
+            id: 'locator-ai-gateway',
+            provider: 'vault',
+            secretPath: 'kv/apisix',
+            secretKey: 'AI_GATEWAY_ACCESS_TOKEN',
+            target: kAccountManagedSecretTargetAIGatewayAccessToken,
+            required: true,
+          ),
+          AccountSecretLocator(
+            id: 'locator-ollama',
+            provider: 'vault',
+            secretPath: 'kv/ollama',
+            secretKey: 'OLLAMA_API_KEY',
+            target: kAccountManagedSecretTargetOllamaCloudApiKey,
+            required: false,
+          ),
+        ],
       ),
-    };
+      profileScope: 'user',
+      tokenConfigured: const AccountTokenConfigured(
+        openclaw: true,
+        vault: false,
+        apisix: true,
+      ),
+    );
   }
 
   Map<String, dynamic> _userPayload({required bool mfaEnabled}) {
