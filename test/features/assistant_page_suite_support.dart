@@ -176,160 +176,19 @@ Future<void> waitForConditionInternal(bool Function() predicate) async {
   }
 }
 
-class InstalledSkillE2ECaseInternal {
-  const InstalledSkillE2ECaseInternal({
-    required this.skillKey,
-    required this.skillLabel,
-    required this.prompt,
-    required this.outputRelativePath,
-  });
-
-  final String skillKey;
-  final String skillLabel;
-  final String prompt;
-  final String outputRelativePath;
-}
-
-const List<InstalledSkillE2ECaseInternal> installedSkillE2ECasesInternal =
-    <InstalledSkillE2ECaseInternal>[
-      InstalledSkillE2ECaseInternal(
-        skillKey: 'pptx',
-        skillLabel: 'pptx',
-        prompt: 'installed-skill harness: exercise pptx handoff',
-        outputRelativePath: 'artifacts/pptx/result.md',
-      ),
-      InstalledSkillE2ECaseInternal(
-        skillKey: 'docx',
-        skillLabel: 'docx',
-        prompt: 'installed-skill harness: exercise docx handoff',
-        outputRelativePath: 'artifacts/docx/result.md',
-      ),
-      InstalledSkillE2ECaseInternal(
-        skillKey: 'xlsx',
-        skillLabel: 'xlsx',
-        prompt: 'installed-skill harness: exercise xlsx handoff',
-        outputRelativePath: 'artifacts/xlsx/result.md',
-      ),
-      InstalledSkillE2ECaseInternal(
-        skillKey: 'pdf',
-        skillLabel: 'pdf',
-        prompt: 'installed-skill harness: exercise pdf handoff',
-        outputRelativePath: 'artifacts/pdf/result.md',
-      ),
-    ];
-
-const List<String> installedSkillE2EDeferredCoverageInternal = <String>[
-  'image-cog',
-  'wan-image-video-generation-editting',
-  'video-translator',
-  'image-resizer',
-];
-
-Future<void> seedInstalledSkillE2ERootInternal(Directory root) async {
-  for (final testCase in installedSkillE2ECasesInternal) {
-    await writeSkillInternal(
-      root,
-      testCase.skillKey,
-      skillName: testCase.skillLabel,
-      description: 'Installed skill ${testCase.skillLabel}',
-    );
-  }
-}
-
-class InstalledSkillE2EAppControllerInternal extends AppController {
-  InstalledSkillE2EAppControllerInternal({
-    required SecureConfigStore store,
-    required this.sendGate,
-    super.singleAgentSharedSkillScanRootOverrides,
-  }) : super(
-         store: store,
-         runtimeCoordinator: RuntimeCoordinator(
-           gateway: FakeGatewayRuntimeInternal(store: store),
-           codex: FakeCodexRuntimeInternal(),
-         ),
-       );
-
-  final Completer<void> sendGate;
-  int sendCallCount = 0;
-  String lastPromptInternal = '';
-  List<String> lastSelectedSkillLabelsInternal = <String>[];
-  String lastWorkspacePathInternal = '';
-
-  @override
-  Future<void> sendChatMessage(
-    String message, {
-    String thinking = 'off',
-    List<GatewayChatAttachmentPayload> attachments =
-        const <GatewayChatAttachmentPayload>[],
-    List<CollaborationAttachment> localAttachments =
-        const <CollaborationAttachment>[],
-    List<String> selectedSkillLabels = const <String>[],
-  }) async {
-    sendCallCount += 1;
-    lastPromptInternal = message;
-    lastSelectedSkillLabelsInternal = selectedSkillLabels.toList(
-      growable: false,
-    );
-    lastWorkspacePathInternal = assistantWorkspacePathForSession(
-      currentSessionKey,
-    );
-    if (lastWorkspacePathInternal.trim().isEmpty) {
-      throw StateError('Installed-skill harness did not resolve a workspace.');
-    }
-
-    final selectedLabel = selectedSkillLabels.isEmpty
-        ? 'unselected'
-        : selectedSkillLabels.first;
-    final artifactFile = File(
-      '$lastWorkspacePathInternal/artifacts/$selectedLabel/result.md',
-    );
-    await artifactFile.parent.create(recursive: true);
-    await artifactFile.writeAsString(
-      [
-        '# $selectedLabel',
-        '',
-        'prompt: $message',
-        'thinking: $thinking',
-        'selected: ${selectedSkillLabels.join(', ')}',
-        'session: $currentSessionKey',
-      ].join('\n'),
-    );
-
-    await sendGate.future;
-  }
-}
-
-Future<InstalledSkillE2EAppControllerInternal>
-createInstalledSkillE2EControllerInternal({
-  required Directory tempDirectory,
-  required Directory skillsRoot,
-}) async {
-  SharedPreferences.setMockInitialValues(<String, Object>{});
-  final controller = InstalledSkillE2EAppControllerInternal(
-    store: await createStoreInternal(tempDirectory.path),
-    sendGate: Completer<void>(),
-    singleAgentSharedSkillScanRootOverrides: <String>[skillsRoot.path],
-  );
-  addTearDown(controller.dispose);
-  await waitForConditionInternal(() => !controller.initializing);
-  await waitForConditionInternal(
-    () => controller
-        .assistantImportedSkillsForSession(controller.currentSessionKey)
-        .isNotEmpty,
-  );
-  return controller;
-}
-
 class PendingSendAppControllerInternal extends AppController {
   PendingSendAppControllerInternal({
     required SecureConfigStore store,
     required this.sendGate,
+    List<String>? singleAgentSharedSkillScanRootOverrides,
   }) : super(
          store: store,
          runtimeCoordinator: RuntimeCoordinator(
            gateway: FakeGatewayRuntimeInternal(store: store),
            codex: FakeCodexRuntimeInternal(),
          ),
+         singleAgentSharedSkillScanRootOverrides:
+             singleAgentSharedSkillScanRootOverrides,
        );
 
   final Completer<void> sendGate;
@@ -350,6 +209,215 @@ class PendingSendAppControllerInternal extends AppController {
     lastSentMessage = message;
     await sendGate.future;
   }
+}
+
+class InstalledSkillE2ECaseInternal {
+  const InstalledSkillE2ECaseInternal({
+    required this.skillKey,
+    required this.prompt,
+    required this.outputRelativePath,
+    required this.outputContent,
+  });
+
+  final String skillKey;
+  final String prompt;
+  final String outputRelativePath;
+  final String outputContent;
+}
+
+const List<InstalledSkillE2ECaseInternal>
+installedSkillE2ECasesInternal = <InstalledSkillE2ECaseInternal>[
+  InstalledSkillE2ECaseInternal(
+    skillKey: 'pptx',
+    prompt: 'Create a concise slide outline for the quarterly review.',
+    outputRelativePath: 'artifacts/pptx/result.md',
+    outputContent: '# pptx\n\nCaptured slide outline for the quarterly review.',
+  ),
+  InstalledSkillE2ECaseInternal(
+    skillKey: 'docx',
+    prompt: 'Draft a short policy note with headings and bullets.',
+    outputRelativePath: 'artifacts/docx/result.md',
+    outputContent: '# docx\n\nCaptured policy note with headings and bullets.',
+  ),
+  InstalledSkillE2ECaseInternal(
+    skillKey: 'xlsx',
+    prompt: 'Prepare a tiny table with one formula and one formatted cell.',
+    outputRelativePath: 'artifacts/xlsx/result.md',
+    outputContent: '# xlsx\n\nCaptured spreadsheet result with formula notes.',
+  ),
+  InstalledSkillE2ECaseInternal(
+    skillKey: 'pdf',
+    prompt: 'Summarize a reference PDF and keep the output deterministic.',
+    outputRelativePath: 'artifacts/pdf/result.md',
+    outputContent: '# pdf\n\nCaptured PDF summary output.',
+  ),
+];
+
+const List<String> installedSkillE2EDeferredCoverageInternal = <String>[
+  'image-cog',
+  'wan-image-video-generation-editting',
+  'video-translator',
+  'image-resizer',
+];
+
+class InstalledSkillE2EAppControllerInternal
+    extends PendingSendAppControllerInternal {
+  InstalledSkillE2EAppControllerInternal({
+    required super.store,
+    required super.sendGate,
+    required this.outputRelativePath,
+    required this.outputContent,
+    required this.importedSkill,
+    super.singleAgentSharedSkillScanRootOverrides,
+    this.sessionKey = 'installed-skill-session',
+  });
+
+  final String outputRelativePath;
+  final String outputContent;
+  final AssistantThreadSkillEntry importedSkill;
+  final String sessionKey;
+  String lastPromptInternal = '';
+  List<String> lastSelectedSkillLabelsInternal = const <String>[];
+  String lastWorkspacePathInternal = '';
+
+  @override
+  Future<void> sendChatMessage(
+    String message, {
+    String thinking = 'off',
+    List<GatewayChatAttachmentPayload> attachments =
+        const <GatewayChatAttachmentPayload>[],
+    List<CollaborationAttachment> localAttachments =
+        const <CollaborationAttachment>[],
+    List<String> selectedSkillLabels = const <String>[],
+  }) async {
+    lastPromptInternal = message;
+    lastSelectedSkillLabelsInternal = List<String>.unmodifiable(
+      selectedSkillLabels,
+    );
+    lastWorkspacePathInternal = assistantWorkspacePathForSession(
+      sessionKey,
+    );
+    final workspacePath = lastWorkspacePathInternal.trim();
+    if (workspacePath.isNotEmpty) {
+      final outputFile = File('$workspacePath/$outputRelativePath');
+      await outputFile.parent.create(recursive: true);
+      await outputFile.writeAsString(outputContent, flush: true);
+    }
+    await super.sendChatMessage(
+      message,
+      thinking: thinking,
+      attachments: attachments,
+      localAttachments: localAttachments,
+      selectedSkillLabels: selectedSkillLabels,
+    );
+  }
+
+  @override
+  String get currentSessionKey => sessionKey;
+}
+
+Future<InstalledSkillE2EAppControllerInternal>
+createInstalledSkillE2EControllerInternal(
+  WidgetTester tester, {
+  required Directory tempDirectory,
+  required Directory skillsRoot,
+  required Directory workspaceRoot,
+  required InstalledSkillE2ECaseInternal testCase,
+}) async {
+  SharedPreferences.setMockInitialValues(<String, Object>{});
+  print('installed-skill ${testCase.skillKey}: helper creating store');
+  final store = SecureConfigStore(
+    enableSecureStorage: false,
+    databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+    fallbackDirectoryPathResolver: () async => tempDirectory.path,
+    defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
+  );
+  await store.initialize();
+  await store.saveSettingsSnapshot(
+    singleAgentTestSettingsInternal(workspacePath: workspaceRoot.path).copyWith(
+      assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
+      multiAgent: MultiAgentConfig.defaults().copyWith(enabled: false),
+    ),
+  );
+  print('installed-skill ${testCase.skillKey}: helper creating controller');
+
+  final controller = InstalledSkillE2EAppControllerInternal(
+    store: store,
+    sendGate: Completer<void>(),
+    outputRelativePath: testCase.outputRelativePath,
+    outputContent: testCase.outputContent,
+    importedSkill: AssistantThreadSkillEntry(
+      key: testCase.skillKey,
+      label: testCase.skillKey,
+      description: 'Installed skill under test',
+      sourcePath: '${skillsRoot.path}/${testCase.skillKey}',
+      sourceLabel: testCase.skillKey,
+    ),
+    singleAgentSharedSkillScanRootOverrides: <String>[skillsRoot.path],
+  );
+  print('installed-skill ${testCase.skillKey}: helper controller created');
+  addTearDown(controller.dispose);
+  print('installed-skill ${testCase.skillKey}: helper pumping once');
+  await tester.pump(const Duration(milliseconds: 100));
+  print('installed-skill ${testCase.skillKey}: helper pumped once');
+  final stopwatch = Stopwatch()..start();
+  while (controller.initializing) {
+    print(
+      'installed-skill ${testCase.skillKey}: helper waiting ${stopwatch.elapsedMilliseconds}ms',
+    );
+    if (stopwatch.elapsed > const Duration(seconds: 10)) {
+      fail('controller did not finish initializing before timeout');
+    }
+    await tester.pump(const Duration(milliseconds: 20));
+  }
+  controller.upsertTaskThreadInternal(
+    controller.currentSessionKey,
+    importedSkills: <AssistantThreadSkillEntry>[controller.importedSkill],
+    selectedSkillKeys: <String>[controller.importedSkill.key],
+  );
+  print('installed-skill ${testCase.skillKey}: helper initialized');
+  return controller;
+}
+
+Future<InstalledSkillE2EAppControllerInternal>
+createInstalledSkillE2EControllerSimpleInternal({
+  required Directory tempDirectory,
+  required Directory skillsRoot,
+  required Directory workspaceRoot,
+  required InstalledSkillE2ECaseInternal testCase,
+}) async {
+  SharedPreferences.setMockInitialValues(<String, Object>{});
+  final store = SecureConfigStore(
+    enableSecureStorage: false,
+    databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+    fallbackDirectoryPathResolver: () async => tempDirectory.path,
+    defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
+  );
+  await store.initialize();
+  await store.saveSettingsSnapshot(
+    singleAgentTestSettingsInternal(workspacePath: workspaceRoot.path).copyWith(
+      assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
+      multiAgent: MultiAgentConfig.defaults().copyWith(enabled: false),
+    ),
+  );
+
+  final controller = InstalledSkillE2EAppControllerInternal(
+    store: store,
+    sendGate: Completer<void>(),
+    outputRelativePath: testCase.outputRelativePath,
+    outputContent: testCase.outputContent,
+    importedSkill: AssistantThreadSkillEntry(
+      key: testCase.skillKey,
+      label: testCase.skillKey,
+      description: 'Installed skill under test',
+      sourcePath: '${skillsRoot.path}/${testCase.skillKey}',
+      sourceLabel: testCase.skillKey,
+    ),
+    singleAgentSharedSkillScanRootOverrides: <String>[skillsRoot.path],
+  );
+  addTearDown(controller.dispose);
+  await waitForConditionInternal(() => !controller.initializing);
+  return controller;
 }
 
 class CaptureSendAppControllerInternal extends AppController {
