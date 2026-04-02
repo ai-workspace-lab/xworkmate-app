@@ -139,6 +139,213 @@ class _AccountPageState extends State<AccountPage> {
     _accountMfaCodeController.clear();
   }
 
+  Widget _buildSignedOutLoginCard(BuildContext context, SettingsSnapshot settings) {
+    final theme = Theme.of(context);
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 840),
+        child: SurfaceCard(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.cloud_outlined,
+                size: 72,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                appText('账号登录', 'Account Sign In'),
+                style: theme.textTheme.headlineMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                appText('请先登录', 'Please sign in first'),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.textTheme.bodyMedium?.color?.withValues(
+                    alpha: 0.8,
+                  ),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+              TextFormField(
+                key: const ValueKey('account-base-url-field'),
+                controller: _accountBaseUrlController,
+                decoration: InputDecoration(
+                  labelText: appText('服务地址', 'Service URL'),
+                  prefixIcon: const Icon(Icons.dns_outlined),
+                ),
+                onFieldSubmitted: (_) => _saveProfile(settings),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                key: const ValueKey('account-username-field'),
+                controller: _accountUsernameController,
+                decoration: InputDecoration(
+                  labelText: appText('邮箱或账号', 'Email or Username'),
+                  prefixIcon: const Icon(Icons.person_outline_rounded),
+                ),
+                onFieldSubmitted: (_) => _saveProfile(settings),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                key: const ValueKey('account-password-field'),
+                controller: _accountPasswordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: appText('密码', 'Password'),
+                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                ),
+                onFieldSubmitted: (_) => _loginAccount(settings),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  key: const ValueKey('account-login-button'),
+                  onPressed: widget.controller.settingsController.accountBusy
+                      ? null
+                      : () => _loginAccount(settings),
+                  child: Text(appText('登录', 'Sign In')),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                key: const ValueKey('account-save-local-button'),
+                onPressed: () => _saveProfile(settings),
+                child: Text(appText('保存本地入口', 'Save Local Entry')),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileCard(
+    BuildContext context,
+    SettingsSnapshot settings,
+    bool accountBusy,
+    bool accountSignedIn,
+    bool accountMfaRequired,
+    String signedInLabel,
+    String profileDescription,
+    String sessionStatusText,
+    String syncStatusText,
+  ) {
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            accountSignedIn
+                ? signedInLabel
+                : settings.accountUsername.trim().isEmpty
+                ? appText('本地操作员', 'Local Operator')
+                : settings.accountUsername,
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            profileDescription,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            sessionStatusText,
+            key: const ValueKey('account-session-status'),
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            syncStatusText,
+            key: const ValueKey('account-sync-status'),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            key: const ValueKey('account-base-url-field'),
+            controller: _accountBaseUrlController,
+            readOnly: accountMfaRequired,
+            decoration: InputDecoration(
+              labelText: appText('服务地址', 'Service URL'),
+            ),
+            onFieldSubmitted: (_) => _saveProfile(settings),
+          ),
+          const SizedBox(height: 14),
+          TextFormField(
+            key: const ValueKey('account-username-field'),
+            controller: _accountUsernameController,
+            readOnly: accountMfaRequired,
+            decoration: InputDecoration(
+              labelText: appText('邮箱 / 用户名', 'Email / Username'),
+            ),
+            onFieldSubmitted: (_) => _saveProfile(settings),
+          ),
+          if (accountMfaRequired) ...[
+            const SizedBox(height: 16),
+            TextFormField(
+              key: const ValueKey('account-mfa-code-field'),
+              controller: _accountMfaCodeController,
+              decoration: InputDecoration(
+                labelText: appText('双重验证代码', 'MFA Code'),
+              ),
+              onFieldSubmitted: (_) => _verifyAccountMfa(),
+            ),
+          ],
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              if (accountMfaRequired)
+                FilledButton.tonal(
+                  key: const ValueKey('account-verify-mfa-button'),
+                  onPressed: accountBusy ? null : _verifyAccountMfa,
+                  child: Text(appText('验证并同步', 'Verify & Sync')),
+                ),
+              if (accountMfaRequired)
+                FilledButton.tonal(
+                  key: const ValueKey('account-edit-button'),
+                  onPressed: accountBusy ? null : _cancelAccountMfa,
+                  child: Text(
+                    appText('返回编辑', 'Back to Edit'),
+                  ),
+                ),
+              if (accountSignedIn)
+                FilledButton.tonal(
+                  key: const ValueKey('account-sync-button'),
+                  onPressed: accountBusy
+                      ? null
+                      : () => _syncAccountSettings(settings),
+                  child: Text(
+                    appText('重新同步', 'Sync Again'),
+                  ),
+                ),
+              if (accountSignedIn)
+                FilledButton.tonal(
+                  key: const ValueKey('account-logout-button'),
+                  onPressed: accountBusy ? null : _logoutAccount,
+                  child: Text(appText('退出登录', 'Log Out')),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton(
+              key: const ValueKey('account-save-local-button'),
+              onPressed: () => _saveProfile(settings),
+              child: Text(appText('保存本地入口', 'Save Local Entry')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -156,6 +363,7 @@ class _AccountPageState extends State<AccountPage> {
         final accountBusy = settingsController.accountBusy;
         final accountSignedIn = settingsController.accountSignedIn;
         final accountMfaRequired = settingsController.accountMfaRequired;
+        final accountSignedOutLoginMode = !accountSignedIn && !accountMfaRequired;
         final signedInLabel = accountSession?.email.trim().isNotEmpty == true
             ? accountSession!.email.trim()
             : accountSession?.name.trim().isNotEmpty == true
@@ -222,133 +430,19 @@ class _AccountPageState extends State<AccountPage> {
               ),
               const SizedBox(height: 24),
               if (_tab == AccountTab.profile)
-                SurfaceCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        accountSignedIn
-                            ? signedInLabel
-                            : settings.accountUsername.trim().isEmpty
-                            ? appText('本地操作员', 'Local Operator')
-                            : settings.accountUsername,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        profileDescription,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        sessionStatusText,
-                        key: const ValueKey('account-session-status'),
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        syncStatusText,
-                        key: const ValueKey('account-sync-status'),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        key: const ValueKey('account-base-url-field'),
-                        controller: _accountBaseUrlController,
-                        readOnly: accountMfaRequired,
-                        decoration: InputDecoration(
-                          labelText: appText('服务地址', 'Service URL'),
-                        ),
-                        onFieldSubmitted: (_) => _saveProfile(settings),
-                      ),
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        key: const ValueKey('account-username-field'),
-                        controller: _accountUsernameController,
-                        readOnly: accountMfaRequired,
-                        decoration: InputDecoration(
-                          labelText: appText('邮箱 / 用户名', 'Email / Username'),
-                        ),
-                        onFieldSubmitted: (_) => _saveProfile(settings),
-                      ),
-                      if (!accountSignedIn && !accountMfaRequired) ...[
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          key: const ValueKey('account-password-field'),
-                          controller: _accountPasswordController,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: appText('密码', 'Password'),
-                          ),
-                          onFieldSubmitted: (_) => _loginAccount(settings),
-                        ),
-                      ],
-                      if (accountMfaRequired) ...[
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          key: const ValueKey('account-mfa-code-field'),
-                          controller: _accountMfaCodeController,
-                          decoration: InputDecoration(
-                            labelText: appText('双重验证代码', 'MFA Code'),
-                          ),
-                          onFieldSubmitted: (_) => _verifyAccountMfa(),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          if (!accountSignedIn && !accountMfaRequired)
-                            FilledButton(
-                              key: const ValueKey('account-login-button'),
-                              onPressed: accountBusy
-                                  ? null
-                                  : () => _loginAccount(settings),
-                              child: Text(appText('登录并同步', 'Sign In & Sync')),
-                            ),
-                          if (accountMfaRequired)
-                            FilledButton.tonal(
-                              key: const ValueKey('account-verify-mfa-button'),
-                              onPressed: accountBusy ? null : _verifyAccountMfa,
-                              child: Text(appText('验证并同步', 'Verify & Sync')),
-                            ),
-                          if (accountMfaRequired)
-                            FilledButton.tonal(
-                              key: const ValueKey('account-edit-button'),
-                              onPressed: accountBusy ? null : _cancelAccountMfa,
-                              child: Text(
-                                appText('返回编辑', 'Back to Edit'),
-                              ),
-                            ),
-                          if (accountSignedIn)
-                            FilledButton.tonal(
-                              key: const ValueKey('account-sync-button'),
-                              onPressed: accountBusy
-                                  ? null
-                                  : () => _syncAccountSettings(settings),
-                              child: Text(
-                                appText('重新同步', 'Sync Again'),
-                              ),
-                            ),
-                          if (accountSignedIn)
-                            FilledButton.tonal(
-                              key: const ValueKey('account-logout-button'),
-                              onPressed: accountBusy ? null : _logoutAccount,
-                              child: Text(appText('退出登录', 'Log Out')),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: FilledButton(
-                          onPressed: () => _saveProfile(settings),
-                          child: Text(appText('保存本地入口', 'Save Local Entry')),
-                        ),
-                      ),
-                    ],
+                accountSignedOutLoginMode
+                ? _buildSignedOutLoginCard(context, settings)
+                : _buildProfileCard(
+                    context,
+                    settings,
+                    accountBusy,
+                    accountSignedIn,
+                    accountMfaRequired,
+                    signedInLabel,
+                    profileDescription,
+                    sessionStatusText,
+                    syncStatusText,
                   ),
-                ),
               if (_tab == AccountTab.workspace)
                 SurfaceCard(
                   child: Column(
