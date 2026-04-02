@@ -98,29 +98,43 @@ class _AccountPageState extends State<AccountPage> {
 
   Future<void> _loginAccount(SettingsSnapshot settings) async {
     await _saveProfile(settings);
-    await widget.controller.settingsController.loginAccount(
-      baseUrl: _accountBaseUrlController.text.trim(),
-      identifier: _accountUsernameController.text.trim(),
-      password: _accountPasswordController.text,
-    );
+    try {
+      await widget.controller.settingsController.loginAccount(
+        baseUrl: _accountBaseUrlController.text.trim(),
+        identifier: _accountUsernameController.text.trim(),
+        password: _accountPasswordController.text,
+      );
+    } finally {
+      _accountPasswordController.clear();
+    }
   }
 
   Future<void> _verifyAccountMfa() async {
-    await widget.controller.settingsController.verifyAccountMfa(
-      baseUrl: _accountBaseUrlController.text.trim(),
-      code: _accountMfaCodeController.text.trim(),
-    );
+    try {
+      await widget.controller.settingsController.verifyAccountMfa(
+        baseUrl: _accountBaseUrlController.text.trim(),
+        code: _accountMfaCodeController.text.trim(),
+      );
+    } finally {
+      _accountMfaCodeController.clear();
+    }
   }
 
-  Future<void> _syncAccountManagedSecrets(SettingsSnapshot settings) async {
+  Future<void> _syncAccountSettings(SettingsSnapshot settings) async {
     await _saveProfile(settings);
-    await widget.controller.settingsController.syncAccountManagedSecrets(
+    await widget.controller.settingsController.syncAccountSettings(
       baseUrl: _accountBaseUrlController.text.trim(),
     );
   }
 
   Future<void> _logoutAccount() async {
     await widget.controller.settingsController.logoutAccount();
+    _accountPasswordController.clear();
+    _accountMfaCodeController.clear();
+  }
+
+  Future<void> _cancelAccountMfa() async {
+    await widget.controller.settingsController.cancelAccountMfaChallenge();
     _accountPasswordController.clear();
     _accountMfaCodeController.clear();
   }
@@ -138,7 +152,7 @@ class _AccountPageState extends State<AccountPage> {
         final settingsController = controller.settingsController;
         _syncControllers(settings);
         final accountSession = settingsController.accountSession;
-        final accountProfile = settingsController.accountProfile;
+        final accountSyncState = settingsController.accountSyncState;
         final accountBusy = settingsController.accountBusy;
         final accountSignedIn = settingsController.accountSignedIn;
         final accountMfaRequired = settingsController.accountMfaRequired;
@@ -152,9 +166,28 @@ class _AccountPageState extends State<AccountPage> {
             : accountMfaRequired
             ? appText('等待双重验证', 'Waiting for MFA verification')
             : appText('未登录', 'Signed out');
-        final syncStatusText = accountProfile == null
+        final syncStatusText = accountSyncState == null
             ? appText('idle · 尚未同步远程配置', 'idle · Remote config not synced yet')
-            : '${accountProfile.syncState} · ${accountProfile.syncMessage}';
+            : '${accountSyncState.syncState} · ${accountSyncState.syncMessage}';
+        final profileDescription = accountSignedIn
+            ? appText(
+                '已登录，远端配置作为默认值；本地保存项优先',
+                'Signed in. Remote defaults apply first, and local saved values win.',
+              )
+            : accountMfaRequired
+            ? appText(
+                '请输入 MFA 验证码完成同步，也可以返回编辑账号信息。',
+                'Enter the MFA code to finish sync, or return to edit account details.',
+              )
+            : settings.accountLocalMode
+            ? appText(
+                '本地模式 · 仅保存账号入口与工作区偏好',
+                'Local mode · saves account entry and workspace preferences only',
+              )
+            : appText(
+                '登录后会同步远端默认配置，本地保存项可以覆盖远端默认值。',
+                'Signing in syncs remote defaults, and local saved values can override them.',
+              );
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
           child: Column(
@@ -194,22 +227,16 @@ class _AccountPageState extends State<AccountPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        settings.accountUsername.trim().isEmpty
+                        accountSignedIn
+                            ? signedInLabel
+                            : settings.accountUsername.trim().isEmpty
                             ? appText('本地操作员', 'Local Operator')
                             : settings.accountUsername,
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        settings.accountLocalMode
-                            ? appText(
-                                '本地模式 · 仅保存账号入口与工作区偏好',
-                                'Local mode · saves account entry and workspace preferences only',
-                              )
-                            : appText(
-                                '统一账号地址已配置，可作为后续接入入口',
-                                'Unified account base URL is configured for future integration',
-                              ),
+                        profileDescription,
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -227,6 +254,7 @@ class _AccountPageState extends State<AccountPage> {
                       TextFormField(
                         key: const ValueKey('account-base-url-field'),
                         controller: _accountBaseUrlController,
+                        readOnly: accountMfaRequired,
                         decoration: InputDecoration(
                           labelText: appText('服务地址', 'Service URL'),
                         ),
@@ -236,23 +264,26 @@ class _AccountPageState extends State<AccountPage> {
                       TextFormField(
                         key: const ValueKey('account-username-field'),
                         controller: _accountUsernameController,
+                        readOnly: accountMfaRequired,
                         decoration: InputDecoration(
                           labelText: appText('邮箱 / 用户名', 'Email / Username'),
                         ),
                         onFieldSubmitted: (_) => _saveProfile(settings),
                       ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        key: const ValueKey('account-password-field'),
-                        controller: _accountPasswordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: appText('密码', 'Password'),
+                      if (!accountSignedIn && !accountMfaRequired) ...[
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          key: const ValueKey('account-password-field'),
+                          controller: _accountPasswordController,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            labelText: appText('密码', 'Password'),
+                          ),
+                          onFieldSubmitted: (_) => _loginAccount(settings),
                         ),
-                        onFieldSubmitted: (_) => _loginAccount(settings),
-                      ),
+                      ],
                       if (accountMfaRequired) ...[
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 16),
                         TextFormField(
                           key: const ValueKey('account-mfa-code-field'),
                           controller: _accountMfaCodeController,
@@ -267,27 +298,36 @@ class _AccountPageState extends State<AccountPage> {
                         spacing: 12,
                         runSpacing: 12,
                         children: [
-                          FilledButton(
-                            key: const ValueKey('account-login-button'),
-                            onPressed: accountBusy
-                                ? null
-                                : () => _loginAccount(settings),
-                            child: Text(appText('登录', 'Log In')),
-                          ),
+                          if (!accountSignedIn && !accountMfaRequired)
+                            FilledButton(
+                              key: const ValueKey('account-login-button'),
+                              onPressed: accountBusy
+                                  ? null
+                                  : () => _loginAccount(settings),
+                              child: Text(appText('登录并同步', 'Sign In & Sync')),
+                            ),
                           if (accountMfaRequired)
                             FilledButton.tonal(
                               key: const ValueKey('account-verify-mfa-button'),
                               onPressed: accountBusy ? null : _verifyAccountMfa,
-                              child: Text(appText('验证 MFA', 'Verify MFA')),
+                              child: Text(appText('验证并同步', 'Verify & Sync')),
+                            ),
+                          if (accountMfaRequired)
+                            FilledButton.tonal(
+                              key: const ValueKey('account-edit-button'),
+                              onPressed: accountBusy ? null : _cancelAccountMfa,
+                              child: Text(
+                                appText('返回编辑', 'Back to Edit'),
+                              ),
                             ),
                           if (accountSignedIn)
                             FilledButton.tonal(
                               key: const ValueKey('account-sync-button'),
                               onPressed: accountBusy
                                   ? null
-                                  : () => _syncAccountManagedSecrets(settings),
+                                  : () => _syncAccountSettings(settings),
                               child: Text(
-                                appText('同步远程配置', 'Sync Remote Config'),
+                                appText('重新同步', 'Sync Again'),
                               ),
                             ),
                           if (accountSignedIn)
