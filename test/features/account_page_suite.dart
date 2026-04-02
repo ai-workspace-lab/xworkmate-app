@@ -25,31 +25,4 @@ void main() {
 
     expect(controller.settings.accountWorkspace, 'QA Workspace');
   });
-
-  testWidgets('AccountPage saves local entry from current controller values', (
-    WidgetTester tester,
-  ) async {
-    final controller = await createTestController(tester);
-
-    await pumpPage(tester, child: AccountPage(controller: controller));
-
-    await tester.enterText(
-      find.byKey(const ValueKey('account-base-url-field')),
-      'https://accounts.mobile.example',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('account-username-field')),
-      'mobile@example.com',
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const ValueKey('account-save-local-button')));
-    await tester.pumpAndSettle();
-
-    expect(
-      controller.settings.accountBaseUrl,
-      'https://accounts.mobile.example',
-    );
-    expect(controller.settings.accountUsername, 'mobile@example.com');
-  });
 }

@@ -212,12 +212,6 @@ class _AccountPageState extends State<AccountPage> {
                   child: Text(appText('登录', 'Sign In')),
                 ),
               ),
-              const SizedBox(height: 12),
-              TextButton(
-                key: const ValueKey('account-save-local-button'),
-                onPressed: () => _saveProfile(settings),
-                child: Text(appText('保存本地入口', 'Save Local Entry')),
-              ),
             ],
           ),
         ),
@@ -332,15 +326,6 @@ class _AccountPageState extends State<AccountPage> {
                 ),
             ],
           ),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton(
-              key: const ValueKey('account-save-local-button'),
-              onPressed: () => _saveProfile(settings),
-              child: Text(appText('保存本地入口', 'Save Local Entry')),
-            ),
-          ),
         ],
       ),
     );
@@ -389,8 +374,8 @@ class _AccountPageState extends State<AccountPage> {
               )
             : settings.accountLocalMode
             ? appText(
-                '本地模式 · 仅保存账号入口与工作区偏好',
-                'Local mode · saves account entry and workspace preferences only',
+                '本地模式 · 仅保存工作区偏好',
+                'Local mode · saves workspace preferences only',
               )
             : appText(
                 '登录后会同步远端默认配置，本地保存项可以覆盖远端默认值。',

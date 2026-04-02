@@ -26,7 +26,7 @@ void main() {
     expect(find.byIcon(Icons.cloud_outlined), findsOneWidget);
     expect(find.byKey(const ValueKey('account-password-field')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '登录'), findsOneWidget);
-    expect(find.byKey(const ValueKey('account-save-local-button')), findsOneWidget);
+    expect(find.text('保存本地入口'), findsNothing);
   });
 
   testWidgets('AccountPage logs in and shows remote sync status inline', (
