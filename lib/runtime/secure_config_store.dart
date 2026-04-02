@@ -174,6 +174,33 @@ class SecureConfigStore {
   Future<void> clearAccountSessionToken() =>
       _secretStore.clearAccountSessionToken();
 
+  Future<int> loadAccountSessionExpiresAtMs() =>
+      _secretStore.loadAccountSessionExpiresAtMs();
+
+  Future<void> saveAccountSessionExpiresAtMs(int value) =>
+      _secretStore.saveAccountSessionExpiresAtMs(value);
+
+  Future<void> clearAccountSessionExpiresAtMs() =>
+      _secretStore.clearAccountSessionExpiresAtMs();
+
+  Future<String?> loadAccountSessionUserId() =>
+      _secretStore.loadAccountSessionUserId();
+
+  Future<void> saveAccountSessionUserId(String value) =>
+      _secretStore.saveAccountSessionUserId(value);
+
+  Future<void> clearAccountSessionUserId() =>
+      _secretStore.clearAccountSessionUserId();
+
+  Future<String?> loadAccountSessionIdentifier() =>
+      _secretStore.loadAccountSessionIdentifier();
+
+  Future<void> saveAccountSessionIdentifier(String value) =>
+      _secretStore.saveAccountSessionIdentifier(value);
+
+  Future<void> clearAccountSessionIdentifier() =>
+      _secretStore.clearAccountSessionIdentifier();
+
   Future<AccountSessionSummary?> loadAccountSessionSummary() =>
       _secretStore.loadAccountSessionSummary();
 
@@ -182,6 +209,24 @@ class SecureConfigStore {
 
   Future<void> clearAccountSessionSummary() =>
       _secretStore.clearAccountSessionSummary();
+
+  Future<AccountSyncState?> loadAccountSyncState() async {
+    final payload = await loadSupportJson('account/sync_state.json');
+    if (payload == null) {
+      return null;
+    }
+    return AccountSyncState.fromJson(payload);
+  }
+
+  Future<void> saveAccountSyncState(AccountSyncState value) =>
+      saveSupportJson('account/sync_state.json', value.toJson());
+
+  Future<void> clearAccountSyncState() async {
+    final file = await supportFile('account/sync_state.json');
+    if (file != null && await file.exists()) {
+      await file.delete();
+    }
+  }
 
   Future<AccountRemoteProfile?> loadAccountProfile() =>
       _secretStore.loadAccountProfile();
