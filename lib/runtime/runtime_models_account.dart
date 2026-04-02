@@ -50,6 +50,54 @@ class AccountSessionSummary {
   }
 }
 
+class AccountTokenConfigured {
+  const AccountTokenConfigured({
+    required this.openclaw,
+    required this.vault,
+    required this.apisix,
+  });
+
+  final bool openclaw;
+  final bool vault;
+  final bool apisix;
+
+  factory AccountTokenConfigured.defaults() {
+    return const AccountTokenConfigured(
+      openclaw: false,
+      vault: false,
+      apisix: false,
+    );
+  }
+
+  AccountTokenConfigured copyWith({
+    bool? openclaw,
+    bool? vault,
+    bool? apisix,
+  }) {
+    return AccountTokenConfigured(
+      openclaw: openclaw ?? this.openclaw,
+      vault: vault ?? this.vault,
+      apisix: apisix ?? this.apisix,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'openclaw': openclaw,
+      'vault': vault,
+      'apisix': apisix,
+    };
+  }
+
+  factory AccountTokenConfigured.fromJson(Map<String, dynamic> json) {
+    return AccountTokenConfigured(
+      openclaw: json['openclaw'] as bool? ?? false,
+      vault: json['vault'] as bool? ?? false,
+      apisix: json['apisix'] as bool? ?? false,
+    );
+  }
+}
+
 class AccountSecretLocator {
   const AccountSecretLocator({
     required this.id,
@@ -116,11 +164,6 @@ class AccountRemoteProfile {
     required this.vaultNamespace,
     required this.apisixUrl,
     required this.secretLocators,
-    required this.syncState,
-    required this.syncMessage,
-    required this.aiGatewayAvailableModels,
-    required this.aiGatewaySyncMessage,
-    required this.lastSyncedAtMs,
   });
 
   final String openclawUrl;
@@ -129,11 +172,6 @@ class AccountRemoteProfile {
   final String vaultNamespace;
   final String apisixUrl;
   final List<AccountSecretLocator> secretLocators;
-  final String syncState;
-  final String syncMessage;
-  final List<String> aiGatewayAvailableModels;
-  final String aiGatewaySyncMessage;
-  final int lastSyncedAtMs;
 
   factory AccountRemoteProfile.defaults() {
     return const AccountRemoteProfile(
@@ -143,11 +181,6 @@ class AccountRemoteProfile {
       vaultNamespace: '',
       apisixUrl: '',
       secretLocators: <AccountSecretLocator>[],
-      syncState: 'idle',
-      syncMessage: 'Ready to sync',
-      aiGatewayAvailableModels: <String>[],
-      aiGatewaySyncMessage: 'Model catalog not synced yet',
-      lastSyncedAtMs: 0,
     );
   }
 
@@ -158,11 +191,6 @@ class AccountRemoteProfile {
     String? vaultNamespace,
     String? apisixUrl,
     List<AccountSecretLocator>? secretLocators,
-    String? syncState,
-    String? syncMessage,
-    List<String>? aiGatewayAvailableModels,
-    String? aiGatewaySyncMessage,
-    int? lastSyncedAtMs,
   }) {
     return AccountRemoteProfile(
       openclawUrl: openclawUrl ?? this.openclawUrl,
@@ -171,13 +199,6 @@ class AccountRemoteProfile {
       vaultNamespace: vaultNamespace ?? this.vaultNamespace,
       apisixUrl: apisixUrl ?? this.apisixUrl,
       secretLocators: secretLocators ?? this.secretLocators,
-      syncState: syncState ?? this.syncState,
-      syncMessage: syncMessage ?? this.syncMessage,
-      aiGatewayAvailableModels:
-          aiGatewayAvailableModels ?? this.aiGatewayAvailableModels,
-      aiGatewaySyncMessage:
-          aiGatewaySyncMessage ?? this.aiGatewaySyncMessage,
-      lastSyncedAtMs: lastSyncedAtMs ?? this.lastSyncedAtMs,
     );
   }
 
@@ -191,11 +212,6 @@ class AccountRemoteProfile {
       'secretLocators': secretLocators
           .map((item) => item.toJson())
           .toList(growable: false),
-      'syncState': syncState,
-      'syncMessage': syncMessage,
-      'aiGatewayAvailableModels': aiGatewayAvailableModels,
-      'aiGatewaySyncMessage': aiGatewaySyncMessage,
-      'lastSyncedAtMs': lastSyncedAtMs,
     };
   }
 
@@ -206,17 +222,9 @@ class AccountRemoteProfile {
       }
       return value
           .whereType<Map>()
-          .map((item) => AccountSecretLocator.fromJson(item.cast<String, dynamic>()))
-          .toList(growable: false);
-    }
-
-    List<String> decodeModels(Object? value) {
-      if (value is! List) {
-        return const <String>[];
-      }
-      return value
-          .map((item) => item.toString().trim())
-          .where((item) => item.isNotEmpty)
+          .map(
+            (item) => AccountSecretLocator.fromJson(item.cast<String, dynamic>()),
+          )
           .toList(growable: false);
     }
 
@@ -230,14 +238,137 @@ class AccountRemoteProfile {
           json['vaultNamespace'] as String? ?? defaults.vaultNamespace,
       apisixUrl: json['apisixUrl'] as String? ?? defaults.apisixUrl,
       secretLocators: decodeLocators(json['secretLocators']),
-      syncState: json['syncState'] as String? ?? defaults.syncState,
-      syncMessage: json['syncMessage'] as String? ?? defaults.syncMessage,
-      aiGatewayAvailableModels: decodeModels(json['aiGatewayAvailableModels']),
-      aiGatewaySyncMessage:
-          json['aiGatewaySyncMessage'] as String? ??
-          defaults.aiGatewaySyncMessage,
-      lastSyncedAtMs:
-          (json['lastSyncedAtMs'] as num?)?.toInt() ?? defaults.lastSyncedAtMs,
+    );
+  }
+
+  AccountSecretLocator? locatorForTarget(String target) {
+    final normalized = target.trim();
+    if (normalized.isEmpty) {
+      return null;
+    }
+    for (final locator in secretLocators) {
+      if (locator.target.trim() == normalized) {
+        return locator;
+      }
+    }
+    return null;
+  }
+}
+
+class AccountProfileResponse {
+  const AccountProfileResponse({
+    required this.profile,
+    required this.profileScope,
+    required this.tokenConfigured,
+  });
+
+  final AccountRemoteProfile profile;
+  final String profileScope;
+  final AccountTokenConfigured tokenConfigured;
+}
+
+class AccountSyncState {
+  const AccountSyncState({
+    required this.syncedDefaults,
+    required this.overrideFlags,
+    required this.syncState,
+    required this.syncMessage,
+    required this.lastSyncAtMs,
+    required this.lastSyncSource,
+    required this.lastSyncError,
+    required this.profileScope,
+    required this.tokenConfigured,
+  });
+
+  final AccountRemoteProfile syncedDefaults;
+  final Map<String, bool> overrideFlags;
+  final String syncState;
+  final String syncMessage;
+  final int lastSyncAtMs;
+  final String lastSyncSource;
+  final String lastSyncError;
+  final String profileScope;
+  final AccountTokenConfigured tokenConfigured;
+
+  factory AccountSyncState.defaults() {
+    return AccountSyncState(
+      syncedDefaults: AccountRemoteProfile.defaults(),
+      overrideFlags: const <String, bool>{},
+      syncState: 'idle',
+      syncMessage: 'Remote config not synced yet',
+      lastSyncAtMs: 0,
+      lastSyncSource: '',
+      lastSyncError: '',
+      profileScope: '',
+      tokenConfigured: AccountTokenConfigured.defaults(),
+    );
+  }
+
+  AccountSyncState copyWith({
+    AccountRemoteProfile? syncedDefaults,
+    Map<String, bool>? overrideFlags,
+    String? syncState,
+    String? syncMessage,
+    int? lastSyncAtMs,
+    String? lastSyncSource,
+    String? lastSyncError,
+    String? profileScope,
+    AccountTokenConfigured? tokenConfigured,
+  }) {
+    return AccountSyncState(
+      syncedDefaults: syncedDefaults ?? this.syncedDefaults,
+      overrideFlags: overrideFlags ?? this.overrideFlags,
+      syncState: syncState ?? this.syncState,
+      syncMessage: syncMessage ?? this.syncMessage,
+      lastSyncAtMs: lastSyncAtMs ?? this.lastSyncAtMs,
+      lastSyncSource: lastSyncSource ?? this.lastSyncSource,
+      lastSyncError: lastSyncError ?? this.lastSyncError,
+      profileScope: profileScope ?? this.profileScope,
+      tokenConfigured: tokenConfigured ?? this.tokenConfigured,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'syncedDefaults': syncedDefaults.toJson(),
+      'overrideFlags': overrideFlags,
+      'syncState': syncState,
+      'syncMessage': syncMessage,
+      'lastSyncAtMs': lastSyncAtMs,
+      'lastSyncSource': lastSyncSource,
+      'lastSyncError': lastSyncError,
+      'profileScope': profileScope,
+      'tokenConfigured': tokenConfigured.toJson(),
+    };
+  }
+
+  factory AccountSyncState.fromJson(Map<String, dynamic> json) {
+    Map<String, bool> decodeOverrideFlags(Object? value) {
+      if (value is! Map) {
+        return const <String, bool>{};
+      }
+      return value.map<String, bool>((key, entry) {
+        return MapEntry(key.toString(), entry == true);
+      });
+    }
+
+    return AccountSyncState(
+      syncedDefaults: AccountRemoteProfile.fromJson(
+        (json['syncedDefaults'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
+      ),
+      overrideFlags: decodeOverrideFlags(json['overrideFlags']),
+      syncState: json['syncState'] as String? ?? 'idle',
+      syncMessage:
+          json['syncMessage'] as String? ?? 'Remote config not synced yet',
+      lastSyncAtMs: (json['lastSyncAtMs'] as num?)?.toInt() ?? 0,
+      lastSyncSource: json['lastSyncSource'] as String? ?? '',
+      lastSyncError: json['lastSyncError'] as String? ?? '',
+      profileScope: json['profileScope'] as String? ?? '',
+      tokenConfigured: AccountTokenConfigured.fromJson(
+        (json['tokenConfigured'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
+      ),
     );
   }
 }
@@ -246,14 +377,10 @@ class AccountSyncResult {
   const AccountSyncResult({
     required this.state,
     required this.message,
-    required this.storedTargets,
-    required this.skippedTargets,
   });
 
   final String state;
   final String message;
-  final List<String> storedTargets;
-  final List<String> skippedTargets;
 }
 
 const String kAccountManagedSecretTargetOpenclawGatewayToken =
@@ -271,3 +398,19 @@ const List<String> kAccountManagedSecretTargets = <String>[
 bool isSupportedAccountManagedSecretTarget(String target) {
   return kAccountManagedSecretTargets.contains(target.trim());
 }
+
+const String kAccountOverrideGatewayRemoteEndpoint = 'gateway.remote.endpoint';
+const String kAccountOverrideVaultAddress = 'vault.address';
+const String kAccountOverrideVaultNamespace = 'vault.namespace';
+const String kAccountOverrideAiGatewayBaseUrl = 'aiGateway.baseUrl';
+const String kAccountOverrideAiGatewayApiKeyRef = 'aiGateway.apiKeyRef';
+const String kAccountOverrideOllamaCloudApiKeyRef = 'ollamaCloud.apiKeyRef';
+
+const List<String> kAccountOverrideFieldKeys = <String>[
+  kAccountOverrideGatewayRemoteEndpoint,
+  kAccountOverrideVaultAddress,
+  kAccountOverrideVaultNamespace,
+  kAccountOverrideAiGatewayBaseUrl,
+  kAccountOverrideAiGatewayApiKeyRef,
+  kAccountOverrideOllamaCloudApiKeyRef,
+];

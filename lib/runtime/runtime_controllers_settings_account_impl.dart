@@ -25,6 +25,8 @@ Future<void> loginAccountSettingsInternal(
 
   controller.accountBusyInternal = true;
   controller.accountStatusInternal = 'Signing in...';
+  controller.pendingAccountMfaTicketInternal = '';
+  controller.pendingAccountBaseUrlInternal = '';
   controller.notifyListeners();
 
   try {
@@ -49,6 +51,7 @@ Future<void> loginAccountSettingsInternal(
       controller,
       baseUrl: normalizedBaseUrl,
       payload: payload,
+      identifier: identifier.trim(),
     );
   } on AccountRuntimeException catch (error) {
     controller.accountStatusInternal = error.message;
@@ -95,12 +98,16 @@ Future<void> verifyAccountMfaSettingsInternal(
       mfaToken: controller.pendingAccountMfaTicketInternal,
       code: code.trim(),
     );
+    final identifier =
+        (await controller.storeInternal.loadAccountSessionIdentifier())?.trim() ??
+        controller.snapshotInternal.accountUsername.trim();
     controller.pendingAccountMfaTicketInternal = '';
     controller.pendingAccountBaseUrlInternal = '';
     await completeAccountSignInSettingsInternal(
       controller,
       baseUrl: normalizedBaseUrl,
       payload: payload,
+      identifier: identifier,
     );
   } on AccountRuntimeException catch (error) {
     controller.accountStatusInternal = error.message;
@@ -114,6 +121,7 @@ Future<void> completeAccountSignInSettingsInternal(
   SettingsController controller, {
   required String baseUrl,
   required Map<String, dynamic> payload,
+  required String identifier,
 }) async {
   final token = _stringValue(payload['token']).isNotEmpty
       ? _stringValue(payload['token'])
@@ -122,21 +130,23 @@ Future<void> completeAccountSignInSettingsInternal(
     controller.accountStatusInternal = 'Account session token is missing';
     return;
   }
-  await controller.storeInternal.saveAccountSessionToken(token);
   final user = _asMap(payload['user']);
-  if (user.isNotEmpty) {
-    await controller.storeInternal.saveAccountSessionSummary(
-      AccountSessionSummary(
-        userId: _stringValue(user['id']),
-        email: _stringValue(user['email']),
-        name: _stringValue(user['name']).isNotEmpty
-            ? _stringValue(user['name'])
-            : _stringValue(user['username']),
-        role: _stringValue(user['role']),
-        mfaEnabled: user['mfaEnabled'] as bool? ?? false,
-      ),
-    );
-  }
+  final sessionSummary = AccountSessionSummary(
+    userId: _stringValue(user['id']),
+    email: _stringValue(user['email']),
+    name: _stringValue(user['name']).isNotEmpty
+        ? _stringValue(user['name'])
+        : _stringValue(user['username']),
+    role: _stringValue(user['role']),
+    mfaEnabled: user['mfaEnabled'] == true,
+  );
+  await controller.storeInternal.saveAccountSessionToken(token);
+  await controller.storeInternal.saveAccountSessionExpiresAtMs(
+    _parseExpiresAtMs(payload['expiresAt']),
+  );
+  await controller.storeInternal.saveAccountSessionUserId(sessionSummary.userId);
+  await controller.storeInternal.saveAccountSessionIdentifier(identifier);
+  await controller.storeInternal.saveAccountSessionSummary(sessionSummary);
   controller.accountStatusInternal = 'Signed in';
   await restoreAccountSessionSettingsInternal(
     controller,
@@ -170,10 +180,21 @@ Future<void> restoreAccountSessionSettingsInternal(
     final client = controller.buildAccountClient(normalizedBaseUrl);
     final session = await client.loadSession(token: token);
     await controller.storeInternal.saveAccountSessionSummary(session);
+    if (session.userId.trim().isNotEmpty) {
+      await controller.storeInternal.saveAccountSessionUserId(session.userId);
+    }
+    final identifier = session.email.trim().isNotEmpty
+        ? session.email.trim()
+        : (await controller.storeInternal.loadAccountSessionIdentifier())
+                  ?.trim() ??
+              '';
+    if (identifier.isNotEmpty) {
+      await controller.storeInternal.saveAccountSessionIdentifier(identifier);
+    }
     controller.accountStatusInternal = session.email.trim().isEmpty
         ? 'Signed in'
-        : 'Signed in as ${session.email}';
-    await syncAccountManagedSecretsSettingsInternal(
+        : 'Signed in as ${session.email.trim()}';
+    await syncAccountSettingsInternal(
       controller,
       baseUrl: normalizedBaseUrl,
       quiet: true,
@@ -197,7 +218,7 @@ Future<void> restoreAccountSessionSettingsInternal(
   }
 }
 
-Future<AccountSyncResult> syncAccountManagedSecretsSettingsInternal(
+Future<AccountSyncResult> syncAccountSettingsInternal(
   SettingsController controller, {
   String baseUrl = '',
   bool quiet = false,
@@ -209,11 +230,9 @@ Future<AccountSyncResult> syncAccountManagedSecretsSettingsInternal(
   final token =
       (await controller.storeInternal.loadAccountSessionToken())?.trim() ?? '';
   if (normalizedBaseUrl.isEmpty || token.isEmpty) {
-    final result = const AccountSyncResult(
+    const result = AccountSyncResult(
       state: 'blocked',
       message: 'Account session is unavailable',
-      storedTargets: <String>[],
-      skippedTargets: <String>[],
     );
     controller.accountStatusInternal = result.message;
     if (!quiet) {
@@ -224,110 +243,56 @@ Future<AccountSyncResult> syncAccountManagedSecretsSettingsInternal(
 
   if (!quiet) {
     controller.accountBusyInternal = true;
-    controller.accountStatusInternal = 'Syncing account-managed secrets...';
+    controller.accountStatusInternal = 'Syncing remote defaults...';
     controller.notifyListeners();
   }
 
   try {
     final client = controller.buildAccountClient(normalizedBaseUrl);
-    final remoteProfile = await client.loadProfile(token: token);
-    final vaultToken =
-        (await controller.storeInternal.loadVaultToken())?.trim() ?? '';
-    if (vaultToken.isEmpty) {
-      final blockedProfile = remoteProfile.copyWith(
-        syncState: 'blocked',
-        syncMessage: 'Vault token is required to sync remote secrets',
-        lastSyncedAtMs: DateTime.now().millisecondsSinceEpoch,
-      );
-      await controller.storeInternal.saveAccountProfile(blockedProfile);
-      await controller.reloadDerivedStateInternal();
-      return const AccountSyncResult(
-        state: 'blocked',
-        message: 'Vault token is required to sync remote secrets',
-        storedTargets: <String>[],
-        skippedTargets: <String>[],
-      );
-    }
-
-    final storedTargets = <String>[];
-    final skippedTargets = <String>[];
-    final syncedValues = <String, String>{};
-
-    for (final locator in remoteProfile.secretLocators) {
-      final provider = locator.provider.trim().toLowerCase();
-      final target = locator.target.trim();
-      if (provider != 'vault' ||
-          !isSupportedAccountManagedSecretTarget(target)) {
-        skippedTargets.add(target);
-        continue;
-      }
-      try {
-        final value = await client.readVaultSecretValue(
-          vaultUrl: remoteProfile.vaultUrl,
-          namespace: remoteProfile.vaultNamespace,
-          vaultToken: vaultToken,
-          secretPath: locator.secretPath,
-          secretKey: locator.secretKey,
-        );
-        if (value.trim().isEmpty) {
-          skippedTargets.add(target);
-          continue;
-        }
-        await controller.storeInternal.saveAccountManagedSecret(
-          target: target,
-          value: value.trim(),
-        );
-        syncedValues[target] = value.trim();
-        storedTargets.add(target);
-      } catch (_) {
-        skippedTargets.add(target);
-      }
-    }
-
-    final aiGatewayCatalog =
-        await loadAccountManagedAiGatewayModelsSettingsInternal(
-          controller,
-          profile: remoteProfile,
-          syncedValues: syncedValues,
-        );
-    final hasSkips = skippedTargets.isNotEmpty;
-    final state = hasSkips ? 'partial' : 'ready';
-    final message = hasSkips
-        ? 'Synced ${storedTargets.length} secret(s) with ${skippedTargets.length} skipped'
-        : 'Synced ${storedTargets.length} secret(s)';
-    final nextProfile = remoteProfile.copyWith(
-      syncState: state,
-      syncMessage: message,
-      aiGatewayAvailableModels: aiGatewayCatalog.$1,
-      aiGatewaySyncMessage: aiGatewayCatalog.$2,
-      lastSyncedAtMs: DateTime.now().millisecondsSinceEpoch,
+    final response = await client.loadProfile(token: token);
+    final previousState =
+        await loadAccountSyncStateWithLegacyMigrationInternal(controller) ??
+        AccountSyncState.defaults();
+    final nextState = previousState.copyWith(
+      syncedDefaults: response.profile,
+      syncState: 'ready',
+      syncMessage: 'Remote defaults synced',
+      lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
+      lastSyncSource: normalizedBaseUrl,
+      lastSyncError: '',
+      profileScope: response.profileScope,
+      tokenConfigured: response.tokenConfigured,
     );
-    await controller.storeInternal.saveAccountProfile(nextProfile);
+    await controller.storeInternal.saveAccountSyncState(nextState);
+    await controller.storeInternal.clearAccountProfile();
+    await applyAccountSyncedDefaultsSettingsInternal(
+      controller,
+      state: nextState,
+    );
     await controller.reloadDerivedStateInternal();
-    return AccountSyncResult(
-      state: state,
-      message: message,
-      storedTargets: storedTargets,
-      skippedTargets: skippedTargets,
+    final email = controller.accountSessionInternal?.email.trim() ?? '';
+    controller.accountStatusInternal = email.isEmpty
+        ? 'Signed in'
+        : 'Signed in as $email';
+    return const AccountSyncResult(
+      state: 'ready',
+      message: 'Remote defaults synced',
     );
   } on AccountRuntimeException catch (error) {
-    final profile =
-        (await controller.storeInternal.loadAccountProfile()) ??
-        AccountRemoteProfile.defaults();
-    await controller.storeInternal.saveAccountProfile(
-      profile.copyWith(
-        syncState: 'error',
-        syncMessage: error.message,
-        lastSyncedAtMs: DateTime.now().millisecondsSinceEpoch,
-      ),
+    final previousState =
+        await loadAccountSyncStateWithLegacyMigrationInternal(controller) ??
+        AccountSyncState.defaults();
+    final errorState = previousState.copyWith(
+      syncState: 'error',
+      syncMessage: error.message,
+      lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
+      lastSyncSource: normalizedBaseUrl,
+      lastSyncError: error.message,
     );
+    await controller.storeInternal.saveAccountSyncState(errorState);
     await controller.reloadDerivedStateInternal();
-    return AccountSyncResult(
-      state: 'error',
-      message: error.message,
-      storedTargets: const <String>[],
-      skippedTargets: const <String>[],
-    );
+    controller.accountStatusInternal = error.message;
+    return AccountSyncResult(state: 'error', message: error.message);
   } finally {
     if (!quiet) {
       controller.accountBusyInternal = false;
@@ -336,43 +301,89 @@ Future<AccountSyncResult> syncAccountManagedSecretsSettingsInternal(
   }
 }
 
-Future<(List<String>, String)>
-loadAccountManagedAiGatewayModelsSettingsInternal(
+Future<void> applyAccountSyncedDefaultsSettingsInternal(
   SettingsController controller, {
-  required AccountRemoteProfile profile,
-  required Map<String, String> syncedValues,
+  required AccountSyncState state,
 }) async {
-  final localBaseUrl = controller.snapshotInternal.aiGateway.baseUrl.trim();
-  final effectiveBaseUrl = localBaseUrl.isNotEmpty
-      ? localBaseUrl
-      : controller.snapshotInternal.accountLocalMode
-      ? ''
-      : profile.apisixUrl.trim();
-  final localApiKey =
-      (await controller.storeInternal.loadAiGatewayApiKey())?.trim() ?? '';
-  final effectiveApiKey = localApiKey.isNotEmpty
-      ? localApiKey
-      : syncedValues[kAccountManagedSecretTargetAIGatewayAccessToken] ?? '';
-  if (effectiveBaseUrl.isEmpty || effectiveApiKey.isEmpty) {
-    return (const <String>[], 'Model catalog not synced yet');
+  final previous = controller.snapshotInternal;
+  var next = previous;
+  final defaults = state.syncedDefaults;
+  final overrideFlags = state.overrideFlags;
+
+  if (_isOverrideDisabled(
+        overrideFlags,
+        kAccountOverrideGatewayRemoteEndpoint,
+      ) &&
+      defaults.openclawUrl.trim().isNotEmpty) {
+    final remoteProfile = previous.gatewayProfiles[kGatewayRemoteProfileIndex];
+    final normalized = normalizeGatewayManualEndpointInternal(
+      host: defaults.openclawUrl,
+      port: remoteProfile.port,
+      tls: remoteProfile.tls,
+    );
+    next = next.copyWithGatewayProfileAt(
+      kGatewayRemoteProfileIndex,
+      remoteProfile.copyWith(
+        mode: RuntimeConnectionMode.remote,
+        useSetupCode: false,
+        setupCode: '',
+        host: normalized.host,
+        port: normalized.port,
+        tls: normalized.tls,
+      ),
+    );
   }
-  final normalizedBaseUrl = controller.normalizeAiGatewayBaseUrlInternal(
-    effectiveBaseUrl,
+
+  if (_isOverrideDisabled(overrideFlags, kAccountOverrideVaultAddress) &&
+      defaults.vaultUrl.trim().isNotEmpty) {
+    next = next.copyWith(
+      vault: next.vault.copyWith(address: defaults.vaultUrl.trim()),
+    );
+  }
+
+  if (_isOverrideDisabled(overrideFlags, kAccountOverrideVaultNamespace) &&
+      defaults.vaultNamespace.trim().isNotEmpty) {
+    next = next.copyWith(
+      vault: next.vault.copyWith(namespace: defaults.vaultNamespace.trim()),
+    );
+  }
+
+  if (_isOverrideDisabled(overrideFlags, kAccountOverrideAiGatewayBaseUrl) &&
+      defaults.apisixUrl.trim().isNotEmpty) {
+    next = next.copyWith(
+      aiGateway: next.aiGateway.copyWith(baseUrl: defaults.apisixUrl.trim()),
+    );
+  }
+
+  final aiGatewayLocator = defaults.locatorForTarget(
+    kAccountManagedSecretTargetAIGatewayAccessToken,
   );
-  if (normalizedBaseUrl == null) {
-    return (const <String>[], 'Invalid LLM API Endpoint');
+  if (_isOverrideDisabled(overrideFlags, kAccountOverrideAiGatewayApiKeyRef) &&
+      aiGatewayLocator != null) {
+    next = next.copyWith(
+      aiGateway: next.aiGateway.copyWith(apiKeyRef: aiGatewayLocator.target),
+    );
   }
-  try {
-    final models = await controller.requestAiGatewayModelsInternal(
-      uri: controller.aiGatewayModelsUriInternal(normalizedBaseUrl),
-      apiKey: effectiveApiKey,
+
+  final ollamaLocator = defaults.locatorForTarget(
+    kAccountManagedSecretTargetOllamaCloudApiKey,
+  );
+  if (_isOverrideDisabled(
+        overrideFlags,
+        kAccountOverrideOllamaCloudApiKeyRef,
+      ) &&
+      ollamaLocator != null) {
+    next = next.copyWith(
+      ollamaCloud: next.ollamaCloud.copyWith(apiKeyRef: ollamaLocator.target),
     );
-    return (
-      models.map((item) => item.id).toList(growable: false),
-      'Loaded ${models.length} model(s)',
-    );
-  } catch (error) {
-    return (const <String>[], controller.networkErrorLabelInternal(error));
+  }
+
+  if (next.accountLocalMode) {
+    next = next.copyWith(accountLocalMode: false);
+  }
+
+  if (next.toJsonString() != previous.toJsonString()) {
+    await controller.saveSnapshot(next, recordAccountOverrides: false);
   }
 }
 
@@ -388,15 +399,34 @@ Future<void> logoutAccountSettingsInternal(
   controller.pendingAccountMfaTicketInternal = '';
   controller.pendingAccountBaseUrlInternal = '';
   await controller.storeInternal.clearAccountSessionToken();
+  await controller.storeInternal.clearAccountSessionExpiresAtMs();
+  await controller.storeInternal.clearAccountSessionUserId();
+  await controller.storeInternal.clearAccountSessionIdentifier();
   await controller.storeInternal.clearAccountSessionSummary();
-  await controller.storeInternal.clearAccountProfile();
-  await controller.storeInternal.clearAccountManagedSecrets();
-  await controller.reloadDerivedStateInternal();
+  if (!controller.snapshotInternal.accountLocalMode) {
+    await controller.saveSnapshot(
+      controller.snapshotInternal.copyWith(accountLocalMode: true),
+      recordAccountOverrides: false,
+    );
+  } else {
+    await controller.reloadDerivedStateInternal();
+  }
   controller.accountStatusInternal = statusMessage;
   if (!quiet) {
     controller.accountBusyInternal = false;
     controller.notifyListeners();
   }
+}
+
+Future<void> cancelAccountMfaChallengeSettingsInternal(
+  SettingsController controller,
+) async {
+  controller.pendingAccountMfaTicketInternal = '';
+  controller.pendingAccountBaseUrlInternal = '';
+  if (!controller.accountSignedIn) {
+    controller.accountStatusInternal = 'Signed out';
+  }
+  controller.notifyListeners();
 }
 
 String normalizeAccountBaseUrlSettingsInternal(
@@ -410,6 +440,171 @@ String normalizeAccountBaseUrlSettingsInternal(
   return candidate.endsWith('/')
       ? candidate.substring(0, candidate.length - 1)
       : candidate;
+}
+
+Future<AccountSyncState?> loadAccountSyncStateWithLegacyMigrationInternal(
+  SettingsController controller,
+) async {
+  final current = await controller.storeInternal.loadAccountSyncState();
+  if (current != null) {
+    return current;
+  }
+  final legacy = await controller.storeInternal.loadAccountProfile();
+  if (legacy == null) {
+    return null;
+  }
+  final migrated = AccountSyncState.defaults().copyWith(
+    syncedDefaults: legacy,
+    syncState: 'ready',
+    syncMessage: 'Remote config migrated',
+    lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
+  );
+  await controller.storeInternal.saveAccountSyncState(migrated);
+  await controller.storeInternal.clearAccountProfile();
+  return migrated;
+}
+
+Future<void> markAccountOverrideSettingsInternal(
+  SettingsController controller, {
+  required String fieldKey,
+}) async {
+  if (!kAccountOverrideFieldKeys.contains(fieldKey)) {
+    return;
+  }
+  final current = await loadAccountSyncStateWithLegacyMigrationInternal(controller);
+  if (current == null) {
+    return;
+  }
+  if (current.overrideFlags[fieldKey] == true) {
+    return;
+  }
+  final nextFlags = Map<String, bool>.from(current.overrideFlags)
+    ..[fieldKey] = true;
+  await controller.storeInternal.saveAccountSyncState(
+    current.copyWith(overrideFlags: nextFlags),
+  );
+  await controller.reloadDerivedStateInternal();
+  controller.notifyListeners();
+}
+
+Future<void> clearAccountOverrideSettingsInternal(
+  SettingsController controller, {
+  required String fieldKey,
+}) async {
+  if (!kAccountOverrideFieldKeys.contains(fieldKey)) {
+    return;
+  }
+  final current = await loadAccountSyncStateWithLegacyMigrationInternal(controller);
+  if (current == null || current.overrideFlags[fieldKey] != true) {
+    return;
+  }
+  final nextFlags = Map<String, bool>.from(current.overrideFlags)
+    ..remove(fieldKey);
+  await controller.storeInternal.saveAccountSyncState(
+    current.copyWith(overrideFlags: nextFlags),
+  );
+  await controller.reloadDerivedStateInternal();
+  controller.notifyListeners();
+}
+
+Future<void> recordAccountOverridesForSnapshotChangeSettingsInternal(
+  SettingsController controller, {
+  required SettingsSnapshot previous,
+  required SettingsSnapshot current,
+}) async {
+  final syncState =
+      await loadAccountSyncStateWithLegacyMigrationInternal(controller);
+  if (syncState == null) {
+    return;
+  }
+
+  final nextFlags = Map<String, bool>.from(syncState.overrideFlags);
+  var changed = false;
+
+  if (_remoteGatewayEndpointChanged(previous, current)) {
+    changed = _markOverrideFlag(
+          nextFlags,
+          kAccountOverrideGatewayRemoteEndpoint,
+        ) ||
+        changed;
+  }
+  if (previous.vault.address != current.vault.address) {
+    changed = _markOverrideFlag(nextFlags, kAccountOverrideVaultAddress) || changed;
+  }
+  if (previous.vault.namespace != current.vault.namespace) {
+    changed =
+        _markOverrideFlag(nextFlags, kAccountOverrideVaultNamespace) || changed;
+  }
+  if (previous.aiGateway.baseUrl != current.aiGateway.baseUrl) {
+    changed =
+        _markOverrideFlag(nextFlags, kAccountOverrideAiGatewayBaseUrl) || changed;
+  }
+  if (previous.aiGateway.apiKeyRef != current.aiGateway.apiKeyRef) {
+    changed = _markOverrideFlag(
+          nextFlags,
+          kAccountOverrideAiGatewayApiKeyRef,
+        ) ||
+        changed;
+  }
+  if (previous.ollamaCloud.apiKeyRef != current.ollamaCloud.apiKeyRef) {
+    changed = _markOverrideFlag(
+          nextFlags,
+          kAccountOverrideOllamaCloudApiKeyRef,
+        ) ||
+        changed;
+  }
+
+  if (!changed) {
+    return;
+  }
+
+  await controller.storeInternal.saveAccountSyncState(
+    syncState.copyWith(overrideFlags: nextFlags),
+  );
+}
+
+bool _isOverrideDisabled(Map<String, bool> flags, String fieldKey) {
+  return flags[fieldKey] != true;
+}
+
+bool _markOverrideFlag(Map<String, bool> flags, String fieldKey) {
+  if (flags[fieldKey] == true) {
+    return false;
+  }
+  flags[fieldKey] = true;
+  return true;
+}
+
+bool _remoteGatewayEndpointChanged(
+  SettingsSnapshot previous,
+  SettingsSnapshot current,
+) {
+  final previousProfile = previous.gatewayProfiles[kGatewayRemoteProfileIndex];
+  final currentProfile = current.gatewayProfiles[kGatewayRemoteProfileIndex];
+  return previousProfile.mode != currentProfile.mode ||
+      previousProfile.useSetupCode != currentProfile.useSetupCode ||
+      previousProfile.setupCode != currentProfile.setupCode ||
+      previousProfile.host != currentProfile.host ||
+      previousProfile.port != currentProfile.port ||
+      previousProfile.tls != currentProfile.tls;
+}
+
+int _parseExpiresAtMs(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  final raw = _stringValue(value);
+  if (raw.isEmpty) {
+    return 0;
+  }
+  final asInt = int.tryParse(raw);
+  if (asInt != null) {
+    return asInt;
+  }
+  return DateTime.tryParse(raw)?.millisecondsSinceEpoch ?? 0;
 }
 
 Map<String, dynamic> _asMap(Object? value) {

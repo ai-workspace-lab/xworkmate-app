@@ -195,7 +195,7 @@ void registerSecureConfigStoreSuiteSecretsTestsInternal() {
     );
 
     test(
-      'SecureConfigStore persists account-managed session, profile, and secrets outside the settings snapshot',
+      'SecureConfigStore persists account session metadata and sync state outside the settings snapshot',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
           'xworkmate-account-managed-store-',
@@ -203,6 +203,9 @@ void registerSecureConfigStoreSuiteSecretsTestsInternal() {
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
 
         await store.saveAccountSessionToken('account-session-token');
+        await store.saveAccountSessionExpiresAtMs(1893456000000);
+        await store.saveAccountSessionUserId('user-1');
+        await store.saveAccountSessionIdentifier('user@example.com');
         await store.saveAccountSessionSummary(
           const AccountSessionSummary(
             userId: 'user-1',
@@ -212,39 +215,48 @@ void registerSecureConfigStoreSuiteSecretsTestsInternal() {
             mfaEnabled: false,
           ),
         );
-        await store.saveAccountProfile(
-          AccountRemoteProfile.defaults().copyWith(
-            openclawUrl: 'https://openclaw.account.example',
-            apisixUrl: 'https://apisix.account.example/v1',
+        await store.saveAccountSyncState(
+          AccountSyncState.defaults().copyWith(
+            syncedDefaults: AccountRemoteProfile.defaults().copyWith(
+              openclawUrl: 'https://openclaw.account.example',
+              apisixUrl: 'https://apisix.account.example/v1',
+              secretLocators: const <AccountSecretLocator>[
+                AccountSecretLocator(
+                  id: 'locator-ai-gateway',
+                  provider: 'vault',
+                  secretPath: 'kv/apisix',
+                  secretKey: 'AI_GATEWAY_ACCESS_TOKEN',
+                  target: kAccountManagedSecretTargetAIGatewayAccessToken,
+                  required: true,
+                ),
+              ],
+            ),
+            overrideFlags: const <String, bool>{
+              kAccountOverrideAiGatewayBaseUrl: true,
+            },
             syncState: 'ready',
-            syncMessage: 'Synced 3 secret(s)',
-            aiGatewayAvailableModels: const <String>['gpt-5.4'],
+            syncMessage: 'Remote defaults synced',
+            lastSyncAtMs: 1893456000000,
+            lastSyncSource: 'https://accounts.svc.plus',
+            profileScope: 'user',
+            tokenConfigured: const AccountTokenConfigured(
+              openclaw: true,
+              vault: false,
+              apisix: true,
+            ),
           ),
-        );
-        await store.saveAccountManagedSecret(
-          target: kAccountManagedSecretTargetAIGatewayAccessToken,
-          value: 'remote-ai-token',
         );
 
         expect(await store.loadAccountSessionToken(), 'account-session-token');
+        expect(await store.loadAccountSessionExpiresAtMs(), 1893456000000);
+        expect(await store.loadAccountSessionUserId(), 'user-1');
+        expect(await store.loadAccountSessionIdentifier(), 'user@example.com');
         expect(await store.loadAccountSessionSummary(), isNotNull);
-        expect(await store.loadAccountProfile(), isNotNull);
-        expect(
-          await store.loadAccountManagedSecret(
-            target: kAccountManagedSecretTargetAIGatewayAccessToken,
-          ),
-          'remote-ai-token',
-        );
-        expect(
-          (await store.loadSecureRefs())[
-              kAccountManagedSecretTargetAIGatewayAccessToken],
-          'remote-ai-token',
-        );
+        expect(await store.loadAccountSyncState(), isNotNull);
         expect(
           (await store.loadSettingsSnapshot()).toJsonString(),
           allOf(
             isNot(contains('account-session-token')),
-            isNot(contains('remote-ai-token')),
             isNot(contains('apisix.account.example')),
           ),
         );
