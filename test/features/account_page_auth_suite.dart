@@ -11,6 +11,24 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 import '../test_support.dart';
 
 void main() {
+  testWidgets('AccountPage shows centered login card while signed out', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(
+      tester,
+      accountClientFactory: (_) => _FakeAccountRuntimeClient(requireMfa: false),
+    );
+
+    await pumpPage(tester, child: AccountPage(controller: controller));
+
+    expect(find.text('账号登录'), findsOneWidget);
+    expect(find.text('请先登录'), findsOneWidget);
+    expect(find.byIcon(Icons.cloud_outlined), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-password-field')), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '登录'), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-save-local-button')), findsOneWidget);
+  });
+
   testWidgets('AccountPage logs in and shows remote sync status inline', (
     WidgetTester tester,
   ) async {
@@ -35,6 +53,7 @@ void main() {
     );
 
     expect(find.byKey(const ValueKey('account-login-button')), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '登录'), findsOneWidget);
 
     await tester.runAsync(() async {
       await controller.settingsController.loginAccount(
@@ -117,10 +136,8 @@ void main() {
     });
     await tester.pump();
 
-    final sessionStatus = tester.widget<Text>(
-      find.byKey(const ValueKey('account-session-status')),
-    );
-    expect(sessionStatus.data, contains('未登录'));
+    expect(find.text('账号登录'), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-login-button')), findsOneWidget);
   });
 }
 
