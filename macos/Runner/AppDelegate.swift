@@ -138,9 +138,12 @@ class AppDelegate: FlutterAppDelegate, NSWindowDelegate {
     NSApp.terminate(nil)
   }
 
+  @IBAction func showMainWindow(_ sender: Any?) {
+    showMainWindow()
+  }
+
   func windowShouldClose(_ sender: NSWindow) -> Bool {
     sender.orderOut(nil)
-    NSApp.hide(nil)
     return false
   }
 
