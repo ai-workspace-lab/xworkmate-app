@@ -90,6 +90,12 @@ class SecretStore {
   static const String _aiGatewayApiKeyKey = 'xworkmate.ai_gateway.api_key';
   static const String _accountSessionTokenKey =
       'xworkmate.account.session.token';
+  static const String _accountSessionExpiresAtKey =
+      'xworkmate.account.session.expires_at';
+  static const String _accountSessionUserIdKey =
+      'xworkmate.account.session.user_id';
+  static const String _accountSessionIdentifierKey =
+      'xworkmate.account.session.identifier';
   static const String _accountSessionSummaryKey =
       'xworkmate.account.session.summary';
   static const String _accountProfileKey = 'xworkmate.account.profile';
@@ -224,6 +230,35 @@ class SecretStore {
 
   Future<void> clearAccountSessionToken() => _deleteSecure(_accountSessionTokenKey);
 
+  Future<int> loadAccountSessionExpiresAtMs() async {
+    final raw = await _readSecure(_accountSessionExpiresAtKey);
+    return int.tryParse((raw ?? '').trim()) ?? 0;
+  }
+
+  Future<void> saveAccountSessionExpiresAtMs(int value) =>
+      _writeSecure(_accountSessionExpiresAtKey, value.toString());
+
+  Future<void> clearAccountSessionExpiresAtMs() =>
+      _deleteSecure(_accountSessionExpiresAtKey);
+
+  Future<String?> loadAccountSessionUserId() =>
+      _readSecure(_accountSessionUserIdKey);
+
+  Future<void> saveAccountSessionUserId(String value) =>
+      _writeSecure(_accountSessionUserIdKey, value);
+
+  Future<void> clearAccountSessionUserId() =>
+      _deleteSecure(_accountSessionUserIdKey);
+
+  Future<String?> loadAccountSessionIdentifier() =>
+      _readSecure(_accountSessionIdentifierKey);
+
+  Future<void> saveAccountSessionIdentifier(String value) =>
+      _writeSecure(_accountSessionIdentifierKey, value);
+
+  Future<void> clearAccountSessionIdentifier() =>
+      _deleteSecure(_accountSessionIdentifierKey);
+
   Future<AccountSessionSummary?> loadAccountSessionSummary() async {
     final raw = await _readSecure(_accountSessionSummaryKey);
     if ((raw ?? '').trim().isEmpty) {
@@ -324,12 +359,6 @@ class SecretStore {
     }
     if (aiGatewayApiKey case final value?) {
       secureRefs['ai_gateway_api_key'] = value;
-    }
-    for (final target in kAccountManagedSecretTargets) {
-      final managedValue = await loadAccountManagedSecret(target: target);
-      if (managedValue case final value?) {
-        secureRefs[target] = value;
-      }
     }
     return secureRefs;
   }

@@ -2,7 +2,8 @@ part of 'runtime_controllers_settings.dart';
 
 extension SettingsControllerAccountExtension on SettingsController {
   AccountSessionSummary? get accountSession => accountSessionInternal;
-  AccountRemoteProfile? get accountProfile => accountProfileInternal;
+  AccountSyncState? get accountSyncState => accountSyncStateInternal;
+  AccountRemoteProfile? get accountProfile => accountSyncStateInternal?.syncedDefaults;
   bool get accountBusy => accountBusyInternal;
   String get accountStatus => accountStatusInternal;
   bool get accountSignedIn =>
@@ -11,11 +12,7 @@ extension SettingsControllerAccountExtension on SettingsController {
   bool get accountMfaRequired =>
       pendingAccountMfaTicketInternal.trim().isNotEmpty && !accountSignedIn;
   bool get hasEffectiveAiGatewayApiKey =>
-      secureRefsInternal.containsKey('ai_gateway_api_key') ||
-      (!snapshotInternal.accountLocalMode &&
-          secureRefsInternal.containsKey(
-            kAccountManagedSecretTargetAIGatewayAccessToken,
-          ));
+      secureRefsInternal.containsKey('ai_gateway_api_key');
 
   String get effectiveAiGatewayBaseUrl {
     final local = snapshotInternal.aiGateway.baseUrl.trim();
@@ -25,21 +22,14 @@ extension SettingsControllerAccountExtension on SettingsController {
     if (snapshotInternal.accountLocalMode) {
       return '';
     }
-    return accountProfileInternal?.apisixUrl.trim() ?? '';
+    return accountSyncStateInternal?.syncedDefaults.apisixUrl.trim() ?? '';
   }
 
   List<String> get effectiveAiGatewayAvailableModels {
-    final local = snapshotInternal.aiGateway.availableModels
+    return snapshotInternal.aiGateway.availableModels
         .map((item) => item.trim())
         .where((item) => item.isNotEmpty)
         .toList(growable: false);
-    if (local.isNotEmpty) {
-      return local;
-    }
-    if (snapshotInternal.accountLocalMode) {
-      return const <String>[];
-    }
-    return accountProfileInternal?.aiGatewayAvailableModels ?? const <String>[];
   }
 
   AccountRuntimeClient buildAccountClient(String baseUrl) {
@@ -48,35 +38,11 @@ extension SettingsControllerAccountExtension on SettingsController {
   }
 
   Future<String> loadEffectiveAiGatewayApiKey() async {
-    final localValue = await loadAiGatewayApiKey();
-    if (localValue.trim().isNotEmpty) {
-      return localValue;
-    }
-    if (snapshotInternal.accountLocalMode) {
-      return '';
-    }
-    return (await storeInternal.loadAccountManagedSecret(
-          target: kAccountManagedSecretTargetAIGatewayAccessToken,
-        ))?.trim() ??
-        '';
+    return (await loadAiGatewayApiKey()).trim();
   }
 
   Future<String> loadEffectiveGatewayToken({int? profileIndex}) async {
-    final localValue = await loadGatewayToken(profileIndex: profileIndex);
-    if (localValue.trim().isNotEmpty) {
-      return localValue;
-    }
-    if (snapshotInternal.accountLocalMode) {
-      return '';
-    }
-    final resolvedIndex = profileIndex ?? kGatewayRemoteProfileIndex;
-    if (resolvedIndex != kGatewayRemoteProfileIndex) {
-      return '';
-    }
-    return (await storeInternal.loadAccountManagedSecret(
-          target: kAccountManagedSecretTargetOpenclawGatewayToken,
-        ))?.trim() ??
-        '';
+    return loadGatewayToken(profileIndex: profileIndex);
   }
 
   Future<void> loginAccount({
@@ -98,10 +64,22 @@ extension SettingsControllerAccountExtension on SettingsController {
   Future<void> restoreAccountSession({String baseUrl = ''}) =>
       restoreAccountSessionSettingsInternal(this, baseUrl: baseUrl);
 
+  Future<AccountSyncResult> syncAccountSettings({String baseUrl = ''}) =>
+      syncAccountSettingsInternal(this, baseUrl: baseUrl);
+
   Future<AccountSyncResult> syncAccountManagedSecrets({String baseUrl = ''}) =>
-      syncAccountManagedSecretsSettingsInternal(this, baseUrl: baseUrl);
+      syncAccountSettings(baseUrl: baseUrl);
 
   Future<void> logoutAccount() => logoutAccountSettingsInternal(this);
+
+  Future<void> cancelAccountMfaChallenge() =>
+      cancelAccountMfaChallengeSettingsInternal(this);
+
+  Future<void> markAccountOverride(String fieldKey) =>
+      markAccountOverrideSettingsInternal(this, fieldKey: fieldKey);
+
+  Future<void> clearAccountOverride(String fieldKey) =>
+      clearAccountOverrideSettingsInternal(this, fieldKey: fieldKey);
 
   List<SecretReferenceEntry> buildSecretReferences() {
     final entries = <SecretReferenceEntry>[
@@ -118,10 +96,10 @@ extension SettingsControllerAccountExtension on SettingsController {
         name: snapshotInternal.aiGateway.name,
         provider: 'LLM API',
         module: 'Settings',
-        maskedValue: snapshotInternal.aiGateway.baseUrl.trim().isEmpty
+        maskedValue: effectiveAiGatewayBaseUrl.trim().isEmpty
             ? 'Not set'
-            : snapshotInternal.aiGateway.baseUrl,
-        status: snapshotInternal.aiGateway.syncState,
+            : effectiveAiGatewayBaseUrl,
+        status: accountSyncStateInternal?.syncState ?? snapshotInternal.aiGateway.syncState,
       ),
     ];
     return entries;
@@ -137,7 +115,9 @@ extension SettingsControllerAccountExtension on SettingsController {
     accountSessionTokenInternal =
         (await storeInternal.loadAccountSessionToken())?.trim() ?? '';
     accountSessionInternal = await storeInternal.loadAccountSessionSummary();
-    accountProfileInternal = await storeInternal.loadAccountProfile();
+    accountSyncStateInternal = await loadAccountSyncStateWithLegacyMigrationInternal(
+      this,
+    );
     if (!accountBusyInternal) {
       if (accountSignedIn) {
         final email = accountSessionInternal?.email.trim() ?? '';
@@ -162,9 +142,6 @@ extension SettingsControllerAccountExtension on SettingsController {
     if (key.contains('ai_gateway')) {
       return 'LLM API';
     }
-    if (key.contains('openclaw')) {
-      return 'Account';
-    }
     if (key.contains('gateway')) {
       return 'Gateway';
     }
@@ -180,9 +157,6 @@ extension SettingsControllerAccountExtension on SettingsController {
     }
     if (key.contains('ai_gateway')) {
       return 'Settings';
-    }
-    if (key.contains('openclaw')) {
-      return 'Account';
     }
     if (key.contains('vault')) {
       return 'Secrets';
