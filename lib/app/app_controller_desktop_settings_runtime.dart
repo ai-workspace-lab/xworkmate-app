@@ -699,7 +699,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       await refreshResolvedCodexCliPathInternal();
       registerCodexExternalProviderInternal();
     }
-    unawaited(refreshSingleAgentCapabilitiesInternal());
+    unawaited(refreshSingleAgentCapabilitiesInternal().catchError((_) {}));
     if (previous.linuxDesktop.toJson().toString() !=
             current.linuxDesktop.toJson().toString() ||
         previous.launchAtLogin != current.launchAtLogin) {
@@ -734,7 +734,11 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     if (refreshAfterSave) {
       recomputeTasksInternal();
     }
-    unawaited(refreshAcpCapabilitiesInternal(persistMountTargets: true));
+    unawaited(
+      refreshAcpCapabilitiesInternal(
+        persistMountTargets: true,
+      ).catchError((_) {}),
+    );
     notifyListeners();
   }
 
