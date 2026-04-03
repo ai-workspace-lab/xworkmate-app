@@ -95,6 +95,33 @@ void main() {
       });
     });
 
+    test('routing execution target uses gateway while session mode stays compatible', () {
+      const request = GoAgentCoreSessionRequest(
+        sessionId: 'session-2',
+        threadId: 'thread-2',
+        target: AssistantExecutionTarget.local,
+        prompt: 'search latest news',
+        workingDirectory: '/tmp/workspace',
+        model: '',
+        thinking: '',
+        selectedSkills: <String>[],
+        inlineAttachments: <GatewayChatAttachmentPayload>[],
+        localAttachments: <CollaborationAttachment>[],
+        aiGatewayBaseUrl: '',
+        aiGatewayApiKey: '',
+        agentId: 'agent-1',
+        metadata: <String, dynamic>{'source': 'test'},
+        provider: SingleAgentProvider.auto,
+      );
+
+      final params = request.toAcpParams();
+
+      expect(request.routingExecutionTarget, 'gateway');
+      expect(params['mode'], 'gateway-chat');
+      expect(params['executionTarget'], 'local');
+      expect(params['agentId'], 'agent-1');
+    });
+
     test(
       'run result prefers completion text and preserves resolved workspace',
       () {

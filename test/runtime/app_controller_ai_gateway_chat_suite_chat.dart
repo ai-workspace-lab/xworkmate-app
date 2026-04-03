@@ -24,7 +24,7 @@ void registerAppControllerAiGatewayChatSuiteChatTestsInternal() {
       'AppController streams and restores persistent Single Agent conversation turns',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
-          'xworkmate-ai-gateway-chat-',
+          'xworkmate-ai-gateway-session-',
         );
         final server = await FakeAiGatewayServerInternal.start(
           responseMode: AiGatewayResponseModeInternal.sse,
