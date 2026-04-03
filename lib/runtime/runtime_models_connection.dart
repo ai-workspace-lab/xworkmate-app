@@ -38,10 +38,11 @@ extension RuntimeConnectionStatusCopy on RuntimeConnectionStatus {
   };
 }
 
-enum AssistantExecutionTarget { singleAgent, local, remote }
+enum AssistantExecutionTarget { auto, singleAgent, local, remote }
 
 extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   String get label => switch (this) {
+    AssistantExecutionTarget.auto => 'Auto',
     AssistantExecutionTarget.singleAgent => appText('单机智能体', 'Single Agent'),
     AssistantExecutionTarget.local => appText(
       '本地 OpenClaw Gateway',
@@ -54,6 +55,7 @@ extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   };
 
   String get promptValue => switch (this) {
+    AssistantExecutionTarget.auto => 'auto',
     AssistantExecutionTarget.singleAgent => 'single-agent',
     AssistantExecutionTarget.local => 'local',
     AssistantExecutionTarget.remote => 'remote',
@@ -62,6 +64,8 @@ extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   static AssistantExecutionTarget fromJsonValue(String? value) {
     final normalized = value?.trim() ?? '';
     switch (normalized) {
+      case 'auto':
+        return AssistantExecutionTarget.auto;
       case 'singleAgent':
       case 'aiGatewayOnly':
       case 'single-agent':
@@ -72,7 +76,7 @@ extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
       case 'remote':
         return AssistantExecutionTarget.remote;
       default:
-        return AssistantExecutionTarget.local;
+        return AssistantExecutionTarget.auto;
     }
   }
 }

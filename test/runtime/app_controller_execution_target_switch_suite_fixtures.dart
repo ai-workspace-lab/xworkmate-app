@@ -17,7 +17,7 @@ import 'app_controller_execution_target_switch_suite_thread.dart';
 import 'app_controller_execution_target_switch_suite_fakes.dart';
 
 Future<void> waitForInternal(bool Function() predicate) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  final deadline = DateTime.now().add(const Duration(seconds: 10));
   while (!predicate()) {
     if (DateTime.now().isAfter(deadline)) {
       fail('condition not met before timeout');

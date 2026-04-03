@@ -38,6 +38,7 @@ String themeLabelInternal(ThemeMode mode) {
 
 String targetLabelInternal(AssistantExecutionTarget target) {
   return switch (target) {
+    AssistantExecutionTarget.auto => 'Auto',
     AssistantExecutionTarget.singleAgent => appText(
       'Single Agent',
       'Single Agent',

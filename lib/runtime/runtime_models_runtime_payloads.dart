@@ -488,12 +488,14 @@ extension WorkspaceKindCopy on WorkspaceKind {
   }
 }
 
-enum ThreadExecutionMode { localAgent, gatewayLocal, gatewayRemote }
+enum ThreadExecutionMode { auto, localAgent, gatewayLocal, gatewayRemote }
 
 extension ThreadExecutionModeCopy on ThreadExecutionMode {
   static ThreadExecutionMode fromJsonValue(String? value) {
     final normalized = value?.trim();
     switch (normalized) {
+      case 'auto':
+        return ThreadExecutionMode.auto;
       case 'singleAgent':
       case 'local_agent':
       case 'localAgent':
@@ -507,7 +509,7 @@ extension ThreadExecutionModeCopy on ThreadExecutionMode {
       case 'gatewayRemote':
         return ThreadExecutionMode.gatewayRemote;
       default:
-        return ThreadExecutionMode.localAgent;
+        return ThreadExecutionMode.auto;
     }
   }
 }
@@ -1006,6 +1008,7 @@ class TaskThread {
       SingleAgentProviderCopy.fromJsonValue(executionBinding.providerId);
   AssistantExecutionTarget get executionTarget =>
       switch (executionBinding.executionMode) {
+        ThreadExecutionMode.auto => AssistantExecutionTarget.auto,
         ThreadExecutionMode.localAgent => AssistantExecutionTarget.singleAgent,
         ThreadExecutionMode.gatewayLocal => AssistantExecutionTarget.local,
         ThreadExecutionMode.gatewayRemote => AssistantExecutionTarget.remote,
@@ -1052,6 +1055,7 @@ class TaskThread {
         : executionTarget == null
         ? nextExecutionBinding.executionMode
         : switch (executionTarget) {
+            AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
             AssistantExecutionTarget.singleAgent =>
               ThreadExecutionMode.localAgent,
             AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
@@ -1115,7 +1119,8 @@ class TaskThread {
   static ThreadExecutionMode _executionModeFromLegacy(
     AssistantExecutionTarget? target,
   ) {
-    return switch (target ?? AssistantExecutionTarget.singleAgent) {
+    return switch (target ?? AssistantExecutionTarget.auto) {
+      AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
       AssistantExecutionTarget.singleAgent => ThreadExecutionMode.localAgent,
       AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
       AssistantExecutionTarget.remote => ThreadExecutionMode.gatewayRemote,
