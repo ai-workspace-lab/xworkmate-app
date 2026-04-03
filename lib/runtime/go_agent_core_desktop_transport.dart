@@ -285,7 +285,7 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
     }
     if (resolvedEndpointTarget.isNotEmpty) {
       params['resolvedEndpointTarget'] = resolvedEndpointTarget;
-      if (resolvedExecutionTarget == 'gateway-chat') {
+      if (_isGatewayExecutionTarget(resolvedExecutionTarget)) {
         params['executionTarget'] = resolvedEndpointTarget;
       }
     }
@@ -323,7 +323,7 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
     }
     final resolvedExecutionTarget =
         routingResult['resolvedExecutionTarget']?.toString().trim() ?? '';
-    if (resolvedExecutionTarget == 'gateway-chat') {
+    if (_isGatewayExecutionTarget(resolvedExecutionTarget)) {
       final endpointTarget =
           routingResult['resolvedEndpointTarget']?.toString().trim() ?? '';
       return switch (endpointTarget) {
@@ -353,5 +353,10 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
         .map((item) => item?.toString().trim() ?? '')
         .where((item) => item.isNotEmpty)
         .toList(growable: false);
+  }
+
+  bool _isGatewayExecutionTarget(String value) {
+    final normalized = value.trim();
+    return normalized == 'gateway' || normalized == 'gateway-chat';
   }
 }

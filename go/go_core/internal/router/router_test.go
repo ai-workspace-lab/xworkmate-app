@@ -58,8 +58,8 @@ func TestResolveAutoOnlineTaskToGateway(t *testing.T) {
 		PreferredGatewayTarget: EndpointTargetLocal,
 	})
 
-	if result.ResolvedExecutionTarget != ExecutionTargetGatewayChat {
-		t.Fatalf("expected gateway-chat route, got %#v", result)
+	if result.ResolvedExecutionTarget != ExecutionTargetGateway {
+		t.Fatalf("expected gateway route, got %#v", result)
 	}
 	if result.ResolvedEndpointTarget != EndpointTargetLocal {
 		t.Fatalf("expected local gateway target, got %#v", result)

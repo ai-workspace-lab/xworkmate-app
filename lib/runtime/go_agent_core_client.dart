@@ -148,8 +148,19 @@ class GoAgentCoreSessionRequest {
     }
     return switch (target) {
       AssistantExecutionTarget.singleAgent => 'single-agent',
-      AssistantExecutionTarget.local => 'gateway-chat',
-      AssistantExecutionTarget.remote => 'gateway-chat',
+      AssistantExecutionTarget.local => _gatewaySessionMode,
+      AssistantExecutionTarget.remote => _gatewaySessionMode,
+    };
+  }
+
+  String get routingExecutionTarget {
+    if (multiAgent) {
+      return 'multi-agent';
+    }
+    return switch (target) {
+      AssistantExecutionTarget.singleAgent => 'single-agent',
+      AssistantExecutionTarget.local => 'gateway',
+      AssistantExecutionTarget.remote => 'gateway',
     };
   }
 
@@ -198,7 +209,7 @@ class GoAgentCoreSessionRequest {
       if (aiGatewayApiKey.trim().isNotEmpty)
         'aiGatewayApiKey': aiGatewayApiKey.trim(),
       if (routing != null) 'routing': routing!.toJson(),
-      if (mode == 'gateway-chat') ...<String, dynamic>{
+      if (_usesGatewaySessionMode(mode)) ...<String, dynamic>{
         'executionTarget': target.promptValue,
         if (agentId.trim().isNotEmpty) 'agentId': agentId.trim(),
         if (metadata.isNotEmpty) 'metadata': metadata,
@@ -206,6 +217,13 @@ class GoAgentCoreSessionRequest {
     };
     return params;
   }
+}
+
+const String _gatewaySessionMode = 'gateway-chat';
+
+bool _usesGatewaySessionMode(String mode) {
+  final normalized = mode.trim();
+  return normalized == 'gateway' || normalized == _gatewaySessionMode;
 }
 
 class GoAgentCoreSessionUpdate {
