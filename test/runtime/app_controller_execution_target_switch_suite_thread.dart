@@ -378,7 +378,7 @@ void registerExecutionTargetSwitchThreadTests() {
           controller.settings.accountUsername,
           SettingsSnapshot.defaults().accountUsername,
         );
-        expect(controller.settings.assistantLastSessionKey, isEmpty);
+        expect(controller.settings.assistantLastSessionKey, 'main');
         expect(controller.assistantCustomTaskTitle('draft:clear-me'), isEmpty);
 
         final reloadedStore = SecureConfigStore(
@@ -394,8 +394,13 @@ void registerExecutionTargetSwitchThreadTests() {
           reloadedSnapshot.accountUsername,
           SettingsSnapshot.defaults().accountUsername,
         );
-        expect(reloadedSnapshot.assistantLastSessionKey, isEmpty);
-        expect(reloadedThreads, isEmpty);
+        expect(reloadedSnapshot.assistantLastSessionKey, 'main');
+        expect(reloadedThreads, hasLength(1));
+        expect(reloadedThreads.single.sessionKey, 'main');
+        expect(
+          reloadedThreads.single.executionTarget,
+          AssistantExecutionTarget.auto,
+        );
       },
     );
   });

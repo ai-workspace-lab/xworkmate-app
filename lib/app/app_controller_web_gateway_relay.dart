@@ -128,6 +128,7 @@ extension AppControllerWebGatewayRelay on AppController {
             existing?.executionBinding ??
             ExecutionBinding(
               executionMode: switch (resolvedExecutionTarget) {
+                AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
                 AssistantExecutionTarget.singleAgent =>
                   ThreadExecutionMode.localAgent,
                 AssistantExecutionTarget.local =>
