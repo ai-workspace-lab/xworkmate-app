@@ -83,3 +83,36 @@ func TestRecordSuccessWritesProjectLevelMemoryFiles(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadLetsProjectMemoryOverrideGlobalPreferences(t *testing.T) {
+	tempDir := t.TempDir()
+	workingDir := filepath.Join(tempDir, "workspace")
+	homeDir := filepath.Join(tempDir, "home")
+	if err := os.MkdirAll(filepath.Join(workingDir, ".xworkmate"), 0o755); err != nil {
+		t.Fatalf("mkdir workspace: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(homeDir, "self-improving", "projects"), 0o755); err != nil {
+		t.Fatalf("mkdir home: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(homeDir, "self-improving", "memory.md"), []byte("preferred-route: single-agent\npreferred-model: gpt-4o\npreferred-skills: docx\n"), 0o644); err != nil {
+		t.Fatalf("write global memory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(homeDir, "self-improving", "projects", "workspace.md"), []byte("preferred-route: gateway\npreferred-model: gpt-5.4\n"), 0o644); err != nil {
+		t.Fatalf("write project home memory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(workingDir, ".xworkmate", "memory.md"), []byte("preferred-route: multi-agent\npreferred-skills: pptx, pdf\n"), 0o644); err != nil {
+		t.Fatalf("write project local memory: %v", err)
+	}
+
+	result := NewService(homeDir).Load(workingDir)
+
+	if result.Preferences.PreferredRoute != "multi-agent" {
+		t.Fatalf("expected project-local route to win, got %#v", result.Preferences)
+	}
+	if result.Preferences.PreferredModel != "gpt-5.4" {
+		t.Fatalf("expected project-home model to override global, got %#v", result.Preferences)
+	}
+	if len(result.Preferences.PreferredSkills) != 2 || result.Preferences.PreferredSkills[0] != "pptx" {
+		t.Fatalf("expected project-local skills to win, got %#v", result.Preferences.PreferredSkills)
+	}
+}

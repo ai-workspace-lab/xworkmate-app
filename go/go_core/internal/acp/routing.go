@@ -33,6 +33,8 @@ func resolveRoutingMetadata(params map[string]any) (router.Result, bool) {
 		ExplicitSkills:          parseRoutingStringSlice(routingParams["explicitSkills"]),
 		AllowSkillInstall:       parseBool(routingParams["allowSkillInstall"]),
 		AvailableSkills:         parseRoutingSkillCandidates(routingParams["availableSkills"]),
+		AIGatewayBaseURL:        strings.TrimSpace(sharedString(params, "aiGatewayBaseUrl")),
+		AIGatewayAPIKey:         strings.TrimSpace(sharedString(params, "aiGatewayApiKey")),
 	})
 	return result, true
 }
@@ -88,6 +90,37 @@ func recordRoutingSuccess(
 		ResolvedModel:           result.ResolvedModel,
 		ResolvedSkills:          append([]string(nil), result.ResolvedSkills...),
 	})
+}
+
+func applyResolvedRouting(params map[string]any, result router.Result) map[string]any {
+	if len(params) == 0 {
+		return params
+	}
+	next := make(map[string]any, len(params)+6)
+	for key, value := range params {
+		next[key] = value
+	}
+	switch result.ResolvedExecutionTarget {
+	case router.ExecutionTargetSingleAgent:
+		next["mode"] = router.ExecutionTargetSingleAgent
+	case router.ExecutionTargetMultiAgent:
+		next["mode"] = router.ExecutionTargetMultiAgent
+	case router.ExecutionTargetGateway:
+		next["mode"] = router.ExecutionTargetGatewayChat
+		if strings.TrimSpace(result.ResolvedEndpointTarget) != "" {
+			next["executionTarget"] = strings.TrimSpace(result.ResolvedEndpointTarget)
+		}
+	}
+	if strings.TrimSpace(result.ResolvedProviderID) != "" {
+		next["provider"] = strings.TrimSpace(result.ResolvedProviderID)
+	}
+	if strings.TrimSpace(result.ResolvedModel) != "" {
+		next["model"] = strings.TrimSpace(result.ResolvedModel)
+	}
+	if len(result.ResolvedSkills) > 0 {
+		next["selectedSkills"] = append([]string(nil), result.ResolvedSkills...)
+	}
+	return next
 }
 
 func parseRoutingSkillCandidates(raw any) []skills.Candidate {

@@ -152,28 +152,31 @@ class GoAgentCoreWebTransport implements GoAgentCoreClient {
     final resolvedModel =
         routingResult['resolvedModel']?.toString().trim() ?? '';
     final resolvedSkills = _castStringList(routingResult['resolvedSkills']);
+    final routedTarget = _targetForRouting(request, routingResult);
 
-    if (resolvedExecutionTarget.isNotEmpty) {
-      params['mode'] = resolvedExecutionTarget;
-      params['resolvedExecutionTarget'] = resolvedExecutionTarget;
-    }
-    if (resolvedEndpointTarget.isNotEmpty) {
-      params['resolvedEndpointTarget'] = resolvedEndpointTarget;
-      if (_isGatewayExecutionTarget(resolvedExecutionTarget)) {
+    if (routedTarget != AssistantExecutionTarget.singleAgent) {
+      if (resolvedExecutionTarget.isNotEmpty) {
+        params['mode'] = 'gateway-chat';
+      }
+      if (resolvedEndpointTarget.isNotEmpty) {
         params['executionTarget'] = resolvedEndpointTarget;
+        params['resolvedEndpointTarget'] = resolvedEndpointTarget;
+      }
+      if (resolvedProviderId.isNotEmpty) {
+        params['provider'] = resolvedProviderId;
+        params['resolvedProviderId'] = resolvedProviderId;
+      }
+      if (resolvedModel.isNotEmpty) {
+        params['model'] = resolvedModel;
+        params['resolvedModel'] = resolvedModel;
+      }
+      if (resolvedSkills.isNotEmpty) {
+        params['selectedSkills'] = resolvedSkills;
+        params['resolvedSkills'] = resolvedSkills;
       }
     }
-    if (resolvedProviderId.isNotEmpty) {
-      params['provider'] = resolvedProviderId;
-      params['resolvedProviderId'] = resolvedProviderId;
-    }
-    if (resolvedModel.isNotEmpty) {
-      params['model'] = resolvedModel;
-      params['resolvedModel'] = resolvedModel;
-    }
-    if (resolvedSkills.isNotEmpty) {
-      params['selectedSkills'] = resolvedSkills;
-      params['resolvedSkills'] = resolvedSkills;
+    if (resolvedExecutionTarget.isNotEmpty) {
+      params['resolvedExecutionTarget'] = resolvedExecutionTarget;
     }
     for (final key in <String>[
       'skillResolutionSource',

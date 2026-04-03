@@ -159,6 +159,7 @@ class GoAgentCoreSessionRequest {
       return 'multi-agent';
     }
     return switch (target) {
+      AssistantExecutionTarget.auto => 'single-agent',
       AssistantExecutionTarget.singleAgent => 'single-agent',
       AssistantExecutionTarget.local => 'gateway',
       AssistantExecutionTarget.remote => 'gateway',
