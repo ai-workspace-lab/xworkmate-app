@@ -33,6 +33,8 @@ type Request struct {
 	ExplicitSkills          []string
 	AllowSkillInstall       bool
 	AvailableSkills         []skills.Candidate
+	AIGatewayBaseURL        string
+	AIGatewayAPIKey         string
 }
 
 type Result struct {
@@ -48,15 +50,19 @@ type Result struct {
 }
 
 type Resolver struct {
-	SkillFinder   skills.Finder
-	MemoryService memory.Service
+	SkillFinder    skills.Finder
+	SkillInstaller skills.Installer
+	MemoryService  memory.Service
+	Classifier     Classifier
 }
 
 func NewResolver() Resolver {
 	homeDir, _ := os.UserHomeDir()
 	return Resolver{
-		SkillFinder:   skills.StaticFinder{},
-		MemoryService: memory.NewService(homeDir),
+		SkillFinder:    skills.NewDefaultFinder(),
+		SkillInstaller: skills.NewDefaultInstaller(),
+		MemoryService:  memory.NewService(homeDir),
+		Classifier:     LLMClassifier{},
 	}
 }
 
@@ -69,7 +75,7 @@ func (r Resolver) Resolve(req Request) Result {
 		MemorySources:      mem.Sources,
 	}
 
-	result.ResolvedExecutionTarget, result.ResolvedEndpointTarget = resolveExecution(req, mem.Preferences)
+	result.ResolvedExecutionTarget, result.ResolvedEndpointTarget = r.resolveExecution(req, mem.Preferences)
 	if result.ResolvedModel == "" {
 		result.ResolvedModel = strings.TrimSpace(mem.Preferences.PreferredModel)
 	}
@@ -80,7 +86,7 @@ func (r Resolver) Resolve(req Request) Result {
 		AvailableSkills:   req.AvailableSkills,
 		AllowSkillInstall: req.AllowSkillInstall,
 	}
-	skillResult := skills.Resolve(skillRequest, r.SkillFinder)
+	skillResult := skills.Resolve(skillRequest, r.SkillFinder, r.SkillInstaller)
 	result.ResolvedSkills = skillResult.ResolvedSkills
 	result.SkillResolutionSource = skillResult.Source
 	result.SkillCandidates = skillResult.Candidates
@@ -104,17 +110,37 @@ func (r Resolver) Resolve(req Request) Result {
 	return result
 }
 
-func resolveExecution(req Request, prefs memory.Preferences) (string, string) {
+func (r Resolver) resolveExecution(req Request, prefs memory.Preferences) (string, string) {
 	explicit := strings.TrimSpace(req.ExplicitExecutionTarget)
 	if strings.EqualFold(strings.TrimSpace(req.RoutingMode), RoutingModeExplicit) && explicit != "" {
 		return mapExplicitTarget(explicit)
 	}
 
 	prompt := normalize(req.Prompt)
-	if looksOnline(prompt) {
+
+	localTask := looksLocal(prompt)
+	onlineTask := looksOnline(prompt)
+	complexTask := looksComplex(prompt)
+
+	switch {
+	case localTask && complexTask:
+		return ExecutionTargetMultiAgent, EndpointTargetSingleAgent
+	case onlineTask && complexTask:
+		return ExecutionTargetMultiAgent, EndpointTargetSingleAgent
+	case localTask:
+		return ExecutionTargetSingleAgent, EndpointTargetSingleAgent
+	case onlineTask:
 		return ExecutionTargetGateway, normalizeGatewayTarget(req.PreferredGatewayTarget)
+	case complexTask:
+		return ExecutionTargetMultiAgent, EndpointTargetSingleAgent
 	}
-	if looksLocal(prompt) {
+
+	switch normalizeExecutionTarget(r.classify(req)) {
+	case ExecutionTargetGateway:
+		return ExecutionTargetGateway, normalizeGatewayTarget(req.PreferredGatewayTarget)
+	case ExecutionTargetMultiAgent:
+		return ExecutionTargetMultiAgent, EndpointTargetSingleAgent
+	case ExecutionTargetSingleAgent:
 		return ExecutionTargetSingleAgent, EndpointTargetSingleAgent
 	}
 
@@ -125,6 +151,17 @@ func resolveExecution(req Request, prefs memory.Preferences) (string, string) {
 		return ExecutionTargetMultiAgent, EndpointTargetSingleAgent
 	}
 	return ExecutionTargetSingleAgent, EndpointTargetSingleAgent
+}
+
+func (r Resolver) classify(req Request) string {
+	if r.Classifier == nil {
+		return ""
+	}
+	return normalizeExecutionTarget(r.Classifier.Classify(ClassificationRequest{
+		Prompt:           req.Prompt,
+		AIGatewayBaseURL: req.AIGatewayBaseURL,
+		AIGatewayAPIKey:  req.AIGatewayAPIKey,
+	}))
 }
 
 func mapExplicitTarget(value string) (string, string) {
@@ -164,6 +201,49 @@ func looksOnline(prompt string) bool {
 		"资讯采集", "跨浏览器", "文生图", "文生视频", "图生视频", "视频翻译",
 		"translate video", "dub video", "subtitles",
 	})
+}
+
+func looksComplex(prompt string) bool {
+	strongSignals := containsAny(prompt, []string{
+		"multiple deliverables", "multiple outputs", "多个产物", "多个输出",
+		"审阅", "复核", "汇编", "end-to-end", "end to end",
+	})
+	if strongSignals {
+		return true
+	}
+
+	reviewSignals := containsAny(prompt, []string{
+		"review", "audit", "verify", "summarize", "compare",
+		"审阅", "复核", "汇总", "对比", "整理", "整合", "汇编",
+	})
+	multiStepSignals := containsAny(prompt, []string{
+		"workflow", "pipeline", "step by step", "multi-step", "collect and",
+		"analyze and", "review and", "compare and", "summarize and",
+		"先", "然后", "之后",
+	})
+	structuredOutputSignals := containsAny(prompt, []string{
+		"report", "memo", "table", "spreadsheet", "document", "deck", "slides",
+		"presentation", "报告", "总结", "表格", "文档", "演示",
+	})
+	onlineCollectionSignals := containsAny(prompt, []string{
+		"browser", "search", "news", "research", "crawl", "scrape",
+		"跨浏览器", "搜索", "资讯", "采集", "检索",
+	})
+
+	score := 0
+	if reviewSignals {
+		score++
+	}
+	if multiStepSignals {
+		score++
+	}
+	if structuredOutputSignals {
+		score++
+	}
+	if onlineCollectionSignals && structuredOutputSignals {
+		return true
+	}
+	return score >= 2
 }
 
 func containsAny(haystack string, needles []string) bool {

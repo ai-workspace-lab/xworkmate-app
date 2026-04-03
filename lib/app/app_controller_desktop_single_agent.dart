@@ -208,7 +208,8 @@ extension AppControllerDesktopSingleAgent on AppController {
               resolvedRuntimeModel;
         }
         final resolvedGatewayEntryState =
-            result.resolvedExecutionTarget == 'gateway-chat'
+            (result.resolvedExecutionTarget == 'gateway' ||
+                result.resolvedExecutionTarget == 'gateway-chat')
             ? (result.resolvedEndpointTarget.trim().isNotEmpty
                   ? result.resolvedEndpointTarget.trim()
                   : AssistantExecutionTarget.local.promptValue)
@@ -857,8 +858,7 @@ extension AppControllerDesktopSingleAgent on AppController {
     final resolvedExplicitExecutionTarget =
         sessionTarget == AssistantExecutionTarget.auto
         ? ''
-        :
-        explicitExecutionTarget?.trim().isNotEmpty == true
+        : explicitExecutionTarget?.trim().isNotEmpty == true
         ? explicitExecutionTarget!.trim()
         : (thread?.hasExplicitExecutionTargetSelection ?? false)
         ? _routingExecutionTargetValue(
@@ -868,8 +868,7 @@ extension AppControllerDesktopSingleAgent on AppController {
     final resolvedExplicitProviderId =
         sessionTarget == AssistantExecutionTarget.auto
         ? ''
-        :
-        thread?.hasExplicitProviderSelection ?? false
+        : thread?.hasExplicitProviderSelection ?? false
         ? singleAgentProviderForSession(normalizedSessionKey).providerId
         : '';
     final resolvedExplicitModel = thread?.hasExplicitModelSelection ?? false

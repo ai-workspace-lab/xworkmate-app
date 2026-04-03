@@ -168,13 +168,13 @@ func parsePreferences(text string) Preferences {
 }
 
 func mergePreferences(dst *Preferences, src Preferences) {
-	if strings.TrimSpace(dst.PreferredRoute) == "" && strings.TrimSpace(src.PreferredRoute) != "" {
+	if strings.TrimSpace(src.PreferredRoute) != "" {
 		dst.PreferredRoute = strings.TrimSpace(src.PreferredRoute)
 	}
-	if strings.TrimSpace(dst.PreferredModel) == "" && strings.TrimSpace(src.PreferredModel) != "" {
+	if strings.TrimSpace(src.PreferredModel) != "" {
 		dst.PreferredModel = strings.TrimSpace(src.PreferredModel)
 	}
-	if len(dst.PreferredSkills) == 0 && len(src.PreferredSkills) > 0 {
+	if len(src.PreferredSkills) > 0 {
 		dst.PreferredSkills = append([]string(nil), src.PreferredSkills...)
 	}
 }
