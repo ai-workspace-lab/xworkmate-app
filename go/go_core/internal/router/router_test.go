@@ -7,10 +7,17 @@ import (
 	"xworkmate/go_core/internal/skills"
 )
 
+type fakeClassifier string
+
+func (f fakeClassifier) Classify(req ClassificationRequest) string {
+	return string(f)
+}
+
 func TestResolveExplicitTargetOverridesAuto(t *testing.T) {
 	resolver := Resolver{
-		SkillFinder:   skills.StaticFinder{},
-		MemoryService: memory.Service{},
+		SkillFinder:    skills.StaticFinder{},
+		SkillInstaller: nil,
+		MemoryService:  memory.Service{},
 	}
 
 	result := resolver.Resolve(Request{
@@ -34,8 +41,9 @@ func TestResolveExplicitTargetOverridesAuto(t *testing.T) {
 
 func TestResolveAutoLocalTaskToSingleAgent(t *testing.T) {
 	resolver := Resolver{
-		SkillFinder:   skills.StaticFinder{},
-		MemoryService: memory.Service{},
+		SkillFinder:    skills.StaticFinder{},
+		SkillInstaller: nil,
+		MemoryService:  memory.Service{},
 	}
 
 	result := resolver.Resolve(Request{
@@ -49,8 +57,9 @@ func TestResolveAutoLocalTaskToSingleAgent(t *testing.T) {
 
 func TestResolveAutoOnlineTaskToGateway(t *testing.T) {
 	resolver := Resolver{
-		SkillFinder:   skills.StaticFinder{},
-		MemoryService: memory.Service{},
+		SkillFinder:    skills.StaticFinder{},
+		SkillInstaller: nil,
+		MemoryService:  memory.Service{},
 	}
 
 	result := resolver.Resolve(Request{
@@ -66,17 +75,39 @@ func TestResolveAutoOnlineTaskToGateway(t *testing.T) {
 	}
 }
 
-func TestResolveComplexTaskStaysWithinAutoSingleAgentAndGatewayLanes(t *testing.T) {
+func TestResolveComplexTaskUpgradesToMultiAgent(t *testing.T) {
 	resolver := Resolver{
-		SkillFinder:   skills.StaticFinder{},
-		MemoryService: memory.Service{},
+		SkillFinder:    skills.StaticFinder{},
+		SkillInstaller: nil,
+		MemoryService:  memory.Service{},
 	}
 
 	result := resolver.Resolve(Request{
 		Prompt: "analyze these files, review the output, and summarize multiple deliverables",
 	})
 
-	if result.ResolvedExecutionTarget != ExecutionTargetSingleAgent {
-		t.Fatalf("expected single-agent route, got %#v", result)
+	if result.ResolvedExecutionTarget != ExecutionTargetMultiAgent {
+		t.Fatalf("expected multi-agent route, got %#v", result)
+	}
+}
+
+func TestResolveUsesClassifierForBoundarySamples(t *testing.T) {
+	resolver := Resolver{
+		SkillFinder:    skills.StaticFinder{},
+		SkillInstaller: nil,
+		MemoryService:  memory.Service{},
+		Classifier:     fakeClassifier(ExecutionTargetGateway),
+	}
+
+	result := resolver.Resolve(Request{
+		Prompt:                 "help me handle this ambiguous request",
+		PreferredGatewayTarget: EndpointTargetLocal,
+	})
+
+	if result.ResolvedExecutionTarget != ExecutionTargetGateway {
+		t.Fatalf("expected classifier to resolve gateway route, got %#v", result)
+	}
+	if result.ResolvedEndpointTarget != EndpointTargetLocal {
+		t.Fatalf("expected local endpoint target, got %#v", result)
 	}
 }

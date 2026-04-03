@@ -17,6 +17,7 @@ import (
 	"xworkmate/go_core/internal/dispatch"
 	"xworkmate/go_core/internal/gatewayruntime"
 	"xworkmate/go_core/internal/mounts"
+	"xworkmate/go_core/internal/router"
 	"xworkmate/go_core/internal/shared"
 )
 
@@ -491,6 +492,11 @@ func (s *Server) runQueue(queue chan task) {
 
 func (s *Server) executeSessionTask(task task) (map[string]any, *shared.RPCError) {
 	params := task.req.Params
+	resolvedRouting, hasResolvedRouting := resolveRoutingMetadata(params)
+	if hasResolvedRouting {
+		params = applyResolvedRouting(params, resolvedRouting)
+	}
+
 	sessionID := strings.TrimSpace(shared.StringArg(params, "sessionId", ""))
 	threadID := strings.TrimSpace(shared.StringArg(params, "threadId", sessionID))
 	mode := strings.TrimSpace(shared.StringArg(params, "mode", "single-agent"))
@@ -510,7 +516,6 @@ func (s *Server) executeSessionTask(task task) (map[string]any, *shared.RPCError
 		session.history = append(session.history, prompt)
 	}
 	turnID := fmt.Sprintf("turn-%d", time.Now().UnixNano())
-	resolvedRouting, hasResolvedRouting := resolveRoutingMetadata(params)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.setSessionCancel(sessionID, cancel)
@@ -524,6 +529,21 @@ func (s *Server) executeSessionTask(task task) (map[string]any, *shared.RPCError
 		"pending": true,
 		"error":   false,
 	})
+
+	if mode == router.ExecutionTargetGatewayChat || mode == router.ExecutionTargetGateway {
+		result := taskResult{
+			response: map[string]any{
+				"success": false,
+				"error":   "gateway execution must be dispatched to a connected gateway ACP endpoint",
+				"turnId":  turnID,
+				"mode":    router.ExecutionTargetGatewayChat,
+			},
+		}
+		if hasResolvedRouting {
+			result.response = mergeRoutingResponse(result.response, resolvedRouting)
+		}
+		return result.response, nil
+	}
 
 	if mode == "multi-agent" {
 		result := s.runMultiAgent(ctx, session, params, turnID, notify)

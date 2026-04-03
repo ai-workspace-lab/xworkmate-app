@@ -16,6 +16,10 @@ type Finder interface {
 	Find(prompt string) []Candidate
 }
 
+type Installer interface {
+	Install(candidates []Candidate) ([]Candidate, error)
+}
+
 type ResolveRequest struct {
 	Prompt            string
 	ExplicitSkills    []string
@@ -48,7 +52,7 @@ func (StaticFinder) Find(prompt string) []Candidate {
 	return dedupeCandidates(candidates)
 }
 
-func Resolve(req ResolveRequest, finder Finder) ResolveResult {
+func Resolve(req ResolveRequest, finder Finder, installer Installer) ResolveResult {
 	available := dedupeCandidates(req.AvailableSkills)
 	explicit := normalizeList(req.ExplicitSkills)
 	if len(explicit) > 0 {
@@ -93,10 +97,28 @@ func Resolve(req ResolveRequest, finder Finder) ResolveResult {
 		}
 	}
 
+	if req.AllowSkillInstall && installer != nil && len(uninstalled) > 0 {
+		installedCandidates, err := installer.Install(uninstalled)
+		if err == nil && len(installedCandidates) > 0 {
+			mergedAvailable := dedupeCandidates(
+				append(append([]Candidate(nil), available...), installedCandidates...),
+			)
+			if resolved := installedMatches(fallback, mergedAvailable); len(resolved) > 0 {
+				return ResolveResult{
+					ResolvedSkills: resolved,
+					Candidates: dedupeCandidates(
+						append(append([]Candidate(nil), fallback...), installedCandidates...),
+					),
+					Source: "find_skills",
+				}
+			}
+		}
+	}
+
 	return ResolveResult{
 		Candidates:   fallback,
 		Source:       "find_skills",
-		NeedsInstall: !req.AllowSkillInstall && len(uninstalled) > 0,
+		NeedsInstall: len(uninstalled) > 0,
 	}
 }
 
@@ -160,6 +182,16 @@ func findInstalledMatch(candidate Candidate, available []Candidate) string {
 		}
 	}
 	return ""
+}
+
+func installedMatches(candidates []Candidate, available []Candidate) []string {
+	resolved := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		if matched := findInstalledMatch(candidate, available); matched != "" {
+			resolved = append(resolved, matched)
+		}
+	}
+	return dedupeStrings(resolved)
 }
 
 func candidateLabel(candidate Candidate) string {
