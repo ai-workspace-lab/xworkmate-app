@@ -35,7 +35,7 @@ func TestLoadMergesGlobalAndProjectMemoryAndSanitizesSecrets(t *testing.T) {
 	if strings.Contains(strings.ToLower(result.MergedText), "api_key") || strings.Contains(strings.ToLower(result.MergedText), "password") {
 		t.Fatalf("expected sanitized merged text, got %q", result.MergedText)
 	}
-	if result.Preferences.PreferredRoute != "gateway-chat" {
+	if result.Preferences.PreferredRoute != "gateway" {
 		t.Fatalf("unexpected preferred route: %#v", result.Preferences)
 	}
 	if result.Preferences.PreferredModel != "gpt-5.4" {

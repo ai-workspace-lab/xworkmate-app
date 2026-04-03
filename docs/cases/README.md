@@ -16,6 +16,7 @@
 2. [ARIS 缺陷修复与审阅循环](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/cases/aris_bugfix_review_loop.md)
 3. [外部 Agent CLI Bridge 会话](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/cases/external_agent_bridge_session.md)
 4. [模式切换与线程连续追问](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/cases/thread_mode_switch_followup.md)
+5. [Intent Router + Skill Resolver + Memory Injector 典型用例](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/cases/intent_router_skill_memory_typical_cases.md)
 
 ## 相关设计文档
 

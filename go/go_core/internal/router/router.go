@@ -14,6 +14,7 @@ const (
 
 	ExecutionTargetSingleAgent = "single-agent"
 	ExecutionTargetMultiAgent  = "multi-agent"
+	ExecutionTargetGateway     = "gateway"
 	ExecutionTargetGatewayChat = "gateway-chat"
 
 	EndpointTargetSingleAgent = "singleAgent"
@@ -114,15 +115,15 @@ func resolveExecution(req Request, prefs memory.Preferences) (string, string) {
 		return ExecutionTargetMultiAgent, EndpointTargetSingleAgent
 	}
 	if looksOnline(prompt) {
-		return ExecutionTargetGatewayChat, normalizeGatewayTarget(req.PreferredGatewayTarget)
+		return ExecutionTargetGateway, normalizeGatewayTarget(req.PreferredGatewayTarget)
 	}
 	if looksLocal(prompt) {
 		return ExecutionTargetSingleAgent, EndpointTargetSingleAgent
 	}
 
-	switch strings.TrimSpace(prefs.PreferredRoute) {
-	case ExecutionTargetGatewayChat:
-		return ExecutionTargetGatewayChat, normalizeGatewayTarget(req.PreferredGatewayTarget)
+	switch normalizeExecutionTarget(strings.TrimSpace(prefs.PreferredRoute)) {
+	case ExecutionTargetGateway:
+		return ExecutionTargetGateway, normalizeGatewayTarget(req.PreferredGatewayTarget)
 	case ExecutionTargetMultiAgent:
 		return ExecutionTargetMultiAgent, EndpointTargetSingleAgent
 	}
@@ -132,9 +133,9 @@ func resolveExecution(req Request, prefs memory.Preferences) (string, string) {
 func mapExplicitTarget(value string) (string, string) {
 	switch strings.TrimSpace(value) {
 	case EndpointTargetLocal:
-		return ExecutionTargetGatewayChat, EndpointTargetLocal
+		return ExecutionTargetGateway, EndpointTargetLocal
 	case EndpointTargetRemote:
-		return ExecutionTargetGatewayChat, EndpointTargetRemote
+		return ExecutionTargetGateway, EndpointTargetRemote
 	case "multiAgent", ExecutionTargetMultiAgent:
 		return ExecutionTargetMultiAgent, EndpointTargetSingleAgent
 	case EndpointTargetSingleAgent, ExecutionTargetSingleAgent:
@@ -186,4 +187,13 @@ func containsAny(haystack string, needles []string) bool {
 
 func normalize(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func normalizeExecutionTarget(value string) string {
+	switch normalize(value) {
+	case ExecutionTargetGatewayChat:
+		return ExecutionTargetGateway
+	default:
+		return normalize(value)
+	}
 }

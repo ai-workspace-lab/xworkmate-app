@@ -149,7 +149,9 @@ func parsePreferences(text string) Preferences {
 		trimmed := strings.TrimSpace(line)
 		switch {
 		case strings.HasPrefix(strings.ToLower(trimmed), "preferred-route:"):
-			prefs.PreferredRoute = strings.TrimSpace(strings.TrimPrefix(trimmed, "preferred-route:"))
+			prefs.PreferredRoute = normalizePreferredRoute(
+				strings.TrimSpace(strings.TrimPrefix(trimmed, "preferred-route:")),
+			)
 		case strings.HasPrefix(strings.ToLower(trimmed), "preferred-model:"):
 			prefs.PreferredModel = strings.TrimSpace(strings.TrimPrefix(trimmed, "preferred-model:"))
 		case strings.HasPrefix(strings.ToLower(trimmed), "preferred-skills:"):
@@ -204,4 +206,13 @@ func projectNameFromWorkingDirectory(workingDirectory string) string {
 		return ""
 	}
 	return strings.TrimSpace(filepath.Base(cleaned))
+}
+
+func normalizePreferredRoute(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "gateway-chat":
+		return "gateway"
+	default:
+		return strings.TrimSpace(value)
+	}
 }

@@ -159,7 +159,7 @@ class GoAgentCoreWebTransport implements GoAgentCoreClient {
     }
     if (resolvedEndpointTarget.isNotEmpty) {
       params['resolvedEndpointTarget'] = resolvedEndpointTarget;
-      if (resolvedExecutionTarget == 'gateway-chat') {
+      if (_isGatewayExecutionTarget(resolvedExecutionTarget)) {
         params['executionTarget'] = resolvedEndpointTarget;
       }
     }
@@ -197,7 +197,7 @@ class GoAgentCoreWebTransport implements GoAgentCoreClient {
     }
     final resolvedExecutionTarget =
         routingResult['resolvedExecutionTarget']?.toString().trim() ?? '';
-    if (resolvedExecutionTarget == 'gateway-chat') {
+    if (_isGatewayExecutionTarget(resolvedExecutionTarget)) {
       final endpointTarget =
           routingResult['resolvedEndpointTarget']?.toString().trim() ?? '';
       return switch (endpointTarget) {
@@ -217,6 +217,11 @@ class GoAgentCoreWebTransport implements GoAgentCoreClient {
       return raw.cast<String, dynamic>();
     }
     return const <String, dynamic>{};
+  }
+
+  bool _isGatewayExecutionTarget(String value) {
+    final normalized = value.trim();
+    return normalized == 'gateway' || normalized == 'gateway-chat';
   }
 
   List<String> _castStringList(Object? raw) {
