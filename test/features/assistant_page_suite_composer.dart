@@ -141,7 +141,7 @@ void registerAssistantPageSuiteComposerTestsInternal() {
       find.byKey(const Key('assistant-permission-button')),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('assistant-model-button')), findsOneWidget);
+    expect(find.byKey(const Key('assistant-model-button')), findsNothing);
     expect(find.byKey(const Key('assistant-thinking-button')), findsOneWidget);
     expect(find.byTooltip('模式'), findsNothing);
 
@@ -161,6 +161,7 @@ void registerAssistantPageSuiteComposerTestsInternal() {
     );
     await pumpForUiSyncInternal(tester);
 
+    expect(find.text('Auto'), findsWidgets);
     expect(find.text('单机智能体'), findsWidgets);
     expect(find.text('本地 OpenClaw Gateway'), findsWidgets);
     expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
