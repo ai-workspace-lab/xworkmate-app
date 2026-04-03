@@ -63,6 +63,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     upsertTaskThreadInternal(
       sessionsControllerInternal.currentSessionKey,
       executionTarget: resolvedTarget,
+      executionTargetSource: ThreadSelectionSource.explicit,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     await ensureDesktopTaskThreadBindingInternal(
@@ -95,6 +96,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     upsertTaskThreadInternal(
       sessionKey,
       singleAgentProvider: sanitizedProvider,
+      singleAgentProviderSource: ThreadSelectionSource.explicit,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     recomputeTasksInternal();
@@ -240,6 +242,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     upsertTaskThreadInternal(
       normalizedSessionKey,
       assistantModelId: trimmed,
+      assistantModelSource: ThreadSelectionSource.explicit,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     recomputeTasksInternal();
@@ -331,7 +334,10 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       );
       return;
     }
-    await replaceSingleAgentThreadSkillsInternal(normalizedSessionKey, localSkills);
+    await replaceSingleAgentThreadSkillsInternal(
+      normalizedSessionKey,
+      localSkills,
+    );
     try {
       await refreshAcpCapabilitiesInternal();
       final response = await gatewayAcpClientInternal.request(
@@ -411,6 +417,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     upsertTaskThreadInternal(
       normalizedSessionKey,
       selectedSkillKeys: nextSelected,
+      selectedSkillsSource: ThreadSelectionSource.explicit,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     notifyIfActiveInternal();

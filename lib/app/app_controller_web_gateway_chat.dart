@@ -107,49 +107,16 @@ extension AppControllerWebGatewayChat on AppController {
           return;
         }
         if (target == AssistantExecutionTarget.singleAgent) {
-          final provider = singleAgentProviderForSession(sessionKey);
-          if (provider == SingleAgentProvider.auto) {
-            if (!canUseAiGatewayConversation) {
-              throw Exception(
-                appText(
-                  '请先在 Settings 配置单机智能体所需的 LLM API Endpoint、LLM API Token 和默认模型。',
-                  'Configure the Single Agent LLM API Endpoint, LLM API Token, and default model first.',
-                ),
-              );
-            }
-            final directPrompt = attachments.isEmpty
-                ? trimmed
-                : augmentPromptWithAttachmentsInternal(trimmed, attachments);
-            final directHistory = List<GatewayChatMessage>.from(nextMessages);
-            if (directHistory.isNotEmpty) {
-              final last = directHistory.removeLast();
-              directHistory.add(
-                last.copyWith(text: directPrompt, role: 'user', error: false),
-              );
-            }
-            final reply = await aiGatewayClientInternal.completeChat(
-              baseUrl: settingsInternal.aiGateway.baseUrl,
-              apiKey: aiGatewayApiKeyCacheInternal,
-              model: assistantModelForSession(sessionKey),
-              history: directHistory,
-            );
-            appendAssistantMessageInternal(
-              sessionKey: sessionKey,
-              text: reply,
-              error: false,
-            );
-          } else {
-            await executeGoAgentCoreRunInternal(
-              sessionKey: sessionKey,
-              prompt: trimmed,
-              target: target,
-              provider: provider,
-              model: assistantModelForSession(sessionKey),
-              thinking: thinking,
-              attachments: attachments,
-              selectedSkillLabels: selectedSkillLabels,
-            );
-          }
+          await executeGoAgentCoreRunInternal(
+            sessionKey: sessionKey,
+            prompt: trimmed,
+            target: target,
+            provider: singleAgentProviderForSession(sessionKey),
+            model: assistantModelForSession(sessionKey),
+            thinking: thinking,
+            attachments: attachments,
+            selectedSkillLabels: selectedSkillLabels,
+          );
         } else {
           await executeGoAgentCoreRunInternal(
             sessionKey: sessionKey,
@@ -206,6 +173,10 @@ extension AppControllerWebGatewayChat on AppController {
             aiGatewayApiKey: aiGatewayApiKeyCacheInternal.trim(),
             agentId: selectedAgentId,
             metadata: const <String, dynamic>{},
+            routing: buildWebGoAgentCoreRoutingForSessionInternal(
+              sessionKey,
+              explicitExecutionTarget: 'multiAgent',
+            ),
             multiAgent: true,
           ),
           onUpdate: (update) {
@@ -217,10 +188,7 @@ extension AppControllerWebGatewayChat on AppController {
         );
         final summaryText = result.message.trim().isNotEmpty
             ? result.message.trim()
-            : appText(
-                '多智能体协作已完成。',
-                'Multi-agent collaboration completed.',
-              );
+            : appText('多智能体协作已完成。', 'Multi-agent collaboration completed.');
         appendAssistantMessageInternal(
           sessionKey: sessionKey,
           text: summaryText,
@@ -287,6 +255,7 @@ extension AppControllerWebGatewayChat on AppController {
         metadata: <String, dynamic>{
           if (selectedSkills.isNotEmpty) 'selectedSkills': selectedSkills,
         },
+        routing: buildWebGoAgentCoreRoutingForSessionInternal(sessionKey),
         provider: provider,
       ),
       onUpdate: (update) {
@@ -314,5 +283,88 @@ extension AppControllerWebGatewayChat on AppController {
       error: false,
     );
     clearStreamingTextInternal(sessionKey);
+  }
+
+  GoAgentCoreRoutingConfig buildWebGoAgentCoreRoutingForSessionInternal(
+    String sessionKey, {
+    String? explicitExecutionTarget,
+  }) {
+    final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
+    final thread = threadRecordsInternal[normalizedSessionKey];
+    final preferredGatewayTarget = switch (assistantExecutionTargetForSession(
+      normalizedSessionKey,
+    )) {
+      AssistantExecutionTarget.local => 'local',
+      AssistantExecutionTarget.remote => 'remote',
+      AssistantExecutionTarget.singleAgent => 'remote',
+    };
+    final availableSkills =
+        assistantImportedSkillsForSession(normalizedSessionKey)
+            .map(
+              (item) => GoAgentCoreAvailableSkill(
+                id: item.key,
+                label: item.label,
+                description: item.description,
+              ),
+            )
+            .toList(growable: false);
+    final selectedSkillKeys = assistantSelectedSkillKeysForSession(
+      normalizedSessionKey,
+    ).toSet();
+    final selectedSkills =
+        assistantImportedSkillsForSession(normalizedSessionKey)
+            .where((item) => selectedSkillKeys.contains(item.key))
+            .map((item) => item.label.trim().isNotEmpty ? item.label : item.key)
+            .where((item) => item.trim().isNotEmpty)
+            .toList(growable: false);
+    final resolvedExplicitExecutionTarget =
+        explicitExecutionTarget?.trim().isNotEmpty == true
+        ? explicitExecutionTarget!.trim()
+        : (thread?.hasExplicitExecutionTargetSelection ?? false)
+        ? _webRoutingExecutionTargetValue(
+            assistantExecutionTargetForSession(normalizedSessionKey),
+          )
+        : '';
+    final resolvedExplicitProviderId =
+        thread?.hasExplicitProviderSelection ?? false
+        ? singleAgentProviderForSession(normalizedSessionKey).providerId
+        : '';
+    final resolvedExplicitModel = thread?.hasExplicitModelSelection ?? false
+        ? assistantModelForSession(normalizedSessionKey)
+        : '';
+    final resolvedExplicitSkills = thread?.hasExplicitSkillSelection ?? false
+        ? selectedSkills
+        : const <String>[];
+    final hasExplicitSelection =
+        resolvedExplicitExecutionTarget.isNotEmpty ||
+        resolvedExplicitProviderId.isNotEmpty ||
+        resolvedExplicitModel.trim().isNotEmpty ||
+        resolvedExplicitSkills.isNotEmpty;
+
+    if (!hasExplicitSelection) {
+      return GoAgentCoreRoutingConfig.auto(
+        preferredGatewayTarget: preferredGatewayTarget,
+        availableSkills: availableSkills,
+      );
+    }
+
+    return GoAgentCoreRoutingConfig(
+      mode: GoAgentCoreRoutingMode.explicit,
+      preferredGatewayTarget: preferredGatewayTarget,
+      explicitExecutionTarget: resolvedExplicitExecutionTarget,
+      explicitProviderId: resolvedExplicitProviderId,
+      explicitModel: resolvedExplicitModel,
+      explicitSkills: resolvedExplicitSkills,
+      allowSkillInstall: false,
+      availableSkills: availableSkills,
+    );
+  }
+
+  String _webRoutingExecutionTargetValue(AssistantExecutionTarget target) {
+    return switch (target) {
+      AssistantExecutionTarget.singleAgent => 'singleAgent',
+      AssistantExecutionTarget.local => 'local',
+      AssistantExecutionTarget.remote => 'remote',
+    };
   }
 }

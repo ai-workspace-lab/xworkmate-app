@@ -112,6 +112,7 @@ extension AppControllerWebSessionActions on AppController {
     upsertThreadRecordInternal(
       sessionKey,
       executionTarget: resolvedTarget,
+      executionTargetSource: ThreadSelectionSource.explicit,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       gatewayEntryState: gatewayEntryStateForTargetInternal(resolvedTarget),
     );
@@ -154,6 +155,7 @@ extension AppControllerWebSessionActions on AppController {
     upsertThreadRecordInternal(
       sessionKey,
       singleAgentProvider: resolvedProvider,
+      singleAgentProviderSource: ThreadSelectionSource.explicit,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     await persistThreadsInternal();
@@ -195,6 +197,7 @@ extension AppControllerWebSessionActions on AppController {
     upsertThreadRecordInternal(
       normalizedSessionKey,
       assistantModelId: trimmed,
+      assistantModelSource: ThreadSelectionSource.explicit,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     await persistThreadsInternal();
@@ -311,6 +314,7 @@ extension AppControllerWebSessionActions on AppController {
     upsertThreadRecordInternal(
       normalizedSessionKey,
       selectedSkillKeys: selected.toList(growable: false),
+      selectedSkillsSource: ThreadSelectionSource.explicit,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     await persistThreadsInternal();
