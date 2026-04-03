@@ -273,6 +273,8 @@ func (s *Server) handleRequest(
 		return map[string]any{"accepted": true, "closed": closed}, nil
 	case "xworkmate.dispatch.resolve":
 		return handleDispatchResolve(request.Params), nil
+	case "xworkmate.routing.resolve":
+		return handleRoutingResolve(request.Params), nil
 	case "xworkmate.mounts.reconcile":
 		return handleMountReconcile(request.Params), nil
 	case "xworkmate.gateway.connect":
@@ -508,6 +510,7 @@ func (s *Server) executeSessionTask(task task) (map[string]any, *shared.RPCError
 		session.history = append(session.history, prompt)
 	}
 	turnID := fmt.Sprintf("turn-%d", time.Now().UnixNano())
+	resolvedRouting, hasResolvedRouting := resolveRoutingMetadata(params)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.setSessionCancel(sessionID, cancel)
@@ -527,12 +530,24 @@ func (s *Server) executeSessionTask(task task) (map[string]any, *shared.RPCError
 		if result.err != nil {
 			return nil, result.err
 		}
+		if hasResolvedRouting {
+			result.response = mergeRoutingResponse(result.response, resolvedRouting)
+			if err := recordRoutingSuccess(params, resolvedRouting, result.response); err != nil {
+				return nil, &shared.RPCError{Code: -32001, Message: err.Error()}
+			}
+		}
 		return result.response, nil
 	}
 
 	result := s.runSingleAgent(ctx, session, params, turnID, notify)
 	if result.err != nil {
 		return nil, result.err
+	}
+	if hasResolvedRouting {
+		result.response = mergeRoutingResponse(result.response, resolvedRouting)
+		if err := recordRoutingSuccess(params, resolvedRouting, result.response); err != nil {
+			return nil, &shared.RPCError{Code: -32001, Message: err.Error()}
+		}
 	}
 	return result.response, nil
 }

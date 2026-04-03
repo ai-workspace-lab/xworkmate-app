@@ -164,7 +164,8 @@ extension AppControllerWebHelpers on AppController {
       ),
       executionBinding: ExecutionBinding(
         executionMode: switch (target) {
-          AssistantExecutionTarget.singleAgent => ThreadExecutionMode.localAgent,
+          AssistantExecutionTarget.singleAgent =>
+            ThreadExecutionMode.localAgent,
           AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
           AssistantExecutionTarget.remote => ThreadExecutionMode.gatewayRemote,
         },
@@ -250,8 +251,7 @@ extension AppControllerWebHelpers on AppController {
           executionMode: switch (executionTarget) {
             AssistantExecutionTarget.singleAgent =>
               ThreadExecutionMode.localAgent,
-            AssistantExecutionTarget.local =>
-              ThreadExecutionMode.gatewayLocal,
+            AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
             AssistantExecutionTarget.remote =>
               ThreadExecutionMode.gatewayRemote,
           },
@@ -275,8 +275,8 @@ extension AppControllerWebHelpers on AppController {
       ownerScope: ownerScope,
       existingBinding: existing?.workspaceBinding,
     );
-    threadRecordsInternal[key] = (existing ?? newRecordInternal(target: resolvedTarget))
-        .copyWith(
+    threadRecordsInternal[key] =
+        (existing ?? newRecordInternal(target: resolvedTarget)).copyWith(
           sessionKey: key,
           ownerScope: ownerScope,
           workspaceBinding: workspaceBinding,
@@ -286,18 +286,19 @@ extension AppControllerWebHelpers on AppController {
                 existing?.singleAgentProvider ?? SingleAgentProvider.auto,
             existingBinding: existing?.executionBinding,
           ),
-          lifecycleState: (existing?.lifecycleState ??
-                  const ThreadLifecycleState(
-                    archived: false,
-                    status: 'ready',
-                    lastRunAtMs: null,
-                    lastResultCode: null,
-                  ))
-              .copyWith(
-                status: workspaceBinding.workspacePath.trim().isEmpty
-                    ? 'needs_workspace'
-                    : 'ready',
-              ),
+          lifecycleState:
+              (existing?.lifecycleState ??
+                      const ThreadLifecycleState(
+                        archived: false,
+                        status: 'ready',
+                        lastRunAtMs: null,
+                        lastResultCode: null,
+                      ))
+                  .copyWith(
+                    status: workspaceBinding.workspacePath.trim().isEmpty
+                        ? 'needs_workspace'
+                        : 'ready',
+                  ),
           executionTarget: resolvedTarget,
           updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
         );
@@ -439,6 +440,10 @@ extension AppControllerWebHelpers on AppController {
     List<String>? selectedSkillKeys,
     String? assistantModelId,
     SingleAgentProvider? singleAgentProvider,
+    ThreadSelectionSource? executionTargetSource,
+    ThreadSelectionSource? singleAgentProviderSource,
+    ThreadSelectionSource? assistantModelSource,
+    ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
     String? workspacePath,
@@ -462,6 +467,15 @@ extension AppControllerWebHelpers on AppController {
       selectedSkillKeys: selectedSkillKeys ?? existing.selectedSkillKeys,
       assistantModelId: assistantModelId ?? existing.assistantModelId,
       singleAgentProvider: singleAgentProvider ?? existing.singleAgentProvider,
+      executionTargetSource:
+          executionTargetSource ??
+          existing.executionBinding.executionModeSource,
+      singleAgentProviderSource:
+          singleAgentProviderSource ?? existing.executionBinding.providerSource,
+      assistantModelSource:
+          assistantModelSource ?? existing.contextState.selectedModelSource,
+      selectedSkillsSource:
+          selectedSkillsSource ?? existing.contextState.selectedSkillsSource,
       gatewayEntryState: gatewayEntryState ?? existing.gatewayEntryState,
       clearGatewayEntryState: clearGatewayEntryState,
       workspacePath: workspacePath ?? existing.workspacePath,

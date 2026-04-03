@@ -335,6 +335,7 @@ extension AppControllerDesktopThreadActions on AppController {
               aiGatewayApiKey: await loadAiGatewayApiKey(),
               agentId: dispatch.agentId ?? '',
               metadata: dispatch.metadata,
+              routing: buildGoAgentCoreRoutingForSessionInternal(sessionKey),
             ),
             onUpdate: (update) {
               if (update.isDelta) {

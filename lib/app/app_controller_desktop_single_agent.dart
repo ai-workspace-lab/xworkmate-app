@@ -82,6 +82,7 @@ extension AppControllerDesktopSingleAgent on AppController {
       notifyIfActiveInternal();
 
       try {
+        final routing = buildGoAgentCoreRoutingForSessionInternal(sessionKey);
         final selection = singleAgentProviderForSession(sessionKey);
         final capabilities = await goAgentCoreClientInternal.loadCapabilities(
           target: AssistantExecutionTarget.singleAgent,
@@ -104,7 +105,7 @@ extension AppControllerDesktopSingleAgent on AppController {
                       'Go Agent-core does not currently support ${selection.label}.',
                     ))
             : null;
-        if (provider == null) {
+        if (provider == null && !routing.isAuto) {
           if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
             appendSingleAgentFallbackStatusMessageInternal(
               sessionKey,
@@ -141,8 +142,12 @@ extension AppControllerDesktopSingleAgent on AppController {
           }
           return;
         }
+        final effectiveProvider = provider ?? SingleAgentProvider.auto;
 
-        appendSingleAgentRuntimeStatusMessageInternal(sessionKey, provider);
+        appendSingleAgentRuntimeStatusMessageInternal(
+          sessionKey,
+          effectiveProvider,
+        );
         final workingDirectory =
             resolveSingleAgentWorkingDirectoryForSessionInternal(
               sessionKey,
@@ -182,7 +187,8 @@ extension AppControllerDesktopSingleAgent on AppController {
             aiGatewayApiKey: await loadAiGatewayApiKey(),
             agentId: '',
             metadata: const <String, dynamic>{},
-            provider: provider,
+            routing: routing,
+            provider: effectiveProvider,
           ),
           onUpdate: (update) {
             if (update.isDelta) {
@@ -237,7 +243,7 @@ extension AppControllerDesktopSingleAgent on AppController {
                 timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
                 toolCallId: null,
                 toolName: singleAgentRuntimeDebugToolNameInternal(
-                  provider.label,
+                  effectiveProvider.label,
                 ),
                 stopReason: null,
                 pending: false,
@@ -785,5 +791,90 @@ extension AppControllerDesktopSingleAgent on AppController {
             '当前线程的外部 Agent ACP 连接尚未就绪：$detail',
             'The external Agent ACP connection for this thread is not ready yet: $detail',
           );
+  }
+
+  GoAgentCoreRoutingConfig buildGoAgentCoreRoutingForSessionInternal(
+    String sessionKey, {
+    String? explicitExecutionTarget,
+  }) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final thread = assistantThreadRecordsInternal[normalizedSessionKey];
+    final preferredGatewayTarget = switch (assistantExecutionTargetForSession(
+      normalizedSessionKey,
+    )) {
+      AssistantExecutionTarget.local => 'local',
+      AssistantExecutionTarget.remote => 'remote',
+      AssistantExecutionTarget.singleAgent =>
+        settings.assistantExecutionTarget == AssistantExecutionTarget.remote
+            ? 'remote'
+            : 'local',
+    };
+    final availableSkills =
+        assistantImportedSkillsForSession(normalizedSessionKey)
+            .map(
+              (item) => GoAgentCoreAvailableSkill(
+                id: item.key,
+                label: item.label,
+                description: item.description,
+              ),
+            )
+            .toList(growable: false);
+    final selectedSkills =
+        assistantSelectedSkillsForSession(normalizedSessionKey)
+            .map((item) => item.label.trim().isNotEmpty ? item.label : item.key)
+            .where((item) => item.trim().isNotEmpty)
+            .toList(growable: false);
+
+    final resolvedExplicitExecutionTarget =
+        explicitExecutionTarget?.trim().isNotEmpty == true
+        ? explicitExecutionTarget!.trim()
+        : (thread?.hasExplicitExecutionTargetSelection ?? false)
+        ? _routingExecutionTargetValue(
+            assistantExecutionTargetForSession(normalizedSessionKey),
+          )
+        : '';
+    final resolvedExplicitProviderId =
+        thread?.hasExplicitProviderSelection ?? false
+        ? singleAgentProviderForSession(normalizedSessionKey).providerId
+        : '';
+    final resolvedExplicitModel = thread?.hasExplicitModelSelection ?? false
+        ? assistantModelForSession(normalizedSessionKey)
+        : '';
+    final resolvedExplicitSkills = thread?.hasExplicitSkillSelection ?? false
+        ? selectedSkills
+        : const <String>[];
+    final hasExplicitSelection =
+        resolvedExplicitExecutionTarget.isNotEmpty ||
+        resolvedExplicitProviderId.isNotEmpty ||
+        resolvedExplicitModel.trim().isNotEmpty ||
+        resolvedExplicitSkills.isNotEmpty;
+
+    if (!hasExplicitSelection) {
+      return GoAgentCoreRoutingConfig.auto(
+        preferredGatewayTarget: preferredGatewayTarget,
+        availableSkills: availableSkills,
+      );
+    }
+
+    return GoAgentCoreRoutingConfig(
+      mode: GoAgentCoreRoutingMode.explicit,
+      preferredGatewayTarget: preferredGatewayTarget,
+      explicitExecutionTarget: resolvedExplicitExecutionTarget,
+      explicitProviderId: resolvedExplicitProviderId,
+      explicitModel: resolvedExplicitModel,
+      explicitSkills: resolvedExplicitSkills,
+      allowSkillInstall: false,
+      availableSkills: availableSkills,
+    );
+  }
+
+  String _routingExecutionTargetValue(AssistantExecutionTarget target) {
+    return switch (target) {
+      AssistantExecutionTarget.singleAgent => 'singleAgent',
+      AssistantExecutionTarget.local => 'local',
+      AssistantExecutionTarget.remote => 'remote',
+    };
   }
 }

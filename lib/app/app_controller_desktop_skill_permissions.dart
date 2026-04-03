@@ -209,6 +209,9 @@ extension AppControllerDesktopSkillPermissions on AppController {
       normalizedSessionKey,
       importedSkills: importedSkills,
       selectedSkillKeys: nextSelected,
+      selectedSkillsSource: assistantThreadRecordsInternal[normalizedSessionKey]
+          ?.contextState
+          .selectedSkillsSource,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     notifyIfActiveInternal();
@@ -265,6 +268,10 @@ extension AppControllerDesktopSkillPermissions on AppController {
     List<String>? selectedSkillKeys,
     String? assistantModelId,
     SingleAgentProvider? singleAgentProvider,
+    ThreadSelectionSource? executionTargetSource,
+    ThreadSelectionSource? singleAgentProviderSource,
+    ThreadSelectionSource? assistantModelSource,
+    ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
     String? workspaceRef,
     WorkspaceRefKind? workspaceRefKind,
@@ -359,6 +366,12 @@ extension AppControllerDesktopSkillPermissions on AppController {
               },
               executorId: nextProvider.providerId,
               providerId: nextProvider.providerId,
+              executionModeSource:
+                  executionTargetSource ??
+                  existing?.executionBinding.executionModeSource,
+              providerSource:
+                  singleAgentProviderSource ??
+                  existing?.executionBinding.providerSource,
             );
     final nextContextState =
         (contextState ??
@@ -388,6 +401,12 @@ extension AppControllerDesktopSkillPermissions on AppController {
                   assistantModelId ??
                   existing?.assistantModelId ??
                   resolvedAssistantModelForTargetInternal(nextExecutionTarget),
+              selectedModelSource:
+                  assistantModelSource ??
+                  existing?.contextState.selectedModelSource,
+              selectedSkillsSource:
+                  selectedSkillsSource ??
+                  existing?.contextState.selectedSkillsSource,
               gatewayEntryState: gatewayEntryState,
             );
     final nextStatus = nextWorkspaceBinding.workspacePath.trim().isEmpty
@@ -399,7 +418,8 @@ extension AppControllerDesktopSkillPermissions on AppController {
         (lifecycleState ??
                 existing?.lifecycleState ??
                 ThreadLifecycleState(
-                  archived: archived ??
+                  archived:
+                      archived ??
                       existing?.archived ??
                       isAssistantTaskArchived(normalizedSessionKey),
                   status: nextStatus,

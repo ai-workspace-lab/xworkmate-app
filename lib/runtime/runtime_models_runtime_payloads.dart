@@ -443,7 +443,7 @@ class AssistantThreadSkillEntry {
   }
 }
 
-const int taskThreadSchemaVersion = 20260328;
+const int taskThreadSchemaVersion = 20260403;
 
 enum ThreadRealm { local, remote }
 
@@ -509,6 +509,17 @@ extension ThreadExecutionModeCopy on ThreadExecutionMode {
       default:
         return ThreadExecutionMode.localAgent;
     }
+  }
+}
+
+enum ThreadSelectionSource { inherited, explicit }
+
+extension ThreadSelectionSourceCopy on ThreadSelectionSource {
+  static ThreadSelectionSource fromJsonValue(String? value) {
+    return ThreadSelectionSource.values.firstWhere(
+      (item) => item.name == value?.trim(),
+      orElse: () => ThreadSelectionSource.inherited,
+    );
   }
 }
 
@@ -621,24 +632,32 @@ class ExecutionBinding {
     required this.executorId,
     required this.providerId,
     required this.endpointId,
+    this.executionModeSource = ThreadSelectionSource.inherited,
+    this.providerSource = ThreadSelectionSource.inherited,
   });
 
   final ThreadExecutionMode executionMode;
   final String executorId;
   final String providerId;
   final String endpointId;
+  final ThreadSelectionSource executionModeSource;
+  final ThreadSelectionSource providerSource;
 
   ExecutionBinding copyWith({
     ThreadExecutionMode? executionMode,
     String? executorId,
     String? providerId,
     String? endpointId,
+    ThreadSelectionSource? executionModeSource,
+    ThreadSelectionSource? providerSource,
   }) {
     return ExecutionBinding(
       executionMode: executionMode ?? this.executionMode,
       executorId: executorId ?? this.executorId,
       providerId: providerId ?? this.providerId,
       endpointId: endpointId ?? this.endpointId,
+      executionModeSource: executionModeSource ?? this.executionModeSource,
+      providerSource: providerSource ?? this.providerSource,
     );
   }
 
@@ -648,6 +667,8 @@ class ExecutionBinding {
       'executorId': executorId,
       'providerId': providerId,
       'endpointId': endpointId,
+      'executionModeSource': executionModeSource.name,
+      'providerSource': providerSource.name,
     };
   }
 
@@ -659,6 +680,12 @@ class ExecutionBinding {
       executorId: json['executorId']?.toString() ?? '',
       providerId: json['providerId']?.toString() ?? '',
       endpointId: json['endpointId']?.toString() ?? '',
+      executionModeSource: ThreadSelectionSourceCopy.fromJsonValue(
+        json['executionModeSource']?.toString(),
+      ),
+      providerSource: ThreadSelectionSourceCopy.fromJsonValue(
+        json['providerSource']?.toString(),
+      ),
     );
   }
 }
@@ -672,6 +699,8 @@ class ThreadContextState {
     required this.permissionLevel,
     required this.messageViewMode,
     required this.latestResolvedRuntimeModel,
+    this.selectedModelSource = ThreadSelectionSource.inherited,
+    this.selectedSkillsSource = ThreadSelectionSource.inherited,
     this.gatewayEntryState,
   });
 
@@ -682,6 +711,8 @@ class ThreadContextState {
   final AssistantPermissionLevel permissionLevel;
   final AssistantMessageViewMode messageViewMode;
   final String latestResolvedRuntimeModel;
+  final ThreadSelectionSource selectedModelSource;
+  final ThreadSelectionSource selectedSkillsSource;
   final String? gatewayEntryState;
 
   ThreadContextState copyWith({
@@ -692,6 +723,8 @@ class ThreadContextState {
     AssistantPermissionLevel? permissionLevel,
     AssistantMessageViewMode? messageViewMode,
     String? latestResolvedRuntimeModel,
+    ThreadSelectionSource? selectedModelSource,
+    ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
   }) {
@@ -704,6 +737,8 @@ class ThreadContextState {
       messageViewMode: messageViewMode ?? this.messageViewMode,
       latestResolvedRuntimeModel:
           latestResolvedRuntimeModel ?? this.latestResolvedRuntimeModel,
+      selectedModelSource: selectedModelSource ?? this.selectedModelSource,
+      selectedSkillsSource: selectedSkillsSource ?? this.selectedSkillsSource,
       gatewayEntryState: clearGatewayEntryState
           ? null
           : (gatewayEntryState ?? this.gatewayEntryState),
@@ -721,6 +756,8 @@ class ThreadContextState {
       'permissionLevel': permissionLevel.name,
       'messageViewMode': messageViewMode.name,
       'latestResolvedRuntimeModel': latestResolvedRuntimeModel,
+      'selectedModelSource': selectedModelSource.name,
+      'selectedSkillsSource': selectedSkillsSource.name,
       'gatewayEntryState': gatewayEntryState,
     };
   }
@@ -769,6 +806,12 @@ class ThreadContextState {
       ),
       latestResolvedRuntimeModel:
           json['latestResolvedRuntimeModel']?.toString() ?? '',
+      selectedModelSource: ThreadSelectionSourceCopy.fromJsonValue(
+        json['selectedModelSource']?.toString(),
+      ),
+      selectedSkillsSource: ThreadSelectionSourceCopy.fromJsonValue(
+        json['selectedSkillsSource']?.toString(),
+      ),
       gatewayEntryState: json['gatewayEntryState']?.toString(),
     );
   }
@@ -941,6 +984,14 @@ class TaskThread {
   String? get gatewayEntryState => contextState.gatewayEntryState;
   String get latestResolvedRuntimeModel =>
       contextState.latestResolvedRuntimeModel;
+  bool get hasExplicitExecutionTargetSelection =>
+      executionBinding.executionModeSource == ThreadSelectionSource.explicit;
+  bool get hasExplicitProviderSelection =>
+      executionBinding.providerSource == ThreadSelectionSource.explicit;
+  bool get hasExplicitModelSelection =>
+      contextState.selectedModelSource == ThreadSelectionSource.explicit;
+  bool get hasExplicitSkillSelection =>
+      contextState.selectedSkillsSource == ThreadSelectionSource.explicit;
   bool get archived => lifecycleState.archived;
   String get workspaceRef => workspaceBinding.workspacePath;
   String get workspacePath => workspaceBinding.workspacePath;
@@ -980,6 +1031,10 @@ class TaskThread {
     List<String>? selectedSkillKeys,
     String? assistantModelId,
     SingleAgentProvider? singleAgentProvider,
+    ThreadSelectionSource? executionTargetSource,
+    ThreadSelectionSource? singleAgentProviderSource,
+    ThreadSelectionSource? assistantModelSource,
+    ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
     String? workspaceRef,
@@ -1010,7 +1065,8 @@ class TaskThread {
       workspaceBinding: (workspaceBinding ?? this.workspaceBinding).copyWith(
         workspacePath: workspacePath ?? workspaceRef,
         displayPath: displayPath,
-        workspaceKind: workspaceKind ??
+        workspaceKind:
+            workspaceKind ??
             (workspaceRefKind == null
                 ? null
                 : _workspaceKindFromLegacy(workspaceRefKind)),
@@ -1020,6 +1076,8 @@ class TaskThread {
         executionMode: nextExecutionMode,
         executorId: singleAgentProvider?.providerId,
         providerId: singleAgentProvider?.providerId,
+        executionModeSource: executionTargetSource,
+        providerSource: singleAgentProviderSource,
       ),
       contextState: (contextState ?? this.contextState).copyWith(
         messages: messages,
@@ -1027,6 +1085,8 @@ class TaskThread {
         importedSkills: importedSkills,
         selectedSkillKeys: selectedSkillKeys,
         selectedModelId: assistantModelId,
+        selectedModelSource: assistantModelSource,
+        selectedSkillsSource: selectedSkillsSource,
         latestResolvedRuntimeModel: latestResolvedRuntimeModel,
         gatewayEntryState: gatewayEntryState,
         clearGatewayEntryState: clearGatewayEntryState,
