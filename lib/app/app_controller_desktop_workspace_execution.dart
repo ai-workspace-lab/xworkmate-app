@@ -77,7 +77,8 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       sessionKey: sessionsControllerInternal.currentSessionKey,
       persistDefaultSelection: true,
     );
-    if (resolvedTarget == AssistantExecutionTarget.singleAgent) {
+    if (resolvedTarget == AssistantExecutionTarget.singleAgent ||
+        resolvedTarget == AssistantExecutionTarget.auto) {
       await refreshSingleAgentSkillsForSession(
         sessionsControllerInternal.currentSessionKey,
       );
@@ -165,7 +166,8 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       );
     }
 
-    if (resolvedTarget == AssistantExecutionTarget.singleAgent) {
+    if (resolvedTarget == AssistantExecutionTarget.singleAgent ||
+        resolvedTarget == AssistantExecutionTarget.auto) {
       if (runtimeInternal.isConnected) {
         preserveGatewayHistoryForSessionInternal(normalizedSessionKey);
       }

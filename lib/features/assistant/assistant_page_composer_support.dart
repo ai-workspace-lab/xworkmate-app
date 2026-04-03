@@ -195,6 +195,7 @@ class ComposerToolbarChipStateInternal
 
 extension AssistantExecutionTargetIconInternal on AssistantExecutionTarget {
   IconData get icon => switch (this) {
+    AssistantExecutionTarget.auto => Icons.auto_awesome_rounded,
     AssistantExecutionTarget.singleAgent => Icons.hub_outlined,
     AssistantExecutionTarget.local => Icons.computer_outlined,
     AssistantExecutionTarget.remote => Icons.cloud_outlined,
