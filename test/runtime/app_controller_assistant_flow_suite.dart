@@ -60,7 +60,6 @@ void main() {
       await controller.selectAgent('main');
 
       await controller.sendChatMessage('请只回复一行：XWORKMATE_OK', thinking: 'low');
-
       await _waitFor(
         () => controller.chatMessages.any(
           (message) =>
@@ -88,6 +87,65 @@ void main() {
             as Map?)?['mode'],
         'gateway-only',
       );
+      expect(
+        goCoreClient.lastRequest?.routing?.mode,
+        GoAgentCoreRoutingMode.auto,
+      );
+      expect(
+        goCoreClient.lastRequest?.routing?.preferredGatewayTarget,
+        'local',
+      );
+    },
+  );
+
+  test(
+    'AppController marks explicit execution selections as explicit routing context',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-explicit-routing-',
+      );
+      addTearDown(() async {
+        await _deleteDirectoryWithRetry(tempDirectory);
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      final goCoreClient = _FakeGoAgentCoreClient();
+      final controller = AppController(
+        store: store,
+        goAgentCoreClient: goCoreClient,
+      );
+      addTearDown(controller.dispose);
+
+      await _waitFor(() => !controller.initializing);
+      await controller.saveSettings(
+        controller.settings.copyWith(workspacePath: tempDirectory.path),
+        refreshAfterSave: false,
+      );
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+      await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
+      if (controller.assistantModelChoices.isNotEmpty) {
+        await controller.selectAssistantModel(
+          controller.assistantModelChoices.first,
+        );
+      }
+
+      await controller.sendChatMessage('只回复 EXPLICIT_OK', thinking: 'low');
+
+      expect(
+        goCoreClient.lastRequest?.routing?.mode,
+        GoAgentCoreRoutingMode.explicit,
+      );
+      expect(
+        goCoreClient.lastRequest?.routing?.explicitExecutionTarget,
+        'singleAgent',
+      );
+      expect(goCoreClient.lastRequest?.routing?.explicitProviderId, 'opencode');
     },
   );
 
@@ -578,10 +636,13 @@ class _FakeGoAgentCoreClient implements GoAgentCoreClient {
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
   }) async {
-    return const GoAgentCoreCapabilities(
+    return GoAgentCoreCapabilities(
       singleAgent: true,
       multiAgent: true,
-      providers: <SingleAgentProvider>{},
+      providers: <SingleAgentProvider>{
+        SingleAgentProvider.codex,
+        SingleAgentProvider.opencode,
+      },
       raw: <String, dynamic>{},
     );
   }

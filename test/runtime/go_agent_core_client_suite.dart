@@ -36,6 +36,16 @@ void main() {
         aiGatewayApiKey: 'secret',
         agentId: '',
         metadata: <String, dynamic>{},
+        routing: GoAgentCoreRoutingConfig.auto(
+          preferredGatewayTarget: 'local',
+          availableSkills: <GoAgentCoreAvailableSkill>[
+            GoAgentCoreAvailableSkill(
+              id: 'pptx',
+              label: 'PPTX',
+              description: 'deck skill',
+            ),
+          ],
+        ),
         provider: SingleAgentProvider.opencode,
       );
 
@@ -69,6 +79,20 @@ void main() {
           'sizeBytes': 5,
         },
       ]);
+      expect(params['routing'], <String, dynamic>{
+        'routingMode': 'auto',
+        'preferredGatewayTarget': 'local',
+        'explicitSkills': const <String>[],
+        'allowSkillInstall': false,
+        'availableSkills': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 'pptx',
+            'label': 'PPTX',
+            'description': 'deck skill',
+            'installed': true,
+          },
+        ],
+      });
     });
 
     test(
@@ -79,13 +103,13 @@ void main() {
             'result': <String, dynamic>{
               'success': true,
               'turnId': 'turn-7',
-            'summary': 'summary text',
-            'resolvedModel': 'codex-sonnet',
-            'resolvedWorkingDirectory': '/tmp/thread',
-            'resolvedWorkspaceRefKind': 'remotePath',
+              'summary': 'summary text',
+              'resolvedModel': 'codex-sonnet',
+              'resolvedWorkingDirectory': '/tmp/thread',
+              'resolvedWorkspaceRefKind': 'remotePath',
+            },
           },
-        },
-        streamedText: 'partial output',
+          streamedText: 'partial output',
           completedMessage: 'final output',
         );
 
