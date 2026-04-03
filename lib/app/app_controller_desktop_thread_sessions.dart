@@ -54,8 +54,9 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    if (assistantExecutionTargetForSession(normalizedSessionKey) ==
-        AssistantExecutionTarget.singleAgent) {
+    final target = assistantExecutionTargetForSession(normalizedSessionKey);
+    if (target == AssistantExecutionTarget.singleAgent ||
+        target == AssistantExecutionTarget.auto) {
       return assistantImportedSkillsForSession(normalizedSessionKey).length;
     }
     return skills.length;
@@ -96,7 +97,8 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
-    if (target == AssistantExecutionTarget.singleAgent) {
+    if (target == AssistantExecutionTarget.singleAgent ||
+        target == AssistantExecutionTarget.auto) {
       if (singleAgentUsesAiChatFallbackForSession(normalizedSessionKey)) {
         final recordModel =
             assistantThreadRecordsInternal[normalizedSessionKey]
@@ -137,8 +139,9 @@ extension AppControllerDesktopThreadSessions on AppController {
     if (existing.isNotEmpty) {
       return existing;
     }
-    if (assistantExecutionTargetForSession(normalizedSessionKey) ==
-        AssistantExecutionTarget.singleAgent) {
+    final target = assistantExecutionTargetForSession(normalizedSessionKey);
+    if (target == AssistantExecutionTarget.singleAgent ||
+        target == AssistantExecutionTarget.auto) {
       return localThreadWorkspacePathInternal(normalizedSessionKey);
     }
     return '';
@@ -337,10 +340,7 @@ extension AppControllerDesktopThreadSessions on AppController {
       singleAgentShouldShowModelControlForSession(currentSessionKey);
 
   List<SingleAgentProvider> get singleAgentProviderOptions =>
-      <SingleAgentProvider>[
-        SingleAgentProvider.auto,
-        ...configuredSingleAgentProviders,
-      ];
+      configuredSingleAgentProviders;
 
   String singleAgentProviderLabelForSession(String sessionKey) {
     return singleAgentProviderForSession(sessionKey).label;
@@ -374,7 +374,8 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
-    if (target == AssistantExecutionTarget.singleAgent) {
+    if (target == AssistantExecutionTarget.singleAgent ||
+        target == AssistantExecutionTarget.auto) {
       final provider = singleAgentProviderForSession(normalizedSessionKey);
       final resolvedProvider = singleAgentResolvedProviderForSession(
         normalizedSessionKey,
@@ -409,15 +410,21 @@ extension AppControllerDesktopThreadSessions on AppController {
               '当前线程的外部 Agent ACP 连接尚未就绪。',
               'The external Agent ACP connection for this thread is not ready yet.',
             );
+      final primaryLabel = target == AssistantExecutionTarget.auto
+          ? 'Auto'
+          : target.label;
+      final actualDetailPrefix = target == AssistantExecutionTarget.auto
+          ? appText('当前: ', 'Current: ')
+          : '';
       return AssistantThreadConnectionState(
         executionTarget: target,
         status: providerReady || fallbackReady
             ? RuntimeConnectionStatus.connected
             : RuntimeConnectionStatus.offline,
-        primaryLabel: target.label,
+        primaryLabel: primaryLabel,
         detailLabel: detail.isEmpty
             ? appText('未配置单机智能体', 'Single Agent is not configured')
-            : detail,
+            : '$actualDetailPrefix$detail',
         ready: providerReady || fallbackReady,
         pairingRequired: false,
         gatewayTokenMissing: false,
@@ -585,6 +592,7 @@ extension AppControllerDesktopThreadSessions on AppController {
     AssistantExecutionTarget target,
   ) {
     return switch (target) {
+      AssistantExecutionTarget.auto => WorkspaceRefKind.localPath,
       AssistantExecutionTarget.singleAgent => WorkspaceRefKind.localPath,
       AssistantExecutionTarget.local ||
       AssistantExecutionTarget.remote => WorkspaceRefKind.remotePath,

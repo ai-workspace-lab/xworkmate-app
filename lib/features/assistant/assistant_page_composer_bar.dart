@@ -442,7 +442,8 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                 ),
               ),
               const SizedBox(width: 4),
-              if (singleAgent) ...[
+              if (singleAgent &&
+                  executionTarget != AssistantExecutionTarget.auto) ...[
                 PopupMenuButton<SingleAgentProvider>(
                   key: const Key('assistant-single-agent-provider-button'),
                   tooltip: appText('单机智能体执行器', 'Single Agent Provider'),

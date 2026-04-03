@@ -34,7 +34,7 @@ extension AppControllerWebSessions on AppController {
     final fallback = sanitizeTargetInternal(
       settingsInternal.assistantExecutionTarget,
     );
-    return recordTarget ?? fallback ?? AssistantExecutionTarget.singleAgent;
+    return recordTarget ?? fallback ?? AssistantExecutionTarget.auto;
   }
 
   AssistantExecutionTarget get assistantExecutionTarget =>
@@ -42,7 +42,8 @@ extension AppControllerWebSessions on AppController {
   AssistantExecutionTarget get currentAssistantExecutionTarget =>
       assistantExecutionTarget;
   bool get isSingleAgentMode =>
-      assistantExecutionTarget == AssistantExecutionTarget.singleAgent;
+      assistantExecutionTarget == AssistantExecutionTarget.singleAgent ||
+      assistantExecutionTarget == AssistantExecutionTarget.auto;
 
   AssistantMessageViewMode assistantMessageViewModeForSession(
     String sessionKey,
@@ -122,10 +123,7 @@ extension AppControllerWebSessions on AppController {
       singleAgentProviderForSession(currentSessionKeyInternal);
 
   List<SingleAgentProvider> get singleAgentProviderOptions =>
-      <SingleAgentProvider>[
-        SingleAgentProvider.auto,
-        ...settingsInternal.availableSingleAgentProviders,
-      ];
+      settingsInternal.availableSingleAgentProviders;
 
   bool singleAgentUsesAiChatFallbackForSession(String sessionKey) {
     final provider = singleAgentProviderForSession(sessionKey);
@@ -152,7 +150,8 @@ extension AppControllerWebSessions on AppController {
     final recordModel =
         threadRecordsInternal[normalizedSessionKey]?.assistantModelId.trim() ??
         '';
-    if (target == AssistantExecutionTarget.singleAgent) {
+    if (target == AssistantExecutionTarget.singleAgent ||
+        target == AssistantExecutionTarget.auto) {
       if (singleAgentUsesAiChatFallbackForSession(normalizedSessionKey)) {
         if (recordModel.isNotEmpty) {
           return recordModel;
@@ -181,7 +180,8 @@ extension AppControllerWebSessions on AppController {
 
   List<String> assistantModelChoicesForSession(String sessionKey) {
     final target = assistantExecutionTargetForSession(sessionKey);
-    if (target == AssistantExecutionTarget.singleAgent) {
+    if (target == AssistantExecutionTarget.singleAgent ||
+        target == AssistantExecutionTarget.auto) {
       if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
         return aiGatewayConversationModelChoices;
       }
@@ -441,7 +441,8 @@ extension AppControllerWebSessions on AppController {
   ) {
     final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
-    if (target == AssistantExecutionTarget.singleAgent) {
+    if (target == AssistantExecutionTarget.singleAgent ||
+        target == AssistantExecutionTarget.auto) {
       final provider = singleAgentProviderForSession(normalizedSessionKey);
       final model = assistantModelForSession(normalizedSessionKey);
       final host = hostLabelInternal(settingsInternal.aiGateway.baseUrl);
@@ -452,9 +453,13 @@ extension AppControllerWebSessions on AppController {
           status: canUseAiGatewayConversation
               ? RuntimeConnectionStatus.connected
               : RuntimeConnectionStatus.offline,
-          primaryLabel: target.label,
+          primaryLabel: target == AssistantExecutionTarget.auto
+              ? 'Auto'
+              : target.label,
           detailLabel: detail.isEmpty
               ? appText('单机智能体未配置', 'Single Agent not configured')
+              : target == AssistantExecutionTarget.auto
+              ? '${appText('当前: ', 'Current: ')}$detail'
               : detail,
           ready: canUseAiGatewayConversation,
           pairingRequired: false,
@@ -473,9 +478,11 @@ extension AppControllerWebSessions on AppController {
         status: remoteReady
             ? RuntimeConnectionStatus.connected
             : RuntimeConnectionStatus.offline,
-        primaryLabel: target.label,
+        primaryLabel: target == AssistantExecutionTarget.auto
+            ? 'Auto'
+            : target.label,
         detailLabel: remoteReady
-            ? joinConnectionPartsInternal(<String>[provider.label, model])
+            ? '${target == AssistantExecutionTarget.auto ? appText('当前: ', 'Current: ') : ''}${joinConnectionPartsInternal(<String>[provider.label, model])}'
             : appText(
                 '${provider.label} 需要 Remote ACP（${remoteAddress.isEmpty ? 'Remote Gateway' : remoteAddress}）',
                 '${provider.label} requires Remote ACP (${remoteAddress.isEmpty ? 'Remote Gateway' : remoteAddress}).',

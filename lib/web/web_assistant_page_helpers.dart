@@ -264,6 +264,7 @@ String thinkingLabelInternal(String level) {
 
 String targetLabelInternal(AssistantExecutionTarget target) {
   return switch (target) {
+    AssistantExecutionTarget.auto => 'Auto',
     AssistantExecutionTarget.singleAgent => appText('单机智能体', 'Single Agent'),
     AssistantExecutionTarget.local => appText(
       '本地 OpenClaw Gateway',

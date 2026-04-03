@@ -110,9 +110,6 @@ func resolveExecution(req Request, prefs memory.Preferences) (string, string) {
 	}
 
 	prompt := normalize(req.Prompt)
-	if looksComplex(prompt) {
-		return ExecutionTargetMultiAgent, EndpointTargetSingleAgent
-	}
 	if looksOnline(prompt) {
 		return ExecutionTargetGatewayChat, normalizeGatewayTarget(req.PreferredGatewayTarget)
 	}
@@ -165,13 +162,6 @@ func looksOnline(prompt string) bool {
 		"image-cog", "wan", "video-translator", "browser", "search", "news",
 		"资讯采集", "跨浏览器", "文生图", "文生视频", "图生视频", "视频翻译",
 		"translate video", "dub video", "subtitles",
-	})
-}
-
-func looksComplex(prompt string) bool {
-	return containsAny(prompt, []string{
-		"review", "qa", "汇总", "复审", "审阅", "多步骤", "多工序", "multi-step",
-		"multiple deliverables", "multiple artifacts", "总结并对比", "整理并审查",
 	})
 }
 

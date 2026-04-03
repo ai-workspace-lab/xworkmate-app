@@ -125,11 +125,12 @@ extension AppControllerWebHelpers on AppController {
     AssistantExecutionTarget? target,
   ) {
     return switch (target) {
+      AssistantExecutionTarget.auto => AssistantExecutionTarget.auto,
       AssistantExecutionTarget.local => AssistantExecutionTarget.local,
       AssistantExecutionTarget.remote => AssistantExecutionTarget.remote,
       AssistantExecutionTarget.singleAgent =>
         AssistantExecutionTarget.singleAgent,
-      _ => AssistantExecutionTarget.singleAgent,
+      _ => AssistantExecutionTarget.auto,
     };
   }
 
@@ -139,6 +140,7 @@ extension AppControllerWebHelpers on AppController {
   }) {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final prefix = switch (target) {
+      AssistantExecutionTarget.auto => 'auto',
       AssistantExecutionTarget.singleAgent => 'single',
       AssistantExecutionTarget.local => 'local',
       AssistantExecutionTarget.remote => 'remote',
@@ -164,6 +166,7 @@ extension AppControllerWebHelpers on AppController {
       ),
       executionBinding: ExecutionBinding(
         executionMode: switch (target) {
+          AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
           AssistantExecutionTarget.singleAgent =>
             ThreadExecutionMode.localAgent,
           AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
@@ -249,6 +252,7 @@ extension AppControllerWebHelpers on AppController {
             ))
         .copyWith(
           executionMode: switch (executionTarget) {
+            AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
             AssistantExecutionTarget.singleAgent =>
               ThreadExecutionMode.localAgent,
             AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
@@ -391,12 +395,13 @@ extension AppControllerWebHelpers on AppController {
     return switch (mode) {
       RuntimeConnectionMode.local => AssistantExecutionTarget.local,
       RuntimeConnectionMode.remote => AssistantExecutionTarget.remote,
-      RuntimeConnectionMode.unconfigured => AssistantExecutionTarget.remote,
+      RuntimeConnectionMode.unconfigured => AssistantExecutionTarget.auto,
     };
   }
 
   int profileIndexForTargetInternal(AssistantExecutionTarget target) {
     return switch (target) {
+      AssistantExecutionTarget.auto => kGatewayLocalProfileIndex,
       AssistantExecutionTarget.local => kGatewayLocalProfileIndex,
       AssistantExecutionTarget.remote => kGatewayRemoteProfileIndex,
       AssistantExecutionTarget.singleAgent => kGatewayRemoteProfileIndex,
@@ -407,6 +412,8 @@ extension AppControllerWebHelpers on AppController {
     AssistantExecutionTarget target,
   ) {
     return switch (target) {
+      AssistantExecutionTarget.auto =>
+        settingsInternal.primaryLocalGatewayProfile,
       AssistantExecutionTarget.local =>
         settingsInternal.primaryLocalGatewayProfile,
       AssistantExecutionTarget.remote =>

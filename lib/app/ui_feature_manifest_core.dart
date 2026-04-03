@@ -521,6 +521,9 @@ class UiFeatureAccess {
 
   List<AssistantExecutionTarget> get availableExecutionTargets {
     final targets = <AssistantExecutionTarget>[];
+    if (platform != UiFeaturePlatform.mobile) {
+      targets.add(AssistantExecutionTarget.auto);
+    }
     if (supportsDirectAi) {
       targets.add(AssistantExecutionTarget.singleAgent);
     }
@@ -542,10 +545,12 @@ class UiFeatureAccess {
     }
     final preferredOrder = platform == UiFeaturePlatform.web
         ? const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.auto,
             AssistantExecutionTarget.singleAgent,
             AssistantExecutionTarget.remote,
           ]
         : const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.auto,
             AssistantExecutionTarget.local,
             AssistantExecutionTarget.singleAgent,
             AssistantExecutionTarget.remote,
@@ -556,8 +561,8 @@ class UiFeatureAccess {
       }
     }
     return platform == UiFeaturePlatform.web
-        ? AssistantExecutionTarget.singleAgent
-        : AssistantExecutionTarget.local;
+        ? AssistantExecutionTarget.auto
+        : AssistantExecutionTarget.auto;
   }
 }
 
