@@ -106,7 +106,11 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         AssistantExecutionTarget.singleAgent) {
       await refreshSingleAgentSkillsForSession(sessionKey);
     }
-    unawaited(refreshMultiAgentMounts(sync: settings.multiAgent.autoSync));
+    unawaited(
+      refreshMultiAgentMounts(
+        sync: settings.multiAgent.autoSync,
+      ).catchError((_) {}),
+    );
   }
 
   Future<void> setAssistantMessageViewMode(
