@@ -79,7 +79,8 @@ extension AppControllerDesktopThreadActions on AppController {
 
   Future<void> connectSavedGateway() async {
     final target = currentAssistantExecutionTarget;
-    if (target == AssistantExecutionTarget.singleAgent) {
+    if (target == AssistantExecutionTarget.singleAgent ||
+        target == AssistantExecutionTarget.auto) {
       return;
     }
     await AppControllerDesktopGateway(this).connectProfileInternal(
@@ -247,8 +248,9 @@ extension AppControllerDesktopThreadActions on AppController {
     List<String> selectedSkillLabels = const <String>[],
   }) async {
     final currentSessionKey = sessionsControllerInternal.currentSessionKey;
-    if (assistantExecutionTargetForSession(currentSessionKey) ==
-        AssistantExecutionTarget.singleAgent) {
+    final currentTarget = assistantExecutionTargetForSession(currentSessionKey);
+    if (currentTarget == AssistantExecutionTarget.singleAgent ||
+        currentTarget == AssistantExecutionTarget.auto) {
       await bootstrapThreadWorkspaceFromExecutionContextInternal(
         currentSessionKey,
         message,
@@ -256,7 +258,7 @@ extension AppControllerDesktopThreadActions on AppController {
     }
     await ensureDesktopTaskThreadBindingInternal(
       currentSessionKey,
-      executionTarget: assistantExecutionTargetForSession(currentSessionKey),
+      executionTarget: currentTarget,
     );
     final workspacePath = assistantWorkspacePathForSession(
       currentSessionKey,
@@ -276,7 +278,8 @@ extension AppControllerDesktopThreadActions on AppController {
       recomputeTasksInternal();
       throw error;
     }
-    if (isSingleAgentMode) {
+    if (currentTarget == AssistantExecutionTarget.singleAgent ||
+        currentTarget == AssistantExecutionTarget.auto) {
       await sendSingleAgentMessageInternal(
         message,
         thinking: thinking,
@@ -321,7 +324,7 @@ extension AppControllerDesktopThreadActions on AppController {
             GoAgentCoreSessionRequest(
               sessionId: sessionKey,
               threadId: sessionKey,
-              target: assistantExecutionTargetForSession(sessionKey),
+              target: currentTarget,
               prompt: message,
               workingDirectory: assistantWorkspacePathForSession(
                 sessionKey,

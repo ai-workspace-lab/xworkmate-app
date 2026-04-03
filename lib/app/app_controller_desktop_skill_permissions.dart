@@ -357,6 +357,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
                 ))
             .copyWith(
               executionMode: switch (nextExecutionTarget) {
+                AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
                 AssistantExecutionTarget.singleAgent =>
                   ThreadExecutionMode.localAgent,
                 AssistantExecutionTarget.local =>

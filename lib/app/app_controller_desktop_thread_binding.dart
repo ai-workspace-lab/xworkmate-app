@@ -139,7 +139,8 @@ extension AppControllerDesktopThreadBinding on AppController {
     required ThreadOwnerScope ownerScope,
     WorkspaceBinding? existingBinding,
   }) {
-    if (executionTarget == AssistantExecutionTarget.singleAgent) {
+    if (executionTarget == AssistantExecutionTarget.auto ||
+        executionTarget == AssistantExecutionTarget.singleAgent) {
       if (existingBinding != null &&
           existingBinding.workspacePath.trim().isNotEmpty) {
         if (existingBinding.workspaceKind == WorkspaceKind.localFs) {
@@ -207,10 +208,11 @@ extension AppControllerDesktopThreadBinding on AppController {
               endpointId: '',
             ))
         .copyWith(
-          executionMode: switch (executionTarget) {
-            AssistantExecutionTarget.singleAgent =>
-              ThreadExecutionMode.localAgent,
-            AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
+        executionMode: switch (executionTarget) {
+          AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
+          AssistantExecutionTarget.singleAgent =>
+            ThreadExecutionMode.localAgent,
+          AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
             AssistantExecutionTarget.remote =>
               ThreadExecutionMode.gatewayRemote,
           },

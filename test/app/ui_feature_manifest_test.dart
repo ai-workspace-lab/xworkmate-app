@@ -75,6 +75,7 @@ void main() {
     expect(
       desktopAccess.availableExecutionTargets,
       equals(<AssistantExecutionTarget>[
+        AssistantExecutionTarget.auto,
         AssistantExecutionTarget.singleAgent,
         AssistantExecutionTarget.local,
         AssistantExecutionTarget.remote,
@@ -87,10 +88,32 @@ void main() {
     expect(
       webAccess.availableExecutionTargets,
       equals(<AssistantExecutionTarget>[
+        AssistantExecutionTarget.auto,
         AssistantExecutionTarget.singleAgent,
         AssistantExecutionTarget.local,
         AssistantExecutionTarget.remote,
       ]),
+    );
+  });
+
+  test('sanitizeExecutionTarget prefers auto when available', () {
+    final manifest = UiFeatureManifest.fallback();
+    final desktopAccess = manifest.forPlatform(
+      UiFeaturePlatform.desktop,
+      buildMode: UiFeatureBuildMode.release,
+    );
+    final webAccess = manifest.forPlatform(
+      UiFeaturePlatform.web,
+      buildMode: UiFeatureBuildMode.release,
+    );
+
+    expect(
+      desktopAccess.sanitizeExecutionTarget(null),
+      AssistantExecutionTarget.auto,
+    );
+    expect(
+      webAccess.sanitizeExecutionTarget(null),
+      AssistantExecutionTarget.auto,
     );
   });
 

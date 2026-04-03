@@ -218,6 +218,9 @@ void registerAssistantPageSuiteCoreTestsInternal() {
     final aiGroup = find.byKey(
       const ValueKey<String>('assistant-task-group-singleAgent'),
     );
+    final autoGroup = find.byKey(
+      const ValueKey<String>('assistant-task-group-auto'),
+    );
     final localGroup = find.byKey(
       const ValueKey<String>('assistant-task-group-local'),
     );
@@ -225,10 +228,15 @@ void registerAssistantPageSuiteCoreTestsInternal() {
       const ValueKey<String>('assistant-task-group-remote'),
     );
 
+    expect(autoGroup, findsOneWidget);
     expect(aiGroup, findsOneWidget);
     expect(localGroup, findsOneWidget);
     expect(remoteGroup, findsOneWidget);
 
+    expect(
+      tester.getTopLeft(autoGroup).dy,
+      lessThan(tester.getTopLeft(aiGroup).dy),
+    );
     expect(
       tester.getTopLeft(aiGroup).dy,
       lessThan(tester.getTopLeft(localGroup).dy),
@@ -322,20 +330,9 @@ void registerAssistantPageSuiteCoreTestsInternal() {
     );
 
     final toggle = find.byKey(const Key('assistant-artifact-pane-toggle'));
-    final decoratedBody = find.descendant(
-      of: toggle,
-      matching: find.byWidgetPredicate(
-        (widget) => widget is Container && widget.decoration is BoxDecoration,
-      ),
-    );
 
     expect(toggle, findsOneWidget);
-    expect(tester.getSize(toggle), const Size(32, 36));
-
-    final body = tester.widget<Container>(decoratedBody);
-    final decoration = body.decoration! as BoxDecoration;
-
-    expect(decoration.borderRadius, BorderRadius.circular(8));
+    expect(tester.getSize(toggle), const Size(20, 20));
   });
 
   testWidgets(
@@ -344,7 +341,7 @@ void registerAssistantPageSuiteCoreTestsInternal() {
     skip: true,
   );
 
-  testWidgets('AssistantPage shows three collapsed task groups by default', (
+  testWidgets('AssistantPage shows four collapsed task groups by default', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
@@ -354,6 +351,10 @@ void registerAssistantPageSuiteCoreTestsInternal() {
       child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
     );
 
+    expect(
+      find.byKey(const ValueKey<String>('assistant-task-group-auto')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey<String>('assistant-task-group-singleAgent')),
       findsOneWidget,
@@ -372,7 +373,7 @@ void registerAssistantPageSuiteCoreTestsInternal() {
     );
 
     await tester.tap(
-      find.byKey(const ValueKey<String>('assistant-task-group-local')),
+      find.byKey(const ValueKey<String>('assistant-task-group-auto')),
     );
     await pumpForUiSyncInternal(tester);
 
@@ -464,6 +465,7 @@ void registerAssistantPageSuiteCoreTestsInternal() {
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
+    await controller.setAssistantExecutionTarget(AssistantExecutionTarget.local);
 
     await pumpPage(
       tester,

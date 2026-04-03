@@ -319,7 +319,8 @@ class AssistantThreadConnectionState {
   final String? lastError;
 
   bool get isSingleAgent =>
-      executionTarget == AssistantExecutionTarget.singleAgent;
+      executionTarget == AssistantExecutionTarget.singleAgent ||
+      executionTarget == AssistantExecutionTarget.auto;
 
   bool get connected => ready;
 

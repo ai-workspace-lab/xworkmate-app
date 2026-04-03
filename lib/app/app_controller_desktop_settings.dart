@@ -248,9 +248,21 @@ extension AppControllerDesktopSettings on AppController {
       defaults.primaryRemoteGatewayProfile.selectedAgentId,
     );
     modelsControllerInternal.restoreFromSettings(defaults.aiGateway);
+    initializeAssistantThreadContext(
+      'main',
+      executionTarget: defaults.assistantExecutionTarget,
+      messageViewMode: AssistantMessageViewMode.rendered,
+      singleAgentProvider: SingleAgentProvider.auto,
+    );
     await setCurrentAssistantSessionKeyInternal(
       'main',
       persistSelection: false,
+    );
+    assistantThreadRecordsInternal.removeWhere((key, _) => key != 'main');
+    assistantThreadMessagesInternal.removeWhere((key, _) => key != 'main');
+    await flushAssistantThreadPersistenceInternal();
+    await storeInternal.saveTaskThreads(
+      assistantThreadRecordsInternal.values.toList(growable: false),
     );
     chatControllerInternal.clear();
     recomputeTasksInternal();

@@ -62,6 +62,7 @@ extension AppControllerDesktopSingleAgent on AppController {
       return;
     }
     await enqueueThreadTurnInternal<void>(sessionKey, () async {
+      final sessionTarget = assistantExecutionTargetForSession(sessionKey);
       final userText = trimmed.isEmpty ? 'See attached.' : trimmed;
       appendAssistantThreadMessageInternal(
         sessionKey,
@@ -142,7 +143,9 @@ extension AppControllerDesktopSingleAgent on AppController {
           }
           return;
         }
-        final effectiveProvider = provider ?? SingleAgentProvider.auto;
+        final effectiveProvider = sessionTarget == AssistantExecutionTarget.auto
+            ? SingleAgentProvider.auto
+            : (provider ?? SingleAgentProvider.auto);
 
         appendSingleAgentRuntimeStatusMessageInternal(
           sessionKey,
@@ -178,7 +181,9 @@ extension AppControllerDesktopSingleAgent on AppController {
             target: AssistantExecutionTarget.singleAgent,
             prompt: message,
             workingDirectory: workingDirectory,
-            model: assistantModelForSession(sessionKey),
+            model: sessionTarget == AssistantExecutionTarget.auto
+                ? ''
+                : assistantModelForSession(sessionKey),
             thinking: thinking,
             selectedSkills: selectedSkills,
             inlineAttachments: attachments,
@@ -202,6 +207,21 @@ extension AppControllerDesktopSingleAgent on AppController {
           singleAgentRuntimeModelBySessionInternal[sessionKey] =
               resolvedRuntimeModel;
         }
+        final resolvedGatewayEntryState =
+            result.resolvedExecutionTarget == 'gateway-chat'
+            ? (result.resolvedEndpointTarget.trim().isNotEmpty
+                  ? result.resolvedEndpointTarget.trim()
+                  : AssistantExecutionTarget.local.promptValue)
+            : result.resolvedExecutionTarget == 'single-agent'
+            ? AssistantExecutionTarget.singleAgent.promptValue
+            : (sessionTarget == AssistantExecutionTarget.auto
+                  ? AssistantExecutionTarget.auto.promptValue
+                  : AssistantExecutionTarget.singleAgent.promptValue);
+        upsertTaskThreadInternal(
+          sessionKey,
+          gatewayEntryState: resolvedGatewayEntryState,
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        );
         final resolvedWorkspaceKind = result.resolvedWorkspaceRefKind;
         final resolvedWorkingDirectory = result.resolvedWorkingDirectory.trim();
         if (resolvedWorkspaceKind != null &&
@@ -221,6 +241,11 @@ extension AppControllerDesktopSingleAgent on AppController {
             appendSingleAgentFallbackStatusMessageInternal(
               sessionKey,
               result.errorMessage,
+            );
+            upsertTaskThreadInternal(
+              sessionKey,
+              gatewayEntryState: 'only-chat',
+              updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
             );
             await sendAiGatewayMessageInternal(
               message,
@@ -801,9 +826,11 @@ extension AppControllerDesktopSingleAgent on AppController {
       sessionKey,
     );
     final thread = assistantThreadRecordsInternal[normalizedSessionKey];
-    final preferredGatewayTarget = switch (assistantExecutionTargetForSession(
+    final sessionTarget = assistantExecutionTargetForSession(
       normalizedSessionKey,
-    )) {
+    );
+    final preferredGatewayTarget = switch (sessionTarget) {
+      AssistantExecutionTarget.auto => 'local',
       AssistantExecutionTarget.local => 'local',
       AssistantExecutionTarget.remote => 'remote',
       AssistantExecutionTarget.singleAgent =>
@@ -828,6 +855,9 @@ extension AppControllerDesktopSingleAgent on AppController {
             .toList(growable: false);
 
     final resolvedExplicitExecutionTarget =
+        sessionTarget == AssistantExecutionTarget.auto
+        ? ''
+        :
         explicitExecutionTarget?.trim().isNotEmpty == true
         ? explicitExecutionTarget!.trim()
         : (thread?.hasExplicitExecutionTargetSelection ?? false)
@@ -836,11 +866,16 @@ extension AppControllerDesktopSingleAgent on AppController {
           )
         : '';
     final resolvedExplicitProviderId =
+        sessionTarget == AssistantExecutionTarget.auto
+        ? ''
+        :
         thread?.hasExplicitProviderSelection ?? false
         ? singleAgentProviderForSession(normalizedSessionKey).providerId
         : '';
     final resolvedExplicitModel = thread?.hasExplicitModelSelection ?? false
-        ? assistantModelForSession(normalizedSessionKey)
+        ? (sessionTarget == AssistantExecutionTarget.auto
+              ? ''
+              : assistantModelForSession(normalizedSessionKey))
         : '';
     final resolvedExplicitSkills = thread?.hasExplicitSkillSelection ?? false
         ? selectedSkills
@@ -872,6 +907,7 @@ extension AppControllerDesktopSingleAgent on AppController {
 
   String _routingExecutionTargetValue(AssistantExecutionTarget target) {
     return switch (target) {
+      AssistantExecutionTarget.auto => 'singleAgent',
       AssistantExecutionTarget.singleAgent => 'singleAgent',
       AssistantExecutionTarget.local => 'local',
       AssistantExecutionTarget.remote => 'remote',
