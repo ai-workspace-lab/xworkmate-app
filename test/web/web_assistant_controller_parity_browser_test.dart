@@ -276,6 +276,7 @@ void main() {
                 label: 'Claude',
                 badge: 'Cl',
                 endpoint: 'wss://claude.example.com/acp',
+                authRef: '',
                 enabled: true,
               ),
             ],

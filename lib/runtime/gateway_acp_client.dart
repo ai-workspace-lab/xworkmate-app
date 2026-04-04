@@ -82,9 +82,13 @@ class GatewayAcpMultiAgentRequest {
 }
 
 class GatewayAcpClient {
-  GatewayAcpClient({required this.endpointResolver});
+  GatewayAcpClient({
+    required this.endpointResolver,
+    this.authorizationResolver,
+  });
 
   final Uri? Function() endpointResolver;
+  final Future<String?> Function(Uri endpoint)? authorizationResolver;
 
   int _requestCounter = 0;
   GatewayAcpCapabilities _cachedCapabilities =
@@ -94,6 +98,7 @@ class GatewayAcpClient {
   Future<GatewayAcpCapabilities> loadCapabilities({
     bool forceRefresh = false,
     Uri? endpointOverride,
+    String authorizationOverride = '',
   }) async {
     if (!forceRefresh &&
         _capabilitiesRefreshedAt != null &&
@@ -110,6 +115,7 @@ class GatewayAcpClient {
       ),
       onNotification: (_) {},
       endpointOverride: endpointOverride,
+      authorizationOverride: authorizationOverride,
     );
     final result = asMap(response['result']);
     final caps = asMap(result['capabilities']);
@@ -241,6 +247,7 @@ class GatewayAcpClient {
     required String sessionId,
     required String threadId,
     Uri? endpointOverride,
+    String authorizationOverride = '',
   }) async {
     await _requestWithFallback(
       _GatewayAcpRpcRequest(
@@ -250,6 +257,7 @@ class GatewayAcpClient {
       ),
       onNotification: (_) {},
       endpointOverride: endpointOverride,
+      authorizationOverride: authorizationOverride,
     );
   }
 
@@ -257,6 +265,7 @@ class GatewayAcpClient {
     required String sessionId,
     required String threadId,
     Uri? endpointOverride,
+    String authorizationOverride = '',
   }) async {
     await _requestWithFallback(
       _GatewayAcpRpcRequest(
@@ -266,6 +275,7 @@ class GatewayAcpClient {
       ),
       onNotification: (_) {},
       endpointOverride: endpointOverride,
+      authorizationOverride: authorizationOverride,
     );
   }
 
@@ -274,6 +284,7 @@ class GatewayAcpClient {
     required Map<String, dynamic> params,
     void Function(Map<String, dynamic>)? onNotification,
     Uri? endpointOverride,
+    String authorizationOverride = '',
   }) async {
     return _requestWithFallback(
       _GatewayAcpRpcRequest(
@@ -283,6 +294,7 @@ class GatewayAcpClient {
       ),
       onNotification: onNotification ?? (_) {},
       endpointOverride: endpointOverride,
+      authorizationOverride: authorizationOverride,
     );
   }
 
@@ -292,18 +304,21 @@ class GatewayAcpClient {
     _GatewayAcpRpcRequest request, {
     required void Function(Map<String, dynamic>) onNotification,
     Uri? endpointOverride,
+    String authorizationOverride = '',
   }) async {
     try {
       return await _requestViaWebSocket(
         request,
         onNotification: onNotification,
         endpointOverride: endpointOverride,
+        authorizationOverride: authorizationOverride,
       );
     } catch (_) {
       return _requestViaHttp(
         request,
         onNotification: onNotification,
         endpointOverride: endpointOverride,
+        authorizationOverride: authorizationOverride,
       );
     }
   }
@@ -312,6 +327,7 @@ class GatewayAcpClient {
     _GatewayAcpRpcRequest request, {
     required void Function(Map<String, dynamic>) onNotification,
     Uri? endpointOverride,
+    String authorizationOverride = '',
   }) async {
     final endpoint = _resolveWebSocketRpcEndpoint(endpointOverride);
     if (endpoint == null) {
@@ -321,13 +337,25 @@ class GatewayAcpClient {
       );
     }
 
-    final socket = await WebSocket.connect(endpoint.toString()).timeout(
-      const Duration(seconds: 6),
-      onTimeout: () => throw const GatewayAcpException(
-        'ACP websocket connect timeout',
-        code: 'ACP_WS_CONNECT_TIMEOUT',
-      ),
+    final authorization = await _resolveAuthorizationHeader(
+      endpoint,
+      authorizationOverride: authorizationOverride,
     );
+    final socket =
+        await WebSocket.connect(
+          endpoint.toString(),
+          headers: authorization.isEmpty
+              ? null
+              : <String, dynamic>{
+                  HttpHeaders.authorizationHeader: authorization,
+                },
+        ).timeout(
+          const Duration(seconds: 6),
+          onTimeout: () => throw const GatewayAcpException(
+            'ACP websocket connect timeout',
+            code: 'ACP_WS_CONNECT_TIMEOUT',
+          ),
+        );
     final completer = Completer<Map<String, dynamic>>();
     late final StreamSubscription<dynamic> subscription;
     subscription = socket.listen(
@@ -390,6 +418,7 @@ class GatewayAcpClient {
     _GatewayAcpRpcRequest request, {
     required void Function(Map<String, dynamic>) onNotification,
     Uri? endpointOverride,
+    String authorizationOverride = '',
   }) async {
     final endpoint = _resolveHttpRpcEndpoint(endpointOverride);
     if (endpoint == null) {
@@ -410,6 +439,13 @@ class GatewayAcpClient {
         HttpHeaders.acceptHeader,
         'text/event-stream, application/json',
       );
+      final authorization = await _resolveAuthorizationHeader(
+        endpoint,
+        authorizationOverride: authorizationOverride,
+      );
+      if (authorization.isNotEmpty) {
+        httpRequest.headers.set(HttpHeaders.authorizationHeader, authorization);
+      }
       httpRequest.add(
         utf8.encode(
           jsonEncode(<String, dynamic>{
@@ -443,6 +479,17 @@ class GatewayAcpClient {
     } finally {
       client.close(force: true);
     }
+  }
+
+  Future<String> _resolveAuthorizationHeader(
+    Uri endpoint, {
+    String authorizationOverride = '',
+  }) async {
+    final override = authorizationOverride.trim();
+    if (override.isNotEmpty) {
+      return override;
+    }
+    return (await authorizationResolver?.call(endpoint))?.trim() ?? '';
   }
 
   Future<Map<String, dynamic>> _consumeSseRpcResponse({

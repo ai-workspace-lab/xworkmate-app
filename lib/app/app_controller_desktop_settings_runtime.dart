@@ -574,8 +574,25 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     SettingsSnapshot previous,
     SettingsSnapshot next,
   ) {
+    final gatewayDraftKeys = <String>{
+      for (final profile in previous.gatewayProfiles) ...[
+        'secret_ref::${profile.tokenRef.trim().isEmpty ? '' : profile.tokenRef.trim()}',
+        'secret_ref::${profile.passwordRef.trim().isEmpty ? '' : profile.passwordRef.trim()}',
+      ],
+      for (final profile in next.gatewayProfiles) ...[
+        'secret_ref::${profile.tokenRef.trim().isEmpty ? '' : profile.tokenRef.trim()}',
+        'secret_ref::${profile.passwordRef.trim().isEmpty ? '' : profile.passwordRef.trim()}',
+      ],
+      'secret_ref::gateway_token',
+      'secret_ref::gateway_password',
+    }..remove('secret_ref::');
+    final aiGatewayDraftKeys = <String>{
+      'secret_ref::${next.aiGateway.apiKeyRef.trim().isEmpty ? AppController.draftAiGatewayApiKeyKeyInternal : next.aiGateway.apiKeyRef.trim()}',
+      'secret_ref::${previous.aiGateway.apiKeyRef.trim().isEmpty ? AppController.draftAiGatewayApiKeyKeyInternal : previous.aiGateway.apiKeyRef.trim()}',
+      AppController.draftAiGatewayApiKeyKeyInternal,
+    };
     final hasGatewaySecretDraft = draftSecretValuesInternal.keys.any(
-      (key) => isGatewayDraftKeyInternal(key),
+      (key) => gatewayDraftKeys.contains(key) || isGatewayDraftKeyInternal(key),
     );
     final gatewayChanged =
         jsonEncode(
@@ -586,48 +603,52 @@ extension AppControllerDesktopSettingsRuntime on AppController {
             ) ||
         previous.assistantExecutionTarget != next.assistantExecutionTarget ||
         hasGatewaySecretDraft;
+    final hasAiGatewaySecretDraft = draftSecretValuesInternal.keys.any(
+      aiGatewayDraftKeys.contains,
+    );
     final aiGatewayChanged =
         previous.aiGateway.toJson().toString() !=
             next.aiGateway.toJson().toString() ||
         previous.defaultModel != next.defaultModel ||
-        draftSecretValuesInternal.containsKey(
-          AppController.draftAiGatewayApiKeyKeyInternal,
-        );
+        hasAiGatewaySecretDraft;
     pendingGatewayApplyInternal = pendingGatewayApplyInternal || gatewayChanged;
     pendingAiGatewayApplyInternal =
         pendingAiGatewayApplyInternal || aiGatewayChanged;
   }
 
   Future<void> persistDraftSecretsInternal() async {
-    for (var index = 0; index < kGatewayProfileListLength; index += 1) {
-      final gatewayToken =
-          draftSecretValuesInternal[draftGatewayTokenKeyInternal(index)];
-      final gatewayPassword =
-          draftSecretValuesInternal[draftGatewayPasswordKeyInternal(index)];
-      if ((gatewayToken ?? '').isNotEmpty ||
-          (gatewayPassword ?? '').isNotEmpty) {
-        await settingsControllerInternal.saveGatewaySecrets(
-          profileIndex: index,
-          token: gatewayToken ?? '',
-          password: gatewayPassword ?? '',
-        );
+    for (final entry in draftSecretValuesInternal.entries) {
+      final key = entry.key.trim();
+      final value = entry.value.trim();
+      if (value.isEmpty) {
+        continue;
       }
-    }
-    final aiGatewayApiKey =
-        draftSecretValuesInternal[AppController
-            .draftAiGatewayApiKeyKeyInternal];
-    if ((aiGatewayApiKey ?? '').isNotEmpty) {
-      await settingsControllerInternal.saveAiGatewayApiKey(aiGatewayApiKey!);
-    }
-    final vaultToken =
-        draftSecretValuesInternal[AppController.draftVaultTokenKeyInternal];
-    if ((vaultToken ?? '').isNotEmpty) {
-      await settingsControllerInternal.saveVaultToken(vaultToken!);
-    }
-    final ollamaApiKey =
-        draftSecretValuesInternal[AppController.draftOllamaApiKeyKeyInternal];
-    if ((ollamaApiKey ?? '').isNotEmpty) {
-      await settingsControllerInternal.saveOllamaCloudApiKey(ollamaApiKey!);
+      if (key.startsWith('secret_ref::')) {
+        final refName = key.substring('secret_ref::'.length).trim();
+        if (refName.isEmpty) {
+          continue;
+        }
+        await settingsControllerInternal.saveSecretValueByRef(
+          refName,
+          value,
+          provider: settingsControllerInternal.providerNameForSecretInternal(
+            refName,
+          ),
+          module: settingsControllerInternal.moduleForSecretInternal(refName),
+        );
+        continue;
+      }
+      if (key == AppController.draftAiGatewayApiKeyKeyInternal) {
+        await settingsControllerInternal.saveAiGatewayApiKey(value);
+        continue;
+      }
+      if (key == AppController.draftVaultTokenKeyInternal) {
+        await settingsControllerInternal.saveVaultToken(value);
+        continue;
+      }
+      if (key == AppController.draftOllamaApiKeyKeyInternal) {
+        await settingsControllerInternal.saveOllamaCloudApiKey(value);
+      }
     }
     draftSecretValuesInternal.clear();
   }
@@ -639,7 +660,12 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       'gateway_password_$profileIndex';
 
   bool isGatewayDraftKeyInternal(String key) =>
-      key.startsWith('gateway_token_') || key.startsWith('gateway_password_');
+      key.startsWith('secret_ref::gateway_token_') ||
+      key.startsWith('secret_ref::gateway_password_') ||
+      key == 'secret_ref::gateway_token' ||
+      key == 'secret_ref::gateway_password' ||
+      key.startsWith('gateway_token_') ||
+      key.startsWith('gateway_password_');
 
   bool authorizedSkillDirectoriesChangedInternal(
     SettingsSnapshot previous,

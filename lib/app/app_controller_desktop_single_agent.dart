@@ -366,7 +366,11 @@ extension AppControllerDesktopSingleAgent on AppController {
     }
 
     final apiKey = await loadAiGatewayApiKey();
-    if (apiKey.isEmpty) {
+    final allowsAnonymous =
+        isLoopbackHostInternal(baseUrl.host) &&
+        (baseUrl.host.trim().toLowerCase() == '127.0.0.1' ||
+            baseUrl.host.trim().toLowerCase() == 'localhost');
+    if (apiKey.isEmpty && !allowsAnonymous) {
       appendAssistantThreadMessageInternal(
         sessionKey,
         assistantErrorMessageInternal(
@@ -495,8 +499,14 @@ extension AppControllerDesktopSingleAgent on AppController {
         HttpHeaders.contentTypeHeader,
         'application/json; charset=utf-8',
       );
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $apiKey');
-      request.headers.set('x-api-key', apiKey);
+      final trimmedApiKey = apiKey.trim();
+      if (trimmedApiKey.isNotEmpty) {
+        request.headers.set(
+          HttpHeaders.authorizationHeader,
+          'Bearer $trimmedApiKey',
+        );
+        request.headers.set('x-api-key', trimmedApiKey);
+      }
       final payload = <String, dynamic>{
         'model': model,
         'stream': true,

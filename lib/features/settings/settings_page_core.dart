@@ -63,6 +63,8 @@ class SettingsPageStateInternal extends State<SettingsPage> {
   late final TextEditingController gatewaySetupCodeControllerInternal;
   late final TextEditingController gatewayHostControllerInternal;
   late final TextEditingController gatewayPortControllerInternal;
+  late final List<TextEditingController> gatewayTokenRefControllersInternal;
+  late final List<TextEditingController> gatewayPasswordRefControllersInternal;
   late final List<TextEditingController> gatewayTokenControllersInternal;
   late final List<TextEditingController> gatewayPasswordControllersInternal;
   late final TextEditingController vaultTokenControllerInternal;
@@ -72,8 +74,13 @@ class SettingsPageStateInternal extends State<SettingsPage> {
   externalAcpLabelControllersInternal;
   late final Map<String, TextEditingController>
   externalAcpEndpointControllersInternal;
+  late final Map<String, TextEditingController>
+  externalAcpAuthControllersInternal;
+  late final List<String> gatewayTokenRefSyncedValuesInternal;
+  late final List<String> gatewayPasswordRefSyncedValuesInternal;
   late final Map<String, String> externalAcpLabelSyncedValuesInternal;
   late final Map<String, String> externalAcpEndpointSyncedValuesInternal;
+  late final Map<String, String> externalAcpAuthSyncedValuesInternal;
   late final Map<String, String> externalAcpMessageByProviderInternal;
   late final Set<String> externalAcpTestingProvidersInternal;
   bool gatewayTestingInternal = false;
@@ -123,9 +130,30 @@ class SettingsPageStateInternal extends State<SettingsPage> {
     gatewaySetupCodeControllerInternal = TextEditingController();
     gatewayHostControllerInternal = TextEditingController();
     gatewayPortControllerInternal = TextEditingController();
+    gatewayTokenRefControllersInternal = List<TextEditingController>.generate(
+      kGatewayProfileListLength,
+      (_) => TextEditingController(),
+      growable: false,
+    );
+    gatewayPasswordRefControllersInternal =
+        List<TextEditingController>.generate(
+          kGatewayProfileListLength,
+          (_) => TextEditingController(),
+          growable: false,
+        );
     gatewayTokenControllersInternal = List<TextEditingController>.generate(
       kGatewayProfileListLength,
       (_) => TextEditingController(),
+      growable: false,
+    );
+    gatewayTokenRefSyncedValuesInternal = List<String>.filled(
+      kGatewayProfileListLength,
+      '',
+      growable: false,
+    );
+    gatewayPasswordRefSyncedValuesInternal = List<String>.filled(
+      kGatewayProfileListLength,
+      '',
       growable: false,
     );
     gatewayPasswordControllersInternal = List<TextEditingController>.generate(
@@ -148,8 +176,10 @@ class SettingsPageStateInternal extends State<SettingsPage> {
     runtimeLogFilterControllerInternal = TextEditingController();
     externalAcpLabelControllersInternal = <String, TextEditingController>{};
     externalAcpEndpointControllersInternal = <String, TextEditingController>{};
+    externalAcpAuthControllersInternal = <String, TextEditingController>{};
     externalAcpLabelSyncedValuesInternal = <String, String>{};
     externalAcpEndpointSyncedValuesInternal = <String, String>{};
+    externalAcpAuthSyncedValuesInternal = <String, String>{};
     externalAcpMessageByProviderInternal = <String, String>{};
     externalAcpTestingProvidersInternal = <String>{};
   }
@@ -206,6 +236,12 @@ class SettingsPageStateInternal extends State<SettingsPage> {
     gatewaySetupCodeControllerInternal.dispose();
     gatewayHostControllerInternal.dispose();
     gatewayPortControllerInternal.dispose();
+    for (final controller in gatewayTokenRefControllersInternal) {
+      controller.dispose();
+    }
+    for (final controller in gatewayPasswordRefControllersInternal) {
+      controller.dispose();
+    }
     for (final controller in gatewayTokenControllersInternal) {
       controller.dispose();
     }
@@ -219,6 +255,9 @@ class SettingsPageStateInternal extends State<SettingsPage> {
       controller.dispose();
     }
     for (final controller in externalAcpEndpointControllersInternal.values) {
+      controller.dispose();
+    }
+    for (final controller in externalAcpAuthControllersInternal.values) {
       controller.dispose();
     }
     super.dispose();

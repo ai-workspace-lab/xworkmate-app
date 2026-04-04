@@ -15,6 +15,7 @@ import 'runtime_controllers_settings_account_impl.dart';
 import 'runtime_controllers_settings_connectivity_impl.dart';
 
 part 'runtime_controllers_settings_account.dart';
+part 'runtime_controllers_settings_secrets_impl.dart';
 
 class SettingsController extends ChangeNotifier {
   SettingsController(
@@ -121,200 +122,119 @@ class SettingsController extends ChangeNotifier {
     int? profileIndex,
     required String token,
     required String password,
-  }) async {
-    final trimmedToken = token.trim();
-    final trimmedPassword = password.trim();
-    if (trimmedToken.isNotEmpty) {
-      await storeInternal.saveGatewayToken(
-        trimmedToken,
-        profileIndex: profileIndex,
-      );
-      await appendAudit(
-        SecretAuditEntry(
-          timeLabel: timeLabelInternal(),
-          action: 'Updated',
-          provider: 'Gateway',
-          target: gatewaySecretTargetInternal('gateway_token', profileIndex),
-          module: 'Assistant',
-          status: 'Success',
-        ),
-      );
-    }
-    if (trimmedPassword.isNotEmpty) {
-      await storeInternal.saveGatewayPassword(
-        trimmedPassword,
-        profileIndex: profileIndex,
-      );
-      await appendAudit(
-        SecretAuditEntry(
-          timeLabel: timeLabelInternal(),
-          action: 'Updated',
-          provider: 'Gateway',
-          target: gatewaySecretTargetInternal('gateway_password', profileIndex),
-          module: 'Assistant',
-          status: 'Success',
-        ),
-      );
-    }
-    await reloadDerivedStateInternal();
-    notifyListeners();
-  }
+  }) => saveGatewaySecretsSettingsInternal(
+    this,
+    profileIndex: profileIndex,
+    token: token,
+    password: password,
+  );
 
   Future<void> clearGatewaySecrets({
     int? profileIndex,
     bool token = false,
     bool password = false,
-  }) async {
-    if (token) {
-      await storeInternal.clearGatewayToken(profileIndex: profileIndex);
-      await appendAudit(
-        SecretAuditEntry(
-          timeLabel: timeLabelInternal(),
-          action: 'Cleared',
-          provider: 'Gateway',
-          target: gatewaySecretTargetInternal('gateway_token', profileIndex),
-          module: 'Assistant',
-          status: 'Success',
-        ),
-      );
-    }
-    if (password) {
-      await storeInternal.clearGatewayPassword(profileIndex: profileIndex);
-      await appendAudit(
-        SecretAuditEntry(
-          timeLabel: timeLabelInternal(),
-          action: 'Cleared',
-          provider: 'Gateway',
-          target: gatewaySecretTargetInternal('gateway_password', profileIndex),
-          module: 'Assistant',
-          status: 'Success',
-        ),
-      );
-    }
-    await reloadDerivedStateInternal();
-    notifyListeners();
-  }
+  }) => clearGatewaySecretsSettingsInternal(
+    this,
+    profileIndex: profileIndex,
+    token: token,
+    password: password,
+  );
 
-  Future<String> loadGatewayToken({int? profileIndex}) async {
-    return (await storeInternal.loadGatewayToken(
-          profileIndex: profileIndex,
-        ))?.trim() ??
-        '';
-  }
+  Future<String> loadGatewayToken({int? profileIndex}) =>
+      loadGatewayTokenSettingsInternal(this, profileIndex: profileIndex);
 
-  Future<String> loadGatewayPassword({int? profileIndex}) async {
-    return (await storeInternal.loadGatewayPassword(
-          profileIndex: profileIndex,
-        ))?.trim() ??
-        '';
-  }
+  Future<String> loadGatewayPassword({int? profileIndex}) =>
+      loadGatewayPasswordSettingsInternal(this, profileIndex: profileIndex);
 
   bool hasStoredGatewayTokenForProfile(int profileIndex) =>
-      secureRefsInternal.containsKey(
-        SecretStore.gatewayTokenRefKey(profileIndex),
-      ) ||
-      secureRefsInternal.containsKey('gateway_token') ||
-      (!snapshotInternal.accountLocalMode &&
-          profileIndex == kGatewayRemoteProfileIndex &&
-          secureRefsInternal.containsKey(
-            kAccountManagedSecretTargetOpenclawGatewayToken,
-          ));
+      hasStoredGatewayTokenForProfileSettingsInternal(this, profileIndex);
 
   bool hasStoredGatewayPasswordForProfile(int profileIndex) =>
-      secureRefsInternal.containsKey(
-        SecretStore.gatewayPasswordRefKey(profileIndex),
-      ) ||
-      secureRefsInternal.containsKey('gateway_password');
+      hasStoredGatewayPasswordForProfileSettingsInternal(this, profileIndex);
 
   String? storedGatewayTokenMaskForProfile(int profileIndex) =>
-      secureRefsInternal[SecretStore.gatewayTokenRefKey(profileIndex)] ??
-      secureRefsInternal['gateway_token'] ??
-      (!snapshotInternal.accountLocalMode &&
-              profileIndex == kGatewayRemoteProfileIndex
-          ? secureRefsInternal[kAccountManagedSecretTargetOpenclawGatewayToken]
-          : null);
+      storedGatewayTokenMaskForProfileSettingsInternal(this, profileIndex);
 
   String? storedGatewayPasswordMaskForProfile(int profileIndex) =>
-      secureRefsInternal[SecretStore.gatewayPasswordRefKey(profileIndex)] ??
-      secureRefsInternal['gateway_password'];
+      storedGatewayPasswordMaskForProfileSettingsInternal(this, profileIndex);
 
-  Future<void> saveOllamaCloudApiKey(String value) async {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) {
-      return;
-    }
-    await storeInternal.saveOllamaCloudApiKey(trimmed);
-    await appendAudit(
-      SecretAuditEntry(
-        timeLabel: timeLabelInternal(),
-        action: 'Updated',
-        provider: 'Ollama Cloud',
-        target: snapshotInternal.ollamaCloud.apiKeyRef,
-        module: 'Settings',
-        status: 'Success',
-      ),
-    );
-    await reloadDerivedStateInternal();
-    notifyListeners();
-  }
+  String gatewayTokenRefForProfileInternal(int profileIndex) =>
+      gatewayTokenRefForProfileSettingsInternal(this, profileIndex);
 
-  Future<String> loadOllamaCloudApiKey() async {
-    return (await storeInternal.loadOllamaCloudApiKey())?.trim() ?? '';
-  }
+  String gatewayPasswordRefForProfileInternal(int profileIndex) =>
+      gatewayPasswordRefForProfileSettingsInternal(this, profileIndex);
 
-  Future<void> saveVaultToken(String value) async {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) {
-      return;
-    }
-    await storeInternal.saveVaultToken(trimmed);
-    await appendAudit(
-      SecretAuditEntry(
-        timeLabel: timeLabelInternal(),
-        action: 'Updated',
-        provider: 'Vault',
-        target: snapshotInternal.vault.tokenRef,
-        module: 'Secrets',
-        status: 'Success',
-      ),
-    );
-    await reloadDerivedStateInternal();
-    notifyListeners();
-  }
+  String aiGatewayApiKeyRefInternal([AiGatewayProfile? profile]) =>
+      aiGatewayApiKeyRefSettingsInternal(this, profile);
 
-  Future<String> loadVaultToken() async {
-    return (await storeInternal.loadVaultToken())?.trim() ?? '';
-  }
+  String vaultTokenRefInternal([VaultConfig? profile]) =>
+      vaultTokenRefSettingsInternal(this, profile);
 
-  Future<void> saveAiGatewayApiKey(String value) async {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) {
-      return;
-    }
-    await storeInternal.saveAiGatewayApiKey(trimmed);
-    await appendAudit(
-      SecretAuditEntry(
-        timeLabel: timeLabelInternal(),
-        action: 'Updated',
-        provider: 'LLM API',
-        target: snapshotInternal.aiGateway.apiKeyRef,
-        module: 'Settings',
-        status: 'Success',
-      ),
-    );
-    await reloadDerivedStateInternal();
-    notifyListeners();
-  }
+  String ollamaCloudApiKeyRefInternal([OllamaCloudConfig? profile]) =>
+      ollamaCloudApiKeyRefSettingsInternal(this, profile);
 
-  Future<String> loadAiGatewayApiKey() async {
-    return (await storeInternal.loadAiGatewayApiKey())?.trim() ?? '';
-  }
+  Future<void> saveOllamaCloudApiKey(String value) =>
+      saveOllamaCloudApiKeySettingsInternal(this, value);
 
-  Future<void> clearAiGatewayApiKey() async {
-    await storeInternal.clearAiGatewayApiKey();
-    await reloadDerivedStateInternal();
-    notifyListeners();
-  }
+  Future<String> loadOllamaCloudApiKey() =>
+      loadOllamaCloudApiKeySettingsInternal(this);
+
+  Future<void> saveVaultToken(String value) =>
+      saveVaultTokenSettingsInternal(this, value);
+
+  Future<String> loadVaultToken() => loadVaultTokenSettingsInternal(this);
+
+  Future<void> saveAiGatewayApiKey(String value) =>
+      saveAiGatewayApiKeySettingsInternal(this, value);
+
+  Future<String> loadAiGatewayApiKey() =>
+      loadAiGatewayApiKeySettingsInternal(this);
+
+  Future<void> clearAiGatewayApiKey() =>
+      clearAiGatewayApiKeySettingsInternal(this);
+
+  Future<void> saveSecretValueByRef(
+    String refName,
+    String value, {
+    required String provider,
+    required String module,
+  }) => saveSecretValueByRefSettingsInternal(
+    this,
+    refName,
+    value,
+    provider: provider,
+    module: module,
+  );
+
+  Future<String> loadSecretValueByRef(String refName) =>
+      loadSecretValueByRefSettingsInternal(this, refName);
+
+  Future<String> loadVaultTokenForSecretReadsInternal({
+    String tokenOverride = '',
+  }) => loadVaultTokenForSecretReadsSettingsInternal(
+    this,
+    tokenOverride: tokenOverride,
+  );
+
+  Future<String> readVaultSecretByRefInternal(String refName) =>
+      readVaultSecretByRefSettingsInternal(this, refName);
+
+  Future<String> resolveSecretValueInternal({
+    String explicitValue = '',
+    String refName = '',
+    String fallbackRefName = '',
+    String accountTarget = '',
+    bool allowVaultLookup = true,
+    bool persistExplicitValue = true,
+  }) => resolveSecretValueSettingsInternal(
+    this,
+    explicitValue: explicitValue,
+    refName: refName,
+    fallbackRefName: fallbackRefName,
+    accountTarget: accountTarget,
+    allowVaultLookup: allowVaultLookup,
+    persistExplicitValue: persistExplicitValue,
+  );
 
   Future<void> appendAudit(SecretAuditEntry entry) async {
     await storeInternal.appendAudit(entry);
@@ -422,8 +342,14 @@ class SettingsController extends ChangeNotifier {
           .getUrl(uri)
           .timeout(const Duration(seconds: 6));
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $apiKey');
-      request.headers.set('x-api-key', apiKey);
+      final trimmedApiKey = apiKey.trim();
+      if (trimmedApiKey.isNotEmpty) {
+        request.headers.set(
+          HttpHeaders.authorizationHeader,
+          'Bearer $trimmedApiKey',
+        );
+        request.headers.set('x-api-key', trimmedApiKey);
+      }
       final response = await request.close().timeout(
         const Duration(seconds: 6),
       );

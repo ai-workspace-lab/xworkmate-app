@@ -12,6 +12,11 @@ import 'runtime_controllers_entities.dart';
 import 'runtime_controllers_derived_tasks.dart';
 import 'runtime_controllers_settings.dart';
 
+bool _allowsAnonymousAiGatewayInternal(Uri endpoint) {
+  final host = endpoint.host.trim().toLowerCase();
+  return host == '127.0.0.1' || host == 'localhost';
+}
+
 Future<String> testOllamaConnectionSettingsInternal(
   SettingsController controller, {
   required bool cloud,
@@ -141,9 +146,20 @@ Future<AiGatewayProfile> syncAiGatewayCatalogSettingsInternal(
     return next;
   }
   final apiKey = apiKeyOverride.trim().isNotEmpty
-      ? apiKeyOverride.trim()
-      : (await controller.storeInternal.loadAiGatewayApiKey())?.trim() ?? '';
-  if (apiKey.isEmpty) {
+      ? await controller.resolveSecretValueInternal(
+          explicitValue: apiKeyOverride,
+          refName: profile.apiKeyRef,
+          fallbackRefName: 'ai_gateway_api_key',
+          accountTarget: kAccountManagedSecretTargetAIGatewayAccessToken,
+          allowVaultLookup: false,
+          persistExplicitValue: false,
+        )
+      : await controller.resolveSecretValueInternal(
+          refName: profile.apiKeyRef,
+          fallbackRefName: 'ai_gateway_api_key',
+          accountTarget: kAccountManagedSecretTargetAIGatewayAccessToken,
+        );
+  if (apiKey.isEmpty && !_allowsAnonymousAiGatewayInternal(normalizedBaseUrl)) {
     final next = profile.copyWith(
       baseUrl: normalizedBaseUrl.toString(),
       syncState: 'invalid',
@@ -165,7 +181,9 @@ Future<AiGatewayProfile> syncAiGatewayCatalogSettingsInternal(
       profile: profile.copyWith(baseUrl: normalizedBaseUrl.toString()),
       apiKeyOverride: apiKey,
     );
-    final availableModels = models.map((item) => item.id).toList(growable: false);
+    final availableModels = models
+        .map((item) => item.id)
+        .toList(growable: false);
     final retainedSelected = profile.selectedModels
         .where(availableModels.contains)
         .toList(growable: false);
@@ -192,7 +210,9 @@ Future<AiGatewayProfile> syncAiGatewayCatalogSettingsInternal(
       aiGateway: next,
       defaultModel: resolvedDefaultModel,
     );
-    await controller.storeInternal.saveSettingsSnapshot(controller.snapshotInternal);
+    await controller.storeInternal.saveSettingsSnapshot(
+      controller.snapshotInternal,
+    );
     await controller.reloadDerivedStateInternal();
     controller.notifyListeners();
     return next;
@@ -206,7 +226,9 @@ Future<AiGatewayProfile> syncAiGatewayCatalogSettingsInternal(
     controller.snapshotInternal = controller.snapshotInternal.copyWith(
       aiGateway: next,
     );
-    await controller.storeInternal.saveSettingsSnapshot(controller.snapshotInternal);
+    await controller.storeInternal.saveSettingsSnapshot(
+      controller.snapshotInternal,
+    );
     controller.notifyListeners();
     return next;
   }
@@ -229,11 +251,23 @@ Future<AiGatewayConnectionCheck> testAiGatewayConnectionSettingsInternal(
     );
   }
   final apiKey = apiKeyOverride.trim().isNotEmpty
-      ? apiKeyOverride.trim()
-      : (await controller.storeInternal.loadAiGatewayApiKey())?.trim() ?? '';
-  final endpoint = controller.aiGatewayModelsUriInternal(normalizedBaseUrl)
+      ? await controller.resolveSecretValueInternal(
+          explicitValue: apiKeyOverride,
+          refName: profile.apiKeyRef,
+          fallbackRefName: 'ai_gateway_api_key',
+          accountTarget: kAccountManagedSecretTargetAIGatewayAccessToken,
+          allowVaultLookup: false,
+          persistExplicitValue: false,
+        )
+      : await controller.resolveSecretValueInternal(
+          refName: profile.apiKeyRef,
+          fallbackRefName: 'ai_gateway_api_key',
+          accountTarget: kAccountManagedSecretTargetAIGatewayAccessToken,
+        );
+  final endpoint = controller
+      .aiGatewayModelsUriInternal(normalizedBaseUrl)
       .toString();
-  if (apiKey.isEmpty) {
+  if (apiKey.isEmpty && !_allowsAnonymousAiGatewayInternal(normalizedBaseUrl)) {
     return AiGatewayConnectionCheck(
       state: 'invalid',
       message: 'Missing LLM API Token',
@@ -283,9 +317,20 @@ Future<List<GatewayModelSummary>> loadAiGatewayModelsSettingsInternal(
     return const <GatewayModelSummary>[];
   }
   final apiKey = apiKeyOverride.trim().isNotEmpty
-      ? apiKeyOverride.trim()
-      : (await controller.storeInternal.loadAiGatewayApiKey())?.trim() ?? '';
-  if (apiKey.isEmpty) {
+      ? await controller.resolveSecretValueInternal(
+          explicitValue: apiKeyOverride,
+          refName: activeProfile.apiKeyRef,
+          fallbackRefName: 'ai_gateway_api_key',
+          accountTarget: kAccountManagedSecretTargetAIGatewayAccessToken,
+          allowVaultLookup: false,
+          persistExplicitValue: false,
+        )
+      : await controller.resolveSecretValueInternal(
+          refName: activeProfile.apiKeyRef,
+          fallbackRefName: 'ai_gateway_api_key',
+          accountTarget: kAccountManagedSecretTargetAIGatewayAccessToken,
+        );
+  if (apiKey.isEmpty && !_allowsAnonymousAiGatewayInternal(normalizedBaseUrl)) {
     return const <GatewayModelSummary>[];
   }
   return controller.requestAiGatewayModelsInternal(

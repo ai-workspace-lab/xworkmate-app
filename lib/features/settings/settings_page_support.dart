@@ -243,10 +243,25 @@ XWorkmate Privacy Policy
   }
 
   void resetSecureFieldUiAfterPersistInternal(AppController controller) {
+    final aiGatewayRef = controller.settings.aiGateway.apiKeyRef.trim().isEmpty
+        ? 'ai_gateway_api_key'
+        : controller.settings.aiGateway.apiKeyRef.trim();
+    final vaultTokenRef = controller.settings.vault.tokenRef.trim().isEmpty
+        ? 'vault_token'
+        : controller.settings.vault.tokenRef.trim();
     final hasStoredAiGatewayApiKey =
-        controller.settingsController.secureRefs['ai_gateway_api_key'] != null;
+        controller.settingsController.secureRefs[aiGatewayRef] != null ||
+        (aiGatewayRef == 'ai_gateway_api_key' &&
+            controller.settingsController.secureRefs['ai_gateway_api_key'] !=
+                null) ||
+        controller
+                .settingsController
+                .secureRefs[kAccountManagedSecretTargetAIGatewayAccessToken] !=
+            null;
     final hasStoredVaultToken =
-        controller.settingsController.secureRefs['vault_token'] != null;
+        controller.settingsController.secureRefs[vaultTokenRef] != null ||
+        (vaultTokenRef == 'vault_token' &&
+            controller.settingsController.secureRefs['vault_token'] != null);
     final hasStoredOllamaApiKey =
         controller.settingsController.secureRefs['ollama_cloud_api_key'] !=
         null;
@@ -305,6 +320,24 @@ XWorkmate Privacy Policy
       syncedValue: gatewayPortSyncedValueInternal,
       onSyncedValueChanged: (value) => gatewayPortSyncedValueInternal = value,
     );
+    syncDraftControllerValueInternal(
+      gatewayTokenRefControllersInternal[selectedGatewayProfileIndexInternal],
+      current.tokenRef,
+      syncedValue:
+          gatewayTokenRefSyncedValuesInternal[selectedGatewayProfileIndexInternal],
+      onSyncedValueChanged: (value) =>
+          gatewayTokenRefSyncedValuesInternal[selectedGatewayProfileIndexInternal] =
+              value,
+    );
+    syncDraftControllerValueInternal(
+      gatewayPasswordRefControllersInternal[selectedGatewayProfileIndexInternal],
+      current.passwordRef,
+      syncedValue:
+          gatewayPasswordRefSyncedValuesInternal[selectedGatewayProfileIndexInternal],
+      onSyncedValueChanged: (value) =>
+          gatewayPasswordRefSyncedValuesInternal[selectedGatewayProfileIndexInternal] =
+              value,
+    );
   }
 
   void syncExternalAcpDraftControllersInternal(SettingsSnapshot settings) {
@@ -319,6 +352,10 @@ XWorkmate Privacy Policy
       );
       final endpointController = externalAcpEndpointControllersInternal
           .putIfAbsent(key, () => TextEditingController());
+      final authController = externalAcpAuthControllersInternal.putIfAbsent(
+        key,
+        () => TextEditingController(),
+      );
       syncDraftControllerValueInternal(
         labelController,
         profile.label,
@@ -333,6 +370,13 @@ XWorkmate Privacy Policy
         onSyncedValueChanged: (value) =>
             externalAcpEndpointSyncedValuesInternal[key] = value,
       );
+      syncDraftControllerValueInternal(
+        authController,
+        profile.authRef,
+        syncedValue: externalAcpAuthSyncedValuesInternal[key] ?? '',
+        onSyncedValueChanged: (value) =>
+            externalAcpAuthSyncedValuesInternal[key] = value,
+      );
     }
     disposeRemovedExternalAcpDraftsInternal(
       externalAcpLabelControllersInternal,
@@ -342,10 +386,17 @@ XWorkmate Privacy Policy
       externalAcpEndpointControllersInternal,
       activeKeys,
     );
+    disposeRemovedExternalAcpDraftsInternal(
+      externalAcpAuthControllersInternal,
+      activeKeys,
+    );
     externalAcpLabelSyncedValuesInternal.removeWhere(
       (key, _) => !activeKeys.contains(key),
     );
     externalAcpEndpointSyncedValuesInternal.removeWhere(
+      (key, _) => !activeKeys.contains(key),
+    );
+    externalAcpAuthSyncedValuesInternal.removeWhere(
       (key, _) => !activeKeys.contains(key),
     );
     externalAcpMessageByProviderInternal.removeWhere(
@@ -489,6 +540,14 @@ XWorkmate Privacy Policy
           ? (decoded?.port ?? current.port)
           : (parsedPort ?? fallbackPort),
       tls: useSetupCode ? (decoded?.tls ?? tls) : tls,
+      tokenRef:
+          gatewayTokenRefControllersInternal[selectedGatewayProfileIndexInternal]
+              .text
+              .trim(),
+      passwordRef:
+          gatewayPasswordRefControllersInternal[selectedGatewayProfileIndexInternal]
+              .text
+              .trim(),
     );
   }
 
@@ -509,6 +568,10 @@ XWorkmate Privacy Policy
       gatewaySetupCodeSyncedValueInternal = profile.setupCode;
       gatewayHostSyncedValueInternal = profile.host;
       gatewayPortSyncedValueInternal = '${profile.port}';
+      gatewayTokenRefSyncedValuesInternal[selectedGatewayProfileIndexInternal] =
+          profile.tokenRef;
+      gatewayPasswordRefSyncedValuesInternal[selectedGatewayProfileIndexInternal] =
+          profile.passwordRef;
       gatewayTestStateInternal = 'idle';
       gatewayTestMessageInternal = '';
       gatewayTestEndpointInternal = '';
@@ -672,14 +735,13 @@ XWorkmate Privacy Policy
       gatewayPasswordState,
     );
     if (token.isEmpty) {
-      token = await controller.settingsController.loadGatewayToken(
+      token = await controller.settingsController.loadEffectiveGatewayToken(
         profileIndex: selectedProfileIndex,
       );
     }
     if (password.isEmpty) {
-      password = await controller.settingsController.loadGatewayPassword(
-        profileIndex: selectedProfileIndex,
-      );
+      password = await controller.settingsController
+          .loadEffectiveGatewayPassword(profileIndex: selectedProfileIndex);
     }
     setStateInternal(() => gatewayTestingInternal = true);
     try {

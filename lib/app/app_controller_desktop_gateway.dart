@@ -204,11 +204,16 @@ extension AppControllerDesktopGateway on AppController {
         : await settingsControllerInternal.loadEffectiveGatewayToken(
             profileIndex: resolvedProfileIndex,
           );
+    final effectiveAuthPasswordOverride = authPasswordOverride.trim().isNotEmpty
+        ? authPasswordOverride.trim()
+        : await settingsControllerInternal.loadEffectiveGatewayPassword(
+            profileIndex: resolvedProfileIndex,
+          );
     await runtimeInternal.connectProfile(
       profile,
       profileIndex: resolvedProfileIndex,
       authTokenOverride: effectiveAuthTokenOverride,
-      authPasswordOverride: authPasswordOverride,
+      authPasswordOverride: effectiveAuthPasswordOverride,
     );
     await refreshGatewayHealth();
     await refreshAgents();
