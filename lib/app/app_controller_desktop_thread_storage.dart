@@ -51,8 +51,9 @@ extension AppControllerDesktopThreadStorage on AppController {
   Future<void> applyPersistedAiGatewaySettingsInternal(
     SettingsSnapshot snapshot,
   ) async {
-    final apiKey = await settingsControllerInternal.loadAiGatewayApiKey();
-    if (snapshot.aiGateway.baseUrl.trim().isEmpty || apiKey.trim().isEmpty) {
+    final apiKey = await settingsControllerInternal
+        .loadEffectiveAiGatewayApiKey();
+    if (snapshot.aiGateway.baseUrl.trim().isEmpty) {
       return;
     }
     try {
@@ -282,8 +283,7 @@ extension AppControllerDesktopThreadStorage on AppController {
     String sessionKey,
     GatewayChatMessage message, {
     bool persistInThreadContext = false,
-  }
-  ) {
+  }) {
     final key = normalizedAssistantSessionKeyInternal(sessionKey);
     final next = List<GatewayChatMessage>.from(
       localSessionMessagesInternal[key] ?? const <GatewayChatMessage>[],

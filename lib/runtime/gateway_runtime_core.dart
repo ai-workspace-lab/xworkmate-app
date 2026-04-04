@@ -123,16 +123,26 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
 
     final endpoint = resolveEndpointInternal(profile);
     final setupPayload = decodeGatewaySetupCode(profile.setupCode);
+    final resolvedProfileIndex = (profileIndex ?? kGatewayRemoteProfileIndex)
+        .clamp(0, kGatewayProfileListLength - 1);
+    final tokenRef = profile.tokenRef.trim().isEmpty
+        ? SecretStore.gatewayTokenRefKey(resolvedProfileIndex)
+        : profile.tokenRef.trim();
+    final passwordRef = profile.passwordRef.trim().isEmpty
+        ? SecretStore.gatewayPasswordRefKey(resolvedProfileIndex)
+        : profile.passwordRef.trim();
     final storedToken =
-        (await storeInternal.loadGatewayToken(
-          profileIndex: profileIndex,
-        ))?.trim() ??
-        '';
+        (await storeInternal.loadSecretValueByRef(tokenRef))?.trim() ??
+        ((await storeInternal.loadGatewayToken(
+              profileIndex: profileIndex,
+            ))?.trim() ??
+            '');
     final storedPassword =
-        (await storeInternal.loadGatewayPassword(
-          profileIndex: profileIndex,
-        ))?.trim() ??
-        '';
+        (await storeInternal.loadSecretValueByRef(passwordRef))?.trim() ??
+        ((await storeInternal.loadGatewayPassword(
+              profileIndex: profileIndex,
+            ))?.trim() ??
+            '');
     final explicitToken = authTokenOverride.trim();
     final explicitPassword = authPasswordOverride.trim();
     final sharedTokenSource = explicitToken.isNotEmpty

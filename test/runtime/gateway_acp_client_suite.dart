@@ -44,6 +44,43 @@ void main() {
     });
 
     test(
+      'forwards ACP authorization resolver headers over websocket',
+      () async {
+        final server = await _AcpFakeServer.start();
+        addTearDown(server.close);
+
+        final client = GatewayAcpClient(
+          endpointResolver: () => server.baseHttpUri,
+          authorizationResolver: (_) async => 'Bearer ws-secret',
+        );
+
+        await client.loadCapabilities(forceRefresh: true);
+
+        expect(server.lastWebSocketAuthorization, 'Bearer ws-secret');
+      },
+    );
+
+    test(
+      'prefers explicit ACP authorization overrides on HTTP fallback',
+      () async {
+        final server = await _AcpFakeServer.start(disableWebSocket: true);
+        addTearDown(server.close);
+
+        final client = GatewayAcpClient(
+          endpointResolver: () => server.baseHttpUri,
+          authorizationResolver: (_) async => 'Bearer resolver-secret',
+        );
+
+        await client.loadCapabilities(
+          forceRefresh: true,
+          authorizationOverride: 'Bearer override-secret',
+        );
+
+        expect(server.lastHttpAuthorization, 'Bearer override-secret');
+      },
+    );
+
+    test(
       'streams multi-agent events and supports cancel/close session',
       () async {
         final server = await _AcpFakeServer.start();
@@ -96,6 +133,8 @@ class _AcpFakeServer {
   final HttpServer _server;
   final bool disableWebSocket;
   final List<String> rpcMethods = <String>[];
+  String? lastWebSocketAuthorization;
+  String? lastHttpAuthorization;
 
   Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${_server.port}');
 
@@ -115,6 +154,9 @@ class _AcpFakeServer {
       if (!disableWebSocket &&
           request.uri.path == '/acp' &&
           WebSocketTransformer.isUpgradeRequest(request)) {
+        lastWebSocketAuthorization = request.headers.value(
+          HttpHeaders.authorizationHeader,
+        );
         final socket = await WebSocketTransformer.upgrade(request);
         unawaited(_handleWebSocket(socket));
         continue;
@@ -155,6 +197,9 @@ class _AcpFakeServer {
   }
 
   Future<void> _handleHttpRpc(HttpRequest request) async {
+    lastHttpAuthorization = request.headers.value(
+      HttpHeaders.authorizationHeader,
+    );
     final body = await utf8.decodeStream(request);
     final envelope = _decodeMap(body);
     final id = envelope['id'];

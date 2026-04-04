@@ -140,10 +140,7 @@ extension SettingsPageGatewayConnectionMixinInternal
             setupCodeFeatureEnabled) ...[
           if (widget.showSectionTabs)
             SectionTabs(
-              items: [
-                appText('配置码', 'Setup Code'),
-                appText('手动配置', 'Manual'),
-              ],
+              items: [appText('配置码', 'Setup Code'), appText('手动配置', 'Manual')],
               value: useSetupCode
                   ? appText('配置码', 'Setup Code')
                   : appText('手动配置', 'Manual'),
@@ -268,10 +265,36 @@ extension SettingsPageGatewayConnectionMixinInternal
           ),
         ],
         const SizedBox(height: 16),
+        TextField(
+          key: const ValueKey('gateway-token-ref-field'),
+          controller: gatewayTokenRefControllersInternal[selectedProfileIndex],
+          decoration: InputDecoration(
+            labelText: appText('共享 Token 引用', 'Shared Token Ref'),
+          ),
+          onChanged: (_) => unawaited(
+            saveGatewayDraftInternal(controller, settings).catchError((_) {}),
+          ),
+          onSubmitted: (_) => saveGatewayDraftInternal(controller, settings),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('gateway-password-ref-field'),
+          controller:
+              gatewayPasswordRefControllersInternal[selectedProfileIndex],
+          decoration: InputDecoration(
+            labelText: appText('密码引用', 'Password Ref'),
+          ),
+          onChanged: (_) => unawaited(
+            saveGatewayDraftInternal(controller, settings).catchError((_) {}),
+          ),
+          onSubmitted: (_) => saveGatewayDraftInternal(controller, settings),
+        ),
+        const SizedBox(height: 16),
         buildSecureFieldInternal(
           fieldKey: const ValueKey('gateway-shared-token-field'),
           controller: gatewayTokenController,
-          label: appText('共享 Token', 'Shared Token'),
+          label:
+              '${appText('共享 Token', 'Shared Token')} (${gatewayTokenRefControllersInternal[selectedProfileIndex].text.trim().isEmpty ? gatewayProfile.tokenRef : gatewayTokenRefControllersInternal[selectedProfileIndex].text.trim()})',
           hasStoredValue: hasStoredGatewayToken,
           fieldState: gatewayTokenState,
           onStateChanged: (value) => setStateInternal(
@@ -297,7 +320,8 @@ extension SettingsPageGatewayConnectionMixinInternal
         buildSecureFieldInternal(
           fieldKey: const ValueKey('gateway-password-field'),
           controller: gatewayPasswordController,
-          label: appText('密码', 'Password'),
+          label:
+              '${appText('密码', 'Password')} (${gatewayPasswordRefControllersInternal[selectedProfileIndex].text.trim().isEmpty ? gatewayProfile.passwordRef : gatewayPasswordRefControllersInternal[selectedProfileIndex].text.trim()})',
           hasStoredValue: hasStoredGatewayPassword,
           fieldState: gatewayPasswordState,
           onStateChanged: (value) => setStateInternal(
@@ -395,6 +419,19 @@ extension SettingsPageGatewayConnectionMixinInternal
             settings.copyWith(vault: settings.vault.copyWith(namespace: value)),
           ),
         ),
+        EditableFieldInternal(
+          fieldKey: const ValueKey('vault-token-ref-field'),
+          label: appText('Root Token Ref', 'Root Token Ref'),
+          value: settings.vault.tokenRef,
+          onSubmitted: (value) => saveSettingsInternal(
+            controller,
+            settings.copyWith(
+              vault: settings.vault.copyWith(
+                tokenRef: value.trim().isEmpty ? 'vault_token' : value.trim(),
+              ),
+            ),
+          ),
+        ),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
@@ -405,8 +442,8 @@ extension SettingsPageGatewayConnectionMixinInternal
           ),
           child: Text(
             appText(
-              '当前固定使用 token 模式，安全引用保持为 vault_token。',
-              'The current integration uses token auth, with the secure reference fixed to vault_token.',
+              '当前使用 token 模式；root token 会写入当前 Token Ref 对应的安全引用，不进入普通 settings 持久层。',
+              'Token auth is used here. The root token is stored under the current Token Ref in secure storage and never persisted in plain settings.',
             ),
             style: theme.textTheme.bodySmall,
           ),

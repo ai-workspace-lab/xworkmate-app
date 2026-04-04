@@ -99,7 +99,8 @@ Future<void> verifyAccountMfaSettingsInternal(
       code: code.trim(),
     );
     final identifier =
-        (await controller.storeInternal.loadAccountSessionIdentifier())?.trim() ??
+        (await controller.storeInternal.loadAccountSessionIdentifier())
+            ?.trim() ??
         controller.snapshotInternal.accountUsername.trim();
     controller.pendingAccountMfaTicketInternal = '';
     controller.pendingAccountBaseUrlInternal = '';
@@ -144,7 +145,9 @@ Future<void> completeAccountSignInSettingsInternal(
   await controller.storeInternal.saveAccountSessionExpiresAtMs(
     _parseExpiresAtMs(payload['expiresAt']),
   );
-  await controller.storeInternal.saveAccountSessionUserId(sessionSummary.userId);
+  await controller.storeInternal.saveAccountSessionUserId(
+    sessionSummary.userId,
+  );
   await controller.storeInternal.saveAccountSessionIdentifier(identifier);
   await controller.storeInternal.saveAccountSessionSummary(sessionSummary);
   controller.accountStatusInternal = 'Signed in';
@@ -334,6 +337,22 @@ Future<void> applyAccountSyncedDefaultsSettingsInternal(
     );
   }
 
+  final gatewayTokenLocator = defaults.locatorForTarget(
+    kAccountManagedSecretTargetOpenclawGatewayToken,
+  );
+  if (gatewayTokenLocator != null) {
+    final remoteProfile = next.gatewayProfiles[kGatewayRemoteProfileIndex];
+    final currentTokenRef = remoteProfile.tokenRef.trim();
+    final defaultRemoteTokenRef =
+        GatewayConnectionProfile.defaultsRemote().tokenRef;
+    if (currentTokenRef.isEmpty || currentTokenRef == defaultRemoteTokenRef) {
+      next = next.copyWithGatewayProfileAt(
+        kGatewayRemoteProfileIndex,
+        remoteProfile.copyWith(tokenRef: gatewayTokenLocator.target),
+      );
+    }
+  }
+
   if (_isOverrideDisabled(overrideFlags, kAccountOverrideVaultAddress) &&
       defaults.vaultUrl.trim().isNotEmpty) {
     next = next.copyWith(
@@ -471,7 +490,9 @@ Future<void> markAccountOverrideSettingsInternal(
   if (!kAccountOverrideFieldKeys.contains(fieldKey)) {
     return;
   }
-  final current = await loadAccountSyncStateWithLegacyMigrationInternal(controller);
+  final current = await loadAccountSyncStateWithLegacyMigrationInternal(
+    controller,
+  );
   if (current == null) {
     return;
   }
@@ -494,7 +515,9 @@ Future<void> clearAccountOverrideSettingsInternal(
   if (!kAccountOverrideFieldKeys.contains(fieldKey)) {
     return;
   }
-  final current = await loadAccountSyncStateWithLegacyMigrationInternal(controller);
+  final current = await loadAccountSyncStateWithLegacyMigrationInternal(
+    controller,
+  );
   if (current == null || current.overrideFlags[fieldKey] != true) {
     return;
   }
@@ -512,8 +535,9 @@ Future<void> recordAccountOverridesForSnapshotChangeSettingsInternal(
   required SettingsSnapshot previous,
   required SettingsSnapshot current,
 }) async {
-  final syncState =
-      await loadAccountSyncStateWithLegacyMigrationInternal(controller);
+  final syncState = await loadAccountSyncStateWithLegacyMigrationInternal(
+    controller,
+  );
   if (syncState == null) {
     return;
   }
@@ -522,14 +546,13 @@ Future<void> recordAccountOverridesForSnapshotChangeSettingsInternal(
   var changed = false;
 
   if (_remoteGatewayEndpointChanged(previous, current)) {
-    changed = _markOverrideFlag(
-          nextFlags,
-          kAccountOverrideGatewayRemoteEndpoint,
-        ) ||
+    changed =
+        _markOverrideFlag(nextFlags, kAccountOverrideGatewayRemoteEndpoint) ||
         changed;
   }
   if (previous.vault.address != current.vault.address) {
-    changed = _markOverrideFlag(nextFlags, kAccountOverrideVaultAddress) || changed;
+    changed =
+        _markOverrideFlag(nextFlags, kAccountOverrideVaultAddress) || changed;
   }
   if (previous.vault.namespace != current.vault.namespace) {
     changed =
@@ -537,20 +560,17 @@ Future<void> recordAccountOverridesForSnapshotChangeSettingsInternal(
   }
   if (previous.aiGateway.baseUrl != current.aiGateway.baseUrl) {
     changed =
-        _markOverrideFlag(nextFlags, kAccountOverrideAiGatewayBaseUrl) || changed;
+        _markOverrideFlag(nextFlags, kAccountOverrideAiGatewayBaseUrl) ||
+        changed;
   }
   if (previous.aiGateway.apiKeyRef != current.aiGateway.apiKeyRef) {
-    changed = _markOverrideFlag(
-          nextFlags,
-          kAccountOverrideAiGatewayApiKeyRef,
-        ) ||
+    changed =
+        _markOverrideFlag(nextFlags, kAccountOverrideAiGatewayApiKeyRef) ||
         changed;
   }
   if (previous.ollamaCloud.apiKeyRef != current.ollamaCloud.apiKeyRef) {
-    changed = _markOverrideFlag(
-          nextFlags,
-          kAccountOverrideOllamaCloudApiKeyRef,
-        ) ||
+    changed =
+        _markOverrideFlag(nextFlags, kAccountOverrideOllamaCloudApiKeyRef) ||
         changed;
   }
 

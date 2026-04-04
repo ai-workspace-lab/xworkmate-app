@@ -16,6 +16,7 @@ class ExternalAcpEndpointProfile {
     required this.label,
     required this.badge,
     required this.endpoint,
+    required this.authRef,
     required this.enabled,
   });
 
@@ -23,6 +24,7 @@ class ExternalAcpEndpointProfile {
   final String label;
   final String badge;
   final String endpoint;
+  final String authRef;
   final bool enabled;
 
   factory ExternalAcpEndpointProfile.defaultsForProvider(
@@ -33,6 +35,7 @@ class ExternalAcpEndpointProfile {
       label: provider.label,
       badge: provider.badge,
       endpoint: '',
+      authRef: '',
       enabled: true,
     );
   }
@@ -42,6 +45,7 @@ class ExternalAcpEndpointProfile {
     String? label,
     String? badge,
     String? endpoint,
+    String? authRef,
     bool? enabled,
   }) {
     return ExternalAcpEndpointProfile(
@@ -51,6 +55,7 @@ class ExternalAcpEndpointProfile {
       label: (label ?? this.label).trim(),
       badge: (badge ?? this.badge).trim(),
       endpoint: (endpoint ?? this.endpoint).trim(),
+      authRef: (authRef ?? this.authRef).trim(),
       enabled: enabled ?? this.enabled,
     );
   }
@@ -85,6 +90,7 @@ class ExternalAcpEndpointProfile {
       'label': label,
       'badge': badge,
       'endpoint': endpoint,
+      'authRef': authRef,
       'enabled': enabled,
     };
   }
@@ -108,6 +114,7 @@ class ExternalAcpEndpointProfile {
               label: label,
             ),
       endpoint: json['endpoint']?.toString().trim() ?? '',
+      authRef: json['authRef']?.toString().trim() ?? '',
       enabled: json['enabled'] as bool? ?? true,
     );
   }
@@ -226,6 +233,7 @@ ExternalAcpEndpointProfile buildCustomExternalAcpEndpointProfile(
       label: normalizedLabel,
     ),
     endpoint: endpoint.trim(),
+    authRef: '',
     enabled: true,
   );
 }

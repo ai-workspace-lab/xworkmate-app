@@ -18,6 +18,8 @@ class GatewayConnectionProfile {
     required this.host,
     required this.port,
     required this.tls,
+    required this.tokenRef,
+    required this.passwordRef,
     required this.selectedAgentId,
   });
 
@@ -27,6 +29,8 @@ class GatewayConnectionProfile {
   final String host;
   final int port;
   final bool tls;
+  final String tokenRef;
+  final String passwordRef;
   final String selectedAgentId;
 
   factory GatewayConnectionProfile.defaults() {
@@ -41,6 +45,8 @@ class GatewayConnectionProfile {
       host: '127.0.0.1',
       port: 18789,
       tls: false,
+      tokenRef: 'gateway_token_0',
+      passwordRef: 'gateway_password_0',
       selectedAgentId: '',
     );
   }
@@ -53,18 +59,22 @@ class GatewayConnectionProfile {
       host: 'openclaw.svc.plus',
       port: 443,
       tls: true,
+      tokenRef: 'gateway_token_1',
+      passwordRef: 'gateway_password_1',
       selectedAgentId: '',
     );
   }
 
   factory GatewayConnectionProfile.emptySlot({required int index}) {
-    return const GatewayConnectionProfile(
+    return GatewayConnectionProfile(
       mode: RuntimeConnectionMode.unconfigured,
       useSetupCode: false,
       setupCode: '',
       host: '',
       port: 443,
       tls: true,
+      tokenRef: 'gateway_token_$index',
+      passwordRef: 'gateway_password_$index',
       selectedAgentId: '',
     );
   }
@@ -76,6 +86,8 @@ class GatewayConnectionProfile {
     String? host,
     int? port,
     bool? tls,
+    String? tokenRef,
+    String? passwordRef,
     String? selectedAgentId,
   }) {
     final normalized = normalizeGatewayManualEndpointInternal(
@@ -90,6 +102,8 @@ class GatewayConnectionProfile {
       host: normalized.host,
       port: normalized.port,
       tls: normalized.tls,
+      tokenRef: tokenRef ?? this.tokenRef,
+      passwordRef: passwordRef ?? this.passwordRef,
       selectedAgentId: selectedAgentId ?? this.selectedAgentId,
     );
   }
@@ -102,6 +116,8 @@ class GatewayConnectionProfile {
       'host': host,
       'port': port,
       'tls': tls,
+      'tokenRef': tokenRef,
+      'passwordRef': passwordRef,
       'selectedAgentId': selectedAgentId,
     };
   }
@@ -120,6 +136,8 @@ class GatewayConnectionProfile {
       host: normalized.host,
       port: normalized.port,
       tls: normalized.tls,
+      tokenRef: json['tokenRef'] as String? ?? '',
+      passwordRef: json['passwordRef'] as String? ?? '',
       selectedAgentId: json['selectedAgentId'] as String? ?? '',
     );
   }
@@ -157,6 +175,12 @@ List<GatewayConnectionProfile> normalizeGatewayProfiles({
           host: current.host.trim().isEmpty ? fallback.host : current.host,
           port: current.port > 0 ? current.port : fallback.port,
           tls: false,
+          tokenRef: current.tokenRef.trim().isEmpty
+              ? fallback.tokenRef
+              : current.tokenRef,
+          passwordRef: current.passwordRef.trim().isEmpty
+              ? fallback.passwordRef
+              : current.passwordRef,
         ),
       );
       continue;
@@ -170,6 +194,12 @@ List<GatewayConnectionProfile> normalizeGatewayProfiles({
           host: useDefaultRemoteEndpoint ? fallback.host : current.host,
           port: useDefaultRemoteEndpoint ? fallback.port : current.port,
           tls: useDefaultRemoteEndpoint ? fallback.tls : current.tls,
+          tokenRef: current.tokenRef.trim().isEmpty
+              ? fallback.tokenRef
+              : current.tokenRef,
+          passwordRef: current.passwordRef.trim().isEmpty
+              ? fallback.passwordRef
+              : current.passwordRef,
         ),
       );
       continue;
@@ -197,6 +227,12 @@ List<GatewayConnectionProfile> normalizeGatewayProfiles({
             ? 18789
             : 443,
         tls: slotMode == RuntimeConnectionMode.local ? false : current.tls,
+        tokenRef: current.tokenRef.trim().isEmpty
+            ? fallback.tokenRef
+            : current.tokenRef,
+        passwordRef: current.passwordRef.trim().isEmpty
+            ? fallback.passwordRef
+            : current.passwordRef,
       ),
     );
   }

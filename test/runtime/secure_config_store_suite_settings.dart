@@ -387,7 +387,7 @@ void registerSecureConfigStoreSuiteSettingsTestsInternal() {
         expect(loadedSnapshot.multiAgent.managedMcpServers, hasLength(1));
         expect(encoded, contains('"multiAgent"'));
         expect(encoded, isNot(contains('ai-gateway-secret')));
-        expect(encoded, isNot(contains('gateway_token')));
+        expect(encoded, isNot(contains('token-secret')));
       },
     );
   });

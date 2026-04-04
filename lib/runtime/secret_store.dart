@@ -99,6 +99,8 @@ class SecretStore {
   static const String _accountSessionSummaryKey =
       'xworkmate.account.session.summary';
   static const String _accountProfileKey = 'xworkmate.account.profile';
+  static const String _customSecretRefRegistryKey =
+      'xworkmate.secret.ref_registry';
 
   final StoreLayoutResolver _layoutResolver;
   final SecureStorageClient? _secureStorageOverride;
@@ -223,12 +225,14 @@ class SecretStore {
 
   Future<void> clearAiGatewayApiKey() => _deleteSecure(_aiGatewayApiKeyKey);
 
-  Future<String?> loadAccountSessionToken() => _readSecure(_accountSessionTokenKey);
+  Future<String?> loadAccountSessionToken() =>
+      _readSecure(_accountSessionTokenKey);
 
   Future<void> saveAccountSessionToken(String value) =>
       _writeSecure(_accountSessionTokenKey, value);
 
-  Future<void> clearAccountSessionToken() => _deleteSecure(_accountSessionTokenKey);
+  Future<void> clearAccountSessionToken() =>
+      _deleteSecure(_accountSessionTokenKey);
 
   Future<int> loadAccountSessionExpiresAtMs() async {
     final raw = await _readSecure(_accountSessionExpiresAtKey);
@@ -315,6 +319,43 @@ class SecretStore {
     }
   }
 
+  Future<String?> loadSecretValueByRef(String refName) async {
+    final normalizedRef = refName.trim();
+    if (normalizedRef.isEmpty) {
+      return null;
+    }
+    return _readSecure(_secureStorageKeyForRef(normalizedRef));
+  }
+
+  Future<void> saveSecretValueByRef(String refName, String value) async {
+    final normalizedRef = refName.trim();
+    final trimmedValue = value.trim();
+    if (normalizedRef.isEmpty || trimmedValue.isEmpty) {
+      return;
+    }
+    final key = _secureStorageKeyForRef(normalizedRef);
+    await _writeSecure(key, trimmedValue);
+    if (_isCustomSecretRef(normalizedRef)) {
+      await _saveCustomSecretRefRegistryInternal(<String>{
+        ...await _loadCustomSecretRefRegistryInternal(),
+        normalizedRef,
+      });
+    }
+  }
+
+  Future<void> clearSecretValueByRef(String refName) async {
+    final normalizedRef = refName.trim();
+    if (normalizedRef.isEmpty) {
+      return;
+    }
+    await _deleteSecure(_secureStorageKeyForRef(normalizedRef));
+    if (_isCustomSecretRef(normalizedRef)) {
+      final refs = await _loadCustomSecretRefRegistryInternal();
+      refs.remove(normalizedRef);
+      await _saveCustomSecretRefRegistryInternal(refs);
+    }
+  }
+
   Future<Map<String, String>> loadSecureRefs() async {
     await initialize();
     final secureRefs = <String, String>{};
@@ -359,6 +400,18 @@ class SecretStore {
     }
     if (aiGatewayApiKey case final value?) {
       secureRefs['ai_gateway_api_key'] = value;
+    }
+    for (final target in kAccountManagedSecretTargets) {
+      final managedValue = await loadAccountManagedSecret(target: target);
+      if (managedValue case final value?) {
+        secureRefs[target] = value;
+      }
+    }
+    for (final refName in await _loadCustomSecretRefRegistryInternal()) {
+      final customValue = await loadSecretValueByRef(refName);
+      if (customValue case final value?) {
+        secureRefs[refName] = value;
+      }
     }
     return secureRefs;
   }
@@ -460,6 +513,98 @@ class SecretStore {
 
   static String _accountManagedSecretKey(String target) =>
       'xworkmate.account.managed.${target.trim()}';
+
+  static String _customSecretRefKey(String refName) =>
+      'xworkmate.secret.ref.${refName.trim()}';
+
+  static bool _looksLikeGatewayProfileRef(String refName, String prefix) {
+    final normalized = refName.trim();
+    if (!normalized.startsWith(prefix)) {
+      return false;
+    }
+    final suffix = normalized.substring(prefix.length);
+    return int.tryParse(suffix) != null;
+  }
+
+  static bool _isCustomSecretRef(String refName) {
+    final normalized = refName.trim();
+    if (normalized.isEmpty ||
+        normalized == 'gateway_token' ||
+        normalized == 'gateway_password' ||
+        normalized == 'vault_token' ||
+        normalized == 'ai_gateway_api_key' ||
+        normalized == 'ollama_cloud_api_key' ||
+        isSupportedAccountManagedSecretTarget(normalized) ||
+        _looksLikeGatewayProfileRef(normalized, 'gateway_token_') ||
+        _looksLikeGatewayProfileRef(normalized, 'gateway_password_')) {
+      return false;
+    }
+    return true;
+  }
+
+  static String _secureStorageKeyForRef(String refName) {
+    final normalized = refName.trim();
+    if (normalized == 'gateway_token') {
+      return _legacyGatewayTokenKey;
+    }
+    if (normalized == 'gateway_password') {
+      return _legacyGatewayPasswordKey;
+    }
+    if (_looksLikeGatewayProfileRef(normalized, 'gateway_token_')) {
+      final index = int.parse(normalized.substring('gateway_token_'.length));
+      return _gatewayTokenKeyForProfile(index);
+    }
+    if (_looksLikeGatewayProfileRef(normalized, 'gateway_password_')) {
+      final index = int.parse(normalized.substring('gateway_password_'.length));
+      return _gatewayPasswordKeyForProfile(index);
+    }
+    if (normalized == 'vault_token') {
+      return _vaultTokenKey;
+    }
+    if (normalized == 'ai_gateway_api_key') {
+      return _aiGatewayApiKeyKey;
+    }
+    if (normalized == 'ollama_cloud_api_key') {
+      return _ollamaCloudApiKeyKey;
+    }
+    if (isSupportedAccountManagedSecretTarget(normalized)) {
+      return _accountManagedSecretKey(normalized);
+    }
+    return _customSecretRefKey(normalized);
+  }
+
+  Future<Set<String>> _loadCustomSecretRefRegistryInternal() async {
+    final raw = await _readSecure(_customSecretRefRegistryKey);
+    if ((raw ?? '').trim().isEmpty) {
+      return <String>{};
+    }
+    try {
+      final decoded = jsonDecode(raw!);
+      if (decoded is! List) {
+        return <String>{};
+      }
+      return decoded
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toSet();
+    } catch (_) {
+      return <String>{};
+    }
+  }
+
+  Future<void> _saveCustomSecretRefRegistryInternal(Set<String> refs) async {
+    final normalized =
+        refs
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
+            .toList(growable: false)
+          ..sort();
+    if (normalized.isEmpty) {
+      await _deleteSecure(_customSecretRefRegistryKey);
+      return;
+    }
+    await _writeSecure(_customSecretRefRegistryKey, jsonEncode(normalized));
+  }
 
   Future<String?> _readSecure(String key) async {
     await initialize();
