@@ -43,6 +43,29 @@ void main() {
       expect(server.rpcMethods, contains('acp.capabilities'));
     });
 
+    test('surfaces HTTP content-type errors without raw JSON parse failures', () async {
+      final server = await _AcpFakeServer.start(
+        disableWebSocket: true,
+        respondWithHtmlError: true,
+      );
+      addTearDown(server.close);
+
+      final client = GatewayAcpClient(
+        endpointResolver: () => server.baseHttpUri,
+      );
+
+      await expectLater(
+        () => client.loadCapabilities(forceRefresh: true),
+        throwsA(
+          isA<GatewayAcpException>().having(
+            (error) => error.toString(),
+            'message',
+            contains('unexpected content type: text/html'),
+          ),
+        ),
+      );
+    });
+
     test(
       'forwards ACP authorization resolver headers over websocket',
       () async {
@@ -128,19 +151,31 @@ void main() {
 }
 
 class _AcpFakeServer {
-  _AcpFakeServer._(this._server, {required this.disableWebSocket});
+  _AcpFakeServer._(
+    this._server, {
+    required this.disableWebSocket,
+    required this.respondWithHtmlError,
+  });
 
   final HttpServer _server;
   final bool disableWebSocket;
+  final bool respondWithHtmlError;
   final List<String> rpcMethods = <String>[];
   String? lastWebSocketAuthorization;
   String? lastHttpAuthorization;
 
   Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${_server.port}');
 
-  static Future<_AcpFakeServer> start({bool disableWebSocket = false}) async {
+  static Future<_AcpFakeServer> start({
+    bool disableWebSocket = false,
+    bool respondWithHtmlError = false,
+  }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final fake = _AcpFakeServer._(server, disableWebSocket: disableWebSocket);
+    final fake = _AcpFakeServer._(
+      server,
+      disableWebSocket: disableWebSocket,
+      respondWithHtmlError: respondWithHtmlError,
+    );
     unawaited(fake._listen());
     return fake;
   }
@@ -200,6 +235,15 @@ class _AcpFakeServer {
     lastHttpAuthorization = request.headers.value(
       HttpHeaders.authorizationHeader,
     );
+    if (respondWithHtmlError) {
+      request.response.statusCode = HttpStatus.notFound;
+      request.response.headers.set(HttpHeaders.contentTypeHeader, 'text/html');
+      request.response.write(
+        '<!doctype html><script>var key = "opencode-theme-id"</script>',
+      );
+      await request.response.close();
+      return;
+    }
     final body = await utf8.decodeStream(request);
     final envelope = _decodeMap(body);
     final id = envelope['id'];
