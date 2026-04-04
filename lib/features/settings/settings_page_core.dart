@@ -68,6 +68,14 @@ class SettingsPageStateInternal extends State<SettingsPage> {
   late final TextEditingController vaultTokenControllerInternal;
   late final TextEditingController ollamaApiKeyControllerInternal;
   late final TextEditingController runtimeLogFilterControllerInternal;
+  late final Map<String, TextEditingController>
+  externalAcpLabelControllersInternal;
+  late final Map<String, TextEditingController>
+  externalAcpEndpointControllersInternal;
+  late final Map<String, String> externalAcpLabelSyncedValuesInternal;
+  late final Map<String, String> externalAcpEndpointSyncedValuesInternal;
+  late final Map<String, String> externalAcpMessageByProviderInternal;
+  late final Set<String> externalAcpTestingProvidersInternal;
   bool gatewayTestingInternal = false;
   String gatewayTestStateInternal = 'idle';
   String gatewayTestMessageInternal = '';
@@ -138,6 +146,12 @@ class SettingsPageStateInternal extends State<SettingsPage> {
     vaultTokenControllerInternal = TextEditingController();
     ollamaApiKeyControllerInternal = TextEditingController();
     runtimeLogFilterControllerInternal = TextEditingController();
+    externalAcpLabelControllersInternal = <String, TextEditingController>{};
+    externalAcpEndpointControllersInternal = <String, TextEditingController>{};
+    externalAcpLabelSyncedValuesInternal = <String, String>{};
+    externalAcpEndpointSyncedValuesInternal = <String, String>{};
+    externalAcpMessageByProviderInternal = <String, String>{};
+    externalAcpTestingProvidersInternal = <String>{};
   }
 
   void setStateInternal(VoidCallback fn) => setState(fn);
@@ -201,6 +215,12 @@ class SettingsPageStateInternal extends State<SettingsPage> {
     vaultTokenControllerInternal.dispose();
     ollamaApiKeyControllerInternal.dispose();
     runtimeLogFilterControllerInternal.dispose();
+    for (final controller in externalAcpLabelControllersInternal.values) {
+      controller.dispose();
+    }
+    for (final controller in externalAcpEndpointControllersInternal.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 

@@ -163,10 +163,7 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
         GatewayIntegrationSubTabInternal.skills => <Widget>[
           buildCollapsibleGatewaySectionInternal(
             context: context,
-            title: appText(
-              'SKILLS 目录授权',
-              'SKILLS Directory Authorization',
-            ),
+            title: appText('SKILLS 目录授权', 'SKILLS Directory Authorization'),
             expanded: skillsDirectoryAuthorizationExpandedInternal,
             onChanged: (value) => setStateInternal(() {
               skillsDirectoryAuthorizationExpandedInternal = value;
@@ -248,10 +245,7 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
       const SizedBox(height: 16),
       buildCollapsibleGatewaySectionInternal(
         context: context,
-        title: appText(
-          'SKILLS 目录授权',
-          'SKILLS Directory Authorization',
-        ),
+        title: appText('SKILLS 目录授权', 'SKILLS Directory Authorization'),
         expanded: skillsDirectoryAuthorizationExpandedInternal,
         onChanged: (value) => setStateInternal(() {
           skillsDirectoryAuthorizationExpandedInternal = value;
@@ -269,6 +263,7 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
     AppController controller,
     SettingsSnapshot settings,
   ) {
+    syncExternalAcpDraftControllersInternal(settings);
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,14 +286,13 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
               settings,
             ),
             icon: const Icon(Icons.add_rounded),
-            label: Text(
-              appText('添加更多自定义配置', 'Add more custom configurations'),
-            ),
+            label: Text(appText('添加更多自定义配置', 'Add more custom configurations')),
           ),
         ),
         const SizedBox(height: 16),
         ...settings.externalAcpEndpoints.map(
           (profile) => Padding(
+            key: ValueKey('external-acp-card-${profile.providerKey}'),
             padding: const EdgeInsets.only(bottom: 12),
             child: buildExternalAcpProviderCardInternal(
               context,
@@ -319,8 +313,16 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
     ExternalAcpEndpointProfile profile,
   ) {
     final provider = profile.toProvider();
-    final endpoint = profile.endpoint.trim();
-    final configured = endpoint.isNotEmpty;
+    final labelController =
+        externalAcpLabelControllersInternal[profile.providerKey]!;
+    final endpointController =
+        externalAcpEndpointControllersInternal[profile.providerKey]!;
+    final message =
+        externalAcpMessageByProviderInternal[profile.providerKey] ?? '';
+    final testing = externalAcpTestingProvidersInternal.contains(
+      profile.providerKey,
+    );
+    final configured = endpointController.text.trim().isNotEmpty;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -366,27 +368,21 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
             ],
           ),
           const SizedBox(height: 12),
-          EditableFieldInternal(
-            label: appText('显示名称', 'Display name'),
-            value: profile.label,
-            onSubmitted: (value) => saveSettingsInternal(
-              controller,
-              settings.copyWithExternalAcpEndpointForProvider(
-                provider,
-                profile.copyWith(label: value),
-              ),
+          TextField(
+            key: ValueKey('external-acp-label-${profile.providerKey}'),
+            controller: labelController,
+            decoration: InputDecoration(
+              labelText: appText('显示名称', 'Display name'),
             ),
+            onChanged: (_) => setStateInternal(() {}),
           ),
-          EditableFieldInternal(
-            label: appText('ACP Server Endpoint', 'ACP Server Endpoint'),
-            value: endpoint,
-            onSubmitted: (value) => saveSettingsInternal(
-              controller,
-              settings.copyWithExternalAcpEndpointForProvider(
-                provider,
-                profile.copyWith(endpoint: value),
-              ),
+          TextField(
+            key: ValueKey('external-acp-endpoint-${profile.providerKey}'),
+            controller: endpointController,
+            decoration: InputDecoration(
+              labelText: appText('ACP Server Endpoint', 'ACP Server Endpoint'),
             ),
+            onChanged: (_) => setStateInternal(() {}),
           ),
           Text(
             appText(
@@ -395,9 +391,130 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
             ),
             style: Theme.of(context).textTheme.bodySmall,
           ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              OutlinedButton(
+                key: ValueKey('external-acp-test-${profile.providerKey}'),
+                onPressed: testing
+                    ? null
+                    : () => testExternalAcpEndpointInternal(
+                        controller,
+                        profile.providerKey,
+                      ),
+                child: Text(
+                  testing
+                      ? appText('测试中...', 'Testing...')
+                      : appText('测试连接', 'Test Connection'),
+                ),
+              ),
+              FilledButton(
+                key: ValueKey('external-acp-apply-${profile.providerKey}'),
+                onPressed: () => saveExternalAcpEndpointInternal(
+                  controller,
+                  settings,
+                  provider,
+                  profile,
+                ),
+                child: Text(appText('保存并生效', 'Save & apply')),
+              ),
+            ],
+          ),
+          if (message.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> saveExternalAcpEndpointInternal(
+    AppController controller,
+    SettingsSnapshot settings,
+    SingleAgentProvider provider,
+    ExternalAcpEndpointProfile profile,
+  ) async {
+    final label =
+        externalAcpLabelControllersInternal[profile.providerKey]?.text ??
+        profile.label;
+    final endpoint =
+        externalAcpEndpointControllersInternal[profile.providerKey]?.text ??
+        profile.endpoint;
+    final next = settings.copyWithExternalAcpEndpointForProvider(
+      provider,
+      profile.copyWith(label: label, endpoint: endpoint),
+    );
+    await saveSettingsInternal(controller, next);
+    await handleTopLevelApplyInternal(controller);
+    if (!mounted) {
+      return;
+    }
+    setStateInternal(() {
+      externalAcpMessageByProviderInternal[profile.providerKey] = appText(
+        '配置已保存并生效。',
+        'Configuration saved and applied.',
+      );
+    });
+  }
+
+  Future<void> testExternalAcpEndpointInternal(
+    AppController controller,
+    String providerKey,
+  ) async {
+    final endpointText =
+        externalAcpEndpointControllersInternal[providerKey]?.text.trim() ?? '';
+    final endpoint = Uri.tryParse(endpointText);
+    if (endpoint == null || endpoint.host.trim().isEmpty) {
+      setStateInternal(() {
+        externalAcpMessageByProviderInternal[providerKey] = appText(
+          '请输入有效的 ACP Server Endpoint。',
+          'Enter a valid ACP server endpoint.',
+        );
+      });
+      return;
+    }
+    setStateInternal(() {
+      externalAcpTestingProvidersInternal.add(providerKey);
+      externalAcpMessageByProviderInternal.remove(providerKey);
+    });
+    try {
+      final capabilities = await controller.gatewayAcpClientInternal
+          .loadCapabilities(forceRefresh: true, endpointOverride: endpoint);
+      if (!mounted) {
+        return;
+      }
+      setStateInternal(() {
+        externalAcpMessageByProviderInternal[providerKey] = appText(
+          capabilities.providers.isEmpty
+              ? '连接成功。'
+              : '连接成功，可用 Provider: ${capabilities.providers.map((item) => item.label).join(' / ')}',
+          capabilities.providers.isEmpty
+              ? 'Connection succeeded.'
+              : 'Connection succeeded. Providers: ${capabilities.providers.map((item) => item.label).join(' / ')}',
+        );
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setStateInternal(() {
+        externalAcpMessageByProviderInternal[providerKey] = '$error';
+      });
+    } finally {
+      if (mounted) {
+        setStateInternal(() {
+          externalAcpTestingProvidersInternal.remove(providerKey);
+        });
+      }
+    }
   }
 
   Future<void> showAddExternalAcpProviderWizardInternal(

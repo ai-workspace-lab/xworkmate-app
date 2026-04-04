@@ -159,11 +159,7 @@ void main() {
   ) async {
     final controller = await createTestController(tester);
 
-    await _pumpSettingsPage(
-      tester,
-      controller,
-      tab: SettingsTab.appearance,
-    );
+    await _pumpSettingsPage(tester, controller, tab: SettingsTab.appearance);
     await tester.tap(find.text('深色'));
     await tester.pumpAndSettle();
 
@@ -221,78 +217,68 @@ void main() {
     (WidgetTester tester) async {
       final controller = await createTestController(tester);
 
-      await _pumpSettingsPage(
-        tester,
-        controller,
-        tab: SettingsTab.workspace,
-      );
+      await _pumpSettingsPage(tester, controller, tab: SettingsTab.workspace);
 
       expect(find.text('远程项目根目录'), findsNothing);
       expect(find.text('Remote Project Root'), findsNothing);
     },
   );
 
-  testWidgets('SettingsPage renders only the active section without internal tabs', (
-    WidgetTester tester,
-  ) async {
-    final controller = await createTestController(tester);
+  testWidgets(
+    'SettingsPage renders only the active section without internal tabs',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
 
-    await pumpPage(
-      tester,
-      child: SettingsPage(
-        controller: controller,
-        showSectionTabs: false,
-      ),
-      platform: TargetPlatform.macOS,
-    );
+      await pumpPage(
+        tester,
+        child: SettingsPage(controller: controller, showSectionTabs: false),
+        platform: TargetPlatform.macOS,
+      );
 
-    expect(find.byType(SectionTabs), findsNothing);
-    expect(find.text('Application'), findsOneWidget);
-    expect(find.text('OpenClaw Gateway'), findsNothing);
-    expect(find.text('LLM 接入点'), findsNothing);
-    expect(find.text('工作区路径'), findsNothing);
-    expect(
-      find.byKey(const ValueKey('external-acp-provider-add-button')),
-      findsNothing,
-    );
-  });
+      expect(find.byType(SectionTabs), findsNothing);
+      expect(find.text('Application'), findsOneWidget);
+      expect(find.text('OpenClaw Gateway'), findsNothing);
+      expect(find.text('LLM 接入点'), findsNothing);
+      expect(find.text('工作区路径'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('external-acp-provider-add-button')),
+        findsNothing,
+      );
+    },
+  );
 
-  testWidgets('SettingsPage workspace edits enable the top save-and-apply flow', (
-    WidgetTester tester,
-  ) async {
-    final controller = await createTestController(tester);
+  testWidgets(
+    'SettingsPage workspace edits enable the top save-and-apply flow',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
 
-    await _pumpSettingsPage(
-      tester,
-      controller,
-      tab: SettingsTab.workspace,
-    );
+      await _pumpSettingsPage(tester, controller, tab: SettingsTab.workspace);
 
-    await tester.enterText(
-      find.byType(TextFormField).first,
-      '/tmp/xworkmate-workspace',
-    );
-    await tester.pump();
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        '/tmp/xworkmate-workspace',
+      );
+      await tester.pump();
 
-    expect(controller.settingsDraft.workspacePath, '/tmp/xworkmate-workspace');
-    expect(controller.hasSettingsDraftChanges, isTrue);
+      expect(
+        controller.settingsDraft.workspacePath,
+        '/tmp/xworkmate-workspace',
+      );
+      expect(controller.hasSettingsDraftChanges, isTrue);
 
-    final applyButton = tester.widget<FilledButton>(
-      find.byKey(const ValueKey('settings-global-apply-button')),
-    );
-    expect(applyButton.onPressed, isNotNull);
-  });
+      final applyButton = tester.widget<FilledButton>(
+        find.byKey(const ValueKey('settings-global-apply-button')),
+      );
+      expect(applyButton.onPressed, isNotNull);
+    },
+  );
 
   testWidgets('SettingsPage integration tab exposes unified gateway controls', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
 
-    await _pumpSettingsPage(
-      tester,
-      controller,
-      tab: SettingsTab.gateway,
-    );
+    await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
 
     expect(find.text('OpenClaw Gateway'), findsWidgets);
     expect(find.text('LLM 接入点'), findsOneWidget);
@@ -348,7 +334,10 @@ void main() {
       find.byKey(const ValueKey('external-acp-provider-add-button')),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('settings-global-apply-button')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('settings-global-apply-button')),
+      findsNothing,
+    );
   });
 
   testWidgets('SettingsPage vault card exposes concrete K/V fields', (
@@ -356,11 +345,7 @@ void main() {
   ) async {
     final controller = await createTestController(tester);
 
-    await _pumpSettingsPage(
-      tester,
-      controller,
-      tab: SettingsTab.gateway,
-    );
+    await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
 
     expect(find.text('Vault Server'), findsAtLeastNWidgets(1));
     expect(find.text('VAULT_SERVER_URL'), findsOneWidget);
@@ -377,11 +362,7 @@ void main() {
   ) async {
     final controller = await createTestController(tester);
 
-    await _pumpSettingsPage(
-      tester,
-      controller,
-      tab: SettingsTab.gateway,
-    );
+    await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
 
     expect(find.text('外部 ACP Server Endpoint'), findsOneWidget);
     expect(find.textContaining('Codex'), findsWidgets);
@@ -411,11 +392,7 @@ void main() {
   ) async {
     final controller = await createTestController(tester);
 
-    await _pumpSettingsPage(
-      tester,
-      controller,
-      tab: SettingsTab.gateway,
-    );
+    await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
 
     await _ensureVisible(
       tester,
@@ -451,11 +428,7 @@ void main() {
       _FakeSkillDirectoryAccessService(userHomeDirectory: '/Users/tester'),
     );
 
-    await _pumpSettingsPage(
-      tester,
-      controller,
-      tab: SettingsTab.gateway,
-    );
+    await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
 
     expect(find.text('~/.agents/skills'), findsOneWidget);
     expect(find.text('/Users/tester/.agents/skills'), findsOneWidget);
@@ -485,11 +458,7 @@ void main() {
       ),
     );
 
-    await _pumpSettingsPage(
-      tester,
-      controller,
-      tab: SettingsTab.gateway,
-    );
+    await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
     await _ensureVisible(
       tester,
       find.byKey(const ValueKey('skill-directory-batch-add-button')),
@@ -546,11 +515,7 @@ paths:
       ),
     );
 
-    await _pumpSettingsPage(
-      tester,
-      controller,
-      tab: SettingsTab.gateway,
-    );
+    await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
     await _ensureVisible(
       tester,
       find.byKey(const ValueKey('skill-directory-batch-add-button')),
@@ -590,11 +555,7 @@ paths:
         _FakeSkillDirectoryAccessService(userHomeDirectory: '/Users/tester'),
       );
 
-      await _pumpSettingsPage(
-        tester,
-        controller,
-        tab: SettingsTab.gateway,
-      );
+      await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
       await _ensureVisible(
         tester,
         find.byKey(const ValueKey('skill-directory-batch-add-button')),
@@ -635,11 +596,7 @@ paths:
   ) async {
     final controller = await createTestController(tester);
 
-    await _pumpSettingsPage(
-      tester,
-      controller,
-      tab: SettingsTab.gateway,
-    );
+    await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
 
     await tester.tap(find.byTooltip('折叠').first);
     await tester.pumpAndSettle();
@@ -667,11 +624,7 @@ paths:
   ) async {
     final controller = await createTestController(tester);
 
-    await _pumpSettingsPage(
-      tester,
-      controller,
-      tab: SettingsTab.gateway,
-    );
+    await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
 
     await _ensureVisible(tester, find.text('外部 ACP Server Endpoint'));
     await tester.tap(find.text('外部 ACP Server Endpoint').first);
@@ -691,6 +644,50 @@ paths:
       findsOneWidget,
     );
     expect(find.textContaining('OpenCode'), findsWidgets);
+  });
+
+  testWidgets('SettingsPage external ACP card supports continuous input', (
+    WidgetTester tester,
+  ) async {
+    final controller = await createTestController(tester);
+    final customProfile = buildCustomExternalAcpEndpointProfile(
+      controller.settingsDraft.externalAcpEndpoints,
+      label: 'Initial Name',
+      endpoint: 'wss://initial.example.com/acp',
+    );
+    await controller.saveSettingsDraft(
+      controller.settingsDraft.copyWith(
+        externalAcpEndpoints: <ExternalAcpEndpointProfile>[
+          ...controller.settingsDraft.externalAcpEndpoints,
+          customProfile,
+        ],
+      ),
+    );
+
+    await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
+
+    final labelField = find.byKey(
+      ValueKey('external-acp-label-${customProfile.providerKey}'),
+    );
+    final testButton = find.byKey(
+      ValueKey('external-acp-test-${customProfile.providerKey}'),
+    );
+    final applyButton = find.byKey(
+      ValueKey('external-acp-apply-${customProfile.providerKey}'),
+    );
+
+    expect(labelField, findsOneWidget);
+    expect(testButton, findsOneWidget);
+    expect(applyButton, findsOneWidget);
+
+    await tester.enterText(labelField, 'A');
+    await tester.pump();
+    await tester.enterText(labelField, 'AB');
+    await tester.pump();
+    await tester.enterText(labelField, 'ABC');
+    await tester.pump();
+
+    expect(find.text('ABC'), findsOneWidget);
   });
 
   testWidgets('SettingsPage shows Linux desktop integration controls', (
@@ -758,11 +755,7 @@ paths:
   ) async {
     final controller = await createTestController(tester);
 
-    await _pumpSettingsPage(
-      tester,
-      controller,
-      tab: SettingsTab.gateway,
-    );
+    await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
     await tester.tap(find.byKey(const ValueKey('gateway-profile-chip-1')));
     await tester.pumpAndSettle();
 
@@ -847,11 +840,7 @@ paths:
     (WidgetTester tester) async {
       final controller = await createTestController(tester);
 
-      await _pumpSettingsPage(
-        tester,
-        controller,
-        tab: SettingsTab.diagnostics,
-      );
+      await _pumpSettingsPage(tester, controller, tab: SettingsTab.diagnostics);
 
       expect(
         find.byKey(const ValueKey('assistant-local-state-card')),
