@@ -27,6 +27,20 @@ void main() {
       expect(server.rpcMethods, contains('acp.capabilities'));
     });
 
+    test('preserves prefixed websocket ACP endpoints', () async {
+      final server = await _AcpFakeServer.start(pathPrefix: '/codex');
+      addTearDown(server.close);
+
+      final client = GatewayAcpClient(
+        endpointResolver: () => server.baseHttpUri,
+      );
+
+      final capabilities = await client.loadCapabilities(forceRefresh: true);
+
+      expect(capabilities.singleAgent, isTrue);
+      expect(server.rpcMethods, contains('acp.capabilities'));
+    });
+
     test('falls back to HTTP+SSE when websocket is unavailable', () async {
       final server = await _AcpFakeServer.start(disableWebSocket: true);
       addTearDown(server.close);
@@ -43,10 +57,10 @@ void main() {
       expect(server.rpcMethods, contains('acp.capabilities'));
     });
 
-    test('surfaces HTTP content-type errors without raw JSON parse failures', () async {
+    test('preserves prefixed HTTP fallback ACP endpoints', () async {
       final server = await _AcpFakeServer.start(
         disableWebSocket: true,
-        respondWithHtmlError: true,
+        pathPrefix: '/opencode',
       );
       addTearDown(server.close);
 
@@ -54,17 +68,37 @@ void main() {
         endpointResolver: () => server.baseHttpUri,
       );
 
-      await expectLater(
-        () => client.loadCapabilities(forceRefresh: true),
-        throwsA(
-          isA<GatewayAcpException>().having(
-            (error) => error.toString(),
-            'message',
-            contains('unexpected content type: text/html'),
-          ),
-        ),
-      );
+      final capabilities = await client.loadCapabilities(forceRefresh: true);
+
+      expect(capabilities.multiAgent, isTrue);
+      expect(server.rpcMethods, contains('acp.capabilities'));
     });
+
+    test(
+      'surfaces HTTP content-type errors without raw JSON parse failures',
+      () async {
+        final server = await _AcpFakeServer.start(
+          disableWebSocket: true,
+          respondWithHtmlError: true,
+        );
+        addTearDown(server.close);
+
+        final client = GatewayAcpClient(
+          endpointResolver: () => server.baseHttpUri,
+        );
+
+        await expectLater(
+          () => client.loadCapabilities(forceRefresh: true),
+          throwsA(
+            isA<GatewayAcpException>().having(
+              (error) => error.toString(),
+              'message',
+              contains('unexpected content type: text/html'),
+            ),
+          ),
+        );
+      },
+    );
 
     test(
       'forwards ACP authorization resolver headers over websocket',
@@ -155,26 +189,31 @@ class _AcpFakeServer {
     this._server, {
     required this.disableWebSocket,
     required this.respondWithHtmlError,
+    required this.pathPrefix,
   });
 
   final HttpServer _server;
   final bool disableWebSocket;
   final bool respondWithHtmlError;
+  final String pathPrefix;
   final List<String> rpcMethods = <String>[];
   String? lastWebSocketAuthorization;
   String? lastHttpAuthorization;
 
-  Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${_server.port}');
+  Uri get baseHttpUri =>
+      Uri.parse('http://127.0.0.1:${_server.port}$pathPrefix');
 
   static Future<_AcpFakeServer> start({
     bool disableWebSocket = false,
     bool respondWithHtmlError = false,
+    String pathPrefix = '',
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final fake = _AcpFakeServer._(
       server,
       disableWebSocket: disableWebSocket,
       respondWithHtmlError: respondWithHtmlError,
+      pathPrefix: _normalizePathPrefix(pathPrefix),
     );
     unawaited(fake._listen());
     return fake;
@@ -187,7 +226,7 @@ class _AcpFakeServer {
   Future<void> _listen() async {
     await for (final request in _server) {
       if (!disableWebSocket &&
-          request.uri.path == '/acp' &&
+          request.uri.path == '$pathPrefix/acp' &&
           WebSocketTransformer.isUpgradeRequest(request)) {
         lastWebSocketAuthorization = request.headers.value(
           HttpHeaders.authorizationHeader,
@@ -196,7 +235,8 @@ class _AcpFakeServer {
         unawaited(_handleWebSocket(socket));
         continue;
       }
-      if (request.uri.path == '/acp/rpc' && request.method == 'POST') {
+      if (request.uri.path == '$pathPrefix/acp/rpc' &&
+          request.method == 'POST') {
         await _handleHttpRpc(request);
         continue;
       }
@@ -434,5 +474,15 @@ class _AcpFakeServer {
       return raw.cast<String, dynamic>();
     }
     return const <String, dynamic>{};
+  }
+
+  static String _normalizePathPrefix(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty || trimmed == '/') {
+      return '';
+    }
+    final prefixed = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+    final normalized = prefixed.replaceFirst(RegExp(r'/+$'), '');
+    return normalized == '/' ? '' : normalized;
   }
 }

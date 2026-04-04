@@ -68,13 +68,18 @@ func Serve(args []string) error {
 	_ = flags.Parse(args)
 
 	server := NewServer()
-	mux := http.NewServeMux()
-	mux.HandleFunc("/acp", server.HandleWebSocket)
-	mux.HandleFunc("/acp/rpc", server.HandleRPC)
-
 	httpServer := &http.Server{
 		Addr:         strings.TrimSpace(*listen),
-		Handler:      mux,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/acp/rpc":
+				server.HandleRPC(w, r)
+			case "/acp":
+				server.HandleWebSocket(w, r)
+			default:
+				http.NotFound(w, r)
+			}
+		}),
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 5 * time.Minute,
 		IdleTimeout:  2 * time.Minute,
@@ -96,7 +101,22 @@ func NewServer() *Server {
 }
 
 func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := wsUpgrader.Upgrade(w, r, nil)
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if !s.originAllowed(origin) {
+		s.writeJSONError(
+			w,
+			nil,
+			http.StatusForbidden,
+			-32003,
+			fmt.Sprintf("origin not allowed: %s", origin),
+		)
+		return
+	}
+	upgrader := wsUpgrader
+	upgrader.CheckOrigin = func(req *http.Request) bool {
+		return s.originAllowed(req.Header.Get("Origin"))
+	}
+	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
@@ -132,20 +152,40 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleRPC(w http.ResponseWriter, r *http.Request) {
+	s.applyCORS(w, r)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		s.writeJSONError(
+			w,
+			nil,
+			http.StatusMethodNotAllowed,
+			-32600,
+			"method not allowed",
+		)
+		return
+	}
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if !s.originAllowed(origin) {
+		s.writeJSONError(
+			w,
+			nil,
+			http.StatusForbidden,
+			-32003,
+			fmt.Sprintf("origin not allowed: %s", origin),
+		)
 		return
 	}
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte("invalid body"))
+		s.writeJSONError(w, nil, http.StatusBadRequest, -32600, "invalid body")
 		return
 	}
 	request, err := shared.DecodeRPCRequest(payload)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte(err.Error()))
+		s.writeJSONError(w, nil, http.StatusBadRequest, -32700, err.Error())
 		return
 	}
 
@@ -195,6 +235,7 @@ func (s *Server) HandleRPC(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(shared.ResultEnvelope(request.ID, response))
 }
