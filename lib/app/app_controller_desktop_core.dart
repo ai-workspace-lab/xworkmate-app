@@ -143,6 +143,10 @@ class AppController extends ChangeNotifier {
             store: storeInternal,
             identityStore: DeviceIdentityStore(storeInternal),
             sessionClient: GoGatewayRuntimeDesktopClient(),
+            allowDirectSocketFallbackOnSessionClientFailure:
+                shouldBlockEmbeddedAgentLaunch(
+                  isAppleHost: Platform.isIOS || Platform.isMacOS,
+                ),
           ),
           codex: CodexRuntime(),
           configBridge: CodexConfigBridge(),
