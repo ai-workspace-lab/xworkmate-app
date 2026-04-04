@@ -61,6 +61,8 @@ class WebSettingsPageStateInternal extends State<WebSettingsPage> {
   String localGatewayMessageInternal = '';
   String remoteGatewayMessageInternal = '';
   String sessionPersistenceMessageInternal = '';
+  late final Map<String, String> externalAcpMessageByProviderInternal;
+  late final Set<String> externalAcpTestingProvidersInternal;
 
   @override
   void initState() {
@@ -81,6 +83,8 @@ class WebSettingsPageStateInternal extends State<WebSettingsPage> {
     sessionApiTokenControllerInternal = TextEditingController();
     externalAcpLabelControllersInternal = <String, TextEditingController>{};
     externalAcpEndpointControllersInternal = <String, TextEditingController>{};
+    externalAcpMessageByProviderInternal = <String, String>{};
+    externalAcpTestingProvidersInternal = <String>{};
     sessionPersistenceModeInternal =
         widget.controller.webSessionPersistence.mode;
     syncControllersInternal();
@@ -221,6 +225,12 @@ class WebSettingsPageStateInternal extends State<WebSettingsPage> {
     disposeRemovedControllersInternal(
       externalAcpEndpointControllersInternal,
       activeKeys,
+    );
+    externalAcpMessageByProviderInternal.removeWhere(
+      (key, _) => !activeKeys.contains(key),
+    );
+    externalAcpTestingProvidersInternal.removeWhere(
+      (key) => !activeKeys.contains(key),
     );
   }
 

@@ -48,10 +48,16 @@ void main() {
     final labelField = find.byKey(
       ValueKey('web-external-acp-label-${customProfile.providerKey}'),
     );
+    final testButton = find.byKey(
+      ValueKey('web-external-acp-test-${customProfile.providerKey}'),
+    );
+    final applyButton = find.byKey(
+      ValueKey('web-external-acp-apply-${customProfile.providerKey}'),
+    );
 
     expect(labelField, findsOneWidget);
-    expect(find.text('测试连接'), findsWidgets);
-    expect(find.text('保存并生效'), findsWidgets);
+    expect(testButton, findsOneWidget);
+    expect(applyButton, findsOneWidget);
 
     await tester.enterText(labelField, 'A');
     await tester.pump();
