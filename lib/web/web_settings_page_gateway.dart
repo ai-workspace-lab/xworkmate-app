@@ -286,6 +286,11 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
         externalAcpLabelControllersInternal[profile.providerKey]!;
     final endpointController =
         externalAcpEndpointControllersInternal[profile.providerKey]!;
+    final message =
+        externalAcpMessageByProviderInternal[profile.providerKey] ?? '';
+    final testing = externalAcpTestingProvidersInternal.contains(
+      profile.providerKey,
+    );
     final configured = endpointController.text.trim().isNotEmpty;
     return Container(
       padding: const EdgeInsets.all(16),
@@ -359,6 +364,42 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
             ),
             style: Theme.of(context).textTheme.bodySmall,
           ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              OutlinedButton(
+                key: ValueKey('web-external-acp-test-${profile.providerKey}'),
+                onPressed: testing
+                    ? null
+                    : () =>
+                          testExternalAcpEndpointInternal(controller, profile),
+                child: Text(
+                  testing
+                      ? appText('测试中...', 'Testing...')
+                      : appText('测试连接', 'Test Connection'),
+                ),
+              ),
+              FilledButton(
+                key: ValueKey('web-external-acp-apply-${profile.providerKey}'),
+                onPressed: () => saveExternalAcpEndpointInternal(
+                  controller,
+                  profile.providerKey,
+                ),
+                child: Text(appText('保存并生效', 'Save & apply')),
+              ),
+            ],
+          ),
+          if (message.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -391,6 +432,78 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
       return;
     }
     unawaited(controller.saveSettingsDraft(next));
+  }
+
+  Future<void> saveExternalAcpEndpointInternal(
+    AppController controller,
+    String providerKey,
+  ) async {
+    stageExternalAcpDraftInternal(controller);
+    await controller.applySettingsDraft();
+    if (!mounted) {
+      return;
+    }
+    setStateInternal(() {
+      externalAcpMessageByProviderInternal[providerKey] = appText(
+        '配置已保存并生效。',
+        'Configuration saved and applied.',
+      );
+    });
+  }
+
+  Future<void> testExternalAcpEndpointInternal(
+    AppController controller,
+    ExternalAcpEndpointProfile profile,
+  ) async {
+    final endpointText =
+        externalAcpEndpointControllersInternal[profile.providerKey]?.text
+            .trim() ??
+        '';
+    final endpoint = Uri.tryParse(endpointText);
+    if (endpoint == null || endpoint.host.trim().isEmpty) {
+      setStateInternal(() {
+        externalAcpMessageByProviderInternal[profile.providerKey] = appText(
+          '请输入有效的 ACP Server Endpoint。',
+          'Enter a valid ACP server endpoint.',
+        );
+      });
+      return;
+    }
+    setStateInternal(() {
+      externalAcpTestingProvidersInternal.add(profile.providerKey);
+      externalAcpMessageByProviderInternal.remove(profile.providerKey);
+    });
+    try {
+      final capabilities = await controller.acpClientInternal.loadCapabilities(
+        endpoint: endpoint,
+      );
+      if (!mounted) {
+        return;
+      }
+      setStateInternal(() {
+        externalAcpMessageByProviderInternal[profile.providerKey] = appText(
+          capabilities.providers.isEmpty
+              ? '连接成功。'
+              : '连接成功，可用 Provider: ${capabilities.providers.map((item) => item.label).join(' / ')}',
+          capabilities.providers.isEmpty
+              ? 'Connection successful.'
+              : 'Connection successful. Providers: ${capabilities.providers.map((item) => item.label).join(' / ')}',
+        );
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setStateInternal(() {
+        externalAcpMessageByProviderInternal[profile.providerKey] = '$error';
+      });
+    } finally {
+      if (mounted) {
+        setStateInternal(() {
+          externalAcpTestingProvidersInternal.remove(profile.providerKey);
+        });
+      }
+    }
   }
 
   Future<void> showAddExternalAcpProviderWizardInternal(
