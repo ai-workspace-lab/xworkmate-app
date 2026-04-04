@@ -762,7 +762,7 @@ class GatewayAcpClient {
     final secure = base.scheme.toLowerCase() == 'https';
     return base.replace(
       scheme: secure ? 'wss' : 'ws',
-      path: '/acp',
+      pathSegments: _deriveAcpPathSegments(base, includeRpc: false),
       query: null,
       fragment: null,
     );
@@ -777,7 +777,41 @@ class GatewayAcpClient {
     if (scheme != 'http' && scheme != 'https') {
       return null;
     }
-    return base.replace(path: '/acp/rpc', query: null, fragment: null);
+    return base.replace(
+      pathSegments: _deriveAcpPathSegments(base, includeRpc: true),
+      query: null,
+      fragment: null,
+    );
+  }
+
+  List<String> _deriveAcpPathSegments(Uri base, {required bool includeRpc}) {
+    final segments = base.pathSegments
+        .where((segment) => segment.isNotEmpty)
+        .toList(growable: true);
+    final endsWithRpc =
+        segments.length >= 2 &&
+        segments[segments.length - 2] == 'acp' &&
+        segments.last == 'rpc';
+    final endsWithAcp = segments.isNotEmpty && segments.last == 'acp';
+
+    if (endsWithRpc) {
+      if (includeRpc) {
+        return segments;
+      }
+      return segments.sublist(0, segments.length - 1);
+    }
+    if (endsWithAcp) {
+      if (includeRpc) {
+        return <String>[...segments, 'rpc'];
+      }
+      return segments;
+    }
+
+    return <String>[
+      ...segments,
+      'acp',
+      if (includeRpc) 'rpc',
+    ];
   }
 
   String _nextRequestId(String method) {
