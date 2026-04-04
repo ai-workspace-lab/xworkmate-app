@@ -16,6 +16,16 @@ void main() {
       expect(text, contains('/acp/rpc'));
     });
 
+    test('example copy still applies when hosted ACP uses a base path', () {
+      setActiveAppLanguage(AppLanguage.en);
+      addTearDown(() => setActiveAppLanguage(AppLanguage.zh));
+
+      final text = externalAcpEndpointExamplesText();
+
+      expect(text, contains('base URL'));
+      expect(text, contains('/acp'));
+    });
+
     test(
       'websocket-only error suggests using https base URL for hosted ACP',
       () {
@@ -49,5 +59,19 @@ void main() {
         expect(text, contains('HTTP ACP bridge'));
       },
     );
+
+    test('tls handshake errors explain server-side tls diagnosis', () {
+      setActiveAppLanguage(AppLanguage.en);
+      addTearDown(() => setActiveAppLanguage(AppLanguage.zh));
+
+      final text = describeExternalAcpTestFailure(
+        'HandshakeException: Handshake error in client (OS Error: TLSV1_ALERT_INTERNAL_ERROR)',
+        endpoint: Uri.parse('https://acp-server.example.com/opencode'),
+      );
+
+      expect(text, contains('TLS handshake failed'));
+      expect(text, contains('curl or openssl'));
+      expect(text, contains('subpath'));
+    });
   });
 }
