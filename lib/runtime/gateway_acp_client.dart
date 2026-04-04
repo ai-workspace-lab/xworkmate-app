@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'acp_endpoint_paths.dart';
 import 'runtime_models.dart';
 
 class GatewayAcpException implements Exception {
@@ -755,29 +756,11 @@ class GatewayAcpClient {
   }
 
   Uri? _resolveWebSocketRpcEndpoint([Uri? endpointOverride]) {
-    final base = endpointOverride ?? endpointResolver();
-    if (base == null) {
-      return null;
-    }
-    final secure = base.scheme.toLowerCase() == 'https';
-    return base.replace(
-      scheme: secure ? 'wss' : 'ws',
-      path: '/acp',
-      query: null,
-      fragment: null,
-    );
+    return resolveAcpWebSocketEndpoint(endpointOverride ?? endpointResolver());
   }
 
   Uri? _resolveHttpRpcEndpoint([Uri? endpointOverride]) {
-    final base = endpointOverride ?? endpointResolver();
-    if (base == null) {
-      return null;
-    }
-    final scheme = base.scheme.toLowerCase();
-    if (scheme != 'http' && scheme != 'https') {
-      return null;
-    }
-    return base.replace(path: '/acp/rpc', query: null, fragment: null);
+    return resolveAcpHttpRpcEndpoint(endpointOverride ?? endpointResolver());
   }
 
   String _nextRequestId(String method) {
