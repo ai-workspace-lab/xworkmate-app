@@ -153,9 +153,9 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
                                   () => directMessageInternal = result.message,
                                 );
                               },
-                        child: Text(appText('测试连接', 'Test')),
+                        child: Text(appText('测试连接', 'Test Connection')),
                       ),
-                      FilledButton.icon(
+                      FilledButton(
                         onPressed: controller.aiGatewayBusy
                             ? null
                             : () async {
@@ -195,7 +195,7 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
                                   );
                                 }
                               },
-                        icon: controller.aiGatewayBusy
+                        child: controller.aiGatewayBusy
                             ? const SizedBox(
                                 width: 14,
                                 height: 14,
@@ -203,8 +203,7 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Icon(Icons.play_circle_outline_rounded),
-                        label: Text(appText('保存并生效', 'Save & apply')),
+                            : Text(appText('保存并生效', 'Save & apply')),
                       ),
                     ],
                   ),
@@ -263,6 +262,7 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
           const SizedBox(height: 16),
           ...controller.settingsDraft.externalAcpEndpoints.map(
             (profile) => Padding(
+              key: ValueKey('web-external-acp-card-${profile.providerKey}'),
               padding: const EdgeInsets.only(bottom: 12),
               child: buildExternalAcpProviderCardInternal(
                 context,
@@ -335,19 +335,21 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
           ),
           const SizedBox(height: 12),
           TextField(
+            key: ValueKey('web-external-acp-label-${profile.providerKey}'),
             controller: labelController,
             decoration: InputDecoration(
               labelText: appText('显示名称', 'Display name'),
             ),
-            onChanged: (_) => stageExternalAcpDraftInternal(controller),
+            onChanged: (_) => setStateInternal(() {}),
           ),
           const SizedBox(height: 12),
           TextField(
+            key: ValueKey('web-external-acp-endpoint-${profile.providerKey}'),
             controller: endpointController,
             decoration: InputDecoration(
               labelText: appText('ACP Server Endpoint', 'ACP Server Endpoint'),
             ),
-            onChanged: (_) => stageExternalAcpDraftInternal(controller),
+            onChanged: (_) => setStateInternal(() {}),
           ),
           const SizedBox(height: 8),
           Text(
@@ -652,9 +654,9 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
                           '${result.state.toUpperCase()} · ${result.message}',
                         );
                       },
-                child: Text(appText('Test', 'Test')),
+                child: Text(appText('测试连接', 'Test Connection')),
               ),
-              FilledButton.icon(
+              FilledButton(
                 onPressed: controller.relayBusy
                     ? null
                     : () async {
@@ -686,14 +688,13 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
                           onMessageChanged('$error');
                         }
                       },
-                icon: controller.relayBusy
+                child: controller.relayBusy
                     ? const SizedBox(
                         width: 14,
                         height: 14,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.play_circle_outline_rounded),
-                label: Text(appText('保存并生效', 'Save & apply')),
+                    : Text(appText('保存并生效', 'Save & apply')),
               ),
             ],
           ),
