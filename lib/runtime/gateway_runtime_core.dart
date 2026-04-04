@@ -145,18 +145,6 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
             '');
     final explicitToken = authTokenOverride.trim();
     final explicitPassword = authPasswordOverride.trim();
-    final sharedTokenSource = explicitToken.isNotEmpty
-        ? 'shared:form'
-        : storedToken.isNotEmpty
-        ? 'shared:store'
-        : (setupPayload?.token.trim().isNotEmpty ?? false)
-        ? 'shared:setup-code'
-        : null;
-    final sharedToken = explicitToken.isNotEmpty
-        ? explicitToken
-        : storedToken.isNotEmpty
-        ? storedToken
-        : (setupPayload?.token.trim() ?? '');
     final passwordSource = explicitPassword.isNotEmpty
         ? 'password:form'
         : storedPassword.isNotEmpty
@@ -177,14 +165,32 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
         ))?.trim() ??
         '';
     final explicitDeviceToken = '';
+    final canUseStoredDeviceToken =
+        explicitToken.isEmpty && storedDeviceToken.isNotEmpty;
+    final sharedTokenSource = explicitToken.isNotEmpty
+        ? 'shared:form'
+        : canUseStoredDeviceToken
+        ? null
+        : storedToken.isNotEmpty
+        ? 'shared:store'
+        : (setupPayload?.token.trim().isNotEmpty ?? false)
+        ? 'shared:setup-code'
+        : null;
+    final sharedToken = explicitToken.isNotEmpty
+        ? explicitToken
+        : canUseStoredDeviceToken
+        ? ''
+        : storedToken.isNotEmpty
+        ? storedToken
+        : (setupPayload?.token.trim() ?? '');
     final deviceTokenSource = explicitDeviceToken.isNotEmpty
         ? 'device:form'
-        : sharedToken.isEmpty && storedDeviceToken.isNotEmpty
+        : canUseStoredDeviceToken
         ? 'device:store'
         : null;
     final deviceToken = explicitDeviceToken.isNotEmpty
         ? explicitDeviceToken
-        : sharedToken.isEmpty
+        : canUseStoredDeviceToken
         ? storedDeviceToken
         : '';
     final authToken = sharedToken.isNotEmpty ? sharedToken : deviceToken;
