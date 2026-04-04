@@ -109,6 +109,41 @@ void registerSecureConfigStoreSuiteSecretsTestsInternal() {
     );
 
     test(
+      'SecureConfigStore tracks arbitrary secret refs in the secure ref registry',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-config-store-custom-refs-',
+        );
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+
+        await store.saveSecretValueByRef(
+          'team_shared_llm_token',
+          'shared-secret',
+        );
+
+        expect(
+          await store.loadSecretValueByRef('team_shared_llm_token'),
+          'shared-secret',
+        );
+        expect(
+          (await store.loadSecureRefs())['team_shared_llm_token'],
+          'shared-secret',
+        );
+
+        await store.clearSecretValueByRef('team_shared_llm_token');
+
+        expect(
+          await store.loadSecretValueByRef('team_shared_llm_token'),
+          isNull,
+        );
+        expect(
+          (await store.loadSecureRefs()).containsKey('team_shared_llm_token'),
+          isFalse,
+        );
+      },
+    );
+
+    test(
       'SecureConfigStore keeps Vault root token out of the settings snapshot payload',
       () async {
         final tempDirectory = await createTempDirectoryInternal(

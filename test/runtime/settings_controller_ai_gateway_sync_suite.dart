@@ -106,6 +106,46 @@ void main() {
   );
 
   test(
+    'SettingsController falls back to ai_gateway_api_key when LLM token ref is empty',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final server = await _FakeAiGatewayServer.start(
+        expectedAuthorization: 'Bearer fallback-ref-key',
+      );
+      addTearDown(server.close);
+
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-settings-ai-gateway-sync-',
+      );
+      addTearDown(() async => _deleteDirectoryBestEffort(tempDirectory));
+      final store = _createIsolatedStore(tempDirectory.path);
+      addTearDown(store.dispose);
+      final controller = SettingsController(store);
+      await controller.initialize();
+      await controller.saveSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          aiGateway: AiGatewayProfile.defaults().copyWith(
+            baseUrl: server.baseUrl,
+            apiKeyRef: '',
+          ),
+        ),
+      );
+      await store.saveSecretValueByRef(
+        'ai_gateway_api_key',
+        'fallback-ref-key',
+      );
+
+      final result = await controller.syncAiGatewayCatalog(
+        controller.snapshot.aiGateway,
+      );
+
+      expect(server.lastAuthorization, 'Bearer fallback-ref-key');
+      expect(result.syncState, 'ready');
+      expect(result.availableModels, isNotEmpty);
+    },
+  );
+
+  test(
     'SettingsController tolerates OpenAI-compatible model payloads with a trailing JSON footer',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -199,6 +239,94 @@ void main() {
       expect(await store.loadAiGatewayApiKey(), isNull);
     },
   );
+
+  test(
+    'SettingsController allows anonymous LLM model sync for 127.0.0.1 only',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final server = await _FakeAiGatewayServer.start(
+        expectedAuthorization: null,
+      );
+      addTearDown(server.close);
+
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-settings-ai-gateway-sync-',
+      );
+      addTearDown(() async => _deleteDirectoryBestEffort(tempDirectory));
+      final store = _createIsolatedStore(tempDirectory.path);
+      addTearDown(store.dispose);
+      final controller = SettingsController(store);
+      await controller.initialize();
+
+      final result = await controller.syncAiGatewayCatalog(
+        AiGatewayProfile.defaults().copyWith(
+          baseUrl: server.baseUrl,
+          apiKeyRef: '',
+        ),
+      );
+
+      expect(result.syncState, 'ready');
+      expect(result.availableModels, isNotEmpty);
+      expect(server.lastAuthorization, isNull);
+    },
+  );
+
+  test(
+    'SettingsController allows anonymous LLM connection checks for localhost only',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final server = await _FakeAiGatewayServer.start(
+        expectedAuthorization: null,
+      );
+      addTearDown(server.close);
+
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-settings-ai-gateway-sync-',
+      );
+      addTearDown(() async => _deleteDirectoryBestEffort(tempDirectory));
+      final store = _createIsolatedStore(tempDirectory.path);
+      addTearDown(store.dispose);
+      final controller = SettingsController(store);
+      await controller.initialize();
+
+      final result = await controller.testAiGatewayConnection(
+        AiGatewayProfile.defaults().copyWith(
+          baseUrl: server.localhostBaseUrl,
+          apiKeyRef: '',
+        ),
+      );
+
+      expect(result.state, 'ready');
+      expect(result.modelCount, 6);
+      expect(server.lastAuthorization, isNull);
+    },
+  );
+
+  test(
+    'SettingsController rejects anonymous LLM access for non-whitelisted loopback addresses',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-settings-ai-gateway-sync-',
+      );
+      addTearDown(() async => _deleteDirectoryBestEffort(tempDirectory));
+      final store = _createIsolatedStore(tempDirectory.path);
+      addTearDown(store.dispose);
+      final controller = SettingsController(store);
+      await controller.initialize();
+
+      final result = await controller.testAiGatewayConnection(
+        AiGatewayProfile.defaults().copyWith(
+          baseUrl: 'http://127.0.0.2:11434/v1',
+          apiKeyRef: '',
+        ),
+      );
+
+      expect(result.state, 'invalid');
+      expect(result.message, 'Missing LLM API Token');
+    },
+  );
 }
 
 SecureConfigStore _createIsolatedStore(String rootPath) {
@@ -235,14 +363,15 @@ class _FakeAiGatewayServer {
   );
 
   final HttpServer _server;
-  final String expectedAuthorization;
+  final String? expectedAuthorization;
   final bool appendFooterJson;
   String? lastAuthorization;
 
   String get baseUrl => 'http://127.0.0.1:${_server.port}/v1';
+  String get localhostBaseUrl => 'http://localhost:${_server.port}/v1';
 
   static Future<_FakeAiGatewayServer> start({
-    String expectedAuthorization = 'Bearer live-inline-key',
+    String? expectedAuthorization = 'Bearer live-inline-key',
     bool appendFooterJson = false,
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

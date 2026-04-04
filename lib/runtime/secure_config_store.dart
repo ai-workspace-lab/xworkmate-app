@@ -129,6 +129,15 @@ class SecureConfigStore {
     return _secretStore.loadSecureRefs();
   }
 
+  Future<String?> loadSecretValueByRef(String refName) =>
+      _secretStore.loadSecretValueByRef(refName);
+
+  Future<void> saveSecretValueByRef(String refName, String value) =>
+      _secretStore.saveSecretValueByRef(refName, value);
+
+  Future<void> clearSecretValueByRef(String refName) =>
+      _secretStore.clearSecretValueByRef(refName);
+
   Future<String?> loadGatewayToken({int? profileIndex}) =>
       _secretStore.loadGatewayToken(profileIndex: profileIndex);
 

@@ -35,6 +35,7 @@ void main() {
                 label: 'Custom Lab',
                 badge: 'CL',
                 endpoint: 'wss://lab.example.com/acp',
+                authRef: '',
                 enabled: true,
               ),
             ],
@@ -58,7 +59,10 @@ void main() {
               .endpoint,
           'https://opencode.example.com',
         );
-        expect(decoded.externalAcpEndpointForProviderId('codex'), isNull);
+        expect(
+          decoded.externalAcpEndpointForProviderId('codex')?.providerKey,
+          startsWith('custom-agent-'),
+        );
         expect(
           decoded.externalAcpEndpoints.any(
             (item) =>
@@ -78,6 +82,7 @@ void main() {
             label: 'Claude',
             badge: 'Cl',
             endpoint: '',
+            authRef: '',
             enabled: true,
           ),
           ExternalAcpEndpointProfile(
@@ -85,6 +90,7 @@ void main() {
             label: 'Gemini',
             badge: 'G',
             endpoint: '',
+            authRef: '',
             enabled: true,
           ),
         ],
@@ -114,6 +120,7 @@ void main() {
               label: 'Claude',
               badge: 'Cl',
               endpoint: 'wss://claude.example.com/acp',
+              authRef: '',
               enabled: true,
             ),
             ExternalAcpEndpointProfile(
@@ -121,6 +128,7 @@ void main() {
               label: 'Gemini',
               badge: 'G',
               endpoint: 'wss://gemini.example.com/acp',
+              authRef: '',
               enabled: true,
             ),
           ],
@@ -146,6 +154,7 @@ void main() {
             label: 'Claude',
             badge: 'Cl',
             endpoint: '',
+            authRef: '',
             enabled: true,
           ),
           ExternalAcpEndpointProfile(
@@ -153,6 +162,7 @@ void main() {
             label: 'Gemini',
             badge: 'G',
             endpoint: '',
+            authRef: '',
             enabled: true,
           ),
         ],
@@ -196,6 +206,7 @@ void main() {
                 label: 'Claude',
                 badge: 'Cl',
                 endpoint: '',
+                authRef: '',
                 enabled: true,
               ),
             ],

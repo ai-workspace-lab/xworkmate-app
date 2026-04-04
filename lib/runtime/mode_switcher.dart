@@ -145,14 +145,10 @@ class ModeSwitcher extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final profile = GatewayConnectionProfile(
-        mode: RuntimeConnectionMode.local,
-        useSetupCode: false,
-        setupCode: '',
+      final profile = GatewayConnectionProfile.defaultsLocal().copyWith(
         host: host,
         port: port,
         tls: false,
-        selectedAgentId: '',
       );
 
       await _gateway.connectProfile(profile, authTokenOverride: token ?? '');
@@ -205,14 +201,10 @@ class ModeSwitcher extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final profile = GatewayConnectionProfile(
-        mode: RuntimeConnectionMode.remote,
-        useSetupCode: false,
-        setupCode: '',
+      final profile = GatewayConnectionProfile.defaultsRemote().copyWith(
         host: host,
         port: port,
         tls: tls,
-        selectedAgentId: '',
       );
 
       await _gateway.connectProfile(profile, authTokenOverride: token ?? '');

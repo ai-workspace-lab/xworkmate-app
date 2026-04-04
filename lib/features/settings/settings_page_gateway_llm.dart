@@ -58,8 +58,21 @@ extension SettingsPageGatewayLlmMixinInternal on SettingsPageStateInternal {
     final filteredModels = filterAiGatewayModelsInternal(
       settings.aiGateway.availableModels,
     );
+    final effectiveApiKeyRef =
+        aiGatewayApiKeyRefControllerInternal.text.trim().isEmpty
+        ? (settings.aiGateway.apiKeyRef.trim().isEmpty
+              ? 'ai_gateway_api_key'
+              : settings.aiGateway.apiKeyRef)
+        : aiGatewayApiKeyRefControllerInternal.text.trim();
     final hasStoredAiGatewayApiKey =
-        controller.settingsController.secureRefs['ai_gateway_api_key'] != null;
+        controller.settingsController.secureRefs[effectiveApiKeyRef] != null ||
+        (effectiveApiKeyRef == 'ai_gateway_api_key' &&
+            controller.settingsController.secureRefs['ai_gateway_api_key'] !=
+                null) ||
+        controller
+                .settingsController
+                .secureRefs[kAccountManagedSecretTargetAIGatewayAccessToken] !=
+            null;
     final statusTheme = aiGatewayFeedbackThemeInternal(
       context,
       aiGatewayTestMessageInternal.isEmpty
@@ -108,7 +121,7 @@ extension SettingsPageGatewayLlmMixinInternal on SettingsPageStateInternal {
           fieldKey: const ValueKey('ai-gateway-api-key-field'),
           controller: aiGatewayApiKeyControllerInternal,
           label:
-              '${appText('LLM API Token', 'LLM API Token')} (${aiGatewayApiKeyRefControllerInternal.text.trim().isEmpty ? settings.aiGateway.apiKeyRef : aiGatewayApiKeyRefControllerInternal.text.trim()})',
+              '${appText('LLM API Token', 'LLM API Token')} ($effectiveApiKeyRef)',
           hasStoredValue: hasStoredAiGatewayApiKey,
           fieldState: aiGatewayApiKeyStateInternal,
           onStateChanged: (value) =>
@@ -124,6 +137,14 @@ extension SettingsPageGatewayLlmMixinInternal on SettingsPageStateInternal {
             '输入后可直接测试，也可通过本区保存并生效提交。',
             'Test it now, or submit it with the local Save & apply action.',
           ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          appText(
+            'Token Ref 可留空。留空时回退读取 ai_gateway_api_key；仅 127.0.0.1 / localhost 允许无认证访问。',
+            'Token Ref can be empty. Empty falls back to ai_gateway_api_key, and only 127.0.0.1 / localhost may connect without auth.',
+          ),
+          style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 12),
         buildSettingsSectionActionsInternal(

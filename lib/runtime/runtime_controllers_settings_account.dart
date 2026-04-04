@@ -3,7 +3,8 @@ part of 'runtime_controllers_settings.dart';
 extension SettingsControllerAccountExtension on SettingsController {
   AccountSessionSummary? get accountSession => accountSessionInternal;
   AccountSyncState? get accountSyncState => accountSyncStateInternal;
-  AccountRemoteProfile? get accountProfile => accountSyncStateInternal?.syncedDefaults;
+  AccountRemoteProfile? get accountProfile =>
+      accountSyncStateInternal?.syncedDefaults;
   bool get accountBusy => accountBusyInternal;
   String get accountStatus => accountStatusInternal;
   bool get accountSignedIn =>
@@ -12,7 +13,12 @@ extension SettingsControllerAccountExtension on SettingsController {
   bool get accountMfaRequired =>
       pendingAccountMfaTicketInternal.trim().isNotEmpty && !accountSignedIn;
   bool get hasEffectiveAiGatewayApiKey =>
-      secureRefsInternal.containsKey('ai_gateway_api_key');
+      secureRefsInternal.containsKey(aiGatewayApiKeyRefInternal()) ||
+      (aiGatewayApiKeyRefInternal() == 'ai_gateway_api_key' &&
+          secureRefsInternal.containsKey('ai_gateway_api_key')) ||
+      secureRefsInternal.containsKey(
+        kAccountManagedSecretTargetAIGatewayAccessToken,
+      );
 
   String get effectiveAiGatewayBaseUrl {
     final local = snapshotInternal.aiGateway.baseUrl.trim();
@@ -38,11 +44,33 @@ extension SettingsControllerAccountExtension on SettingsController {
   }
 
   Future<String> loadEffectiveAiGatewayApiKey() async {
-    return (await loadAiGatewayApiKey()).trim();
+    return resolveSecretValueInternal(
+      refName: snapshotInternal.aiGateway.apiKeyRef,
+      fallbackRefName: 'ai_gateway_api_key',
+      accountTarget: kAccountManagedSecretTargetAIGatewayAccessToken,
+    );
   }
 
   Future<String> loadEffectiveGatewayToken({int? profileIndex}) async {
-    return loadGatewayToken(profileIndex: profileIndex);
+    final resolvedProfileIndex = (profileIndex ?? kGatewayRemoteProfileIndex)
+        .clamp(0, kGatewayProfileListLength - 1);
+    return resolveSecretValueInternal(
+      refName: gatewayTokenRefForProfileInternal(resolvedProfileIndex),
+      fallbackRefName: SecretStore.gatewayTokenRefKey(resolvedProfileIndex),
+      accountTarget: resolvedProfileIndex == kGatewayRemoteProfileIndex
+          ? kAccountManagedSecretTargetOpenclawGatewayToken
+          : '',
+    );
+  }
+
+  Future<String> loadEffectiveGatewayPassword({int? profileIndex}) async {
+    final resolvedProfileIndex = (profileIndex ?? kGatewayRemoteProfileIndex)
+        .clamp(0, kGatewayProfileListLength - 1);
+    return resolveSecretValueInternal(
+      refName: gatewayPasswordRefForProfileInternal(resolvedProfileIndex),
+      fallbackRefName: SecretStore.gatewayPasswordRefKey(resolvedProfileIndex),
+      allowVaultLookup: true,
+    );
   }
 
   Future<void> loginAccount({
@@ -99,7 +127,9 @@ extension SettingsControllerAccountExtension on SettingsController {
         maskedValue: effectiveAiGatewayBaseUrl.trim().isEmpty
             ? 'Not set'
             : effectiveAiGatewayBaseUrl,
-        status: accountSyncStateInternal?.syncState ?? snapshotInternal.aiGateway.syncState,
+        status:
+            accountSyncStateInternal?.syncState ??
+            snapshotInternal.aiGateway.syncState,
       ),
     ];
     return entries;
@@ -115,9 +145,8 @@ extension SettingsControllerAccountExtension on SettingsController {
     accountSessionTokenInternal =
         (await storeInternal.loadAccountSessionToken())?.trim() ?? '';
     accountSessionInternal = await storeInternal.loadAccountSessionSummary();
-    accountSyncStateInternal = await loadAccountSyncStateWithLegacyMigrationInternal(
-      this,
-    );
+    accountSyncStateInternal =
+        await loadAccountSyncStateWithLegacyMigrationInternal(this);
     if (!accountBusyInternal) {
       if (accountSignedIn) {
         final email = accountSessionInternal?.email.trim() ?? '';

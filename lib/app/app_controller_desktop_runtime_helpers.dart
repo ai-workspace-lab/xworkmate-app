@@ -624,6 +624,33 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     return uri;
   }
 
+  Future<String> resolveSingleAgentAuthorizationHeaderInternal(
+    Uri endpoint,
+  ) async {
+    final normalizedEndpoint = _normalizeExternalAcpEndpointInternal(
+      endpoint.toString(),
+    );
+    if (normalizedEndpoint == null) {
+      return '';
+    }
+    for (final profile in settings.externalAcpEndpoints) {
+      final profileEndpoint = _normalizeExternalAcpEndpointInternal(
+        profile.endpoint,
+      );
+      if (profileEndpoint == null || profileEndpoint != normalizedEndpoint) {
+        continue;
+      }
+      final authRef = profile.authRef.trim();
+      if (authRef.isEmpty) {
+        return '';
+      }
+      return settingsControllerInternal.resolveSecretValueInternal(
+        refName: authRef,
+      );
+    }
+    return '';
+  }
+
   Uri? resolveGatewayAcpEndpointInternal() {
     final target = assistantExecutionTargetForSession(
       sessionsControllerInternal.currentSessionKey,
@@ -678,12 +705,37 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     return trimmed == '127.0.0.1' || trimmed == 'localhost';
   }
 
+  String? _normalizeExternalAcpEndpointInternal(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    final candidate = trimmed.contains('://') ? trimmed : 'ws://$trimmed';
+    final uri = Uri.tryParse(candidate);
+    if (uri == null || uri.host.trim().isEmpty) {
+      return null;
+    }
+    final scheme = uri.scheme.trim().toLowerCase();
+    if (scheme != 'ws' &&
+        scheme != 'wss' &&
+        scheme != 'http' &&
+        scheme != 'https') {
+      return null;
+    }
+    final defaultPort = switch (scheme) {
+      'https' || 'wss' => 443,
+      _ => 80,
+    };
+    final port = uri.hasPort ? uri.port : defaultPort;
+    final path = uri.path.trim().isEmpty ? '/' : uri.path.trim();
+    return '$scheme://${uri.host.toLowerCase()}:$port$path';
+  }
+
   AssistantExecutionTarget assistantExecutionTargetForModeInternal(
     RuntimeConnectionMode mode,
   ) {
     return switch (mode) {
-      RuntimeConnectionMode.unconfigured =>
-        AssistantExecutionTarget.auto,
+      RuntimeConnectionMode.unconfigured => AssistantExecutionTarget.auto,
       RuntimeConnectionMode.local => AssistantExecutionTarget.local,
       RuntimeConnectionMode.remote => AssistantExecutionTarget.remote,
     };

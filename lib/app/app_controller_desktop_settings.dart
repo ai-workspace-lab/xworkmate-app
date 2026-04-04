@@ -67,30 +67,62 @@ extension AppControllerDesktopSettings on AppController {
     notifyListeners();
   }
 
+  String draftSecretRefKeyInternal(String refName) =>
+      'secret_ref::${refName.trim()}';
+
   void saveGatewayTokenDraft(String value, {required int profileIndex}) {
-    saveSecretDraftInternal(draftGatewayTokenKeyInternal(profileIndex), value);
+    saveSecretDraftInternal(
+      draftSecretRefKeyInternal(
+        settingsDraft.gatewayProfiles[profileIndex].tokenRef.trim().isEmpty
+            ? SecretStore.gatewayTokenRefKey(profileIndex)
+            : settingsDraft.gatewayProfiles[profileIndex].tokenRef,
+      ),
+      value,
+    );
   }
 
   void saveGatewayPasswordDraft(String value, {required int profileIndex}) {
     saveSecretDraftInternal(
-      draftGatewayPasswordKeyInternal(profileIndex),
+      draftSecretRefKeyInternal(
+        settingsDraft.gatewayProfiles[profileIndex].passwordRef.trim().isEmpty
+            ? SecretStore.gatewayPasswordRefKey(profileIndex)
+            : settingsDraft.gatewayProfiles[profileIndex].passwordRef,
+      ),
       value,
     );
   }
 
   void saveAiGatewayApiKeyDraft(String value) {
     saveSecretDraftInternal(
-      AppController.draftAiGatewayApiKeyKeyInternal,
+      draftSecretRefKeyInternal(
+        settingsDraft.aiGateway.apiKeyRef.trim().isEmpty
+            ? AppController.draftAiGatewayApiKeyKeyInternal
+            : settingsDraft.aiGateway.apiKeyRef,
+      ),
       value,
     );
   }
 
   void saveVaultTokenDraft(String value) {
-    saveSecretDraftInternal(AppController.draftVaultTokenKeyInternal, value);
+    saveSecretDraftInternal(
+      draftSecretRefKeyInternal(
+        settingsDraft.vault.tokenRef.trim().isEmpty
+            ? AppController.draftVaultTokenKeyInternal
+            : settingsDraft.vault.tokenRef,
+      ),
+      value,
+    );
   }
 
   void saveOllamaCloudApiKeyDraft(String value) {
-    saveSecretDraftInternal(AppController.draftOllamaApiKeyKeyInternal, value);
+    saveSecretDraftInternal(
+      draftSecretRefKeyInternal(
+        settingsDraft.ollamaCloud.apiKeyRef.trim().isEmpty
+            ? AppController.draftOllamaApiKeyKeyInternal
+            : settingsDraft.ollamaCloud.apiKeyRef,
+      ),
+      value,
+    );
   }
 
   Future<void> saveWorkspacePath(String value) async {
