@@ -307,6 +307,67 @@ XWorkmate Privacy Policy
     );
   }
 
+  void syncExternalAcpDraftControllersInternal(SettingsSnapshot settings) {
+    final activeKeys = settings.externalAcpEndpoints
+        .map((item) => item.providerKey)
+        .toSet();
+    for (final profile in settings.externalAcpEndpoints) {
+      final key = profile.providerKey;
+      final labelController = externalAcpLabelControllersInternal.putIfAbsent(
+        key,
+        () => TextEditingController(),
+      );
+      final endpointController = externalAcpEndpointControllersInternal
+          .putIfAbsent(key, () => TextEditingController());
+      syncDraftControllerValueInternal(
+        labelController,
+        profile.label,
+        syncedValue: externalAcpLabelSyncedValuesInternal[key] ?? '',
+        onSyncedValueChanged: (value) =>
+            externalAcpLabelSyncedValuesInternal[key] = value,
+      );
+      syncDraftControllerValueInternal(
+        endpointController,
+        profile.endpoint,
+        syncedValue: externalAcpEndpointSyncedValuesInternal[key] ?? '',
+        onSyncedValueChanged: (value) =>
+            externalAcpEndpointSyncedValuesInternal[key] = value,
+      );
+    }
+    disposeRemovedExternalAcpDraftsInternal(
+      externalAcpLabelControllersInternal,
+      activeKeys,
+    );
+    disposeRemovedExternalAcpDraftsInternal(
+      externalAcpEndpointControllersInternal,
+      activeKeys,
+    );
+    externalAcpLabelSyncedValuesInternal.removeWhere(
+      (key, _) => !activeKeys.contains(key),
+    );
+    externalAcpEndpointSyncedValuesInternal.removeWhere(
+      (key, _) => !activeKeys.contains(key),
+    );
+    externalAcpMessageByProviderInternal.removeWhere(
+      (key, _) => !activeKeys.contains(key),
+    );
+    externalAcpTestingProvidersInternal.removeWhere(
+      (key) => !activeKeys.contains(key),
+    );
+  }
+
+  void disposeRemovedExternalAcpDraftsInternal(
+    Map<String, TextEditingController> controllers,
+    Set<String> activeKeys,
+  ) {
+    final removedKeys = controllers.keys
+        .where((key) => !activeKeys.contains(key))
+        .toList(growable: false);
+    for (final key in removedKeys) {
+      controllers.remove(key)?.dispose();
+    }
+  }
+
   GatewayConnectionProfile selectedGatewayProfileInternal(
     SettingsSnapshot settings,
   ) {
