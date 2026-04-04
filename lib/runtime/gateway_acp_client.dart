@@ -465,6 +465,21 @@ class GatewayAcpClient {
               .value(HttpHeaders.contentTypeHeader)
               ?.toLowerCase() ??
           '';
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final body = await response.transform(utf8.decoder).join();
+        throw GatewayAcpException(
+          _describeHttpError(
+            statusCode: response.statusCode,
+            contentType: contentType,
+            body: body,
+          ),
+          code: 'ACP_HTTP_${response.statusCode}',
+          details: <String, dynamic>{
+            'statusCode': response.statusCode,
+            'contentType': contentType,
+          },
+        );
+      }
       if (contentType.contains('text/event-stream')) {
         return _consumeSseRpcResponse(
           response: response,
@@ -479,6 +494,58 @@ class GatewayAcpClient {
     } finally {
       client.close(force: true);
     }
+  }
+
+  String _describeHttpError({
+    required int statusCode,
+    required String contentType,
+    required String body,
+  }) {
+    final base = 'ACP HTTP request failed ($statusCode)';
+    final normalizedType = contentType.trim();
+    if (normalizedType.isNotEmpty &&
+        !_contentTypeLooksJsonOrSse(normalizedType)) {
+      return '$base · unexpected content type: $normalizedType';
+    }
+
+    final detail = _extractErrorDetail(body);
+    if (detail.isNotEmpty) {
+      return '$base · $detail';
+    }
+    return base;
+  }
+
+  bool _contentTypeLooksJsonOrSse(String contentType) {
+    return contentType.contains('application/json') ||
+        contentType.contains('application/problem+json') ||
+        contentType.contains('text/json') ||
+        contentType.contains('text/event-stream');
+  }
+
+  String _extractErrorDetail(String body) {
+    final trimmed = body.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+    try {
+      final decoded = _decodeMap(trimmed);
+      final error = asMap(decoded['error']);
+      return (stringValue(error['message']) ??
+              stringValue(decoded['message']) ??
+              stringValue(decoded['detail']) ??
+              '')
+          .trim();
+    } on FormatException {
+      // Fall through to textual snippet extraction below.
+    }
+
+    final singleLine = trimmed.replaceAll(RegExp(r'\s+'), ' ');
+    if (singleLine.isEmpty) {
+      return '';
+    }
+    return singleLine.length <= 160
+        ? singleLine
+        : '${singleLine.substring(0, 157)}...';
   }
 
   Future<String> _resolveAuthorizationHeader(
