@@ -260,9 +260,16 @@ extension AppControllerDesktopThreadActions on AppController {
       currentSessionKey,
       executionTarget: currentTarget,
     );
-    final workspacePath = assistantWorkspacePathForSession(
+    var workspacePath = assistantWorkspacePathForSession(
       currentSessionKey,
     ).trim();
+    if (workspacePath.isEmpty) {
+      await tryBindWorkspaceForOnlyChatFallbackInternal(
+        currentSessionKey,
+        currentTarget,
+      );
+      workspacePath = assistantWorkspacePathForSession(currentSessionKey).trim();
+    }
     if (workspacePath.isEmpty) {
       final error = StateError(
         appText(
@@ -585,5 +592,61 @@ extension AppControllerDesktopThreadActions on AppController {
       return null;
     }
     return value.isEmpty ? null : value;
+  }
+
+  Future<void> tryBindWorkspaceForOnlyChatFallbackInternal(
+    String sessionKey,
+    AssistantExecutionTarget currentTarget,
+  ) async {
+    if (currentTarget != AssistantExecutionTarget.singleAgent &&
+        currentTarget != AssistantExecutionTarget.auto) {
+      return;
+    }
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    if (!singleAgentUsesAiChatFallbackForSession(normalizedSessionKey)) {
+      return;
+    }
+    if (assistantWorkspacePathForSession(normalizedSessionKey).trim().isNotEmpty) {
+      return;
+    }
+
+    final candidateRoots = <String>{
+      settings.workspacePath.trim(),
+      Directory.current.path.trim(),
+      settings.remoteProjectRoot.trim(),
+    }.where((item) => item.isNotEmpty);
+    for (final root in candidateRoots) {
+      final threadWorkspace =
+          '${trimTrailingPathSeparatorInternal(root)}/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
+      if (!ensureLocalWorkspaceDirectoryInternal(threadWorkspace)) {
+        continue;
+      }
+      final existing = assistantThreadRecordsInternal[normalizedSessionKey];
+      upsertTaskThreadInternal(
+        normalizedSessionKey,
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: normalizedSessionKey,
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: threadWorkspace,
+          displayPath: threadWorkspace,
+          writable: existing?.workspaceBinding.writable ?? true,
+        ),
+        lifecycleState:
+            (existing?.lifecycleState ??
+                    const ThreadLifecycleState(
+                      archived: false,
+                      status: 'ready',
+                      lastRunAtMs: null,
+                      lastResultCode: null,
+                    ))
+                .copyWith(status: 'ready'),
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
+      await flushAssistantThreadPersistenceInternal();
+      recomputeTasksInternal();
+      return;
+    }
   }
 }
