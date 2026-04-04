@@ -175,11 +175,28 @@ class WebAcpClient {
       _ => 'ws',
     };
     return endpoint.replace(
-      path: '/acp',
+      pathSegments: _deriveAcpPathSegmentsInternal(endpoint),
       query: null,
       fragment: null,
       scheme: wsScheme,
     );
+  }
+
+  static List<String> _deriveAcpPathSegmentsInternal(Uri endpoint) {
+    final segments = endpoint.pathSegments
+        .where((segment) => segment.isNotEmpty)
+        .toList(growable: false);
+    final endsWithRpc =
+        segments.length >= 2 &&
+        segments[segments.length - 2] == 'acp' &&
+        segments.last == 'rpc';
+    if (endsWithRpc) {
+      return segments.sublist(0, segments.length - 1);
+    }
+    if (segments.isNotEmpty && segments.last == 'acp') {
+      return segments;
+    }
+    return <String>[...segments, 'acp'];
   }
 
   void throwIfJsonRpcErrorInternal(Map<String, dynamic> response) {

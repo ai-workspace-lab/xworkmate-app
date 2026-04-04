@@ -103,6 +103,34 @@ void main() {
       },
     );
 
+    test('preserves hosted ACP base path for websocket requests', () async {
+      final server = await _AcpFakeServer.start();
+      addTearDown(server.close);
+
+      final client = GatewayAcpClient(
+        endpointResolver: () => server.baseHttpUri.replace(path: '/opencode'),
+      );
+
+      final capabilities = await client.loadCapabilities(forceRefresh: true);
+
+      expect(capabilities.singleAgent, isTrue);
+      expect(server.lastWebSocketRequestPath, '/opencode/acp');
+    });
+
+    test('preserves hosted ACP base path for HTTP fallback requests', () async {
+      final server = await _AcpFakeServer.start(disableWebSocket: true);
+      addTearDown(server.close);
+
+      final client = GatewayAcpClient(
+        endpointResolver: () => server.baseHttpUri.replace(path: '/opencode'),
+      );
+
+      final capabilities = await client.loadCapabilities(forceRefresh: true);
+
+      expect(capabilities.singleAgent, isTrue);
+      expect(server.lastHttpRequestPath, '/opencode/acp/rpc');
+    });
+
     test(
       'streams multi-agent events and supports cancel/close session',
       () async {
@@ -163,6 +191,8 @@ class _AcpFakeServer {
   final List<String> rpcMethods = <String>[];
   String? lastWebSocketAuthorization;
   String? lastHttpAuthorization;
+  String? lastWebSocketRequestPath;
+  String? lastHttpRequestPath;
 
   Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${_server.port}');
 
@@ -189,6 +219,18 @@ class _AcpFakeServer {
       if (!disableWebSocket &&
           request.uri.path == '/acp' &&
           WebSocketTransformer.isUpgradeRequest(request)) {
+        lastWebSocketRequestPath = request.uri.path;
+        lastWebSocketAuthorization = request.headers.value(
+          HttpHeaders.authorizationHeader,
+        );
+        final socket = await WebSocketTransformer.upgrade(request);
+        unawaited(_handleWebSocket(socket));
+        continue;
+      }
+      if (!disableWebSocket &&
+          request.uri.path == '/opencode/acp' &&
+          WebSocketTransformer.isUpgradeRequest(request)) {
+        lastWebSocketRequestPath = request.uri.path;
         lastWebSocketAuthorization = request.headers.value(
           HttpHeaders.authorizationHeader,
         );
@@ -197,6 +239,12 @@ class _AcpFakeServer {
         continue;
       }
       if (request.uri.path == '/acp/rpc' && request.method == 'POST') {
+        lastHttpRequestPath = request.uri.path;
+        await _handleHttpRpc(request);
+        continue;
+      }
+      if (request.uri.path == '/opencode/acp/rpc' && request.method == 'POST') {
+        lastHttpRequestPath = request.uri.path;
         await _handleHttpRpc(request);
         continue;
       }
