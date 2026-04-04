@@ -127,6 +127,50 @@ void main() {
   );
 
   test(
+    'GatewayRuntime prefers a stored operator device token over a stored shared token on reconnect',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final store = createIsolatedTestStore();
+      final identityStore = DeviceIdentityStore(store);
+      final identity = await identityStore.loadOrCreate();
+      await store.saveGatewayToken(
+        'stored-shared-token',
+        profileIndex: kGatewayRemoteProfileIndex,
+      );
+      await store.saveDeviceToken(
+        deviceId: identity.deviceId,
+        role: 'operator',
+        token: 'stored-device-token',
+      );
+      final runtime = GatewayRuntime(
+        store: store,
+        identityStore: identityStore,
+      );
+      final server = await FakeGatewayRuntimeServerInternal.start();
+      addTearDown(runtime.dispose);
+      addTearDown(server.close);
+
+      await runtime.connectProfile(
+        GatewayConnectionProfile.defaults().copyWith(
+          mode: RuntimeConnectionMode.remote,
+          host: '127.0.0.1',
+          port: server.port,
+          tls: false,
+          useSetupCode: false,
+        ),
+        profileIndex: kGatewayRemoteProfileIndex,
+      );
+
+      expect(server.connectAuth?['token'], 'stored-device-token');
+      expect(server.connectAuth?['deviceToken'], 'stored-device-token');
+      expect(runtime.snapshot.connectAuthMode, 'device-token');
+      expect(runtime.snapshot.connectAuthSources, const <String>[
+        'device:store',
+      ]);
+    },
+  );
+
+  test(
     'GatewayRuntime persists returned device token and applies go-core session notifications',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
