@@ -443,6 +443,65 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         );
       },
     );
+
+    test(
+      'AppController auto-binds a thread workspace in AI Chat fallback when workspace root is missing',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-single-agent-fallback-missing-workspace-',
+        );
+        final server = await FakeAiGatewayServerInternal.start(
+          responseMode: AiGatewayResponseModeInternal.json,
+        );
+        addTearDown(() async {
+          await server.close();
+        });
+
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+        final client = FallbackOnlyGoAgentCoreClientInternal();
+        final controller = await createAppControllerInternal(
+          store: store,
+          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+          goAgentCoreClient: client,
+        );
+
+        await controller.settingsController.saveAiGatewayApiKey('live-key');
+        await controller.saveSettings(
+          controller.settings.copyWith(
+            workspacePath: '',
+            aiGateway: controller.settings.aiGateway.copyWith(
+              baseUrl: server.baseUrl,
+              availableModels: const <String>['moonshotai/kimi-k2.5'],
+              selectedModels: const <String>['moonshotai/kimi-k2.5'],
+            ),
+            defaultModel: 'moonshotai/kimi-k2.5',
+          ),
+          refreshAfterSave: false,
+        );
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.singleAgent,
+        );
+        await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
+
+        await controller.sendChatMessage('你好', thinking: 'low');
+
+        final workspacePath = controller.assistantWorkspacePathForSession(
+          controller.currentSessionKey,
+        );
+        expect(client.capabilitiesCalls, greaterThanOrEqualTo(1));
+        expect(client.executeCalls, 0);
+        expect(server.requestCount, 1);
+        expect(workspacePath, isNotEmpty);
+        expect(
+          workspacePath,
+          contains('.xworkmate/threads/'),
+        );
+      },
+    );
   });
 
   group('Single Agent workspace resolution', () {
