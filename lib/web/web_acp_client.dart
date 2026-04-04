@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../runtime/acp_endpoint_paths.dart';
 import '../runtime/runtime_models.dart';
 
 class WebAcpException implements Exception {
@@ -166,20 +167,7 @@ class WebAcpClient {
   }
 
   static Uri? resolveWebSocketEndpointInternal(Uri? endpoint) {
-    if (endpoint == null || endpoint.host.trim().isEmpty) {
-      return null;
-    }
-    final scheme = endpoint.scheme.trim().toLowerCase();
-    final wsScheme = switch (scheme) {
-      'https' || 'wss' => 'wss',
-      _ => 'ws',
-    };
-    return endpoint.replace(
-      path: '/acp',
-      query: null,
-      fragment: null,
-      scheme: wsScheme,
-    );
+    return resolveAcpWebSocketEndpoint(endpoint);
   }
 
   void throwIfJsonRpcErrorInternal(Map<String, dynamic> response) {
