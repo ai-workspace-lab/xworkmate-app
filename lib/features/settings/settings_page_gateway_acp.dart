@@ -11,6 +11,46 @@ import 'settings_page_core.dart';
 import 'settings_page_support.dart';
 import 'settings_page_widgets.dart';
 
+String externalAcpEndpointExamplesText() {
+  return appText(
+    '推荐：托管服务优先填写 https://agent.example.com 这类基地址；应用会自动派生 /acp 与 /acp/rpc。仅在直连原始 ACP WebSocket 监听器时使用 ws://127.0.0.1:9001 或 wss://agent.example.com/acp。AUTH 填 secret ref 名；为空时不发送 Authorization。',
+    'Recommended: for hosted services, enter a base URL such as https://agent.example.com. The app derives /acp and /acp/rpc automatically. Use ws://127.0.0.1:9001 or wss://agent.example.com/acp only when connecting to a raw ACP WebSocket listener directly. AUTH stores a secret ref name; leave it empty to omit Authorization.',
+  );
+}
+
+String describeExternalAcpTestFailure(Object error, {Uri? endpoint}) {
+  final raw = error.toString().trim();
+  final lowered = raw.toLowerCase();
+  final scheme = endpoint?.scheme.trim().toLowerCase() ?? '';
+
+  if (raw.contains('ACP_HTTP_ENDPOINT_MISSING')) {
+    return appText(
+      '连接失败：当前地址是 WebSocket 地址，无法回退到 HTTP ACP RPC。托管服务通常应填写 https://host[:port] 基地址；只有在直连原始 ACP WebSocket 监听器时才使用 ws:// 或 wss://。',
+      'Connection failed: the current address is a WebSocket URL, so HTTP ACP RPC fallback is unavailable. Hosted services should usually use a base URL like https://host[:port]. Use ws:// or wss:// only for a direct raw ACP WebSocket listener.',
+    );
+  }
+
+  if (raw.contains('Missing JSON document')) {
+    return appText(
+      scheme == 'http' || scheme == 'https'
+          ? '连接失败：已访问 /acp/rpc，但服务端返回的不是 ACP JSON 响应。请确认该地址提供了 HTTP ACP bridge，而不是只暴露网页或仅支持 WebSocket。'
+          : '连接失败：服务端返回的不是 ACP JSON 响应。请确认该地址是有效的 ACP 入口。',
+      scheme == 'http' || scheme == 'https'
+          ? 'Connection failed: /acp/rpc responded, but it did not return ACP JSON. Confirm that this address exposes an HTTP ACP bridge instead of only a webpage or a websocket-only endpoint.'
+          : 'Connection failed: the endpoint did not return ACP JSON. Confirm that this is a valid ACP endpoint.',
+    );
+  }
+
+  if (lowered.contains('403')) {
+    return appText(
+      '连接被拒绝（403）。请检查该服务是否允许当前客户端来源访问，并确认 AUTH 引用或服务端鉴权配置是否正确。',
+      'Connection was rejected (403). Check whether the service allows this client origin and whether the AUTH ref or server-side auth configuration is correct.',
+    );
+  }
+
+  return raw;
+}
+
 extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
   Widget buildExternalAcpEndpointManagerInternal(
     BuildContext context,
@@ -137,6 +177,10 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
             controller: endpointController,
             decoration: InputDecoration(
               labelText: appText('ACP Server Endpoint', 'ACP Server Endpoint'),
+              hintText: appText(
+                'https://agent.example.com',
+                'https://agent.example.com',
+              ),
             ),
             onChanged: (_) => setStateInternal(() {}),
           ),
@@ -150,10 +194,7 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
             onChanged: (_) => setStateInternal(() {}),
           ),
           Text(
-            appText(
-              '示例：ws://127.0.0.1:9001、wss://acp.example.com/rpc、http://127.0.0.1:8080、https://agent.example.com。AUTH 填 secret ref 名；为空时不发送 Authorization。',
-              'Examples: ws://127.0.0.1:9001, wss://acp.example.com/rpc, http://127.0.0.1:8080, https://agent.example.com. AUTH stores a secret ref name; leave it empty to omit Authorization.',
-            ),
+            externalAcpEndpointExamplesText(),
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 12),
@@ -285,7 +326,8 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
         return;
       }
       setStateInternal(() {
-        externalAcpMessageByProviderInternal[providerKey] = '$error';
+        externalAcpMessageByProviderInternal[providerKey] =
+            describeExternalAcpTestFailure(error, endpoint: endpoint);
       });
     } finally {
       if (mounted) {
@@ -365,7 +407,7 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
                         ),
                         controller: endpointController,
                         decoration: InputDecoration(
-                          hintText: 'ws://127.0.0.1:9001',
+                          hintText: 'https://agent.example.com',
                           errorText: attemptedSubmit && endpoint.isEmpty
                               ? appText(
                                   '请输入 ACP Server Endpoint。',
@@ -383,8 +425,8 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
                       const SizedBox(height: 8),
                       Text(
                         appText(
-                          '支持协议：ws、wss、http、https。新增后会出现在下方列表，并和助手页的 provider 菜单保持一致。',
-                          'Supported schemes: ws, wss, http, https. The new entry appears in the list below and stays aligned with the assistant provider menu.',
+                          '支持协议：ws、wss、http、https。托管服务推荐填写 https://host[:port] 基地址；只有在直连原始 ACP WebSocket 监听器时才使用 ws / wss。',
+                          'Supported schemes: ws, wss, http, https. For hosted services, prefer a base URL like https://host[:port]. Use ws / wss only when connecting to a raw ACP WebSocket listener directly.',
                         ),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
