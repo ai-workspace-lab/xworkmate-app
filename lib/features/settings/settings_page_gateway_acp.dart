@@ -48,6 +48,16 @@ String describeExternalAcpTestFailure(Object error, {Uri? endpoint}) {
     );
   }
 
+  if (lowered.contains('handshakeexception') ||
+      lowered.contains('tlsv1_alert_internal_error') ||
+      lowered.contains('ssl alert number 80') ||
+      lowered.contains('tls handshake failed')) {
+    return appText(
+      'TLS 握手失败。当前更像是服务端 HTTPS/TLS 配置异常，而不是 ACP JSON-RPC 本身报错。请先用 curl 或 openssl 直接探测该域名；如果基地址带子路径，应用会自动派生到该子路径下的 /acp 与 /acp/rpc。',
+      'TLS handshake failed. This looks more like a server-side HTTPS/TLS configuration issue than an ACP JSON-RPC failure. Probe the host directly with curl or openssl first; if the base URL includes a subpath, the app derives /acp and /acp/rpc under that subpath automatically.',
+    );
+  }
+
   return raw;
 }
 
