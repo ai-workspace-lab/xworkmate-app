@@ -307,18 +307,46 @@ class GatewayAcpClient {
     Uri? endpointOverride,
     String authorizationOverride = '',
   }) async {
+    final resolvedEndpoint = endpointOverride ?? endpointResolver();
+    final scheme = resolvedEndpoint?.scheme.trim().toLowerCase() ?? '';
+    final canUseHttp = resolveAcpHttpRpcEndpoint(resolvedEndpoint) != null;
+
+    if (scheme == 'http' || scheme == 'https') {
+      try {
+        return await _requestViaHttp(
+          request,
+          onNotification: onNotification,
+          endpointOverride: resolvedEndpoint,
+          authorizationOverride: authorizationOverride,
+        );
+      } catch (error) {
+        if (error is GatewayAcpException) {
+          rethrow;
+        }
+        return _requestViaWebSocket(
+          request,
+          onNotification: onNotification,
+          endpointOverride: resolvedEndpoint,
+          authorizationOverride: authorizationOverride,
+        );
+      }
+    }
+
     try {
       return await _requestViaWebSocket(
         request,
         onNotification: onNotification,
-        endpointOverride: endpointOverride,
+        endpointOverride: resolvedEndpoint,
         authorizationOverride: authorizationOverride,
       );
     } catch (_) {
+      if (!canUseHttp) {
+        rethrow;
+      }
       return _requestViaHttp(
         request,
         onNotification: onNotification,
-        endpointOverride: endpointOverride,
+        endpointOverride: resolvedEndpoint,
         authorizationOverride: authorizationOverride,
       );
     }
