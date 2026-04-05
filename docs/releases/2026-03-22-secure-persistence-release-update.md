@@ -113,5 +113,4 @@
 
 ## 相关文档
 
-- [Secure Local Persistence Architecture](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/architecture/secure-local-persistence-architecture.md)
-- [Secure Local Persistence Postmortem](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/cases/secure-local-persistence-postmortem.md)
+- [Secure Local Persistence Architecture](../architecture/secure-local-persistence-architecture.md)
