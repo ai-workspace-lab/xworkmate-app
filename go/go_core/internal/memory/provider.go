@@ -17,6 +17,7 @@ type Preferences struct {
 	PreferredRoute  string
 	PreferredModel  string
 	PreferredSkills []string
+	Provider        string
 }
 
 type LoadResult struct {
@@ -91,28 +92,37 @@ func (s Service) RecordSuccess(workingDirectory string, entry SuccessEntry) erro
 	if projectName == "" {
 		return nil
 	}
-	targets := []string{
-		filepath.Join(s.HomeDir, "self-improving", "projects", projectName+".md"),
-		filepath.Join(workingDirectory, ".xworkmate", "memory.md"),
+	target := s.projectWriteTarget(workingDirectory, projectName)
+	if target == "" {
+		return nil
 	}
 	block := formatSuccessEntry(entry)
-	for _, target := range targets {
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return err
-		}
-		file, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-		if err != nil {
-			return err
-		}
-		if _, err := file.WriteString(block); err != nil {
-			_ = file.Close()
-			return err
-		}
-		if err := file.Close(); err != nil {
-			return err
-		}
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := file.WriteString(block); err != nil {
+		_ = file.Close()
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
 	}
 	return nil
+}
+
+func (s Service) projectWriteTarget(
+	workingDirectory string,
+	projectName string,
+) string {
+	repoLocalDir := filepath.Join(workingDirectory, ".xworkmate")
+	if err := os.MkdirAll(repoLocalDir, 0o755); err == nil {
+		return filepath.Join(repoLocalDir, "memory.md")
+	}
+	return filepath.Join(s.HomeDir, "self-improving", "projects", projectName+".md")
 }
 
 func formatSuccessEntry(entry SuccessEntry) string {
@@ -162,6 +172,8 @@ func parsePreferences(text string) Preferences {
 					prefs.PreferredSkills = append(prefs.PreferredSkills, value)
 				}
 			}
+		case strings.HasPrefix(strings.ToLower(trimmed), "provider:"):
+			prefs.Provider = strings.TrimSpace(strings.TrimPrefix(trimmed, "provider:"))
 		}
 	}
 	return prefs
@@ -176,6 +188,9 @@ func mergePreferences(dst *Preferences, src Preferences) {
 	}
 	if len(src.PreferredSkills) > 0 {
 		dst.PreferredSkills = append([]string(nil), src.PreferredSkills...)
+	}
+	if strings.TrimSpace(src.Provider) != "" {
+		dst.Provider = strings.TrimSpace(src.Provider)
 	}
 }
 
@@ -192,7 +207,8 @@ func sanitizeMemoryText(text string) string {
 			strings.Contains(normalized, "password") ||
 			strings.Contains(normalized, "secret") ||
 			strings.Contains(normalized, "api_key") ||
-			strings.Contains(normalized, "apikey") {
+			strings.Contains(normalized, "apikey") ||
+			strings.Contains(normalized, "api key") {
 			continue
 		}
 		filtered = append(filtered, line)

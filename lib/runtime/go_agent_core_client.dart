@@ -20,6 +20,32 @@ class GoAgentCoreCapabilities {
   final Map<String, dynamic> raw;
 }
 
+class GoAgentCoreSyncedProvider {
+  const GoAgentCoreSyncedProvider({
+    required this.providerId,
+    required this.label,
+    required this.endpoint,
+    required this.authorizationHeader,
+    required this.enabled,
+  });
+
+  final String providerId;
+  final String label;
+  final String endpoint;
+  final String authorizationHeader;
+  final bool enabled;
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'providerId': providerId.trim(),
+      'label': label.trim(),
+      'endpoint': endpoint.trim(),
+      'authorizationHeader': authorizationHeader.trim(),
+      'enabled': enabled,
+    };
+  }
+}
+
 enum GoAgentCoreRoutingMode { auto, explicit }
 
 class GoAgentCoreAvailableSkill {
@@ -55,6 +81,7 @@ class GoAgentCoreRoutingConfig {
     required this.explicitSkills,
     required this.allowSkillInstall,
     required this.availableSkills,
+    this.installApproval,
   });
 
   const GoAgentCoreRoutingConfig.auto({
@@ -65,7 +92,8 @@ class GoAgentCoreRoutingConfig {
        explicitProviderId = '',
        explicitModel = '',
        explicitSkills = const <String>[],
-       allowSkillInstall = false;
+       allowSkillInstall = false,
+       installApproval = null;
 
   final GoAgentCoreRoutingMode mode;
   final String preferredGatewayTarget;
@@ -75,6 +103,7 @@ class GoAgentCoreRoutingConfig {
   final List<String> explicitSkills;
   final bool allowSkillInstall;
   final List<GoAgentCoreAvailableSkill> availableSkills;
+  final GoAgentCoreSkillInstallApproval? installApproval;
 
   bool get isAuto => mode == GoAgentCoreRoutingMode.auto;
 
@@ -96,6 +125,27 @@ class GoAgentCoreRoutingConfig {
       'allowSkillInstall': allowSkillInstall,
       'availableSkills': availableSkills
           .map((item) => item.toJson())
+          .toList(growable: false),
+      if (installApproval != null) 'installApproval': installApproval!.toJson(),
+    };
+  }
+}
+
+class GoAgentCoreSkillInstallApproval {
+  const GoAgentCoreSkillInstallApproval({
+    required this.requestId,
+    required this.approvedSkillKeys,
+  });
+
+  final String requestId;
+  final List<String> approvedSkillKeys;
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'requestId': requestId.trim(),
+      'approvedSkillKeys': approvedSkillKeys
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
           .toList(growable: false),
     };
   }
@@ -168,7 +218,11 @@ class GoAgentCoreSessionRequest {
 
   bool get hasInlineAttachments => inlineAttachments.isNotEmpty;
 
+  GoAgentCoreRoutingConfig get effectiveRouting =>
+      routing ?? _synthesizedRouting();
+
   Map<String, dynamic> toAcpParams() {
+    final resolvedRouting = effectiveRouting;
     final params = <String, dynamic>{
       'sessionId': sessionId,
       'threadId': threadId,
@@ -210,7 +264,7 @@ class GoAgentCoreSessionRequest {
         'aiGatewayBaseUrl': aiGatewayBaseUrl.trim(),
       if (aiGatewayApiKey.trim().isNotEmpty)
         'aiGatewayApiKey': aiGatewayApiKey.trim(),
-      if (routing != null) 'routing': routing!.toJson(),
+      'routing': resolvedRouting.toJson(),
       if (_usesGatewaySessionMode(mode)) ...<String, dynamic>{
         'executionTarget': target.promptValue,
         if (agentId.trim().isNotEmpty) 'agentId': agentId.trim(),
@@ -218,6 +272,47 @@ class GoAgentCoreSessionRequest {
       },
     };
     return params;
+  }
+
+  GoAgentCoreRoutingConfig _synthesizedRouting() {
+    final preferredGatewayTarget = switch (target) {
+      AssistantExecutionTarget.remote => 'remote',
+      _ => 'local',
+    };
+    final explicitExecutionTarget = switch (target) {
+      AssistantExecutionTarget.local => 'local',
+      AssistantExecutionTarget.remote => 'remote',
+      AssistantExecutionTarget.singleAgent => 'singleAgent',
+      AssistantExecutionTarget.auto => '',
+    };
+    final explicitProviderId = provider == SingleAgentProvider.auto
+        ? ''
+        : provider.providerId;
+    final explicitModelValue = model.trim();
+    final explicitSkillsValue = selectedSkills
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+    final hasExplicitSelection =
+        explicitExecutionTarget.isNotEmpty ||
+        explicitProviderId.isNotEmpty ||
+        explicitModelValue.isNotEmpty ||
+        explicitSkillsValue.isNotEmpty;
+    if (!hasExplicitSelection) {
+      return GoAgentCoreRoutingConfig.auto(
+        preferredGatewayTarget: preferredGatewayTarget,
+      );
+    }
+    return GoAgentCoreRoutingConfig(
+      mode: GoAgentCoreRoutingMode.explicit,
+      preferredGatewayTarget: preferredGatewayTarget,
+      explicitExecutionTarget: explicitExecutionTarget,
+      explicitProviderId: explicitProviderId,
+      explicitModel: explicitModelValue,
+      explicitSkills: explicitSkillsValue,
+      allowSkillInstall: false,
+      availableSkills: const <GoAgentCoreAvailableSkill>[],
+    );
   }
 }
 
@@ -302,6 +397,15 @@ class GoAgentCoreRunResult {
 
   bool get needsSkillInstall => _boolValue(raw['needsSkillInstall']) ?? false;
 
+  String get skillInstallRequestId =>
+      raw['skillInstallRequestId']?.toString().trim() ?? '';
+
+  List<Map<String, dynamic>> get skillCandidates =>
+      _castMapList(raw['skillCandidates']);
+
+  List<Map<String, dynamic>> get memorySources =>
+      _castMapList(raw['memorySources']);
+
   WorkspaceRefKind? get resolvedWorkspaceRefKind {
     final rawValue = raw['resolvedWorkspaceRefKind']?.toString().trim() ?? '';
     if (rawValue.isEmpty) {
@@ -312,6 +416,8 @@ class GoAgentCoreRunResult {
 }
 
 abstract class GoAgentCoreClient {
+  Future<void> syncProviders(List<GoAgentCoreSyncedProvider> providers);
+
   Future<GoAgentCoreCapabilities> loadCapabilities({
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
@@ -465,4 +571,14 @@ bool? _boolValue(Object? raw) {
     return false;
   }
   return null;
+}
+
+List<Map<String, dynamic>> _castMapList(Object? raw) {
+  if (raw is! List) {
+    return const <Map<String, dynamic>>[];
+  }
+  return raw
+      .map((item) => _castMap(item))
+      .where((item) => item.isNotEmpty)
+      .toList(growable: false);
 }

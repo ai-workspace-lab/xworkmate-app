@@ -72,11 +72,38 @@ func TestResolveFallsBackToFindSkillsCandidates(t *testing.T) {
 }
 
 func TestResolveInstallsMissingSkillsWhenAuthorized(t *testing.T) {
+	initial := Resolve(
+		ResolveRequest{
+			Prompt:            "translate and dub this video with subtitles",
+			AvailableSkills:   []Candidate{{ID: "docx", Label: "docx", Installed: true}},
+			AllowSkillInstall: true,
+		},
+		fakeFinder{
+			{ID: "video-translator", Label: "video-translator", Installed: false},
+		},
+		fakeInstaller{
+			installed: []Candidate{
+				{ID: "video-translator", Label: "video-translator", Installed: true},
+			},
+		},
+	)
+
+	if !initial.NeedsInstall {
+		t.Fatalf("expected install approval flow to pause first, got %#v", initial)
+	}
+	if initial.InstallRequestID == "" {
+		t.Fatalf("expected install request id, got %#v", initial)
+	}
+
 	result := Resolve(
 		ResolveRequest{
 			Prompt:            "translate and dub this video with subtitles",
 			AvailableSkills:   []Candidate{{ID: "docx", Label: "docx", Installed: true}},
 			AllowSkillInstall: true,
+			InstallApproval: InstallApproval{
+				RequestID:         initial.InstallRequestID,
+				ApprovedSkillKeys: []string{"video-translator"},
+			},
 		},
 		fakeFinder{
 			{ID: "video-translator", Label: "video-translator", Installed: false},
