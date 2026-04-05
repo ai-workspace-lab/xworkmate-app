@@ -136,6 +136,9 @@ class FakeGoAgentCoreClientInternal implements GoAgentCoreClient {
       <GoAgentCoreSessionRequest>[];
 
   @override
+  Future<void> syncProviders(List<GoAgentCoreSyncedProvider> providers) async {}
+
+  @override
   Future<GoAgentCoreCapabilities> loadCapabilities({
     required AssistantExecutionTarget target,
     bool forceRefresh = false,

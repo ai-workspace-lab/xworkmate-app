@@ -45,6 +45,8 @@ import 'app_controller_desktop_workspace_execution.dart';
 import 'app_controller_desktop_settings_runtime.dart';
 import 'app_controller_desktop_thread_storage.dart';
 import 'app_controller_desktop_skill_permissions.dart';
+import 'app_controller_desktop_go_agent_core_routing.dart';
+import 'app_controller_desktop_runtime_helpers.dart';
 
 Future<void> refreshAcpCapabilitiesRuntimeInternal(
   AppController controller, {
@@ -82,6 +84,7 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
   AppController controller, {
   bool forceRefresh = false,
 }) async {
+  await controller.syncGoAgentCoreProvidersInternal();
   final capabilities = await controller.goAgentCoreClientInternal
       .loadCapabilities(
         target: AssistantExecutionTarget.singleAgent,

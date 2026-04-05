@@ -315,6 +315,11 @@ class AppController extends ChangeNotifier {
       <String, String>{};
   final Map<String, String> singleAgentRuntimeModelBySessionInternal =
       <String, String>{};
+  final Map<String, Map<String, dynamic>>
+  latestRoutingResolutionBySessionInternal =
+      <String, Map<String, dynamic>>{};
+  final Map<String, GoAgentCoreSyncedProvider> syncedGoAgentProvidersInternal =
+      <String, GoAgentCoreSyncedProvider>{};
   final DesktopThreadArtifactService threadArtifactServiceInternal =
       DesktopThreadArtifactService();
   List<AssistantThreadSkillEntry> singleAgentSharedImportedSkillsInternal =
