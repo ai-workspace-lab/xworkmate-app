@@ -4,10 +4,33 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"xworkmate/go_core/internal/shared"
 )
+
+func TestCapabilitiesIgnoreLocalProviderAutodetectUntilSync(t *testing.T) {
+	fakeProvider := t.TempDir() + "/fake-claude"
+	if err := os.WriteFile(fakeProvider, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake provider: %v", err)
+	}
+	t.Setenv("ACP_CLAUDE_BIN", fakeProvider)
+
+	server := NewServer()
+	result, rpcErr := server.handleRequest(shared.RPCRequest{
+		Method: "acp.capabilities",
+		Params: map[string]any{},
+	}, func(map[string]any) {})
+	if rpcErr != nil {
+		t.Fatalf("expected capabilities success, got %v", rpcErr)
+	}
+
+	providers, _ := result["providers"].([]string)
+	if len(providers) != 0 {
+		t.Fatalf("expected no providers before sync, got %#v", providers)
+	}
+}
 
 func TestProvidersSyncUpdatesCapabilities(t *testing.T) {
 	server := NewServer()
