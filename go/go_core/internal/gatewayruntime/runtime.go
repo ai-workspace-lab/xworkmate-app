@@ -163,6 +163,27 @@ func (m *Manager) Request(
 	return current.request(method, params, timeout)
 }
 
+func (m *Manager) RequestByMode(
+	mode string,
+	method string,
+	params map[string]any,
+	timeout time.Duration,
+	notify func(map[string]any),
+) RequestResult {
+	current := m.lookupConnectedByMode(mode)
+	if current == nil {
+		return RequestResult{
+			OK: false,
+			Error: (&GatewayError{
+				Message: "gateway not connected",
+				Code:    "OFFLINE",
+			}).Map(),
+		}
+	}
+	current.setNotify(notify)
+	return current.request(method, params, timeout)
+}
+
 func (m *Manager) Disconnect(runtimeID string, notify func(map[string]any)) {
 	current := m.lookup(runtimeID)
 	if current == nil {
@@ -176,6 +197,25 @@ func (m *Manager) lookup(runtimeID string) *session {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.sessions[strings.TrimSpace(runtimeID)]
+}
+
+func (m *Manager) lookupConnectedByMode(mode string) *session {
+	normalizedMode := strings.TrimSpace(mode)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, current := range m.sessions {
+		if current == nil {
+			continue
+		}
+		current.mu.Lock()
+		connected := current.snapshot.Status == "connected"
+		currentMode := current.snapshot.Mode
+		current.mu.Unlock()
+		if connected && strings.TrimSpace(currentMode) == normalizedMode {
+			return current
+		}
+	}
+	return nil
 }
 
 type session struct {
