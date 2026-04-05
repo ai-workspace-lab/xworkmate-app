@@ -1,6 +1,6 @@
 # XWorkmate 测试规范模板与指南
 
-> 适用范围: `xworkmate.svc.plus`
+> 适用范围: `XWorkmate`
 > 目的: 提供可直接套用的验收写法，方便快速产出单次测试记录。
 
 ## 1. 这份文档的角色
@@ -104,5 +104,7 @@
 
 可参考现有验收文档：
 
-- `docs/releases/2026-03-23-single-agent-test-acceptance.md`
+- `docs/reports/2026-03-23-single-agent-test-acceptance.md`
 - 正式规范: `docs/quality/xworkmate-test-spec.md`
+- 长期自动化规划: `docs/testing/core-integration-auto-test-plan.md`
+- 长期手动 case: `docs/cases/core-integration-manual-cases.md`
