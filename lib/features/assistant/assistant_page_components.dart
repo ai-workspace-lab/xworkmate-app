@@ -484,6 +484,8 @@ class AssistantEmptyStateInternal extends StatelessWidget {
     final theme = Theme.of(context);
     final connectionState = controller.currentAssistantConnectionState;
     final singleAgent = connectionState.isSingleAgent;
+    final autoMode =
+        connectionState.executionTarget == AssistantExecutionTarget.auto;
     final connected = connectionState.connected;
     final singleAgentFallback = controller.currentSingleAgentUsesAiChatFallback;
     final singleAgentNeedsAiGateway =
@@ -493,7 +495,11 @@ class AssistantEmptyStateInternal extends StatelessWidget {
     final providerLabel = controller.currentSingleAgentProvider.label;
     final reconnectAvailable = controller.canQuickConnectGateway;
     final title = singleAgent
-        ? connected
+        ? autoMode
+              ? connected
+                    ? appText('开始对话或运行任务', 'Start a chat or run a task')
+                    : appText('先准备 Auto 路由', 'Prepare Auto routing first')
+              : connected
               ? appText('开始单机智能体任务', 'Start a single-agent task')
               : singleAgentNeedsAiGateway
               ? appText('先配置 LLM API', 'Configure LLM API first')
@@ -504,7 +510,17 @@ class AssistantEmptyStateInternal extends StatelessWidget {
         ? appText('Gateway 连接失败', 'Gateway connection failed')
         : appText('先连接 Gateway', 'Connect a gateway first');
     final description = singleAgent
-        ? connected
+        ? autoMode
+              ? connected
+                    ? appText(
+                        '输入需求后会自动选择可用执行方式，并把结果回写到当前会话。',
+                        'Type a request and XWorkmate will choose an available execution route automatically, then return results to this session.',
+                      )
+                    : appText(
+                        'Auto 当前还没有可用执行方式。请先配置任一外部 Agent ACP 端点、连接 Gateway，或配置 LLM API fallback。',
+                        'Auto currently has no available execution route. Configure an external Agent ACP endpoint, connect a Gateway, or configure LLM API fallback.',
+                      )
+              : connected
               ? (singleAgentFallback
                     ? appText(
                         '当前没有可用的外部 Agent ACP 连接，这个线程已降级到 AI Chat fallback，不会建立 OpenClaw Gateway 会话。',
