@@ -1,42 +1,27 @@
-# Multi-Agent Cases
+# 核心集成测试 Cases
 
-这组案例用于手动验证 `XWorkmate` 当前的多 Agent 协作链路，覆盖：
+`docs/cases/` 只保留当前项目主线需要长期维护的手动集成用例，不再承载旧的多 Agent / ARIS / 外部桥接历史 case。
 
-- `单机智能体`
-- `本地 OpenClaw Gateway`
-- `远程 OpenClaw Gateway`
-- `ARIS + 本地 Ollama`
-- `Architect / Engineer / Tester`
-- `Go core reviewer`
-- `外部 Agent CLI / JSON-RPC session`
+## 当前入口
 
-## 推荐验证顺序
+- [核心功能集成测试手动 Case](./core-integration-manual-cases.md)
 
-1. [ARIS 本地 Ollama 功能交付](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/cases/aris_local_ollama_feature_delivery.md)
-2. [ARIS 缺陷修复与审阅循环](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/cases/aris_bugfix_review_loop.md)
-3. [外部 Agent CLI Bridge 会话](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/cases/external_agent_bridge_session.md)
-4. [模式切换与线程连续追问](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/cases/thread_mode_switch_followup.md)
-5. [Intent Router + Skill Resolver + Memory Injector 典型用例](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/cases/intent_router_skill_memory_typical_cases.md)
+## 配套文档
 
-## 相关设计文档
+- [核心功能集成测试自动化规划](../testing/core-integration-auto-test-plan.md)
+- [XWorkmate 测试规范模板与指南](../testing/xworkmate-test-spec.md)
+- [XWorkmate 测试规范](../quality/xworkmate-test-spec.md)
 
-- [Assistant 任务线程信息架构](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate.svc.plus/docs/architecture/assistant-thread-information-architecture.md)
+## 使用建议
 
-## 你应该重点观察的点
+推荐顺序：
 
-- Assistant 仍复用现有输入框、附件、技能和当前线程
-- `ARIS` 模式下会显示框架状态，但不会改变主布局
-- 协作任务应按 `Architect -> Engineer -> Tester` 顺序推进
-- 本地 Ollama 可用时，即便缺失部分云端 CLI，也应能退化运行
-- 线程应可继续追问，不是一答即结束
-- 任务列表仍保持极简，只显示名称、时间、归档
-- `llm-chat` 和 `claude-review` 由 Go core 驱动，不依赖 `go run`
+1. 先看自动化规划，确认当前能力树与测试落点
+2. 再按手动 Case 执行设置页与任务线程验证
+3. 执行后把证据记录回具体测试单或验收报告
 
-## 建议记录项
+## 维护边界
 
-- 当前使用的框架：`原生` 或 `ARIS`
-- 当前执行模式：`单机智能体` / `本地 OpenClaw Gateway` / `远程 OpenClaw Gateway`
-- 参与角色的 CLI 组合
-- 是否看到流式输出
-- 是否发生自动回退
-- 最终是否能继续在同一线程追问
+- 这里不再新增历史回溯型 postmortem 或旧架构演示 case
+- 与当前主线不匹配的多 Agent / ARIS / 外部 CLI bridge 案例已移除
+- 如果新增长期手动用例，必须挂到当前“设置页配置”或“任务线程”能力树下
