@@ -144,21 +144,11 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final existing =
-        assistantThreadRecordsInternal[normalizedSessionKey]
+    return assistantThreadRecordsInternal[normalizedSessionKey]
             ?.workspaceBinding
             .workspacePath
             .trim() ??
         '';
-    if (existing.isNotEmpty) {
-      return existing;
-    }
-    final target = assistantExecutionTargetForSession(normalizedSessionKey);
-    if (target == AssistantExecutionTarget.singleAgent ||
-        target == AssistantExecutionTarget.auto) {
-      return localThreadWorkspacePathInternal(normalizedSessionKey);
-    }
-    return '';
   }
 
   WorkspaceRefKind assistantWorkspaceKindForSession(String sessionKey) {

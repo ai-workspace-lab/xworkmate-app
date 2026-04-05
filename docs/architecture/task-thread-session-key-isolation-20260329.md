@@ -27,7 +27,7 @@ currentSessionKey
 这条链路说明：
 
 1. 真正决定执行目录的是 `sessionKey`
-2. `workspace_root` 文本上下文本身不会自动进入线程绑定
+2. `workspace_root` 文本上下文本身不会创建 first binding
 3. 空 `sessionKey` 会被归一为 `main`
 4. 一旦多个任务线没有真正切换到独立 `sessionKey`，它们就会共享 `main`
 
@@ -51,7 +51,7 @@ currentSessionKey
 3. `TaskThread.threadId` 就是该任务线的 `sessionKey`。
 4. 任何可触发执行的入口都不得在空 `sessionKey` 下运行。
 5. 对非主线程任务线，禁止 silent fallback 到 `main`。
-6. `workspace_root` 不是线程身份；它最多只能作为该线程 `workspaceBinding` 的输入之一。
+6. `workspace_root` 不是线程身份；它只能更新当前已存在线程的 `workspaceBinding`，不能创建 first binding。
 
 换句话说：
 
@@ -146,7 +146,7 @@ request.workingDirectory == current TaskThread.workspaceBinding.workspacePath
 
 - 空 `sessionKey -> main` 只允许用于真正的主线程初始化阶段
 - 非主线程任务线若缺少 `sessionKey`，状态应为 `needs_binding` 或 `not_runnable`
-- 非主线程任务线若缺少工作路径，状态应为 `needs_workspace`
+- 本地可执行线程在 create/load 阶段必须已经拥有唯一工作目录
 - 不允许继续执行并偷偷落到 `threads/main`
 
 ## 5. `workspace_root` 的正确角色
@@ -161,15 +161,14 @@ request.workingDirectory == current TaskThread.workspaceBinding.workspacePath
 
 它可以是：
 
-- 创建新线程时的初始工作区候选根目录
-- 外部 provider / 执行上下文导入时的显式 workspace bootstrap 输入
-- 当前线程 `workspaceBinding` 的一次用户确认更新来源
+- 当前线程 `workspaceBinding` 的一次显式更新来源
+- 外部 provider / 执行上下文导入时对当前线程 binding 的确认更新输入
 
 因此正确顺序应为：
 
 ```text
 Execution context.workspace_root
--> bind/update current TaskThread.workspaceBinding
+-> update current TaskThread.workspaceBinding
 -> persist on that TaskThread
 -> subsequent execute reads TaskThread.workspaceBinding.workspacePath
 ```
@@ -280,7 +279,7 @@ single-agent 入口必须在执行前验证：
 
 1. 历史共享 `main` 的记录继续作为 `main`
 2. 从修正版本开始，新建任务线必须创建独立 `sessionKey`
-3. 对已暴露出共享问题的入口，优先阻止继续 silent fallback
+3. 对已暴露出共享问题的入口，优先阻止继续 silent fallback，并移除 runtime first-binding
 
 ### 8.3 未绑定任务线
 
@@ -303,7 +302,7 @@ single-agent 入口必须在执行前验证：
 3. 切换任务线后，`currentSessionKey` 与右栏路径同步变化。
 4. single-agent 请求里的 `sessionId / threadId / workingDirectory` 始终对应当前线程。
 5. 任意非主线程缺少 `sessionKey` 时，执行被阻止，而不是回落到 `main`。
-6. `workspace_root` 被当作线程 binding 输入处理，而不是 prompt-only 文本或跨线程覆盖指令。
+6. `workspace_root` 被当作当前线程 binding 的显式更新输入处理，而不是 prompt-only 文本、first-binding 指令或跨线程覆盖指令。
 
 ## 10. 与现有架构文档的关系
 

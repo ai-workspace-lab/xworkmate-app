@@ -142,29 +142,16 @@ extension AppControllerDesktopThreadBinding on AppController {
     if (executionTarget == AssistantExecutionTarget.auto ||
         executionTarget == AssistantExecutionTarget.singleAgent) {
       if (existingBinding != null &&
-          existingBinding.workspacePath.trim().isNotEmpty) {
-        if (existingBinding.workspaceKind == WorkspaceKind.localFs) {
-          if (ensureLocalWorkspaceDirectoryInternal(
-            existingBinding.workspacePath,
-          )) {
-            return existingBinding.copyWith(
-              displayPath: existingBinding.workspacePath,
-            );
-          }
-        }
-        final defaultRemotePath = remoteThreadWorkspacePathInternal(
-          sessionKey,
-          ownerScope,
-        );
-        if (existingBinding.workspacePath.trim() != defaultRemotePath) {
-          return existingBinding.copyWith(
-            displayPath: existingBinding.displayPath.trim().isEmpty
-                ? existingBinding.workspacePath
-                : null,
-          );
-        }
+          existingBinding.workspaceKind == WorkspaceKind.localFs &&
+          ensureLocalWorkspaceDirectoryInternal(existingBinding.workspacePath)) {
+        return existingBinding.copyWith(displayPath: existingBinding.workspacePath);
       }
       final localPath = localThreadWorkspacePathInternal(sessionKey);
+      if (localPath.isEmpty) {
+        throw StateError(
+          'Local executable thread $sessionKey requires a writable local workspace.',
+        );
+      }
       return WorkspaceBinding(
         workspaceId: normalizedAssistantSessionKeyInternal(sessionKey),
         workspaceKind: WorkspaceKind.localFs,
@@ -242,9 +229,6 @@ extension AppControllerDesktopThreadBinding on AppController {
       ownerScope: ownerScope,
       existingBinding: existing?.workspaceBinding,
     );
-    final lifecycleStatus = workspaceBinding.workspacePath.trim().isEmpty
-        ? 'needs_workspace'
-        : 'ready';
     upsertTaskThreadInternal(
       normalizedSessionKey,
       ownerScope: ownerScope,
@@ -263,7 +247,7 @@ extension AppControllerDesktopThreadBinding on AppController {
                     lastRunAtMs: null,
                     lastResultCode: null,
                   ))
-              .copyWith(status: lifecycleStatus),
+              .copyWith(status: 'ready'),
       executionTarget: resolvedExecutionTarget,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );

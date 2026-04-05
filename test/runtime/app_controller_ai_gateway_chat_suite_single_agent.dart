@@ -530,15 +530,20 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         );
         await store.saveTaskThreads(<TaskThread>[
           TaskThread(
-            sessionKey: 'main',
+            threadId: 'main',
+            workspaceBinding: WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: threadWorkspace.path,
+              displayPath: threadWorkspace.path,
+              writable: true,
+            ),
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,
             title: 'Main',
             archived: false,
             executionTarget: AssistantExecutionTarget.singleAgent,
             messageViewMode: AssistantMessageViewMode.rendered,
-            workspaceRef: threadWorkspace.path,
-            workspaceRefKind: WorkspaceRefKind.localPath,
           ),
         ]);
 

@@ -588,6 +588,9 @@ class WorkspaceBinding {
   final String displayPath;
   final bool writable;
 
+  bool get isComplete =>
+      workspaceId.trim().isNotEmpty && workspacePath.trim().isNotEmpty;
+
   WorkspaceBinding copyWith({
     String? workspaceId,
     WorkspaceKind? workspaceKind,
@@ -616,11 +619,17 @@ class WorkspaceBinding {
 
   factory WorkspaceBinding.fromJson(Map<String, dynamic> json) {
     final path = json['workspacePath']?.toString() ?? '';
+    final workspaceId = json['workspaceId']?.toString() ?? '';
+    final workspaceKindValue = json['workspaceKind']?.toString();
+    if (workspaceId.trim().isEmpty ||
+        path.trim().isEmpty ||
+        workspaceKindValue == null ||
+        workspaceKindValue.trim().isEmpty) {
+      throw const FormatException('TaskThread.workspaceBinding is incomplete.');
+    }
     return WorkspaceBinding(
-      workspaceId: json['workspaceId']?.toString() ?? '',
-      workspaceKind: WorkspaceKindCopy.fromJsonValue(
-        json['workspaceKind']?.toString(),
-      ),
+      workspaceId: workspaceId,
+      workspaceKind: WorkspaceKindCopy.fromJsonValue(workspaceKindValue),
       workspacePath: path,
       displayPath: json['displayPath']?.toString() ?? path,
       writable: json['writable'] as bool? ?? true,
@@ -877,11 +886,10 @@ class ThreadLifecycleState {
 
 class TaskThread {
   TaskThread({
-    String? threadId,
-    String? sessionKey,
+    required String threadId,
     String? title,
     ThreadOwnerScope? ownerScope,
-    WorkspaceBinding? workspaceBinding,
+    required WorkspaceBinding workspaceBinding,
     ExecutionBinding? executionBinding,
     ThreadContextState? contextState,
     ThreadLifecycleState? lifecycleState,
@@ -896,15 +904,11 @@ class TaskThread {
     String? assistantModelId,
     SingleAgentProvider? singleAgentProvider,
     String? gatewayEntryState,
-    String? workspaceRef,
-    WorkspaceRefKind? workspaceRefKind,
-    String? displayPath,
     AssistantPermissionLevel? permissionLevel,
     String? latestResolvedRuntimeModel,
-    String? lifecycleStatus,
     double? lastRunAtMs,
     String? lastResultCode,
-  }) : threadId = _resolveThreadId(threadId, sessionKey),
+  }) : threadId = _resolveThreadId(threadId),
        title = title ?? '',
        ownerScope =
            ownerScope ??
@@ -914,15 +918,7 @@ class TaskThread {
              subjectId: '',
              displayName: '',
            ),
-       workspaceBinding =
-           workspaceBinding ??
-           WorkspaceBinding(
-             workspaceId: _resolveThreadId(threadId, sessionKey),
-             workspaceKind: _workspaceKindFromLegacy(workspaceRefKind),
-             workspacePath: workspaceRef?.trim() ?? '',
-             displayPath: (displayPath ?? workspaceRef ?? '').trim(),
-             writable: true,
-           ),
+       workspaceBinding = _validateWorkspaceBinding(workspaceBinding),
        executionBinding =
            executionBinding ??
            ExecutionBinding(
@@ -953,11 +949,7 @@ class TaskThread {
            lifecycleState ??
            ThreadLifecycleState(
              archived: archived ?? false,
-             status:
-                 lifecycleStatus ??
-                 ((workspaceRef?.trim().isEmpty ?? true)
-                     ? 'needs_workspace'
-                     : 'ready'),
+             status: 'ready',
              lastRunAtMs: lastRunAtMs,
              lastResultCode: lastResultCode?.trim(),
            ),
@@ -1016,7 +1008,6 @@ class TaskThread {
 
   TaskThread copyWith({
     String? threadId,
-    String? sessionKey,
     String? title,
     ThreadOwnerScope? ownerScope,
     WorkspaceBinding? workspaceBinding,
@@ -1040,13 +1031,6 @@ class TaskThread {
     ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
-    String? workspaceRef,
-    WorkspaceRefKind? workspaceRefKind,
-    String? workspacePath,
-    String? displayPath,
-    WorkspaceKind? workspaceKind,
-    bool? writable,
-    String? lifecycleStatus,
     String? latestResolvedRuntimeModel,
   }) {
     final nextExecutionBinding = executionBinding ?? this.executionBinding;
@@ -1063,19 +1047,10 @@ class TaskThread {
               ThreadExecutionMode.gatewayRemote,
           };
     return TaskThread(
-      threadId: threadId ?? sessionKey ?? this.threadId,
+      threadId: threadId ?? this.threadId,
       title: title ?? this.title,
       ownerScope: ownerScope ?? this.ownerScope,
-      workspaceBinding: (workspaceBinding ?? this.workspaceBinding).copyWith(
-        workspacePath: workspacePath ?? workspaceRef,
-        displayPath: displayPath,
-        workspaceKind:
-            workspaceKind ??
-            (workspaceRefKind == null
-                ? null
-                : _workspaceKindFromLegacy(workspaceRefKind)),
-        writable: writable,
-      ),
+      workspaceBinding: workspaceBinding ?? this.workspaceBinding,
       executionBinding: nextExecutionBinding.copyWith(
         executionMode: nextExecutionMode,
         executorId: singleAgentProvider?.providerId,
@@ -1097,23 +1072,25 @@ class TaskThread {
       ),
       lifecycleState: (lifecycleState ?? this.lifecycleState).copyWith(
         archived: archived,
-        status: lifecycleStatus,
       ),
       createdAtMs: createdAtMs ?? this.createdAtMs,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );
   }
 
-  static String _resolveThreadId(String? threadId, String? sessionKey) {
-    return (threadId ?? sessionKey ?? '').trim();
+  static String _resolveThreadId(String threadId) {
+    return threadId.trim();
   }
 
-  static WorkspaceKind _workspaceKindFromLegacy(WorkspaceRefKind? kind) {
-    return switch (kind) {
-      WorkspaceRefKind.remotePath ||
-      WorkspaceRefKind.objectStore => WorkspaceKind.remoteFs,
-      _ => WorkspaceKind.localFs,
-    };
+  static WorkspaceBinding _validateWorkspaceBinding(
+    WorkspaceBinding workspaceBinding,
+  ) {
+    if (!workspaceBinding.isComplete) {
+      throw StateError(
+        'TaskThread requires a complete workspaceBinding at create/load time.',
+      );
+    }
+    return workspaceBinding;
   }
 
   static ThreadExecutionMode _executionModeFromLegacy(

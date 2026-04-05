@@ -9,10 +9,10 @@
 1. `TaskThread` 是任务线程的唯一主对象。
 2. UI 保持现有结构不变，但线程选择的唯一键是 `TaskThread.threadId`。
 3. UI 选中线程后，系统必须读取完整 `TaskThread`，而不是从页面状态拼装线程信息。
-4. `TaskThread` 持久化 schema 保持不变；本轮只迁移 runtime 解释层与执行链路。
+4. `TaskThread` 持久化 schema 保持不变，但 `workspaceBinding` 在 create/load 时必须完整；缺失 binding 的旧记录按非法数据处理并跳过加载。
 5. 执行请求由 controller / runtime 根据 `ownerScope / workspaceBinding / executionBinding / contextState` 构造。
 6. controller / runtime 统一通过 `Go Agent-core` 调度执行：Desktop 走 App 内 local bridge，Web 走远端 ACP / RPC endpoint。
-7. 执行结果先回写 `TaskThread.contextState`，主体区域同步显示；只有必要时才更新 `workspaceBinding`；右栏展示读取的是当前 `TaskThread` 最新记录。
+7. 执行结果先回写 `TaskThread.contextState`，主体区域同步显示；UI 与执行始终只读取当前 `TaskThread.workspaceBinding`，不再存在 runtime first-binding 或 fallback 到 `main`。
 
 ## 2. TaskThread 结构
 
@@ -112,7 +112,7 @@ ThreadLifecycleState
 职责：
 
 - `archived`：归档标记
-- `status`：线程生命周期摘要，例如 `needs_workspace / ready`
+- `status`：线程生命周期摘要，例如 `ready / error`
 - `lastRunAtMs / lastResultCode`：最近执行摘要
 
 ## 3. TaskThread 生命周期主链
@@ -136,7 +136,7 @@ flowchart LR
   F --> G["执行结果"]
 
   G --> H["回写线程上下文\n(主体区域 同步显示)"]
-  G --> I["必要时更新 workspaceBinding"]
+  G --> I["仅显式更新当前线程 workspaceBinding"]
 
   H --> J["右栏显示"]
   I --> J
@@ -149,8 +149,8 @@ flowchart LR
 3. `构造执行请求` 属于 agent-core / runtime 协调层，不属于 UI。
 4. `Go Agent-core` 是唯一执行调度面；Desktop / Web 共用同一套 session 语义，只在 transport 上有差异。
 5. `回写线程上下文` 是执行结束后的第一落点；主体区域同步显示依赖这一回写。
-6. `必要时更新 workspaceBinding` 是条件分支，不是固定每次都发生的回写步骤。
-7. `右栏显示` 读取的是当前 `TaskThread` 最新记录，因此它与主体区域共享同一线程事实来源。
+6. `workspaceBinding` 不是运行时补齐对象；线程在 create/load 时必须已经完整。
+7. `右栏显示` 与执行请求都读取当前 `TaskThread.workspaceBinding`，因此它与主体区域共享同一线程事实来源。
 
 ## 4. 当前设计约束
 
@@ -170,7 +170,7 @@ flowchart LR
 ### 4.3 TaskThread 约束
 
 - `threadId` 是线程身份唯一键。
-- `workspaceBinding` 是线程生命周期字段，不再承担 fallback 猜测语义。
+- `workspaceBinding` 是 `TaskThread` 的必填生命周期字段；create/load 阶段缺失即为非法线程数据。
 - `contextState` 是线程上下文真相源。
 - `lifecycleState` 只表达归档与生命周期摘要，不替代线程主体模型。
 

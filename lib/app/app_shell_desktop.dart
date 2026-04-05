@@ -97,48 +97,81 @@ class _AppShellState extends State<AppShell> {
       animation: widget.controller,
       builder: (context, _) {
         final controller = widget.controller;
+        final palette = context.palette;
         return Scaffold(
           body: SafeArea(
             bottom: false,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final palette = context.palette;
-                final platform = Theme.of(context).platform;
-                final isCompactMobile =
-                    (platform == TargetPlatform.iOS ||
-                        platform == TargetPlatform.android) &&
-                    constraints.maxWidth < 900;
-                final isMobile = constraints.maxWidth < 900;
-                final sidebarState = controller.sidebarState;
-                final showSidebar = sidebarState != AppSidebarState.hidden;
-                final uiFeatures = controller.featuresFor(
-                  resolveUiFeaturePlatformFromContext(context),
-                );
-                final sidebarTaskItems = _buildSidebarTaskItems(controller);
-                final expandedSidebarWidth = _clampSidebarWidth(
-                  _sidebarExpandedWidth ??
-                      _defaultSidebarWidth(
-                        controller.appLanguage,
-                        constraints.maxWidth,
+            child: Column(
+              children: [
+                if ((controller.startupTaskThreadWarning ?? '').trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: palette.accentMuted,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: palette.warning),
                       ),
-                  constraints.maxWidth,
-                );
-                final showPinnedDetail =
-                    controller.detailPanel != null &&
-                    constraints.maxWidth > 1280;
-                final mobileDestination =
-                    controller.destination == WorkspaceDestination.account
-                    ? WorkspaceDestination.assistant
-                    : controller.destination;
-                final availableMobileDestinations = _mobileDestinations
-                    .where(controller.capabilities.supportsDestination)
-                    .toList(growable: false);
-                final resolvedMobileDestination =
-                    availableMobileDestinations.contains(mobileDestination)
-                    ? mobileDestination
-                    : (availableMobileDestinations.isEmpty
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              controller.startupTaskThreadWarning!,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          TextButton(
+                            onPressed: controller.dismissStartupTaskThreadWarning,
+                            child: Text(appText('关闭', 'Dismiss')),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final palette = context.palette;
+                      final platform = Theme.of(context).platform;
+                      final isCompactMobile =
+                          (platform == TargetPlatform.iOS ||
+                              platform == TargetPlatform.android) &&
+                          constraints.maxWidth < 900;
+                      final isMobile = constraints.maxWidth < 900;
+                      final sidebarState = controller.sidebarState;
+                      final showSidebar = sidebarState != AppSidebarState.hidden;
+                      final uiFeatures = controller.featuresFor(
+                        resolveUiFeaturePlatformFromContext(context),
+                      );
+                      final sidebarTaskItems = _buildSidebarTaskItems(controller);
+                      final expandedSidebarWidth = _clampSidebarWidth(
+                        _sidebarExpandedWidth ??
+                            _defaultSidebarWidth(
+                              controller.appLanguage,
+                              constraints.maxWidth,
+                            ),
+                        constraints.maxWidth,
+                      );
+                      final showPinnedDetail =
+                          controller.detailPanel != null &&
+                          constraints.maxWidth > 1280;
+                      final mobileDestination =
+                          controller.destination == WorkspaceDestination.account
+                          ? WorkspaceDestination.assistant
+                          : controller.destination;
+                      final availableMobileDestinations = _mobileDestinations
+                          .where(controller.capabilities.supportsDestination)
+                          .toList(growable: false);
+                      final resolvedMobileDestination =
+                          availableMobileDestinations.contains(mobileDestination)
                           ? mobileDestination
-                          : availableMobileDestinations.first);
+                          : (availableMobileDestinations.isEmpty
+                                ? mobileDestination
+                                : availableMobileDestinations.first);
 
                 void openMobileDetail(DetailPanelData detail) {
                   showModalBottomSheet<void>(
@@ -404,7 +437,10 @@ class _AppShellState extends State<AppShell> {
                       ),
                   ],
                 );
-              },
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
         );
