@@ -11,7 +11,39 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   group('GatewayAcpClient', () {
-    test('loads ACP capabilities over websocket when available', () async {
+    test('loads ACP capabilities over websocket when ws endpoint is provided', () async {
+      final server = await _AcpFakeServer.start();
+      addTearDown(server.close);
+
+      final client = GatewayAcpClient(
+        endpointResolver: () => server.baseHttpUri.replace(scheme: 'ws'),
+      );
+
+      final capabilities = await client.loadCapabilities(forceRefresh: true);
+
+      expect(capabilities.singleAgent, isTrue);
+      expect(capabilities.multiAgent, isTrue);
+      expect(capabilities.providers, contains(SingleAgentProvider.codex));
+      expect(server.rpcMethods, contains('acp.capabilities'));
+      expect(server.lastWebSocketRequestPath, '/acp');
+      expect(server.lastHttpRequestPath, isNull);
+    });
+
+    test('preserves prefixed websocket ACP endpoints', () async {
+      final server = await _AcpFakeServer.start(pathPrefix: '/codex');
+      addTearDown(server.close);
+
+      final client = GatewayAcpClient(
+        endpointResolver: () => server.baseHttpUri.replace(scheme: 'ws'),
+      );
+
+      final capabilities = await client.loadCapabilities(forceRefresh: true);
+
+      expect(capabilities.singleAgent, isTrue);
+      expect(server.rpcMethods, contains('acp.capabilities'));
+    });
+
+    test('prefers HTTP RPC when http endpoint is provided', () async {
       final server = await _AcpFakeServer.start();
       addTearDown(server.close);
 
@@ -22,23 +54,8 @@ void main() {
       final capabilities = await client.loadCapabilities(forceRefresh: true);
 
       expect(capabilities.singleAgent, isTrue);
-      expect(capabilities.multiAgent, isTrue);
-      expect(capabilities.providers, contains(SingleAgentProvider.codex));
-      expect(server.rpcMethods, contains('acp.capabilities'));
-    });
-
-    test('preserves prefixed websocket ACP endpoints', () async {
-      final server = await _AcpFakeServer.start(pathPrefix: '/codex');
-      addTearDown(server.close);
-
-      final client = GatewayAcpClient(
-        endpointResolver: () => server.baseHttpUri,
-      );
-
-      final capabilities = await client.loadCapabilities(forceRefresh: true);
-
-      expect(capabilities.singleAgent, isTrue);
-      expect(server.rpcMethods, contains('acp.capabilities'));
+      expect(server.lastHttpRequestPath, '/acp/rpc');
+      expect(server.lastWebSocketRequestPath, isNull);
     });
 
     test('falls back to HTTP+SSE when websocket is unavailable', () async {
@@ -107,7 +124,7 @@ void main() {
         addTearDown(server.close);
 
         final client = GatewayAcpClient(
-          endpointResolver: () => server.baseHttpUri,
+          endpointResolver: () => server.baseHttpUri.replace(scheme: 'ws'),
           authorizationResolver: (_) async => 'Bearer ws-secret',
         );
 
@@ -142,7 +159,7 @@ void main() {
       addTearDown(server.close);
 
       final client = GatewayAcpClient(
-        endpointResolver: () => server.baseHttpUri,
+        endpointResolver: () => server.baseHttpUri.replace(scheme: 'ws'),
       );
 
       final capabilities = await client.loadCapabilities(forceRefresh: true);
@@ -151,11 +168,8 @@ void main() {
       expect(server.lastWebSocketRequestPath, '/opencode/acp');
     });
 
-    test('preserves hosted ACP base path for HTTP fallback requests', () async {
-      final server = await _AcpFakeServer.start(
-        disableWebSocket: true,
-        pathPrefix: '/opencode',
-      );
+    test('preserves hosted ACP base path for HTTP requests', () async {
+      final server = await _AcpFakeServer.start(pathPrefix: '/opencode');
       addTearDown(server.close);
 
       final client = GatewayAcpClient(
