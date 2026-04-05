@@ -79,6 +79,9 @@ class SecureConfigStore {
     return _settingsStore.loadTaskThreads();
   }
 
+  List<String> get lastSkippedInvalidTaskThreadIds =>
+      _settingsStore.lastSkippedInvalidTaskThreadIds;
+
   Future<void> saveTaskThreads(List<TaskThread> records) {
     return _settingsStore.saveTaskThreads(records);
   }

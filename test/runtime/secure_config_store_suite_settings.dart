@@ -187,7 +187,16 @@ void registerSecureConfigStoreSuiteSettingsTestsInternal() {
 
         await store.saveTaskThreads(<TaskThread>[
           TaskThread(
-            sessionKey: 'draft:memory-only',
+            threadId: 'draft:memory-only',
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'draft:memory-only',
+              workspaceKind: WorkspaceKind.remoteFs,
+              workspacePath:
+                  '/owners/remote/user/memory/threads/draft:memory-only',
+              displayPath:
+                  '/owners/remote/user/memory/threads/draft:memory-only',
+              writable: true,
+            ),
             title: 'Memory only',
             archived: false,
             executionTarget: AssistantExecutionTarget.local,

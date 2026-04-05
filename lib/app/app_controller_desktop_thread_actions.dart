@@ -544,6 +544,9 @@ extension AppControllerDesktopThreadActions on AppController {
       sessionKey,
     );
     final existing = assistantThreadRecordsInternal[normalizedSessionKey];
+    if (existing == null || !existing.workspaceBinding.isComplete) {
+      return;
+    }
     upsertTaskThreadInternal(
       normalizedSessionKey,
       workspaceBinding: WorkspaceBinding(
@@ -551,16 +554,10 @@ extension AppControllerDesktopThreadActions on AppController {
         workspaceKind: WorkspaceKind.localFs,
         workspacePath: workspaceRoot,
         displayPath: workspaceRoot,
-        writable: existing?.workspaceBinding.writable ?? true,
+        writable: existing.workspaceBinding.writable,
       ),
       lifecycleState:
-          (existing?.lifecycleState ??
-                  const ThreadLifecycleState(
-                    archived: false,
-                    status: 'ready',
-                    lastRunAtMs: null,
-                    lastResultCode: null,
-                  ))
+          (existing.lifecycleState)
               .copyWith(status: 'ready'),
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
@@ -597,56 +594,5 @@ extension AppControllerDesktopThreadActions on AppController {
   Future<void> tryBindWorkspaceForOnlyChatFallbackInternal(
     String sessionKey,
     AssistantExecutionTarget currentTarget,
-  ) async {
-    if (currentTarget != AssistantExecutionTarget.singleAgent &&
-        currentTarget != AssistantExecutionTarget.auto) {
-      return;
-    }
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    if (!singleAgentUsesAiChatFallbackForSession(normalizedSessionKey)) {
-      return;
-    }
-    if (assistantWorkspacePathForSession(normalizedSessionKey).trim().isNotEmpty) {
-      return;
-    }
-
-    final candidateRoots = <String>{
-      settings.workspacePath.trim(),
-      Directory.current.path.trim(),
-      settings.remoteProjectRoot.trim(),
-    }.where((item) => item.isNotEmpty);
-    for (final root in candidateRoots) {
-      final threadWorkspace =
-          '${trimTrailingPathSeparatorInternal(root)}/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
-      if (!ensureLocalWorkspaceDirectoryInternal(threadWorkspace)) {
-        continue;
-      }
-      final existing = assistantThreadRecordsInternal[normalizedSessionKey];
-      upsertTaskThreadInternal(
-        normalizedSessionKey,
-        workspaceBinding: WorkspaceBinding(
-          workspaceId: normalizedSessionKey,
-          workspaceKind: WorkspaceKind.localFs,
-          workspacePath: threadWorkspace,
-          displayPath: threadWorkspace,
-          writable: existing?.workspaceBinding.writable ?? true,
-        ),
-        lifecycleState:
-            (existing?.lifecycleState ??
-                    const ThreadLifecycleState(
-                      archived: false,
-                      status: 'ready',
-                      lastRunAtMs: null,
-                      lastResultCode: null,
-                    ))
-                .copyWith(status: 'ready'),
-        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      );
-      await flushAssistantThreadPersistenceInternal();
-      recomputeTasksInternal();
-      return;
-    }
-  }
+  ) async {}
 }
