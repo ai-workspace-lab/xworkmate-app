@@ -247,7 +247,7 @@ extension AppControllerWebGatewayRelay on AppController {
     );
     final existing = threadRecordsInternal[resolvedKey];
     final next = (existing ?? newRecordInternal(target: target)).copyWith(
-      sessionKey: resolvedKey,
+      threadId: resolvedKey,
       messages: messages,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       title: deriveThreadTitleInternal(

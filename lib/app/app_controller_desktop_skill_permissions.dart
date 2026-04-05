@@ -273,8 +273,6 @@ extension AppControllerDesktopSkillPermissions on AppController {
     ThreadSelectionSource? assistantModelSource,
     ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
-    String? workspaceRef,
-    WorkspaceRefKind? workspaceRefKind,
   }) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -307,40 +305,13 @@ extension AppControllerDesktopSkillPermissions on AppController {
           subjectId: '',
           displayName: '',
         );
-    final explicitWorkspaceKind = workspaceRefKind == null
-        ? null
-        : (workspaceRefKind == WorkspaceRefKind.localPath
-              ? WorkspaceKind.localFs
-              : WorkspaceKind.remoteFs);
-    final baseWorkspaceBinding =
-        workspaceBinding ??
-        existing?.workspaceBinding ??
-        WorkspaceBinding(
-          workspaceId: normalizedSessionKey,
-          workspaceKind:
-              explicitWorkspaceKind ??
-              (nextExecutionTarget == AssistantExecutionTarget.singleAgent
-                  ? WorkspaceKind.localFs
-                  : WorkspaceKind.remoteFs),
-          workspacePath: '',
-          displayPath: '',
-          writable: true,
-        );
-    final nextWorkspacePath =
-        workspaceRef ?? baseWorkspaceBinding.workspacePath;
-    final nextDisplayPath =
-        workspaceRef ??
-        (baseWorkspaceBinding.displayPath.trim().isNotEmpty
-            ? baseWorkspaceBinding.displayPath
-            : nextWorkspacePath);
-    final nextWorkspaceBinding = baseWorkspaceBinding.copyWith(
-      workspaceId: baseWorkspaceBinding.workspaceId.trim().isEmpty
-          ? normalizedSessionKey
-          : baseWorkspaceBinding.workspaceId,
-      workspaceKind: explicitWorkspaceKind,
-      workspacePath: nextWorkspacePath,
-      displayPath: nextDisplayPath,
-    );
+    final nextWorkspaceBinding =
+        workspaceBinding ?? existing?.workspaceBinding;
+    if (nextWorkspaceBinding == null || !nextWorkspaceBinding.isComplete) {
+      throw StateError(
+        'TaskThread $normalizedSessionKey is missing a complete workspaceBinding.',
+      );
+    }
     final nextProvider =
         singleAgentProvider ??
         SingleAgentProviderCopy.fromJsonValue(
@@ -410,11 +381,8 @@ extension AppControllerDesktopSkillPermissions on AppController {
                   existing?.contextState.selectedSkillsSource,
               gatewayEntryState: gatewayEntryState,
             );
-    final nextStatus = nextWorkspaceBinding.workspacePath.trim().isEmpty
-        ? 'needs_workspace'
-        : (lifecycleState?.status ??
-              existing?.lifecycleState.status ??
-              'ready');
+    final nextStatus =
+        lifecycleState?.status ?? existing?.lifecycleState.status ?? 'ready';
     final nextLifecycleState =
         (lifecycleState ??
                 existing?.lifecycleState ??

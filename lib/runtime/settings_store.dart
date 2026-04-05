@@ -58,10 +58,13 @@ class SettingsStore {
   PersistentWriteFailure? _tasksWriteFailure;
   PersistentWriteFailure? _auditWriteFailure;
   bool _taskThreadStateResetRequired = false;
+  List<String> _lastSkippedInvalidTaskThreadIds = const <String>[];
 
   PersistentWriteFailure? get settingsWriteFailure => _settingsWriteFailure;
   PersistentWriteFailure? get tasksWriteFailure => _tasksWriteFailure;
   PersistentWriteFailure? get auditWriteFailure => _auditWriteFailure;
+  List<String> get lastSkippedInvalidTaskThreadIds =>
+      List<String>.unmodifiable(_lastSkippedInvalidTaskThreadIds);
 
   Future<void> initialize() async {
     if (_initialized) {
@@ -426,8 +429,25 @@ class SettingsStore {
       return const <TaskThread>[];
     }
     _taskThreadStateResetRequired = false;
+    _lastSkippedInvalidTaskThreadIds = const <String>[];
     final orderedKeys = index.sessions;
     final recordsByKey = <String, TaskThread>{};
+    final skippedIds = <String>{};
+
+    String inferThreadIdFromTaskFile(File file) {
+      final name = file.uri.pathSegments.isEmpty
+          ? file.path
+          : file.uri.pathSegments.last;
+      final encoded = name.endsWith('.json')
+          ? name.substring(0, name.length - 5)
+          : name;
+      try {
+        return utf8.decode(base64Url.decode(base64Url.normalize(encoded)));
+      } catch (_) {
+        return encoded;
+      }
+    }
+
     try {
       await for (final entity in layout.tasksDirectory.list()) {
         if (entity is! File ||
@@ -452,6 +472,7 @@ class SettingsStore {
             }
           }
         } catch (_) {
+          skippedIds.add(inferThreadIdFromTaskFile(entity));
           continue;
         }
       }
@@ -472,6 +493,7 @@ class SettingsStore {
         ordered.add(record);
       }
     }
+    _lastSkippedInvalidTaskThreadIds = skippedIds.toList()..sort();
     return ordered;
   }
 
