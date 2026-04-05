@@ -22,7 +22,6 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
     GoCoreLocator? goCoreLocator,
     GoAgentCoreProcessStarter? processStarter,
   }) : _acpClient = acpClient,
-       _endpointResolver = endpointResolver,
        _goCoreLocator = goCoreLocator ?? GoCoreLocator(),
        _processStarter =
            processStarter ??
@@ -32,11 +31,10 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
                arguments,
                environment: environment,
                workingDirectory: workingDirectory,
-             );
+            );
            });
 
   final GatewayAcpClient _acpClient;
-  final Uri? Function(AssistantExecutionTarget target) _endpointResolver;
   final GoCoreLocator _goCoreLocator;
   final GoAgentCoreProcessStarter _processStarter;
 
@@ -45,11 +43,26 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
   Future<Uri?>? _localEndpointFuture;
 
   @override
+  Future<void> syncProviders(List<GoAgentCoreSyncedProvider> providers) async {
+    final endpoint = await _ensureLocalEndpoint();
+    if (endpoint == null) {
+      return;
+    }
+    await _acpClient.request(
+      method: 'xworkmate.providers.sync',
+      params: <String, dynamic>{
+        'providers': providers.map((item) => item.toJson()).toList(growable: false),
+      },
+      endpointOverride: endpoint,
+    );
+  }
+
+  @override
   Future<GoAgentCoreCapabilities> loadCapabilities({
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
   }) async {
-    final endpoint = await _resolveEndpoint(target);
+    final endpoint = await _ensureLocalEndpoint();
     if (endpoint == null) {
       return const GoAgentCoreCapabilities.empty();
     }
@@ -70,10 +83,7 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
     GoAgentCoreSessionRequest request, {
     required void Function(GoAgentCoreSessionUpdate update) onUpdate,
   }) async {
-    final routingResult = await _resolveRouting(request);
-    final endpoint = await _resolveEndpoint(
-      _targetForRouting(request, routingResult),
-    );
+    final endpoint = await _ensureLocalEndpoint();
     if (endpoint == null) {
       throw const GatewayAcpException(
         'Missing Go Agent-core endpoint',
@@ -84,7 +94,7 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
     String? completedMessage;
     final response = await _acpClient.request(
       method: request.resumeSession ? 'session.message' : 'session.start',
-      params: _resolvedParams(request, routingResult),
+      params: request.toAcpParams(),
       endpointOverride: endpoint,
       onNotification: (notification) {
         final update = goAgentCoreUpdateFromNotification(notification);
@@ -100,11 +110,8 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
         onUpdate(update);
       },
     );
-    final mergedResponse = routingResult == null
-        ? response
-        : mergeGoAgentCoreResponseResult(response, routingResult);
     return goAgentCoreRunResultFromResponse(
-      mergedResponse,
+      response,
       streamedText: streamedText,
       completedMessage: completedMessage,
     );
@@ -116,7 +123,7 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
     required String sessionId,
     required String threadId,
   }) async {
-    final endpoint = await _resolveEndpoint(target);
+    final endpoint = await _ensureLocalEndpoint();
     if (endpoint == null) {
       return;
     }
@@ -133,7 +140,7 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
     required String sessionId,
     required String threadId,
   }) async {
-    final endpoint = await _resolveEndpoint(target);
+    final endpoint = await _ensureLocalEndpoint();
     if (endpoint == null) {
       return;
     }
@@ -157,13 +164,6 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
         // Best effort only.
       }
     }
-  }
-
-  Future<Uri?> _resolveEndpoint(AssistantExecutionTarget target) async {
-    if (target == AssistantExecutionTarget.singleAgent) {
-      return _ensureLocalEndpoint();
-    }
-    return _endpointResolver(target);
   }
 
   Future<Uri?> _ensureLocalEndpoint() async {
@@ -236,130 +236,5 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
     }
     await dispose();
     return null;
-  }
-
-  Future<Map<String, dynamic>?> _resolveRouting(
-    GoAgentCoreSessionRequest request,
-  ) async {
-    final routing = request.routing;
-    if (routing == null) {
-      return null;
-    }
-    final endpoint = await _ensureLocalEndpoint();
-    if (endpoint == null) {
-      return null;
-    }
-    try {
-      final response = await _acpClient.request(
-        method: 'xworkmate.routing.resolve',
-        params: request.toAcpParams(),
-        endpointOverride: endpoint,
-      );
-      return _castRoutingResult(response['result']);
-    } on Object {
-      return null;
-    }
-  }
-
-  Map<String, dynamic> _resolvedParams(
-    GoAgentCoreSessionRequest request,
-    Map<String, dynamic>? routingResult,
-  ) {
-    final params = Map<String, dynamic>.from(request.toAcpParams());
-    if (routingResult == null || routingResult.isEmpty) {
-      return params;
-    }
-    final resolvedExecutionTarget =
-        routingResult['resolvedExecutionTarget']?.toString().trim() ?? '';
-    final resolvedEndpointTarget =
-        routingResult['resolvedEndpointTarget']?.toString().trim() ?? '';
-    final resolvedProviderId =
-        routingResult['resolvedProviderId']?.toString().trim() ?? '';
-    final resolvedModel =
-        routingResult['resolvedModel']?.toString().trim() ?? '';
-    final resolvedSkills = _castStringList(routingResult['resolvedSkills']);
-    final routedTarget = _targetForRouting(request, routingResult);
-
-    if (routedTarget != AssistantExecutionTarget.singleAgent) {
-      if (resolvedExecutionTarget.isNotEmpty) {
-        params['mode'] = 'gateway-chat';
-      }
-      if (resolvedEndpointTarget.isNotEmpty) {
-        params['executionTarget'] = resolvedEndpointTarget;
-        params['resolvedEndpointTarget'] = resolvedEndpointTarget;
-      }
-      if (resolvedProviderId.isNotEmpty) {
-        params['provider'] = resolvedProviderId;
-        params['resolvedProviderId'] = resolvedProviderId;
-      }
-      if (resolvedModel.isNotEmpty) {
-        params['model'] = resolvedModel;
-        params['resolvedModel'] = resolvedModel;
-      }
-      if (resolvedSkills.isNotEmpty) {
-        params['selectedSkills'] = resolvedSkills;
-        params['resolvedSkills'] = resolvedSkills;
-      }
-    }
-    if (resolvedExecutionTarget.isNotEmpty) {
-      params['resolvedExecutionTarget'] = resolvedExecutionTarget;
-    }
-    for (final key in <String>[
-      'skillResolutionSource',
-      'memorySources',
-      'skillCandidates',
-      'needsSkillInstall',
-    ]) {
-      if (routingResult.containsKey(key)) {
-        params[key] = routingResult[key];
-      }
-    }
-    return params;
-  }
-
-  AssistantExecutionTarget _targetForRouting(
-    GoAgentCoreSessionRequest request,
-    Map<String, dynamic>? routingResult,
-  ) {
-    if (routingResult == null || routingResult.isEmpty) {
-      return request.target;
-    }
-    final resolvedExecutionTarget =
-        routingResult['resolvedExecutionTarget']?.toString().trim() ?? '';
-    if (_isGatewayExecutionTarget(resolvedExecutionTarget)) {
-      final endpointTarget =
-          routingResult['resolvedEndpointTarget']?.toString().trim() ?? '';
-      return switch (endpointTarget) {
-        'local' => AssistantExecutionTarget.local,
-        'remote' => AssistantExecutionTarget.remote,
-        _ => request.target,
-      };
-    }
-    return AssistantExecutionTarget.singleAgent;
-  }
-
-  Map<String, dynamic> _castRoutingResult(Object? raw) {
-    if (raw is Map<String, dynamic>) {
-      return raw;
-    }
-    if (raw is Map) {
-      return raw.cast<String, dynamic>();
-    }
-    return const <String, dynamic>{};
-  }
-
-  List<String> _castStringList(Object? raw) {
-    if (raw is! List) {
-      return const <String>[];
-    }
-    return raw
-        .map((item) => item?.toString().trim() ?? '')
-        .where((item) => item.isNotEmpty)
-        .toList(growable: false);
-  }
-
-  bool _isGatewayExecutionTarget(String value) {
-    final normalized = value.trim();
-    return normalized == 'gateway' || normalized == 'gateway-chat';
   }
 }
