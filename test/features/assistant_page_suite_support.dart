@@ -180,15 +180,13 @@ class PendingSendAppControllerInternal extends AppController {
   PendingSendAppControllerInternal({
     required SecureConfigStore store,
     required this.sendGate,
-    List<String>? singleAgentSharedSkillScanRootOverrides,
+    super.singleAgentSharedSkillScanRootOverrides,
   }) : super(
          store: store,
          runtimeCoordinator: RuntimeCoordinator(
            gateway: FakeGatewayRuntimeInternal(store: store),
            codex: FakeCodexRuntimeInternal(),
          ),
-         singleAgentSharedSkillScanRootOverrides:
-             singleAgentSharedSkillScanRootOverrides,
        );
 
   final Completer<void> sendGate;
@@ -325,7 +323,6 @@ createInstalledSkillE2EControllerInternal(
   required InstalledSkillE2ECaseInternal testCase,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
-  print('installed-skill ${testCase.skillKey}: helper creating store');
   final store = SecureConfigStore(
     enableSecureStorage: false,
     databasePathResolver: () async => '${tempDirectory.path}/settings.db',
@@ -339,7 +336,6 @@ createInstalledSkillE2EControllerInternal(
       multiAgent: MultiAgentConfig.defaults().copyWith(enabled: false),
     ),
   );
-  print('installed-skill ${testCase.skillKey}: helper creating controller');
 
   final controller = InstalledSkillE2EAppControllerInternal(
     store: store,
@@ -355,16 +351,10 @@ createInstalledSkillE2EControllerInternal(
     ),
     singleAgentSharedSkillScanRootOverrides: <String>[skillsRoot.path],
   );
-  print('installed-skill ${testCase.skillKey}: helper controller created');
   addTearDown(controller.dispose);
-  print('installed-skill ${testCase.skillKey}: helper pumping once');
   await tester.pump(const Duration(milliseconds: 100));
-  print('installed-skill ${testCase.skillKey}: helper pumped once');
   final stopwatch = Stopwatch()..start();
   while (controller.initializing) {
-    print(
-      'installed-skill ${testCase.skillKey}: helper waiting ${stopwatch.elapsedMilliseconds}ms',
-    );
     if (stopwatch.elapsed > const Duration(seconds: 10)) {
       fail('controller did not finish initializing before timeout');
     }
@@ -375,7 +365,6 @@ createInstalledSkillE2EControllerInternal(
     importedSkills: <AssistantThreadSkillEntry>[controller.importedSkill],
     selectedSkillKeys: <String>[controller.importedSkill.key],
   );
-  print('installed-skill ${testCase.skillKey}: helper initialized');
   return controller;
 }
 
