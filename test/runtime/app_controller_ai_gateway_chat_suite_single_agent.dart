@@ -56,7 +56,9 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         );
         await controller.saveSettings(
           controller.settings.copyWith(
-            multiAgent: controller.settings.multiAgent.copyWith(autoSync: false),
+            multiAgent: controller.settings.multiAgent.copyWith(
+              autoSync: false,
+            ),
           ),
           refreshAfterSave: false,
         );
@@ -93,6 +95,58 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             (message) => message.toolName == 'OpenCode',
           ),
           isFalse,
+        );
+      },
+    );
+
+    test(
+      'AppController treats Auto as ready before the first routing resolution when any route is available',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-auto-route-ready-',
+        );
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+        final client = FakeGoAgentCoreClientInternal(
+          capabilities: GoAgentCoreCapabilities(
+            singleAgent: true,
+            multiAgent: false,
+            providers: <SingleAgentProvider>{SingleAgentProvider.opencode},
+            raw: <String, dynamic>{},
+          ),
+        );
+        final controller = await createAppControllerInternal(
+          store: store,
+          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+            SingleAgentProvider.opencode,
+          ],
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+          goAgentCoreClient: client,
+        );
+        await controller.saveSettings(
+          controller.settings.copyWith(
+            multiAgent: controller.settings.multiAgent.copyWith(
+              autoSync: false,
+            ),
+          ),
+          refreshAfterSave: false,
+        );
+        await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.auto,
+        );
+
+        expect(
+          controller.currentAssistantConnectionState.executionTarget,
+          AssistantExecutionTarget.auto,
+        );
+        expect(controller.currentAssistantConnectionState.connected, isTrue);
+        expect(controller.currentAssistantConnectionState.ready, isTrue);
+        expect(
+          controller.currentAssistantConnectionState.detailLabel,
+          '待服务端路由',
         );
       },
     );
@@ -161,7 +215,9 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         final tempDirectory = await createTempDirectoryInternal(
           'xworkmate-single-agent-workspace-bootstrap-',
         );
-        final workspaceRoot = Directory('${tempDirectory.path}/thread-workspace');
+        final workspaceRoot = Directory(
+          '${tempDirectory.path}/thread-workspace',
+        );
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
         await store.initialize();
         await store.saveSettingsSnapshot(
@@ -196,7 +252,9 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         );
         await controller.saveSettings(
           controller.settings.copyWith(
-            multiAgent: controller.settings.multiAgent.copyWith(autoSync: false),
+            multiAgent: controller.settings.multiAgent.copyWith(
+              autoSync: false,
+            ),
           ),
           refreshAfterSave: false,
         );
@@ -206,9 +264,8 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         );
         await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
 
-        final initialWorkspacePath = controller.assistantWorkspacePathForSession(
-          controller.currentSessionKey,
-        );
+        final initialWorkspacePath = controller
+            .assistantWorkspacePathForSession(controller.currentSessionKey);
         expect(initialWorkspacePath, isNot(workspaceRoot.path));
 
         await controller.sendChatMessage(
@@ -282,9 +339,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         final beforeWorkspacePath = controller.assistantWorkspacePathForSession(
           controller.currentSessionKey,
         );
-        final placeholderDir = Directory(
-          '${Directory.current.path}/not-set',
-        );
+        final placeholderDir = Directory('${Directory.current.path}/not-set');
         if (await placeholderDir.exists()) {
           await placeholderDir.delete(recursive: true);
         }
@@ -496,10 +551,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         expect(client.executeCalls, 0);
         expect(server.requestCount, 1);
         expect(workspacePath, isNotEmpty);
-        expect(
-          workspacePath,
-          contains('.xworkmate/threads/'),
-        );
+        expect(workspacePath, contains('.xworkmate/threads/'));
       },
     );
   });

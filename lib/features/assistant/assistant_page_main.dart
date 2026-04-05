@@ -187,8 +187,7 @@ class AssistantPageStateInternal extends State<AssistantPage> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final showThreadRail =
-                  widget.showStandaloneTaskRail &&
-                  constraints.maxWidth >= 860;
+                  widget.showStandaloneTaskRail && constraints.maxWidth >= 860;
               final mainWorkspace = buildMainWorkspaceInternal(
                 controller: controller,
                 timelineItems: timelineItems,
@@ -644,20 +643,33 @@ class ConversationAreaInternal extends StatelessWidget {
       children: [
         Padding(
           padding: EdgeInsets.fromLTRB(10, 8, 10 + topTrailingInset, 8),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              alignment: WrapAlignment.end,
-              children: [
-                MessageViewModeChipInternal(
-                  value: messageViewMode,
-                  onSelected: onMessageViewModeChanged,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final maxConnectionChipWidth = math.min<double>(
+                constraints.maxWidth,
+                math.max<double>(180, constraints.maxWidth * 0.62),
+              );
+              return Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    MessageViewModeChipInternal(
+                      value: messageViewMode,
+                      onSelected: onMessageViewModeChanged,
+                    ),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: maxConnectionChipWidth,
+                      ),
+                      child: ConnectionChipInternal(controller: controller),
+                    ),
+                  ],
                 ),
-                ConnectionChipInternal(controller: controller),
-              ],
-            ),
+              );
+            },
           ),
         ),
         Divider(height: 1, color: palette.strokeSoft),
