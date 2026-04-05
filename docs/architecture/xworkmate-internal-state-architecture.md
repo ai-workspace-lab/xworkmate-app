@@ -181,6 +181,8 @@ Ownership summary:
 
 - 如果值已经存在于 `TaskThread`，则线程值优先于 Settings 默认值
 - `TaskThread` 是当前线程展示与执行的唯一主对象
+- `TaskThread` 在 create/load 时必须已经拥有完整 `workspaceBinding`
+- 缺少 `workspaceBinding` 的旧记录属于非法线程数据，应在恢复阶段跳过并通过启动告警暴露
 
 ### 3.3 Agent-Core / Runtime 协调状态
 
@@ -196,6 +198,7 @@ Primary responsibilities:
 - 请求构造不属于 UI
 - Flutter UI 不直接承担 runtime dispatch 职责
 - 工作空间选择不再通过旧式运行前猜测获得
+- 不允许 runtime fallback 到 `main`、`Directory.current` 或 prompt first-binding
 - 结果回写先更新线程上下文，再驱动主体区域与右栏刷新
 - Desktop / Web 共用相同 session 生命周期；不再单独发明 relay-only 执行协议
 

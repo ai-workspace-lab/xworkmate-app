@@ -105,19 +105,22 @@ extension AppControllerWebHelpers on AppController {
     final target =
         sanitizeTargetInternal(record.executionTarget) ??
         AssistantExecutionTarget.singleAgent;
+    final workspacePath = record.workspacePath.trim();
     return record.copyWith(
       executionTarget: target,
       title: record.title.trim().isEmpty
           ? appText('新对话', 'New conversation')
           : record.title.trim(),
-      workspacePath: record.workspacePath.trim(),
-      displayPath: record.displayPath.trim().isEmpty
-          ? record.workspacePath.trim()
-          : record.displayPath.trim(),
-      workspaceKind: WorkspaceKind.remoteFs,
-      lifecycleStatus: record.workspacePath.trim().isEmpty
-          ? 'needs_workspace'
-          : 'ready',
+      workspaceBinding: WorkspaceBinding(
+        workspaceId: record.threadId,
+        workspaceKind: WorkspaceKind.remoteFs,
+        workspacePath: workspacePath,
+        displayPath: record.displayPath.trim().isEmpty
+            ? workspacePath
+            : record.displayPath.trim(),
+        writable: record.workspaceBinding.writable,
+      ),
+      lifecycleState: record.lifecycleState.copyWith(status: 'ready'),
     );
   }
 
@@ -146,6 +149,8 @@ extension AppControllerWebHelpers on AppController {
       AssistantExecutionTarget.remote => 'remote',
     };
     final threadId = '$prefix:$timestamp';
+    final workspacePath =
+        '/owners/${ThreadRealm.remote.name}/${ThreadSubjectType.user.name}/threads/$threadId';
     return TaskThread(
       threadId: threadId,
       createdAtMs: timestamp.toDouble(),
@@ -160,8 +165,8 @@ extension AppControllerWebHelpers on AppController {
       workspaceBinding: WorkspaceBinding(
         workspaceId: threadId,
         workspaceKind: WorkspaceKind.remoteFs,
-        workspacePath: '',
-        displayPath: '',
+        workspacePath: workspacePath,
+        displayPath: workspacePath,
         writable: true,
       ),
       executionBinding: ExecutionBinding(
@@ -188,7 +193,7 @@ extension AppControllerWebHelpers on AppController {
       ),
       lifecycleState: const ThreadLifecycleState(
         archived: false,
-        status: 'needs_workspace',
+        status: 'ready',
         lastRunAtMs: null,
         lastResultCode: null,
       ),
@@ -281,7 +286,7 @@ extension AppControllerWebHelpers on AppController {
     );
     threadRecordsInternal[key] =
         (existing ?? newRecordInternal(target: resolvedTarget)).copyWith(
-          sessionKey: key,
+          threadId: key,
           ownerScope: ownerScope,
           workspaceBinding: workspaceBinding,
           executionBinding: buildWebExecutionBindingInternal(
@@ -462,6 +467,12 @@ extension AppControllerWebHelpers on AppController {
         assistantExecutionTargetForSession(key);
     final existing =
         threadRecordsInternal[key] ?? newRecordInternal(target: resolvedTarget);
+    final nextWorkspaceBinding = existing.workspaceBinding;
+    if (!nextWorkspaceBinding.isComplete) {
+      throw StateError(
+        'TaskThread $key is missing a complete workspaceBinding.',
+      );
+    }
     threadRecordsInternal[key] = existing.copyWith(
       threadId: key,
       messages: messages ?? existing.messages,
@@ -485,8 +496,15 @@ extension AppControllerWebHelpers on AppController {
           selectedSkillsSource ?? existing.contextState.selectedSkillsSource,
       gatewayEntryState: gatewayEntryState ?? existing.gatewayEntryState,
       clearGatewayEntryState: clearGatewayEntryState,
-      workspacePath: workspacePath ?? existing.workspacePath,
-      workspaceKind: workspaceKind ?? existing.workspaceKind,
+      workspaceBinding:
+          (workspacePath != null || workspaceKind != null)
+              ? nextWorkspaceBinding.copyWith(
+                  workspacePath: workspacePath,
+                  displayPath: workspacePath ?? nextWorkspaceBinding.displayPath,
+                  workspaceKind: workspaceKind,
+                )
+              : nextWorkspaceBinding,
+      lifecycleState: existing.lifecycleState.copyWith(status: 'ready'),
     );
     recomputeDerivedWorkspaceStateInternal();
   }

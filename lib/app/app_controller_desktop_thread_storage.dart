@@ -669,9 +669,20 @@ extension AppControllerDesktopThreadStorage on AppController {
       if (sessionKey.isEmpty) {
         continue;
       }
+      if (!record.workspaceBinding.isComplete) {
+        continue;
+      }
       final titleFromSettings = assistantCustomTaskTitle(sessionKey);
+      final workspaceBinding = record.workspaceBinding.copyWith(
+        workspaceId: sessionKey,
+        displayPath: record.workspaceKind == WorkspaceKind.localFs
+            ? record.workspacePath.trim()
+            : (record.displayPath.trim().isEmpty
+                  ? record.workspacePath.trim()
+                  : record.displayPath.trim()),
+      );
       final normalizedRecord = record.copyWith(
-        sessionKey: sessionKey,
+        threadId: sessionKey,
         title: titleFromSettings.isEmpty
             ? record.title.trim()
             : titleFromSettings,
@@ -690,16 +701,8 @@ extension AppControllerDesktopThreadStorage on AppController {
         gatewayEntryState: (record.gatewayEntryState ?? '').trim().isEmpty
             ? gatewayEntryStateForTargetInternal(record.executionTarget)
             : record.gatewayEntryState,
-        workspacePath: record.workspacePath.trim(),
-        displayPath: record.workspaceKind == WorkspaceKind.localFs
-            ? record.workspacePath.trim()
-            : (record.displayPath.trim().isEmpty
-                  ? record.workspacePath.trim()
-                  : record.displayPath.trim()),
-        workspaceKind: record.workspaceKind,
-        lifecycleStatus: record.workspacePath.trim().isEmpty
-            ? 'needs_workspace'
-            : record.lifecycleState.status,
+        workspaceBinding: workspaceBinding,
+        lifecycleState: record.lifecycleState.copyWith(status: 'ready'),
       );
       if (normalizedRecord.workspaceKind == WorkspaceKind.localFs &&
           normalizedRecord.workspacePath.trim().isNotEmpty) {
