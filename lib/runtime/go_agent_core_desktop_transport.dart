@@ -22,6 +22,7 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
     GoCoreLocator? goCoreLocator,
     GoAgentCoreProcessStarter? processStarter,
   }) : _acpClient = acpClient,
+       _endpointResolver = endpointResolver,
        _goCoreLocator = goCoreLocator ?? GoCoreLocator(),
        _processStarter =
            processStarter ??
@@ -35,6 +36,7 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
            });
 
   final GatewayAcpClient _acpClient;
+  final Uri? Function(AssistantExecutionTarget target) _endpointResolver;
   final GoCoreLocator _goCoreLocator;
   final GoAgentCoreProcessStarter _processStarter;
 
@@ -62,7 +64,7 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
   }) async {
-    final endpoint = await _ensureLocalEndpoint();
+    final endpoint = await _resolveEndpoint(target);
     if (endpoint == null) {
       return const GoAgentCoreCapabilities.empty();
     }
@@ -83,7 +85,7 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
     GoAgentCoreSessionRequest request, {
     required void Function(GoAgentCoreSessionUpdate update) onUpdate,
   }) async {
-    final endpoint = await _ensureLocalEndpoint();
+    final endpoint = await _resolveEndpoint(request.target);
     if (endpoint == null) {
       throw const GatewayAcpException(
         'Missing Go Agent-core endpoint',
@@ -123,7 +125,7 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
     required String sessionId,
     required String threadId,
   }) async {
-    final endpoint = await _ensureLocalEndpoint();
+    final endpoint = await _resolveEndpoint(target);
     if (endpoint == null) {
       return;
     }
@@ -140,7 +142,7 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
     required String sessionId,
     required String threadId,
   }) async {
-    final endpoint = await _ensureLocalEndpoint();
+    final endpoint = await _resolveEndpoint(target);
     if (endpoint == null) {
       return;
     }
@@ -164,6 +166,14 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
         // Best effort only.
       }
     }
+  }
+
+  Future<Uri?> _resolveEndpoint(AssistantExecutionTarget target) async {
+    if (target == AssistantExecutionTarget.singleAgent ||
+        target == AssistantExecutionTarget.auto) {
+      return _ensureLocalEndpoint();
+    }
+    return _endpointResolver(target);
   }
 
   Future<Uri?> _ensureLocalEndpoint() async {
