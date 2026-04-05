@@ -3,8 +3,6 @@ package acp
 import (
 	"sort"
 	"strings"
-
-	"xworkmate/go_core/internal/shared"
 )
 
 type syncedProvider struct {
@@ -66,9 +64,6 @@ func (s *Server) syncedProviderByID(providerID string) (syncedProvider, bool) {
 
 func (s *Server) availableProviders() []string {
 	providers := make(map[string]struct{})
-	for _, provider := range shared.DetectACPProviders() {
-		providers[provider] = struct{}{}
-	}
 	s.mu.Lock()
 	for _, provider := range s.providerCatalog {
 		if !provider.Enabled || strings.TrimSpace(provider.Endpoint) == "" {

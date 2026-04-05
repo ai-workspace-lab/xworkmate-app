@@ -78,8 +78,8 @@ func (r Resolver) Resolve(req Request) Result {
 	availableProviders := normalizeProviders(req.AvailableProviders)
 
 	result := Result{
-		ResolvedModel:      strings.TrimSpace(req.ExplicitModel),
-		MemorySources:      mem.Sources,
+		ResolvedModel: strings.TrimSpace(req.ExplicitModel),
+		MemorySources: mem.Sources,
 	}
 
 	result.ResolvedExecutionTarget, result.ResolvedEndpointTarget = r.resolveExecution(req, mem.Preferences)
@@ -226,9 +226,6 @@ func resolveProvider(
 ) (string, bool, string, string) {
 	explicitProviderID := normalize(strings.TrimSpace(req.ExplicitProviderID))
 	if explicitProviderID != "" {
-		if len(availableProviders) == 0 {
-			return explicitProviderID, false, "", ""
-		}
 		if containsProvider(availableProviders, explicitProviderID) {
 			return explicitProviderID, false, "", ""
 		}

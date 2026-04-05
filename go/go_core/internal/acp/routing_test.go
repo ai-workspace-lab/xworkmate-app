@@ -1,6 +1,7 @@
 package acp
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +11,36 @@ import (
 
 	"xworkmate/go_core/internal/shared"
 )
+
+func newExternalSingleAgentProvider(
+	t *testing.T,
+	providerID string,
+	output string,
+) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/acp/rpc" {
+			http.NotFound(w, r)
+			return
+		}
+		defer r.Body.Close()
+		var request map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"jsonrpc": "2.0",
+			"id":      request["id"],
+			"result": map[string]any{
+				"success":  true,
+				"output":   output,
+				"turnId":   "turn-" + providerID,
+				"provider": providerID,
+				"mode":     "single-agent",
+			},
+		})
+	}))
+}
 
 func TestHandleRoutingResolveCoversNineScenarioBuckets(t *testing.T) {
 	localAvailableSkills := []map[string]any{
@@ -139,19 +170,17 @@ func TestExecuteSessionTaskAutoRoutingRecordsProjectMemory(t *testing.T) {
 		t.Fatalf("create workspace: %v", err)
 	}
 
-	fakeProvider := filepath.Join(t.TempDir(), "fake-claude.sh")
-	if err := os.WriteFile(
-		fakeProvider,
-		[]byte("#!/bin/sh\nprintf 'done'\n"),
-		0o755,
-	); err != nil {
-		t.Fatalf("write fake provider: %v", err)
-	}
-
 	t.Setenv("HOME", homeDir)
-	t.Setenv("ACP_CLAUDE_BIN", fakeProvider)
 
 	server := NewServer()
+	providerServer := newExternalSingleAgentProvider(t, "claude", "done")
+	defer providerServer.Close()
+	server.syncProviders([]syncedProvider{{
+		ProviderID: "claude",
+		Label:      "Claude",
+		Endpoint:   providerServer.URL,
+		Enabled:    true,
+	}})
 	response, rpcErr := server.executeSessionTask(task{
 		req: shared.RPCRequest{
 			Params: map[string]any{
@@ -212,19 +241,17 @@ func TestExecuteSessionTaskExplicitRoutingDoesNotRecordProjectMemory(t *testing.
 		t.Fatalf("create workspace: %v", err)
 	}
 
-	fakeProvider := filepath.Join(t.TempDir(), "fake-claude.sh")
-	if err := os.WriteFile(
-		fakeProvider,
-		[]byte("#!/bin/sh\nprintf 'done'\n"),
-		0o755,
-	); err != nil {
-		t.Fatalf("write fake provider: %v", err)
-	}
-
 	t.Setenv("HOME", homeDir)
-	t.Setenv("ACP_CLAUDE_BIN", fakeProvider)
 
 	server := NewServer()
+	providerServer := newExternalSingleAgentProvider(t, "claude", "done")
+	defer providerServer.Close()
+	server.syncProviders([]syncedProvider{{
+		ProviderID: "claude",
+		Label:      "Claude",
+		Endpoint:   providerServer.URL,
+		Enabled:    true,
+	}})
 	response, rpcErr := server.executeSessionTask(task{
 		req: shared.RPCRequest{
 			Params: map[string]any{
@@ -267,6 +294,34 @@ func TestExecuteSessionTaskExplicitRoutingDoesNotRecordProjectMemory(t *testing.
 		if _, err := os.Stat(target); !os.IsNotExist(err) {
 			t.Fatalf("expected no memory write for explicit routing at %s, err=%v", target, err)
 		}
+	}
+}
+
+func TestExecuteSessionTaskExplicitProviderRequiresSyncedCatalog(t *testing.T) {
+	server := NewServer()
+	response, rpcErr := server.executeSessionTask(task{
+		req: shared.RPCRequest{
+			Method: "session.start",
+			Params: map[string]any{
+				"sessionId":  "session-explicit-provider",
+				"threadId":   "thread-explicit-provider",
+				"taskPrompt": "create a powerpoint deck for launch",
+				"routing": map[string]any{
+					"routingMode":             "explicit",
+					"explicitExecutionTarget": "singleAgent",
+					"explicitProviderId":      "claude",
+				},
+			},
+		},
+	})
+	if rpcErr != nil {
+		t.Fatalf("expected structured unavailable response, got rpc error: %v", rpcErr)
+	}
+	if got := response["unavailable"]; got != true {
+		t.Fatalf("expected unavailable response, got %#v", response)
+	}
+	if got := response["unavailableCode"]; got != "PROVIDER_UNAVAILABLE" {
+		t.Fatalf("expected PROVIDER_UNAVAILABLE, got %#v", response)
 	}
 }
 
