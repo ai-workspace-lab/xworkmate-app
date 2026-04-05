@@ -357,6 +357,7 @@ class AppController extends ChangeNotifier {
   String settingsDraftStatusMessageInternal = '';
   bool initializingInternal = true;
   String? bootstrapErrorInternal;
+  String? startupTaskThreadWarningInternal;
   StreamSubscription<GatewayPushEvent>? runtimeEventsSubscriptionInternal;
   bool disposedInternal = false;
   String resolvedUserHomeDirectoryInternal = resolveUserHomeDirectory();
@@ -414,6 +415,15 @@ class AppController extends ChangeNotifier {
   DetailPanelData? get detailPanel => detailPanelInternal;
   bool get initializing => initializingInternal;
   String? get bootstrapError => bootstrapErrorInternal;
+  String? get startupTaskThreadWarning => startupTaskThreadWarningInternal;
+
+  void dismissStartupTaskThreadWarning() {
+    if ((startupTaskThreadWarningInternal ?? '').trim().isEmpty) {
+      return;
+    }
+    startupTaskThreadWarningInternal = null;
+    notifyIfActiveInternal();
+  }
 
   UiFeatureAccess featuresFor(UiFeaturePlatform platform) {
     final manifest = applyAppleAppStorePolicy(

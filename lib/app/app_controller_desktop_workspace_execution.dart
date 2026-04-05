@@ -60,15 +60,25 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         settings.assistantExecutionTarget == resolvedTarget) {
       return;
     }
+    if (!assistantThreadRecordsInternal.containsKey(
+      sessionsControllerInternal.currentSessionKey,
+    )) {
+      initializeAssistantThreadContext(
+        sessionsControllerInternal.currentSessionKey,
+        executionTarget: resolvedTarget,
+        messageViewMode: currentAssistantMessageViewMode,
+        singleAgentProvider: currentSingleAgentProvider,
+      );
+    }
+    await ensureDesktopTaskThreadBindingInternal(
+      sessionsControllerInternal.currentSessionKey,
+      executionTarget: resolvedTarget,
+    );
     upsertTaskThreadInternal(
       sessionsControllerInternal.currentSessionKey,
       executionTarget: resolvedTarget,
       executionTargetSource: ThreadSelectionSource.explicit,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
-    await ensureDesktopTaskThreadBindingInternal(
-      sessionsControllerInternal.currentSessionKey,
-      executionTarget: resolvedTarget,
     );
     recomputeTasksInternal();
     notifyIfActiveInternal();
@@ -92,6 +102,14 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     final sanitizedProvider = settings.resolveSingleAgentProvider(provider);
     if (singleAgentProviderForSession(sessionKey) == sanitizedProvider) {
       return;
+    }
+    if (!assistantThreadRecordsInternal.containsKey(sessionKey)) {
+      initializeAssistantThreadContext(
+        sessionKey,
+        executionTarget: assistantExecutionTargetForSession(sessionKey),
+        messageViewMode: assistantMessageViewModeForSession(sessionKey),
+        singleAgentProvider: currentSingleAgentProvider,
+      );
     }
     singleAgentRuntimeModelBySessionInternal.remove(sessionKey);
     upsertTaskThreadInternal(
@@ -121,6 +139,14 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     );
     if (assistantMessageViewModeForSession(sessionKey) == mode) {
       return;
+    }
+    if (!assistantThreadRecordsInternal.containsKey(sessionKey)) {
+      initializeAssistantThreadContext(
+        sessionKey,
+        executionTarget: assistantExecutionTargetForSession(sessionKey),
+        messageViewMode: assistantMessageViewModeForSession(sessionKey),
+        singleAgentProvider: singleAgentProviderForSession(sessionKey),
+      );
     }
     upsertTaskThreadInternal(
       sessionKey,
@@ -245,6 +271,14 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         trimmed) {
       return;
     }
+    if (!assistantThreadRecordsInternal.containsKey(normalizedSessionKey)) {
+      initializeAssistantThreadContext(
+        normalizedSessionKey,
+        executionTarget: assistantExecutionTargetForSession(normalizedSessionKey),
+        messageViewMode: assistantMessageViewModeForSession(normalizedSessionKey),
+        singleAgentProvider: singleAgentProviderForSession(normalizedSessionKey),
+      );
+    }
     upsertTaskThreadInternal(
       normalizedSessionKey,
       assistantModelId: trimmed,
@@ -281,24 +315,25 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     final resolvedTarget =
         executionTarget ??
         assistantExecutionTargetForSession(currentSessionKey);
-    final initialWorkspaceBinding =
-        resolvedTarget == AssistantExecutionTarget.singleAgent
-        ? (() {
-            final localPath = localThreadWorkspacePathInternal(
-              normalizedSessionKey,
-            );
-            return WorkspaceBinding(
-              workspaceId: normalizedSessionKey,
-              workspaceKind: WorkspaceKind.localFs,
-              workspacePath: localPath,
-              displayPath: localPath,
-              writable: true,
-            );
-          })()
-        : null;
+    final initialOwnerScope =
+        assistantThreadRecordsInternal[normalizedSessionKey]?.ownerScope ??
+        const ThreadOwnerScope(
+          realm: ThreadRealm.local,
+          subjectType: ThreadSubjectType.user,
+          subjectId: '',
+          displayName: '',
+        );
+    final initialWorkspaceBinding = buildDesktopWorkspaceBindingInternal(
+      normalizedSessionKey,
+      executionTarget: resolvedTarget,
+      ownerScope: initialOwnerScope,
+      existingBinding:
+          assistantThreadRecordsInternal[normalizedSessionKey]?.workspaceBinding,
+    );
     upsertTaskThreadInternal(
       normalizedSessionKey,
       title: title.trim(),
+      ownerScope: initialOwnerScope,
       executionTarget: resolvedTarget,
       workspaceBinding: initialWorkspaceBinding,
       messageViewMode:
