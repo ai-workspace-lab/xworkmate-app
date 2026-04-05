@@ -58,7 +58,15 @@ void registerSecureConfigStoreSuiteCompatibilityTestsInternal() {
         );
         final legacyRecords = <TaskThread>[
           TaskThread(
-            sessionKey: 'draft:legacy-1',
+            threadId: 'draft:legacy-1',
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'draft:legacy-1',
+              workspaceKind: WorkspaceKind.remoteFs,
+              workspacePath: '/owners/remote/user/legacy/threads/draft:legacy-1',
+              displayPath:
+                  '/owners/remote/user/legacy/threads/draft:legacy-1',
+              writable: true,
+            ),
             title: 'Legacy thread',
             archived: false,
             executionTarget: AssistantExecutionTarget.local,
@@ -255,52 +263,51 @@ void registerSecureConfigStoreSuiteCompatibilityTestsInternal() {
       expect(decoded.lifecycleState.status, 'ready');
     });
 
-    test('TaskThread defaults lifecycle status to needs_workspace', () {
-      final decoded = TaskThread.fromJson(<String, dynamic>{
-        'schemaVersion': taskThreadSchemaVersion,
-        'threadId': 'thread-legacy',
-        'title': 'Needs Workspace',
-        'ownerScope': const <String, Object?>{
-          'realm': 'local',
-          'subjectType': 'user',
-          'subjectId': 'device-1',
-          'displayName': 'device-1',
-        },
-        'workspaceBinding': const <String, Object?>{
-          'workspaceId': 'thread-legacy',
-          'workspaceKind': 'localFs',
-          'workspacePath': '',
-          'displayPath': '',
-          'writable': true,
-        },
-        'executionBinding': const <String, Object?>{
-          'executionMode': 'localAgent',
-          'executorId': 'auto',
-          'providerId': 'auto',
-          'endpointId': '',
-        },
-        'contextState': const <String, Object?>{
-          'messages': <Object>[],
-          'selectedModelId': '',
-          'selectedSkillKeys': <Object>[],
-          'importedSkills': <Object>[],
-          'permissionLevel': 'defaultAccess',
-          'messageViewMode': 'rendered',
-          'latestResolvedRuntimeModel': '',
-        },
-        'lifecycleState': const <String, Object?>{
-          'archived': false,
-          'status': 'needs_workspace',
-          'lastRunAtMs': null,
-          'lastResultCode': null,
-        },
-        'createdAtMs': 1700000000000,
-        'updatedAtMs': 1700000000000,
-      });
-
-      expect(decoded.workspaceRef, isEmpty);
-      expect(decoded.workspaceKind, WorkspaceKind.localFs);
-      expect(decoded.lifecycleState.status, 'needs_workspace');
+    test('TaskThread rejects persisted records without a complete binding', () {
+      expect(
+        () => TaskThread.fromJson(<String, dynamic>{
+          'schemaVersion': taskThreadSchemaVersion,
+          'threadId': 'thread-legacy',
+          'title': 'Needs Workspace',
+          'ownerScope': const <String, Object?>{
+            'realm': 'local',
+            'subjectType': 'user',
+            'subjectId': 'device-1',
+            'displayName': 'device-1',
+          },
+          'workspaceBinding': const <String, Object?>{
+            'workspaceId': 'thread-legacy',
+            'workspaceKind': 'localFs',
+            'workspacePath': '',
+            'displayPath': '',
+            'writable': true,
+          },
+          'executionBinding': const <String, Object?>{
+            'executionMode': 'localAgent',
+            'executorId': 'auto',
+            'providerId': 'auto',
+            'endpointId': '',
+          },
+          'contextState': const <String, Object?>{
+            'messages': <Object>[],
+            'selectedModelId': '',
+            'selectedSkillKeys': <Object>[],
+            'importedSkills': <Object>[],
+            'permissionLevel': 'defaultAccess',
+            'messageViewMode': 'rendered',
+            'latestResolvedRuntimeModel': '',
+          },
+          'lifecycleState': const <String, Object?>{
+            'archived': false,
+            'status': 'needs_workspace',
+            'lastRunAtMs': null,
+            'lastResultCode': null,
+          },
+          'createdAtMs': 1700000000000,
+          'updatedAtMs': 1700000000000,
+        }),
+        throwsFormatException,
+      );
     });
   });
 }

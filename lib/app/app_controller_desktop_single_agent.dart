@@ -232,8 +232,19 @@ extension AppControllerDesktopSingleAgent on AppController {
             resolvedWorkspaceKind != WorkspaceRefKind.localPath) {
           upsertTaskThreadInternal(
             sessionKey,
-            workspaceRef: resolvedWorkingDirectory,
-            workspaceRefKind: resolvedWorkspaceKind,
+            workspaceBinding: WorkspaceBinding(
+              workspaceId: normalizedAssistantSessionKeyInternal(sessionKey),
+              workspaceKind: resolvedWorkspaceKind == WorkspaceRefKind.remotePath
+                  ? WorkspaceKind.remoteFs
+                  : WorkspaceKind.localFs,
+              workspacePath: resolvedWorkingDirectory,
+              displayPath: resolvedWorkingDirectory,
+              writable:
+                  assistantThreadRecordsInternal[normalizedAssistantSessionKeyInternal(sessionKey)]
+                      ?.workspaceBinding
+                      .writable ??
+                  true,
+            ),
             updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
           );
         }

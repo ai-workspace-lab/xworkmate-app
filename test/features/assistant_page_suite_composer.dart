@@ -254,26 +254,36 @@ void registerAssistantPageSuiteComposerTestsInternal() {
         ).create(recursive: true);
         await store.saveTaskThreads(<TaskThread>[
           TaskThread(
-            sessionKey: 'main',
+            threadId: 'main',
+            workspaceBinding: WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: '${tempDirectory.path}/thread-main',
+              displayPath: '${tempDirectory.path}/thread-main',
+              writable: true,
+            ),
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,
             title: 'Main',
             archived: false,
             executionTarget: AssistantExecutionTarget.singleAgent,
             messageViewMode: AssistantMessageViewMode.rendered,
-            workspaceRef: '${tempDirectory.path}/thread-main',
-            workspaceRefKind: WorkspaceRefKind.localPath,
           ),
           TaskThread(
-            sessionKey: 'draft:artifact-thread',
+            threadId: 'draft:artifact-thread',
+            workspaceBinding: WorkspaceBinding(
+              workspaceId: 'draft:artifact-thread',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: '${tempDirectory.path}/thread-task',
+              displayPath: '${tempDirectory.path}/thread-task',
+              writable: true,
+            ),
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 2,
             title: 'Artifact Thread',
             archived: false,
             executionTarget: AssistantExecutionTarget.singleAgent,
             messageViewMode: AssistantMessageViewMode.rendered,
-            workspaceRef: '${tempDirectory.path}/thread-task',
-            workspaceRefKind: WorkspaceRefKind.localPath,
           ),
         ]);
         controller = CaptureSendAppControllerInternal(
@@ -823,7 +833,14 @@ void registerAssistantPageSuiteComposerTestsInternal() {
       final controller = await createControllerWithThreadRecordsInternal(
         records: <TaskThread>[
           TaskThread(
-            sessionKey: 'main',
+            threadId: 'main',
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: '/tmp/main-thread',
+              displayPath: '/tmp/main-thread',
+              writable: true,
+            ),
             title: '研发任务',
             archived: false,
             executionTarget: AssistantExecutionTarget.singleAgent,
@@ -937,7 +954,14 @@ void registerAssistantPageSuiteComposerTestsInternal() {
     final controller = await createControllerWithThreadRecordsInternal(
       records: <TaskThread>[
         TaskThread(
-          sessionKey: 'main',
+          threadId: 'main',
+          workspaceBinding: const WorkspaceBinding(
+            workspaceId: 'main',
+            workspaceKind: WorkspaceKind.localFs,
+            workspacePath: '/tmp/main-thread',
+            displayPath: '/tmp/main-thread',
+            writable: true,
+          ),
           title: '研发任务',
           archived: false,
           executionTarget: AssistantExecutionTarget.singleAgent,

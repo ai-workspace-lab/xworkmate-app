@@ -45,7 +45,14 @@ void main() {
       final bodies = <String>[];
       final records = <TaskThread>[
         TaskThread(
-          sessionKey: 'direct:1',
+          threadId: 'direct:1',
+          workspaceBinding: const WorkspaceBinding(
+            workspaceId: 'direct:1',
+            workspaceKind: WorkspaceKind.remoteFs,
+            workspacePath: '/owners/remote/user/direct/threads/direct:1',
+            displayPath: '/owners/remote/user/direct/threads/direct:1',
+            writable: true,
+          ),
           messages: const <GatewayChatMessage>[
             GatewayChatMessage(
               id: 'm1',

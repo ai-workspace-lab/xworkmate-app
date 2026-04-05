@@ -30,7 +30,14 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         );
         final records = <TaskThread>[
           TaskThread(
-            sessionKey: 'main',
+            threadId: 'main',
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.remoteFs,
+              workspacePath: '/owners/remote/user/main/threads/main',
+              displayPath: '/owners/remote/user/main/threads/main',
+              writable: true,
+            ),
             title: '研发任务',
             archived: true,
             executionTarget: AssistantExecutionTarget.remote,
@@ -132,7 +139,14 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         );
         final records = <TaskThread>[
           TaskThread(
-            sessionKey: 'draft:backup-1',
+            threadId: 'draft:backup-1',
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'draft:backup-1',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: '/tmp/draft-backup-1',
+              displayPath: '/tmp/draft-backup-1',
+              writable: true,
+            ),
             title: '备份线程',
             archived: false,
             executionTarget: AssistantExecutionTarget.singleAgent,
@@ -202,7 +216,15 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         );
         final records = <TaskThread>[
           TaskThread(
-            sessionKey: 'draft:clear-1',
+            threadId: 'draft:clear-1',
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'draft:clear-1',
+              workspaceKind: WorkspaceKind.remoteFs,
+              workspacePath: '/owners/remote/user/clear/threads/draft:clear-1',
+              displayPath:
+                  '/owners/remote/user/clear/threads/draft:clear-1',
+              writable: true,
+            ),
             title: '清理线程',
             archived: false,
             executionTarget: AssistantExecutionTarget.local,
