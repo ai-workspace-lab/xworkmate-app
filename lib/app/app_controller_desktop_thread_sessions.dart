@@ -50,6 +50,14 @@ import 'app_controller_desktop_thread_sessions_collaboration_impl.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 extension AppControllerDesktopThreadSessions on AppController {
+  Map<String, dynamic> latestRoutingResolutionForSession(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    return latestRoutingResolutionBySessionInternal[normalizedSessionKey] ??
+        const <String, dynamic>{};
+  }
+
   int assistantSkillCountForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -97,8 +105,14 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
+    final latestRouting = latestRoutingResolutionForSession(normalizedSessionKey);
+    final latestResolvedModel =
+        latestRouting['resolvedModel']?.toString().trim() ?? '';
     if (target == AssistantExecutionTarget.singleAgent ||
         target == AssistantExecutionTarget.auto) {
+      if (latestResolvedModel.isNotEmpty) {
+        return latestResolvedModel;
+      }
       if (singleAgentUsesAiChatFallbackForSession(normalizedSessionKey)) {
         final recordModel =
             assistantThreadRecordsInternal[normalizedSessionKey]
@@ -376,6 +390,67 @@ extension AppControllerDesktopThreadSessions on AppController {
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
     if (target == AssistantExecutionTarget.singleAgent ||
         target == AssistantExecutionTarget.auto) {
+      final latestRouting = latestRoutingResolutionForSession(normalizedSessionKey);
+      final latestResolvedExecutionTarget =
+          latestRouting['resolvedExecutionTarget']?.toString().trim() ?? '';
+      final latestResolvedEndpointTarget =
+          latestRouting['resolvedEndpointTarget']?.toString().trim() ?? '';
+      final latestResolvedProviderId =
+          latestRouting['resolvedProviderId']?.toString().trim() ?? '';
+      final latestResolvedModel =
+          latestRouting['resolvedModel']?.toString().trim() ?? '';
+      final primaryLabel = target == AssistantExecutionTarget.auto
+          ? 'Auto'
+          : target.label;
+      final actualDetailPrefix = target == AssistantExecutionTarget.auto
+          ? appText('当前: ', 'Current: ')
+          : '';
+      if (target == AssistantExecutionTarget.auto &&
+          latestResolvedExecutionTarget.isEmpty) {
+        return AssistantThreadConnectionState(
+          executionTarget: target,
+          status: RuntimeConnectionStatus.offline,
+          primaryLabel: primaryLabel,
+          detailLabel: appText('待服务端路由', 'Waiting for server routing'),
+          ready: false,
+          pairingRequired: false,
+          gatewayTokenMissing: false,
+          lastError: null,
+        );
+      }
+      if (target == AssistantExecutionTarget.auto &&
+          latestResolvedExecutionTarget.isNotEmpty) {
+        final detail = switch (latestResolvedExecutionTarget) {
+          'gateway' => joinConnectionPartsInternal(<String>[
+              latestResolvedEndpointTarget.isEmpty
+                  ? appText('OpenClaw Gateway', 'OpenClaw Gateway')
+                  : latestResolvedEndpointTarget,
+              latestResolvedModel,
+            ]),
+          'multi-agent' => joinConnectionPartsInternal(<String>[
+              appText('Multi-Agent', 'Multi-Agent'),
+              latestResolvedModel,
+            ]),
+          _ => joinConnectionPartsInternal(<String>[
+              latestResolvedProviderId.isEmpty
+                  ? appText('Single Agent', 'Single Agent')
+                  : latestResolvedProviderId,
+              latestResolvedModel,
+            ]),
+        };
+        return AssistantThreadConnectionState(
+          executionTarget: target,
+          status: RuntimeConnectionStatus.connected,
+          primaryLabel: primaryLabel,
+          detailLabel: detail.isEmpty
+              ? appText('待服务端路由', 'Waiting for server routing')
+              : '$actualDetailPrefix$detail',
+          ready: true,
+          pairingRequired: false,
+          gatewayTokenMissing: false,
+          lastError: null,
+        );
+      }
       final provider = singleAgentProviderForSession(normalizedSessionKey);
       final resolvedProvider = singleAgentResolvedProviderForSession(
         normalizedSessionKey,
@@ -410,12 +485,6 @@ extension AppControllerDesktopThreadSessions on AppController {
               '当前线程的外部 Agent ACP 连接尚未就绪。',
               'The external Agent ACP connection for this thread is not ready yet.',
             );
-      final primaryLabel = target == AssistantExecutionTarget.auto
-          ? 'Auto'
-          : target.label;
-      final actualDetailPrefix = target == AssistantExecutionTarget.auto
-          ? appText('当前: ', 'Current: ')
-          : '';
       return AssistantThreadConnectionState(
         executionTarget: target,
         status: providerReady || fallbackReady

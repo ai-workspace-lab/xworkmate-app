@@ -95,6 +95,39 @@ void main() {
       });
     });
 
+    test('session request synthesizes routing when caller omits it', () {
+      const request = GoAgentCoreSessionRequest(
+        sessionId: 'session-implicit-routing',
+        threadId: 'thread-implicit-routing',
+        target: AssistantExecutionTarget.singleAgent,
+        prompt: 'hello world',
+        workingDirectory: '/tmp/workspace',
+        model: 'codex-sonnet',
+        thinking: '',
+        selectedSkills: <String>['PPTX'],
+        inlineAttachments: <GatewayChatAttachmentPayload>[],
+        localAttachments: <CollaborationAttachment>[],
+        aiGatewayBaseUrl: '',
+        aiGatewayApiKey: '',
+        agentId: '',
+        metadata: <String, dynamic>{},
+        provider: SingleAgentProvider.opencode,
+      );
+
+      final params = request.toAcpParams();
+
+      expect(params['routing'], <String, dynamic>{
+        'routingMode': 'explicit',
+        'preferredGatewayTarget': 'local',
+        'explicitExecutionTarget': 'singleAgent',
+        'explicitProviderId': 'opencode',
+        'explicitModel': 'codex-sonnet',
+        'explicitSkills': const <String>['PPTX'],
+        'allowSkillInstall': false,
+        'availableSkills': const <Map<String, dynamic>>[],
+      });
+    });
+
     test('routing execution target uses gateway while session mode stays compatible', () {
       const request = GoAgentCoreSessionRequest(
         sessionId: 'session-2',
@@ -120,6 +153,14 @@ void main() {
       expect(params['mode'], 'gateway-chat');
       expect(params['executionTarget'], 'local');
       expect(params['agentId'], 'agent-1');
+      expect(params['routing'], <String, dynamic>{
+        'routingMode': 'explicit',
+        'preferredGatewayTarget': 'local',
+        'explicitExecutionTarget': 'local',
+        'explicitSkills': const <String>[],
+        'allowSkillInstall': false,
+        'availableSkills': const <Map<String, dynamic>>[],
+      });
     });
 
     test(
