@@ -65,22 +65,21 @@ func TestRecordSuccessWritesProjectLevelMemoryFiles(t *testing.T) {
 		t.Fatalf("record success: %v", err)
 	}
 
-	targets := []string{
-		filepath.Join(homeDir, "self-improving", "projects", "repo.md"),
-		filepath.Join(workingDir, ".xworkmate", "memory.md"),
+	repoLocalTarget := filepath.Join(workingDir, ".xworkmate", "memory.md")
+	content, err := os.ReadFile(repoLocalTarget)
+	if err != nil {
+		t.Fatalf("read target %s: %v", repoLocalTarget, err)
 	}
-	for _, target := range targets {
-		content, err := os.ReadFile(target)
-		if err != nil {
-			t.Fatalf("read target %s: %v", target, err)
-		}
-		text := string(content)
-		if !strings.Contains(text, "preferred-route: single-agent") {
-			t.Fatalf("missing preferred route in %s: %q", target, text)
-		}
-		if strings.Contains(strings.ToLower(text), "token") {
-			t.Fatalf("unexpected sensitive content in %s: %q", target, text)
-		}
+	text := string(content)
+	if !strings.Contains(text, "preferred-route: single-agent") {
+		t.Fatalf("missing preferred route in %s: %q", repoLocalTarget, text)
+	}
+	if strings.Contains(strings.ToLower(text), "token") {
+		t.Fatalf("unexpected sensitive content in %s: %q", repoLocalTarget, text)
+	}
+	homeProjectTarget := filepath.Join(homeDir, "self-improving", "projects", "repo.md")
+	if _, err := os.Stat(homeProjectTarget); !os.IsNotExist(err) {
+		t.Fatalf("expected single project-level write target, got stat err=%v", err)
 	}
 }
 

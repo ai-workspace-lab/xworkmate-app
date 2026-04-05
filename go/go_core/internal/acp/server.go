@@ -48,6 +48,7 @@ type Server struct {
 	sessions map[string]*session
 	queues   map[string]chan task
 	gateway  *gatewayruntime.Manager
+	providerCatalog map[string]syncedProvider
 }
 
 var wsUpgrader = websocket.Upgrader{
@@ -97,6 +98,7 @@ func NewServer() *Server {
 		sessions: make(map[string]*session),
 		queues:   make(map[string]chan task),
 		gateway:  gatewayruntime.NewManager(),
+		providerCatalog: make(map[string]syncedProvider),
 	}
 }
 
@@ -247,7 +249,7 @@ func (s *Server) handleRequest(
 	method := strings.TrimSpace(request.Method)
 	switch method {
 	case "acp.capabilities":
-		providers := shared.DetectACPProviders()
+		providers := s.availableProviders()
 		singleAgent := len(providers) > 0
 		multiAgent := shared.BoolArg(
 			shared.EnvOrDefault("ACP_MULTI_AGENT_ENABLED", "true"),
@@ -316,7 +318,13 @@ func (s *Server) handleRequest(
 	case "xworkmate.dispatch.resolve":
 		return handleDispatchResolve(request.Params), nil
 	case "xworkmate.routing.resolve":
-		return handleRoutingResolve(request.Params), nil
+		result, _ := resolveRoutingMetadataWithProviders(
+			request.Params,
+			s.availableProviders(),
+		)
+		return mergeRoutingResponse(map[string]any{"ok": true}, result), nil
+	case "xworkmate.providers.sync":
+		return s.syncProviders(parseSyncedProviders(request.Params["providers"])), nil
 	case "xworkmate.mounts.reconcile":
 		return handleMountReconcile(request.Params), nil
 	case "xworkmate.gateway.connect":
@@ -533,18 +541,32 @@ func (s *Server) runQueue(queue chan task) {
 
 func (s *Server) executeSessionTask(task task) (map[string]any, *shared.RPCError) {
 	params := task.req.Params
-	resolvedRouting, hasResolvedRouting := resolveRoutingMetadata(params)
-	if hasResolvedRouting {
-		params = applyResolvedRouting(params, resolvedRouting)
+	resolvedRouting, hasResolvedRouting := resolveRoutingMetadataWithProviders(
+		params,
+		s.availableProviders(),
+	)
+	if !hasResolvedRouting {
+		return nil, &shared.RPCError{
+			Code:    -32602,
+			Message: "ROUTING_REQUIRED",
+		}
 	}
 
 	sessionID := strings.TrimSpace(shared.StringArg(params, "sessionId", ""))
 	threadID := strings.TrimSpace(shared.StringArg(params, "threadId", sessionID))
-	mode := strings.TrimSpace(shared.StringArg(params, "mode", "single-agent"))
-	provider := strings.TrimSpace(shared.StringArg(params, "provider", ""))
-	if mode == "single-agent" && provider == "" {
-		provider = "codex"
+	if resolvedRouting.Unavailable {
+		response := mergeRoutingResponse(map[string]any{
+			"success":           false,
+			"error":             resolvedRouting.UnavailableMessage,
+			"unavailable":       true,
+			"unavailableCode":   resolvedRouting.UnavailableCode,
+			"unavailableMessage": resolvedRouting.UnavailableMessage,
+		}, resolvedRouting)
+		return response, nil
 	}
+	executionParams := buildResolvedExecutionParams(params, resolvedRouting)
+	mode := strings.TrimSpace(shared.StringArg(executionParams, "mode", "single-agent"))
+	provider := strings.TrimSpace(shared.StringArg(executionParams, "provider", ""))
 
 	session := s.getOrCreateSession(sessionID, threadID)
 	session.mode = mode
@@ -552,7 +574,7 @@ func (s *Server) executeSessionTask(task task) (map[string]any, *shared.RPCError
 		session.provider = provider
 	}
 
-	prompt := strings.TrimSpace(shared.StringArg(params, "taskPrompt", ""))
+	prompt := strings.TrimSpace(shared.StringArg(executionParams, "taskPrompt", ""))
 	if prompt != "" {
 		session.history = append(session.history, prompt)
 	}
@@ -572,49 +594,54 @@ func (s *Server) executeSessionTask(task task) (map[string]any, *shared.RPCError
 	})
 
 	if mode == router.ExecutionTargetGatewayChat || mode == router.ExecutionTargetGateway {
-		result := taskResult{
-			response: map[string]any{
-				"success": false,
-				"error":   "gateway execution must be dispatched to a connected gateway ACP endpoint",
-				"turnId":  turnID,
-				"mode":    router.ExecutionTargetGatewayChat,
-			},
+		result := s.runGateway(
+			ctx,
+			task.req.Method,
+			session,
+			executionParams,
+			turnID,
+			notify,
+		)
+		if result.err != nil {
+			return nil, result.err
 		}
-		if hasResolvedRouting {
-			result.response = mergeRoutingResponse(result.response, resolvedRouting)
-		}
+		result.response = mergeRoutingResponse(result.response, resolvedRouting)
 		return result.response, nil
 	}
 
 	if mode == "multi-agent" {
-		result := s.runMultiAgent(ctx, session, params, turnID, notify)
+		result := s.runMultiAgent(ctx, session, executionParams, turnID, notify)
 		if result.err != nil {
 			return nil, result.err
 		}
-		if hasResolvedRouting {
-			result.response = mergeRoutingResponse(result.response, resolvedRouting)
-			if err := recordRoutingSuccess(params, resolvedRouting, result.response); err != nil {
-				return nil, &shared.RPCError{Code: -32001, Message: err.Error()}
-			}
-		}
-		return result.response, nil
-	}
-
-	result := s.runSingleAgent(ctx, session, params, turnID, notify)
-	if result.err != nil {
-		return nil, result.err
-	}
-	if hasResolvedRouting {
 		result.response = mergeRoutingResponse(result.response, resolvedRouting)
 		if err := recordRoutingSuccess(params, resolvedRouting, result.response); err != nil {
 			return nil, &shared.RPCError{Code: -32001, Message: err.Error()}
 		}
+		return result.response, nil
+	}
+
+	result := s.runSingleAgent(
+		ctx,
+		task.req.Method,
+		session,
+		executionParams,
+		turnID,
+		notify,
+	)
+	if result.err != nil {
+		return nil, result.err
+	}
+	result.response = mergeRoutingResponse(result.response, resolvedRouting)
+	if err := recordRoutingSuccess(params, resolvedRouting, result.response); err != nil {
+		return nil, &shared.RPCError{Code: -32001, Message: err.Error()}
 	}
 	return result.response, nil
 }
 
 func (s *Server) runSingleAgent(
 	ctx context.Context,
+	method string,
 	session *session,
 	params map[string]any,
 	turnID string,
@@ -630,6 +657,55 @@ func (s *Server) runSingleAgent(
 	model := strings.TrimSpace(shared.StringArg(params, "model", ""))
 	prompt := strings.TrimSpace(shared.StringArg(params, "taskPrompt", ""))
 	prompt = shared.AugmentPromptWithAttachments(prompt, params)
+
+	if syncedProvider, ok := s.syncedProviderByID(provider); ok {
+		response, err := s.runSingleAgentViaExternalProvider(
+			ctx,
+			syncedProvider,
+			method,
+			params,
+			notify,
+		)
+		if err == nil {
+			result := asMap(response["result"])
+			if len(result) == 0 {
+				result = response
+			}
+			if _, exists := result["provider"]; !exists {
+				result["provider"] = provider
+			}
+			if _, exists := result["mode"]; !exists {
+				result["mode"] = "single-agent"
+			}
+			if _, exists := result["turnId"]; !exists {
+				result["turnId"] = turnID
+			}
+			return taskResult{response: result}
+		}
+		s.emitSessionUpdate(session, notify, turnID, map[string]any{
+			"type":    "status",
+			"event":   "completed",
+			"message": err.Error(),
+			"pending": false,
+			"error":   true,
+		})
+		s.emitSessionUpdate(session, notify, turnID, map[string]any{
+			"type":    "status",
+			"event":   "completed",
+			"message": err.Error(),
+			"pending": false,
+			"error":   true,
+		})
+		return taskResult{
+			response: map[string]any{
+				"success":  false,
+				"error":    err.Error(),
+				"turnId":   turnID,
+				"mode":     "single-agent",
+				"provider": provider,
+			},
+		}
+	}
 
 	output, err := shared.RunProviderCommand(
 		ctx,

@@ -11,15 +11,23 @@ import (
 )
 
 func handleRoutingResolve(params map[string]any) map[string]any {
-	result, _ := resolveRoutingMetadata(params)
+	result, _ := resolveRoutingMetadataWithProviders(params, nil)
 	return mergeRoutingResponse(map[string]any{"ok": true}, result)
 }
 
 func resolveRoutingMetadata(params map[string]any) (router.Result, bool) {
+	return resolveRoutingMetadataWithProviders(params, nil)
+}
+
+func resolveRoutingMetadataWithProviders(
+	params map[string]any,
+	availableProviders []string,
+) (router.Result, bool) {
 	routingParams := asMap(params["routing"])
 	if len(routingParams) == 0 {
 		return router.Result{}, false
 	}
+	installApproval := asMap(routingParams["installApproval"])
 
 	resolver := router.NewResolver()
 	result := resolver.Resolve(router.Request{
@@ -32,9 +40,14 @@ func resolveRoutingMetadata(params map[string]any) (router.Result, bool) {
 		ExplicitModel:           strings.TrimSpace(sharedString(routingParams, "explicitModel")),
 		ExplicitSkills:          parseRoutingStringSlice(routingParams["explicitSkills"]),
 		AllowSkillInstall:       parseBool(routingParams["allowSkillInstall"]),
-		AvailableSkills:         parseRoutingSkillCandidates(routingParams["availableSkills"]),
-		AIGatewayBaseURL:        strings.TrimSpace(sharedString(params, "aiGatewayBaseUrl")),
-		AIGatewayAPIKey:         strings.TrimSpace(sharedString(params, "aiGatewayApiKey")),
+		InstallApproval: skills.InstallApproval{
+			RequestID:         strings.TrimSpace(sharedString(installApproval, "requestId")),
+			ApprovedSkillKeys: parseRoutingStringSlice(installApproval["approvedSkillKeys"]),
+		},
+		AvailableSkills:   parseRoutingSkillCandidates(routingParams["availableSkills"]),
+		AvailableProviders: append([]string(nil), availableProviders...),
+		AIGatewayBaseURL:  strings.TrimSpace(sharedString(params, "aiGatewayBaseUrl")),
+		AIGatewayAPIKey:   strings.TrimSpace(sharedString(params, "aiGatewayApiKey")),
 	})
 	return result, true
 }
@@ -50,6 +63,16 @@ func mergeRoutingResponse(response map[string]any, result router.Result) map[str
 	response["resolvedSkills"] = append([]string(nil), result.ResolvedSkills...)
 	response["skillResolutionSource"] = result.SkillResolutionSource
 	response["needsSkillInstall"] = result.NeedsSkillInstall
+	response["unavailable"] = result.Unavailable
+	if strings.TrimSpace(result.UnavailableCode) != "" {
+		response["unavailableCode"] = result.UnavailableCode
+	}
+	if strings.TrimSpace(result.UnavailableMessage) != "" {
+		response["unavailableMessage"] = result.UnavailableMessage
+	}
+	if strings.TrimSpace(result.SkillInstallRequestID) != "" {
+		response["skillInstallRequestId"] = result.SkillInstallRequestID
+	}
 	if len(result.SkillCandidates) > 0 {
 		response["skillCandidates"] = routingSkillCandidatesMap(result.SkillCandidates)
 	}
@@ -90,37 +113,6 @@ func recordRoutingSuccess(
 		ResolvedModel:           result.ResolvedModel,
 		ResolvedSkills:          append([]string(nil), result.ResolvedSkills...),
 	})
-}
-
-func applyResolvedRouting(params map[string]any, result router.Result) map[string]any {
-	if len(params) == 0 {
-		return params
-	}
-	next := make(map[string]any, len(params)+6)
-	for key, value := range params {
-		next[key] = value
-	}
-	switch result.ResolvedExecutionTarget {
-	case router.ExecutionTargetSingleAgent:
-		next["mode"] = router.ExecutionTargetSingleAgent
-	case router.ExecutionTargetMultiAgent:
-		next["mode"] = router.ExecutionTargetMultiAgent
-	case router.ExecutionTargetGateway:
-		next["mode"] = router.ExecutionTargetGatewayChat
-		if strings.TrimSpace(result.ResolvedEndpointTarget) != "" {
-			next["executionTarget"] = strings.TrimSpace(result.ResolvedEndpointTarget)
-		}
-	}
-	if strings.TrimSpace(result.ResolvedProviderID) != "" {
-		next["provider"] = strings.TrimSpace(result.ResolvedProviderID)
-	}
-	if strings.TrimSpace(result.ResolvedModel) != "" {
-		next["model"] = strings.TrimSpace(result.ResolvedModel)
-	}
-	if len(result.ResolvedSkills) > 0 {
-		next["selectedSkills"] = append([]string(nil), result.ResolvedSkills...)
-	}
-	return next
 }
 
 func parseRoutingSkillCandidates(raw any) []skills.Candidate {

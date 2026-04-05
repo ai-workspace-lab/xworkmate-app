@@ -632,6 +632,9 @@ class _FakeGoAgentCoreClient implements GoAgentCoreClient {
   final void Function(GoAgentCoreSessionRequest request)? onExecute;
 
   @override
+  Future<void> syncProviders(List<GoAgentCoreSyncedProvider> providers) async {}
+
+  @override
   Future<GoAgentCoreCapabilities> loadCapabilities({
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
