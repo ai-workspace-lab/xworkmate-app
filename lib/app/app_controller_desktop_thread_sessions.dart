@@ -105,7 +105,9 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
-    final latestRouting = latestRoutingResolutionForSession(normalizedSessionKey);
+    final latestRouting = latestRoutingResolutionForSession(
+      normalizedSessionKey,
+    );
     final latestResolvedModel =
         latestRouting['resolvedModel']?.toString().trim() ?? '';
     if (target == AssistantExecutionTarget.singleAgent ||
@@ -285,6 +287,21 @@ extension AppControllerDesktopThreadSessions on AppController {
   bool get currentSingleAgentShouldSuggestAutoSwitch =>
       singleAgentShouldSuggestAutoSwitchForSession(currentSessionKey);
 
+  bool autoRouteReadyForSession(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    if (assistantExecutionTargetForSession(normalizedSessionKey) !=
+        AssistantExecutionTarget.auto) {
+      return false;
+    }
+    return hasAnyAvailableSingleAgentProvider ||
+        canUseAiGatewayConversation ||
+        connection.status == RuntimeConnectionStatus.connected;
+  }
+
+  bool get currentAutoRouteReady => autoRouteReadyForSession(currentSessionKey);
+
   String singleAgentRuntimeModelForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -380,7 +397,9 @@ extension AppControllerDesktopThreadSessions on AppController {
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
     if (target == AssistantExecutionTarget.singleAgent ||
         target == AssistantExecutionTarget.auto) {
-      final latestRouting = latestRoutingResolutionForSession(normalizedSessionKey);
+      final latestRouting = latestRoutingResolutionForSession(
+        normalizedSessionKey,
+      );
       final latestResolvedExecutionTarget =
           latestRouting['resolvedExecutionTarget']?.toString().trim() ?? '';
       final latestResolvedEndpointTarget =
@@ -397,12 +416,15 @@ extension AppControllerDesktopThreadSessions on AppController {
           : '';
       if (target == AssistantExecutionTarget.auto &&
           latestResolvedExecutionTarget.isEmpty) {
+        final autoReady = autoRouteReadyForSession(normalizedSessionKey);
         return AssistantThreadConnectionState(
           executionTarget: target,
-          status: RuntimeConnectionStatus.offline,
+          status: autoReady
+              ? RuntimeConnectionStatus.connected
+              : RuntimeConnectionStatus.offline,
           primaryLabel: primaryLabel,
           detailLabel: appText('待服务端路由', 'Waiting for server routing'),
-          ready: false,
+          ready: autoReady,
           pairingRequired: false,
           gatewayTokenMissing: false,
           lastError: null,
@@ -412,21 +434,21 @@ extension AppControllerDesktopThreadSessions on AppController {
           latestResolvedExecutionTarget.isNotEmpty) {
         final detail = switch (latestResolvedExecutionTarget) {
           'gateway' => joinConnectionPartsInternal(<String>[
-              latestResolvedEndpointTarget.isEmpty
-                  ? appText('OpenClaw Gateway', 'OpenClaw Gateway')
-                  : latestResolvedEndpointTarget,
-              latestResolvedModel,
-            ]),
+            latestResolvedEndpointTarget.isEmpty
+                ? appText('OpenClaw Gateway', 'OpenClaw Gateway')
+                : latestResolvedEndpointTarget,
+            latestResolvedModel,
+          ]),
           'multi-agent' => joinConnectionPartsInternal(<String>[
-              appText('Multi-Agent', 'Multi-Agent'),
-              latestResolvedModel,
-            ]),
+            appText('Multi-Agent', 'Multi-Agent'),
+            latestResolvedModel,
+          ]),
           _ => joinConnectionPartsInternal(<String>[
-              latestResolvedProviderId.isEmpty
-                  ? appText('Single Agent', 'Single Agent')
-                  : latestResolvedProviderId,
-              latestResolvedModel,
-            ]),
+            latestResolvedProviderId.isEmpty
+                ? appText('Single Agent', 'Single Agent')
+                : latestResolvedProviderId,
+            latestResolvedModel,
+          ]),
         };
         return AssistantThreadConnectionState(
           executionTarget: target,
