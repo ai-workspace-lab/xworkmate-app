@@ -1,6 +1,6 @@
 # XWorkmate 测试规范
 
-> 适用范围: `xworkmate.svc.plus`
+> 适用范围: `XWorkmate`
 > 规范等级: 正式
 > 用途: 统一一次变更的测试规划、执行、验收、归档口径。
 
@@ -102,4 +102,9 @@
 
 示例验收文档：
 
-- `docs/releases/2026-03-23-single-agent-test-acceptance.md`
+- `docs/reports/2026-03-23-single-agent-test-acceptance.md`
+
+长期维护文档：
+
+- `docs/testing/core-integration-auto-test-plan.md`
+- `docs/cases/core-integration-manual-cases.md`
