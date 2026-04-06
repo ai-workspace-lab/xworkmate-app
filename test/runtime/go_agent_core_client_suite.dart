@@ -120,6 +120,33 @@ void main() {
       expect(params['mode'], 'gateway-chat');
       expect(params['executionTarget'], 'local');
       expect(params['agentId'], 'agent-1');
+      expect(params.containsKey('metadata'), isFalse);
+    });
+
+    test('remote gateway mode keeps dispatch metadata in ACP params', () {
+      const request = GoAgentCoreSessionRequest(
+        sessionId: 'session-3',
+        threadId: 'thread-3',
+        target: AssistantExecutionTarget.remote,
+        prompt: 'route remotely',
+        workingDirectory: '/tmp/workspace',
+        model: '',
+        thinking: '',
+        selectedSkills: <String>[],
+        inlineAttachments: <GatewayChatAttachmentPayload>[],
+        localAttachments: <CollaborationAttachment>[],
+        aiGatewayBaseUrl: '',
+        aiGatewayApiKey: '',
+        agentId: 'agent-remote',
+        metadata: <String, dynamic>{'source': 'test'},
+        provider: SingleAgentProvider.auto,
+      );
+
+      final params = request.toAcpParams();
+
+      expect(params['mode'], 'gateway-chat');
+      expect(params['executionTarget'], 'remote');
+      expect(params['metadata'], <String, dynamic>{'source': 'test'});
     });
 
     test(
