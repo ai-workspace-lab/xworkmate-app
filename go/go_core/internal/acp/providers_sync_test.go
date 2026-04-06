@@ -1,6 +1,7 @@
 package acp
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -146,5 +147,55 @@ func TestExecuteSessionTaskUsesSyncedExternalProvider(t *testing.T) {
 	}
 	if got := response["resolvedProviderId"]; got != "claude" {
 		t.Fatalf("expected resolved provider claude, got %#v", response)
+	}
+}
+
+func TestRunSingleAgentUsesFrozenExternalProviderParams(t *testing.T) {
+	externalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/acp/rpc" {
+			http.NotFound(w, r)
+			return
+		}
+		defer r.Body.Close()
+		var request map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"jsonrpc": "2.0",
+			"id":      request["id"],
+			"result": map[string]any{
+				"success":  true,
+				"output":   "frozen-provider-ok",
+				"turnId":   "turn-frozen",
+				"provider": "custom-agent-1",
+				"mode":     "single-agent",
+			},
+		})
+	}))
+	defer externalServer.Close()
+
+	server := NewServer()
+	session := server.getOrCreateSession("session-frozen", "thread-frozen")
+	result := server.runSingleAgent(
+		context.Background(),
+		"session.start",
+		session,
+		map[string]any{
+			"provider":                             "custom-agent-1",
+			"taskPrompt":                           "hello",
+			"workingDirectory":                     t.TempDir(),
+			externalProviderEndpointKey:            externalServer.URL,
+			externalProviderAuthorizationHeaderKey: "Bearer test",
+			externalProviderLabelKey:               "Codex",
+		},
+		"turn-frozen",
+		func(map[string]any) {},
+	)
+	if result.err != nil {
+		t.Fatalf("expected success, got rpc error: %v", result.err)
+	}
+	if got := result.response["output"]; got != "frozen-provider-ok" {
+		t.Fatalf("expected frozen provider output, got %#v", result.response)
 	}
 }
