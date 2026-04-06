@@ -146,7 +146,6 @@ extension GatewayRuntimeApiInternal on GatewayRuntime {
           'idempotencyKey': runId,
           if (agentId != null && agentId.trim().isNotEmpty)
             'agentId': agentId.trim(),
-          if (metadata != null && metadata.isNotEmpty) 'metadata': metadata,
           if (attachments.isNotEmpty)
             'attachments': attachments
                 .map((attachment) => attachment.toJson())
