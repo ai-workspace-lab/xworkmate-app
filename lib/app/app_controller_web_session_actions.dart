@@ -25,9 +25,17 @@ import 'app_controller_web_helpers.dart';
 
 extension AppControllerWebSessionActions on AppController {
   Future<void> createConversation({AssistantExecutionTarget? target}) async {
-    final inheritedTarget =
+    final requestedTarget =
         sanitizeTargetInternal(target) ??
         assistantExecutionTargetForSession(currentSessionKeyInternal);
+    final visibleTargets = visibleAssistantExecutionTargets(const <AssistantExecutionTarget>[
+      AssistantExecutionTarget.singleAgent,
+      AssistantExecutionTarget.local,
+      AssistantExecutionTarget.remote,
+    ]);
+    final inheritedTarget = visibleTargets.contains(requestedTarget)
+        ? requestedTarget
+        : (visibleTargets.isNotEmpty ? visibleTargets.first : requestedTarget);
     final inheritedRecord = taskThreadForSessionInternal(currentSessionKeyInternal);
     final baseRecord = newRecordInternal(
       target: inheritedTarget,
@@ -108,9 +116,17 @@ extension AppControllerWebSessionActions on AppController {
   Future<void> setAssistantExecutionTarget(
     AssistantExecutionTarget target,
   ) async {
-    final resolvedTarget =
+    final requestedTarget =
         sanitizeTargetInternal(target) ??
         assistantExecutionTargetForSession(currentSessionKeyInternal);
+    final visibleTargets = visibleAssistantExecutionTargets(const <AssistantExecutionTarget>[
+      AssistantExecutionTarget.singleAgent,
+      AssistantExecutionTarget.local,
+      AssistantExecutionTarget.remote,
+    ]);
+    final resolvedTarget = visibleTargets.contains(requestedTarget)
+        ? requestedTarget
+        : (visibleTargets.isNotEmpty ? visibleTargets.first : requestedTarget);
     final sessionKey = normalizedSessionKeyInternal(currentSessionKeyInternal);
     upsertThreadRecordInternal(
       sessionKey,

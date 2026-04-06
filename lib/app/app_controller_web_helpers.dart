@@ -1001,23 +1001,14 @@ extension AppControllerWebHelpers on AppController {
     String currentTitle,
     List<GatewayChatMessage> messages, {
     String fallback = '',
+    bool hasCustomTitle = false,
   }) {
-    final trimmedCurrent = currentTitle.trim();
-    if (trimmedCurrent.isNotEmpty &&
-        trimmedCurrent != appText('新对话', 'New conversation')) {
-      return trimmedCurrent;
-    }
-    for (final message in messages) {
-      if (message.role.trim().toLowerCase() != 'user') {
-        continue;
-      }
-      final text = message.text.trim();
-      if (text.isEmpty) {
-        continue;
-      }
-      return text.length <= 32 ? text : '${text.substring(0, 32)}...';
-    }
-    return fallback.isEmpty ? appText('新对话', 'New conversation') : fallback;
+    return derivePersistedTaskTitle(
+      currentTitle,
+      messages,
+      fallback: fallback,
+      hasCustomTitle: hasCustomTitle,
+    );
   }
 
   String hostLabelInternal(String rawUrl) {

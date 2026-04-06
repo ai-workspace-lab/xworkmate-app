@@ -148,6 +148,10 @@ extension AppControllerWebGatewayConfig on AppController {
           tls: mode == RuntimeConnectionMode.local ? false : tls,
         ),
       ),
+    ).markGatewayTargetSaved(
+      profileIndex == kGatewayLocalProfileIndex
+          ? AssistantExecutionTarget.local
+          : AssistantExecutionTarget.remote,
     );
     relayTokenByProfileInternal[profileIndex] = token.trim();
     relayPasswordByProfileInternal[profileIndex] = password.trim();

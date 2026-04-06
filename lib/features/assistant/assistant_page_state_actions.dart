@@ -77,7 +77,10 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       resolveUiFeaturePlatformFromContext(context),
     );
     final settings = controller.settings;
-    final executionTarget = controller.assistantExecutionTarget;
+    final executionTarget = resolvedVisibleExecutionTargetInternal(
+      controller,
+      supportedTargets: uiFeatures.availableExecutionTargets,
+    );
     final rawPrompt = inputControllerInternal.text.trim();
     if (rawPrompt.isEmpty) {
       return;
@@ -434,7 +437,14 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
 
   Future<void> createNewThreadInternal() async {
     final sessionKey = buildDraftSessionKeyInternal(widget.controller);
-    final inheritedTarget = widget.controller.currentAssistantExecutionTarget;
+    final inheritedTarget = resolvedVisibleExecutionTargetInternal(
+      widget.controller,
+      supportedTargets: const <AssistantExecutionTarget>[
+        AssistantExecutionTarget.singleAgent,
+        AssistantExecutionTarget.local,
+        AssistantExecutionTarget.remote,
+      ],
+    );
     final inheritedViewMode = widget.controller.currentAssistantMessageViewMode;
     setState(() {
       archivedTaskKeysInternal.removeWhere(
@@ -531,7 +541,14 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       owner: conversationOwnerLabelInternal(widget.controller),
       surface: 'Assistant',
-      executionTarget: widget.controller.currentAssistantExecutionTarget,
+      executionTarget: resolvedVisibleExecutionTargetInternal(
+        widget.controller,
+        supportedTargets: const <AssistantExecutionTarget>[
+          AssistantExecutionTarget.singleAgent,
+          AssistantExecutionTarget.local,
+          AssistantExecutionTarget.remote,
+        ],
+      ),
       isCurrent: true,
       draft: true,
     );
@@ -648,6 +665,22 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       return sessionDisplayTitleInternal(resolvedSession);
     }
     return fallbackSessionTitleInternal(sessionKey);
+  }
+
+  AssistantExecutionTarget resolvedVisibleExecutionTargetInternal(
+    AppController controller, {
+    required Iterable<AssistantExecutionTarget> supportedTargets,
+  }) {
+    final visibleTargets = controller.visibleAssistantExecutionTargets(
+      supportedTargets,
+    );
+    if (visibleTargets.contains(controller.currentAssistantExecutionTarget)) {
+      return controller.currentAssistantExecutionTarget;
+    }
+    if (visibleTargets.isNotEmpty) {
+      return visibleTargets.first;
+    }
+    return controller.currentAssistantExecutionTarget;
   }
 
   void touchTaskSeedInternal({
