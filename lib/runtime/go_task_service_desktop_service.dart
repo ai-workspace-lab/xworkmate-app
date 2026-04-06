@@ -117,7 +117,6 @@ class DesktopGoTaskService implements GoTaskServiceClient {
       thinking: request.thinking,
       attachments: request.inlineAttachments,
       agentId: request.agentId.trim().isEmpty ? null : request.agentId.trim(),
-      metadata: request.metadata.isEmpty ? null : request.metadata,
     );
     final pending = _PendingOpenClawTask(
       request: request,
