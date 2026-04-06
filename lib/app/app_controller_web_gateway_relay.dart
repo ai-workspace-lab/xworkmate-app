@@ -115,15 +115,18 @@ extension AppControllerWebGatewayRelay on AppController {
               subjectId: '',
               displayName: '',
             ),
-        workspaceBinding:
-            existing?.workspaceBinding ??
-            WorkspaceBinding(
-              workspaceId: sessionKey,
-              workspaceKind: WorkspaceKind.remoteFs,
-              workspacePath: '',
-              displayPath: '',
-              writable: true,
-            ),
+        workspaceBinding: buildWebWorkspaceBindingInternal(
+          sessionKey,
+          ownerScope:
+              existing?.ownerScope ??
+              const ThreadOwnerScope(
+                realm: ThreadRealm.remote,
+                subjectType: ThreadSubjectType.user,
+                subjectId: '',
+                displayName: '',
+              ),
+          existingBinding: existing?.workspaceBinding,
+        ),
         executionBinding:
             existing?.executionBinding ??
             ExecutionBinding(
@@ -158,16 +161,12 @@ extension AppControllerWebGatewayRelay on AppController {
             existing?.lifecycleState ??
             const ThreadLifecycleState(
               archived: false,
-              status: 'needs_workspace',
+              status: 'ready',
               lastRunAtMs: null,
               lastResultCode: null,
             ),
       );
       threadRecordsInternal[sessionKey] = next;
-      await ensureWebTaskThreadBindingInternal(
-        sessionKey,
-        executionTarget: next.executionTarget,
-      );
     }
     await persistThreadsInternal();
     recomputeDerivedWorkspaceStateInternal();

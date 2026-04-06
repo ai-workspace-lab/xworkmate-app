@@ -178,9 +178,9 @@ flowchart LR
 
 - [task-thread-session-key-isolation-20260329.md](task-thread-session-key-isolation-20260329.md)
   补充“任务线必须先成为真实 `TaskThread/sessionKey`”的隔离约束，说明为什么 single-agent 的工作目录只能围绕当前线程身份解析。
-- [assistant-thread-information-architecture.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-taskthread-docs-naming-cleanup/docs/architecture/assistant-thread-information-architecture.md)
+- [assistant-thread-information-architecture.md](assistant-thread-information-architecture.md)
   说明线程信息如何进入 UI、agent-core / runtime 请求构造、结果回写和右栏展示。
-- [xworkmate-internal-state-architecture.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-taskthread-docs-naming-cleanup/docs/architecture/xworkmate-internal-state-architecture.md)
+- [xworkmate-internal-state-architecture.md](xworkmate-internal-state-architecture.md)
   说明控制器、状态存储和派生 UI 状态如何围绕 `TaskThread` 组织。
 
 归档文档仍可保留作为历史背景，但不再参与当前设计说明。

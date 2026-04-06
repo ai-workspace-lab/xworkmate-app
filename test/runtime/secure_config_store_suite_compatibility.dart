@@ -299,7 +299,7 @@ void registerSecureConfigStoreSuiteCompatibilityTestsInternal() {
           },
           'lifecycleState': const <String, Object?>{
             'archived': false,
-            'status': 'needs_workspace',
+            'status': 'ready',
             'lastRunAtMs': null,
             'lastResultCode': null,
           },

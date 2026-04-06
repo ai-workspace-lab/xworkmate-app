@@ -249,6 +249,10 @@ extension AppControllerDesktopThreadActions on AppController {
   }) async {
     final currentSessionKey = sessionsControllerInternal.currentSessionKey;
     final currentTarget = assistantExecutionTargetForSession(currentSessionKey);
+    await ensureDesktopTaskThreadBindingInternal(
+      currentSessionKey,
+      executionTarget: currentTarget,
+    );
     if (currentTarget == AssistantExecutionTarget.singleAgent ||
         currentTarget == AssistantExecutionTarget.auto) {
       await bootstrapThreadWorkspaceFromExecutionContextInternal(
@@ -256,20 +260,9 @@ extension AppControllerDesktopThreadActions on AppController {
         message,
       );
     }
-    await ensureDesktopTaskThreadBindingInternal(
-      currentSessionKey,
-      executionTarget: currentTarget,
-    );
     var workspacePath = assistantWorkspacePathForSession(
       currentSessionKey,
     ).trim();
-    if (workspacePath.isEmpty) {
-      await tryBindWorkspaceForOnlyChatFallbackInternal(
-        currentSessionKey,
-        currentTarget,
-      );
-      workspacePath = assistantWorkspacePathForSession(currentSessionKey).trim();
-    }
     if (workspacePath.isEmpty) {
       final error = StateError(
         appText(
@@ -545,6 +538,13 @@ extension AppControllerDesktopThreadActions on AppController {
     );
     final existing = assistantThreadRecordsInternal[normalizedSessionKey];
     if (existing == null || !existing.workspaceBinding.isComplete) {
+      throw StateError(
+        'TaskThread $normalizedSessionKey is missing a complete workspaceBinding.',
+      );
+    }
+    final target = existing.executionTarget;
+    if (target != AssistantExecutionTarget.singleAgent &&
+        target != AssistantExecutionTarget.auto) {
       return;
     }
     upsertTaskThreadInternal(
@@ -594,5 +594,9 @@ extension AppControllerDesktopThreadActions on AppController {
   Future<void> tryBindWorkspaceForOnlyChatFallbackInternal(
     String sessionKey,
     AssistantExecutionTarget currentTarget,
-  ) async {}
+  ) async {
+    throw StateError(
+      'tryBindWorkspaceForOnlyChatFallbackInternal is no longer supported.',
+    );
+  }
 }
