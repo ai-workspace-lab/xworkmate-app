@@ -41,7 +41,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             raw: <String, dynamic>{},
             errorMessage: '',
             resolvedModel: 'codex-sonnet',
-          route: GoTaskServiceRoute.externalAcpSingle,
+            route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
@@ -96,6 +96,93 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             (message) => message.toolName == 'OpenCode',
           ),
           isFalse,
+        );
+      },
+    );
+
+    test(
+      'AppController syncs custom single-agent providers before execution',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-single-agent-custom-provider-',
+        );
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+        const customProvider = SingleAgentProvider(
+          providerId: 'custom-agent-1',
+          label: 'Codex',
+          badge: 'C',
+        );
+        final client = FakeGoTaskServiceClientInternal(
+          capabilities: ExternalCodeAgentAcpCapabilities(
+            singleAgent: true,
+            multiAgent: false,
+            providers: <SingleAgentProvider>{customProvider},
+            raw: <String, dynamic>{},
+          ),
+          result: const GoTaskServiceResult(
+            success: true,
+            message: 'CUSTOM_PROVIDER_REPLY',
+            turnId: 'turn-custom',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        final controller = await createAppControllerInternal(
+          store: store,
+          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+            customProvider,
+          ],
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+          goTaskServiceClient: client,
+        );
+        await controller.saveSettings(
+          controller.settings.copyWith(
+            externalAcpEndpoints: normalizeExternalAcpEndpoints(
+              profiles: const <ExternalAcpEndpointProfile>[
+                ExternalAcpEndpointProfile(
+                  providerKey: 'custom-agent-1',
+                  label: 'Codex',
+                  badge: 'C',
+                  endpoint: 'ws://127.0.0.1:9101/acp',
+                  authRef: '',
+                  enabled: true,
+                ),
+              ],
+            ),
+            multiAgent: controller.settings.multiAgent.copyWith(
+              autoSync: false,
+            ),
+          ),
+          refreshAfterSave: false,
+        );
+
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.singleAgent,
+        );
+        await controller.setSingleAgentProvider(customProvider);
+
+        await controller.sendChatMessage(
+          '请输出 CUSTOM_PROVIDER_REPLY',
+          thinking: 'low',
+        );
+
+        expect(client.syncProvidersCalls, greaterThanOrEqualTo(1));
+        expect(client.executeCalls, 1);
+        expect(client.lastRequest?.provider, customProvider);
+        expect(
+          client.syncedProvidersHistory.any(
+            (batch) => batch.any(
+              (provider) =>
+                  provider.providerId == 'custom-agent-1' &&
+                  provider.endpoint == 'ws://127.0.0.1:9101/acp',
+            ),
+          ),
+          isTrue,
         );
       },
     );
@@ -173,7 +260,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             raw: <String, dynamic>{},
             errorMessage: '',
             resolvedModel: 'codex-sonnet',
-          route: GoTaskServiceRoute.externalAcpSingle,
+            route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
@@ -220,7 +307,9 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
         await store.initialize();
         await store.saveSettingsSnapshot(
-          SettingsSnapshot.defaults().copyWith(workspacePath: tempDirectory.path),
+          SettingsSnapshot.defaults().copyWith(
+            workspacePath: tempDirectory.path,
+          ),
         );
         final client = FakeGoTaskServiceClientInternal(
           capabilities: ExternalCodeAgentAcpCapabilities(
@@ -236,7 +325,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             raw: <String, dynamic>{},
             errorMessage: '',
             resolvedModel: 'codex-sonnet',
-          route: GoTaskServiceRoute.externalAcpSingle,
+            route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
@@ -311,7 +400,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             raw: <String, dynamic>{},
             errorMessage: '',
             resolvedModel: 'codex-sonnet',
-          route: GoTaskServiceRoute.externalAcpSingle,
+            route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
@@ -607,7 +696,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             raw: <String, dynamic>{},
             errorMessage: '',
             resolvedModel: '',
-          route: GoTaskServiceRoute.externalAcpSingle,
+            route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
@@ -667,7 +756,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             raw: <String, dynamic>{},
             errorMessage: '',
             resolvedModel: '',
-          route: GoTaskServiceRoute.externalAcpSingle,
+            route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
@@ -748,7 +837,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             },
             errorMessage: '',
             resolvedModel: '',
-          route: GoTaskServiceRoute.externalAcpSingle,
+            route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
@@ -839,7 +928,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             },
             errorMessage: '',
             resolvedModel: '',
-          route: GoTaskServiceRoute.externalAcpSingle,
+            route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
