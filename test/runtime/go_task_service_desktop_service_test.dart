@@ -187,6 +187,7 @@ void main() {
 
       expect(acp.executeCalls, 0);
       expect(gateway.sendChatCalls, hasLength(1));
+      expect(gateway.sendChatCalls.single['metadata'], isNull);
       expect(result.route, GoTaskServiceRoute.openClawTask);
       expect(result.message, 'OPENCLAW_OK');
       expect(updates.last.route, GoTaskServiceRoute.openClawTask);
