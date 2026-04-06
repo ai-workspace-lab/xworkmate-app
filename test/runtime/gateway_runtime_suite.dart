@@ -34,6 +34,24 @@ void main() {
     );
   });
 
+  test('GatewayRuntime omits metadata from chat.send payloads', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final store = createIsolatedTestStore();
+    final runtime = _FakeGatewayRuntimeForSendChat(store: store);
+
+    final runId = await runtime.sendChat(
+      sessionKey: 'thread-1',
+      message: 'hello',
+      thinking: 'medium',
+      metadata: const <String, dynamic>{'threadMode': 'test'},
+    );
+
+    expect(runId, 'run-send-chat');
+    expect(runtime.lastMethod, 'chat.send');
+    expect(runtime.lastParams, isNotNull);
+    expect(runtime.lastParams, isNot(contains('metadata')));
+  });
+
   test(
     'GatewayRuntime uses explicit shared token override for the initial connect handshake',
     () async {
@@ -666,6 +684,25 @@ class _FakeGatewayRuntimeForChatController extends GatewayRuntime {
       default:
         return const <String, dynamic>{};
     }
+  }
+}
+
+class _FakeGatewayRuntimeForSendChat extends GatewayRuntime {
+  _FakeGatewayRuntimeForSendChat({required super.store})
+    : super(identityStore: DeviceIdentityStore(store));
+
+  String? lastMethod;
+  Map<String, dynamic>? lastParams;
+
+  @override
+  Future<dynamic> request(
+    String method, {
+    Map<String, dynamic>? params,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    lastMethod = method;
+    lastParams = params == null ? null : Map<String, dynamic>.from(params);
+    return const <String, dynamic>{'runId': 'run-send-chat'};
   }
 }
 
