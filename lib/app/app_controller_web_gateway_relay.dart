@@ -260,6 +260,10 @@ extension AppControllerWebGatewayRelay on AppController {
         existing?.title ?? '',
         messages,
         fallback: resolvedKey,
+        hasCustomTitle:
+            (settingsInternal.assistantCustomTaskTitles[resolvedKey]?.trim() ??
+                    '')
+                .isNotEmpty,
       ),
       executionBinding: (existing?.executionBinding ??
               ExecutionBinding(

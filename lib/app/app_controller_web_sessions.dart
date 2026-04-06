@@ -139,7 +139,19 @@ extension AppControllerWebSessions on AppController {
       singleAgentProviderForSession(currentSessionKeyInternal);
 
   List<SingleAgentProvider> get singleAgentProviderOptions =>
-      settingsInternal.availableSingleAgentProviders;
+      settingsInternal.savedSingleAgentProviders;
+
+  List<SingleAgentProvider> get availableSingleAgentProviders =>
+      singleAgentProviderOptions;
+
+  List<AssistantExecutionTarget> visibleAssistantExecutionTargets(
+    Iterable<AssistantExecutionTarget> supportedTargets,
+  ) {
+    return settingsInternal.visibleAssistantExecutionTargets(
+      supportedTargets: supportedTargets,
+      availableSingleAgentProviders: availableSingleAgentProviders,
+    );
+  }
 
   bool singleAgentUsesAiChatFallbackForSession(String sessionKey) {
     final provider = singleAgentProviderForSession(sessionKey);
