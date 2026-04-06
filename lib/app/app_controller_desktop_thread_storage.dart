@@ -226,9 +226,6 @@ extension AppControllerDesktopThreadStorage on AppController {
   AssistantExecutionTarget sanitizePersistedExecutionTargetInternal(
     AssistantExecutionTarget? target,
   ) {
-    if (target == AssistantExecutionTarget.auto) {
-      return AssistantExecutionTarget.auto;
-    }
     return sanitizeExecutionTargetInternal(target);
   }
 

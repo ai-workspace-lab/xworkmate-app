@@ -147,7 +147,7 @@ void registerExecutionTargetSwitchConnectionTests() {
         expect(controller.assistantConnectionStatusLabel, '单机智能体');
         expect(
           controller.assistantConnectionTargetLabel,
-          SingleAgentProvider.opencode.label,
+          '没有可用的外部 Agent ACP 端点，请配置 LLM API fallback。',
         );
         expect(
           gateway.connectedProfiles,
@@ -265,7 +265,7 @@ void registerExecutionTargetSwitchConnectionTests() {
     );
 
     test(
-      'AppController applySettingsDraft syncs the active session execution target',
+      'AppController applySettingsDraft keeps the active thread manual execution target',
       () async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
         final tempDirectory = await Directory.systemTemp.createTemp(
@@ -293,6 +293,7 @@ void registerExecutionTargetSwitchConnectionTests() {
         await controller.saveSettings(
           withRemoteGatewayProfileInternal(
             controller.settings.copyWith(
+              workspacePath: tempDirectory.path,
               assistantExecutionTarget: AssistantExecutionTarget.local,
               aiGateway: controller.settings.aiGateway.copyWith(
                 baseUrl: 'http://127.0.0.1:11434/v1',
@@ -312,7 +313,7 @@ void registerExecutionTargetSwitchConnectionTests() {
         );
 
         await controller.setAssistantExecutionTarget(
-          AssistantExecutionTarget.local,
+          AssistantExecutionTarget.singleAgent,
         );
 
         await controller.saveSettingsDraft(
@@ -324,22 +325,19 @@ void registerExecutionTargetSwitchConnectionTests() {
 
         expect(
           controller.currentAssistantExecutionTarget,
-          AssistantExecutionTarget.remote,
+          AssistantExecutionTarget.singleAgent,
         );
         expect(
           controller.assistantExecutionTargetForSession(
             controller.currentSessionKey,
           ),
+          AssistantExecutionTarget.singleAgent,
+        );
+        expect(
+          controller.settings.assistantExecutionTarget,
           AssistantExecutionTarget.remote,
         );
-        expect(
-          controller.assistantConnectionTargetLabel,
-          'openclaw.svc.plus:443',
-        );
-        expect(
-          gateway.connectedProfiles.last.mode,
-          RuntimeConnectionMode.remote,
-        );
+        expect(controller.assistantConnectionStatusLabel, '单机智能体');
       },
     );
 
