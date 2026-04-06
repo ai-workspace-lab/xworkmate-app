@@ -674,13 +674,17 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     final visibleTargets = controller.visibleAssistantExecutionTargets(
       supportedTargets,
     );
-    if (visibleTargets.contains(controller.currentAssistantExecutionTarget)) {
-      return controller.currentAssistantExecutionTarget;
+    final currentTarget = controller.currentAssistantExecutionTarget;
+    if (visibleTargets.contains(currentTarget)) {
+      return currentTarget;
+    }
+    if (currentTarget == AssistantExecutionTarget.auto) {
+      return currentTarget;
     }
     if (visibleTargets.isNotEmpty) {
       return visibleTargets.first;
     }
-    return controller.currentAssistantExecutionTarget;
+    return currentTarget;
   }
 
   void touchTaskSeedInternal({
