@@ -52,7 +52,9 @@ extension AppControllerDesktopThreadBinding on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final baseWorkspace = settings.workspacePath.trim();
+    final baseWorkspace = settings.workspacePath.trim().isNotEmpty
+        ? settings.workspacePath.trim()
+        : resolvedUserHomeDirectoryInternal.trim();
     if (baseWorkspace.isEmpty) {
       return '';
     }
@@ -158,8 +160,7 @@ extension AppControllerDesktopThreadBinding on AppController {
             : null,
       );
     }
-    if (executionTarget == AssistantExecutionTarget.auto ||
-        executionTarget == AssistantExecutionTarget.singleAgent) {
+    if (executionTarget == AssistantExecutionTarget.singleAgent) {
       if (existingBinding != null &&
           existingBinding.workspaceKind == WorkspaceKind.localFs &&
           ensureLocalWorkspaceDirectoryInternal(
@@ -226,7 +227,6 @@ extension AppControllerDesktopThreadBinding on AppController {
             ))
         .copyWith(
           executionMode: switch (executionTarget) {
-            AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
             AssistantExecutionTarget.singleAgent =>
               ThreadExecutionMode.localAgent,
             AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
@@ -293,18 +293,13 @@ extension AppControllerDesktopThreadBinding on AppController {
 AssistantExecutionTarget pickDraftThreadExecutionTargetInternal({
   required AssistantExecutionTarget currentTarget,
   required Iterable<AssistantExecutionTarget> visibleTargets,
-  required bool localWorkspaceAvailable,
+  bool? localWorkspaceAvailable,
 }) {
   final orderedTargets = <AssistantExecutionTarget>[
     if (visibleTargets.contains(currentTarget)) currentTarget,
     ...visibleTargets.where((target) => target != currentTarget),
   ];
   for (final target in orderedTargets) {
-    if (!localWorkspaceAvailable &&
-        (target == AssistantExecutionTarget.singleAgent ||
-            target == AssistantExecutionTarget.local)) {
-      continue;
-    }
     return target;
   }
   return currentTarget;

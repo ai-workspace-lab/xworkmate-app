@@ -210,10 +210,10 @@ flowchart TB
 
 这一层的上位语义应该理解为：
 
-- `OpenClaw task`
-  - `TaskThread -> GoTaskService -> GatewayRuntime / Web relay -> OpenClaw gateway`
-- `ACP task`
-  - `TaskThread -> GoTaskService -> ExternalCodeAgentAcp* -> ACP/provider route`
+- `OpenClaw Gateway task`
+  - `TaskThread -> GoTaskService -> GatewayRuntime / Web relay -> OpenClaw Gateway Local / Remote`
+- `ACP Server task`
+  - `TaskThread -> GoTaskService -> ExternalCodeAgentAcp* -> ACP Server Local / Remote`
 
 也就是说，`GoTaskService` 才是整层的上位名字；具体 transport 与 gateway/ACP lane 只是它的执行子路径。
 
@@ -247,11 +247,11 @@ flowchart TB
 | 术语 | 规范语义 | 当前作用 |
 | --- | --- | --- |
 | `TaskThread` | 线程级控制面主对象 | 承载线程身份、工作区、执行绑定、上下文与生命周期 |
-| `OpenClaw task` | 面向本地或远端 OpenClaw gateway 的任务 | 规范路径：`TaskThread -> GoTaskService -> GatewayRuntime / Web relay -> OpenClaw gateway` |
-| `ACP task` | 不走 OpenClaw gateway 的任务 | 规范路径：`TaskThread -> GoTaskService -> ExternalCodeAgentAcp* -> ACP/provider route` |
-| `GatewayRuntime` | OpenClaw task 的 App 侧 runtime 门面 | 负责 gateway chat / session / pairing / history 等语义 |
-| `ExternalCodeAgentAcp*` | ACP task 的 transport 组件 | 负责把任务送入 ACP/provider route |
-| `ACP/provider route` | 非 OpenClaw provider 的执行通道 | 包括 ACP transport、provider endpoint、兼容 relay/provider 路径 |
+| `OpenClaw Gateway task` | 面向 `local / remote` 执行目标的任务 | 规范路径：`TaskThread -> GoTaskService -> GatewayRuntime / Web relay -> OpenClaw Gateway Local / Remote` |
+| `ACP Server task` | 面向 `singleAgent / multiAgent` 的任务 | 规范路径：`TaskThread -> GoTaskService -> ExternalCodeAgentAcp* -> ACP Server Local / Remote` |
+| `GatewayRuntime` | OpenClaw Gateway task 的 App 侧 runtime 门面 | 负责 gateway chat / session / pairing / history 等语义 |
+| `ExternalCodeAgentAcp*` | ACP Server task 的 transport 组件 | 负责把任务送入 ACP Server Local / Remote 路径 |
+| `ACP Server route` | 不经过 OpenClaw Gateway 的执行通道 | 包括 ACP transport、provider endpoint、兼容 relay/provider 路径 |
 
 ### 5. 对接服务与扩展层
 
@@ -315,8 +315,8 @@ flowchart LR
     C4 --> D
 
     D --> E{"任务类型分流"}
-    E -->|OpenClaw task| G["GoTaskService -> GatewayRuntime / Web relay -> OpenClaw gateway"]
-    E -->|singleAgent / multiAgent| H["GoTaskService -> ExternalCodeAgentAcp* -> ACP route"]
+    E -->|local / remote| G["GoTaskService -> GatewayRuntime / Web relay -> OpenClaw Gateway Local / Remote"]
+    E -->|singleAgent / multiAgent| H["GoTaskService -> ExternalCodeAgentAcp* -> ACP Server Local / Remote"]
 
     G --> I
     H --> I
@@ -334,8 +334,8 @@ flowchart LR
 - UI 先选线程，不是先选 provider
 - 线程先绑定，再执行
 - 执行模式与 provider 绑定共同决定最终任务分流
-- `OpenClaw task` 不再走 ACP 兼容桥，而是统一走 `GoTaskService -> GatewayRuntime / Web relay -> OpenClaw gateway`
-- `singleAgent / multiAgent` 统一走 `GoTaskService -> ExternalCodeAgentAcp* -> ACP/provider route`
+- `local / remote` 不再走 ACP 兼容桥，而是统一走 `GoTaskService -> GatewayRuntime / Web relay -> OpenClaw Gateway Local / Remote`
+- `singleAgent / multiAgent` 统一走 `GoTaskService -> ExternalCodeAgentAcp* -> ACP Server Local / Remote`
 - 结果先回写线程，再刷新 UI
 - 远端返回新的 working directory 时，只能显式回写当前已完整线程的 `workspaceBinding`
 - 这类回写不能创建 first binding，也不能改变线程身份
@@ -355,9 +355,9 @@ flowchart LR
 
 | 平台 | UI 入口 | 线程控制面 | `GoTaskService` 重点 | 当前执行特点 |
 | --- | --- | --- | --- | --- |
-| Desktop | `AppShellDesktop` + workspace 页面 | `TaskThread` 持久化最完整 | `AppControllerDesktop` + `GoTaskService` + `GatewayRuntime / ExternalCodeAgentAcp*` | 支持本地 single-agent、OpenClaw local / remote、ACP/provider route |
+| Desktop | `AppShellDesktop` + workspace 页面 | `TaskThread` 持久化最完整 | `AppControllerDesktop` + `GoTaskService` + `GatewayRuntime / ExternalCodeAgentAcp*` | 支持 `ACP Server Local`、`OpenClaw Gateway Local / Remote` |
 | Mobile | `mobile_shell_*` | 复用同一线程模型 | 仍走 native host/controller 体系 | 当前以 remote gateway 场景为主 |
-| Web | `AppShellWeb` | 同 schema 的 thread records | `AppControllerWeb` + `ExternalCodeAgentAcpWebTransport` + relay/acp client | 远程 ACP / relay / AI Gateway 路径 |
+| Web | `AppShellWeb` | 同 schema 的 thread records | `AppControllerWeb` + `ExternalCodeAgentAcpWebTransport` + relay/acp client | 支持 `ACP Server Remote`、`OpenClaw Gateway Local / Remote` relay、AI Gateway fallback |
 
 ## 对你给出的旧图，按代码需要做的三个修正
 
@@ -385,7 +385,7 @@ flowchart LR
 - `WebAcpClient`
 - `MultiAgentOrchestrator`
 
-因此，新的整体架构里应把“broker / ACP / transport”归到 `GoTaskService` 调度层内部，
+因此，新的整体架构里应把“broker / ACP Server / transport”归到 `GoTaskService` 调度层内部，
 而不是单独挂成一个与 UI 并列的主系统。
 
 ### 修正 3：`Assistant composer / Settings / Feature flags` 属于 UI 层，不属于运行时层

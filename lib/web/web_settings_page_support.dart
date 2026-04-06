@@ -38,15 +38,17 @@ String themeLabelInternal(ThemeMode mode) {
 
 String targetLabelInternal(AssistantExecutionTarget target) {
   return switch (target) {
-    AssistantExecutionTarget.auto => 'Auto',
     AssistantExecutionTarget.singleAgent => appText(
-      'Single Agent',
-      'Single Agent',
+      'ACP Server Remote',
+      'ACP Server Remote',
     ),
-    AssistantExecutionTarget.local => appText('Local Gateway', 'Local Gateway'),
+    AssistantExecutionTarget.local => appText(
+      'OpenClaw Gateway Local',
+      'OpenClaw Gateway Local',
+    ),
     AssistantExecutionTarget.remote => appText(
-      'Remote Gateway',
-      'Remote Gateway',
+      'OpenClaw Gateway Remote',
+      'OpenClaw Gateway Remote',
     ),
   };
 }

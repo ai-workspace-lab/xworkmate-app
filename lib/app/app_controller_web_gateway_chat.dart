@@ -113,20 +113,13 @@ extension AppControllerWebGatewayChat on AppController {
           );
           return;
         }
-        if (target == AssistantExecutionTarget.singleAgent ||
-            target == AssistantExecutionTarget.auto) {
+        if (target == AssistantExecutionTarget.singleAgent) {
           await executeGoTaskServiceRunInternal(
             sessionKey: sessionKey,
             prompt: trimmed,
-            target: target == AssistantExecutionTarget.auto
-                ? AssistantExecutionTarget.singleAgent
-                : target,
-            provider: target == AssistantExecutionTarget.auto
-                ? SingleAgentProvider.auto
-                : singleAgentProviderForSession(sessionKey),
-            model: target == AssistantExecutionTarget.auto
-                ? ''
-                : assistantModelForSession(sessionKey),
+            target: target,
+            provider: singleAgentProviderForSession(sessionKey),
+            model: assistantModelForSession(sessionKey),
             thinking: thinking,
             attachments: attachments,
             selectedSkillLabels: selectedSkillLabels,
@@ -350,7 +343,6 @@ extension AppControllerWebGatewayChat on AppController {
       normalizedSessionKey,
     );
     final preferredGatewayTarget = switch (sessionTarget) {
-      AssistantExecutionTarget.auto => 'local',
       AssistantExecutionTarget.local => 'local',
       AssistantExecutionTarget.remote => 'remote',
       AssistantExecutionTarget.singleAgent => 'remote',
@@ -375,9 +367,6 @@ extension AppControllerWebGatewayChat on AppController {
             .where((item) => item.trim().isNotEmpty)
             .toList(growable: false);
     final resolvedExplicitExecutionTarget =
-        sessionTarget == AssistantExecutionTarget.auto
-        ? ''
-        :
         explicitExecutionTarget?.trim().isNotEmpty == true
         ? explicitExecutionTarget!.trim()
         : (thread?.hasExplicitExecutionTargetSelection ?? false)
@@ -386,16 +375,11 @@ extension AppControllerWebGatewayChat on AppController {
           )
         : '';
     final resolvedExplicitProviderId =
-        sessionTarget == AssistantExecutionTarget.auto
-        ? ''
-        :
         thread?.hasExplicitProviderSelection ?? false
         ? singleAgentProviderForSession(normalizedSessionKey).providerId
         : '';
     final resolvedExplicitModel = thread?.hasExplicitModelSelection ?? false
-        ? (sessionTarget == AssistantExecutionTarget.auto
-              ? ''
-              : assistantModelForSession(normalizedSessionKey))
+        ? assistantModelForSession(normalizedSessionKey)
         : '';
     final resolvedExplicitSkills = thread?.hasExplicitSkillSelection ?? false
         ? selectedSkills
@@ -427,7 +411,6 @@ extension AppControllerWebGatewayChat on AppController {
 
   String _webRoutingExecutionTargetValue(AssistantExecutionTarget target) {
     return switch (target) {
-      AssistantExecutionTarget.auto => 'singleAgent',
       AssistantExecutionTarget.singleAgent => 'singleAgent',
       AssistantExecutionTarget.local => 'local',
       AssistantExecutionTarget.remote => 'remote',

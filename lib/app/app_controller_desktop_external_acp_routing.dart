@@ -88,13 +88,9 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
       normalizedSessionKey,
     );
     final preferredGatewayTarget = switch (sessionTarget) {
-      AssistantExecutionTarget.auto => 'local',
       AssistantExecutionTarget.local => 'local',
       AssistantExecutionTarget.remote => 'remote',
-      AssistantExecutionTarget.singleAgent =>
-        settings.assistantExecutionTarget == AssistantExecutionTarget.remote
-            ? 'remote'
-            : 'local',
+      AssistantExecutionTarget.singleAgent => 'local',
     };
     final availableSkills =
         assistantImportedSkillsForSession(normalizedSessionKey)
@@ -115,9 +111,7 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
             .toList(growable: false);
 
     final resolvedExplicitExecutionTarget =
-        sessionTarget == AssistantExecutionTarget.auto
-        ? ''
-        : explicitExecutionTarget?.trim().isNotEmpty == true
+        explicitExecutionTarget?.trim().isNotEmpty == true
         ? explicitExecutionTarget!.trim()
         : (thread?.hasExplicitExecutionTargetSelection ?? false)
         ? _routingExecutionTargetValueInternal(
@@ -125,15 +119,11 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
           )
         : '';
     final resolvedExplicitProviderId =
-        sessionTarget == AssistantExecutionTarget.auto
-        ? ''
-        : thread?.hasExplicitProviderSelection ?? false
+        thread?.hasExplicitProviderSelection ?? false
         ? singleAgentProviderForSession(normalizedSessionKey).providerId
         : '';
     final resolvedExplicitModel = thread?.hasExplicitModelSelection ?? false
-        ? (sessionTarget == AssistantExecutionTarget.auto
-              ? ''
-              : assistantModelForSession(normalizedSessionKey))
+        ? assistantModelForSession(normalizedSessionKey)
         : '';
     final resolvedExplicitSkills = thread?.hasExplicitSkillSelection ?? false
         ? selectedSkills
@@ -165,7 +155,6 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
 
   String _routingExecutionTargetValueInternal(AssistantExecutionTarget target) {
     return switch (target) {
-      AssistantExecutionTarget.auto => 'singleAgent',
       AssistantExecutionTarget.singleAgent => 'singleAgent',
       AssistantExecutionTarget.local => 'local',
       AssistantExecutionTarget.remote => 'remote',

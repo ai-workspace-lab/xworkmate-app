@@ -302,7 +302,6 @@ void main() {
       expect(
         snapshot.visibleAssistantExecutionTargets(
           supportedTargets: const <AssistantExecutionTarget>[
-            AssistantExecutionTarget.auto,
             AssistantExecutionTarget.singleAgent,
             AssistantExecutionTarget.local,
             AssistantExecutionTarget.remote,

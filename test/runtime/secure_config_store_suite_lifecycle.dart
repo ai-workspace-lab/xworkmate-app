@@ -203,8 +203,7 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
           fallbackDirectoryPathResolver: () async => tempDirectory.path,
         );
         final recoveredSnapshot = await recoveredStore.loadSettingsSnapshot();
-        final recoveredRecords = await recoveredStore
-            .loadTaskThreads();
+        final recoveredRecords = await recoveredStore.loadTaskThreads();
 
         expect(recoveredSnapshot.accountUsername, 'backup-user');
         expect(recoveredSnapshot.assistantLastSessionKey, 'draft:backup-1');
@@ -213,6 +212,58 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         expect(recoveredRecords.first.messages.single.text, 'backup message');
         expect(await settingsFile.readAsString(), 'legacy-settings-snapshot');
         expect(await threadsFile.readAsString(), 'legacy-assistant-threads');
+      },
+    );
+
+    test(
+      'SecureConfigStore skips persisted legacy auto threads and records the removal reason',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-config-store-legacy-auto-thread-',
+        );
+        final tasksDirectory = Directory('${tempDirectory.path}/tasks');
+        await tasksDirectory.create(recursive: true);
+        const threadId = 'legacy:auto-thread';
+        await File('${tasksDirectory.path}/index.json').writeAsString(
+          jsonEncode(<String, dynamic>{
+            'version': taskThreadSchemaVersion,
+            'sessions': const <String>[threadId],
+          }),
+          flush: true,
+        );
+        await File(
+          '${tasksDirectory.path}/${encodeStableFileKey(threadId)}.json',
+        ).writeAsString(
+          jsonEncode(<String, dynamic>{
+            'schemaVersion': taskThreadSchemaVersion,
+            'threadId': threadId,
+            'workspaceBinding': <String, dynamic>{
+              'workspaceId': threadId,
+              'workspaceKind': WorkspaceKind.localFs.name,
+              'workspacePath': '/tmp/$threadId',
+              'displayPath': '/tmp/$threadId',
+              'writable': true,
+            },
+            'executionBinding': <String, dynamic>{
+              'executionMode': 'auto',
+              'executorId': 'auto',
+              'providerId': 'auto',
+              'endpointId': '',
+            },
+          }),
+          flush: true,
+        );
+
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+        final restoredThreads = await store.loadTaskThreads();
+
+        expect(restoredThreads, isEmpty);
+        expect(store.lastSkippedInvalidTaskThreadIds, const <String>[threadId]);
+        expect(store.lastSkippedInvalidTaskThreadRecords, hasLength(1));
+        expect(
+          store.lastSkippedInvalidTaskThreadRecords.single.reason,
+          SkippedTaskThreadReason.removedAutoExecutionMode,
+        );
       },
     );
 
@@ -234,8 +285,7 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
               workspaceId: 'draft:clear-1',
               workspaceKind: WorkspaceKind.remoteFs,
               workspacePath: '/owners/remote/user/clear/threads/draft:clear-1',
-              displayPath:
-                  '/owners/remote/user/clear/threads/draft:clear-1',
+              displayPath: '/owners/remote/user/clear/threads/draft:clear-1',
               writable: true,
             ),
             title: '清理线程',
@@ -262,10 +312,7 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         final clearedRecords = await store.loadTaskThreads();
         final settingsFiles = await store.resolvedSettingsFiles();
 
-        expect(
-          clearedSnapshot.accountUsername,
-          'clear-me',
-        );
+        expect(clearedSnapshot.accountUsername, 'clear-me');
         expect(clearedSnapshot.assistantLastSessionKey, isEmpty);
         expect(clearedRecords, isEmpty);
         expect(await store.loadGatewayToken(), 'token-secret');
@@ -275,7 +322,9 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         }
 
         store.dispose();
-        final reloadedStore = createStoreFromTempDirectoryInternal(tempDirectory);
+        final reloadedStore = createStoreFromTempDirectoryInternal(
+          tempDirectory,
+        );
         final reloadedSnapshot = await reloadedStore.loadSettingsSnapshot();
         final reloadedRecords = await reloadedStore.loadTaskThreads();
         expect(reloadedSnapshot.accountUsername, 'clear-me');

@@ -330,12 +330,6 @@ desktop:
       build_modes: [debug, profile, release]
       description: Desktop multi-agent toggle in assistant composer
       ui_surface: assistant_page
-    task_dialog_mode_auto:
-      enabled: false
-      release_tier: experimental
-      build_modes: [debug, profile, release]
-      description: Desktop task dialog mode auto option
-      ui_surface: assistant_page
     local_runtime:
       enabled: true
       release_tier: stable

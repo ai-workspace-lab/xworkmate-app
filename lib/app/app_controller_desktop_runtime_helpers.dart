@@ -735,7 +735,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     RuntimeConnectionMode mode,
   ) {
     return switch (mode) {
-      RuntimeConnectionMode.unconfigured => AssistantExecutionTarget.auto,
+      RuntimeConnectionMode.unconfigured => AssistantExecutionTarget.singleAgent,
       RuntimeConnectionMode.local => AssistantExecutionTarget.local,
       RuntimeConnectionMode.remote => AssistantExecutionTarget.remote,
     };
@@ -745,7 +745,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     AssistantExecutionTarget target,
   ) {
     return switch (target) {
-      AssistantExecutionTarget.auto => settings.primaryLocalGatewayProfile,
       AssistantExecutionTarget.local => settings.primaryLocalGatewayProfile,
       AssistantExecutionTarget.remote => settings.primaryRemoteGatewayProfile,
       AssistantExecutionTarget.singleAgent => throw StateError(
@@ -758,7 +757,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     AssistantExecutionTarget target,
   ) {
     return switch (target) {
-      AssistantExecutionTarget.auto => kGatewayLocalProfileIndex,
       AssistantExecutionTarget.local => kGatewayLocalProfileIndex,
       AssistantExecutionTarget.remote => kGatewayRemoteProfileIndex,
       AssistantExecutionTarget.singleAgent => throw StateError(

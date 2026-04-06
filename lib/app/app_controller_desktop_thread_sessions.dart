@@ -73,8 +73,7 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
-    if (target == AssistantExecutionTarget.singleAgent ||
-        target == AssistantExecutionTarget.auto) {
+    if (target == AssistantExecutionTarget.singleAgent) {
       return assistantImportedSkillsForSession(normalizedSessionKey).length;
     }
     return skills.length;
@@ -120,8 +119,7 @@ extension AppControllerDesktopThreadSessions on AppController {
           normalizedSessionKey,
         )?.latestResolvedRuntimeModel.trim() ??
         '';
-    if (target == AssistantExecutionTarget.singleAgent ||
-        target == AssistantExecutionTarget.auto) {
+    if (target == AssistantExecutionTarget.singleAgent) {
       if (latestResolvedModel.isNotEmpty) {
         return latestResolvedModel;
       }
@@ -275,7 +273,7 @@ extension AppControllerDesktopThreadSessions on AppController {
   bool get currentSingleAgentHasResolvedProvider =>
       singleAgentHasResolvedProviderForSession(currentSessionKey);
 
-  bool singleAgentShouldSuggestAutoSwitchForSession(String sessionKey) {
+  bool singleAgentShouldSuggestAcpSwitchForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
@@ -291,23 +289,8 @@ extension AppControllerDesktopThreadSessions on AppController {
         hasAnyAvailableSingleAgentProvider;
   }
 
-  bool get currentSingleAgentShouldSuggestAutoSwitch =>
-      singleAgentShouldSuggestAutoSwitchForSession(currentSessionKey);
-
-  bool autoRouteReadyForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    if (assistantExecutionTargetForSession(normalizedSessionKey) !=
-        AssistantExecutionTarget.auto) {
-      return false;
-    }
-    return hasAnyAvailableSingleAgentProvider ||
-        canUseAiGatewayConversation ||
-        connection.status == RuntimeConnectionStatus.connected;
-  }
-
-  bool get currentAutoRouteReady => autoRouteReadyForSession(currentSessionKey);
+  bool get currentSingleAgentShouldSuggestAcpSwitch =>
+      singleAgentShouldSuggestAcpSwitchForSession(currentSessionKey);
 
   String singleAgentRuntimeModelForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
@@ -403,74 +386,8 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
-    if (target == AssistantExecutionTarget.singleAgent ||
-        target == AssistantExecutionTarget.auto) {
-      final thread = taskThreadForSessionInternal(normalizedSessionKey);
-      final resolvedGatewayEntryState =
-          switch (thread?.gatewayEntryState?.trim() ?? '') {
-            'auto' => '',
-            final value => value,
-          };
-      final latestResolvedModel =
-          thread?.latestResolvedRuntimeModel.trim() ?? '';
-      final primaryLabel = target == AssistantExecutionTarget.auto
-          ? 'Auto'
-          : target.label;
-      final actualDetailPrefix = target == AssistantExecutionTarget.auto
-          ? appText('当前: ', 'Current: ')
-          : '';
-      if (target == AssistantExecutionTarget.auto &&
-          resolvedGatewayEntryState.isEmpty) {
-        final autoReady = autoRouteReadyForSession(normalizedSessionKey);
-        return AssistantThreadConnectionState(
-          executionTarget: target,
-          status: autoReady
-              ? RuntimeConnectionStatus.connected
-              : RuntimeConnectionStatus.offline,
-          primaryLabel: primaryLabel,
-          detailLabel: appText('待服务端路由', 'Waiting for server routing'),
-          ready: autoReady,
-          pairingRequired: false,
-          gatewayTokenMissing: false,
-          lastError: null,
-        );
-      }
-      if (target == AssistantExecutionTarget.auto &&
-          resolvedGatewayEntryState.isNotEmpty) {
-        final detail = switch (resolvedGatewayEntryState) {
-          'local' => joinConnectionPartsInternal(<String>[
-            appText('OpenClaw Gateway', 'OpenClaw Gateway'),
-            latestResolvedModel,
-          ]),
-          'remote' => joinConnectionPartsInternal(<String>[
-            appText('OpenClaw Gateway', 'OpenClaw Gateway'),
-            latestResolvedModel,
-          ]),
-          _ => joinConnectionPartsInternal(<String>[
-            singleAgentResolvedProviderForSession(
-                      normalizedSessionKey,
-                    )?.label.isNotEmpty ==
-                    true
-                ? singleAgentResolvedProviderForSession(
-                    normalizedSessionKey,
-                  )!.label
-                : appText('Single Agent', 'Single Agent'),
-            latestResolvedModel,
-          ]),
-        };
-        return AssistantThreadConnectionState(
-          executionTarget: target,
-          status: RuntimeConnectionStatus.connected,
-          primaryLabel: primaryLabel,
-          detailLabel: detail.isEmpty
-              ? appText('待服务端路由', 'Waiting for server routing')
-              : '$actualDetailPrefix$detail',
-          ready: true,
-          pairingRequired: false,
-          gatewayTokenMissing: false,
-          lastError: null,
-        );
-      }
+    if (target == AssistantExecutionTarget.singleAgent) {
+      final primaryLabel = appText('ACP Server Local', 'ACP Server Local');
       final provider = singleAgentProviderForSession(normalizedSessionKey);
       final resolvedProvider = singleAgentResolvedProviderForSession(
         normalizedSessionKey,
@@ -489,10 +406,10 @@ extension AppControllerDesktopThreadSessions on AppController {
               model,
               host,
             ])
-          : singleAgentShouldSuggestAutoSwitchForSession(normalizedSessionKey)
+          : singleAgentShouldSuggestAcpSwitchForSession(normalizedSessionKey)
           ? appText(
-              '${provider.label} 不可用，可切到 Auto',
-              '${provider.label} is unavailable. Switch to Auto.',
+              '${provider.label} 不可用，请切到可用的 ACP Server。',
+              '${provider.label} is unavailable. Switch to an available ACP Server.',
             )
           : singleAgentNeedsAiGatewayConfigurationForSession(
               normalizedSessionKey,
@@ -513,7 +430,7 @@ extension AppControllerDesktopThreadSessions on AppController {
         primaryLabel: primaryLabel,
         detailLabel: detail.isEmpty
             ? appText('未配置单机智能体', 'Single Agent is not configured')
-            : '$actualDetailPrefix$detail',
+            : detail,
         ready: providerReady || fallbackReady,
         pairingRequired: false,
         gatewayTokenMissing: false,
@@ -685,7 +602,6 @@ extension AppControllerDesktopThreadSessions on AppController {
     AssistantExecutionTarget target,
   ) {
     return switch (target) {
-      AssistantExecutionTarget.auto => WorkspaceRefKind.localPath,
       AssistantExecutionTarget.singleAgent => WorkspaceRefKind.localPath,
       AssistantExecutionTarget.local ||
       AssistantExecutionTarget.remote => WorkspaceRefKind.remotePath,
