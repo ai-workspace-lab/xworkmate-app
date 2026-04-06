@@ -26,6 +26,14 @@ import 'assistant_page_suite_core.dart';
 import 'assistant_page_suite_support.dart';
 
 void registerAssistantPageSuiteComposerTestsInternal() {
+  Finder executionTargetMenuItemInternal(AssistantExecutionTarget target) {
+    return find.byWidgetPredicate(
+      (widget) =>
+          widget is PopupMenuItem<AssistantExecutionTarget> &&
+          widget.value == target,
+    );
+  }
+
   testWidgets(
     'AssistantPage empty state stays above the composer instead of centering over the workspace',
     (WidgetTester tester) async {
@@ -161,7 +169,10 @@ void registerAssistantPageSuiteComposerTestsInternal() {
     );
     await pumpForUiSyncInternal(tester);
 
-    expect(find.text('Auto'), findsWidgets);
+    expect(
+      executionTargetMenuItemInternal(AssistantExecutionTarget.auto),
+      findsNothing,
+    );
     expect(find.text('单机智能体'), findsWidgets);
     expect(find.text('本地 OpenClaw Gateway'), findsWidgets);
     expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
@@ -615,6 +626,69 @@ void registerAssistantPageSuiteComposerTestsInternal() {
       findsNothing,
     );
   });
+
+  testWidgets(
+    'AssistantPage hides Auto execution target when desktop flag is disabled',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
+
+      await pumpPage(
+        tester,
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+        platform: TargetPlatform.macOS,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('assistant-execution-target-button')),
+      );
+      await pumpForUiSyncInternal(tester);
+
+      expect(
+        controller.assistantExecutionTarget,
+        isNot(AssistantExecutionTarget.auto),
+      );
+      expect(
+        executionTargetMenuItemInternal(AssistantExecutionTarget.auto),
+        findsNothing,
+      );
+      expect(find.text('单机智能体'), findsWidgets);
+      expect(find.text('本地 OpenClaw Gateway'), findsWidgets);
+      expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'AssistantPage shows Auto execution target when desktop flag is enabled',
+    (WidgetTester tester) async {
+      final manifest = UiFeatureManifest.fallback().copyWithFeature(
+        platform: UiFeaturePlatform.desktop,
+        module: 'assistant',
+        feature: 'task_dialog_mode_auto',
+        enabled: true,
+        releaseTier: UiFeatureReleaseTier.stable,
+      );
+      final controller = await createTestController(
+        tester,
+        uiFeatureManifest: manifest,
+      );
+
+      await pumpPage(
+        tester,
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+        platform: TargetPlatform.macOS,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('assistant-execution-target-button')),
+      );
+      await pumpForUiSyncInternal(tester);
+
+      expect(
+        executionTargetMenuItemInternal(AssistantExecutionTarget.auto),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('AssistantPage composer input area can be resized vertically', (
     WidgetTester tester,
