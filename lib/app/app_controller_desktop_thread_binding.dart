@@ -196,6 +196,19 @@ extension AppControllerDesktopThreadBinding on AppController {
     );
   }
 
+  AssistantExecutionTarget resolveDraftThreadExecutionTargetInternal(
+    String sessionKey, {
+    required Iterable<AssistantExecutionTarget> supportedTargets,
+  }) {
+    return pickDraftThreadExecutionTargetInternal(
+      currentTarget: assistantExecutionTargetForSession(sessionKey),
+      visibleTargets: visibleAssistantExecutionTargets(supportedTargets),
+      localWorkspaceAvailable: localThreadWorkspacePathInternal(
+        sessionKey,
+      ).trim().isNotEmpty,
+    );
+  }
+
   ExecutionBinding buildDesktopExecutionBindingInternal({
     required AssistantExecutionTarget executionTarget,
     required SingleAgentProvider singleAgentProvider,
@@ -275,4 +288,24 @@ extension AppControllerDesktopThreadBinding on AppController {
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
   }
+}
+
+AssistantExecutionTarget pickDraftThreadExecutionTargetInternal({
+  required AssistantExecutionTarget currentTarget,
+  required Iterable<AssistantExecutionTarget> visibleTargets,
+  required bool localWorkspaceAvailable,
+}) {
+  final orderedTargets = <AssistantExecutionTarget>[
+    if (visibleTargets.contains(currentTarget)) currentTarget,
+    ...visibleTargets.where((target) => target != currentTarget),
+  ];
+  for (final target in orderedTargets) {
+    if (!localWorkspaceAvailable &&
+        (target == AssistantExecutionTarget.singleAgent ||
+            target == AssistantExecutionTarget.local)) {
+      continue;
+    }
+    return target;
+  }
+  return currentTarget;
 }

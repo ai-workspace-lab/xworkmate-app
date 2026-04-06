@@ -10,6 +10,7 @@ import '../widgets/detail_drawer.dart';
 import '../widgets/pane_resize_handle.dart';
 import '../widgets/sidebar_navigation.dart';
 import 'app_controller.dart';
+import 'app_controller_desktop_thread_binding.dart';
 import 'ui_feature_manifest.dart';
 import 'workspace_page_registry.dart';
 
@@ -82,12 +83,13 @@ class _AppShellState extends State<AppShell> {
     List<AssistantExecutionTarget> visibleTargets,
   ) async {
     final sessionKey = 'draft:${DateTime.now().millisecondsSinceEpoch}';
-    final target =
-        visibleTargets.contains(controller.currentAssistantExecutionTarget)
-        ? controller.currentAssistantExecutionTarget
-        : (visibleTargets.isNotEmpty
-              ? visibleTargets.first
-              : controller.currentAssistantExecutionTarget);
+    final target = pickDraftThreadExecutionTargetInternal(
+      currentTarget: controller.currentAssistantExecutionTarget,
+      visibleTargets: visibleTargets,
+      localWorkspaceAvailable: controller.settings.workspacePath
+          .trim()
+          .isNotEmpty,
+    );
     controller.initializeAssistantThreadContext(
       sessionKey,
       title: appText('新对话', 'New conversation'),
