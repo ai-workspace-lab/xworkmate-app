@@ -220,7 +220,7 @@ extension AppControllerDesktopThreadSessions on AppController {
           )?.executionBinding.providerId ??
           '',
     );
-    return settings.resolveSingleAgentProvider(stored);
+    return settings.sanitizeSingleAgentProviderSelection(stored);
   }
 
   SingleAgentProvider get currentSingleAgentProvider =>

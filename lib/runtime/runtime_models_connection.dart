@@ -180,7 +180,6 @@ class SingleAgentProvider {
     providerId: 'codex',
     label: 'Codex',
     badge: 'C',
-    source: SingleAgentProviderSource.builtInReserved,
   );
 
   static const SingleAgentProvider opencode = SingleAgentProvider(
@@ -283,12 +282,7 @@ enum SingleAgentProviderSource { externalExtension, builtInReserved }
 
 SingleAgentProvider normalizeSingleAgentProviderSelection(
   SingleAgentProvider provider,
-) {
-  if (provider.isBuiltInReserved) {
-    return SingleAgentProvider.opencode;
-  }
-  return provider;
-}
+) => provider;
 
 List<SingleAgentProvider> normalizeSingleAgentProviderList(
   Iterable<SingleAgentProvider> providers,
@@ -315,8 +309,4 @@ const List<SingleAgentProvider> kKnownSingleAgentProviders =
       SingleAgentProvider.gemini,
     ];
 
-const Set<String> kLegacyExternalAcpProviderIds = <String>{
-  'claude',
-  'gemini',
-  'codex',
-};
+const Set<String> kLegacyExternalAcpProviderIds = <String>{'claude', 'gemini'};

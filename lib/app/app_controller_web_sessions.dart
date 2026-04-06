@@ -75,10 +75,9 @@ extension AppControllerWebSessions on AppController {
 
   String assistantWorkspacePathForSession(String sessionKey) {
     final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
-    return taskThreadForSessionInternal(normalizedSessionKey)
-            ?.workspaceBinding
-            .workspacePath
-            .trim() ??
+    return taskThreadForSessionInternal(
+          normalizedSessionKey,
+        )?.workspaceBinding.workspacePath.trim() ??
         '';
   }
 
@@ -91,10 +90,9 @@ extension AppControllerWebSessions on AppController {
 
   String assistantWorkspaceDisplayPathForSession(String sessionKey) {
     final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
-    return taskThreadForSessionInternal(normalizedSessionKey)
-            ?.workspaceBinding
-            .displayPath
-            .trim() ??
+    return taskThreadForSessionInternal(
+          normalizedSessionKey,
+        )?.workspaceBinding.displayPath.trim() ??
         '';
   }
 
@@ -127,12 +125,12 @@ extension AppControllerWebSessions on AppController {
   SingleAgentProvider singleAgentProviderForSession(String sessionKey) {
     final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
     final stored = SingleAgentProviderCopy.fromJsonValue(
-      taskThreadForSessionInternal(normalizedSessionKey)
-              ?.executionBinding
-              .providerId ??
+      taskThreadForSessionInternal(
+            normalizedSessionKey,
+          )?.executionBinding.providerId ??
           '',
     );
-    return settingsInternal.resolveSingleAgentProvider(stored);
+    return settingsInternal.sanitizeSingleAgentProviderSelection(stored);
   }
 
   SingleAgentProvider get currentSingleAgentProvider =>
@@ -163,10 +161,8 @@ extension AppControllerWebSessions on AppController {
 
   String singleAgentRuntimeModelForSession(String sessionKey) {
     return taskThreadForSessionInternal(
-              normalizedSessionKeyInternal(sessionKey),
-            )
-            ?.latestResolvedRuntimeModel
-            .trim() ??
+          normalizedSessionKeyInternal(sessionKey),
+        )?.latestResolvedRuntimeModel.trim() ??
         '';
   }
 

@@ -28,15 +28,18 @@ extension AppControllerWebSessionActions on AppController {
     final requestedTarget =
         sanitizeTargetInternal(target) ??
         assistantExecutionTargetForSession(currentSessionKeyInternal);
-    final visibleTargets = visibleAssistantExecutionTargets(const <AssistantExecutionTarget>[
-      AssistantExecutionTarget.singleAgent,
-      AssistantExecutionTarget.local,
-      AssistantExecutionTarget.remote,
-    ]);
+    final visibleTargets =
+        visibleAssistantExecutionTargets(const <AssistantExecutionTarget>[
+          AssistantExecutionTarget.singleAgent,
+          AssistantExecutionTarget.local,
+          AssistantExecutionTarget.remote,
+        ]);
     final inheritedTarget = visibleTargets.contains(requestedTarget)
         ? requestedTarget
         : (visibleTargets.isNotEmpty ? visibleTargets.first : requestedTarget);
-    final inheritedRecord = taskThreadForSessionInternal(currentSessionKeyInternal);
+    final inheritedRecord = taskThreadForSessionInternal(
+      currentSessionKeyInternal,
+    );
     final baseRecord = newRecordInternal(
       target: inheritedTarget,
       title: appText('新对话', 'New conversation'),
@@ -119,11 +122,12 @@ extension AppControllerWebSessionActions on AppController {
     final requestedTarget =
         sanitizeTargetInternal(target) ??
         assistantExecutionTargetForSession(currentSessionKeyInternal);
-    final visibleTargets = visibleAssistantExecutionTargets(const <AssistantExecutionTarget>[
-      AssistantExecutionTarget.singleAgent,
-      AssistantExecutionTarget.local,
-      AssistantExecutionTarget.remote,
-    ]);
+    final visibleTargets =
+        visibleAssistantExecutionTargets(const <AssistantExecutionTarget>[
+          AssistantExecutionTarget.singleAgent,
+          AssistantExecutionTarget.local,
+          AssistantExecutionTarget.remote,
+        ]);
     final resolvedTarget = visibleTargets.contains(requestedTarget)
         ? requestedTarget
         : (visibleTargets.isNotEmpty ? visibleTargets.first : requestedTarget);
@@ -160,9 +164,8 @@ extension AppControllerWebSessionActions on AppController {
   }
 
   Future<void> setSingleAgentProvider(SingleAgentProvider provider) async {
-    final resolvedProvider = settingsInternal.resolveSingleAgentProvider(
-      provider,
-    );
+    final resolvedProvider = settingsInternal
+        .sanitizeSingleAgentProviderSelection(provider);
     if (!singleAgentProviderOptions.contains(resolvedProvider)) {
       return;
     }

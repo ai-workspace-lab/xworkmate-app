@@ -19,7 +19,7 @@ void main() {
     });
 
     test(
-      'round-trip preserves migrated legacy entries and custom extensions',
+      'round-trip keeps canonical built-in providers and custom extensions',
       () {
         final snapshot = SettingsSnapshot.defaults().copyWith(
           externalAcpEndpoints: normalizeExternalAcpEndpoints(
@@ -49,7 +49,7 @@ void main() {
             (item) =>
                 item.label == 'Codex' &&
                 item.endpoint == 'ws://127.0.0.1:9001' &&
-                item.providerKey.startsWith('custom-agent-'),
+                item.providerKey == 'codex',
           ),
           isTrue,
         );
@@ -61,7 +61,7 @@ void main() {
         );
         expect(
           decoded.externalAcpEndpointForProviderId('codex')?.providerKey,
-          startsWith('custom-agent-'),
+          'codex',
         );
         expect(
           decoded.externalAcpEndpoints.any(
@@ -111,7 +111,7 @@ void main() {
     });
 
     test(
-      'configured legacy claude and gemini entries migrate into custom endpoints',
+      'configured legacy claude and gemini entries keep canonical provider ids',
       () {
         final normalized = normalizeExternalAcpEndpoints(
           profiles: const <ExternalAcpEndpointProfile>[
@@ -136,13 +136,15 @@ void main() {
 
         expect(
           normalized
-              .where((item) => item.providerKey.startsWith('custom-agent-'))
-              .map((item) => item.label)
+              .where(
+                (item) =>
+                    item.providerKey == 'claude' ||
+                    item.providerKey == 'gemini',
+              )
+              .map((item) => item.providerKey)
               .toList(growable: false),
-          const <String>['Claude', 'Gemini'],
+          const <String>['claude', 'gemini'],
         );
-        expect(normalized.any((item) => item.providerKey == 'claude'), isFalse);
-        expect(normalized.any((item) => item.providerKey == 'gemini'), isFalse);
       },
     );
 
@@ -173,6 +175,37 @@ void main() {
         const <String>['opencode'],
       );
     });
+
+    test(
+      'legacy custom built-in aliases are canonicalized back to built-in ids',
+      () {
+        final normalized = normalizeExternalAcpEndpoints(
+          profiles: const <ExternalAcpEndpointProfile>[
+            ExternalAcpEndpointProfile(
+              providerKey: 'custom-agent-1',
+              label: 'Codex',
+              badge: 'C',
+              endpoint: 'wss://codex.example.com/acp',
+              authRef: '',
+              enabled: true,
+            ),
+          ],
+        );
+
+        expect(
+          normalized.any(
+            (item) =>
+                item.providerKey == 'codex' &&
+                item.endpoint == 'wss://codex.example.com/acp',
+          ),
+          isTrue,
+        );
+        expect(
+          normalized.any((item) => item.providerKey == 'custom-agent-1'),
+          isFalse,
+        );
+      },
+    );
 
     test(
       'custom endpoint builder validates sequential keys and label fallback',

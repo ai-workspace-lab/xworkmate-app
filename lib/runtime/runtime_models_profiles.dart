@@ -126,57 +126,65 @@ List<ExternalAcpEndpointProfile> normalizeExternalAcpEndpoints({
   final incoming =
       profiles?.toList(growable: false) ?? const <ExternalAcpEndpointProfile>[];
   final byKey = <String, ExternalAcpEndpointProfile>{};
-  final migratedCustomProfiles = <ExternalAcpEndpointProfile>[];
-  var customSuffix = 1;
 
-  String nextCustomKey() {
-    while (true) {
-      final key = 'custom-agent-$customSuffix';
-      customSuffix += 1;
-      if (!byKey.containsKey(key) &&
-          !migratedCustomProfiles.any((item) => item.providerKey == key)) {
-        return key;
-      }
-    }
-  }
-
-  bool isLegacyCustomPlaceholder(ExternalAcpEndpointProfile profile) {
+  SingleAgentProvider? canonicalProviderForProfile(
+    ExternalAcpEndpointProfile profile,
+  ) {
     final key = profile.providerKey.trim().toLowerCase();
-    if (!key.startsWith('custom-agent-') ||
-        profile.endpoint.trim().isNotEmpty) {
-      return false;
+    for (final provider in kKnownSingleAgentProviders) {
+      if (provider.isAuto) {
+        continue;
+      }
+      if (provider.providerId == key) {
+        return provider;
+      }
     }
     final label = profile.label.trim();
     final badge = profile.badge.trim();
-    return (label == SingleAgentProvider.claude.label &&
-            badge == SingleAgentProvider.claude.badge) ||
-        (label == SingleAgentProvider.gemini.label &&
-            badge == SingleAgentProvider.gemini.badge);
+    for (final provider in kKnownSingleAgentProviders) {
+      if (provider.isAuto) {
+        continue;
+      }
+      if (provider.label == label && provider.badge == badge) {
+        return provider;
+      }
+    }
+    return null;
   }
 
   for (final item in incoming) {
-    final key = item.providerKey.trim().toLowerCase();
-    if (key.isEmpty || byKey.containsKey(key)) {
+    final originalKey = item.providerKey.trim().toLowerCase();
+    final canonicalProvider = canonicalProviderForProfile(item);
+    final key = canonicalProvider?.providerId ?? originalKey;
+    if (key.isEmpty) {
       continue;
     }
-    if (kLegacyExternalAcpProviderIds.contains(key)) {
-      if (item.endpoint.trim().isEmpty) {
-        continue;
-      }
-      migratedCustomProfiles.add(item.copyWith(providerKey: nextCustomKey()));
+    if (kLegacyExternalAcpProviderIds.contains(originalKey) &&
+        item.endpoint.trim().isEmpty) {
       continue;
     }
-    if (isLegacyCustomPlaceholder(item)) {
+    if (originalKey.startsWith('custom-agent-') &&
+        canonicalProvider != null &&
+        item.endpoint.trim().isEmpty) {
       continue;
     }
-    byKey[key] = item.copyWith(providerKey: key);
+    final normalizedItem = item.copyWith(
+      providerKey: key,
+      label: canonicalProvider?.label ?? item.label,
+      badge: canonicalProvider?.badge ?? item.badge,
+    );
+    final existing = byKey[key];
+    if (existing == null ||
+        (existing.endpoint.trim().isEmpty &&
+            normalizedItem.endpoint.trim().isNotEmpty)) {
+      byKey[key] = normalizedItem;
+    }
   }
 
   final normalized = <ExternalAcpEndpointProfile>[
     for (final provider in kPresetExternalAcpProviders)
       byKey.remove(provider.providerId) ??
           ExternalAcpEndpointProfile.defaultsForProvider(provider),
-    ...migratedCustomProfiles,
     ...byKey.values,
   ];
   return List<ExternalAcpEndpointProfile>.unmodifiable(normalized);
