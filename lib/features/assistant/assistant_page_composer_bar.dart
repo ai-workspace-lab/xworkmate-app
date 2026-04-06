@@ -355,7 +355,16 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     final connected = connectionState.connected;
     final reconnectAvailable = controller.canQuickConnectGateway;
     final connecting = connectionState.connecting;
-    final executionTarget = controller.assistantExecutionTarget;
+    final visibleExecutionTargets = controller.visibleAssistantExecutionTargets(
+      uiFeatures.availableExecutionTargets,
+    );
+    final executionTarget = visibleExecutionTargets.contains(
+      controller.assistantExecutionTarget,
+    )
+        ? controller.assistantExecutionTarget
+        : (visibleExecutionTargets.isNotEmpty
+              ? visibleExecutionTargets.first
+              : controller.assistantExecutionTarget);
     final permissionLevel = controller.assistantPermissionLevel;
     final selectedSkills = widget.availableSkills
         .where((skill) => widget.selectedSkillKeys.contains(skill.key))
@@ -409,39 +418,41 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                 ),
                 const SizedBox(width: 6),
               ],
-              PopupMenuButton<AssistantExecutionTarget>(
-                key: const Key('assistant-execution-target-button'),
-                tooltip: appText('任务对话模式', 'Task Dialog Mode'),
-                onSelected: (value) {
-                  controller.setAssistantExecutionTarget(value);
-                },
-                itemBuilder: (context) => uiFeatures.availableExecutionTargets
-                    .map(
-                      (value) => PopupMenuItem<AssistantExecutionTarget>(
-                        value: value,
-                        child: Row(
-                          children: [
-                            Icon(value.icon, size: 18),
-                            const SizedBox(width: 10),
-                            Expanded(child: Text(value.label)),
-                            if (value == executionTarget)
-                              const Icon(Icons.check_rounded, size: 18),
-                          ],
+              if (visibleExecutionTargets.isNotEmpty) ...[
+                PopupMenuButton<AssistantExecutionTarget>(
+                  key: const Key('assistant-execution-target-button'),
+                  tooltip: appText('任务对话模式', 'Task Dialog Mode'),
+                  onSelected: (value) {
+                    controller.setAssistantExecutionTarget(value);
+                  },
+                  itemBuilder: (context) => visibleExecutionTargets
+                      .map(
+                        (value) => PopupMenuItem<AssistantExecutionTarget>(
+                          value: value,
+                          child: Row(
+                            children: [
+                              Icon(value.icon, size: 18),
+                              const SizedBox(width: 10),
+                              Expanded(child: Text(value.label)),
+                              if (value == executionTarget)
+                                const Icon(Icons.check_rounded, size: 18),
+                            ],
+                          ),
                         ),
-                      ),
-                    )
-                    .toList(),
-                child: ComposerToolbarChipInternal(
-                  icon: executionTarget.icon,
-                  tooltip: executionTargetTooltipInternal(executionTarget),
-                  showChevron: true,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
+                      )
+                      .toList(),
+                  child: ComposerToolbarChipInternal(
+                    icon: executionTarget.icon,
+                    tooltip: executionTargetTooltipInternal(executionTarget),
+                    showChevron: true,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 4),
+                const SizedBox(width: 4),
+              ],
               if (singleAgent &&
                   executionTarget != AssistantExecutionTarget.auto) ...[
                 PopupMenuButton<SingleAgentProvider>(

@@ -237,7 +237,20 @@ extension AppControllerDesktopSettings on AppController {
       return;
     }
     final previous = settings;
-    await persistSettingsSnapshotInternal(snapshot);
+    var nextSnapshot = snapshot;
+    if (jsonEncode(previous.primaryLocalGatewayProfile.toJson()) !=
+        jsonEncode(snapshot.primaryLocalGatewayProfile.toJson())) {
+      nextSnapshot = nextSnapshot.markGatewayTargetSaved(
+        AssistantExecutionTarget.local,
+      );
+    }
+    if (jsonEncode(previous.primaryRemoteGatewayProfile.toJson()) !=
+        jsonEncode(snapshot.primaryRemoteGatewayProfile.toJson())) {
+      nextSnapshot = nextSnapshot.markGatewayTargetSaved(
+        AssistantExecutionTarget.remote,
+      );
+    }
+    await persistSettingsSnapshotInternal(nextSnapshot);
     if (disposedInternal) {
       return;
     }
