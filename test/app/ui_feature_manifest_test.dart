@@ -57,18 +57,81 @@ void main() {
     expect(capabilities.supportsDiagnostics, isFalse);
   });
 
-  test('execution target arrays stay fixed per platform', () {
-    final manifest = UiFeatureManifest.fallback();
+  test(
+    'execution target arrays respect task dialog auto gating on desktop',
+    () {
+      final manifest = UiFeatureManifest.fallback();
+      final desktopAccess = manifest.forPlatform(
+        UiFeaturePlatform.desktop,
+        buildMode: UiFeatureBuildMode.release,
+      );
+      final mobileAccess = manifest.forPlatform(
+        UiFeaturePlatform.mobile,
+        buildMode: UiFeatureBuildMode.release,
+      );
+      final webAccess = manifest.forPlatform(
+        UiFeaturePlatform.web,
+        buildMode: UiFeatureBuildMode.release,
+      );
+
+      expect(
+        desktopAccess.availableExecutionTargets,
+        equals(<AssistantExecutionTarget>[
+          AssistantExecutionTarget.singleAgent,
+          AssistantExecutionTarget.local,
+          AssistantExecutionTarget.remote,
+        ]),
+      );
+      expect(
+        mobileAccess.availableExecutionTargets,
+        equals(<AssistantExecutionTarget>[AssistantExecutionTarget.remote]),
+      );
+      expect(
+        webAccess.availableExecutionTargets,
+        equals(<AssistantExecutionTarget>[
+          AssistantExecutionTarget.auto,
+          AssistantExecutionTarget.singleAgent,
+          AssistantExecutionTarget.local,
+          AssistantExecutionTarget.remote,
+        ]),
+      );
+    },
+  );
+
+  test(
+    'sanitizeExecutionTarget falls back to local on desktop when auto is gated off',
+    () {
+      final manifest = UiFeatureManifest.fallback();
+      final desktopAccess = manifest.forPlatform(
+        UiFeaturePlatform.desktop,
+        buildMode: UiFeatureBuildMode.release,
+      );
+      final webAccess = manifest.forPlatform(
+        UiFeaturePlatform.web,
+        buildMode: UiFeatureBuildMode.release,
+      );
+
+      expect(
+        desktopAccess.sanitizeExecutionTarget(null),
+        AssistantExecutionTarget.local,
+      );
+      expect(
+        webAccess.sanitizeExecutionTarget(null),
+        AssistantExecutionTarget.auto,
+      );
+    },
+  );
+
+  test('desktop auto execution target can be re-enabled from the manifest', () {
+    final manifest = UiFeatureManifest.fallback().copyWithFeature(
+      platform: UiFeaturePlatform.desktop,
+      module: 'assistant',
+      feature: 'task_dialog_mode_auto',
+      enabled: true,
+      releaseTier: UiFeatureReleaseTier.stable,
+    );
     final desktopAccess = manifest.forPlatform(
       UiFeaturePlatform.desktop,
-      buildMode: UiFeatureBuildMode.release,
-    );
-    final mobileAccess = manifest.forPlatform(
-      UiFeaturePlatform.mobile,
-      buildMode: UiFeatureBuildMode.release,
-    );
-    final webAccess = manifest.forPlatform(
-      UiFeaturePlatform.web,
       buildMode: UiFeatureBuildMode.release,
     );
 
@@ -82,37 +145,7 @@ void main() {
       ]),
     );
     expect(
-      mobileAccess.availableExecutionTargets,
-      equals(<AssistantExecutionTarget>[AssistantExecutionTarget.remote]),
-    );
-    expect(
-      webAccess.availableExecutionTargets,
-      equals(<AssistantExecutionTarget>[
-        AssistantExecutionTarget.auto,
-        AssistantExecutionTarget.singleAgent,
-        AssistantExecutionTarget.local,
-        AssistantExecutionTarget.remote,
-      ]),
-    );
-  });
-
-  test('sanitizeExecutionTarget prefers auto when available', () {
-    final manifest = UiFeatureManifest.fallback();
-    final desktopAccess = manifest.forPlatform(
-      UiFeaturePlatform.desktop,
-      buildMode: UiFeatureBuildMode.release,
-    );
-    final webAccess = manifest.forPlatform(
-      UiFeaturePlatform.web,
-      buildMode: UiFeatureBuildMode.release,
-    );
-
-    expect(
       desktopAccess.sanitizeExecutionTarget(null),
-      AssistantExecutionTarget.auto,
-    );
-    expect(
-      webAccess.sanitizeExecutionTarget(null),
       AssistantExecutionTarget.auto,
     );
   });
