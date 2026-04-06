@@ -669,7 +669,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     );
   }
 
-  Uri? resolveGoAgentCoreEndpointForTargetInternal(
+  Uri? resolveExternalAcpEndpointForTargetInternal(
     AssistantExecutionTarget target,
   ) {
     if (target == AssistantExecutionTarget.singleAgent) {

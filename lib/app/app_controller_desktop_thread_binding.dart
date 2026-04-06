@@ -139,40 +139,6 @@ extension AppControllerDesktopThreadBinding on AppController {
     required ThreadOwnerScope ownerScope,
     WorkspaceBinding? existingBinding,
   }) {
-    if (executionTarget == AssistantExecutionTarget.auto ||
-        executionTarget == AssistantExecutionTarget.singleAgent) {
-      if (existingBinding != null &&
-          existingBinding.workspacePath.trim().isNotEmpty) {
-        if (existingBinding.workspaceKind == WorkspaceKind.localFs) {
-          if (ensureLocalWorkspaceDirectoryInternal(
-            existingBinding.workspacePath,
-          )) {
-            return existingBinding.copyWith(
-              displayPath: existingBinding.workspacePath,
-            );
-          }
-        }
-        final defaultRemotePath = remoteThreadWorkspacePathInternal(
-          sessionKey,
-          ownerScope,
-        );
-        if (existingBinding.workspacePath.trim() != defaultRemotePath) {
-          return existingBinding.copyWith(
-            displayPath: existingBinding.displayPath.trim().isEmpty
-                ? existingBinding.workspacePath
-                : null,
-          );
-        }
-      }
-      final localPath = localThreadWorkspacePathInternal(sessionKey);
-      return WorkspaceBinding(
-        workspaceId: normalizedAssistantSessionKeyInternal(sessionKey),
-        workspaceKind: WorkspaceKind.localFs,
-        workspacePath: localPath,
-        displayPath: localPath,
-        writable: true,
-      );
-    }
     if (existingBinding != null &&
         existingBinding.workspaceKind == WorkspaceKind.remoteFs &&
         existingBinding.workspacePath.trim().isNotEmpty) {
@@ -180,6 +146,27 @@ extension AppControllerDesktopThreadBinding on AppController {
         displayPath: existingBinding.displayPath.trim().isEmpty
             ? existingBinding.workspacePath
             : null,
+      );
+    }
+    if (executionTarget == AssistantExecutionTarget.auto ||
+        executionTarget == AssistantExecutionTarget.singleAgent) {
+      if (existingBinding != null &&
+          existingBinding.workspaceKind == WorkspaceKind.localFs &&
+          ensureLocalWorkspaceDirectoryInternal(existingBinding.workspacePath)) {
+        return existingBinding.copyWith(displayPath: existingBinding.workspacePath);
+      }
+      final localPath = localThreadWorkspacePathInternal(sessionKey);
+      if (localPath.isEmpty) {
+        throw StateError(
+          'Local executable thread $sessionKey requires a writable local workspace.',
+        );
+      }
+      return WorkspaceBinding(
+        workspaceId: normalizedAssistantSessionKeyInternal(sessionKey),
+        workspaceKind: WorkspaceKind.localFs,
+        workspacePath: localPath,
+        displayPath: localPath,
+        writable: true,
       );
     }
     final remotePath = remoteThreadWorkspacePathInternal(
@@ -231,7 +218,11 @@ extension AppControllerDesktopThreadBinding on AppController {
     final existing = assistantThreadRecordsInternal[normalizedSessionKey];
     final resolvedExecutionTarget =
         executionTarget ??
-        existing?.executionTarget ??
+        (existing == null
+            ? null
+            : assistantExecutionTargetFromExecutionMode(
+                existing.executionBinding.executionMode,
+              )) ??
         assistantExecutionTargetForSession(normalizedSessionKey);
     final ownerScope = await ensureDesktopThreadOwnerScopeInternal(
       normalizedSessionKey,
@@ -242,9 +233,6 @@ extension AppControllerDesktopThreadBinding on AppController {
       ownerScope: ownerScope,
       existingBinding: existing?.workspaceBinding,
     );
-    final lifecycleStatus = workspaceBinding.workspacePath.trim().isEmpty
-        ? 'needs_workspace'
-        : 'ready';
     upsertTaskThreadInternal(
       normalizedSessionKey,
       ownerScope: ownerScope,
@@ -252,7 +240,9 @@ extension AppControllerDesktopThreadBinding on AppController {
       executionBinding: buildDesktopExecutionBindingInternal(
         executionTarget: resolvedExecutionTarget,
         singleAgentProvider:
-            existing?.singleAgentProvider ?? SingleAgentProvider.auto,
+            SingleAgentProviderCopy.fromJsonValue(
+              existing?.executionBinding.providerId ?? '',
+            ),
         existingBinding: existing?.executionBinding,
       ),
       lifecycleState:
@@ -263,8 +253,7 @@ extension AppControllerDesktopThreadBinding on AppController {
                     lastRunAtMs: null,
                     lastResultCode: null,
                   ))
-              .copyWith(status: lifecycleStatus),
-      executionTarget: resolvedExecutionTarget,
+              .copyWith(status: 'ready'),
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
   }

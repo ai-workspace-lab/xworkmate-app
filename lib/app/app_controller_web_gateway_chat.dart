@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/assistant_artifacts.dart';
-import '../runtime/go_agent_core_client.dart';
+import '../runtime/go_task_service_client.dart';
 import '../runtime/runtime_models.dart';
 import '../web/web_acp_client.dart';
 import '../web/web_ai_gateway_client.dart';
@@ -108,7 +108,7 @@ extension AppControllerWebGatewayChat on AppController {
         }
         if (target == AssistantExecutionTarget.singleAgent ||
             target == AssistantExecutionTarget.auto) {
-          await executeGoAgentCoreRunInternal(
+          await executeGoTaskServiceRunInternal(
             sessionKey: sessionKey,
             prompt: trimmed,
             target: target == AssistantExecutionTarget.auto
@@ -125,7 +125,7 @@ extension AppControllerWebGatewayChat on AppController {
             selectedSkillLabels: selectedSkillLabels,
           );
         } else {
-          await executeGoAgentCoreRunInternal(
+          await executeGoTaskServiceRunInternal(
             sessionKey: sessionKey,
             prompt: trimmed,
             target: target,
@@ -141,6 +141,13 @@ extension AppControllerWebGatewayChat on AppController {
           sessionKey: sessionKey,
           text: error.toString(),
           error: true,
+        );
+        upsertThreadRecordInternal(
+          sessionKey,
+          lifecycleStatus: 'ready',
+          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          lastResultCode: 'error',
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
         );
         lastAssistantErrorInternal = error.toString();
         pendingSessionKeysInternal.remove(sessionKey);
@@ -164,8 +171,8 @@ extension AppControllerWebGatewayChat on AppController {
       pendingSessionKeysInternal.add(sessionKey);
       notifyChangedInternal();
       try {
-        final result = await goAgentCoreClientInternal.executeSession(
-          GoAgentCoreSessionRequest(
+        final result = await goTaskServiceClientInternal.executeTask(
+          GoTaskServiceRequest(
             sessionId: sessionKey,
             threadId: sessionKey,
             target: assistantExecutionTargetForSession(sessionKey),
@@ -180,7 +187,7 @@ extension AppControllerWebGatewayChat on AppController {
             aiGatewayApiKey: aiGatewayApiKeyCacheInternal.trim(),
             agentId: selectedAgentId,
             metadata: const <String, dynamic>{},
-            routing: buildWebGoAgentCoreRoutingForSessionInternal(
+            routing: buildWebExternalAcpRoutingForSessionInternal(
               sessionKey,
               explicitExecutionTarget: 'multiAgent',
             ),
@@ -213,6 +220,13 @@ extension AppControllerWebGatewayChat on AppController {
         acpBusyInternal = false;
         pendingSessionKeysInternal.remove(sessionKey);
         clearStreamingTextInternal(sessionKey);
+        upsertThreadRecordInternal(
+          sessionKey,
+          lifecycleStatus: 'ready',
+          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          lastResultCode: lastAssistantErrorInternal == null ? 'success' : 'error',
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        );
         await persistThreadsInternal();
         notifyChangedInternal();
       }
@@ -230,7 +244,7 @@ extension AppControllerWebGatewayChat on AppController {
     notifyChangedInternal();
   }
 
-  Future<void> executeGoAgentCoreRunInternal({
+  Future<void> executeGoTaskServiceRunInternal({
     required String sessionKey,
     required String prompt,
     required AssistantExecutionTarget target,
@@ -244,8 +258,7 @@ extension AppControllerWebGatewayChat on AppController {
         .map((item) => item.trim())
         .where((item) => item.isNotEmpty)
         .toList(growable: false);
-    final result = await goAgentCoreClientInternal.executeSession(
-      GoAgentCoreSessionRequest(
+    final request = GoTaskServiceRequest(
         sessionId: sessionKey,
         threadId: sessionKey,
         target: target,
@@ -262,37 +275,65 @@ extension AppControllerWebGatewayChat on AppController {
         metadata: <String, dynamic>{
           if (selectedSkills.isNotEmpty) 'selectedSkills': selectedSkills,
         },
-        routing: buildWebGoAgentCoreRoutingForSessionInternal(sessionKey),
+        routing: buildWebExternalAcpRoutingForSessionInternal(sessionKey),
         provider: provider,
-      ),
-      onUpdate: (update) {
-        if (update.isDelta) {
-          appendStreamingTextInternal(sessionKey, update.text);
-          notifyChangedInternal();
-        }
-      },
-    );
-    final message = result.message.trim();
-    if (!result.success && result.errorMessage.trim().isNotEmpty) {
-      throw Exception(result.errorMessage.trim());
-    }
-    if (message.isEmpty) {
-      throw Exception(
-        appText(
-          'Go Agent-core 没有返回可显示的输出。',
-          'Go Agent-core returned no displayable output.',
-        ),
       );
+    final route = request.route;
+    if (route == GoTaskServiceRoute.openClawTask) {
+      goTaskServiceManagedRelaySessionsInternal.add(sessionKey);
     }
-    appendAssistantMessageInternal(
-      sessionKey: sessionKey,
-      text: message,
-      error: false,
-    );
-    clearStreamingTextInternal(sessionKey);
+    try {
+      final result = await goTaskServiceClientInternal.executeTask(
+        request,
+        onUpdate: (update) {
+          if (update.isDelta) {
+            appendStreamingTextInternal(sessionKey, update.text);
+            notifyChangedInternal();
+          }
+        },
+      );
+      final message = result.message.trim();
+      if (!result.success && result.errorMessage.trim().isNotEmpty) {
+        throw Exception(result.errorMessage.trim());
+      }
+      if (message.isEmpty) {
+        throw Exception(
+          appText(
+            route == GoTaskServiceRoute.openClawTask
+                ? 'OpenClaw task 没有返回可显示的输出。'
+                : 'Go Task Service 没有返回可显示的输出。',
+            route == GoTaskServiceRoute.openClawTask
+                ? 'OpenClaw task returned no displayable output.'
+                : 'Go Task Service returned no displayable output.',
+          ),
+        );
+      }
+      upsertThreadRecordInternal(
+        sessionKey,
+        gatewayEntryState: goTaskServiceGatewayEntryState(
+          requestedTarget: target,
+          result: result,
+        ),
+        latestResolvedRuntimeModel: result.resolvedModel.trim(),
+        lifecycleStatus: 'ready',
+        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastResultCode: 'success',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
+      appendAssistantMessageInternal(
+        sessionKey: sessionKey,
+        text: message,
+        error: false,
+      );
+    } finally {
+      clearStreamingTextInternal(sessionKey);
+      if (route == GoTaskServiceRoute.openClawTask) {
+        goTaskServiceManagedRelaySessionsInternal.remove(sessionKey);
+      }
+    }
   }
 
-  GoAgentCoreRoutingConfig buildWebGoAgentCoreRoutingForSessionInternal(
+  ExternalCodeAgentAcpRoutingConfig buildWebExternalAcpRoutingForSessionInternal(
     String sessionKey, {
     String? explicitExecutionTarget,
   }) {
@@ -310,7 +351,7 @@ extension AppControllerWebGatewayChat on AppController {
     final availableSkills =
         assistantImportedSkillsForSession(normalizedSessionKey)
             .map(
-              (item) => GoAgentCoreAvailableSkill(
+              (item) => ExternalCodeAgentAcpAvailableSkill(
                 id: item.key,
                 label: item.label,
                 description: item.description,
@@ -359,14 +400,14 @@ extension AppControllerWebGatewayChat on AppController {
         resolvedExplicitSkills.isNotEmpty;
 
     if (!hasExplicitSelection) {
-      return GoAgentCoreRoutingConfig.auto(
+      return ExternalCodeAgentAcpRoutingConfig.auto(
         preferredGatewayTarget: preferredGatewayTarget,
         availableSkills: availableSkills,
       );
     }
 
-    return GoAgentCoreRoutingConfig(
-      mode: GoAgentCoreRoutingMode.explicit,
+    return ExternalCodeAgentAcpRoutingConfig(
+      mode: ExternalCodeAgentAcpRoutingMode.explicit,
       preferredGatewayTarget: preferredGatewayTarget,
       explicitExecutionTarget: resolvedExplicitExecutionTarget,
       explicitProviderId: resolvedExplicitProviderId,

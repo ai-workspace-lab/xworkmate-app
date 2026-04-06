@@ -44,24 +44,15 @@ extension AppControllerWebWorkspace on AppController {
       webSessionClientIdInternal = await storeInternal
           .loadOrCreateWebSessionClientId();
       final records = await loadThreadRecordsInternal();
-      for (final record in records) {
-        final sanitized = sanitizeRecordInternal(record);
-        threadRecordsInternal[sanitized.sessionKey] = sanitized;
-        await ensureWebTaskThreadBindingInternal(
-          sanitized.sessionKey,
-          executionTarget: sanitized.executionTarget,
-        );
-      }
+      threadRepositoryInternal.replaceAll(
+        records.map(sanitizeRecordInternal),
+      );
       if (threadRecordsInternal.isEmpty) {
         final record = newRecordInternal(
           target: settingsInternal.assistantExecutionTarget,
           title: appText('新对话', 'New conversation'),
         );
-        threadRecordsInternal[record.sessionKey] = record;
-        await ensureWebTaskThreadBindingInternal(
-          record.sessionKey,
-          executionTarget: record.executionTarget,
-        );
+        threadRepositoryInternal.replace(record);
       }
       final preferredSession = normalizedSessionKeyInternal(
         settingsInternal.assistantLastSessionKey,

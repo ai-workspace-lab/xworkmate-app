@@ -21,13 +21,13 @@ currentSessionKey
 -> normalizedAssistantSessionKeyInternal(sessionKey)
 -> assistantWorkspacePathForSession(sessionKey)
 -> resolveSingleAgentWorkingDirectoryForSessionInternal(sessionKey)
--> GoAgentCoreSessionRequest.workingDirectory
+-> GoTaskServiceRequest.workingDirectory
 ```
 
 这条链路说明：
 
 1. 真正决定执行目录的是 `sessionKey`
-2. `workspace_root` 文本上下文本身不会自动进入线程绑定
+2. prompt 文本不会创建 first binding，也不会覆盖当前线程绑定
 3. 空 `sessionKey` 会被归一为 `main`
 4. 一旦多个任务线没有真正切换到独立 `sessionKey`，它们就会共享 `main`
 
@@ -51,7 +51,7 @@ currentSessionKey
 3. `TaskThread.threadId` 就是该任务线的 `sessionKey`。
 4. 任何可触发执行的入口都不得在空 `sessionKey` 下运行。
 5. 对非主线程任务线，禁止 silent fallback 到 `main`。
-6. `workspace_root` 不是线程身份；它最多只能作为该线程 `workspaceBinding` 的输入之一。
+6. prompt `workspace_root` 不是线程身份，也不再参与主链更新；`workspaceBinding` 只能由显式 create/load 绑定或结构化执行结果回写更新。
 
 换句话说：
 
@@ -134,7 +134,7 @@ request.workingDirectory == current TaskThread.workspaceBinding.workspacePath
 
 禁止：
 
-- 从 prompt 中提取 `workspace_root` 直接替代线程身份
+- 从 prompt 文本中提取 `workspace_root` 或其他 side-channel 直接替代线程身份
 - 因 `sessionKey` 缺失而自动转发到 `main`
 - 因右栏展示路径存在而绕过线程绑定
 
@@ -146,30 +146,30 @@ request.workingDirectory == current TaskThread.workspaceBinding.workspacePath
 
 - 空 `sessionKey -> main` 只允许用于真正的主线程初始化阶段
 - 非主线程任务线若缺少 `sessionKey`，状态应为 `needs_binding` 或 `not_runnable`
-- 非主线程任务线若缺少工作路径，状态应为 `needs_workspace`
+- 本地可执行线程在 create/load 阶段必须已经拥有唯一工作目录
 - 不允许继续执行并偷偷落到 `threads/main`
 
-## 5. `workspace_root` 的正确角色
+## 5. Workspace 更新的正确角色
 
-`workspace_root` 需要被重新约束语义。
+运行期 workspace 更新必须通过结构化数据进入主链。
 
 它不是：
 
+- prompt 文本中的 `workspace_root`
 - 线程身份
 - session 选择器
 - 运行时对当前线程的隐式覆盖命令
 
-它可以是：
+它只能是：
 
-- 创建新线程时的初始工作区候选根目录
-- 外部 provider / 执行上下文导入时的显式 workspace bootstrap 输入
-- 当前线程 `workspaceBinding` 的一次用户确认更新来源
+- create/load 阶段对当前线程 `workspaceBinding` 的显式绑定
+- 外部 provider / transport 返回的结构化字段（例如 `resolvedWorkingDirectory` 与 `resolvedWorkspaceRefKind`）对当前线程 binding 的确认更新
 
 因此正确顺序应为：
 
 ```text
-Execution context.workspace_root
--> bind/update current TaskThread.workspaceBinding
+Structured execution result
+-> update current TaskThread.workspaceBinding
 -> persist on that TaskThread
 -> subsequent execute reads TaskThread.workspaceBinding.workspacePath
 ```
@@ -177,7 +177,7 @@ Execution context.workspace_root
 而不是：
 
 ```text
-Execution context.workspace_root
+Prompt text side-channel
 -> bypass thread binding
 -> directly becomes runtime workingDirectory
 ```
@@ -201,7 +201,7 @@ flowchart LR
   J --> L["executionBinding"]
   J --> M["contextState"]
 
-  K --> N["GoAgentCoreSessionRequest.workingDirectory"]
+  K --> N["GoTaskServiceRequest.workingDirectory"]
   L --> O["provider / execution mode"]
   M --> P["messages / model / skills"]
 
@@ -280,7 +280,7 @@ single-agent 入口必须在执行前验证：
 
 1. 历史共享 `main` 的记录继续作为 `main`
 2. 从修正版本开始，新建任务线必须创建独立 `sessionKey`
-3. 对已暴露出共享问题的入口，优先阻止继续 silent fallback
+3. 对已暴露出共享问题的入口，优先阻止继续 silent fallback，并移除 prompt / runtime side-channel first-binding
 
 ### 8.3 未绑定任务线
 
@@ -303,7 +303,7 @@ single-agent 入口必须在执行前验证：
 3. 切换任务线后，`currentSessionKey` 与右栏路径同步变化。
 4. single-agent 请求里的 `sessionId / threadId / workingDirectory` 始终对应当前线程。
 5. 任意非主线程缺少 `sessionKey` 时，执行被阻止，而不是回落到 `main`。
-6. `workspace_root` 被当作线程 binding 输入处理，而不是 prompt-only 文本或跨线程覆盖指令。
+6. workspace 更新只接受结构化回写或显式绑定；prompt-only 文本不会进入线程 binding 主链。
 
 ## 10. 与现有架构文档的关系
 
@@ -311,7 +311,7 @@ single-agent 入口必须在执行前验证：
 
 - 为什么任务线必须先成为真实 `TaskThread`
 - 为什么 `sessionKey` 才是 single-agent 工作目录的身份锚点
-- 为什么 `workspace_root` 不能替代线程身份
+- 为什么 prompt side-channel 不能替代线程身份或 workspaceBinding
 
 推荐阅读顺序：
 

@@ -9,7 +9,7 @@ import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
-import 'package:xworkmate/runtime/go_agent_core_client.dart';
+import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
@@ -27,20 +27,21 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           'xworkmate-single-agent-provider-',
         );
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
-        final client = FakeGoAgentCoreClientInternal(
-          capabilities: GoAgentCoreCapabilities(
+        final client = FakeGoTaskServiceClientInternal(
+          capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
             providers: <SingleAgentProvider>{SingleAgentProvider.opencode},
             raw: <String, dynamic>{},
           ),
-          result: const GoAgentCoreRunResult(
+          result: const GoTaskServiceResult(
             success: true,
             message: 'CODEX_REPLY',
             turnId: 'turn-1',
             raw: <String, dynamic>{},
             errorMessage: '',
             resolvedModel: 'codex-sonnet',
+          route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
@@ -52,11 +53,13 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: client,
+          goTaskServiceClient: client,
         );
         await controller.saveSettings(
           controller.settings.copyWith(
-            multiAgent: controller.settings.multiAgent.copyWith(autoSync: false),
+            multiAgent: controller.settings.multiAgent.copyWith(
+              autoSync: false,
+            ),
           ),
           refreshAfterSave: false,
         );
@@ -98,26 +101,18 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
     );
 
     test(
-      'AppController shows Single Agent runtime status only when debug runtime is enabled',
+      'AppController treats Auto as ready before the first routing resolution when any route is available',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
-          'xworkmate-single-agent-provider-debug-',
+          'xworkmate-auto-route-ready-',
         );
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
-        final client = FakeGoAgentCoreClientInternal(
-          capabilities: GoAgentCoreCapabilities(
+        final client = FakeGoTaskServiceClientInternal(
+          capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
             providers: <SingleAgentProvider>{SingleAgentProvider.opencode},
             raw: <String, dynamic>{},
-          ),
-          result: const GoAgentCoreRunResult(
-            success: true,
-            message: 'CODEX_REPLY',
-            turnId: 'turn-1',
-            raw: <String, dynamic>{},
-            errorMessage: '',
-            resolvedModel: 'codex-sonnet',
           ),
         );
         final controller = await createAppControllerInternal(
@@ -129,7 +124,68 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: client,
+          goTaskServiceClient: client,
+        );
+        await controller.saveSettings(
+          controller.settings.copyWith(
+            multiAgent: controller.settings.multiAgent.copyWith(
+              autoSync: false,
+            ),
+          ),
+          refreshAfterSave: false,
+        );
+        await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.auto,
+        );
+
+        expect(
+          controller.currentAssistantConnectionState.executionTarget,
+          AssistantExecutionTarget.auto,
+        );
+        expect(controller.currentAssistantConnectionState.connected, isTrue);
+        expect(controller.currentAssistantConnectionState.ready, isTrue);
+        expect(
+          controller.currentAssistantConnectionState.detailLabel,
+          '待服务端路由',
+        );
+      },
+    );
+
+    test(
+      'AppController shows Single Agent runtime status only when debug runtime is enabled',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-single-agent-provider-debug-',
+        );
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+        final client = FakeGoTaskServiceClientInternal(
+          capabilities: ExternalCodeAgentAcpCapabilities(
+            singleAgent: true,
+            multiAgent: false,
+            providers: <SingleAgentProvider>{SingleAgentProvider.opencode},
+            raw: <String, dynamic>{},
+          ),
+          result: const GoTaskServiceResult(
+            success: true,
+            message: 'CODEX_REPLY',
+            turnId: 'turn-1',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: 'codex-sonnet',
+          route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        final controller = await createAppControllerInternal(
+          store: store,
+          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+            SingleAgentProvider.opencode,
+          ],
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+          goTaskServiceClient: client,
         );
 
         await controller.saveSettings(
@@ -156,31 +212,31 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
     );
 
     test(
-      'AppController bootstraps the current thread workspace from execution context before single-agent send',
+      'AppController executes local single-agent threads from the bound workspace path',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
-          'xworkmate-single-agent-workspace-bootstrap-',
+          'xworkmate-single-agent-bound-workspace-',
         );
-        final workspaceRoot = Directory('${tempDirectory.path}/thread-workspace');
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
         await store.initialize();
         await store.saveSettingsSnapshot(
-          SettingsSnapshot.defaults().copyWith(workspacePath: ''),
+          SettingsSnapshot.defaults().copyWith(workspacePath: tempDirectory.path),
         );
-        final client = FakeGoAgentCoreClientInternal(
-          capabilities: GoAgentCoreCapabilities(
+        final client = FakeGoTaskServiceClientInternal(
+          capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
             providers: <SingleAgentProvider>{SingleAgentProvider.opencode},
             raw: <String, dynamic>{},
           ),
-          result: const GoAgentCoreRunResult(
+          result: const GoTaskServiceResult(
             success: true,
             message: 'WORKSPACE_OK',
             turnId: 'turn-1',
             raw: <String, dynamic>{},
             errorMessage: '',
             resolvedModel: 'codex-sonnet',
+          route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
@@ -192,11 +248,13 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: client,
+          goTaskServiceClient: client,
         );
         await controller.saveSettings(
           controller.settings.copyWith(
-            multiAgent: controller.settings.multiAgent.copyWith(autoSync: false),
+            multiAgent: controller.settings.multiAgent.copyWith(
+              autoSync: false,
+            ),
           ),
           refreshAfterSave: false,
         );
@@ -206,37 +264,29 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         );
         await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
 
-        final initialWorkspacePath = controller.assistantWorkspacePathForSession(
-          controller.currentSessionKey,
-        );
-        expect(initialWorkspacePath, isNot(workspaceRoot.path));
+        final initialWorkspacePath = controller
+            .assistantWorkspacePathForSession(controller.currentSessionKey);
+        expect(initialWorkspacePath, isNotEmpty);
 
-        await controller.sendChatMessage(
-          'Execution context:\n'
-          '- target: single-agent\n'
-          '- workspace_root: ${workspaceRoot.path}\n'
-          '- permission: full-access\n\n'
-          '请输出 WORKSPACE_OK',
-          thinking: 'low',
-        );
+        await controller.sendChatMessage('请输出 WORKSPACE_OK', thinking: 'low');
 
         expect(client.executeCalls, 1);
-        expect(client.lastRequest?.workingDirectory, workspaceRoot.path);
-        expect(await workspaceRoot.exists(), isTrue);
+        expect(client.lastRequest?.workingDirectory, initialWorkspacePath);
+        expect(await Directory(initialWorkspacePath).exists(), isTrue);
         expect(
           controller.assistantWorkspacePathForSession(
             controller.currentSessionKey,
           ),
-          workspaceRoot.path,
+          initialWorkspacePath,
         );
       },
     );
 
     test(
-      'AppController ignores placeholder workspace_root markers during single-agent send',
+      'AppController does not let prompt text override the bound workspace path during single-agent send',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
-          'xworkmate-single-agent-workspace-placeholder-',
+          'xworkmate-single-agent-bound-workspace-text-',
         );
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
         await store.initialize();
@@ -247,20 +297,21 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             ),
           ),
         );
-        final client = FakeGoAgentCoreClientInternal(
-          capabilities: GoAgentCoreCapabilities(
+        final client = FakeGoTaskServiceClientInternal(
+          capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
             providers: <SingleAgentProvider>{SingleAgentProvider.opencode},
             raw: <String, dynamic>{},
           ),
-          result: const GoAgentCoreRunResult(
+          result: const GoTaskServiceResult(
             success: true,
             message: 'WORKSPACE_PLACEHOLDER_OK',
             turnId: 'turn-1',
             raw: <String, dynamic>{},
             errorMessage: '',
             resolvedModel: 'codex-sonnet',
+          route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
@@ -272,7 +323,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: client,
+          goTaskServiceClient: client,
         );
 
         await controller.setAssistantExecutionTarget(
@@ -282,30 +333,23 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         final beforeWorkspacePath = controller.assistantWorkspacePathForSession(
           controller.currentSessionKey,
         );
-        final placeholderDir = Directory(
-          '${Directory.current.path}/not-set',
-        );
-        if (await placeholderDir.exists()) {
-          await placeholderDir.delete(recursive: true);
-        }
 
         await controller.sendChatMessage(
           'Execution context:\n'
           '- target: single-agent\n'
-          '- workspace_root: not-set\n'
           '- permission: full-access\n\n'
           '请输出 WORKSPACE_PLACEHOLDER_OK',
           thinking: 'low',
         );
 
         expect(client.executeCalls, 1);
+        expect(client.lastRequest?.workingDirectory, beforeWorkspacePath);
         expect(
           controller.assistantWorkspacePathForSession(
             controller.currentSessionKey,
           ),
           beforeWorkspacePath,
         );
-        expect(await placeholderDir.exists(), isFalse);
       },
     );
 
@@ -323,7 +367,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         });
 
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
-        final client = FallbackOnlyGoAgentCoreClientInternal();
+        final client = FallbackOnlyGoTaskServiceClientInternal();
         final controller = await createAppControllerInternal(
           store: store,
           availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
@@ -333,7 +377,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: client,
+          goTaskServiceClient: client,
         );
 
         await controller.settingsController.saveAiGatewayApiKey('live-key');
@@ -389,7 +433,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         });
 
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
-        final client = FallbackOnlyGoAgentCoreClientInternal();
+        final client = FallbackOnlyGoTaskServiceClientInternal();
         final controller = await createAppControllerInternal(
           store: store,
           availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
@@ -397,7 +441,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: client,
+          goTaskServiceClient: client,
         );
 
         await controller.settingsController.saveAiGatewayApiKey('live-key');
@@ -445,7 +489,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
     );
 
     test(
-      'AppController auto-binds a thread workspace in AI Chat fallback when workspace root is missing',
+      'AppController auto-binds a thread workspace in AI Chat fallback when the thread binding is missing',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
           'xworkmate-single-agent-fallback-missing-workspace-',
@@ -458,7 +502,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         });
 
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
-        final client = FallbackOnlyGoAgentCoreClientInternal();
+        final client = FallbackOnlyGoTaskServiceClientInternal();
         final controller = await createAppControllerInternal(
           store: store,
           availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
@@ -466,13 +510,13 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: client,
+          goTaskServiceClient: client,
         );
 
         await controller.settingsController.saveAiGatewayApiKey('live-key');
         await controller.saveSettings(
           controller.settings.copyWith(
-            workspacePath: '',
+            workspacePath: tempDirectory.path,
             aiGateway: controller.settings.aiGateway.copyWith(
               baseUrl: server.baseUrl,
               availableModels: const <String>['moonshotai/kimi-k2.5'],
@@ -496,10 +540,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         expect(client.executeCalls, 0);
         expect(server.requestCount, 1);
         expect(workspacePath, isNotEmpty);
-        expect(
-          workspacePath,
-          contains('.xworkmate/threads/'),
-        );
+        expect(workspacePath, contains('.xworkmate/threads/'));
       },
     );
   });
@@ -530,32 +571,43 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         );
         await store.saveTaskThreads(<TaskThread>[
           TaskThread(
-            sessionKey: 'main',
+            threadId: 'main',
+            workspaceBinding: WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: threadWorkspace.path,
+              displayPath: threadWorkspace.path,
+              writable: true,
+            ),
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,
             title: 'Main',
             archived: false,
-            executionTarget: AssistantExecutionTarget.singleAgent,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.localAgent,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
-            workspaceRef: threadWorkspace.path,
-            workspaceRefKind: WorkspaceRefKind.localPath,
           ),
         ]);
 
-        final client = FakeGoAgentCoreClientInternal(
-          capabilities: GoAgentCoreCapabilities(
+        final client = FakeGoTaskServiceClientInternal(
+          capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
             providers: <SingleAgentProvider>{SingleAgentProvider.opencode},
             raw: <String, dynamic>{},
           ),
-          result: const GoAgentCoreRunResult(
+          result: const GoTaskServiceResult(
             success: true,
             message: 'THREAD_OK',
             turnId: 'turn-1',
             raw: <String, dynamic>{},
             errorMessage: '',
             resolvedModel: '',
+          route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
@@ -567,7 +619,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: client,
+          goTaskServiceClient: client,
         );
 
         await controller.sendChatMessage('检查当前线程目录', thinking: 'low');
@@ -601,20 +653,21 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           ),
         );
 
-        final client = FakeGoAgentCoreClientInternal(
-          capabilities: GoAgentCoreCapabilities(
+        final client = FakeGoTaskServiceClientInternal(
+          capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
             providers: <SingleAgentProvider>{SingleAgentProvider.opencode},
             raw: <String, dynamic>{},
           ),
-          result: const GoAgentCoreRunResult(
+          result: const GoTaskServiceResult(
             success: true,
             message: 'THREAD_OK',
             turnId: 'turn-1',
             raw: <String, dynamic>{},
             errorMessage: '',
             resolvedModel: '',
+          route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
@@ -626,7 +679,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: client,
+          goTaskServiceClient: client,
         );
 
         controller.initializeAssistantThreadContext(
@@ -658,7 +711,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
     );
 
     test(
-      'AppController keeps isolated thread workspace even when runner reports another directory',
+      'AppController rebinds local Single Agent threads to the structured resolved directory',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
           'xworkmate-single-agent-remote-thread-cwd-',
@@ -677,14 +730,14 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           ),
         );
 
-        final client = FakeGoAgentCoreClientInternal(
-          capabilities: GoAgentCoreCapabilities(
+        final client = FakeGoTaskServiceClientInternal(
+          capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
             providers: <SingleAgentProvider>{SingleAgentProvider.opencode},
             raw: <String, dynamic>{},
           ),
-          result: const GoAgentCoreRunResult(
+          result: const GoTaskServiceResult(
             success: true,
             message: 'THREAD_OK',
             turnId: 'turn-1',
@@ -695,6 +748,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             },
             errorMessage: '',
             resolvedModel: '',
+          route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
@@ -706,7 +760,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: client,
+          goTaskServiceClient: client,
         );
 
         controller.initializeAssistantThreadContext(
@@ -723,7 +777,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         );
         expect(
           controller.assistantWorkspacePathForSession('draft:remote-thread'),
-          '${defaultWorkspace.path}/.xworkmate/threads/draft-remote-thread',
+          '/opt/data/.xworkmate/threads/draft-remote-thread',
         );
         expect(
           controller.assistantWorkspaceKindForSession('draft:remote-thread'),
@@ -733,7 +787,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         await controller.sendChatMessage('第二次运行', thinking: 'low');
         expect(
           client.requests.last.workingDirectory,
-          '${defaultWorkspace.path}/.xworkmate/threads/draft-remote-thread',
+          '/opt/data/.xworkmate/threads/draft-remote-thread',
         );
       },
     );
@@ -768,14 +822,14 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           ),
         );
 
-        final client = FakeGoAgentCoreClientInternal(
-          capabilities: GoAgentCoreCapabilities(
+        final client = FakeGoTaskServiceClientInternal(
+          capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
             providers: <SingleAgentProvider>{SingleAgentProvider.opencode},
             raw: <String, dynamic>{},
           ),
-          result: const GoAgentCoreRunResult(
+          result: const GoTaskServiceResult(
             success: true,
             message: 'THREAD_OK',
             turnId: 'turn-1',
@@ -785,6 +839,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             },
             errorMessage: '',
             resolvedModel: '',
+          route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
         final controller = await createAppControllerInternal(
@@ -796,7 +851,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: client,
+          goTaskServiceClient: client,
         );
 
         await controller.setAssistantExecutionTarget(

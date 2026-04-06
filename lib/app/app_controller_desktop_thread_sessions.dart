@@ -50,6 +50,24 @@ import 'app_controller_desktop_thread_sessions_collaboration_impl.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 extension AppControllerDesktopThreadSessions on AppController {
+  TaskThread? taskThreadForSessionInternal(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    return taskThreadRepositoryInternal.taskThreadForSession(
+      normalizedSessionKey,
+    );
+  }
+
+  TaskThread requireTaskThreadForSessionInternal(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    return taskThreadRepositoryInternal.requireTaskThreadForSession(
+      normalizedSessionKey,
+    );
+  }
+
   int assistantSkillCountForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -97,8 +115,16 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
+    final latestResolvedModel =
+        taskThreadForSessionInternal(normalizedSessionKey)
+            ?.latestResolvedRuntimeModel
+            .trim() ??
+        '';
     if (target == AssistantExecutionTarget.singleAgent ||
         target == AssistantExecutionTarget.auto) {
+      if (latestResolvedModel.isNotEmpty) {
+        return latestResolvedModel;
+      }
       if (singleAgentUsesAiChatFallbackForSession(normalizedSessionKey)) {
         final recordModel =
             assistantThreadRecordsInternal[normalizedSessionKey]
@@ -130,43 +156,25 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final existing =
-        assistantThreadRecordsInternal[normalizedSessionKey]
+    return taskThreadForSessionInternal(normalizedSessionKey)
             ?.workspaceBinding
             .workspacePath
             .trim() ??
         '';
-    if (existing.isNotEmpty) {
-      return existing;
-    }
-    final target = assistantExecutionTargetForSession(normalizedSessionKey);
-    if (target == AssistantExecutionTarget.singleAgent ||
-        target == AssistantExecutionTarget.auto) {
-      return localThreadWorkspacePathInternal(normalizedSessionKey);
-    }
-    return '';
   }
 
   WorkspaceRefKind assistantWorkspaceKindForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final record = assistantThreadRecordsInternal[normalizedSessionKey];
-    if (record != null) {
-      return record.workspaceKind == WorkspaceKind.localFs
-          ? WorkspaceRefKind.localPath
-          : WorkspaceRefKind.remotePath;
-    }
-    return defaultWorkspaceRefKindForTargetInternal(
-      assistantExecutionTargetForSession(normalizedSessionKey),
-    );
+    final record = requireTaskThreadForSessionInternal(sessionKey);
+    return record.workspaceBinding.workspaceKind == WorkspaceKind.localFs
+        ? WorkspaceRefKind.localPath
+        : WorkspaceRefKind.remotePath;
   }
 
   String assistantWorkspaceDisplayPathForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    return assistantThreadRecordsInternal[normalizedSessionKey]
+    return taskThreadForSessionInternal(normalizedSessionKey)
             ?.workspaceBinding
             .displayPath
             .trim() ??
@@ -203,10 +211,12 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final stored =
-        assistantThreadRecordsInternal[normalizedSessionKey]
-            ?.singleAgentProvider ??
-        SingleAgentProvider.auto;
+    final stored = SingleAgentProviderCopy.fromJsonValue(
+      taskThreadForSessionInternal(normalizedSessionKey)
+              ?.executionBinding
+              .providerId ??
+          '',
+    );
     return settings.resolveSingleAgentProvider(stored);
   }
 
@@ -281,12 +291,28 @@ extension AppControllerDesktopThreadSessions on AppController {
   bool get currentSingleAgentShouldSuggestAutoSwitch =>
       singleAgentShouldSuggestAutoSwitchForSession(currentSessionKey);
 
+  bool autoRouteReadyForSession(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    if (assistantExecutionTargetForSession(normalizedSessionKey) !=
+        AssistantExecutionTarget.auto) {
+      return false;
+    }
+    return hasAnyAvailableSingleAgentProvider ||
+        canUseAiGatewayConversation ||
+        connection.status == RuntimeConnectionStatus.connected;
+  }
+
+  bool get currentAutoRouteReady => autoRouteReadyForSession(currentSessionKey);
+
   String singleAgentRuntimeModelForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    return singleAgentRuntimeModelBySessionInternal[normalizedSessionKey]
-            ?.trim() ??
+    return taskThreadForSessionInternal(normalizedSessionKey)
+            ?.latestResolvedRuntimeModel
+            .trim() ??
         '';
   }
 
@@ -376,6 +402,70 @@ extension AppControllerDesktopThreadSessions on AppController {
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
     if (target == AssistantExecutionTarget.singleAgent ||
         target == AssistantExecutionTarget.auto) {
+      final thread = taskThreadForSessionInternal(normalizedSessionKey);
+      final resolvedGatewayEntryState = switch (
+        thread?.gatewayEntryState?.trim() ?? ''
+      ) {
+        'auto' => '',
+        final value => value,
+      };
+      final latestResolvedModel = thread?.latestResolvedRuntimeModel.trim() ?? '';
+      final primaryLabel = target == AssistantExecutionTarget.auto
+          ? 'Auto'
+          : target.label;
+      final actualDetailPrefix = target == AssistantExecutionTarget.auto
+          ? appText('当前: ', 'Current: ')
+          : '';
+      if (target == AssistantExecutionTarget.auto &&
+          resolvedGatewayEntryState.isEmpty) {
+        final autoReady = autoRouteReadyForSession(normalizedSessionKey);
+        return AssistantThreadConnectionState(
+          executionTarget: target,
+          status: autoReady
+              ? RuntimeConnectionStatus.connected
+              : RuntimeConnectionStatus.offline,
+          primaryLabel: primaryLabel,
+          detailLabel: appText('待服务端路由', 'Waiting for server routing'),
+          ready: autoReady,
+          pairingRequired: false,
+          gatewayTokenMissing: false,
+          lastError: null,
+        );
+      }
+      if (target == AssistantExecutionTarget.auto &&
+          resolvedGatewayEntryState.isNotEmpty) {
+        final detail = switch (resolvedGatewayEntryState) {
+          'local' => joinConnectionPartsInternal(<String>[
+            appText('OpenClaw Gateway', 'OpenClaw Gateway'),
+            latestResolvedModel,
+          ]),
+          'remote' => joinConnectionPartsInternal(<String>[
+            appText('OpenClaw Gateway', 'OpenClaw Gateway'),
+            latestResolvedModel,
+          ]),
+          _ => joinConnectionPartsInternal(<String>[
+            singleAgentResolvedProviderForSession(normalizedSessionKey)
+                        ?.label
+                        .isNotEmpty ==
+                    true
+                ? singleAgentResolvedProviderForSession(normalizedSessionKey)!.label
+                : appText('Single Agent', 'Single Agent'),
+            latestResolvedModel,
+          ]),
+        };
+        return AssistantThreadConnectionState(
+          executionTarget: target,
+          status: RuntimeConnectionStatus.connected,
+          primaryLabel: primaryLabel,
+          detailLabel: detail.isEmpty
+              ? appText('待服务端路由', 'Waiting for server routing')
+              : '$actualDetailPrefix$detail',
+          ready: true,
+          pairingRequired: false,
+          gatewayTokenMissing: false,
+          lastError: null,
+        );
+      }
       final provider = singleAgentProviderForSession(normalizedSessionKey);
       final resolvedProvider = singleAgentResolvedProviderForSession(
         normalizedSessionKey,
@@ -410,12 +500,6 @@ extension AppControllerDesktopThreadSessions on AppController {
               '当前线程的外部 Agent ACP 连接尚未就绪。',
               'The external Agent ACP connection for this thread is not ready yet.',
             );
-      final primaryLabel = target == AssistantExecutionTarget.auto
-          ? 'Auto'
-          : target.label;
-      final actualDetailPrefix = target == AssistantExecutionTarget.auto
-          ? appText('当前: ', 'Current: ')
-          : '';
       return AssistantThreadConnectionState(
         executionTarget: target,
         status: providerReady || fallbackReady
@@ -571,9 +655,13 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    final record = taskThreadForSessionInternal(normalizedSessionKey);
     return sanitizeExecutionTargetInternal(
-      assistantThreadRecordsInternal[normalizedSessionKey]?.executionTarget ??
-          settings.assistantExecutionTarget,
+      record == null
+          ? settings.assistantExecutionTarget
+          : assistantExecutionTargetFromExecutionMode(
+              record.executionBinding.executionMode,
+            ),
     );
   }
 

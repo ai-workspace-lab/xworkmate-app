@@ -625,8 +625,9 @@ class ConnectionChipInternal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final connectionState = controller.currentAssistantConnectionState;
+    final statusLabel =
+        '${controller.assistantConnectionStatusLabel} · ${controller.assistantConnectionTargetLabel}';
     final color = connectionState.isSingleAgent
         ? (connectionState.connected
               ? context.palette.accentMuted
@@ -641,20 +642,47 @@ class ConnectionChipInternal extends StatelessWidget {
             RuntimeConnectionStatus.offline => context.palette.surfaceSecondary,
           };
 
-    return Container(
+    return ConnectionStatusChipInternal(
       key: const Key('assistant-connection-chip'),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xs,
-        vertical: 5,
-      ),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(AppRadius.chip),
-        border: Border.all(color: context.palette.strokeSoft),
-      ),
-      child: Text(
-        '${controller.assistantConnectionStatusLabel} · ${controller.assistantConnectionTargetLabel}',
-        style: theme.textTheme.labelMedium,
+      statusLabel: statusLabel,
+      backgroundColor: color,
+    );
+  }
+}
+
+class ConnectionStatusChipInternal extends StatelessWidget {
+  const ConnectionStatusChipInternal({
+    super.key,
+    required this.statusLabel,
+    required this.backgroundColor,
+  });
+
+  final String statusLabel;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Tooltip(
+      message: statusLabel,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: 5,
+        ),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+          border: Border.all(color: context.palette.strokeSoft),
+        ),
+        child: Text(
+          statusLabel,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          softWrap: false,
+          style: theme.textTheme.labelMedium,
+        ),
       ),
     );
   }

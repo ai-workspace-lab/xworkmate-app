@@ -294,10 +294,6 @@ class WebRelayGatewayClient {
     Map<String, dynamic> metadata = const <String, dynamic>{},
   }) async {
     final runId = randomIdInternal();
-    final normalizedMetadata = <String, dynamic>{
-      for (final entry in metadata.entries)
-        if (entry.key.trim().isNotEmpty) entry.key: entry.value,
-    };
     final payload = asMapInternal(
       await request(
         'chat.send',
@@ -309,7 +305,6 @@ class WebRelayGatewayClient {
             'attachments': attachments
                 .map((item) => item.toJson())
                 .toList(growable: false),
-          if (normalizedMetadata.isNotEmpty) 'metadata': normalizedMetadata,
           'timeoutMs': 30000,
           'idempotencyKey': runId,
         },

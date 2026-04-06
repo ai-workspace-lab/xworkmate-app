@@ -30,10 +30,16 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         );
         final records = <TaskThread>[
           TaskThread(
-            sessionKey: 'main',
+            threadId: 'main',
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.remoteFs,
+              workspacePath: '/owners/remote/user/main/threads/main',
+              displayPath: '/owners/remote/user/main/threads/main',
+              writable: true,
+            ),
             title: '研发任务',
             archived: true,
-            executionTarget: AssistantExecutionTarget.remote,
             messageViewMode: AssistantMessageViewMode.raw,
             importedSkills: <AssistantThreadSkillEntry>[
               AssistantThreadSkillEntry(
@@ -46,8 +52,13 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
             ],
             selectedSkillKeys: <String>['/tmp/imported-skill'],
             assistantModelId: 'gpt-5.4-mini',
-            singleAgentProvider: SingleAgentProvider.claude,
             gatewayEntryState: 'single-agent',
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.gatewayRemote,
+              executorId: 'claude',
+              providerId: 'claude',
+              endpointId: '',
+            ),
             updatedAtMs: 1700000000000,
             messages: <GatewayChatMessage>[
               GatewayChatMessage(
@@ -92,7 +103,9 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         expect(reloadedRecords.first.archived, isTrue);
         expect(reloadedRecords.first.title, '研发任务');
         expect(
-          reloadedRecords.first.executionTarget,
+          assistantExecutionTargetFromExecutionMode(
+            reloadedRecords.first.executionBinding.executionMode,
+          ),
           AssistantExecutionTarget.remote,
         );
         expect(
@@ -105,7 +118,9 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         ]);
         expect(reloadedRecords.first.assistantModelId, 'gpt-5.4-mini');
         expect(
-          reloadedRecords.first.singleAgentProvider,
+          SingleAgentProviderCopy.fromJsonValue(
+            reloadedRecords.first.executionBinding.providerId,
+          ),
           SingleAgentProvider.claude,
         );
         expect(reloadedRecords.first.gatewayEntryState, 'single-agent');
@@ -132,10 +147,22 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         );
         final records = <TaskThread>[
           TaskThread(
-            sessionKey: 'draft:backup-1',
+            threadId: 'draft:backup-1',
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'draft:backup-1',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: '/tmp/draft-backup-1',
+              displayPath: '/tmp/draft-backup-1',
+              writable: true,
+            ),
             title: '备份线程',
             archived: false,
-            executionTarget: AssistantExecutionTarget.singleAgent,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.localAgent,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
             updatedAtMs: 1700000000000,
             messages: <GatewayChatMessage>[
@@ -202,10 +229,23 @@ void registerSecureConfigStoreSuiteLifecycleTestsInternal() {
         );
         final records = <TaskThread>[
           TaskThread(
-            sessionKey: 'draft:clear-1',
+            threadId: 'draft:clear-1',
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'draft:clear-1',
+              workspaceKind: WorkspaceKind.remoteFs,
+              workspacePath: '/owners/remote/user/clear/threads/draft:clear-1',
+              displayPath:
+                  '/owners/remote/user/clear/threads/draft:clear-1',
+              writable: true,
+            ),
             title: '清理线程',
             archived: false,
-            executionTarget: AssistantExecutionTarget.local,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.gatewayLocal,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
             updatedAtMs: 1700000000000,
             messages: <GatewayChatMessage>[],
