@@ -16,7 +16,7 @@ APP_BUILD_NUMBER := $(if $(APP_BUILD_NUMBER_RAW),$(APP_BUILD_NUMBER_RAW),1)
 APP_DART_DEFINE_VERSION ?= --dart-define=XWORKMATE_DISPLAY_VERSION=$(APP_VERSION)
 APP_DART_DEFINE_BUILD ?= --dart-define=XWORKMATE_BUILD_NUMBER=$(APP_BUILD_NUMBER)
 
-.PHONY: help deps analyze test check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs check-export-compliance
+.PHONY: help deps analyze test test-all test-golden test-golden-update test-integration test-features test-runtime test-patrol check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs check-export-compliance
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -29,6 +29,26 @@ analyze: ## Run static analysis
 
 test: ## Run Flutter tests
 	$(FLUTTER) test
+
+test-all: test test-golden test-features test-runtime ## Run all tests
+
+test-golden: ## Run Golden UI tests
+	$(FLUTTER) test test/golden/
+
+test-golden-update: ## Update Golden UI test screenshots
+	$(FLUTTER) test test/golden/ --update-goldens
+
+test-integration: ## Run integration tests
+	$(FLUTTER) test integration_test/ -d $(DEVICE)
+
+test-features: ## Run feature tests
+	$(FLUTTER) test test/features/
+
+test-runtime: ## Run runtime tests
+	$(FLUTTER) test test/runtime/
+
+test-patrol: ## Run Patrol E2E tests (requires device)
+	$(FLUTTER) pub global activate patrol && $(FLUTTER) pub run patrol test
 
 check: analyze test ## Run the standard validation suite
 

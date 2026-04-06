@@ -1,0 +1,298 @@
+name: Architecture Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  FLUTTER_VERSION: '3.29.0'
+
+jobs:
+  # =============================================================================
+  # Layer 2: Multi-end UI Shell (Golden + Widget)
+  # =============================================================================
+  layer2-app-shell-golden:
+    name: '[L2] App Shell Golden'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: flutter test test/golden/golden_test.dart --update-goldens
+      - name: Upload golden screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-l2-app-shell
+          path: test/golden/goldens/
+
+  layer2-widget-tests:
+    name: '[L2] Widget Tests'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: flutter test test/widget_test.dart
+
+  # =============================================================================
+  # Layer 3: TaskThread Control Plane (Golden + Integration)
+  # =============================================================================
+  layer3-taskthread-golden:
+    name: '[L3] TaskThread Golden'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: |
+          # Run TaskThread-specific golden tests
+          flutter test test/golden/architecture_golden_test.dart \
+            --name='task_rail\|thread_switched\|task_thread'
+      - name: Upload golden artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-l3-taskthread
+          path: test/golden/goldens/
+
+  layer3-taskthread-integration:
+    name: '[L3] TaskThread Integration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: |
+          flutter test integration_test/architecture_layers_test.dart \
+            --name='TaskThread'
+      - name: Upload integration logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-l3-taskthread
+          path: build/integration_test_results/
+
+  # =============================================================================
+  # Layer 4: GoTaskService Dispatch (Golden + Integration)
+  # =============================================================================
+  layer4-gotaskservice-golden:
+    name: '[L4] GoTaskService Dispatch Golden'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: |
+          flutter test test/golden/architecture_golden_test.dart \
+            --name='execution\|connection'
+      - name: Upload golden artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-l4-gotaskservice
+          path: test/golden/goldens/
+
+  layer4-gotaskservice-integration:
+    name: '[L4] GoTaskService Dispatch Integration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: |
+          flutter test integration_test/architecture_layers_test.dart \
+            --name='GoTaskService\|Dispatch'
+      - name: Upload integration logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-l4-gotaskservice
+          path: build/integration_test_results/
+
+  # =============================================================================
+  # Layer 5: Service Integration (Golden + Integration)
+  # =============================================================================
+  layer5-service-integration-golden:
+    name: '[L5] Service Integration Golden'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: |
+          flutter test test/golden/architecture_golden_test.dart \
+            --name='settings\|skills'
+      - name: Upload golden artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-l5-service
+          path: test/golden/goldens/
+
+  layer5-service-integration-test:
+    name: '[L5] Service Integration Test'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: |
+          flutter test integration_test/architecture_integration_test.dart \
+            --name='Service Integration'
+      - name: Upload integration logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-l5-service
+          path: build/integration_test_results/
+
+  # =============================================================================
+  # Cross-cutting: Security & Persistence (Integration)
+  # =============================================================================
+  crosscut-security-integration:
+    name: '[Cross] Security & Persistence'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: |
+          flutter test integration_test/architecture_integration_test.dart \
+            --name='Security\|Persistence'
+      - name: Upload integration logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-cross-security
+          path: build/integration_test_results/
+
+  # =============================================================================
+  # Feature & Runtime Tests
+  # =============================================================================
+  feature-tests:
+    name: '[Features] Feature Tests'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test-file:
+          - test/features/settings_page_test.dart
+          - test/features/assistant_page_test.dart
+          - test/features/tasks_page_test.dart
+          - test/features/ai_gateway_page_test.dart
+          - test/features/skills_page_test.dart
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: flutter test ${{ matrix.test-file }}
+
+  runtime-tests:
+    name: '[Runtime] Runtime Tests'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: flutter test test/runtime/
+
+  # =============================================================================
+  # Patrol E2E (Release Phase - requires device)
+  # =============================================================================
+  patrol-e2e:
+    name: '[Patrol] E2E Tests'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: dart pub global activate patrol
+      - run: flutter pub run patrol test patrol_test/architecture_patrol_test.dart
+        env:
+          PATROL_ANDROID_API_KEY: ${{ secrets.PATROL_ANDROID_API_KEY }}
+          PATROL_IOS_API_KEY: ${{ secrets.PATROL_IOS_API_KEY }}
+
+  # =============================================================================
+  # Full Architecture Flow Test
+  # =============================================================================
+  architecture-flow-test:
+    name: '[Flow] Architecture Full Flow'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: flutter test integration_test/architecture_integration_test.dart
+        --name='full flow'
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flow-test-results
+          path: build/
+
+  # =============================================================================
+  # Summary (runs after all other jobs)
+  # =============================================================================
+  test-summary:
+    name: Test Summary
+    needs:
+      - layer2-app-shell-golden
+      - layer2-widget-tests
+      - layer3-taskthread-golden
+      - layer3-taskthread-integration
+      - layer4-gotaskservice-golden
+      - layer4-gotaskservice-integration
+      - layer5-service-integration-golden
+      - layer5-service-integration-test
+      - crosscut-security-integration
+      - feature-tests
+      - runtime-tests
+      - architecture-flow-test
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Build Test Summary
+        run: |
+          echo "## Architecture Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Layer | Test Type | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| L2: App Shell | Golden + Widget | ${{ needs.layer2-app-shell-golden.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| L3: TaskThread | Golden + Integration | ${{ needs.layer3-taskthread-golden.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| L4: GoTaskService | Golden + Integration | ${{ needs.layer4-gotaskservice-golden.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| L5: Service Integration | Golden + Test | ${{ needs.layer5-service-integration-golden.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cross-cutting | Integration | ${{ needs.crosscut-security-integration.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Features | Feature Tests | ${{ needs.feature-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Runtime | Runtime Tests | ${{ needs.runtime-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Flow | Architecture Flow | ${{ needs.architecture-flow-test.result }} |" >> $GITHUB_STEP_SUMMARY
