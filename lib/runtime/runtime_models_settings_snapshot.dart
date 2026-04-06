@@ -46,6 +46,7 @@ class SettingsSnapshot {
     required this.assistantNavigationDestinations,
     required this.assistantCustomTaskTitles,
     required this.assistantArchivedTaskKeys,
+    required this.savedGatewayTargets,
     required this.assistantLastSessionKey,
   });
 
@@ -83,6 +84,7 @@ class SettingsSnapshot {
   final List<AssistantFocusEntry> assistantNavigationDestinations;
   final Map<String, String> assistantCustomTaskTitles;
   final List<String> assistantArchivedTaskKeys;
+  final List<String> savedGatewayTargets;
   final String assistantLastSessionKey;
 
   factory SettingsSnapshot.defaults() {
@@ -121,6 +123,7 @@ class SettingsSnapshot {
       assistantNavigationDestinations: kAssistantNavigationDestinationDefaults,
       assistantCustomTaskTitles: const <String, String>{},
       assistantArchivedTaskKeys: const <String>[],
+      savedGatewayTargets: const <String>[],
       assistantLastSessionKey: '',
     );
   }
@@ -160,6 +163,7 @@ class SettingsSnapshot {
     List<AssistantFocusEntry>? assistantNavigationDestinations,
     Map<String, String>? assistantCustomTaskTitles,
     List<String>? assistantArchivedTaskKeys,
+    List<String>? savedGatewayTargets,
     String? assistantLastSessionKey,
   }) {
     final resolvedGatewayProfiles = gatewayProfiles != null
@@ -217,6 +221,9 @@ class SettingsSnapshot {
           assistantCustomTaskTitles ?? this.assistantCustomTaskTitles,
       assistantArchivedTaskKeys:
           assistantArchivedTaskKeys ?? this.assistantArchivedTaskKeys,
+      savedGatewayTargets: normalizeSavedGatewayTargets(
+        savedGatewayTargets ?? this.savedGatewayTargets,
+      ),
       assistantLastSessionKey:
           assistantLastSessionKey ?? this.assistantLastSessionKey,
     );
@@ -266,6 +273,7 @@ class SettingsSnapshot {
           .toList(growable: false),
       'assistantCustomTaskTitles': assistantCustomTaskTitles,
       'assistantArchivedTaskKeys': assistantArchivedTaskKeys,
+      'savedGatewayTargets': savedGatewayTargets,
       'assistantLastSessionKey': assistantLastSessionKey,
     };
   }
@@ -301,6 +309,15 @@ class SettingsSnapshot {
         normalized.add(normalizedKey);
       }
       return normalized;
+    }
+
+    List<String> normalizeSavedGatewayTargetsFromJson(Object? value) {
+      if (value is! List) {
+        return const <String>[];
+      }
+      return normalizeSavedGatewayTargets(
+        value.map((item) => item?.toString() ?? ''),
+      );
     }
 
     final rawAssistantNavigationDestinations =
@@ -422,6 +439,9 @@ class SettingsSnapshot {
       ),
       assistantArchivedTaskKeys: normalizeTaskKeys(
         json['assistantArchivedTaskKeys'],
+      ),
+      savedGatewayTargets: normalizeSavedGatewayTargetsFromJson(
+        json['savedGatewayTargets'],
       ),
       assistantLastSessionKey: json['assistantLastSessionKey'] as String? ?? '',
     );
@@ -551,6 +571,74 @@ class SettingsSnapshot {
         externalAcpEndpoints.map((item) => item.toProvider()),
       );
 
+  List<SingleAgentProvider> get savedSingleAgentProviders =>
+      normalizeSingleAgentProviderList(
+        externalAcpEndpoints
+            .where(
+              (item) =>
+                  item.enabled &&
+                  item.endpoint.trim().isNotEmpty,
+            )
+            .map((item) => item.toProvider()),
+      );
+
+  bool isGatewayTargetSaved(AssistantExecutionTarget target) {
+    final targetKey = switch (target) {
+      AssistantExecutionTarget.local => 'local',
+      AssistantExecutionTarget.remote => 'remote',
+      _ => '',
+    };
+    return targetKey.isNotEmpty && savedGatewayTargets.contains(targetKey);
+  }
+
+  SettingsSnapshot markGatewayTargetSaved(AssistantExecutionTarget target) {
+    final targetKey = switch (target) {
+      AssistantExecutionTarget.local => 'local',
+      AssistantExecutionTarget.remote => 'remote',
+      _ => '',
+    };
+    if (targetKey.isEmpty || savedGatewayTargets.contains(targetKey)) {
+      return this;
+    }
+    return copyWith(
+      savedGatewayTargets: <String>[...savedGatewayTargets, targetKey],
+    );
+  }
+
+  List<SingleAgentProvider> visibleSingleAgentProviders(
+    Iterable<SingleAgentProvider> availableProviders,
+  ) {
+    final allowedProviderIds = savedSingleAgentProviders
+        .map((item) => item.providerId)
+        .toSet();
+    return normalizeSingleAgentProviderList(
+      availableProviders.where(
+        (item) => allowedProviderIds.contains(item.providerId),
+      ),
+    );
+  }
+
+  List<AssistantExecutionTarget> visibleAssistantExecutionTargets({
+    required Iterable<AssistantExecutionTarget> supportedTargets,
+    required Iterable<SingleAgentProvider> availableSingleAgentProviders,
+  }) {
+    final supported = supportedTargets.toSet();
+    final visible = <AssistantExecutionTarget>[];
+    if (supported.contains(AssistantExecutionTarget.singleAgent) &&
+        visibleSingleAgentProviders(availableSingleAgentProviders).isNotEmpty) {
+      visible.add(AssistantExecutionTarget.singleAgent);
+    }
+    if (supported.contains(AssistantExecutionTarget.local) &&
+        isGatewayTargetSaved(AssistantExecutionTarget.local)) {
+      visible.add(AssistantExecutionTarget.local);
+    }
+    if (supported.contains(AssistantExecutionTarget.remote) &&
+        isGatewayTargetSaved(AssistantExecutionTarget.remote)) {
+      visible.add(AssistantExecutionTarget.remote);
+    }
+    return List<AssistantExecutionTarget>.unmodifiable(visible);
+  }
+
   SettingsSnapshot copyWithExternalAcpEndpointForProvider(
     SingleAgentProvider provider,
     ExternalAcpEndpointProfile profile,
@@ -563,4 +651,18 @@ class SettingsSnapshot {
       ),
     );
   }
+}
+
+List<String> normalizeSavedGatewayTargets(Iterable<String> rawTargets) {
+  final normalized = <String>[];
+  final seen = <String>{};
+  for (final item in rawTargets) {
+    final normalizedTarget = item.trim().toLowerCase();
+    if ((normalizedTarget != 'local' && normalizedTarget != 'remote') ||
+        !seen.add(normalizedTarget)) {
+      continue;
+    }
+    normalized.add(normalizedTarget);
+  }
+  return List<String>.unmodifiable(normalized);
 }

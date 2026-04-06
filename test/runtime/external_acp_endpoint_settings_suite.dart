@@ -221,5 +221,66 @@ void main() {
         );
       },
     );
+
+    test('saved single-agent providers require a non-empty saved endpoint', () {
+      final defaults = SettingsSnapshot.defaults();
+      final snapshot = defaults.copyWith(
+        externalAcpEndpoints: normalizeExternalAcpEndpoints(
+          profiles: <ExternalAcpEndpointProfile>[
+            ...defaults.externalAcpEndpoints,
+            ExternalAcpEndpointProfile.defaultsForProvider(
+              SingleAgentProvider.codex,
+            ).copyWith(endpoint: 'wss://codex.example.com/acp'),
+            const ExternalAcpEndpointProfile(
+              providerKey: 'custom-agent-2',
+              label: 'Empty Agent',
+              badge: 'EA',
+              endpoint: '',
+              authRef: '',
+              enabled: true,
+            ),
+          ],
+        ),
+      );
+
+      expect(
+        snapshot.savedSingleAgentProviders
+            .map((item) => item.label)
+            .toList(growable: false),
+        const <String>['Codex'],
+      );
+    });
+
+    test('visible execution targets only include explicitly saved targets', () {
+      final defaults = SettingsSnapshot.defaults();
+      final snapshot = defaults
+          .copyWith(
+            externalAcpEndpoints: normalizeExternalAcpEndpoints(
+              profiles: <ExternalAcpEndpointProfile>[
+                ...defaults.externalAcpEndpoints,
+                ExternalAcpEndpointProfile.defaultsForProvider(
+                  SingleAgentProvider.codex,
+                ).copyWith(endpoint: 'wss://codex.example.com/acp'),
+              ],
+            ),
+          )
+          .markGatewayTargetSaved(AssistantExecutionTarget.remote);
+
+      expect(
+        snapshot.visibleAssistantExecutionTargets(
+          supportedTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.auto,
+            AssistantExecutionTarget.singleAgent,
+            AssistantExecutionTarget.local,
+            AssistantExecutionTarget.remote,
+          ],
+          availableSingleAgentProviders: snapshot.availableSingleAgentProviders,
+        ),
+        const <AssistantExecutionTarget>[
+          AssistantExecutionTarget.singleAgent,
+          AssistantExecutionTarget.remote,
+        ],
+      );
+    });
   });
 }

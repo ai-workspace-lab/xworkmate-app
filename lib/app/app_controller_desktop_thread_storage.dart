@@ -261,12 +261,22 @@ extension AppControllerDesktopThreadStorage on AppController {
     GatewayChatMessage message,
   ) {
     final key = normalizedAssistantSessionKeyInternal(sessionKey);
+    final existingTitle =
+        assistantThreadRecordsInternal[key]?.title.trim() ?? '';
+    final customTitle =
+        settings.assistantCustomTaskTitles[key]?.trim() ?? '';
     final next = List<GatewayChatMessage>.from(
       assistantThreadMessagesInternal[key] ?? const <GatewayChatMessage>[],
     )..add(message);
     assistantThreadMessagesInternal[key] = next;
     upsertTaskThreadInternal(
       key,
+      title: derivePersistedTaskTitle(
+        existingTitle,
+        next,
+        fallback: key,
+        hasCustomTitle: customTitle.isNotEmpty,
+      ),
       messages: next,
       updatedAtMs:
           message.timestampMs ??

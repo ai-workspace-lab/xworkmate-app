@@ -1212,3 +1212,46 @@ class TaskThread {
     );
   }
 }
+
+const int kDefaultTaskTitleMaxLength = 32;
+
+bool isNewConversationTaskTitle(String title) {
+  final trimmed = title.trim();
+  return trimmed == '新对话' || trimmed == 'New conversation';
+}
+
+String firstUserMessageTaskTitle(
+  Iterable<GatewayChatMessage> messages, {
+  String fallback = '',
+}) {
+  for (final message in messages) {
+    if (message.role.trim().toLowerCase() != 'user') {
+      continue;
+    }
+    final text = message.text.trim();
+    if (text.isEmpty) {
+      continue;
+    }
+    if (text.length <= kDefaultTaskTitleMaxLength) {
+      return text;
+    }
+    return '${text.substring(0, kDefaultTaskTitleMaxLength)}...';
+  }
+  return fallback.trim().isEmpty ? appText('新对话', 'New conversation') : fallback;
+}
+
+String derivePersistedTaskTitle(
+  String currentTitle,
+  Iterable<GatewayChatMessage> messages, {
+  String fallback = '',
+  bool hasCustomTitle = false,
+}) {
+  if (hasCustomTitle) {
+    return currentTitle.trim();
+  }
+  final trimmedCurrent = currentTitle.trim();
+  if (trimmedCurrent.isNotEmpty && !isNewConversationTaskTitle(trimmedCurrent)) {
+    return trimmedCurrent;
+  }
+  return firstUserMessageTaskTitle(messages, fallback: fallback);
+}

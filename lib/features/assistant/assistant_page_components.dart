@@ -79,7 +79,14 @@ class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {
     final theme = Theme.of(context);
     final palette = context.palette;
     final tasks = widget.tasks;
-    final groupedTasks = groupTasksForRailInternal(tasks);
+    final groupedTasks = groupTasksForRailInternal(
+      tasks,
+      widget.controller.visibleAssistantExecutionTargets(const <AssistantExecutionTarget>[
+        AssistantExecutionTarget.singleAgent,
+        AssistantExecutionTarget.local,
+        AssistantExecutionTarget.remote,
+      ]),
+    );
     final runningCount = tasks
         .where((task) => normalizedTaskStatusInternal(task.status) == 'running')
         .length;
@@ -276,15 +283,20 @@ class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {
 
 List<AssistantTaskGroupInternal> groupTasksForRailInternal(
   List<AssistantTaskEntryInternal> tasks,
+  List<AssistantExecutionTarget> visibleExecutionTargets,
 ) {
   final grouped = <AssistantExecutionTarget, List<AssistantTaskEntryInternal>>{
-    for (final target in AssistantExecutionTarget.values)
+    for (final target in visibleExecutionTargets)
       target: <AssistantTaskEntryInternal>[],
   };
   for (final task in tasks) {
-    grouped[task.executionTarget]!.add(task);
+    final bucket = grouped[task.executionTarget];
+    if (bucket == null) {
+      continue;
+    }
+    bucket.add(task);
   }
-  return AssistantExecutionTarget.values
+  return visibleExecutionTargets
       .map(
         (target) => AssistantTaskGroupInternal(
           executionTarget: target,

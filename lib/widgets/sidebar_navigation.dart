@@ -38,6 +38,11 @@ class SidebarNavigation extends StatelessWidget {
     this.availableSettingsTabs = const <SettingsTab>[],
     this.onSettingsTabChanged,
     this.taskItems = const <SidebarTaskItem>[],
+    this.visibleExecutionTargets = const <AssistantExecutionTarget>[
+      AssistantExecutionTarget.singleAgent,
+      AssistantExecutionTarget.local,
+      AssistantExecutionTarget.remote,
+    ],
     this.assistantSkillCount = 0,
     this.onRefreshTasks,
     this.onCreateTask,
@@ -72,6 +77,7 @@ class SidebarNavigation extends StatelessWidget {
   final List<SettingsTab> availableSettingsTabs;
   final ValueChanged<SettingsTab>? onSettingsTabChanged;
   final List<SidebarTaskItem> taskItems;
+  final List<AssistantExecutionTarget> visibleExecutionTargets;
   final int assistantSkillCount;
   final Future<void> Function()? onRefreshTasks;
   final Future<void> Function()? onCreateTask;
@@ -121,6 +127,7 @@ class SidebarNavigation extends StatelessWidget {
                     Expanded(
                       child: SidebarTaskSection(
                         items: taskItems,
+                        visibleExecutionTargets: visibleExecutionTargets,
                         skillCount: assistantSkillCount,
                         showCollapseControl: showCollapseControl,
                         onCycleSidebarState: onCycleSidebarState,
