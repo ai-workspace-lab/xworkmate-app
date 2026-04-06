@@ -767,6 +767,22 @@ paths:
     expect(find.byKey(const ValueKey('gateway-host-field')), findsOneWidget);
   });
 
+  testWidgets(
+    'SettingsPage gateway save and apply marks the selected gateway target as saved even for default-valued profiles',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
+
+      await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
+      await tester.tap(find.byKey(const ValueKey('gateway-profile-chip-0')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('gateway-apply-button')));
+      await tester.pumpAndSettle();
+
+      expect(controller.settings.savedGatewayTargets, contains('local'));
+    },
+  );
+
   testWidgets('SettingsPage diagnostics tab filters and clears runtime logs', (
     WidgetTester tester,
   ) async {

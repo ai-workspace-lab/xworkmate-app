@@ -48,6 +48,26 @@ import 'app_controller_desktop_runtime_helpers.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 extension AppControllerDesktopSettings on AppController {
+  SettingsSnapshot _markSavedGatewayTargetsForChangedProfiles(
+    SettingsSnapshot previous,
+    SettingsSnapshot snapshot,
+  ) {
+    var nextSnapshot = snapshot;
+    if (jsonEncode(previous.primaryLocalGatewayProfile.toJson()) !=
+        jsonEncode(snapshot.primaryLocalGatewayProfile.toJson())) {
+      nextSnapshot = nextSnapshot.markGatewayTargetSaved(
+        AssistantExecutionTarget.local,
+      );
+    }
+    if (jsonEncode(previous.primaryRemoteGatewayProfile.toJson()) !=
+        jsonEncode(snapshot.primaryRemoteGatewayProfile.toJson())) {
+      nextSnapshot = nextSnapshot.markGatewayTargetSaved(
+        AssistantExecutionTarget.remote,
+      );
+    }
+    return nextSnapshot;
+  }
+
   Future<void> saveSettingsDraft(SettingsSnapshot snapshot) async {
     if (disposedInternal) {
       return;
@@ -173,7 +193,10 @@ extension AppControllerDesktopSettings on AppController {
       notifyListeners();
       return;
     }
-    final nextSettings = settingsDraft;
+    final nextSettings = _markSavedGatewayTargetsForChangedProfiles(
+      settings,
+      settingsDraft,
+    );
     markPendingApplyDomainsInternal(settings, nextSettings);
     await persistDraftSecretsInternal();
     if (nextSettings.toJsonString() != settings.toJsonString()) {
@@ -237,19 +260,10 @@ extension AppControllerDesktopSettings on AppController {
       return;
     }
     final previous = settings;
-    var nextSnapshot = snapshot;
-    if (jsonEncode(previous.primaryLocalGatewayProfile.toJson()) !=
-        jsonEncode(snapshot.primaryLocalGatewayProfile.toJson())) {
-      nextSnapshot = nextSnapshot.markGatewayTargetSaved(
-        AssistantExecutionTarget.local,
-      );
-    }
-    if (jsonEncode(previous.primaryRemoteGatewayProfile.toJson()) !=
-        jsonEncode(snapshot.primaryRemoteGatewayProfile.toJson())) {
-      nextSnapshot = nextSnapshot.markGatewayTargetSaved(
-        AssistantExecutionTarget.remote,
-      );
-    }
+    final nextSnapshot = _markSavedGatewayTargetsForChangedProfiles(
+      previous,
+      snapshot,
+    );
     await persistSettingsSnapshotInternal(nextSnapshot);
     if (disposedInternal) {
       return;

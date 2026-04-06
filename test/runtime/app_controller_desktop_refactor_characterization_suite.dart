@@ -98,6 +98,31 @@ void main() {
   );
 
   test(
+    'AppController marks gateway targets as saved when settings drafts are applied',
+    () async {
+      final harness = await _DesktopControllerHarness.create();
+      addTearDown(harness.dispose);
+      final controller = harness.controller;
+      final defaults = controller.settings;
+      final nextSettings = defaults.copyWith(
+        gatewayProfiles: replaceGatewayProfileAt(
+          defaults.gatewayProfiles,
+          kGatewayLocalProfileIndex,
+          defaults.primaryLocalGatewayProfile.copyWith(
+            host: '127.0.0.1',
+            port: 18789,
+          ),
+        ),
+      );
+
+      await controller.saveSettingsDraft(nextSettings);
+      await controller.applySettingsDraft();
+
+      expect(controller.settings.savedGatewayTargets, contains('local'));
+    },
+  );
+
+  test(
     'AppController keeps AI Gateway model choices when single-agent falls back to AI chat',
     () async {
       final harness = await _DesktopControllerHarness.create(
