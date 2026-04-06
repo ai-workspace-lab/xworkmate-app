@@ -6,8 +6,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xworkmate/runtime/external_code_agent_acp_desktop_transport.dart';
 import 'package:xworkmate/runtime/gateway_acp_client.dart';
-import 'package:xworkmate/runtime/go_agent_core_desktop_transport.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
@@ -82,7 +82,7 @@ void main() {
           isA<GatewayAcpException>().having(
             (error) => error.code,
             'code',
-            'GO_AGENT_CORE_ENDPOINT_MISSING',
+            'EXTERNAL_ACP_ENDPOINT_MISSING',
           ),
         ),
       );

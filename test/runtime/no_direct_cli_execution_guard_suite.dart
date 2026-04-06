@@ -19,7 +19,7 @@ void main() {
         ];
         const guardedFiles = <String>[
           'lib/app/app_controller_desktop.dart',
-          'lib/runtime/go_agent_core_client.dart',
+          'lib/runtime/go_task_service_client.dart',
           'lib/runtime/runtime_coordinator.dart',
           'lib/runtime/gateway_acp_client.dart',
         ];
@@ -65,7 +65,7 @@ void main() {
         expect(
           File(relativePath).existsSync(),
           isFalse,
-          reason: '$relativePath should stay removed after GoAgentCore cutover',
+          reason: '$relativePath should stay removed after GoTaskService cutover',
         );
       }
 

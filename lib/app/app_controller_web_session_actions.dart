@@ -154,11 +154,11 @@ extension AppControllerWebSessionActions on AppController {
     if (singleAgentProviderForSession(sessionKey) == resolvedProvider) {
       return;
     }
-    singleAgentRuntimeModelBySessionInternal.remove(sessionKey);
     upsertThreadRecordInternal(
       sessionKey,
       singleAgentProvider: resolvedProvider,
       singleAgentProviderSource: ThreadSelectionSource.explicit,
+      latestResolvedRuntimeModel: '',
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     await persistThreadsInternal();

@@ -112,8 +112,8 @@ class FakeCodexRuntimeInternal extends CodexRuntime {
   Future<void> stop() async {}
 }
 
-class FakeGoAgentCoreClientInternal implements GoTaskServiceClient {
-  FakeGoAgentCoreClientInternal({
+class FakeGoTaskServiceClientInternal implements GoTaskServiceClient {
+  FakeGoTaskServiceClientInternal({
     this.capabilities = const ExternalCodeAgentAcpCapabilities.empty(),
     this.result = const GoTaskServiceResult(
       success: false,
@@ -198,9 +198,9 @@ class FakeGoAgentCoreClientInternal implements GoTaskServiceClient {
   Future<void> dispose() async {}
 }
 
-class FallbackOnlyGoAgentCoreClientInternal
-    extends FakeGoAgentCoreClientInternal {
-  FallbackOnlyGoAgentCoreClientInternal()
+class FallbackOnlyGoTaskServiceClientInternal
+    extends FakeGoTaskServiceClientInternal {
+  FallbackOnlyGoTaskServiceClientInternal()
     : super(capabilities: const ExternalCodeAgentAcpCapabilities.empty());
 }
 

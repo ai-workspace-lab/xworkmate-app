@@ -45,7 +45,7 @@ import 'app_controller_desktop_workspace_execution.dart';
 import 'app_controller_desktop_settings_runtime.dart';
 import 'app_controller_desktop_thread_storage.dart';
 import 'app_controller_desktop_skill_permissions.dart';
-import 'app_controller_desktop_go_agent_core_routing.dart';
+import 'app_controller_desktop_external_acp_routing.dart';
 import 'app_controller_desktop_runtime_helpers.dart';
 
 Future<void> refreshAcpCapabilitiesRuntimeInternal(
@@ -101,7 +101,7 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
     next[provider] = DirectSingleAgentCapabilities(
       available: true,
       supportedProviders: <SingleAgentProvider>[provider],
-      endpoint: 'go-agent-core',
+      endpoint: 'go-task-service',
     );
   }
   controller.singleAgentCapabilitiesByProviderInternal = next;

@@ -29,12 +29,12 @@ void main() {
         databasePathResolver: () async => '${tempDirectory.path}/settings.db',
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
       );
-      final goCoreClient = _FakeGoAgentCoreClient(
+      final goTaskServiceClient = _FakeGoTaskServiceClient(
         onExecute: gateway.recordGoCoreTurn,
       );
       final controller = AppController(
         store: store,
-        goTaskServiceClient: goCoreClient,
+        goTaskServiceClient: goTaskServiceClient,
       );
       addTearDown(() async {
         controller.dispose();
@@ -76,23 +76,23 @@ void main() {
         ),
         isTrue,
       );
-      expect(goCoreClient.lastRequest?.agentId, 'main');
+      expect(goTaskServiceClient.lastRequest?.agentId, 'main');
       expect(
-        ((goCoreClient.lastRequest?.metadata as Map?)?['node']
+        ((goTaskServiceClient.lastRequest?.metadata as Map?)?['node']
             as Map?)?['kind'],
         'app-mediated-cooperative-node',
       );
       expect(
-        ((goCoreClient.lastRequest?.metadata as Map?)?['dispatch']
+        ((goTaskServiceClient.lastRequest?.metadata as Map?)?['dispatch']
             as Map?)?['mode'],
         'gateway-only',
       );
       expect(
-        goCoreClient.lastRequest?.routing?.mode,
+        goTaskServiceClient.lastRequest?.routing?.mode,
         ExternalCodeAgentAcpRoutingMode.auto,
       );
       expect(
-        goCoreClient.lastRequest?.routing?.preferredGatewayTarget,
+        goTaskServiceClient.lastRequest?.routing?.preferredGatewayTarget,
         'local',
       );
     },
@@ -113,10 +113,10 @@ void main() {
         databasePathResolver: () async => '${tempDirectory.path}/settings.db',
         fallbackDirectoryPathResolver: () async => tempDirectory.path,
       );
-      final goCoreClient = _FakeGoAgentCoreClient();
+      final goTaskServiceClient = _FakeGoTaskServiceClient();
       final controller = AppController(
         store: store,
-        goTaskServiceClient: goCoreClient,
+        goTaskServiceClient: goTaskServiceClient,
       );
       addTearDown(controller.dispose);
 
@@ -138,14 +138,17 @@ void main() {
       await controller.sendChatMessage('只回复 EXPLICIT_OK', thinking: 'low');
 
       expect(
-        goCoreClient.lastRequest?.routing?.mode,
+        goTaskServiceClient.lastRequest?.routing?.mode,
         ExternalCodeAgentAcpRoutingMode.explicit,
       );
       expect(
-        goCoreClient.lastRequest?.routing?.explicitExecutionTarget,
+        goTaskServiceClient.lastRequest?.routing?.explicitExecutionTarget,
         'singleAgent',
       );
-      expect(goCoreClient.lastRequest?.routing?.explicitProviderId, 'opencode');
+      expect(
+        goTaskServiceClient.lastRequest?.routing?.explicitProviderId,
+        'opencode',
+      );
     },
   );
 
@@ -167,7 +170,7 @@ void main() {
       );
       final controller = AppController(
         store: store,
-        goTaskServiceClient: _FakeGoAgentCoreClient(
+        goTaskServiceClient: _FakeGoTaskServiceClient(
           onExecute: gateway.recordGoCoreTurn,
         ),
       );
@@ -217,7 +220,7 @@ void main() {
       );
       final controller = AppController(
         store: store,
-        goTaskServiceClient: _FakeGoAgentCoreClient(
+        goTaskServiceClient: _FakeGoTaskServiceClient(
           onExecute: gateway.recordGoCoreTurn,
         ),
       );
@@ -625,8 +628,8 @@ class _FakeGatewayServer {
   }
 }
 
-class _FakeGoAgentCoreClient implements GoTaskServiceClient {
-  _FakeGoAgentCoreClient({this.onExecute});
+class _FakeGoTaskServiceClient implements GoTaskServiceClient {
+  _FakeGoTaskServiceClient({this.onExecute});
 
   GoTaskServiceRequest? lastRequest;
   final void Function(GoTaskServiceRequest request)? onExecute;

@@ -12,13 +12,14 @@ class ExternalCodeAgentAcpWebTransport implements ExternalCodeAgentAcpTransport 
   final WebAcpClient _acpClient;
   final Uri? Function(AssistantExecutionTarget target) _endpointResolver;
 
-  Uri? get _goCoreEndpoint => _endpointResolver(AssistantExecutionTarget.singleAgent);
+  Uri? get _externalAcpEndpoint =>
+      _endpointResolver(AssistantExecutionTarget.singleAgent);
 
   @override
   Future<void> syncExternalProviders(
     List<ExternalCodeAgentAcpSyncedProvider> providers,
   ) async {
-    final endpoint = _goCoreEndpoint;
+    final endpoint = _externalAcpEndpoint;
     if (endpoint == null) {
       return;
     }
@@ -36,7 +37,7 @@ class ExternalCodeAgentAcpWebTransport implements ExternalCodeAgentAcpTransport 
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
   }) async {
-    final endpoint = _goCoreEndpoint;
+    final endpoint = _externalAcpEndpoint;
     if (endpoint == null) {
       return const ExternalCodeAgentAcpCapabilities.empty();
     }
@@ -54,11 +55,11 @@ class ExternalCodeAgentAcpWebTransport implements ExternalCodeAgentAcpTransport 
     GoTaskServiceRequest request, {
     required void Function(GoTaskServiceUpdate update) onUpdate,
   }) async {
-    final endpoint = _goCoreEndpoint;
+    final endpoint = _externalAcpEndpoint;
     if (endpoint == null) {
       throw const WebAcpException(
-        'Missing Go Agent-core endpoint',
-        code: 'GO_AGENT_CORE_ENDPOINT_MISSING',
+        'Missing external ACP endpoint',
+        code: 'EXTERNAL_ACP_ENDPOINT_MISSING',
       );
     }
     var streamedText = '';
@@ -95,7 +96,7 @@ class ExternalCodeAgentAcpWebTransport implements ExternalCodeAgentAcpTransport 
     required String sessionId,
     required String threadId,
   }) async {
-    final endpoint = _goCoreEndpoint;
+    final endpoint = _externalAcpEndpoint;
     if (endpoint == null) {
       return;
     }
@@ -112,7 +113,7 @@ class ExternalCodeAgentAcpWebTransport implements ExternalCodeAgentAcpTransport 
     required String sessionId,
     required String threadId,
   }) async {
-    final endpoint = _goCoreEndpoint;
+    final endpoint = _externalAcpEndpoint;
     if (endpoint == null) {
       return;
     }

@@ -269,7 +269,6 @@ extension AppControllerDesktopSettings on AppController {
     aiGatewayStreamingClientsInternal.clear();
     aiGatewayPendingSessionKeysInternal.clear();
     aiGatewayAbortedSessionKeysInternal.clear();
-    latestRoutingResolutionBySessionInternal.clear();
     singleAgentExternalCliPendingSessionKeysInternal.clear();
     assistantThreadTurnQueuesInternal.clear();
     multiAgentRunPendingInternal = false;

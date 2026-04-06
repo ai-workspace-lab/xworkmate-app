@@ -1,6 +1,6 @@
 # Assistant TaskThread 信息架构
 
-本文描述当前 XWorkmate 中，线程信息如何围绕 `TaskThread` 进入 UI、进入 controller / runtime 的执行请求构造、再通过 `Go Agent-core` 回写到 UI。
+本文描述当前 XWorkmate 中，线程信息如何围绕 `TaskThread` 进入 UI、进入 controller / runtime 的执行请求构造、再通过 `GoTaskService` 回写到 UI。
 
 本文统一采用 `TaskThread` 聚合对象作为线程信息架构主语义。
 
@@ -57,7 +57,7 @@ TaskThread
 
 - 当前线程执行模式
 - provider / endpoint 绑定
-- 为 agent-core / runtime 协调层提供调度输入
+- 为 `GoTaskService / runtime` 协调层提供调度输入
 
 ### 2.4 contextState
 
@@ -98,7 +98,7 @@ flowchart LR
   D3 --> E
   D4 --> E
 
-  E --> F["Go Agent-core\nDesktop: local bridge\nWeb: remote ACP / RPC"]
+  E --> F["GoTaskService\nDesktop: GatewayRuntime / ExternalCodeAgentAcpDesktopTransport\nWeb: relay / ExternalCodeAgentAcpWebTransport"]
   F --> G["执行结果"]
 
   G --> H["回写线程上下文\n(主体区域 同步显示)"]
@@ -111,7 +111,7 @@ flowchart LR
 这张图表达的是当前线程信息架构，而不是旧的“工作目录 fallback 流程”：
 
 - `读取 TaskThread` 是 UI 与执行层共享的唯一线程信息入口
-- `构造执行请求` 在 agent-core / runtime 协调层完成
+- `构造执行请求` 在 `GoTaskService / runtime` 协调层完成
 - `右栏显示` 明确依赖 `TaskThread` 当前记录
 - `workspaceBinding` 更新只允许发生在当前线程已完整的前提下
 - prompt 中的 `workspace_root` side-channel 已退出主链；workspace 更新只允许来自 create/load 显式绑定或结构化执行结果回写
@@ -123,9 +123,9 @@ flowchart LR
 | 当前线程身份 | `threadId` | UI 按 `threadId` 选中线程，再读取完整 `TaskThread` |
 | owner 信息 | `ownerScope` | 线程归属、owner 展示与 remote owner path 推导 |
 | 工作空间路径展示 | `workspaceBinding.displayPath` | 右栏当前路径展示 |
-| 执行工作空间 | `workspaceBinding.workspacePath` | agent-core / runtime 构造执行请求时使用 |
+| 执行工作空间 | `workspaceBinding.workspacePath` | `GoTaskService / runtime` 构造执行请求时使用 |
 | 工作空间类型 | `workspaceBinding.workspaceKind` | 区分 `localFs / remoteFs` |
-| 执行模式 | `executionBinding.executionMode` | 映射 Go Agent-core 调度输入与 transport 选择 |
+| 执行模式 | `executionBinding.executionMode` | 映射 `GoTaskService` 调度输入与 transport 选择 |
 | provider / endpoint | `executionBinding.providerId / endpointId` | 当前执行通道来源 |
 | 消息历史 | `contextState.messages` | 主体区域消息列表 |
 | 模型 | `contextState.selectedModelId` | 当前线程模型选择 |
@@ -143,7 +143,7 @@ flowchart LR
 
 - UI 仍保持现有结构与呈现方式
 - UI 不负责执行请求构造
-- controller / runtime 负责根据 `TaskThread` 构造请求并调用 `Go Agent-core`
+- controller / runtime 负责根据 `TaskThread` 构造请求并调用 `GoTaskService`
 - 执行结果先回写线程上下文，主体区域同步显示
 - 右栏显示与预览结果来自当前 `TaskThread` 最新记录
 - Desktop / Web 共用同一套 session 语义，只保留 local bridge / remote ACP-RPC transport 差异

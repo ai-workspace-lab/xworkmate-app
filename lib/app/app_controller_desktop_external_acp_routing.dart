@@ -38,7 +38,7 @@ import '../runtime/skill_directory_access.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 
-extension AppControllerDesktopGoAgentCoreRouting on AppController {
+extension AppControllerDesktopExternalAcpRouting on AppController {
   Future<List<ExternalCodeAgentAcpSyncedProvider>>
   buildExternalAcpSyncedProvidersInternal() async {
     final providers = <ExternalCodeAgentAcpSyncedProvider>[];
@@ -74,28 +74,5 @@ extension AppControllerDesktopGoAgentCoreRouting on AppController {
         providers.map((item) => MapEntry(item.providerId.trim(), item)),
       );
     await goTaskServiceClientInternal.syncExternalProviders(providers);
-  }
-
-  void updateLatestRoutingResolutionInternal(
-    String sessionKey,
-    GoTaskServiceResult result,
-  ) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    latestRoutingResolutionBySessionInternal[normalizedSessionKey] =
-        <String, dynamic>{
-          'resolvedExecutionTarget': result.resolvedExecutionTarget,
-          'resolvedEndpointTarget': result.resolvedEndpointTarget,
-          'resolvedProviderId': result.resolvedProviderId,
-          'resolvedModel': result.resolvedModel.trim(),
-          'resolvedSkills': result.resolvedSkills,
-          'skillResolutionSource': result.skillResolutionSource,
-          'skillCandidates': result.skillCandidates,
-          'needsSkillInstall': result.needsSkillInstall,
-          'skillInstallRequestId': result.skillInstallRequestId,
-          'memorySources': result.memorySources,
-          'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
-        };
   }
 }

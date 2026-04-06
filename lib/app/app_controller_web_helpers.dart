@@ -384,6 +384,13 @@ extension AppControllerWebHelpers on AppController {
         text: text,
         error: false,
       );
+      upsertThreadRecordInternal(
+        sessionKey,
+        lifecycleStatus: 'ready',
+        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastResultCode: 'success',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
     }
     if (state == 'final' || state == 'aborted' || state == 'error') {
       pendingSessionKeysInternal.remove(sessionKey);
@@ -394,6 +401,17 @@ extension AppControllerWebHelpers on AppController {
           error: true,
         );
       }
+      upsertThreadRecordInternal(
+        sessionKey,
+        lifecycleStatus: 'ready',
+        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastResultCode: switch (state) {
+          'aborted' => 'aborted',
+          'error' => 'error',
+          _ => 'success',
+        },
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
       clearStreamingTextInternal(sessionKey);
       unawaited(refreshRelaySessions());
       unawaited(refreshRelayHistory(sessionKey: sessionKey));
@@ -470,8 +488,12 @@ extension AppControllerWebHelpers on AppController {
     ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
+    String? latestResolvedRuntimeModel,
     String? workspacePath,
     WorkspaceKind? workspaceKind,
+    String? lifecycleStatus,
+    double? lastRunAtMs,
+    String? lastResultCode,
   }) {
     final key = normalizedSessionKeyInternal(sessionKey);
     final resolvedTarget =
@@ -500,6 +522,7 @@ extension AppControllerWebHelpers on AppController {
             assistantModelSource ?? existing.contextState.selectedModelSource,
         selectedSkillsSource:
             selectedSkillsSource ?? existing.contextState.selectedSkillsSource,
+        latestResolvedRuntimeModel: latestResolvedRuntimeModel,
         gatewayEntryState: gatewayEntryState ?? existing.gatewayEntryState,
         clearGatewayEntryState: clearGatewayEntryState,
         workspaceBinding:
@@ -531,7 +554,11 @@ extension AppControllerWebHelpers on AppController {
           providerSource:
               singleAgentProviderSource ?? existing.executionBinding.providerSource,
         ),
-        lifecycleState: existing.lifecycleState.copyWith(status: 'ready'),
+        lifecycleState: existing.lifecycleState.copyWith(
+          status: lifecycleStatus ?? 'ready',
+          lastRunAtMs: lastRunAtMs,
+          lastResultCode: lastResultCode,
+        ),
       ),
     );
     recomputeDerivedWorkspaceStateInternal();

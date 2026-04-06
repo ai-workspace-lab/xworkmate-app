@@ -29,7 +29,7 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
-import '../runtime/go_agent_core_desktop_transport.dart';
+import '../runtime/external_code_agent_acp_desktop_transport.dart';
 import '../runtime/go_task_service_client.dart';
 import '../runtime/go_task_service_desktop_service.dart';
 import '../runtime/go_gateway_runtime_desktop_client.dart';
@@ -221,7 +221,7 @@ class AppController extends ChangeNotifier {
           gateway: runtimeCoordinatorInternal.gateway,
           acpTransport: ExternalCodeAgentAcpDesktopTransport(
             acpClient: gatewayAcpClientInternal,
-            endpointResolver: resolveGoAgentCoreEndpointForTargetInternal,
+            endpointResolver: resolveExternalAcpEndpointForTargetInternal,
             goCoreLocator: goCoreLocatorInternal,
           ),
         );
@@ -318,11 +318,6 @@ class AppController extends ChangeNotifier {
       <String, List<GatewayChatMessage>>{};
   final Map<String, String> aiGatewayStreamingTextBySessionInternal =
       <String, String>{};
-  final Map<String, String> singleAgentRuntimeModelBySessionInternal =
-      <String, String>{};
-  final Map<String, Map<String, dynamic>>
-  latestRoutingResolutionBySessionInternal =
-      <String, Map<String, dynamic>>{};
   final Map<String, ExternalCodeAgentAcpSyncedProvider>
   syncedGoAgentProvidersInternal = <String, ExternalCodeAgentAcpSyncedProvider>{};
   final DesktopThreadArtifactService threadArtifactServiceInternal =
