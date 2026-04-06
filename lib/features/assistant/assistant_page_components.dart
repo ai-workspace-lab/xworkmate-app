@@ -81,11 +81,12 @@ class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {
     final tasks = widget.tasks;
     final groupedTasks = groupTasksForRailInternal(
       tasks,
-      widget.controller.visibleAssistantExecutionTargets(const <AssistantExecutionTarget>[
-        AssistantExecutionTarget.singleAgent,
-        AssistantExecutionTarget.local,
-        AssistantExecutionTarget.remote,
-      ]),
+      widget.controller
+          .visibleAssistantExecutionTargets(const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.singleAgent,
+            AssistantExecutionTarget.local,
+            AssistantExecutionTarget.remote,
+          ]),
     );
     final runningCount = tasks
         .where((task) => normalizedTaskStatusInternal(task.status) == 'running')
@@ -496,65 +497,49 @@ class AssistantEmptyStateInternal extends StatelessWidget {
     final theme = Theme.of(context);
     final connectionState = controller.currentAssistantConnectionState;
     final singleAgent = connectionState.isSingleAgent;
-    final autoMode =
-        connectionState.executionTarget == AssistantExecutionTarget.auto;
     final connected = connectionState.connected;
     final singleAgentFallback = controller.currentSingleAgentUsesAiChatFallback;
     final singleAgentNeedsAiGateway =
         controller.currentSingleAgentNeedsAiGatewayConfiguration;
-    final singleAgentSuggestsAuto =
-        controller.currentSingleAgentShouldSuggestAutoSwitch;
+    final singleAgentSuggestsAcpSwitch =
+        controller.currentSingleAgentShouldSuggestAcpSwitch;
     final providerLabel = controller.currentSingleAgentProvider.label;
     final reconnectAvailable = controller.canQuickConnectGateway;
     final title = singleAgent
-        ? autoMode
-              ? connected
-                    ? appText('开始对话或运行任务', 'Start a chat or run a task')
-                    : appText('先准备 Auto 路由', 'Prepare Auto routing first')
-              : connected
-              ? appText('开始单机智能体任务', 'Start a single-agent task')
+        ? connected
+              ? appText('开始 ACP Server 任务', 'Start an ACP Server task')
               : singleAgentNeedsAiGateway
               ? appText('先配置 LLM API', 'Configure LLM API first')
-              : appText('先准备外部 Agent', 'Prepare the external Agent first')
+              : appText('先准备 ACP Server', 'Prepare the ACP Server first')
         : connected
         ? appText('开始对话或运行任务', 'Start a chat or run a task')
         : connectionState.status == RuntimeConnectionStatus.error
         ? appText('Gateway 连接失败', 'Gateway connection failed')
         : appText('先连接 Gateway', 'Connect a gateway first');
     final description = singleAgent
-        ? autoMode
-              ? connected
-                    ? appText(
-                        '输入需求后会自动选择可用执行方式，并把结果回写到当前会话。',
-                        'Type a request and XWorkmate will choose an available execution route automatically, then return results to this session.',
-                      )
-                    : appText(
-                        'Auto 当前还没有可用执行方式。请先配置任一外部 Agent ACP 端点、连接 Gateway，或配置 LLM API fallback。',
-                        'Auto currently has no available execution route. Configure an external Agent ACP endpoint, connect a Gateway, or configure LLM API fallback.',
-                      )
-              : connected
+        ? connected
               ? (singleAgentFallback
                     ? appText(
                         '当前没有可用的外部 Agent ACP 连接，这个线程已降级到 AI Chat fallback，不会建立 OpenClaw Gateway 会话。',
                         'No external Agent ACP connection is available for this thread, so it is running in AI Chat fallback without opening an OpenClaw Gateway session.',
                       )
                     : appText(
-                        '当前模式使用单机智能体处理当前任务，不会建立 OpenClaw Gateway 会话。',
-                        'This mode uses a single agent for the current task and does not open an OpenClaw Gateway session.',
+                        '当前线程通过 ACP Server 处理任务，不会建立 OpenClaw Gateway 会话。',
+                        'This thread runs through the ACP Server path and does not open an OpenClaw Gateway session.',
                       ))
-              : singleAgentSuggestsAuto
+              : singleAgentSuggestsAcpSwitch
               ? appText(
-                  '当前线程固定为 $providerLabel，但它在这台设备上不可用。检测到其他外部 Agent ACP 端点时不会自动切换，可在工具栏里改成 Auto。',
-                  'This thread is pinned to $providerLabel, but it is unavailable on this device. XWorkmate will not switch to another external Agent ACP endpoint automatically. Change the provider to Auto in the toolbar.',
+                  '当前线程固定为 $providerLabel，但它在这台设备上不可用。请改成可用的 ACP Server。',
+                  'This thread is pinned to $providerLabel, but it is unavailable on this device. Switch to an available ACP Server.',
                 )
               : singleAgentNeedsAiGateway
               ? appText(
-                  '请先在 设置 -> 集成 中配置 LLM API Endpoint、LLM API Token 和默认模型，然后以单机智能体模式继续当前任务。',
-                  'Set the LLM API Endpoint, LLM API Token, and default model in Settings -> Integrations, then continue this task in Single Agent mode.',
+                  '请先在 设置 -> 集成 中配置 LLM API Endpoint、LLM API Token 和默认模型，然后以 ACP Server 模式继续当前任务。',
+                  'Set the LLM API Endpoint, LLM API Token, and default model in Settings -> Integrations, then continue this task in ACP Server mode.',
                 )
               : appText(
-                  '当前线程的外部 Agent ACP 连接尚未就绪。请先配置 $providerLabel 对应端点，或切换到 Auto。',
-                  'The external Agent ACP connection for this thread is not ready yet. Configure the endpoint for $providerLabel first, or switch to Auto.',
+                  '当前线程的外部 Agent ACP 连接尚未就绪。请先配置 $providerLabel 对应端点。',
+                  'The external Agent ACP connection for this thread is not ready yet. Configure the endpoint for $providerLabel first.',
                 )
         : connected
         ? appText(

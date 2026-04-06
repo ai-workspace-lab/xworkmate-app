@@ -121,9 +121,7 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
         }
         return;
       }
-      final effectiveProvider = sessionTarget == AssistantExecutionTarget.auto
-          ? SingleAgentProvider.auto
-          : (provider ?? SingleAgentProvider.auto);
+      final effectiveProvider = provider ?? SingleAgentProvider.auto;
 
       appendSingleAgentRuntimeStatusDesktopInternal(
         controller,
@@ -164,9 +162,7 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
           target: AssistantExecutionTarget.singleAgent,
           prompt: message,
           workingDirectory: workingDirectory,
-          model: sessionTarget == AssistantExecutionTarget.auto
-              ? ''
-              : controller.assistantModelForSession(sessionKey),
+          model: controller.assistantModelForSession(sessionKey),
           thinking: thinking,
           selectedSkills: selectedSkills,
           inlineAttachments: attachments,

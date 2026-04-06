@@ -488,14 +488,18 @@ extension WorkspaceKindCopy on WorkspaceKind {
   }
 }
 
-enum ThreadExecutionMode { auto, localAgent, gatewayLocal, gatewayRemote }
+bool isLegacyAutoThreadExecutionModeValue(String? value) {
+  return value?.trim().toLowerCase() == 'auto';
+}
+
+enum ThreadExecutionMode { localAgent, gatewayLocal, gatewayRemote }
 
 extension ThreadExecutionModeCopy on ThreadExecutionMode {
   static ThreadExecutionMode fromJsonValue(String? value) {
     final normalized = value?.trim();
     switch (normalized) {
       case 'auto':
-        return ThreadExecutionMode.auto;
+        return ThreadExecutionMode.localAgent;
       case 'singleAgent':
       case 'local_agent':
       case 'localAgent':
@@ -509,7 +513,7 @@ extension ThreadExecutionModeCopy on ThreadExecutionMode {
       case 'gatewayRemote':
         return ThreadExecutionMode.gatewayRemote;
       default:
-        return ThreadExecutionMode.auto;
+        return ThreadExecutionMode.localAgent;
     }
   }
 }
@@ -705,7 +709,6 @@ ThreadExecutionMode threadExecutionModeFromAssistantExecutionTarget(
   AssistantExecutionTarget target,
 ) {
   return switch (target) {
-    AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
     AssistantExecutionTarget.singleAgent => ThreadExecutionMode.localAgent,
     AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
     AssistantExecutionTarget.remote => ThreadExecutionMode.gatewayRemote,
@@ -716,7 +719,6 @@ AssistantExecutionTarget assistantExecutionTargetFromExecutionMode(
   ThreadExecutionMode mode,
 ) {
   return switch (mode) {
-    ThreadExecutionMode.auto => AssistantExecutionTarget.auto,
     ThreadExecutionMode.localAgent => AssistantExecutionTarget.singleAgent,
     ThreadExecutionMode.gatewayLocal => AssistantExecutionTarget.local,
     ThreadExecutionMode.gatewayRemote => AssistantExecutionTarget.remote,
@@ -949,7 +951,7 @@ class TaskThread {
        executionBinding =
            executionBinding ??
            ExecutionBinding(
-             executionMode: ThreadExecutionMode.auto,
+             executionMode: ThreadExecutionMode.localAgent,
              executorId: SingleAgentProvider.auto.providerId,
              providerId: SingleAgentProvider.auto.providerId,
              endpointId: '',
@@ -1136,8 +1138,23 @@ class TaskThread {
       final nested =
           (json['executionBinding'] as Map?)?.cast<String, dynamic>() ??
           const <String, dynamic>{};
+      if (nested.isNotEmpty &&
+          isLegacyAutoThreadExecutionModeValue(
+            nested['executionMode']?.toString(),
+          )) {
+        throw const FormatException(
+          'TaskThread.executionBinding.executionMode "auto" is no longer supported.',
+        );
+      }
       if (nested.isNotEmpty) {
         return nested;
+      }
+      if (isLegacyAutoAssistantExecutionTargetValue(
+        json['executionTarget']?.toString(),
+      )) {
+        throw const FormatException(
+          'TaskThread.executionTarget "auto" is no longer supported.',
+        );
       }
       final legacyTarget = AssistantExecutionTargetCopy.fromJsonValue(
         json['executionTarget']?.toString(),

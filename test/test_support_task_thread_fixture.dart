@@ -50,7 +50,6 @@ TaskThread buildTaskThreadFixture({
     ),
     executionBinding: ExecutionBinding(
       executionMode: switch (executionTarget) {
-        AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
         AssistantExecutionTarget.singleAgent => ThreadExecutionMode.localAgent,
         AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
         AssistantExecutionTarget.remote => ThreadExecutionMode.gatewayRemote,

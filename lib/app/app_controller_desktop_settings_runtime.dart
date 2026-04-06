@@ -466,14 +466,11 @@ extension AppControllerDesktopSettingsRuntime on AppController {
           await skillDirectoryAccessServiceInternal.resolveUserHomeDirectory();
       await settingsControllerInternal.initialize();
       final storedAssistantThreads = await storeInternal.loadTaskThreads();
-      final skippedInvalidThreadIds =
-          storeInternal.lastSkippedInvalidTaskThreadIds;
-      startupTaskThreadWarningInternal = skippedInvalidThreadIds.isEmpty
+      final skippedInvalidThreadRecords =
+          storeInternal.lastSkippedInvalidTaskThreadRecords;
+      startupTaskThreadWarningInternal = skippedInvalidThreadRecords.isEmpty
           ? null
-          : appText(
-              '已跳过 ${skippedInvalidThreadIds.length} 个缺少完整 workspaceBinding 的旧任务线程: ${skippedInvalidThreadIds.join(', ')}',
-              'Skipped ${skippedInvalidThreadIds.length} persisted task threads missing a complete workspaceBinding: ${skippedInvalidThreadIds.join(', ')}',
-            );
+          : formatStartupTaskThreadWarningInternal(skippedInvalidThreadRecords);
       if (disposedInternal) {
         return;
       }
@@ -593,6 +590,51 @@ extension AppControllerDesktopSettingsRuntime on AppController {
         notifyIfActiveInternal();
       }
     }
+  }
+
+  String formatStartupTaskThreadWarningInternal(
+    List<SkippedTaskThreadRecord> records,
+  ) {
+    final grouped = <SkippedTaskThreadReason, List<String>>{};
+    for (final item in records) {
+      grouped.putIfAbsent(item.reason, () => <String>[]).add(item.threadId);
+    }
+
+    String zhSegment(SkippedTaskThreadReason reason, List<String> threadIds) {
+      final joined = threadIds.join(', ');
+      return switch (reason) {
+        SkippedTaskThreadReason.removedAutoExecutionMode =>
+          '仍使用已移除 Auto 执行模式: $joined',
+        SkippedTaskThreadReason.incompleteWorkspaceBinding =>
+          '缺少完整 workspaceBinding: $joined',
+        SkippedTaskThreadReason.invalidPersistedThreadData => '数据无效: $joined',
+      };
+    }
+
+    String enSegment(SkippedTaskThreadReason reason, List<String> threadIds) {
+      final joined = threadIds.join(', ');
+      return switch (reason) {
+        SkippedTaskThreadReason.removedAutoExecutionMode =>
+          'removed Auto execution mode: $joined',
+        SkippedTaskThreadReason.incompleteWorkspaceBinding =>
+          'missing a complete workspaceBinding: $joined',
+        SkippedTaskThreadReason.invalidPersistedThreadData =>
+          'invalid persisted data: $joined',
+      };
+    }
+
+    final reasons = grouped.keys.toList()
+      ..sort((left, right) => left.index.compareTo(right.index));
+    final zhSummary = reasons
+        .map((reason) => zhSegment(reason, grouped[reason]!))
+        .join('；');
+    final enSummary = reasons
+        .map((reason) => enSegment(reason, grouped[reason]!))
+        .join('; ');
+    return appText(
+      '已跳过 ${records.length} 个旧任务线程：$zhSummary',
+      'Skipped ${records.length} persisted task threads: $enSummary',
+    );
   }
 
   void markPendingApplyDomainsInternal(

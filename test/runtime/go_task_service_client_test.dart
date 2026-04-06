@@ -38,13 +38,9 @@ void main() {
       );
     });
 
-    test('routes single-agent and auto targets to the ACP single lane', () {
+    test('routes single-agent targets to the ACP single lane', () {
       expect(
         buildRequest(target: AssistantExecutionTarget.singleAgent).route,
-        GoTaskServiceRoute.externalAcpSingle,
-      );
-      expect(
-        buildRequest(target: AssistantExecutionTarget.auto).route,
         GoTaskServiceRoute.externalAcpSingle,
       );
     });

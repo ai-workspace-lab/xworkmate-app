@@ -564,8 +564,7 @@ class AppController extends ChangeNotifier {
 
   int get activeGatewayProfileIndexInternal {
     final target = currentAssistantExecutionTarget;
-    if (target == AssistantExecutionTarget.singleAgent ||
-        target == AssistantExecutionTarget.auto) {
+    if (target == AssistantExecutionTarget.singleAgent) {
       return kGatewayRemoteProfileIndex;
     }
     return gatewayProfileIndexForExecutionTargetInternal(target);

@@ -1,6 +1,7 @@
 // ignore_for_file: unused_import, unnecessary_import
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -97,7 +98,7 @@ void registerExecutionTargetSwitchThreadTests() {
           AssistantExecutionTarget.singleAgent,
         );
         expect(gateway.disconnectCount, 1);
-        expect(controller.assistantConnectionStatusLabel, '单机智能体');
+        expect(controller.assistantConnectionStatusLabel, 'ACP Server Local');
         expect(
           controller.settings.assistantExecutionTarget,
           AssistantExecutionTarget.local,
@@ -194,7 +195,7 @@ void registerExecutionTargetSwitchThreadTests() {
         );
         await controller.switchSession('main');
 
-        expect(controller.assistantConnectionStatusLabel, '单机智能体');
+        expect(controller.assistantConnectionStatusLabel, 'ACP Server Local');
         expect(
           controller.assistantConnectionTargetLabel,
           '没有可用的外部 Agent ACP 端点，请配置 LLM API fallback。',
@@ -336,6 +337,72 @@ void registerExecutionTargetSwitchThreadTests() {
     );
 
     test(
+      'AppController warns once when persisted legacy auto threads are skipped at startup',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        final tempDirectory = await Directory.systemTemp.createTemp(
+          'xworkmate-thread-legacy-auto-warning-',
+        );
+        addTearDown(() async {
+          await deleteDirectoryWithRetryInternal(tempDirectory);
+        });
+        final tasksDirectory = Directory('${tempDirectory.path}/tasks');
+        await tasksDirectory.create(recursive: true);
+        const threadId = 'legacy:auto-thread';
+        await File('${tasksDirectory.path}/index.json').writeAsString(
+          jsonEncode(<String, dynamic>{
+            'version': taskThreadSchemaVersion,
+            'sessions': const <String>[threadId],
+          }),
+          flush: true,
+        );
+        await File(
+          '${tasksDirectory.path}/${encodeStableFileKey(threadId)}.json',
+        ).writeAsString(
+          jsonEncode(<String, dynamic>{
+            'schemaVersion': taskThreadSchemaVersion,
+            'threadId': threadId,
+            'workspaceBinding': <String, dynamic>{
+              'workspaceId': threadId,
+              'workspaceKind': WorkspaceKind.localFs.name,
+              'workspacePath': '/tmp/$threadId',
+              'displayPath': '/tmp/$threadId',
+              'writable': true,
+            },
+            'executionBinding': <String, dynamic>{
+              'executionMode': 'auto',
+              'executorId': 'auto',
+              'providerId': 'auto',
+              'endpointId': '',
+            },
+          }),
+          flush: true,
+        );
+
+        final store = SecureConfigStore(
+          enableSecureStorage: false,
+          databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+          fallbackDirectoryPathResolver: () async => tempDirectory.path,
+        );
+        final controller = AppController(
+          store: store,
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+        );
+        addTearDown(controller.dispose);
+
+        await waitForInternal(() => !controller.initializing);
+
+        expect(controller.currentSessionKey, 'main');
+        expect(controller.startupTaskThreadWarning, isNotNull);
+        expect(controller.startupTaskThreadWarning, contains('已移除 Auto 执行模式'));
+        expect(controller.startupTaskThreadWarning, contains(threadId));
+      },
+    );
+
+    test(
       'AppController clears local assistant state and resets persisted defaults',
       () async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -400,7 +467,7 @@ void registerExecutionTargetSwitchThreadTests() {
           assistantExecutionTargetFromExecutionMode(
             reloadedThreads.single.executionBinding.executionMode,
           ),
-          AssistantExecutionTarget.local,
+          AssistantExecutionTarget.singleAgent,
         );
       },
     );

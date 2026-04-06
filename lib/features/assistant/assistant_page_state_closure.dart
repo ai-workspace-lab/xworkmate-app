@@ -180,17 +180,11 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                   focusNode: composerFocusNodeInternal,
                   thinkingLabel: thinkingLabelInternal,
                   showModelControl:
-                      controller.currentAssistantExecutionTarget ==
-                          AssistantExecutionTarget.auto
-                      ? false
-                      : !controller.isSingleAgentMode
+                      !controller.isSingleAgentMode
                       ? true
                       : controller.currentSingleAgentShouldShowModelControl,
                   modelLabel:
-                      controller.currentAssistantExecutionTarget ==
-                          AssistantExecutionTarget.auto
-                      ? 'Auto'
-                      : controller.isSingleAgentMode
+                      controller.isSingleAgentMode
                       ? controller.currentSingleAgentModelDisplayLabel
                       : controller.resolvedAssistantModel.isEmpty
                       ? appText('未选择模型', 'No model selected')

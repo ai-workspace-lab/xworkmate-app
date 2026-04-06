@@ -64,7 +64,6 @@ abstract final class UiFeatureKeys {
   static const assistantFileAttachments = 'assistant.file_attachments';
   static const assistantMultiAgent = 'assistant.multi_agent';
   static const assistantLocalRuntime = 'assistant.local_runtime';
-  static const assistantTaskDialogModeAuto = 'assistant.task_dialog_mode_auto';
 
   static const settingsGeneral = 'settings.general';
   static const settingsWorkspace = 'settings.workspace';
@@ -483,10 +482,6 @@ class UiFeatureAccess {
       platform == UiFeaturePlatform.desktop &&
       isEnabledPath(UiFeatureKeys.assistantLocalRuntime);
 
-  bool get supportsTaskDialogModeAuto =>
-      platform != UiFeaturePlatform.desktop ||
-      isEnabledPath(UiFeatureKeys.assistantTaskDialogModeAuto);
-
   bool get supportsDiagnostics =>
       isEnabledPath(UiFeatureKeys.settingsDiagnostics);
 
@@ -526,9 +521,6 @@ class UiFeatureAccess {
 
   List<AssistantExecutionTarget> get availableExecutionTargets {
     final targets = <AssistantExecutionTarget>[];
-    if (platform != UiFeaturePlatform.mobile && supportsTaskDialogModeAuto) {
-      targets.add(AssistantExecutionTarget.auto);
-    }
     if (supportsDirectAi) {
       targets.add(AssistantExecutionTarget.singleAgent);
     }
@@ -550,14 +542,13 @@ class UiFeatureAccess {
     }
     final preferredOrder = platform == UiFeaturePlatform.web
         ? const <AssistantExecutionTarget>[
-            AssistantExecutionTarget.auto,
             AssistantExecutionTarget.singleAgent,
+            AssistantExecutionTarget.local,
             AssistantExecutionTarget.remote,
           ]
         : const <AssistantExecutionTarget>[
-            AssistantExecutionTarget.auto,
-            AssistantExecutionTarget.local,
             AssistantExecutionTarget.singleAgent,
+            AssistantExecutionTarget.local,
             AssistantExecutionTarget.remote,
           ];
     for (final candidate in preferredOrder) {
@@ -565,9 +556,7 @@ class UiFeatureAccess {
         return candidate;
       }
     }
-    return platform == UiFeaturePlatform.web
-        ? AssistantExecutionTarget.auto
-        : AssistantExecutionTarget.auto;
+    return AssistantExecutionTarget.singleAgent;
   }
 }
 

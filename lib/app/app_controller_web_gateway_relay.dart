@@ -94,7 +94,6 @@ extension AppControllerWebGatewayRelay on AppController {
       final sessionKey = normalizedSessionKeyInternal(session.key);
       final existing = taskThreadForSessionInternal(sessionKey);
       final resolvedExecutionTarget = switch (existing?.executionBinding.executionMode) {
-        ThreadExecutionMode.auto => AssistantExecutionTarget.auto,
         ThreadExecutionMode.localAgent => AssistantExecutionTarget.singleAgent,
         ThreadExecutionMode.gatewayLocal => AssistantExecutionTarget.local,
         ThreadExecutionMode.gatewayRemote => AssistantExecutionTarget.remote,
@@ -138,7 +137,6 @@ extension AppControllerWebGatewayRelay on AppController {
             existing?.executionBinding ??
             ExecutionBinding(
               executionMode: switch (resolvedExecutionTarget) {
-                AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
                 AssistantExecutionTarget.singleAgent =>
                   ThreadExecutionMode.localAgent,
                 AssistantExecutionTarget.local =>
@@ -274,7 +272,6 @@ extension AppControllerWebGatewayRelay on AppController {
               ))
           .copyWith(
             executionMode: switch (target) {
-              AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
               AssistantExecutionTarget.singleAgent =>
                 ThreadExecutionMode.localAgent,
               AssistantExecutionTarget.local =>

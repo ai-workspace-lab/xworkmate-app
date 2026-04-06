@@ -397,7 +397,6 @@ bool canQuickConnectGatewayThreadSessionInternal(AppController controller) {
     return true;
   }
   final defaults = switch (target) {
-    AssistantExecutionTarget.auto => GatewayConnectionProfile.defaultsLocal(),
     AssistantExecutionTarget.singleAgent => GatewayConnectionProfile.emptySlot(
       index: kGatewayRemoteProfileIndex,
     ),

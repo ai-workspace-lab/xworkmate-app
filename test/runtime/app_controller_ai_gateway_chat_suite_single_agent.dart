@@ -286,7 +286,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
     );
 
     test(
-      'AppController treats Auto as ready before the first routing resolution when any route is available',
+      'AppController treats automatic ACP provider selection as ready before the first routing resolution when any route is available',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
           'xworkmate-auto-route-ready-',
@@ -321,18 +321,18 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         );
         await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
         await controller.setAssistantExecutionTarget(
-          AssistantExecutionTarget.auto,
+          AssistantExecutionTarget.singleAgent,
         );
 
         expect(
           controller.currentAssistantConnectionState.executionTarget,
-          AssistantExecutionTarget.auto,
+          AssistantExecutionTarget.singleAgent,
         );
         expect(controller.currentAssistantConnectionState.connected, isTrue);
         expect(controller.currentAssistantConnectionState.ready, isTrue);
         expect(
           controller.currentAssistantConnectionState.detailLabel,
-          '待服务端路由',
+          contains('OpenCode'),
         );
       },
     );
@@ -599,7 +599,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         expect(controller.currentAssistantConnectionState.connected, isFalse);
         expect(
           controller.chatMessages.any(
-            (message) => message.text.contains('可切到 Auto'),
+            (message) => message.text.contains('可切到可用的 ACP Server'),
           ),
           isTrue,
         );

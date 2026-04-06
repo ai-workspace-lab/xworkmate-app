@@ -22,6 +22,19 @@ class SettingsSnapshotReloadResult {
   bool get applied => status == SettingsSnapshotReloadStatus.applied;
 }
 
+enum SkippedTaskThreadReason {
+  incompleteWorkspaceBinding,
+  removedAutoExecutionMode,
+  invalidPersistedThreadData,
+}
+
+class SkippedTaskThreadRecord {
+  const SkippedTaskThreadRecord({required this.threadId, required this.reason});
+
+  final String threadId;
+  final SkippedTaskThreadReason reason;
+}
+
 class SettingsStore {
   SettingsStore({
     Future<String?> Function()? fallbackDirectoryPathResolver,
@@ -58,13 +71,21 @@ class SettingsStore {
   PersistentWriteFailure? _tasksWriteFailure;
   PersistentWriteFailure? _auditWriteFailure;
   bool _taskThreadStateResetRequired = false;
-  List<String> _lastSkippedInvalidTaskThreadIds = const <String>[];
+  List<SkippedTaskThreadRecord> _lastSkippedInvalidTaskThreadRecords =
+      const <SkippedTaskThreadRecord>[];
 
   PersistentWriteFailure? get settingsWriteFailure => _settingsWriteFailure;
   PersistentWriteFailure? get tasksWriteFailure => _tasksWriteFailure;
   PersistentWriteFailure? get auditWriteFailure => _auditWriteFailure;
-  List<String> get lastSkippedInvalidTaskThreadIds =>
-      List<String>.unmodifiable(_lastSkippedInvalidTaskThreadIds);
+  List<SkippedTaskThreadRecord> get lastSkippedInvalidTaskThreadRecords =>
+      List<SkippedTaskThreadRecord>.unmodifiable(
+        _lastSkippedInvalidTaskThreadRecords,
+      );
+  List<String> get lastSkippedInvalidTaskThreadIds => List<String>.unmodifiable(
+    _lastSkippedInvalidTaskThreadRecords
+        .map((item) => item.threadId)
+        .toList(growable: false),
+  );
 
   Future<void> initialize() async {
     if (_initialized) {
@@ -185,9 +206,7 @@ class SettingsStore {
     return List<TaskThread>.from(_threadRecords);
   }
 
-  Future<void> saveTaskThreads(
-    List<TaskThread> records,
-  ) async {
+  Future<void> saveTaskThreads(List<TaskThread> records) async {
     await initialize();
     final normalized = records
         .where((item) => item.threadId.trim().isNotEmpty)
@@ -272,7 +291,10 @@ class SettingsStore {
           ? <File>[layout.settingsFile]
           : _settingsFiles;
       for (final file in settingsFiles) {
-        await atomicWriteString(file, encodeYamlDocument(nextSnapshot.toJson()));
+        await atomicWriteString(
+          file,
+          encodeYamlDocument(nextSnapshot.toJson()),
+        );
       }
       _settingsWriteFailure = null;
     } catch (error) {
@@ -420,8 +442,10 @@ class SettingsStore {
   Future<List<TaskThread>> _readTaskThreads() async {
     final layout = _layout;
     if (layout == null) {
+      _lastSkippedInvalidTaskThreadRecords = const <SkippedTaskThreadRecord>[];
       return const <TaskThread>[];
     }
+    _lastSkippedInvalidTaskThreadRecords = const <SkippedTaskThreadRecord>[];
     final index = await _readThreadIndex(layout);
     if (index.resetRequired) {
       await _resetTaskThreadState(layout);
@@ -429,10 +453,9 @@ class SettingsStore {
       return const <TaskThread>[];
     }
     _taskThreadStateResetRequired = false;
-    _lastSkippedInvalidTaskThreadIds = const <String>[];
     final orderedKeys = index.sessions;
     final recordsByKey = <String, TaskThread>{};
-    final skippedIds = <String>{};
+    final skippedRecords = <SkippedTaskThreadRecord>[];
 
     String inferThreadIdFromTaskFile(File file) {
       final name = file.uri.pathSegments.isEmpty
@@ -471,8 +494,13 @@ class SettingsStore {
               recordsByKey[record.threadId] = record;
             }
           }
-        } catch (_) {
-          skippedIds.add(inferThreadIdFromTaskFile(entity));
+        } catch (error) {
+          skippedRecords.add(
+            SkippedTaskThreadRecord(
+              threadId: inferThreadIdFromTaskFile(entity),
+              reason: _classifySkippedTaskThreadReason(error),
+            ),
+          );
           continue;
         }
       }
@@ -493,8 +521,22 @@ class SettingsStore {
         ordered.add(record);
       }
     }
-    _lastSkippedInvalidTaskThreadIds = skippedIds.toList()..sort();
+    skippedRecords.sort(
+      (left, right) => left.threadId.compareTo(right.threadId),
+    );
+    _lastSkippedInvalidTaskThreadRecords = skippedRecords;
     return ordered;
+  }
+
+  SkippedTaskThreadReason _classifySkippedTaskThreadReason(Object error) {
+    final message = error.toString();
+    if (message.contains('"auto" is no longer supported')) {
+      return SkippedTaskThreadReason.removedAutoExecutionMode;
+    }
+    if (message.contains('workspaceBinding')) {
+      return SkippedTaskThreadReason.incompleteWorkspaceBinding;
+    }
+    return SkippedTaskThreadReason.invalidPersistedThreadData;
   }
 
   Future<_ThreadIndexReadResult> _readThreadIndex(StoreLayout layout) async {
