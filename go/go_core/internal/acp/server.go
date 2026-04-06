@@ -44,10 +44,10 @@ type taskResult struct {
 }
 
 type Server struct {
-	mu       sync.Mutex
-	sessions map[string]*session
-	queues   map[string]chan task
-	gateway  *gatewayruntime.Manager
+	mu              sync.Mutex
+	sessions        map[string]*session
+	queues          map[string]chan task
+	gateway         *gatewayruntime.Manager
 	providerCatalog map[string]syncedProvider
 }
 
@@ -70,7 +70,7 @@ func Serve(args []string) error {
 
 	server := NewServer()
 	httpServer := &http.Server{
-		Addr:         strings.TrimSpace(*listen),
+		Addr: strings.TrimSpace(*listen),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case "/acp/rpc":
@@ -95,9 +95,9 @@ func Serve(args []string) error {
 
 func NewServer() *Server {
 	return &Server{
-		sessions: make(map[string]*session),
-		queues:   make(map[string]chan task),
-		gateway:  gatewayruntime.NewManager(),
+		sessions:        make(map[string]*session),
+		queues:          make(map[string]chan task),
+		gateway:         gatewayruntime.NewManager(),
 		providerCatalog: make(map[string]syncedProvider),
 	}
 }
@@ -556,10 +556,10 @@ func (s *Server) executeSessionTask(task task) (map[string]any, *shared.RPCError
 	threadID := strings.TrimSpace(shared.StringArg(params, "threadId", sessionID))
 	if resolvedRouting.Unavailable {
 		response := mergeRoutingResponse(map[string]any{
-			"success":           false,
-			"error":             resolvedRouting.UnavailableMessage,
-			"unavailable":       true,
-			"unavailableCode":   resolvedRouting.UnavailableCode,
+			"success":            false,
+			"error":              resolvedRouting.UnavailableMessage,
+			"unavailable":        true,
+			"unavailableCode":    resolvedRouting.UnavailableCode,
 			"unavailableMessage": resolvedRouting.UnavailableMessage,
 		}, resolvedRouting)
 		return response, nil
@@ -567,6 +567,14 @@ func (s *Server) executeSessionTask(task task) (map[string]any, *shared.RPCError
 	executionParams := buildResolvedExecutionParams(params, resolvedRouting)
 	mode := strings.TrimSpace(shared.StringArg(executionParams, "mode", "single-agent"))
 	provider := strings.TrimSpace(shared.StringArg(executionParams, "provider", ""))
+	if provider != "" {
+		if syncedProvider, ok := s.syncedProviderByID(provider); ok {
+			executionParams = injectResolvedExternalProviderParams(
+				executionParams,
+				syncedProvider,
+			)
+		}
+	}
 
 	session := s.getOrCreateSession(sessionID, threadID)
 	session.mode = mode
@@ -657,6 +665,48 @@ func (s *Server) runSingleAgent(
 	model := strings.TrimSpace(shared.StringArg(params, "model", ""))
 	prompt := strings.TrimSpace(shared.StringArg(params, "taskPrompt", ""))
 	prompt = shared.AugmentPromptWithAttachments(prompt, params)
+
+	if syncedProvider, ok := externalProviderFromParams(params); ok {
+		response, err := s.runSingleAgentViaExternalProvider(
+			ctx,
+			syncedProvider,
+			method,
+			params,
+			notify,
+		)
+		if err == nil {
+			result := asMap(response["result"])
+			if len(result) == 0 {
+				result = response
+			}
+			if _, exists := result["provider"]; !exists {
+				result["provider"] = provider
+			}
+			if _, exists := result["mode"]; !exists {
+				result["mode"] = "single-agent"
+			}
+			if _, exists := result["turnId"]; !exists {
+				result["turnId"] = turnID
+			}
+			return taskResult{response: result}
+		}
+		s.emitSessionUpdate(session, notify, turnID, map[string]any{
+			"type":    "status",
+			"event":   "completed",
+			"message": err.Error(),
+			"pending": false,
+			"error":   true,
+		})
+		return taskResult{
+			response: map[string]any{
+				"success":  false,
+				"error":    err.Error(),
+				"turnId":   turnID,
+				"mode":     "single-agent",
+				"provider": provider,
+			},
+		}
+	}
 
 	if syncedProvider, ok := s.syncedProviderByID(provider); ok {
 		response, err := s.runSingleAgentViaExternalProvider(
