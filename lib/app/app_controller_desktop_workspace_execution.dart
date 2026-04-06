@@ -52,7 +52,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
   Future<void> setAssistantExecutionTarget(
     AssistantExecutionTarget target,
   ) async {
-    final resolvedTarget = sanitizeExecutionTargetInternal(target);
+    final resolvedTarget = sanitizePersistedExecutionTargetInternal(target);
     final currentTarget = assistantExecutionTargetForSession(
       sessionsControllerInternal.currentSessionKey,
     );
@@ -78,6 +78,8 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       sessionsControllerInternal.currentSessionKey,
       executionTarget: resolvedTarget,
       executionTargetSource: ThreadSelectionSource.explicit,
+      gatewayEntryState: gatewayEntryStateForTargetInternal(resolvedTarget),
+      latestResolvedRuntimeModel: '',
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     recomputeTasksInternal();
@@ -177,7 +179,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     required String sessionKey,
     required bool persistDefaultSelection,
   }) async {
-    final resolvedTarget = sanitizeExecutionTargetInternal(target);
+    final resolvedTarget = sanitizePersistedExecutionTargetInternal(target);
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
@@ -356,12 +358,10 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
           singleAgentProviderForSession(currentSessionKey),
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
-    unawaited(
-      ensureDesktopTaskThreadBindingInternal(
-        normalizedSessionKey,
-        executionTarget: resolvedTarget,
-      ),
-    );
+    // Re-read the current thread target when the async binding sync runs so a
+    // just-created thread cannot be rebound back to a stale target if the user
+    // switches execution mode immediately afterwards.
+    unawaited(ensureDesktopTaskThreadBindingInternal(normalizedSessionKey));
     unawaited(persistAssistantLastSessionKeyInternal(normalizedSessionKey));
     notifyIfActiveInternal();
   }

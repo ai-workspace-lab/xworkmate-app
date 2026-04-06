@@ -26,6 +26,11 @@ void main() {
       // Tightened in T2/T3 after assistant + app/runtime closure split.
       'lib/features/assistant/assistant_page_main.dart': 1000,
       'lib/app/app_controller_desktop_runtime_helpers.dart': 800,
+      'lib/app/app_controller_desktop_single_agent.dart': 200,
+      'lib/app/app_controller_desktop_single_agent_ai_gateway.dart': 800,
+      'lib/app/app_controller_desktop_single_agent_go_task_flow.dart': 800,
+      'lib/app/app_controller_desktop_single_agent_status_messages.dart': 400,
+      'lib/app/app_controller_desktop_external_acp_routing.dart': 400,
       'lib/app/app_controller_desktop_thread_sessions.dart': 800,
       'lib/app/app_controller_desktop_runtime_coordination_impl.dart': 800,
       'lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart':

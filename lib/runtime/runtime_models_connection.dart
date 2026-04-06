@@ -206,8 +206,6 @@ class SingleAgentProvider {
   final SingleAgentProviderSource source;
 
   bool get isAuto => providerId == auto.providerId;
-  bool get isBuiltInReserved =>
-      source == SingleAgentProviderSource.builtInReserved;
   bool get isExternalExtension =>
       source == SingleAgentProviderSource.externalExtension;
 
@@ -278,11 +276,7 @@ extension SingleAgentProviderCopy on SingleAgentProvider {
   }) => SingleAgentProvider.fromJsonValue(value, label: label, badge: badge);
 }
 
-enum SingleAgentProviderSource { externalExtension, builtInReserved }
-
-SingleAgentProvider normalizeSingleAgentProviderSelection(
-  SingleAgentProvider provider,
-) => provider;
+enum SingleAgentProviderSource { externalExtension }
 
 List<SingleAgentProvider> normalizeSingleAgentProviderList(
   Iterable<SingleAgentProvider> providers,
@@ -290,9 +284,8 @@ List<SingleAgentProvider> normalizeSingleAgentProviderList(
   final normalized = <SingleAgentProvider>[];
   final seen = <String>{};
   for (final provider in providers) {
-    final resolved = normalizeSingleAgentProviderSelection(provider);
-    if (seen.add(resolved.providerId)) {
-      normalized.add(resolved);
+    if (seen.add(provider.providerId)) {
+      normalized.add(provider);
     }
   }
   return normalized;

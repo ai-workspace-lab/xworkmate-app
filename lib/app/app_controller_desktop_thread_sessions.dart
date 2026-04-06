@@ -661,7 +661,7 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final record = taskThreadForSessionInternal(normalizedSessionKey);
-    return sanitizeExecutionTargetInternal(
+    return sanitizePersistedExecutionTargetInternal(
       record == null
           ? settings.assistantExecutionTarget
           : assistantExecutionTargetFromExecutionMode(
