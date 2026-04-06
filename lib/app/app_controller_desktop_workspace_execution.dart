@@ -53,6 +53,17 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     AssistantExecutionTarget target,
   ) async {
     final resolvedTarget = sanitizePersistedExecutionTargetInternal(target);
+    if (sessionsControllerInternal.currentSessionKey.trim().isEmpty) {
+      final bootstrapSessionKey =
+          'draft:${DateTime.now().millisecondsSinceEpoch}';
+      initializeAssistantThreadContext(
+        bootstrapSessionKey,
+        executionTarget: resolvedTarget,
+        messageViewMode: currentAssistantMessageViewMode,
+        singleAgentProvider: currentSingleAgentProvider,
+      );
+      await setCurrentAssistantSessionKeyInternal(bootstrapSessionKey);
+    }
     final currentThread = taskThreadForSessionInternal(
       sessionsControllerInternal.currentSessionKey,
     );
@@ -183,9 +194,18 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     required bool persistDefaultSelection,
   }) async {
     final resolvedTarget = sanitizePersistedExecutionTargetInternal(target);
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+    var normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    if (normalizedSessionKey.isEmpty) {
+      normalizedSessionKey = 'draft:${DateTime.now().millisecondsSinceEpoch}';
+      initializeAssistantThreadContext(
+        normalizedSessionKey,
+        executionTarget: resolvedTarget,
+        messageViewMode: currentAssistantMessageViewMode,
+        singleAgentProvider: currentSingleAgentProvider,
+      );
+    }
     if (resolvedTarget != AssistantExecutionTarget.singleAgent) {
       upsertTaskThreadInternal(
         normalizedSessionKey,
@@ -372,6 +392,9 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    if (normalizedSessionKey.isEmpty) {
+      return;
+    }
     if (assistantExecutionTargetForSession(normalizedSessionKey) !=
         AssistantExecutionTarget.singleAgent) {
       return;

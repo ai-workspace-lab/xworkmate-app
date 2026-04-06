@@ -104,9 +104,12 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
   required List<CollaborationAttachment> attachments,
   required List<String> selectedSkillLabels,
 }) async {
-  final sessionKey = controller.currentSessionKey.trim().isEmpty
-      ? 'main'
-      : controller.currentSessionKey;
+  final sessionKey = controller.currentSessionKey.trim();
+  if (sessionKey.isEmpty) {
+    throw StateError(
+      'TaskThread session key is required for multi-agent collaboration.',
+    );
+  }
   await controller.enqueueThreadTurnInternal<void>(sessionKey, () async {
     final aiGatewayApiKey = await loadAiGatewayApiKeyThreadSessionInternal(
       controller,
@@ -413,7 +416,7 @@ bool canQuickConnectGatewayThreadSessionInternal(AppController controller) {
 
 String normalizeAssistantSessionKeyThreadInternal(String sessionKey) {
   final trimmed = sessionKey.trim();
-  return trimmed.isEmpty ? 'main' : trimmed;
+  return trimmed;
 }
 
 String joinConnectionPartsThreadSessionInternal(List<String> parts) {

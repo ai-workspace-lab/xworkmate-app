@@ -344,6 +344,23 @@ void main() {
   );
 
   test(
+    'GatewayChatController does not fall back to main when loading an empty session key',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final store = createIsolatedTestStore();
+      final runtime = _FakeGatewayRuntimeForChatController(store: store);
+      final controller = GatewayChatController(runtime);
+      addTearDown(controller.dispose);
+
+      await controller.loadSession('');
+
+      expect(controller.sessionKey, isEmpty);
+      expect(controller.messages, isEmpty);
+      expect(runtime.loadedSessions, isEmpty);
+    },
+  );
+
+  test(
     'GatewayRuntime does not silently fall back to direct websocket when go-core bridge is unavailable',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -701,6 +718,7 @@ class _FakeGatewayRuntimeForChatController extends GatewayRuntime {
     : super(identityStore: DeviceIdentityStore(store));
 
   final List<Map<String, dynamic>> _history = <Map<String, dynamic>>[];
+  final List<String> loadedSessions = <String>[];
 
   @override
   bool get isConnected => true;
@@ -723,6 +741,7 @@ class _FakeGatewayRuntimeForChatController extends GatewayRuntime {
   }) async {
     switch (method) {
       case 'chat.history':
+        loadedSessions.add(params?['sessionKey']?.toString() ?? '');
         return <String, dynamic>{'messages': List<Object>.from(_history)};
       case 'chat.send':
         final text = params?['message']?.toString().trim() ?? '';

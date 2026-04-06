@@ -152,7 +152,7 @@ extension AppControllerDesktopThreadActions on AppController {
   Future<void> refreshAgents() async {
     await agentsControllerInternal.refresh();
     sessionsControllerInternal.configure(
-      mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? 'main',
+      mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? '',
       selectedAgentId: agentsControllerInternal.selectedAgentId,
       defaultAgentId: '',
     );
@@ -176,7 +176,7 @@ extension AppControllerDesktopThreadActions on AppController {
       );
     }
     sessionsControllerInternal.configure(
-      mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? 'main',
+      mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? '',
       selectedAgentId: agentsControllerInternal.selectedAgentId,
       defaultAgentId: '',
     );
@@ -193,7 +193,7 @@ extension AppControllerDesktopThreadActions on AppController {
 
   Future<void> refreshSessions() async {
     sessionsControllerInternal.configure(
-      mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? 'main',
+      mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? '',
       selectedAgentId: agentsControllerInternal.selectedAgentId,
       defaultAgentId: '',
     );

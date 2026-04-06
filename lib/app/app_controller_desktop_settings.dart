@@ -306,8 +306,9 @@ extension AppControllerDesktopSettings on AppController {
       defaults.primaryRemoteGatewayProfile.selectedAgentId,
     );
     modelsControllerInternal.restoreFromSettings(defaults.aiGateway);
+    final resetThreadKey = 'draft:${DateTime.now().millisecondsSinceEpoch}';
     initializeAssistantThreadContext(
-      'main',
+      resetThreadKey,
       executionTarget: sanitizePersistedExecutionTargetInternal(
         defaults.assistantExecutionTarget,
       ),
@@ -315,14 +316,14 @@ extension AppControllerDesktopSettings on AppController {
       singleAgentProvider: SingleAgentProvider.auto,
     );
     await setCurrentAssistantSessionKeyInternal(
-      'main',
+      resetThreadKey,
       persistSelection: false,
     );
     taskThreadRepositoryInternal.removeWhere(
-      (key, _) => key != 'main',
+      (key, _) => key != resetThreadKey,
       persist: false,
     );
-    assistantThreadMessagesInternal.removeWhere((key, _) => key != 'main');
+    assistantThreadMessagesInternal.removeWhere((key, _) => key != resetThreadKey);
     await flushAssistantThreadPersistenceInternal();
     await storeInternal.saveTaskThreads(
       taskThreadRepositoryInternal.snapshot(),

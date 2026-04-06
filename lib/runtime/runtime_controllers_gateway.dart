@@ -93,8 +93,8 @@ class GatewaySessionsController extends ChangeNotifier {
 
   List<GatewaySessionSummary> sessionsInternal =
       const <GatewaySessionSummary>[];
-  String currentSessionKeyInternal = 'main';
-  String mainSessionBaseKeyInternal = 'main';
+  String currentSessionKeyInternal = '';
+  String mainSessionBaseKeyInternal = '';
   String selectedAgentIdInternal = '';
   String defaultAgentIdInternal = '';
   bool loadingInternal = false;
@@ -116,7 +116,6 @@ class GatewaySessionsController extends ChangeNotifier {
     defaultAgentIdInternal = defaultAgentId.trim();
     final preferred = preferredSessionKey;
     if (currentSessionKeyInternal.trim().isEmpty ||
-        currentSessionKeyInternal == 'main' ||
         currentSessionKeyInternal == mainSessionBaseKeyInternal ||
         currentSessionKeyInternal.startsWith('agent:')) {
       currentSessionKeyInternal = preferred;
@@ -150,7 +149,8 @@ class GatewaySessionsController extends ChangeNotifier {
       if (!sessionsInternal.any(
         (item) => matchesSessionKey(item.key, currentSessionKeyInternal),
       )) {
-        currentSessionKeyInternal = preferredSessionKey;
+        currentSessionKeyInternal =
+            sessionsInternal.isEmpty ? '' : preferredSessionKey;
       }
     } catch (error) {
       errorInternal = error.toString();
@@ -176,7 +176,7 @@ class GatewayChatController extends ChangeNotifier {
   final GatewayRuntime runtimeInternal;
 
   List<GatewayChatMessage> messagesInternal = const <GatewayChatMessage>[];
-  String sessionKeyInternal = 'main';
+  String sessionKeyInternal = '';
   bool loadingInternal = false;
   bool sendingInternal = false;
   bool abortingInternal = false;
@@ -196,7 +196,15 @@ class GatewayChatController extends ChangeNotifier {
       pendingRunsInternal.isEmpty ? null : pendingRunsInternal.first;
 
   Future<void> loadSession(String sessionKey) async {
-    final next = sessionKey.trim().isEmpty ? 'main' : sessionKey.trim();
+    final next = sessionKey.trim();
+    if (next.isEmpty) {
+      sessionKeyInternal = '';
+      messagesInternal = const <GatewayChatMessage>[];
+      streamingAssistantTextInternal = null;
+      errorInternal = null;
+      notifyListeners();
+      return;
+    }
     sessionKeyInternal = next;
     if (!runtimeInternal.isConnected) {
       messagesInternal = const <GatewayChatMessage>[];
@@ -233,7 +241,10 @@ class GatewayChatController extends ChangeNotifier {
         !runtimeInternal.isConnected) {
       return;
     }
-    sessionKeyInternal = sessionKey.trim().isEmpty ? 'main' : sessionKey.trim();
+    sessionKeyInternal = sessionKey.trim();
+    if (sessionKeyInternal.isEmpty) {
+      return;
+    }
     sendingInternal = true;
     errorInternal = null;
     streamingAssistantTextInternal = null;

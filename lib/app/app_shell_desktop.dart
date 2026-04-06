@@ -51,14 +51,10 @@ class _AppShellState extends State<AppShell> {
   }
 
   List<SidebarTaskItem> _buildSidebarTaskItems(AppController controller) {
-    final currentSessionKey = controller.currentSessionKey.trim().isEmpty
-        ? 'main'
-        : controller.currentSessionKey.trim();
+    final currentSessionKey = controller.currentSessionKey.trim();
     return controller.assistantSessions
         .map((session) {
-          final sessionKey = session.key.trim().isEmpty
-              ? 'main'
-              : session.key.trim();
+          final sessionKey = session.key.trim();
           final preview = session.lastMessagePreview?.trim() ?? '';
           return SidebarTaskItem(
             sessionKey: sessionKey,

@@ -421,8 +421,7 @@ extension AppControllerWebHelpers on AppController {
   }
 
   String normalizedSessionKeyInternal(String sessionKey) {
-    final trimmed = sessionKey.trim();
-    return trimmed.isEmpty ? 'main' : trimmed;
+    return sessionKey.trim();
   }
 
   AssistantExecutionTarget assistantExecutionTargetForModeInternal(

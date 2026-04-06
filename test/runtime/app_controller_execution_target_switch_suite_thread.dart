@@ -395,7 +395,7 @@ void registerExecutionTargetSwitchThreadTests() {
 
         await waitForInternal(() => !controller.initializing);
 
-        expect(controller.currentSessionKey, 'main');
+        expect(controller.currentSessionKey, isEmpty);
         expect(controller.startupTaskThreadWarning, isNotNull);
         expect(controller.startupTaskThreadWarning, contains('已移除 Auto 执行模式'));
         expect(controller.startupTaskThreadWarning, contains(threadId));
@@ -439,13 +439,15 @@ void registerExecutionTargetSwitchThreadTests() {
         await controller.switchSession('draft:clear-me');
 
         await controller.clearAssistantLocalState();
+        final resetThreadKey = controller.currentSessionKey;
 
-        expect(controller.currentSessionKey, 'main');
+        expect(resetThreadKey, isNotEmpty);
+        expect(resetThreadKey, startsWith('draft:'));
         expect(
           controller.settings.accountUsername,
           SettingsSnapshot.defaults().accountUsername,
         );
-        expect(controller.settings.assistantLastSessionKey, 'main');
+        expect(controller.settings.assistantLastSessionKey, resetThreadKey);
         expect(controller.assistantCustomTaskTitle('draft:clear-me'), isEmpty);
 
         final reloadedStore = SecureConfigStore(
@@ -460,9 +462,9 @@ void registerExecutionTargetSwitchThreadTests() {
           reloadedSnapshot.accountUsername,
           SettingsSnapshot.defaults().accountUsername,
         );
-        expect(reloadedSnapshot.assistantLastSessionKey, 'main');
+        expect(reloadedSnapshot.assistantLastSessionKey, resetThreadKey);
         expect(reloadedThreads, hasLength(1));
-        expect(reloadedThreads.single.sessionKey, 'main');
+        expect(reloadedThreads.single.sessionKey, resetThreadKey);
         expect(
           assistantExecutionTargetFromExecutionMode(
             reloadedThreads.single.executionBinding.executionMode,

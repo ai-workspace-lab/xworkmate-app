@@ -567,8 +567,7 @@ extension AppControllerDesktopThreadSessions on AppController {
   }
 
   String normalizedAssistantSessionKeyInternal(String sessionKey) {
-    final trimmed = sessionKey.trim();
-    return trimmed.isEmpty ? 'main' : trimmed;
+    return sessionKey.trim();
   }
 
   AssistantExecutionTarget assistantExecutionTargetForSession(

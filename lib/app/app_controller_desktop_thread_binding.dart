@@ -242,9 +242,19 @@ extension AppControllerDesktopThreadBinding on AppController {
     String sessionKey, {
     AssistantExecutionTarget? executionTarget,
   }) async {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+    var normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    if (normalizedSessionKey.isEmpty) {
+      normalizedSessionKey = 'draft:${DateTime.now().millisecondsSinceEpoch}';
+      initializeAssistantThreadContext(
+        normalizedSessionKey,
+        executionTarget:
+            executionTarget ?? assistantExecutionTargetForSession(currentSessionKey),
+        messageViewMode: currentAssistantMessageViewMode,
+        singleAgentProvider: currentSingleAgentProvider,
+      );
+    }
     final existing = assistantThreadRecordsInternal[normalizedSessionKey];
     final resolvedExecutionTarget =
         executionTarget ??

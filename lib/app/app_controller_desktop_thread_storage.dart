@@ -70,42 +70,24 @@ extension AppControllerDesktopThreadStorage on AppController {
         )) {
       return;
     }
-    final fallback = assistantSessionSummariesInternal().firstWhere(
-      (item) => !isAssistantTaskArchived(item.key),
-      orElse: () => GatewaySessionSummary(
-        key: 'draft:${DateTime.now().millisecondsSinceEpoch}',
-        kind: 'assistant',
-        displayName: appText('新对话', 'New conversation'),
-        surface: 'Assistant',
-        subject: null,
-        room: null,
-        space: null,
-        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        sessionId: null,
-        systemSent: false,
-        abortedLastRun: false,
-        thinkingLevel: null,
-        verboseLevel: null,
-        inputTokens: null,
-        outputTokens: null,
-        totalTokens: null,
-        model: null,
-        contextTokens: null,
-        derivedTitle: appText('新对话', 'New conversation'),
-        lastMessagePreview: null,
-      ),
-    );
-    await setCurrentAssistantSessionKeyInternal(fallback.key);
+    TaskThread? fallback;
+    for (final record in assistantThreadRecordsInternal.values) {
+      if (!record.archived) {
+        fallback = record;
+        break;
+      }
+    }
+    if (fallback == null || fallback.threadId.trim().isEmpty) {
+      return;
+    }
+    await setCurrentAssistantSessionKeyInternal(fallback.threadId);
   }
 
   Future<void> restoreInitialAssistantSessionSelectionInternal() async {
     final normalized = normalizedAssistantSessionKeyInternal(
       settings.assistantLastSessionKey,
     );
-    final known =
-        normalized == 'main' ||
-        assistantThreadRecordsInternal.containsKey(normalized) ||
-        assistantThreadMessagesInternal.containsKey(normalized);
+    final known = assistantThreadRecordsInternal.containsKey(normalized);
     if (normalized.isEmpty || !known || isAssistantTaskArchived(normalized)) {
       return;
     }
@@ -352,7 +334,9 @@ extension AppControllerDesktopThreadStorage on AppController {
     final hasCurrent = items.any(
       (item) => matchesSessionKey(item.key, currentSessionKey),
     );
-    if (!hasCurrent && !archivedKeys.contains(currentSessionKey)) {
+    if (currentSessionKey.isNotEmpty &&
+        !hasCurrent &&
+        !archivedKeys.contains(currentSessionKey)) {
       items.add(assistantSessionSummaryForInternal(currentSessionKey));
     }
 

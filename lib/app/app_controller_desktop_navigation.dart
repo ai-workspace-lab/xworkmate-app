@@ -82,10 +82,7 @@ extension AppControllerDesktopNavigation on AppController {
   }
 
   void navigateHome() {
-    final mainSessionKey =
-        runtimeInternal.snapshot.mainSessionKey?.trim().isNotEmpty == true
-        ? runtimeInternal.snapshot.mainSessionKey!.trim()
-        : 'main';
+    final mainSessionKey = runtimeInternal.snapshot.mainSessionKey?.trim() ?? '';
     final homeDestination =
         capabilities.supportsDestination(WorkspaceDestination.assistant)
         ? WorkspaceDestination.assistant
@@ -104,7 +101,8 @@ extension AppControllerDesktopNavigation on AppController {
     if (destinationChanged || detailChanged || settingsDrillInChanged) {
       notifyListeners();
     }
-    if (sessionsControllerInternal.currentSessionKey != mainSessionKey) {
+    if (mainSessionKey.isNotEmpty &&
+        sessionsControllerInternal.currentSessionKey != mainSessionKey) {
       unawaited(switchSession(mainSessionKey));
     }
   }

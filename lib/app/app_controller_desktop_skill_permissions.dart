@@ -97,9 +97,14 @@ extension AppControllerDesktopSkillPermissions on AppController {
     if (disposedInternal) {
       return;
     }
-    if (assistantExecutionTargetForSession(currentSessionKey) ==
+    final currentKey = normalizedAssistantSessionKeyInternal(currentSessionKey);
+    if (currentKey.isEmpty) {
+      notifyIfActiveInternal();
+      return;
+    }
+    if (assistantExecutionTargetForSession(currentKey) ==
         AssistantExecutionTarget.singleAgent) {
-      await refreshSingleAgentSkillsForSession(currentSessionKey);
+      await refreshSingleAgentSkillsForSession(currentKey);
       return;
     }
     notifyIfActiveInternal();
