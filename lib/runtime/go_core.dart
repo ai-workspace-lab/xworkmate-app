@@ -1,13 +1,20 @@
 import 'dart:io';
 
+enum GoCoreLaunchSource {
+  bundledHelper,
+  buildArtifact,
+}
+
 class GoCoreLaunch {
   const GoCoreLaunch({
     required this.executable,
+    required this.source,
     this.arguments = const <String>[],
     this.workingDirectory,
   });
 
   final String executable;
+  final GoCoreLaunchSource source;
   final List<String> arguments;
   final String? workingDirectory;
 }
@@ -33,39 +40,12 @@ class GoCoreLocator {
       return bundled;
     }
 
-    final override =
-        (Platform.environment['XWORKMATE_GO_CORE_BIN'] ??
-                Platform.environment['GO_CORE_BIN'] ??
-                '')
-            .trim();
-    if (override.isNotEmpty && await _binaryExists(override)) {
-      return GoCoreLaunch(executable: override);
-    }
-
-    for (final candidate in <String>['xworkmate-go-core', 'go-core']) {
-      if (await _binaryExists(candidate)) {
-        return GoCoreLaunch(executable: candidate);
-      }
-    }
-
-    final root = (_workspaceRoot ?? Directory.current.path).trim();
-    if (root.isNotEmpty) {
-      for (final path in <String>[
-        '$root/go/bin/xworkmate-go-core',
-        '$root/go/bin/go-core',
-        '$root/build/bin/xworkmate-go-core',
-      ]) {
-        if (await File(path).exists()) {
-          return GoCoreLaunch(executable: path);
-        }
-      }
-
-      final packageDirectory = Directory('$root/go/go_core');
-      if (await packageDirectory.exists() && await _binaryExists('go')) {
+    for (final root in _candidateRoots()) {
+      final path = '$root/build/bin/xworkmate-go-core';
+      if (await _binaryExists(path)) {
         return GoCoreLaunch(
-          executable: 'go',
-          arguments: const <String>['run', '.'],
-          workingDirectory: packageDirectory.path,
+          executable: path,
+          source: GoCoreLaunchSource.buildArtifact,
         );
       }
     }
@@ -94,25 +74,55 @@ class GoCoreLocator {
       return null;
     }
     final bundledPath = '${contentsDirectory.path}/Helpers/xworkmate-go-core';
-    if (await File(bundledPath).exists()) {
-      return GoCoreLaunch(executable: bundledPath);
+    if (await _binaryExists(bundledPath)) {
+      return GoCoreLaunch(
+        executable: bundledPath,
+        source: GoCoreLaunchSource.bundledHelper,
+      );
     }
     return null;
   }
 
-  Future<bool> _binaryExists(String command) async {
-    final resolver = _binaryExistsResolver;
-    if (resolver != null) {
-      return resolver(command);
+  List<String> _candidateRoots() {
+    final roots = <String>{};
+    final explicitRoot = _workspaceRoot?.trim() ?? '';
+    if (explicitRoot.isNotEmpty) {
+      roots.add(explicitRoot);
+      roots.addAll(_ancestorPaths(Directory(explicitRoot)));
     }
-    if (command.contains(Platform.pathSeparator)) {
-      return File(command).exists();
+
+    final currentPath = Directory.current.path.trim();
+    if (currentPath.isNotEmpty) {
+      roots.add(currentPath);
+      roots.addAll(_ancestorPaths(Directory(currentPath)));
     }
-    final check = await Process.run(
-      Platform.isWindows ? 'where' : 'which',
-      <String>[command],
-      runInShell: true,
-    );
-    return check.exitCode == 0 && '${check.stdout}'.trim().isNotEmpty;
+
+    final resolvedExecutable =
+        (_resolvedExecutableResolver?.call() ?? Platform.resolvedExecutable)
+            .trim();
+    if (resolvedExecutable.isNotEmpty) {
+      final executableDirectory = File(resolvedExecutable).parent;
+      roots.add(executableDirectory.path);
+      roots.addAll(_ancestorPaths(executableDirectory));
+    }
+
+    return roots.where((path) => path.trim().isNotEmpty).toList(growable: false);
   }
+
+  List<String> _ancestorPaths(Directory start) {
+    final ancestors = <String>[];
+    var current = start.absolute;
+    while (true) {
+      final parent = current.parent;
+      if (parent.path == current.path) {
+        break;
+      }
+      ancestors.add(parent.path);
+      current = parent;
+    }
+    return ancestors;
+  }
+
+  Future<bool> _binaryExists(String command) async =>
+      (_binaryExistsResolver?.call(command)) ?? File(command).exists();
 }

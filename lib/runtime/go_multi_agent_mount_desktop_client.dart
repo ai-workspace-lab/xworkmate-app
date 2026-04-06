@@ -132,13 +132,14 @@ class GoMultiAgentMountDesktopClient implements MultiAgentMountResolver {
   }
 
   Future<Uri?> _startLocalProcess() async {
-    if (shouldBlockEmbeddedAgentLaunch(
-      isAppleHost: Platform.isIOS || Platform.isMacOS,
-    )) {
-      return null;
-    }
     final launch = await _goCoreLocator.locate();
     if (launch == null) {
+      return null;
+    }
+    if (shouldBlockGoCoreLaunch(
+      launch,
+      isAppleHost: Platform.isIOS || Platform.isMacOS,
+    )) {
       return null;
     }
     final reservedSocket = await ServerSocket.bind(
