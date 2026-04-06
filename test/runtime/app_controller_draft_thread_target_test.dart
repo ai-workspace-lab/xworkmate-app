@@ -4,32 +4,30 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   group('pickDraftThreadExecutionTargetInternal', () {
-    test('prefers the first visible manual target for new drafts', () {
+    test('prefers the current visible target for new drafts', () {
       final target = pickDraftThreadExecutionTargetInternal(
-        currentTarget: AssistantExecutionTarget.auto,
+        currentTarget: AssistantExecutionTarget.singleAgent,
         visibleTargets: const <AssistantExecutionTarget>[
           AssistantExecutionTarget.singleAgent,
           AssistantExecutionTarget.local,
           AssistantExecutionTarget.remote,
         ],
-        localWorkspaceAvailable: true,
       );
 
       expect(target, AssistantExecutionTarget.singleAgent);
     });
 
-    test('skips local targets when the local workspace is unavailable', () {
+    test('keeps singleAgent even when the local workspace is unavailable', () {
       final target = pickDraftThreadExecutionTargetInternal(
-        currentTarget: AssistantExecutionTarget.auto,
+        currentTarget: AssistantExecutionTarget.singleAgent,
         visibleTargets: const <AssistantExecutionTarget>[
           AssistantExecutionTarget.singleAgent,
           AssistantExecutionTarget.local,
           AssistantExecutionTarget.remote,
         ],
-        localWorkspaceAvailable: false,
       );
 
-      expect(target, AssistantExecutionTarget.remote);
+      expect(target, AssistantExecutionTarget.singleAgent);
     });
 
     test('keeps the current visible manual target when it is usable', () {
@@ -40,7 +38,6 @@ void main() {
           AssistantExecutionTarget.local,
           AssistantExecutionTarget.remote,
         ],
-        localWorkspaceAvailable: false,
       );
 
       expect(target, AssistantExecutionTarget.remote);

@@ -264,15 +264,17 @@ String thinkingLabelInternal(String level) {
 
 String targetLabelInternal(AssistantExecutionTarget target) {
   return switch (target) {
-    AssistantExecutionTarget.auto => 'Auto',
-    AssistantExecutionTarget.singleAgent => appText('单机智能体', 'Single Agent'),
+    AssistantExecutionTarget.singleAgent => appText(
+      'ACP Server Remote',
+      'ACP Server Remote',
+    ),
     AssistantExecutionTarget.local => appText(
-      '本地 OpenClaw Gateway',
-      'Local Gateway',
+      'OpenClaw Gateway Local',
+      'OpenClaw Gateway Local',
     ),
     AssistantExecutionTarget.remote => appText(
-      '远程 OpenClaw Gateway',
-      'Remote Gateway',
+      'OpenClaw Gateway Remote',
+      'OpenClaw Gateway Remote',
     ),
   };
 }

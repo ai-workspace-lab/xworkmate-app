@@ -57,9 +57,7 @@ void main() {
     expect(capabilities.supportsDiagnostics, isFalse);
   });
 
-  test(
-    'execution target arrays respect task dialog auto gating on desktop',
-    () {
+  test('execution target arrays expose only supported manual targets', () {
       final manifest = UiFeatureManifest.fallback();
       final desktopAccess = manifest.forPlatform(
         UiFeaturePlatform.desktop,
@@ -89,7 +87,6 @@ void main() {
       expect(
         webAccess.availableExecutionTargets,
         equals(<AssistantExecutionTarget>[
-          AssistantExecutionTarget.auto,
           AssistantExecutionTarget.singleAgent,
           AssistantExecutionTarget.local,
           AssistantExecutionTarget.remote,
@@ -98,9 +95,7 @@ void main() {
     },
   );
 
-  test(
-    'sanitizeExecutionTarget falls back to local on desktop when auto is gated off',
-    () {
+  test('sanitizeExecutionTarget falls back to singleAgent by default', () {
       final manifest = UiFeatureManifest.fallback();
       final desktopAccess = manifest.forPlatform(
         UiFeaturePlatform.desktop,
@@ -113,42 +108,14 @@ void main() {
 
       expect(
         desktopAccess.sanitizeExecutionTarget(null),
-        AssistantExecutionTarget.local,
+        AssistantExecutionTarget.singleAgent,
       );
       expect(
         webAccess.sanitizeExecutionTarget(null),
-        AssistantExecutionTarget.auto,
+        AssistantExecutionTarget.singleAgent,
       );
     },
   );
-
-  test('desktop auto execution target can be re-enabled from the manifest', () {
-    final manifest = UiFeatureManifest.fallback().copyWithFeature(
-      platform: UiFeaturePlatform.desktop,
-      module: 'assistant',
-      feature: 'task_dialog_mode_auto',
-      enabled: true,
-      releaseTier: UiFeatureReleaseTier.stable,
-    );
-    final desktopAccess = manifest.forPlatform(
-      UiFeaturePlatform.desktop,
-      buildMode: UiFeatureBuildMode.release,
-    );
-
-    expect(
-      desktopAccess.availableExecutionTargets,
-      equals(<AssistantExecutionTarget>[
-        AssistantExecutionTarget.auto,
-        AssistantExecutionTarget.singleAgent,
-        AssistantExecutionTarget.local,
-        AssistantExecutionTarget.remote,
-      ]),
-    );
-    expect(
-      desktopAccess.sanitizeExecutionTarget(null),
-      AssistantExecutionTarget.auto,
-    );
-  });
 
   test('parser rejects unsupported flag fields', () {
     expect(

@@ -70,8 +70,7 @@ class ExternalCodeAgentAcpDesktopTransport
     if (endpoint == null) {
       return const ExternalCodeAgentAcpCapabilities.empty();
     }
-    if (target == AssistantExecutionTarget.singleAgent ||
-        target == AssistantExecutionTarget.auto) {
+    if (target == AssistantExecutionTarget.singleAgent) {
       await _syncProvidersToEndpoint(endpoint, _syncedProviders);
     }
     final capabilities = await _acpClient.loadCapabilities(
@@ -98,8 +97,7 @@ class ExternalCodeAgentAcpDesktopTransport
         code: 'EXTERNAL_ACP_ENDPOINT_MISSING',
       );
     }
-    if (request.target == AssistantExecutionTarget.singleAgent ||
-        request.target == AssistantExecutionTarget.auto) {
+    if (request.target == AssistantExecutionTarget.singleAgent) {
       await _syncProvidersToEndpoint(endpoint, _syncedProviders);
     }
     var streamedText = '';
@@ -180,8 +178,7 @@ class ExternalCodeAgentAcpDesktopTransport
   }
 
   Future<Uri?> _resolveEndpoint(AssistantExecutionTarget target) async {
-    if (target == AssistantExecutionTarget.singleAgent ||
-        target == AssistantExecutionTarget.auto) {
+    if (target == AssistantExecutionTarget.singleAgent) {
       return _ensureLocalEndpoint();
     }
     return _endpointResolver(target);

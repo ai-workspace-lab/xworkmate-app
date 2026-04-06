@@ -118,7 +118,7 @@ class SettingsSnapshot {
       accountWorkspaceFollowed: false,
       accountLocalMode: true,
       linuxDesktop: LinuxDesktopConfig.defaults(),
-      assistantExecutionTarget: AssistantExecutionTarget.auto,
+      assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
       assistantPermissionLevel: AssistantPermissionLevel.defaultAccess,
       assistantNavigationDestinations: kAssistantNavigationDestinationDefaults,
       assistantCustomTaskTitles: const <String, String>{},
@@ -471,7 +471,6 @@ class SettingsSnapshot {
     AssistantExecutionTarget target,
   ) {
     return switch (target) {
-      AssistantExecutionTarget.auto => primaryLocalGatewayProfile,
       AssistantExecutionTarget.singleAgent => null,
       AssistantExecutionTarget.local => primaryLocalGatewayProfile,
       AssistantExecutionTarget.remote => primaryRemoteGatewayProfile,
@@ -492,7 +491,6 @@ class SettingsSnapshot {
     GatewayConnectionProfile profile,
   ) {
     final index = switch (target) {
-      AssistantExecutionTarget.auto => kGatewayLocalProfileIndex,
       AssistantExecutionTarget.local => kGatewayLocalProfileIndex,
       AssistantExecutionTarget.remote => kGatewayRemoteProfileIndex,
       AssistantExecutionTarget.singleAgent => null,

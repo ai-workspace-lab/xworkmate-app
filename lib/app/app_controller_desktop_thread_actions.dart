@@ -80,8 +80,7 @@ extension AppControllerDesktopThreadActions on AppController {
 
   Future<void> connectSavedGateway() async {
     final target = currentAssistantExecutionTarget;
-    if (target == AssistantExecutionTarget.singleAgent ||
-        target == AssistantExecutionTarget.auto) {
+    if (target == AssistantExecutionTarget.singleAgent) {
       return;
     }
     await AppControllerDesktopGateway(this).connectProfileInternal(
@@ -272,8 +271,7 @@ extension AppControllerDesktopThreadActions on AppController {
       recomputeTasksInternal();
       throw error;
     }
-    if (currentTarget == AssistantExecutionTarget.singleAgent ||
-        currentTarget == AssistantExecutionTarget.auto) {
+    if (currentTarget == AssistantExecutionTarget.singleAgent) {
       await sendSingleAgentMessageInternal(
         message,
         thinking: thinking,
@@ -482,9 +480,7 @@ extension AppControllerDesktopThreadActions on AppController {
       await goTaskServiceClientInternal.cancelTask(
         route:
             assistantExecutionTargetForSession(sessionKey) ==
-                    AssistantExecutionTarget.singleAgent ||
-                assistantExecutionTargetForSession(sessionKey) ==
-                    AssistantExecutionTarget.auto
+                AssistantExecutionTarget.singleAgent
             ? GoTaskServiceRoute.externalAcpSingle
             : GoTaskServiceRoute.openClawTask,
         target: assistantExecutionTargetForSession(sessionKey),

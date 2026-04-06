@@ -98,17 +98,17 @@ String singleAgentUnavailableLabelDesktopInternal(
   final selection = controller.singleAgentProviderForSession(
     normalizedSessionKey,
   );
-  if (controller.singleAgentShouldSuggestAutoSwitchForSession(
+  if (controller.singleAgentShouldSuggestAcpSwitchForSession(
     normalizedSessionKey,
   )) {
     return detail.isEmpty
         ? appText(
-            '当前线程固定为 ${selection.label}，但它在这台设备上不可用。检测到其他外部 Agent ACP 端点时不会自动改线，可切到 Auto。',
-            'This thread is pinned to ${selection.label}, but it is unavailable on this device. XWorkmate will not reroute to another external Agent ACP endpoint automatically. Switch to Auto instead.',
+            '当前线程固定为 ${selection.label}，但它在这台设备上不可用。检测到其他外部 Agent ACP 端点时不会自动改线，请切到可用的 ACP Server。',
+            'This thread is pinned to ${selection.label}, but it is unavailable on this device. XWorkmate will not reroute to another external Agent ACP endpoint automatically. Switch to an available ACP Server.',
           )
         : appText(
-            '当前线程固定为 ${selection.label}：$detail 检测到其他外部 Agent ACP 端点时不会自动改线，可切到 Auto。',
-            'This thread is pinned to ${selection.label}: $detail XWorkmate will not reroute to another external Agent ACP endpoint automatically. Switch to Auto instead.',
+            '当前线程固定为 ${selection.label}：$detail 检测到其他外部 Agent ACP 端点时不会自动改线，请切到可用的 ACP Server。',
+            'This thread is pinned to ${selection.label}: $detail XWorkmate will not reroute to another external Agent ACP endpoint automatically. Switch to an available ACP Server.',
           );
   }
   if (controller.singleAgentNeedsAiGatewayConfigurationForSession(

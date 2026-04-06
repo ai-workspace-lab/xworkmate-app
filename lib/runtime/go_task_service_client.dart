@@ -202,7 +202,6 @@ class GoTaskServiceRequest {
       AssistantExecutionTarget.local => GoTaskServiceRoute.openClawTask,
       AssistantExecutionTarget.remote => GoTaskServiceRoute.openClawTask,
       AssistantExecutionTarget.singleAgent => GoTaskServiceRoute.externalAcpSingle,
-      AssistantExecutionTarget.auto => GoTaskServiceRoute.externalAcpSingle,
     };
   }
 
@@ -211,7 +210,6 @@ class GoTaskServiceRequest {
       return 'multi-agent';
     }
     return switch (target) {
-      AssistantExecutionTarget.auto => 'single-agent',
       AssistantExecutionTarget.singleAgent => 'single-agent',
       AssistantExecutionTarget.local => _gatewaySessionMode,
       AssistantExecutionTarget.remote => _gatewaySessionMode,
@@ -223,7 +221,6 @@ class GoTaskServiceRequest {
       return 'multi-agent';
     }
     return switch (target) {
-      AssistantExecutionTarget.auto => 'single-agent',
       AssistantExecutionTarget.singleAgent => 'single-agent',
       AssistantExecutionTarget.local => 'gateway',
       AssistantExecutionTarget.remote => 'gateway',
@@ -297,7 +294,6 @@ class GoTaskServiceRequest {
       AssistantExecutionTarget.local => 'local',
       AssistantExecutionTarget.remote => 'remote',
       AssistantExecutionTarget.singleAgent => 'singleAgent',
-      AssistantExecutionTarget.auto => '',
     };
     final explicitProviderId = provider == SingleAgentProvider.auto
         ? ''
@@ -455,9 +451,6 @@ String? goTaskServiceGatewayEntryState({
     case 'multi-agent':
       return AssistantExecutionTarget.singleAgent.promptValue;
     default:
-      if (requestedTarget == AssistantExecutionTarget.auto) {
-        return null;
-      }
       return requestedTarget.promptValue;
   }
 }

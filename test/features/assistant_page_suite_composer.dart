@@ -606,16 +606,20 @@ void registerAssistantPageSuiteComposerTestsInternal() {
   });
 
   testWidgets(
-    'UiFeatureManifest disables desktop Auto execution target',
+    'UiFeatureManifest exposes only singleAgent and gateway execution targets on desktop',
     (WidgetTester tester) async {
       final manifest = UiFeatureManifest.fallback();
       final availableTargets = manifest
           .forPlatform(UiFeaturePlatform.desktop)
           .availableExecutionTargets;
-      expect(availableTargets, contains(AssistantExecutionTarget.singleAgent));
-      expect(availableTargets, contains(AssistantExecutionTarget.local));
-      expect(availableTargets, contains(AssistantExecutionTarget.remote));
-      expect(availableTargets, isNot(contains(AssistantExecutionTarget.auto)));
+      expect(
+        availableTargets,
+        equals(<AssistantExecutionTarget>[
+          AssistantExecutionTarget.singleAgent,
+          AssistantExecutionTarget.local,
+          AssistantExecutionTarget.remote,
+        ]),
+      );
     },
   );
 

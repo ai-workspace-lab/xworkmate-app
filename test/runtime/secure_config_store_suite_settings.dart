@@ -137,6 +137,40 @@ void registerSecureConfigStoreSuiteSettingsTestsInternal() {
     );
 
     test(
+      'SecureConfigStore normalizes legacy auto assistant execution target to singleAgent on restore',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-config-store-legacy-auto-settings-',
+        );
+        final settingsDirectory = Directory('${tempDirectory.path}/config');
+        await settingsDirectory.create(recursive: true);
+        final settingsFile = File('${settingsDirectory.path}/settings.yaml');
+        await settingsFile.writeAsString(
+          encodeYamlDocument(<String, dynamic>{
+            'assistantExecutionTarget': 'auto',
+            'accountUsername': 'legacy-user',
+          }),
+          flush: true,
+        );
+
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+        final snapshot = await store.loadSettingsSnapshot();
+
+        expect(snapshot.accountUsername, 'legacy-user');
+        expect(
+          snapshot.assistantExecutionTarget,
+          AssistantExecutionTarget.singleAgent,
+        );
+
+        await store.saveSettingsSnapshot(snapshot);
+        final reloadedYaml =
+            decodeYamlDocument(await settingsFile.readAsString())
+                as Map<String, dynamic>;
+        expect(reloadedYaml['assistantExecutionTarget'], 'singleAgent');
+      },
+    );
+
+    test(
       'SecureConfigStore keeps settings in memory when no durable path is available',
       () async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
