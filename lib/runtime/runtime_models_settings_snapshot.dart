@@ -526,17 +526,14 @@ class SettingsSnapshot {
   }
 
   SingleAgentProvider resolveSingleAgentProvider(SingleAgentProvider provider) {
-    final normalizedSelection = normalizeSingleAgentProviderSelection(provider);
-    if (normalizedSelection.isAuto) {
+    if (provider.isAuto) {
       return SingleAgentProvider.auto;
     }
-    final profile = externalAcpEndpointForProviderId(
-      normalizedSelection.providerId,
-    );
+    final profile = externalAcpEndpointForProviderId(provider.providerId);
     if (profile != null) {
       return profile.toProvider();
     }
-    return normalizedSelection;
+    return provider;
   }
 
   SingleAgentProvider singleAgentProviderForId(String providerId) {
@@ -544,9 +541,7 @@ class SettingsSnapshot {
     if (resolved.isEmpty || resolved == SingleAgentProvider.auto.providerId) {
       return SingleAgentProvider.auto;
     }
-    final normalizedSelection = normalizeSingleAgentProviderSelection(
-      SingleAgentProvider.fromJsonValue(resolved),
-    );
+    final normalizedSelection = SingleAgentProvider.fromJsonValue(resolved);
     final profile = externalAcpEndpointForProviderId(
       normalizedSelection.providerId,
     );

@@ -223,6 +223,15 @@ extension AppControllerDesktopThreadStorage on AppController {
     ).sanitizeExecutionTarget(target);
   }
 
+  AssistantExecutionTarget sanitizePersistedExecutionTargetInternal(
+    AssistantExecutionTarget? target,
+  ) {
+    if (target == AssistantExecutionTarget.auto) {
+      return AssistantExecutionTarget.auto;
+    }
+    return sanitizeExecutionTargetInternal(target);
+  }
+
   MultiAgentConfig resolveMultiAgentConfigInternal(SettingsSnapshot snapshot) {
     final defaults = MultiAgentConfig.defaults();
     final current = snapshot.multiAgent;

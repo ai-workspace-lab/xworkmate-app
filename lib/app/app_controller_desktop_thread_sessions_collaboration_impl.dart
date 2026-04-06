@@ -314,7 +314,7 @@ List<String> assistantModelChoicesForSessionThreadSessionInternal(
   final normalizedSessionKey = normalizeAssistantSessionKeyThreadInternal(
     sessionKey,
   );
-  final target = controller.sanitizeExecutionTargetInternal(
+  final target = controller.sanitizePersistedExecutionTargetInternal(
     controller.taskThreadForSessionInternal(normalizedSessionKey) == null
         ? controller.settings.assistantExecutionTarget
         : assistantExecutionTargetFromExecutionMode(

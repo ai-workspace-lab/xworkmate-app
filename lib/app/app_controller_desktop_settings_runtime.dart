@@ -532,7 +532,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       if (disposedInternal) {
         return;
       }
-      final startupTarget = sanitizeExecutionTargetInternal(
+      final startupTarget = sanitizePersistedExecutionTargetInternal(
         settings.assistantExecutionTarget,
       );
       agentsControllerInternal.restoreSelection(
@@ -796,7 +796,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
   Future<void> applyPersistedGatewaySettingsInternal(
     SettingsSnapshot snapshot,
   ) async {
-    final target = sanitizeExecutionTargetInternal(
+    final target = sanitizePersistedExecutionTargetInternal(
       snapshot.assistantExecutionTarget,
     );
     final sessionKey = normalizedAssistantSessionKeyInternal(
@@ -805,6 +805,8 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     upsertTaskThreadInternal(
       sessionKey,
       executionTarget: target,
+      gatewayEntryState: gatewayEntryStateForTargetInternal(target),
+      latestResolvedRuntimeModel: '',
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     recomputeTasksInternal();

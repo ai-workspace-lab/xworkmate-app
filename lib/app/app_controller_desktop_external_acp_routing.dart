@@ -75,4 +75,100 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
       );
     await goTaskServiceClientInternal.syncExternalProviders(providers);
   }
+
+  ExternalCodeAgentAcpRoutingConfig buildExternalAcpRoutingForSessionInternal(
+    String sessionKey, {
+    String? explicitExecutionTarget,
+  }) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final thread = assistantThreadRecordsInternal[normalizedSessionKey];
+    final sessionTarget = assistantExecutionTargetForSession(
+      normalizedSessionKey,
+    );
+    final preferredGatewayTarget = switch (sessionTarget) {
+      AssistantExecutionTarget.auto => 'local',
+      AssistantExecutionTarget.local => 'local',
+      AssistantExecutionTarget.remote => 'remote',
+      AssistantExecutionTarget.singleAgent =>
+        settings.assistantExecutionTarget == AssistantExecutionTarget.remote
+            ? 'remote'
+            : 'local',
+    };
+    final availableSkills =
+        assistantImportedSkillsForSession(normalizedSessionKey)
+            .map((item) {
+              return ExternalCodeAgentAcpAvailableSkill(
+                id: item.key,
+                label: item.label,
+                description: item.description,
+              );
+            })
+            .toList(growable: false);
+    final selectedSkills =
+        assistantSelectedSkillsForSession(normalizedSessionKey)
+            .map((item) {
+              return item.label.trim().isNotEmpty ? item.label : item.key;
+            })
+            .where((item) => item.trim().isNotEmpty)
+            .toList(growable: false);
+
+    final resolvedExplicitExecutionTarget =
+        sessionTarget == AssistantExecutionTarget.auto
+        ? ''
+        : explicitExecutionTarget?.trim().isNotEmpty == true
+        ? explicitExecutionTarget!.trim()
+        : (thread?.hasExplicitExecutionTargetSelection ?? false)
+        ? _routingExecutionTargetValueInternal(
+            assistantExecutionTargetForSession(normalizedSessionKey),
+          )
+        : '';
+    final resolvedExplicitProviderId =
+        sessionTarget == AssistantExecutionTarget.auto
+        ? ''
+        : thread?.hasExplicitProviderSelection ?? false
+        ? singleAgentProviderForSession(normalizedSessionKey).providerId
+        : '';
+    final resolvedExplicitModel = thread?.hasExplicitModelSelection ?? false
+        ? (sessionTarget == AssistantExecutionTarget.auto
+              ? ''
+              : assistantModelForSession(normalizedSessionKey))
+        : '';
+    final resolvedExplicitSkills = thread?.hasExplicitSkillSelection ?? false
+        ? selectedSkills
+        : const <String>[];
+    final hasExplicitSelection =
+        resolvedExplicitExecutionTarget.isNotEmpty ||
+        resolvedExplicitProviderId.isNotEmpty ||
+        resolvedExplicitModel.trim().isNotEmpty ||
+        resolvedExplicitSkills.isNotEmpty;
+
+    if (!hasExplicitSelection) {
+      return ExternalCodeAgentAcpRoutingConfig.auto(
+        preferredGatewayTarget: preferredGatewayTarget,
+        availableSkills: availableSkills,
+      );
+    }
+
+    return ExternalCodeAgentAcpRoutingConfig(
+      mode: ExternalCodeAgentAcpRoutingMode.explicit,
+      preferredGatewayTarget: preferredGatewayTarget,
+      explicitExecutionTarget: resolvedExplicitExecutionTarget,
+      explicitProviderId: resolvedExplicitProviderId,
+      explicitModel: resolvedExplicitModel,
+      explicitSkills: resolvedExplicitSkills,
+      allowSkillInstall: false,
+      availableSkills: availableSkills,
+    );
+  }
+
+  String _routingExecutionTargetValueInternal(AssistantExecutionTarget target) {
+    return switch (target) {
+      AssistantExecutionTarget.auto => 'singleAgent',
+      AssistantExecutionTarget.singleAgent => 'singleAgent',
+      AssistantExecutionTarget.local => 'local',
+      AssistantExecutionTarget.remote => 'remote',
+    };
+  }
 }

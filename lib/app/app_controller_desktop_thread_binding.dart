@@ -76,6 +76,11 @@ extension AppControllerDesktopThreadBinding on AppController {
     return '/owners/$realm/$subjectType/$subjectId/threads/$normalizedSessionKey';
   }
 
+  bool isOwnerScopedRemoteWorkspacePathInternal(String path) {
+    final normalizedPath = path.trim();
+    return normalizedPath.startsWith('/owners/');
+  }
+
   String threadWorkspaceDirectoryNameInternal(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -139,9 +144,14 @@ extension AppControllerDesktopThreadBinding on AppController {
     required ThreadOwnerScope ownerScope,
     WorkspaceBinding? existingBinding,
   }) {
-    if (existingBinding != null &&
+    final preservesRemoteSingleAgentBinding =
+        existingBinding != null &&
         existingBinding.workspaceKind == WorkspaceKind.remoteFs &&
-        existingBinding.workspacePath.trim().isNotEmpty) {
+        existingBinding.workspacePath.trim().isNotEmpty &&
+        !isOwnerScopedRemoteWorkspacePathInternal(
+          existingBinding.workspacePath,
+        );
+    if (preservesRemoteSingleAgentBinding) {
       return existingBinding.copyWith(
         displayPath: existingBinding.displayPath.trim().isEmpty
             ? existingBinding.workspacePath

@@ -39,6 +39,7 @@ import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
+import 'app_controller_desktop_external_acp_routing.dart';
 import 'app_controller_desktop_single_agent.dart';
 import 'app_controller_desktop_thread_binding.dart';
 import 'app_controller_desktop_thread_sessions.dart';
@@ -479,10 +480,11 @@ extension AppControllerDesktopThreadActions on AppController {
     );
     if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
       await goTaskServiceClientInternal.cancelTask(
-        route: assistantExecutionTargetForSession(sessionKey) ==
-                AssistantExecutionTarget.singleAgent ||
+        route:
             assistantExecutionTargetForSession(sessionKey) ==
-                AssistantExecutionTarget.auto
+                    AssistantExecutionTarget.singleAgent ||
+                assistantExecutionTargetForSession(sessionKey) ==
+                    AssistantExecutionTarget.auto
             ? GoTaskServiceRoute.externalAcpSingle
             : GoTaskServiceRoute.openClawTask,
         target: assistantExecutionTargetForSession(sessionKey),
