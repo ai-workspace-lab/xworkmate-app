@@ -15,6 +15,12 @@ import (
 	"xworkmate/go_core/internal/shared"
 )
 
+const (
+	externalProviderEndpointKey            = "externalProviderEndpoint"
+	externalProviderAuthorizationHeaderKey = "externalProviderAuthorizationHeader"
+	externalProviderLabelKey               = "externalProviderLabel"
+)
+
 func buildResolvedExecutionParams(
 	params map[string]any,
 	resolved router.Result,
@@ -47,6 +53,25 @@ func buildResolvedExecutionParams(
 	next["resolvedModel"] = resolved.ResolvedModel
 	next["resolvedSkills"] = append([]string(nil), resolved.ResolvedSkills...)
 	return next
+}
+
+func injectResolvedExternalProviderParams(
+	params map[string]any,
+	provider syncedProvider,
+) map[string]any {
+	if params == nil {
+		params = map[string]any{}
+	}
+	if endpoint := strings.TrimSpace(provider.Endpoint); endpoint != "" {
+		params[externalProviderEndpointKey] = endpoint
+	}
+	if authorization := strings.TrimSpace(provider.AuthorizationHeader); authorization != "" {
+		params[externalProviderAuthorizationHeaderKey] = authorization
+	}
+	if label := strings.TrimSpace(provider.Label); label != "" {
+		params[externalProviderLabelKey] = label
+	}
+	return params
 }
 
 func (s *Server) runGateway(
@@ -123,6 +148,20 @@ func (s *Server) runSingleAgentViaExternalProvider(
 		params,
 		notify,
 	)
+}
+
+func externalProviderFromParams(params map[string]any) (syncedProvider, bool) {
+	endpoint := strings.TrimSpace(shared.StringArg(params, externalProviderEndpointKey, ""))
+	if endpoint == "" {
+		return syncedProvider{}, false
+	}
+	return syncedProvider{
+		ProviderID:          strings.TrimSpace(shared.StringArg(params, "provider", "")),
+		Label:               strings.TrimSpace(shared.StringArg(params, externalProviderLabelKey, "")),
+		Endpoint:            endpoint,
+		AuthorizationHeader: strings.TrimSpace(shared.StringArg(params, externalProviderAuthorizationHeaderKey, "")),
+		Enabled:             true,
+	}, true
 }
 
 func requestExternalACP(
