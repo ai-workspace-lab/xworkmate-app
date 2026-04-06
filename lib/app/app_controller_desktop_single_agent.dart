@@ -86,11 +86,12 @@ extension AppControllerDesktopSingleAgent on AppController {
       try {
         final routing = buildExternalAcpRoutingForSessionInternal(sessionKey);
         final selection = singleAgentProviderForSession(sessionKey);
+        await syncExternalAcpProvidersInternal();
         final capabilities = await goTaskServiceClientInternal
             .loadExternalAcpCapabilities(
-          target: AssistantExecutionTarget.singleAgent,
-          forceRefresh: true,
-        );
+              target: AssistantExecutionTarget.singleAgent,
+              forceRefresh: true,
+            );
         final availableProviders = configuredSingleAgentProviders
             .where(capabilities.providers.contains)
             .toList(growable: false);
@@ -222,12 +223,15 @@ extension AppControllerDesktopSingleAgent on AppController {
         final resolvedWorkingDirectory = result.resolvedWorkingDirectory.trim();
         if (resolvedWorkspaceKind != null &&
             resolvedWorkingDirectory.isNotEmpty) {
-          final existingThread = requireTaskThreadForSessionInternal(sessionKey);
+          final existingThread = requireTaskThreadForSessionInternal(
+            sessionKey,
+          );
           upsertTaskThreadInternal(
             sessionKey,
             workspaceBinding: WorkspaceBinding(
               workspaceId: existingThread.workspaceBinding.workspaceId,
-              workspaceKind: resolvedWorkspaceKind == WorkspaceRefKind.remotePath
+              workspaceKind:
+                  resolvedWorkspaceKind == WorkspaceRefKind.remotePath
                   ? WorkspaceKind.remoteFs
                   : WorkspaceKind.localFs,
               workspacePath: resolvedWorkingDirectory,
