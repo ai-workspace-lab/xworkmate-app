@@ -12,6 +12,7 @@ import 'package:markdown/markdown.dart' as md;
 import 'package:path_provider/path_provider.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../app/app_controller.dart';
+import '../../app/app_controller_desktop_thread_binding.dart';
 import '../../app/app_metadata.dart';
 import '../../app/ui_feature_manifest.dart';
 import '../../i18n/app_language.dart';
@@ -437,13 +438,17 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
 
   Future<void> createNewThreadInternal() async {
     final sessionKey = buildDraftSessionKeyInternal(widget.controller);
-    final inheritedTarget = resolvedVisibleExecutionTargetInternal(
-      widget.controller,
-      supportedTargets: const <AssistantExecutionTarget>[
-        AssistantExecutionTarget.singleAgent,
-        AssistantExecutionTarget.local,
-        AssistantExecutionTarget.remote,
-      ],
+    final inheritedTarget = pickDraftThreadExecutionTargetInternal(
+      currentTarget: widget.controller.currentAssistantExecutionTarget,
+      visibleTargets: widget.controller
+          .visibleAssistantExecutionTargets(const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.singleAgent,
+            AssistantExecutionTarget.local,
+            AssistantExecutionTarget.remote,
+          ]),
+      localWorkspaceAvailable: widget.controller.settings.workspacePath
+          .trim()
+          .isNotEmpty,
     );
     final inheritedViewMode = widget.controller.currentAssistantMessageViewMode;
     setState(() {
