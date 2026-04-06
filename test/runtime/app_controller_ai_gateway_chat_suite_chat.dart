@@ -42,7 +42,7 @@ void registerAppControllerAiGatewayChatSuiteChatTestsInternal() {
             gateway: gateway,
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: FallbackOnlyGoAgentCoreClientInternal(),
+          goTaskServiceClient: FallbackOnlyGoAgentCoreClientInternal(),
         );
 
         await controller.settingsController.saveAiGatewayApiKey('live-key');
@@ -104,7 +104,7 @@ void registerAppControllerAiGatewayChatSuiteChatTestsInternal() {
             gateway: secondGateway,
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: FallbackOnlyGoAgentCoreClientInternal(),
+          goTaskServiceClient: FallbackOnlyGoAgentCoreClientInternal(),
         );
 
         await secondController.settingsController.saveAiGatewayApiKey(
@@ -182,7 +182,7 @@ void registerAppControllerAiGatewayChatSuiteChatTestsInternal() {
           gateway: FakeGatewayRuntimeInternal(store: store),
           codex: FakeCodexRuntimeInternal(),
         ),
-        goAgentCoreClient: FallbackOnlyGoAgentCoreClientInternal(),
+        goTaskServiceClient: FallbackOnlyGoAgentCoreClientInternal(),
       );
 
       await controller.settingsController.saveAiGatewayApiKey('live-key');
@@ -242,7 +242,7 @@ void registerAppControllerAiGatewayChatSuiteChatTestsInternal() {
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: FallbackOnlyGoAgentCoreClientInternal(),
+          goTaskServiceClient: FallbackOnlyGoAgentCoreClientInternal(),
         );
 
         await controller.settingsController.saveAiGatewayApiKey('live-key');

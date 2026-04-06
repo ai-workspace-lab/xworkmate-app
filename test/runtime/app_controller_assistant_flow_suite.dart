@@ -8,7 +8,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
-import 'package:xworkmate/runtime/go_agent_core_client.dart';
+import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
@@ -34,7 +34,7 @@ void main() {
       );
       final controller = AppController(
         store: store,
-        goAgentCoreClient: goCoreClient,
+        goTaskServiceClient: goCoreClient,
       );
       addTearDown(() async {
         controller.dispose();
@@ -89,7 +89,7 @@ void main() {
       );
       expect(
         goCoreClient.lastRequest?.routing?.mode,
-        GoAgentCoreRoutingMode.auto,
+        ExternalCodeAgentAcpRoutingMode.auto,
       );
       expect(
         goCoreClient.lastRequest?.routing?.preferredGatewayTarget,
@@ -116,7 +116,7 @@ void main() {
       final goCoreClient = _FakeGoAgentCoreClient();
       final controller = AppController(
         store: store,
-        goAgentCoreClient: goCoreClient,
+        goTaskServiceClient: goCoreClient,
       );
       addTearDown(controller.dispose);
 
@@ -139,7 +139,7 @@ void main() {
 
       expect(
         goCoreClient.lastRequest?.routing?.mode,
-        GoAgentCoreRoutingMode.explicit,
+        ExternalCodeAgentAcpRoutingMode.explicit,
       );
       expect(
         goCoreClient.lastRequest?.routing?.explicitExecutionTarget,
@@ -167,7 +167,7 @@ void main() {
       );
       final controller = AppController(
         store: store,
-        goAgentCoreClient: _FakeGoAgentCoreClient(
+        goTaskServiceClient: _FakeGoAgentCoreClient(
           onExecute: gateway.recordGoCoreTurn,
         ),
       );
@@ -217,7 +217,7 @@ void main() {
       );
       final controller = AppController(
         store: store,
-        goAgentCoreClient: _FakeGoAgentCoreClient(
+        goTaskServiceClient: _FakeGoAgentCoreClient(
           onExecute: gateway.recordGoCoreTurn,
         ),
       );
@@ -615,8 +615,8 @@ class _FakeGatewayServer {
     socket.add(jsonEncode(frame));
   }
 
-  void recordGoCoreTurn(GoAgentCoreSessionRequest request) {
-    lastChatSendParams = request.toAcpParams();
+  void recordGoCoreTurn(GoTaskServiceRequest request) {
+    lastChatSendParams = request.toExternalAcpParams();
     final prompt = request.prompt.trim();
     if (prompt.isNotEmpty) {
       _appendMessage(role: 'user', text: prompt);
@@ -625,21 +625,23 @@ class _FakeGatewayServer {
   }
 }
 
-class _FakeGoAgentCoreClient implements GoAgentCoreClient {
+class _FakeGoAgentCoreClient implements GoTaskServiceClient {
   _FakeGoAgentCoreClient({this.onExecute});
 
-  GoAgentCoreSessionRequest? lastRequest;
-  final void Function(GoAgentCoreSessionRequest request)? onExecute;
+  GoTaskServiceRequest? lastRequest;
+  final void Function(GoTaskServiceRequest request)? onExecute;
 
   @override
-  Future<void> syncProviders(List<GoAgentCoreSyncedProvider> providers) async {}
+  Future<void> syncExternalProviders(
+    List<ExternalCodeAgentAcpSyncedProvider> providers,
+  ) async {}
 
   @override
-  Future<GoAgentCoreCapabilities> loadCapabilities({
+  Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
   }) async {
-    return GoAgentCoreCapabilities(
+    return ExternalCodeAgentAcpCapabilities(
       singleAgent: true,
       multiAgent: true,
       providers: <SingleAgentProvider>{
@@ -651,14 +653,14 @@ class _FakeGoAgentCoreClient implements GoAgentCoreClient {
   }
 
   @override
-  Future<GoAgentCoreRunResult> executeSession(
-    GoAgentCoreSessionRequest request, {
-    required void Function(GoAgentCoreSessionUpdate update) onUpdate,
+  Future<GoTaskServiceResult> executeTask(
+    GoTaskServiceRequest request, {
+    required void Function(GoTaskServiceUpdate update) onUpdate,
   }) async {
     lastRequest = request;
     onExecute?.call(request);
     onUpdate(
-      GoAgentCoreSessionUpdate(
+      GoTaskServiceUpdate(
         sessionId: request.sessionId,
         threadId: request.threadId,
         turnId: 'turn-1',
@@ -667,28 +669,32 @@ class _FakeGoAgentCoreClient implements GoAgentCoreClient {
         message: '',
         pending: false,
         error: false,
+        route: request.route,
         payload: const <String, dynamic>{'type': 'delta'},
       ),
     );
-    return const GoAgentCoreRunResult(
+    return GoTaskServiceResult(
       success: true,
       message: 'XWORKMATE_OK',
       turnId: 'turn-1',
       raw: <String, dynamic>{},
       errorMessage: '',
       resolvedModel: '',
+      route: request.route,
     );
   }
 
   @override
-  Future<void> cancelSession({
+  Future<void> cancelTask({
+    required GoTaskServiceRoute route,
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
   }) async {}
 
   @override
-  Future<void> closeSession({
+  Future<void> closeTask({
+    required GoTaskServiceRoute route,
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,

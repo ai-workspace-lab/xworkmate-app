@@ -9,7 +9,7 @@ import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
-import 'package:xworkmate/runtime/go_agent_core_client.dart';
+import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
@@ -112,34 +112,36 @@ class FakeCodexRuntimeInternal extends CodexRuntime {
   Future<void> stop() async {}
 }
 
-class FakeGoAgentCoreClientInternal implements GoAgentCoreClient {
+class FakeGoAgentCoreClientInternal implements GoTaskServiceClient {
   FakeGoAgentCoreClientInternal({
-    this.capabilities = const GoAgentCoreCapabilities.empty(),
-    this.result = const GoAgentCoreRunResult(
+    this.capabilities = const ExternalCodeAgentAcpCapabilities.empty(),
+    this.result = const GoTaskServiceResult(
       success: false,
       message: '',
       turnId: '',
       raw: <String, dynamic>{},
       errorMessage: 'no result configured',
       resolvedModel: '',
+      route: GoTaskServiceRoute.externalAcpSingle,
     ),
   });
 
-  final GoAgentCoreCapabilities capabilities;
-  final GoAgentCoreRunResult result;
+  final ExternalCodeAgentAcpCapabilities capabilities;
+  final GoTaskServiceResult result;
 
   int capabilitiesCalls = 0;
   int executeCalls = 0;
   int cancelCalls = 0;
-  GoAgentCoreSessionRequest? lastRequest;
-  final List<GoAgentCoreSessionRequest> requests =
-      <GoAgentCoreSessionRequest>[];
+  GoTaskServiceRequest? lastRequest;
+  final List<GoTaskServiceRequest> requests = <GoTaskServiceRequest>[];
 
   @override
-  Future<void> syncProviders(List<GoAgentCoreSyncedProvider> providers) async {}
+  Future<void> syncExternalProviders(
+    List<ExternalCodeAgentAcpSyncedProvider> providers,
+  ) async {}
 
   @override
-  Future<GoAgentCoreCapabilities> loadCapabilities({
+  Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
   }) async {
@@ -148,16 +150,16 @@ class FakeGoAgentCoreClientInternal implements GoAgentCoreClient {
   }
 
   @override
-  Future<GoAgentCoreRunResult> executeSession(
-    GoAgentCoreSessionRequest request, {
-    required void Function(GoAgentCoreSessionUpdate update) onUpdate,
+  Future<GoTaskServiceResult> executeTask(
+    GoTaskServiceRequest request, {
+    required void Function(GoTaskServiceUpdate update) onUpdate,
   }) async {
     executeCalls += 1;
     lastRequest = request;
     requests.add(request);
     if (result.message.trim().isNotEmpty) {
       onUpdate(
-        GoAgentCoreSessionUpdate(
+        GoTaskServiceUpdate(
           sessionId: request.sessionId,
           threadId: request.threadId,
           turnId: result.turnId,
@@ -166,6 +168,7 @@ class FakeGoAgentCoreClientInternal implements GoAgentCoreClient {
           message: '',
           pending: false,
           error: false,
+          route: result.route,
           payload: const <String, dynamic>{'type': 'delta'},
         ),
       );
@@ -174,7 +177,8 @@ class FakeGoAgentCoreClientInternal implements GoAgentCoreClient {
   }
 
   @override
-  Future<void> cancelSession({
+  Future<void> cancelTask({
+    required GoTaskServiceRoute route,
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
@@ -183,7 +187,8 @@ class FakeGoAgentCoreClientInternal implements GoAgentCoreClient {
   }
 
   @override
-  Future<void> closeSession({
+  Future<void> closeTask({
+    required GoTaskServiceRoute route,
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
@@ -196,7 +201,7 @@ class FakeGoAgentCoreClientInternal implements GoAgentCoreClient {
 class FallbackOnlyGoAgentCoreClientInternal
     extends FakeGoAgentCoreClientInternal {
   FallbackOnlyGoAgentCoreClientInternal()
-    : super(capabilities: const GoAgentCoreCapabilities.empty());
+    : super(capabilities: const ExternalCodeAgentAcpCapabilities.empty());
 }
 
 class FakeAiGatewayServerInternal {
