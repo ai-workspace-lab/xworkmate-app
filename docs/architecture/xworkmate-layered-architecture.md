@@ -9,7 +9,7 @@ Last Updated: 2026-03-29
 
 - 本地用户、Web 用户、远程租户如何进入系统
 - 任务线程如何成为 UI 与执行之间的控制面主对象
-- Desktop / Mobile / Web 三个界面层如何共用同一套 `GoTaskService` 执行主链
+- Desktop / Mobile / Web 三个界面层如何共用同一套 `GoTaskService` 执行主链与任务分流语义
 - 本地 agent、OpenClaw Gateway、ACP endpoint、AI Gateway、Skills / MCP
   等扩展能力应该落在哪一层
 
@@ -48,7 +48,7 @@ Last Updated: 2026-03-29
 
 - UI 不是执行状态真值源
 - `TaskThread` 才是线程级控制面真值源
-- `GoTaskService` 负责把线程状态翻译成可执行请求
+- `GoTaskService` 负责把线程状态翻译成可执行请求，并在 OpenClaw lane 与 ACP lane 之间分流
 - 真正的 provider / gateway / ACP / Skills / MCP 都应放在 `GoTaskService` 之下
 
 ## 整体架构
@@ -202,11 +202,20 @@ flowchart TB
 因此，推荐把所有“切换线程、发消息、切换目标、切换 provider、回写远端目录”
 都看成对线程控制面的更新，而不是页面局部状态切换。
 
-### 4. Agent-core 调度层
+### 4. GoTaskService 调度层
 
 这是 XWorkmate 的核心中枢。
 
 它不只是“某个 agent SDK”，而是一整套把线程控制面翻译成执行请求的调度层。
+
+这一层的上位语义应该理解为：
+
+- `OpenClaw task`
+  - `TaskThread -> GoTaskService -> GatewayRuntime / Web relay -> OpenClaw gateway`
+- `ACP task`
+  - `TaskThread -> GoTaskService -> ExternalCodeAgentAcp* -> ACP/provider route`
+
+也就是说，`GoTaskService` 才是整层的上位名字；具体 transport 与 gateway/ACP lane 只是它的执行子路径。
 
 当前代码里，这层最关键的组件是：
 
@@ -232,6 +241,17 @@ flowchart TB
 - `CodeAgentNodeOrchestrator` 负责 app-mediated cooperative node metadata
 - `MultiAgentOrchestrator` / `MultiAgentMountManager` 负责协作执行与挂载
 - Config bridge 只负责受管配置写入，不越权持有 UI 真值
+
+## 术语表
+
+| 术语 | 规范语义 | 当前作用 |
+| --- | --- | --- |
+| `TaskThread` | 线程级控制面主对象 | 承载线程身份、工作区、执行绑定、上下文与生命周期 |
+| `OpenClaw task` | 面向本地或远端 OpenClaw gateway 的任务 | 规范路径：`TaskThread -> GoTaskService -> GatewayRuntime / Web relay -> OpenClaw gateway` |
+| `ACP task` | 不走 OpenClaw gateway 的任务 | 规范路径：`TaskThread -> GoTaskService -> ExternalCodeAgentAcp* -> ACP/provider route` |
+| `GatewayRuntime` | OpenClaw task 的 App 侧 runtime 门面 | 负责 gateway chat / session / pairing / history 等语义 |
+| `ExternalCodeAgentAcp*` | ACP task 的 transport 组件 | 负责把任务送入 ACP/provider route |
+| `ACP/provider route` | 非 OpenClaw provider 的执行通道 | 包括 ACP transport、provider endpoint、兼容 relay/provider 路径 |
 
 ### 5. 对接服务与扩展层
 
@@ -294,9 +314,9 @@ flowchart LR
     C3 --> D
     C4 --> D
 
-    D --> E{"executionMode"}
-    E -->|openclaw task| G["GoTaskService -> GatewayRuntime / Web relay"]
-    E -->|singleAgent / multiAgent| H["GoTaskService -> ExternalCodeAgentAcp* / ACP route"]
+    D --> E{"任务类型分流"}
+    E -->|OpenClaw task| G["GoTaskService -> GatewayRuntime / Web relay -> OpenClaw gateway"]
+    E -->|singleAgent / multiAgent| H["GoTaskService -> ExternalCodeAgentAcp* -> ACP route"]
 
     G --> I
     H --> I
@@ -313,7 +333,9 @@ flowchart LR
 
 - UI 先选线程，不是先选 provider
 - 线程先绑定，再执行
-- 执行模式由 `executionBinding` 决定
+- 执行模式与 provider 绑定共同决定最终任务分流
+- `OpenClaw task` 不再走 ACP 兼容桥，而是统一走 `GoTaskService -> GatewayRuntime / Web relay -> OpenClaw gateway`
+- `singleAgent / multiAgent` 统一走 `GoTaskService -> ExternalCodeAgentAcp* -> ACP/provider route`
 - 结果先回写线程，再刷新 UI
 - 远端返回新的 working directory 时，只能显式回写当前已完整线程的 `workspaceBinding`
 - 这类回写不能创建 first binding，也不能改变线程身份
@@ -325,7 +347,7 @@ flowchart LR
 | 访问与归属层 | `ThreadOwnerScope`、`DeviceIdentityStore`、Web session identity | `lib/runtime/runtime_models_runtime_payloads.dart`, `lib/runtime/device_identity_store.dart`, `lib/web/web_session_repository.dart` | 定义线程归属、设备身份、远程会话身份 |
 | 多端 UI 层 | `AppShellDesktop`、`mobile_shell_*`、`AppShellWeb`、`AssistantPage`、`SettingsPage` | `lib/app/`, `lib/features/assistant/`, `lib/features/mobile/`, `lib/features/settings/` | 接收用户操作、展示线程与设置 |
 | 线程控制面 | `TaskThread` + thread records | `lib/runtime/runtime_models_runtime_payloads.dart`, `lib/runtime/settings_store.dart`, `lib/web/web_session_repository.dart` | 保存线程级真值状态 |
-| `GoTaskService` 调度层 | `AppControllerDesktop/Web`、`GoTaskServiceClient`、`RuntimeCoordinator`、`CodeAgentNodeOrchestrator`、`MultiAgentOrchestrator` | `lib/app/`, `lib/runtime/`, `lib/web/` | 把线程状态翻译为执行请求并协调 transport |
+| `GoTaskService` 调度层 | `AppControllerDesktop/Web`、`GoTaskServiceClient`、`RuntimeCoordinator`、`CodeAgentNodeOrchestrator`、`MultiAgentOrchestrator` | `lib/app/`, `lib/runtime/`, `lib/web/` | 把线程状态翻译为执行请求，并按 OpenClaw / ACP 路径分流执行 |
 | 对接服务与扩展层 | local agent、OpenClaw Gateway、ACP endpoint、AI Gateway、Skills / MCP / adapters | `lib/runtime/external_code_agent_acp_desktop_transport.dart`, `lib/web/external_code_agent_acp_web_transport.dart`, `lib/runtime/multi_agent_mounts.dart` | 真实执行与扩展接入 |
 | 安全与持久化基座 | `SettingsStore`、`SecretStore`、`SecureConfigStore`、`WebStore` | `lib/runtime/`, `lib/web/web_store.dart` | 提供持久化与 secret 保护 |
 
@@ -333,7 +355,7 @@ flowchart LR
 
 | 平台 | UI 入口 | 线程控制面 | `GoTaskService` 重点 | 当前执行特点 |
 | --- | --- | --- | --- | --- |
-| Desktop | `AppShellDesktop` + workspace 页面 | `TaskThread` 持久化最完整 | `AppControllerDesktop` + `RuntimeCoordinator` + Desktop transport | 支持本地 single-agent、gateway local、gateway remote |
+| Desktop | `AppShellDesktop` + workspace 页面 | `TaskThread` 持久化最完整 | `AppControllerDesktop` + `GoTaskService` + `GatewayRuntime / ExternalCodeAgentAcp*` | 支持本地 single-agent、OpenClaw local / remote、ACP/provider route |
 | Mobile | `mobile_shell_*` | 复用同一线程模型 | 仍走 native host/controller 体系 | 当前以 remote gateway 场景为主 |
 | Web | `AppShellWeb` | 同 schema 的 thread records | `AppControllerWeb` + `ExternalCodeAgentAcpWebTransport` + relay/acp client | 远程 ACP / relay / AI Gateway 路径 |
 

@@ -11,7 +11,7 @@
 3. UI 选中线程后，系统必须读取完整 `TaskThread`，而不是从页面状态拼装线程信息。
 4. `TaskThread` 持久化 schema 保持不变，但 `workspaceBinding` 在 create/load 时必须完整；缺失 binding 的旧记录按非法数据处理并跳过加载。
 5. 执行请求由 controller / runtime 根据 `ownerScope / workspaceBinding / executionBinding / contextState` 构造。
-6. controller / runtime 统一通过 `GoTaskService` 调度执行：OpenClaw task 走 `TaskThread -> GoTaskService -> GatewayRuntime / Web relay -> OpenClaw gateway`；`singleAgent / multiAgent` 走 `TaskThread -> GoTaskService -> ExternalCodeAgentAcp* -> ACP/provider route`。
+6. controller / runtime 统一通过 `GoTaskService` 调度执行，并遵循 `TaskThread` 驱动的任务分流语义：`OpenClaw task` 走 `TaskThread -> GoTaskService -> GatewayRuntime / Web relay -> OpenClaw gateway`；`singleAgent / multiAgent` 等 ACP lane 走 `TaskThread -> GoTaskService -> ExternalCodeAgentAcp* -> ACP/provider route`。
 7. 执行结果先回写 `TaskThread.contextState`，主体区域同步显示；UI 与执行始终只读取当前 `TaskThread.workspaceBinding`，不再存在 runtime first-binding 或 fallback 到 `main`。
 8. `contextState` 是线程上下文真相源；`lifecycleState` 只表达生命周期摘要；controller 侧缓存不承载线程持久语义。
 
@@ -78,7 +78,7 @@ ExecutionBinding
 
 - 定义线程当前执行模式
 - 定义 provider / endpoint 绑定
-- 为 `GoTaskService / runtime` 协调层提供调度输入
+- 为 `GoTaskService / runtime` 的任务分流与执行通道选择提供调度输入
 
 ### 2.4 contextState
 
@@ -133,14 +133,18 @@ flowchart LR
   D3 --> E
   D4 --> E
 
-  E --> F["GoTaskService\nDesktop: GatewayRuntime / ExternalCodeAgentAcpDesktopTransport\nWeb: relay / ExternalCodeAgentAcpWebTransport"]
-  F --> G["执行结果"]
+  E --> F{"GoTaskService 任务分流"}
+  F -->|OpenClaw task| G["GatewayRuntime / Web relay -> OpenClaw gateway"]
+  F -->|singleAgent / multiAgent| H["ExternalCodeAgentAcp* -> ACP/provider route"]
 
-  G --> H["回写线程上下文\n(主体区域 同步显示)"]
-  G --> I["仅显式更新当前线程 workspaceBinding"]
+  G --> I["执行结果"]
+  H --> I
 
-  H --> J["右栏显示"]
-  I --> J
+  I --> J["回写线程上下文\n(主体区域 同步显示)"]
+  I --> K["仅显式更新当前线程 workspaceBinding"]
+
+  J --> L["右栏显示"]
+  K --> L
 ```
 
 这条链路是当前唯一生命周期基准：
@@ -148,10 +152,12 @@ flowchart LR
 1. UI 仍保持现有形态，但只负责选择 `threadId` 与消费回写结果。
 2. 线程的执行输入来自完整 `TaskThread`。
 3. `构造执行请求` 属于 `GoTaskService / runtime` 协调层，不属于 UI。
-4. `GoTaskService` 是唯一执行调度面；Desktop / Web 共用同一套 session 语义，只在 transport 上有差异。
-5. `回写线程上下文` 是执行结束后的第一落点；主体区域同步显示依赖这一回写。
-6. `workspaceBinding` 不是运行时补齐对象；线程在 create/load 时必须已经完整。
-7. `右栏显示` 与执行请求都读取当前 `TaskThread.workspaceBinding`，因此它与主体区域共享同一线程事实来源。
+4. 当前任务流不是单一路由：`OpenClaw task` 与 ACP lane 在 `TaskThread` 读取之后立即分流。
+5. `OpenClaw task` 的规范路径是 `TaskThread -> GoTaskService -> GatewayRuntime / Web relay -> OpenClaw gateway`。
+6. `singleAgent / multiAgent` 的规范路径是 `TaskThread -> GoTaskService -> ExternalCodeAgentAcp* -> ACP/provider route`。
+7. `回写线程上下文` 是执行结束后的第一落点；主体区域同步显示依赖这一回写。
+8. `workspaceBinding` 不是运行时补齐对象；线程在 create/load 时必须已经完整。
+9. `右栏显示` 与执行请求都读取当前 `TaskThread.workspaceBinding`，因此它与主体区域共享同一线程事实来源。
 
 ## 4. 当前设计约束
 
@@ -165,7 +171,9 @@ flowchart LR
 ### 4.2 GoTaskService / runtime 协调层约束
 
 - 根据 `ownerScope / workspaceBinding / executionBinding / contextState` 构造执行请求。
-- 负责把线程请求调度到 `GoTaskService`，而不是让 Flutter UI 直接承担 runtime 职责。
+- 负责根据任务类型把线程请求分流到正确执行通道，而不是让 Flutter UI 直接承担 runtime 职责。
+- `OpenClaw task` 必须走 `TaskThread -> GoTaskService -> GatewayRuntime / Web relay -> OpenClaw gateway`。
+- `singleAgent / multiAgent` 必须走 `TaskThread -> GoTaskService -> ExternalCodeAgentAcp* -> ACP/provider route`。
 - 接收执行结果并驱动 `TaskThread` 回写。
 
 ### 4.3 TaskThread 约束
@@ -183,5 +191,7 @@ flowchart LR
   说明线程信息如何进入 UI、`GoTaskService / runtime` 请求构造、结果回写和右栏展示。
 - [xworkmate-internal-state-architecture.md](xworkmate-internal-state-architecture.md)
   说明控制器、状态存储和派生 UI 状态如何围绕 `TaskThread` 组织。
+- [xworkmate-layered-architecture.md](xworkmate-layered-architecture.md)
+  说明 `GoTaskService`、`GatewayRuntime / Web relay`、`ExternalCodeAgentAcp*` 与 `ACP/provider route` 的分层关系。
 
 归档文档仍可保留作为历史背景，但不再参与当前设计说明。
