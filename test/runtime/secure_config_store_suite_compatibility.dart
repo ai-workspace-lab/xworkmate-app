@@ -69,7 +69,12 @@ void registerSecureConfigStoreSuiteCompatibilityTestsInternal() {
             ),
             title: 'Legacy thread',
             archived: false,
-            executionTarget: AssistantExecutionTarget.local,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.gatewayLocal,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
             messages: <GatewayChatMessage>[
               GatewayChatMessage(
@@ -261,6 +266,93 @@ void registerSecureConfigStoreSuiteCompatibilityTestsInternal() {
       );
       expect(decoded.contextState.selectedModelId, 'gpt-5.4');
       expect(decoded.lifecycleState.status, 'ready');
+    });
+
+    test('TaskThread.toJson omits legacy projection fields', () {
+      final record = TaskThread(
+        threadId: 'thread-1',
+        title: 'Thread 1',
+        workspaceBinding: const WorkspaceBinding(
+          workspaceId: 'workspace-1',
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: '/tmp/workspace',
+          displayPath: '/tmp/workspace',
+          writable: true,
+        ),
+        executionBinding: const ExecutionBinding(
+          executionMode: ThreadExecutionMode.localAgent,
+          executorId: 'auto',
+          providerId: 'claude',
+          endpointId: '',
+        ),
+        contextState: const ThreadContextState(
+          messages: <GatewayChatMessage>[],
+          selectedModelId: 'gpt-5.4',
+          selectedSkillKeys: <String>[],
+          importedSkills: <AssistantThreadSkillEntry>[],
+          permissionLevel: AssistantPermissionLevel.defaultAccess,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          latestResolvedRuntimeModel: '',
+        ),
+        lifecycleState: const ThreadLifecycleState(
+          archived: false,
+          status: 'ready',
+          lastRunAtMs: null,
+          lastResultCode: null,
+        ),
+        createdAtMs: 1700000000000,
+        updatedAtMs: 1700000001000,
+      );
+
+      final json = record.toJson();
+
+      expect(json.containsKey('workspaceRef'), isFalse);
+      expect(json.containsKey('workspaceRefKind'), isFalse);
+      expect(json.containsKey('executionTarget'), isFalse);
+      expect(json.containsKey('singleAgentProvider'), isFalse);
+    });
+
+    test('TaskThread.fromJson reads legacy workspace and execution fields', () {
+      final decoded = TaskThread.fromJson(<String, dynamic>{
+        'schemaVersion': taskThreadSchemaVersion,
+        'threadId': 'thread-legacy',
+        'title': 'Legacy Thread',
+        'ownerScope': const <String, Object?>{
+          'realm': 'local',
+          'subjectType': 'user',
+          'subjectId': 'device-1',
+          'displayName': 'device-1',
+        },
+        'workspaceRef': '/legacy/workspace',
+        'workspaceRefKind': 'remotePath',
+        'executionTarget': 'remote',
+        'singleAgentProvider': 'claude',
+        'contextState': const <String, Object?>{
+          'messages': <Object>[],
+          'selectedModelId': 'gpt-5.4',
+          'selectedSkillKeys': <Object>[],
+          'importedSkills': <Object>[],
+          'permissionLevel': 'defaultAccess',
+          'messageViewMode': 'rendered',
+          'latestResolvedRuntimeModel': '',
+        },
+        'lifecycleState': const <String, Object?>{
+          'archived': false,
+          'status': 'ready',
+          'lastRunAtMs': null,
+          'lastResultCode': null,
+        },
+        'createdAtMs': 1700000000000,
+        'updatedAtMs': 1700000001000,
+      });
+
+      expect(decoded.workspaceBinding.workspacePath, '/legacy/workspace');
+      expect(decoded.workspaceBinding.workspaceKind, WorkspaceKind.remoteFs);
+      expect(
+        decoded.executionBinding.executionMode,
+        ThreadExecutionMode.gatewayRemote,
+      );
+      expect(decoded.executionBinding.providerId, 'claude');
     });
 
     test('TaskThread rejects persisted records without a complete binding', () {

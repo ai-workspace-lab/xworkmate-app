@@ -56,7 +56,6 @@ class AssistantArtifactEntry {
       'updatedAtMs': updatedAtMs,
       'previewable': previewable,
       'workspacePath': workspacePath,
-      'workspaceRef': workspacePath,
     };
   }
 
@@ -187,9 +186,7 @@ class AssistantArtifactSnapshot {
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
       'workspacePath': workspacePath,
-      'workspaceRef': workspacePath,
       'workspaceKind': workspaceKind.name,
-      'workspaceRefKind': workspaceKind.name,
       'resultEntries': resultEntries.map((item) => item.toJson()).toList(),
       'fileEntries': fileEntries.map((item) => item.toJson()).toList(),
       'changes': changes.map((item) => item.toJson()).toList(),

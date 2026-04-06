@@ -71,7 +71,6 @@ void registerAppControllerAiGatewayChatSuiteChatTestsInternal() {
         const firstQuestion =
             'Execution context:\n'
             '- target: single-agent\n'
-            '- workspace_root: /opt/data/workspace\n'
             '- permission: full-access\n\n'
             '今天聊点什么';
         const secondQuestion = '继续刚才的话题';
