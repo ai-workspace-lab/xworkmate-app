@@ -113,11 +113,17 @@ void main() {
 }
 
 GoCoreLocator _fixedLocator() {
+  final appRoot = Directory('${Directory.systemTemp.path}/aris-llm-chat-app');
+  final helpersDir = Directory('${appRoot.path}/XWorkmate.app/Contents/Helpers');
+  helpersDir.createSync(recursive: true);
+  final helper = File('${helpersDir.path}/xworkmate-go-core');
+  if (!helper.existsSync()) {
+    helper.writeAsStringSync('#!/bin/sh\nexit 0\n');
+    Process.runSync('chmod', <String>['+x', helper.path]);
+  }
   return GoCoreLocator(
-    binaryExistsResolver: (_) async => true,
-    workspaceRoot: Directory.systemTemp.path,
     resolvedExecutableResolver: () =>
-        '${Directory.systemTemp.path}/XWorkmate.app/Contents/MacOS/XWorkmate',
+        '${appRoot.path}/XWorkmate.app/Contents/MacOS/XWorkmate',
   );
 }
 
