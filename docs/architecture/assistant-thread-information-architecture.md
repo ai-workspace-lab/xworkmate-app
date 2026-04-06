@@ -114,7 +114,7 @@ flowchart LR
 - `构造执行请求` 在 agent-core / runtime 协调层完成
 - `右栏显示` 明确依赖 `TaskThread` 当前记录
 - `workspaceBinding` 更新只允许发生在当前线程已完整的前提下
-- `workspace_root` 不是线程身份，也不是运行时 override
+- prompt 中的 `workspace_root` side-channel 已退出主链；workspace 更新只允许来自 create/load 显式绑定或结构化执行结果回写
 
 ## 4. UI 信息来源矩阵
 

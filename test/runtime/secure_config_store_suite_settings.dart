@@ -199,7 +199,12 @@ void registerSecureConfigStoreSuiteSettingsTestsInternal() {
             ),
             title: 'Memory only',
             archived: false,
-            executionTarget: AssistantExecutionTarget.local,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.gatewayLocal,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
             updatedAtMs: 1700000000000,
             messages: <GatewayChatMessage>[],

@@ -253,13 +253,6 @@ extension AppControllerDesktopThreadActions on AppController {
       currentSessionKey,
       executionTarget: currentTarget,
     );
-    if (currentTarget == AssistantExecutionTarget.singleAgent ||
-        currentTarget == AssistantExecutionTarget.auto) {
-      await bootstrapThreadWorkspaceFromExecutionContextInternal(
-        currentSessionKey,
-        message,
-      );
-    }
     var workspacePath = assistantWorkspacePathForSession(
       currentSessionKey,
     ).trim();
@@ -520,75 +513,6 @@ extension AppControllerDesktopThreadActions on AppController {
       case RuntimeConnectionStatus.offline:
         return 'disconnected';
     }
-  }
-
-  Future<void> bootstrapThreadWorkspaceFromExecutionContextInternal(
-    String sessionKey,
-    String message,
-  ) async {
-    final workspaceRoot = parseExecutionContextWorkspaceRootInternal(message);
-    if (workspaceRoot == null) {
-      return;
-    }
-    if (!ensureLocalWorkspaceDirectoryInternal(workspaceRoot)) {
-      return;
-    }
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final existing = assistantThreadRecordsInternal[normalizedSessionKey];
-    if (existing == null || !existing.workspaceBinding.isComplete) {
-      throw StateError(
-        'TaskThread $normalizedSessionKey is missing a complete workspaceBinding.',
-      );
-    }
-    final target = existing.executionTarget;
-    if (target != AssistantExecutionTarget.singleAgent &&
-        target != AssistantExecutionTarget.auto) {
-      return;
-    }
-    upsertTaskThreadInternal(
-      normalizedSessionKey,
-      workspaceBinding: WorkspaceBinding(
-        workspaceId: normalizedSessionKey,
-        workspaceKind: WorkspaceKind.localFs,
-        workspacePath: workspaceRoot,
-        displayPath: workspaceRoot,
-        writable: existing.workspaceBinding.writable,
-      ),
-      lifecycleState:
-          (existing.lifecycleState)
-              .copyWith(status: 'ready'),
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
-  }
-
-  String? parseExecutionContextWorkspaceRootInternal(String message) {
-    final match = RegExp(
-      r'^\s*-\s*workspace_root\s*:\s*(.+?)\s*$',
-      multiLine: true,
-      caseSensitive: false,
-    ).firstMatch(message);
-    if (match == null) {
-      return null;
-    }
-    var value = (match.group(1) ?? '').trim();
-    if (value.isEmpty) {
-      return null;
-    }
-    if ((value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.substring(1, value.length - 1).trim();
-    }
-    final normalized = value.toLowerCase();
-    if (normalized == 'not-set' ||
-        normalized == 'unset' ||
-        normalized == 'none' ||
-        normalized == 'null' ||
-        normalized == 'n/a') {
-      return null;
-    }
-    return value.isEmpty ? null : value;
   }
 
   Future<void> tryBindWorkspaceForOnlyChatFallbackInternal(

@@ -92,10 +92,17 @@ extension AppControllerWebGatewayRelay on AppController {
     final sessions = await relayClientInternal.listSessions(limit: 50);
     for (final session in sessions) {
       final sessionKey = normalizedSessionKeyInternal(session.key);
-      final existing = threadRecordsInternal[sessionKey];
-      final resolvedExecutionTarget = existing?.executionTarget ?? target;
-      final resolvedProvider =
-          existing?.singleAgentProvider ?? SingleAgentProvider.auto;
+      final existing = taskThreadForSessionInternal(sessionKey);
+      final resolvedExecutionTarget = switch (existing?.executionBinding.executionMode) {
+        ThreadExecutionMode.auto => AssistantExecutionTarget.auto,
+        ThreadExecutionMode.localAgent => AssistantExecutionTarget.singleAgent,
+        ThreadExecutionMode.gatewayLocal => AssistantExecutionTarget.local,
+        ThreadExecutionMode.gatewayRemote => AssistantExecutionTarget.remote,
+        null => target,
+      };
+      final resolvedProvider = SingleAgentProviderCopy.fromJsonValue(
+        existing?.executionBinding.providerId ?? '',
+      );
       final next = TaskThread(
         threadId: sessionKey,
         createdAtMs:
@@ -166,7 +173,7 @@ extension AppControllerWebGatewayRelay on AppController {
               lastResultCode: null,
             ),
       );
-      threadRecordsInternal[sessionKey] = next;
+      threadRepositoryInternal.replace(next);
     }
     await persistThreadsInternal();
     recomputeDerivedWorkspaceStateInternal();
@@ -244,7 +251,7 @@ extension AppControllerWebGatewayRelay on AppController {
       resolvedKey,
       limit: 120,
     );
-    final existing = threadRecordsInternal[resolvedKey];
+    final existing = taskThreadForSessionInternal(resolvedKey);
     final next = (existing ?? newRecordInternal(target: target)).copyWith(
       threadId: resolvedKey,
       messages: messages,
@@ -254,15 +261,32 @@ extension AppControllerWebGatewayRelay on AppController {
         messages,
         fallback: resolvedKey,
       ),
-      executionTarget: existing?.executionTarget ?? target,
+      executionBinding: (existing?.executionBinding ??
+              ExecutionBinding(
+                executionMode: ThreadExecutionMode.gatewayLocal,
+                executorId: SingleAgentProvider.auto.providerId,
+                providerId: SingleAgentProvider.auto.providerId,
+                endpointId: '',
+              ))
+          .copyWith(
+            executionMode: switch (target) {
+              AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
+              AssistantExecutionTarget.singleAgent =>
+                ThreadExecutionMode.localAgent,
+              AssistantExecutionTarget.local =>
+                ThreadExecutionMode.gatewayLocal,
+              AssistantExecutionTarget.remote =>
+                ThreadExecutionMode.gatewayRemote,
+            },
+          ),
       gatewayEntryState:
           existing?.gatewayEntryState ??
           gatewayEntryStateForTargetInternal(target),
     );
-    threadRecordsInternal[resolvedKey] = next;
+    threadRepositoryInternal.replace(next);
     await ensureWebTaskThreadBindingInternal(
       resolvedKey,
-      executionTarget: next.executionTarget,
+      executionTarget: assistantExecutionTargetForSession(resolvedKey),
     );
     streamingTextBySessionInternal.remove(resolvedKey);
     await persistThreadsInternal();

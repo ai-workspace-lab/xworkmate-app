@@ -17,6 +17,7 @@ import '../web/web_store.dart';
 import '../web/web_workspace_controllers.dart';
 import 'app_capabilities.dart';
 import 'ui_feature_manifest.dart';
+import 'task_thread_repositories.dart';
 import 'app_controller_web_sessions.dart';
 import 'app_controller_web_workspace.dart';
 import 'app_controller_web_session_actions.dart';
@@ -93,8 +94,8 @@ class AppController extends ChangeNotifier {
   bool aiGatewayBusyInternal = false;
   bool acpBusyInternal = false;
   bool multiAgentRunPendingInternal = false;
-  final Map<String, TaskThread> threadRecordsInternal =
-      <String, TaskThread>{};
+  final WebTaskThreadRepository threadRepositoryInternal =
+      WebTaskThreadRepository();
   final Set<String> pendingSessionKeysInternal = <String>{};
   final Map<String, String> streamingTextBySessionInternal = <String, String>{};
   final Map<String, Future<void>> threadTurnQueuesInternal =
@@ -169,6 +170,8 @@ class AppController extends ChangeNotifier {
   bool get isMultiAgentRunPending => multiAgentRunPendingInternal;
   String? get lastAssistantError => lastAssistantErrorInternal;
   String get currentSessionKey => currentSessionKeyInternal;
+  Map<String, TaskThread> get threadRecordsInternal =>
+      threadRepositoryInternal.recordsView;
   WebSessionPersistenceConfig get webSessionPersistence =>
       settingsInternal.webSessionPersistence;
   String get sessionPersistenceStatusMessage =>

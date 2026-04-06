@@ -277,11 +277,17 @@ extension AppControllerDesktopSkillPermissions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final existing = assistantThreadRecordsInternal[normalizedSessionKey];
+    final existing = taskThreadForSessionInternal(normalizedSessionKey);
     final nextExecutionTarget =
         executionTarget ??
-        existing?.executionTarget ??
-        settings.assistantExecutionTarget;
+        switch (existing?.executionBinding.executionMode) {
+          ThreadExecutionMode.auto => AssistantExecutionTarget.auto,
+          ThreadExecutionMode.localAgent =>
+            AssistantExecutionTarget.singleAgent,
+          ThreadExecutionMode.gatewayLocal => AssistantExecutionTarget.local,
+          ThreadExecutionMode.gatewayRemote => AssistantExecutionTarget.remote,
+          null => settings.assistantExecutionTarget,
+        };
     final nextImportedSkills =
         importedSkills ??
         existing?.importedSkills ??
@@ -418,30 +424,11 @@ extension AppControllerDesktopSkillPermissions on AppController {
           existing?.updatedAtMs ??
           (nextMessages.isNotEmpty ? nextMessages.last.timestampMs : null),
     );
-    assistantThreadRecordsInternal[normalizedSessionKey] = nextRecord;
+    taskThreadRepositoryInternal.replace(nextRecord);
     if (messages != null) {
       assistantThreadMessagesInternal[normalizedSessionKey] =
           List<GatewayChatMessage>.from(messages);
     }
-    final snapshot = assistantThreadRecordsInternal.values.toList(
-      growable: false,
-    );
-    final nextPersist = assistantThreadPersistQueueInternal
-        .catchError((_) {})
-        .then((_) async {
-          if (disposedInternal) {
-            return;
-          }
-          try {
-            await storeInternal.saveTaskThreads(snapshot);
-          } catch (_) {
-            // Assistant thread persistence is background best-effort. Keep the
-            // in-memory session usable even when teardown or temp-directory
-            // cleanup races with the durable write.
-          }
-        });
-    assistantThreadPersistQueueInternal = nextPersist;
-    unawaited(nextPersist);
   }
 
   Future<void> setCurrentAssistantSessionKeyInternal(
