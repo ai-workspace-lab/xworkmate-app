@@ -9,7 +9,6 @@ import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
-import 'package:xworkmate/runtime/go_agent_core_client.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
@@ -42,7 +41,7 @@ void registerAppControllerAiGatewayChatSuiteChatTestsInternal() {
             gateway: gateway,
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: FallbackOnlyGoAgentCoreClientInternal(),
+          goTaskServiceClient: FallbackOnlyGoTaskServiceClientInternal(),
         );
 
         await controller.settingsController.saveAiGatewayApiKey('live-key');
@@ -71,7 +70,6 @@ void registerAppControllerAiGatewayChatSuiteChatTestsInternal() {
         const firstQuestion =
             'Execution context:\n'
             '- target: single-agent\n'
-            '- workspace_root: /opt/data/workspace\n'
             '- permission: full-access\n\n'
             '今天聊点什么';
         const secondQuestion = '继续刚才的话题';
@@ -105,7 +103,7 @@ void registerAppControllerAiGatewayChatSuiteChatTestsInternal() {
             gateway: secondGateway,
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: FallbackOnlyGoAgentCoreClientInternal(),
+          goTaskServiceClient: FallbackOnlyGoTaskServiceClientInternal(),
         );
 
         await secondController.settingsController.saveAiGatewayApiKey(
@@ -183,7 +181,7 @@ void registerAppControllerAiGatewayChatSuiteChatTestsInternal() {
           gateway: FakeGatewayRuntimeInternal(store: store),
           codex: FakeCodexRuntimeInternal(),
         ),
-        goAgentCoreClient: FallbackOnlyGoAgentCoreClientInternal(),
+        goTaskServiceClient: FallbackOnlyGoTaskServiceClientInternal(),
       );
 
       await controller.settingsController.saveAiGatewayApiKey('live-key');
@@ -243,7 +241,7 @@ void registerAppControllerAiGatewayChatSuiteChatTestsInternal() {
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
-          goAgentCoreClient: FallbackOnlyGoAgentCoreClientInternal(),
+          goTaskServiceClient: FallbackOnlyGoTaskServiceClientInternal(),
         );
 
         await controller.settingsController.saveAiGatewayApiKey('live-key');

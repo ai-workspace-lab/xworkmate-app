@@ -44,7 +44,11 @@ class WebTasksController {
           currentSessionKey: currentSessionKey,
           pendingSessionKeys: pendingSessionKeys,
         ),
-        surface: surfaceForTargetInternal(thread.executionTarget),
+        surface: surfaceForTargetInternal(
+          assistantExecutionTargetFromExecutionMode(
+            thread.executionBinding.executionMode,
+          ),
+        ),
         startedAtLabel: timeLabelInternal(thread.updatedAtMs),
         durationLabel: durationLabelInternal(thread.updatedAtMs),
         summary: summaryForThreadInternal(thread),

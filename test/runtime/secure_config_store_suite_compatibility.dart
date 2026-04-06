@@ -58,10 +58,23 @@ void registerSecureConfigStoreSuiteCompatibilityTestsInternal() {
         );
         final legacyRecords = <TaskThread>[
           TaskThread(
-            sessionKey: 'draft:legacy-1',
+            threadId: 'draft:legacy-1',
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'draft:legacy-1',
+              workspaceKind: WorkspaceKind.remoteFs,
+              workspacePath: '/owners/remote/user/legacy/threads/draft:legacy-1',
+              displayPath:
+                  '/owners/remote/user/legacy/threads/draft:legacy-1',
+              writable: true,
+            ),
             title: 'Legacy thread',
             archived: false,
-            executionTarget: AssistantExecutionTarget.local,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.gatewayLocal,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
             messages: <GatewayChatMessage>[
               GatewayChatMessage(
@@ -255,33 +268,68 @@ void registerSecureConfigStoreSuiteCompatibilityTestsInternal() {
       expect(decoded.lifecycleState.status, 'ready');
     });
 
-    test('TaskThread defaults lifecycle status to needs_workspace', () {
+    test('TaskThread.toJson omits legacy projection fields', () {
+      final record = TaskThread(
+        threadId: 'thread-1',
+        title: 'Thread 1',
+        workspaceBinding: const WorkspaceBinding(
+          workspaceId: 'workspace-1',
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: '/tmp/workspace',
+          displayPath: '/tmp/workspace',
+          writable: true,
+        ),
+        executionBinding: const ExecutionBinding(
+          executionMode: ThreadExecutionMode.localAgent,
+          executorId: 'auto',
+          providerId: 'claude',
+          endpointId: '',
+        ),
+        contextState: const ThreadContextState(
+          messages: <GatewayChatMessage>[],
+          selectedModelId: 'gpt-5.4',
+          selectedSkillKeys: <String>[],
+          importedSkills: <AssistantThreadSkillEntry>[],
+          permissionLevel: AssistantPermissionLevel.defaultAccess,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          latestResolvedRuntimeModel: '',
+        ),
+        lifecycleState: const ThreadLifecycleState(
+          archived: false,
+          status: 'ready',
+          lastRunAtMs: null,
+          lastResultCode: null,
+        ),
+        createdAtMs: 1700000000000,
+        updatedAtMs: 1700000001000,
+      );
+
+      final json = record.toJson();
+
+      expect(json.containsKey('workspaceRef'), isFalse);
+      expect(json.containsKey('workspaceRefKind'), isFalse);
+      expect(json.containsKey('executionTarget'), isFalse);
+      expect(json.containsKey('singleAgentProvider'), isFalse);
+    });
+
+    test('TaskThread.fromJson reads legacy workspace and execution fields', () {
       final decoded = TaskThread.fromJson(<String, dynamic>{
         'schemaVersion': taskThreadSchemaVersion,
         'threadId': 'thread-legacy',
-        'title': 'Needs Workspace',
+        'title': 'Legacy Thread',
         'ownerScope': const <String, Object?>{
           'realm': 'local',
           'subjectType': 'user',
           'subjectId': 'device-1',
           'displayName': 'device-1',
         },
-        'workspaceBinding': const <String, Object?>{
-          'workspaceId': 'thread-legacy',
-          'workspaceKind': 'localFs',
-          'workspacePath': '',
-          'displayPath': '',
-          'writable': true,
-        },
-        'executionBinding': const <String, Object?>{
-          'executionMode': 'localAgent',
-          'executorId': 'auto',
-          'providerId': 'auto',
-          'endpointId': '',
-        },
+        'workspaceRef': '/legacy/workspace',
+        'workspaceRefKind': 'remotePath',
+        'executionTarget': 'remote',
+        'singleAgentProvider': 'claude',
         'contextState': const <String, Object?>{
           'messages': <Object>[],
-          'selectedModelId': '',
+          'selectedModelId': 'gpt-5.4',
           'selectedSkillKeys': <Object>[],
           'importedSkills': <Object>[],
           'permissionLevel': 'defaultAccess',
@@ -290,17 +338,68 @@ void registerSecureConfigStoreSuiteCompatibilityTestsInternal() {
         },
         'lifecycleState': const <String, Object?>{
           'archived': false,
-          'status': 'needs_workspace',
+          'status': 'ready',
           'lastRunAtMs': null,
           'lastResultCode': null,
         },
         'createdAtMs': 1700000000000,
-        'updatedAtMs': 1700000000000,
+        'updatedAtMs': 1700000001000,
       });
 
-      expect(decoded.workspaceRef, isEmpty);
-      expect(decoded.workspaceKind, WorkspaceKind.localFs);
-      expect(decoded.lifecycleState.status, 'needs_workspace');
+      expect(decoded.workspaceBinding.workspacePath, '/legacy/workspace');
+      expect(decoded.workspaceBinding.workspaceKind, WorkspaceKind.remoteFs);
+      expect(
+        decoded.executionBinding.executionMode,
+        ThreadExecutionMode.gatewayRemote,
+      );
+      expect(decoded.executionBinding.providerId, 'claude');
+    });
+
+    test('TaskThread rejects persisted records without a complete binding', () {
+      expect(
+        () => TaskThread.fromJson(<String, dynamic>{
+          'schemaVersion': taskThreadSchemaVersion,
+          'threadId': 'thread-legacy',
+          'title': 'Needs Workspace',
+          'ownerScope': const <String, Object?>{
+            'realm': 'local',
+            'subjectType': 'user',
+            'subjectId': 'device-1',
+            'displayName': 'device-1',
+          },
+          'workspaceBinding': const <String, Object?>{
+            'workspaceId': 'thread-legacy',
+            'workspaceKind': 'localFs',
+            'workspacePath': '',
+            'displayPath': '',
+            'writable': true,
+          },
+          'executionBinding': const <String, Object?>{
+            'executionMode': 'localAgent',
+            'executorId': 'auto',
+            'providerId': 'auto',
+            'endpointId': '',
+          },
+          'contextState': const <String, Object?>{
+            'messages': <Object>[],
+            'selectedModelId': '',
+            'selectedSkillKeys': <Object>[],
+            'importedSkills': <Object>[],
+            'permissionLevel': 'defaultAccess',
+            'messageViewMode': 'rendered',
+            'latestResolvedRuntimeModel': '',
+          },
+          'lifecycleState': const <String, Object?>{
+            'archived': false,
+            'status': 'ready',
+            'lastRunAtMs': null,
+            'lastResultCode': null,
+          },
+          'createdAtMs': 1700000000000,
+          'updatedAtMs': 1700000000000,
+        }),
+        throwsFormatException,
+      );
     });
   });
 }

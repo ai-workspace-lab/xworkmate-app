@@ -109,9 +109,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       executionTarget: executionTarget,
       singleAgentProvider: controller.currentSingleAgentProvider,
       permissionLevel: settings.assistantPermissionLevel,
-      workspacePath: controller.assistantWorkspacePathForSession(
-        controller.currentSessionKey,
-      ),
     );
 
     setState(() {
@@ -326,7 +323,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     required AssistantExecutionTarget executionTarget,
     required SingleAgentProvider singleAgentProvider,
     required AssistantPermissionLevel permissionLevel,
-    required String workspacePath,
   }) {
     final attachmentBlock = attachmentNames.isEmpty
         ? ''
@@ -334,12 +330,10 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     final skillBlock = selectedSkillLabels.isEmpty
         ? ''
         : 'Preferred skills:\n${selectedSkillLabels.map((name) => '- $name').join('\n')}\n\n';
-    final targetRoot = workspacePath.trim();
     final executionContext =
         'Execution context:\n'
         '- target: ${executionTarget.promptValue}\n'
         '${executionTarget == AssistantExecutionTarget.singleAgent ? '- provider: ${singleAgentProvider.providerId}\n' : ''}'
-        '- workspace_root: ${targetRoot.isEmpty ? 'not-set' : targetRoot}\n'
         '- permission: ${permissionLevel.promptValue}\n\n';
 
     return switch (mode) {

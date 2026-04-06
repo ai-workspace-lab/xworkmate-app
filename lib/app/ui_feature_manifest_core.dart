@@ -64,6 +64,7 @@ abstract final class UiFeatureKeys {
   static const assistantFileAttachments = 'assistant.file_attachments';
   static const assistantMultiAgent = 'assistant.multi_agent';
   static const assistantLocalRuntime = 'assistant.local_runtime';
+  static const assistantTaskDialogModeAuto = 'assistant.task_dialog_mode_auto';
 
   static const settingsGeneral = 'settings.general';
   static const settingsWorkspace = 'settings.workspace';
@@ -482,6 +483,10 @@ class UiFeatureAccess {
       platform == UiFeaturePlatform.desktop &&
       isEnabledPath(UiFeatureKeys.assistantLocalRuntime);
 
+  bool get supportsTaskDialogModeAuto =>
+      platform != UiFeaturePlatform.desktop ||
+      isEnabledPath(UiFeatureKeys.assistantTaskDialogModeAuto);
+
   bool get supportsDiagnostics =>
       isEnabledPath(UiFeatureKeys.settingsDiagnostics);
 
@@ -521,7 +526,7 @@ class UiFeatureAccess {
 
   List<AssistantExecutionTarget> get availableExecutionTargets {
     final targets = <AssistantExecutionTarget>[];
-    if (platform != UiFeaturePlatform.mobile) {
+    if (platform != UiFeaturePlatform.mobile && supportsTaskDialogModeAuto) {
       targets.add(AssistantExecutionTarget.auto);
     }
     if (supportsDirectAi) {

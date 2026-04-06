@@ -28,7 +28,7 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
-import '../runtime/go_agent_core_client.dart';
+import '../runtime/go_task_service_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
@@ -249,13 +249,6 @@ extension AppControllerDesktopThreadActions on AppController {
   }) async {
     final currentSessionKey = sessionsControllerInternal.currentSessionKey;
     final currentTarget = assistantExecutionTargetForSession(currentSessionKey);
-    if (currentTarget == AssistantExecutionTarget.singleAgent ||
-        currentTarget == AssistantExecutionTarget.auto) {
-      await bootstrapThreadWorkspaceFromExecutionContextInternal(
-        currentSessionKey,
-        message,
-      );
-    }
     await ensureDesktopTaskThreadBindingInternal(
       currentSessionKey,
       executionTarget: currentTarget,
@@ -263,13 +256,6 @@ extension AppControllerDesktopThreadActions on AppController {
     var workspacePath = assistantWorkspacePathForSession(
       currentSessionKey,
     ).trim();
-    if (workspacePath.isEmpty) {
-      await tryBindWorkspaceForOnlyChatFallbackInternal(
-        currentSessionKey,
-        currentTarget,
-      );
-      workspacePath = assistantWorkspacePathForSession(currentSessionKey).trim();
-    }
     if (workspacePath.isEmpty) {
       final error = StateError(
         appText(
@@ -327,8 +313,8 @@ extension AppControllerDesktopThreadActions on AppController {
         try {
           final dispatch = await codeAgentNodeOrchestratorInternal
               .buildGatewayDispatch(buildCodeAgentNodeStateInternal());
-          final result = await goAgentCoreClientInternal.executeSession(
-            GoAgentCoreSessionRequest(
+          final result = await goTaskServiceClientInternal.executeTask(
+            GoTaskServiceRequest(
               sessionId: sessionKey,
               threadId: sessionKey,
               target: currentTarget,
@@ -345,7 +331,7 @@ extension AppControllerDesktopThreadActions on AppController {
               aiGatewayApiKey: await loadAiGatewayApiKey(),
               agentId: dispatch.agentId ?? '',
               metadata: dispatch.metadata,
-              routing: buildGoAgentCoreRoutingForSessionInternal(sessionKey),
+              routing: buildExternalAcpRoutingForSessionInternal(sessionKey),
             ),
             onUpdate: (update) {
               if (update.isDelta) {
@@ -355,14 +341,26 @@ extension AppControllerDesktopThreadActions on AppController {
             },
           );
           clearAiGatewayStreamingTextInternal(sessionKey);
+          upsertTaskThreadInternal(
+            sessionKey,
+            gatewayEntryState: goTaskServiceGatewayEntryState(
+              requestedTarget: currentTarget,
+              result: result,
+            ),
+            latestResolvedRuntimeModel: result.resolvedModel.trim(),
+            lifecycleStatus: 'ready',
+            lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            lastResultCode: result.success ? 'success' : 'error',
+            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          );
           if (!result.success) {
             appendLocalSessionMessageInternal(
               sessionKey,
               assistantErrorMessageInternal(
                 result.errorMessage.trim().isEmpty
                     ? appText(
-                        'Go Agent-core 执行失败。',
-                        'Go Agent-core execution failed.',
+                        'GoTaskService 执行失败。',
+                        'GoTaskService execution failed.',
                       )
                     : result.errorMessage,
               ),
@@ -376,8 +374,8 @@ extension AppControllerDesktopThreadActions on AppController {
               sessionKey,
               assistantErrorMessageInternal(
                 appText(
-                  'Go Agent-core 没有返回可显示的输出。',
-                  'Go Agent-core returned no displayable output.',
+                  'GoTaskService 没有返回可显示的输出。',
+                  'GoTaskService returned no displayable output.',
                 ),
               ),
               persistInThreadContext: true,
@@ -401,6 +399,13 @@ extension AppControllerDesktopThreadActions on AppController {
           );
         } catch (error) {
           clearAiGatewayStreamingTextInternal(sessionKey);
+          upsertTaskThreadInternal(
+            sessionKey,
+            lifecycleStatus: 'ready',
+            lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            lastResultCode: 'error',
+            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          );
           appendLocalSessionMessageInternal(
             sessionKey,
             assistantErrorMessageInternal(error.toString()),
@@ -431,6 +436,13 @@ extension AppControllerDesktopThreadActions on AppController {
         // Best effort cancellation only.
       }
       multiAgentRunPendingInternal = false;
+      upsertTaskThreadInternal(
+        sessionKey,
+        lifecycleStatus: 'ready',
+        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastResultCode: 'aborted',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
       recomputeTasksInternal();
       notifyIfActiveInternal();
       return;
@@ -440,13 +452,21 @@ extension AppControllerDesktopThreadActions on AppController {
         sessionsControllerInternal.currentSessionKey,
       );
       if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
-        await goAgentCoreClientInternal.cancelSession(
+        await goTaskServiceClientInternal.cancelTask(
+          route: GoTaskServiceRoute.externalAcpSingle,
           target: AssistantExecutionTarget.singleAgent,
           sessionId: sessionKey,
           threadId: sessionKey,
         );
         aiGatewayPendingSessionKeysInternal.remove(sessionKey);
         clearAiGatewayStreamingTextInternal(sessionKey);
+        upsertTaskThreadInternal(
+          sessionKey,
+          lifecycleStatus: 'ready',
+          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          lastResultCode: 'aborted',
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        );
         recomputeTasksInternal();
         notifyIfActiveInternal();
         return;
@@ -458,13 +478,26 @@ extension AppControllerDesktopThreadActions on AppController {
       sessionsControllerInternal.currentSessionKey,
     );
     if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
-      await goAgentCoreClientInternal.cancelSession(
+      await goTaskServiceClientInternal.cancelTask(
+        route: assistantExecutionTargetForSession(sessionKey) ==
+                AssistantExecutionTarget.singleAgent ||
+            assistantExecutionTargetForSession(sessionKey) ==
+                AssistantExecutionTarget.auto
+            ? GoTaskServiceRoute.externalAcpSingle
+            : GoTaskServiceRoute.openClawTask,
         target: assistantExecutionTargetForSession(sessionKey),
         sessionId: sessionKey,
         threadId: sessionKey,
       );
       aiGatewayPendingSessionKeysInternal.remove(sessionKey);
       clearAiGatewayStreamingTextInternal(sessionKey);
+      upsertTaskThreadInternal(
+        sessionKey,
+        lifecycleStatus: 'ready',
+        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastResultCode: 'aborted',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
       recomputeTasksInternal();
       notifyIfActiveInternal();
       return;
@@ -529,124 +562,12 @@ extension AppControllerDesktopThreadActions on AppController {
     }
   }
 
-  Future<void> bootstrapThreadWorkspaceFromExecutionContextInternal(
-    String sessionKey,
-    String message,
-  ) async {
-    final workspaceRoot = parseExecutionContextWorkspaceRootInternal(message);
-    if (workspaceRoot == null) {
-      return;
-    }
-    if (!ensureLocalWorkspaceDirectoryInternal(workspaceRoot)) {
-      return;
-    }
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final existing = assistantThreadRecordsInternal[normalizedSessionKey];
-    upsertTaskThreadInternal(
-      normalizedSessionKey,
-      workspaceBinding: WorkspaceBinding(
-        workspaceId: normalizedSessionKey,
-        workspaceKind: WorkspaceKind.localFs,
-        workspacePath: workspaceRoot,
-        displayPath: workspaceRoot,
-        writable: existing?.workspaceBinding.writable ?? true,
-      ),
-      lifecycleState:
-          (existing?.lifecycleState ??
-                  const ThreadLifecycleState(
-                    archived: false,
-                    status: 'ready',
-                    lastRunAtMs: null,
-                    lastResultCode: null,
-                  ))
-              .copyWith(status: 'ready'),
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
-  }
-
-  String? parseExecutionContextWorkspaceRootInternal(String message) {
-    final match = RegExp(
-      r'^\s*-\s*workspace_root\s*:\s*(.+?)\s*$',
-      multiLine: true,
-      caseSensitive: false,
-    ).firstMatch(message);
-    if (match == null) {
-      return null;
-    }
-    var value = (match.group(1) ?? '').trim();
-    if (value.isEmpty) {
-      return null;
-    }
-    if ((value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.substring(1, value.length - 1).trim();
-    }
-    final normalized = value.toLowerCase();
-    if (normalized == 'not-set' ||
-        normalized == 'unset' ||
-        normalized == 'none' ||
-        normalized == 'null' ||
-        normalized == 'n/a') {
-      return null;
-    }
-    return value.isEmpty ? null : value;
-  }
-
   Future<void> tryBindWorkspaceForOnlyChatFallbackInternal(
     String sessionKey,
     AssistantExecutionTarget currentTarget,
   ) async {
-    if (currentTarget != AssistantExecutionTarget.singleAgent &&
-        currentTarget != AssistantExecutionTarget.auto) {
-      return;
-    }
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
+    throw StateError(
+      'tryBindWorkspaceForOnlyChatFallbackInternal is no longer supported.',
     );
-    if (!singleAgentUsesAiChatFallbackForSession(normalizedSessionKey)) {
-      return;
-    }
-    if (assistantWorkspacePathForSession(normalizedSessionKey).trim().isNotEmpty) {
-      return;
-    }
-
-    final candidateRoots = <String>{
-      settings.workspacePath.trim(),
-      Directory.current.path.trim(),
-      settings.remoteProjectRoot.trim(),
-    }.where((item) => item.isNotEmpty);
-    for (final root in candidateRoots) {
-      final threadWorkspace =
-          '${trimTrailingPathSeparatorInternal(root)}/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
-      if (!ensureLocalWorkspaceDirectoryInternal(threadWorkspace)) {
-        continue;
-      }
-      final existing = assistantThreadRecordsInternal[normalizedSessionKey];
-      upsertTaskThreadInternal(
-        normalizedSessionKey,
-        workspaceBinding: WorkspaceBinding(
-          workspaceId: normalizedSessionKey,
-          workspaceKind: WorkspaceKind.localFs,
-          workspacePath: threadWorkspace,
-          displayPath: threadWorkspace,
-          writable: existing?.workspaceBinding.writable ?? true,
-        ),
-        lifecycleState:
-            (existing?.lifecycleState ??
-                    const ThreadLifecycleState(
-                      archived: false,
-                      status: 'ready',
-                      lastRunAtMs: null,
-                      lastResultCode: null,
-                    ))
-                .copyWith(status: 'ready'),
-        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      );
-      await flushAssistantThreadPersistenceInternal();
-      recomputeTasksInternal();
-      return;
-    }
   }
 }

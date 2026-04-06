@@ -26,6 +26,7 @@ func TestResolveExplicitTargetOverridesAuto(t *testing.T) {
 		ExplicitExecutionTarget: "singleAgent",
 		ExplicitProviderID:      "codex",
 		ExplicitModel:           "gpt-5.4",
+		AvailableProviders:      []string{"codex"},
 	})
 
 	if result.ResolvedExecutionTarget != ExecutionTargetSingleAgent {
@@ -36,6 +37,28 @@ func TestResolveExplicitTargetOverridesAuto(t *testing.T) {
 	}
 	if result.ResolvedProviderID != "codex" || result.ResolvedModel != "gpt-5.4" {
 		t.Fatalf("unexpected explicit provider/model: %#v", result)
+	}
+}
+
+func TestResolveExplicitProviderRequiresAvailability(t *testing.T) {
+	resolver := Resolver{
+		SkillFinder:    skills.StaticFinder{},
+		SkillInstaller: nil,
+		MemoryService:  memory.Service{},
+	}
+
+	result := resolver.Resolve(Request{
+		Prompt:                  "search the web and summarize results",
+		RoutingMode:             RoutingModeExplicit,
+		ExplicitExecutionTarget: "singleAgent",
+		ExplicitProviderID:      "codex",
+	})
+
+	if !result.Unavailable {
+		t.Fatalf("expected explicit provider to be unavailable without synced catalog, got %#v", result)
+	}
+	if result.UnavailableCode != "PROVIDER_UNAVAILABLE" {
+		t.Fatalf("expected PROVIDER_UNAVAILABLE, got %#v", result)
 	}
 }
 

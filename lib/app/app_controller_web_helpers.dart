@@ -102,22 +102,36 @@ extension AppControllerWebHelpers on AppController {
   }
 
   TaskThread sanitizeRecordInternal(TaskThread record) {
-    final target =
-        sanitizeTargetInternal(record.executionTarget) ??
+    final target = sanitizeTargetInternal(
+      assistantExecutionTargetFromExecutionMode(
+        record.executionBinding.executionMode,
+      ),
+    ) ??
         AssistantExecutionTarget.singleAgent;
+    final workspaceBinding = record.workspaceBinding;
+    if (!workspaceBinding.isComplete) {
+      throw StateError(
+        'TaskThread ${record.threadId} is missing a complete workspaceBinding.',
+      );
+    }
+    final workspacePath = workspaceBinding.workspacePath.trim();
     return record.copyWith(
-      executionTarget: target,
       title: record.title.trim().isEmpty
           ? appText('新对话', 'New conversation')
           : record.title.trim(),
-      workspacePath: record.workspacePath.trim(),
-      displayPath: record.displayPath.trim().isEmpty
-          ? record.workspacePath.trim()
-          : record.displayPath.trim(),
-      workspaceKind: WorkspaceKind.remoteFs,
-      lifecycleStatus: record.workspacePath.trim().isEmpty
-          ? 'needs_workspace'
-          : 'ready',
+      workspaceBinding: WorkspaceBinding(
+        workspaceId: record.threadId,
+        workspaceKind: workspaceBinding.workspaceKind,
+        workspacePath: workspacePath,
+        displayPath: record.displayPath.trim().isEmpty
+            ? workspacePath
+            : record.displayPath.trim(),
+        writable: workspaceBinding.writable,
+      ),
+      executionBinding: record.executionBinding.copyWith(
+        executionMode: threadExecutionModeFromAssistantExecutionTarget(target),
+      ),
+      lifecycleState: record.lifecycleState.copyWith(status: 'ready'),
     );
   }
 
@@ -146,6 +160,8 @@ extension AppControllerWebHelpers on AppController {
       AssistantExecutionTarget.remote => 'remote',
     };
     final threadId = '$prefix:$timestamp';
+    final workspacePath =
+        '/owners/${ThreadRealm.remote.name}/${ThreadSubjectType.user.name}/threads/$threadId';
     return TaskThread(
       threadId: threadId,
       createdAtMs: timestamp.toDouble(),
@@ -160,8 +176,8 @@ extension AppControllerWebHelpers on AppController {
       workspaceBinding: WorkspaceBinding(
         workspaceId: threadId,
         workspaceKind: WorkspaceKind.remoteFs,
-        workspacePath: '',
-        displayPath: '',
+        workspacePath: workspacePath,
+        displayPath: workspacePath,
         writable: true,
       ),
       executionBinding: ExecutionBinding(
@@ -188,7 +204,7 @@ extension AppControllerWebHelpers on AppController {
       ),
       lifecycleState: const ThreadLifecycleState(
         archived: false,
-        status: 'needs_workspace',
+        status: 'ready',
         lastRunAtMs: null,
         lastResultCode: null,
       ),
@@ -269,7 +285,7 @@ extension AppControllerWebHelpers on AppController {
     AssistantExecutionTarget? executionTarget,
   }) async {
     final key = normalizedSessionKeyInternal(sessionKey);
-    final existing = threadRecordsInternal[key];
+    final existing = taskThreadForSessionInternal(key);
     final resolvedTarget =
         sanitizeTargetInternal(executionTarget) ??
         assistantExecutionTargetForSession(key);
@@ -279,15 +295,17 @@ extension AppControllerWebHelpers on AppController {
       ownerScope: ownerScope,
       existingBinding: existing?.workspaceBinding,
     );
-    threadRecordsInternal[key] =
+    threadRepositoryInternal.replace(
         (existing ?? newRecordInternal(target: resolvedTarget)).copyWith(
-          sessionKey: key,
+          threadId: key,
           ownerScope: ownerScope,
           workspaceBinding: workspaceBinding,
           executionBinding: buildWebExecutionBindingInternal(
             executionTarget: resolvedTarget,
             singleAgentProvider:
-                existing?.singleAgentProvider ?? SingleAgentProvider.auto,
+                SingleAgentProviderCopy.fromJsonValue(
+                  existing?.executionBinding.providerId ?? '',
+                ),
             existingBinding: existing?.executionBinding,
           ),
           lifecycleState:
@@ -298,14 +316,10 @@ extension AppControllerWebHelpers on AppController {
                         lastRunAtMs: null,
                         lastResultCode: null,
                       ))
-                  .copyWith(
-                    status: workspaceBinding.workspacePath.trim().isEmpty
-                        ? 'needs_workspace'
-                        : 'ready',
-                  ),
-          executionTarget: resolvedTarget,
+                  .copyWith(status: 'ready'),
           updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        );
+        ),
+    );
   }
 
   void appendAssistantMessageInternal({
@@ -355,6 +369,9 @@ extension AppControllerWebHelpers on AppController {
     if (sessionKey.isEmpty) {
       return;
     }
+    if (goTaskServiceManagedRelaySessionsInternal.contains(sessionKey)) {
+      return;
+    }
     final state = payload['state']?.toString().trim() ?? '';
     final message = castMapInternal(payload['message']);
     final text = extractMessageTextInternal(message);
@@ -367,6 +384,13 @@ extension AppControllerWebHelpers on AppController {
         text: text,
         error: false,
       );
+      upsertThreadRecordInternal(
+        sessionKey,
+        lifecycleStatus: 'ready',
+        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastResultCode: 'success',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
     }
     if (state == 'final' || state == 'aborted' || state == 'error') {
       pendingSessionKeysInternal.remove(sessionKey);
@@ -377,6 +401,17 @@ extension AppControllerWebHelpers on AppController {
           error: true,
         );
       }
+      upsertThreadRecordInternal(
+        sessionKey,
+        lifecycleStatus: 'ready',
+        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastResultCode: switch (state) {
+          'aborted' => 'aborted',
+          'error' => 'error',
+          _ => 'success',
+        },
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
       clearStreamingTextInternal(sessionKey);
       unawaited(refreshRelaySessions());
       unawaited(refreshRelayHistory(sessionKey: sessionKey));
@@ -453,40 +488,78 @@ extension AppControllerWebHelpers on AppController {
     ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
+    String? latestResolvedRuntimeModel,
     String? workspacePath,
     WorkspaceKind? workspaceKind,
+    String? lifecycleStatus,
+    double? lastRunAtMs,
+    String? lastResultCode,
   }) {
     final key = normalizedSessionKeyInternal(sessionKey);
     final resolvedTarget =
         sanitizeTargetInternal(executionTarget) ??
         assistantExecutionTargetForSession(key);
     final existing =
-        threadRecordsInternal[key] ?? newRecordInternal(target: resolvedTarget);
-    threadRecordsInternal[key] = existing.copyWith(
-      threadId: key,
-      messages: messages ?? existing.messages,
-      updatedAtMs: updatedAtMs ?? existing.updatedAtMs,
-      title: title ?? existing.title,
-      archived: archived ?? existing.archived,
-      executionTarget: resolvedTarget,
-      messageViewMode: messageViewMode ?? existing.messageViewMode,
-      importedSkills: importedSkills ?? existing.importedSkills,
-      selectedSkillKeys: selectedSkillKeys ?? existing.selectedSkillKeys,
-      assistantModelId: assistantModelId ?? existing.assistantModelId,
-      singleAgentProvider: singleAgentProvider ?? existing.singleAgentProvider,
-      executionTargetSource:
-          executionTargetSource ??
-          existing.executionBinding.executionModeSource,
-      singleAgentProviderSource:
-          singleAgentProviderSource ?? existing.executionBinding.providerSource,
-      assistantModelSource:
-          assistantModelSource ?? existing.contextState.selectedModelSource,
-      selectedSkillsSource:
-          selectedSkillsSource ?? existing.contextState.selectedSkillsSource,
-      gatewayEntryState: gatewayEntryState ?? existing.gatewayEntryState,
-      clearGatewayEntryState: clearGatewayEntryState,
-      workspacePath: workspacePath ?? existing.workspacePath,
-      workspaceKind: workspaceKind ?? existing.workspaceKind,
+        taskThreadForSessionInternal(key) ?? newRecordInternal(target: resolvedTarget);
+    final nextWorkspaceBinding = existing.workspaceBinding;
+    if (!nextWorkspaceBinding.isComplete) {
+      throw StateError(
+        'TaskThread $key is missing a complete workspaceBinding.',
+      );
+    }
+    threadRepositoryInternal.replace(
+      existing.copyWith(
+        threadId: key,
+        messages: messages ?? existing.messages,
+        updatedAtMs: updatedAtMs ?? existing.updatedAtMs,
+        title: title ?? existing.title,
+        archived: archived ?? existing.archived,
+        messageViewMode: messageViewMode ?? existing.messageViewMode,
+        importedSkills: importedSkills ?? existing.importedSkills,
+        selectedSkillKeys: selectedSkillKeys ?? existing.selectedSkillKeys,
+        assistantModelId: assistantModelId ?? existing.assistantModelId,
+        assistantModelSource:
+            assistantModelSource ?? existing.contextState.selectedModelSource,
+        selectedSkillsSource:
+            selectedSkillsSource ?? existing.contextState.selectedSkillsSource,
+        latestResolvedRuntimeModel: latestResolvedRuntimeModel,
+        gatewayEntryState: gatewayEntryState ?? existing.gatewayEntryState,
+        clearGatewayEntryState: clearGatewayEntryState,
+        workspaceBinding:
+            (workspacePath != null || workspaceKind != null)
+                ? nextWorkspaceBinding.copyWith(
+                    workspacePath: workspacePath,
+                    displayPath:
+                        workspacePath ?? nextWorkspaceBinding.displayPath,
+                    workspaceKind: workspaceKind,
+                  )
+                : nextWorkspaceBinding,
+        executionBinding: existing.executionBinding.copyWith(
+          executionMode: threadExecutionModeFromAssistantExecutionTarget(
+            resolvedTarget,
+          ),
+          executorId:
+              (singleAgentProvider ?? SingleAgentProviderCopy.fromJsonValue(
+                    existing.executionBinding.providerId,
+                  ))
+                  .providerId,
+          providerId:
+              (singleAgentProvider ?? SingleAgentProviderCopy.fromJsonValue(
+                    existing.executionBinding.providerId,
+                  ))
+                  .providerId,
+          executionModeSource:
+              executionTargetSource ??
+              existing.executionBinding.executionModeSource,
+          providerSource:
+              singleAgentProviderSource ?? existing.executionBinding.providerSource,
+        ),
+        lifecycleState: existing.lifecycleState.copyWith(
+          status: lifecycleStatus ?? 'ready',
+          lastRunAtMs: lastRunAtMs,
+          lastResultCode: lastResultCode,
+        ),
+      ),
     );
     recomputeDerivedWorkspaceStateInternal();
   }
@@ -787,7 +860,7 @@ extension AppControllerWebHelpers on AppController {
   }
 
   Future<void> persistThreadsInternal() async {
-    final records = threadRecordsInternal.values.toList(growable: false);
+    final records = threadRepositoryInternal.snapshot();
     await browserSessionRepositoryInternal.saveThreadRecords(records);
     final invalidRemoteConfigMessage =
         invalidRemoteSessionConfigMessageInternal();

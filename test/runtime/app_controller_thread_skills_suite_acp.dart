@@ -89,15 +89,25 @@ void registerThreadSkillsAcpTests() {
         );
         await store.saveTaskThreads(<TaskThread>[
           TaskThread(
-            sessionKey: 'main',
+            threadId: 'main',
+            workspaceBinding: WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: workspaceRoot.path,
+              displayPath: workspaceRoot.path,
+              writable: true,
+            ),
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,
             title: '',
             archived: false,
-            executionTarget: AssistantExecutionTarget.singleAgent,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.localAgent,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
-            workspaceRef: workspaceRoot.path,
-            workspaceRefKind: WorkspaceRefKind.localPath,
           ),
         ]);
 
@@ -281,15 +291,25 @@ void registerThreadSkillsAcpTests() {
         );
         await store.saveTaskThreads(<TaskThread>[
           TaskThread(
-            sessionKey: 'main',
+            threadId: 'main',
+            workspaceBinding: WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: '${tempDirectory.path}/missing-workspace',
+              displayPath: '${tempDirectory.path}/missing-workspace',
+              writable: true,
+            ),
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,
             title: '',
             archived: false,
-            executionTarget: AssistantExecutionTarget.singleAgent,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.localAgent,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
-            workspaceRef: '${tempDirectory.path}/missing-workspace',
-            workspaceRefKind: WorkspaceRefKind.localPath,
           ),
         ]);
 

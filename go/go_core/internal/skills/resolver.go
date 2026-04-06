@@ -2,6 +2,7 @@ package skills
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -25,6 +26,12 @@ type ResolveRequest struct {
 	ExplicitSkills    []string
 	AvailableSkills   []Candidate
 	AllowSkillInstall bool
+	InstallApproval   InstallApproval
+}
+
+type InstallApproval struct {
+	RequestID         string
+	ApprovedSkillKeys []string
 }
 
 type ResolveResult struct {
@@ -32,6 +39,7 @@ type ResolveResult struct {
 	Candidates     []Candidate
 	Source         string
 	NeedsInstall   bool
+	InstallRequestID string
 }
 
 type StaticFinder struct{}
@@ -97,8 +105,23 @@ func Resolve(req ResolveRequest, finder Finder, installer Installer) ResolveResu
 		}
 	}
 
-	if req.AllowSkillInstall && installer != nil && len(uninstalled) > 0 {
-		installedCandidates, err := installer.Install(uninstalled)
+	installRequestID := buildInstallRequestID(uninstalled)
+	if shouldInstallApprovedCandidates(req, installRequestID) &&
+		installer != nil &&
+		len(uninstalled) > 0 {
+		approvedCandidates := filterApprovedCandidates(
+			uninstalled,
+			req.InstallApproval.ApprovedSkillKeys,
+		)
+		if len(approvedCandidates) == 0 {
+			return ResolveResult{
+				Candidates:       fallback,
+				Source:           "find_skills",
+				NeedsInstall:     true,
+				InstallRequestID: installRequestID,
+			}
+		}
+		installedCandidates, err := installer.Install(approvedCandidates)
 		if err == nil && len(installedCandidates) > 0 {
 			mergedAvailable := dedupeCandidates(
 				append(append([]Candidate(nil), available...), installedCandidates...),
@@ -116,10 +139,69 @@ func Resolve(req ResolveRequest, finder Finder, installer Installer) ResolveResu
 	}
 
 	return ResolveResult{
-		Candidates:   fallback,
-		Source:       "find_skills",
-		NeedsInstall: len(uninstalled) > 0,
+		Candidates:        fallback,
+		Source:            "find_skills",
+		NeedsInstall:      len(uninstalled) > 0,
+		InstallRequestID:  installRequestID,
 	}
+}
+
+func shouldInstallApprovedCandidates(
+	req ResolveRequest,
+	expectedRequestID string,
+) bool {
+	if !req.AllowSkillInstall || expectedRequestID == "" {
+		return false
+	}
+	if strings.TrimSpace(req.InstallApproval.RequestID) != expectedRequestID {
+		return false
+	}
+	return len(dedupeStrings(req.InstallApproval.ApprovedSkillKeys)) > 0
+}
+
+func filterApprovedCandidates(
+	candidates []Candidate,
+	approvedSkillKeys []string,
+) []Candidate {
+	if len(candidates) == 0 {
+		return nil
+	}
+	approved := make(map[string]struct{}, len(approvedSkillKeys))
+	for _, key := range approvedSkillKeys {
+		normalized := normalize(key)
+		if normalized == "" {
+			continue
+		}
+		approved[normalized] = struct{}{}
+	}
+	filtered := make([]Candidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		if _, ok := approved[normalize(candidate.ID)]; ok {
+			filtered = append(filtered, candidate)
+		}
+	}
+	return filtered
+}
+
+func buildInstallRequestID(candidates []Candidate) string {
+	if len(candidates) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		key := normalize(candidate.ID)
+		if key == "" {
+			key = normalize(candidate.Label)
+		}
+		if key != "" {
+			keys = append(keys, key)
+		}
+	}
+	if len(keys) == 0 {
+		return ""
+	}
+	sort.Strings(keys)
+	return "skill-install:" + strings.Join(keys, ",")
 }
 
 type builtinSkill struct {

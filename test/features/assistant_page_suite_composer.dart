@@ -26,6 +26,14 @@ import 'assistant_page_suite_core.dart';
 import 'assistant_page_suite_support.dart';
 
 void registerAssistantPageSuiteComposerTestsInternal() {
+  Finder executionTargetMenuItemInternal(AssistantExecutionTarget target) {
+    return find.byWidgetPredicate(
+      (widget) =>
+          widget is PopupMenuItem<AssistantExecutionTarget> &&
+          widget.value == target,
+    );
+  }
+
   testWidgets(
     'AssistantPage empty state stays above the composer instead of centering over the workspace',
     (WidgetTester tester) async {
@@ -161,7 +169,10 @@ void registerAssistantPageSuiteComposerTestsInternal() {
     );
     await pumpForUiSyncInternal(tester);
 
-    expect(find.text('Auto'), findsWidgets);
+    expect(
+      executionTargetMenuItemInternal(AssistantExecutionTarget.auto),
+      findsNothing,
+    );
     expect(find.text('单机智能体'), findsWidgets);
     expect(find.text('本地 OpenClaw Gateway'), findsWidgets);
     expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
@@ -254,26 +265,46 @@ void registerAssistantPageSuiteComposerTestsInternal() {
         ).create(recursive: true);
         await store.saveTaskThreads(<TaskThread>[
           TaskThread(
-            sessionKey: 'main',
+            threadId: 'main',
+            workspaceBinding: WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: '${tempDirectory.path}/thread-main',
+              displayPath: '${tempDirectory.path}/thread-main',
+              writable: true,
+            ),
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,
             title: 'Main',
             archived: false,
-            executionTarget: AssistantExecutionTarget.singleAgent,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.localAgent,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
-            workspaceRef: '${tempDirectory.path}/thread-main',
-            workspaceRefKind: WorkspaceRefKind.localPath,
           ),
           TaskThread(
-            sessionKey: 'draft:artifact-thread',
+            threadId: 'draft:artifact-thread',
+            workspaceBinding: WorkspaceBinding(
+              workspaceId: 'draft:artifact-thread',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: '${tempDirectory.path}/thread-task',
+              displayPath: '${tempDirectory.path}/thread-task',
+              writable: true,
+            ),
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 2,
             title: 'Artifact Thread',
             archived: false,
-            executionTarget: AssistantExecutionTarget.singleAgent,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.localAgent,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
-            workspaceRef: '${tempDirectory.path}/thread-task',
-            workspaceRefKind: WorkspaceRefKind.localPath,
           ),
         ]);
         controller = CaptureSendAppControllerInternal(
@@ -596,6 +627,69 @@ void registerAssistantPageSuiteComposerTestsInternal() {
     );
   });
 
+  testWidgets(
+    'AssistantPage hides Auto execution target when desktop flag is disabled',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
+
+      await pumpPage(
+        tester,
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+        platform: TargetPlatform.macOS,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('assistant-execution-target-button')),
+      );
+      await pumpForUiSyncInternal(tester);
+
+      expect(
+        controller.assistantExecutionTarget,
+        isNot(AssistantExecutionTarget.auto),
+      );
+      expect(
+        executionTargetMenuItemInternal(AssistantExecutionTarget.auto),
+        findsNothing,
+      );
+      expect(find.text('单机智能体'), findsWidgets);
+      expect(find.text('本地 OpenClaw Gateway'), findsWidgets);
+      expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'AssistantPage shows Auto execution target when desktop flag is enabled',
+    (WidgetTester tester) async {
+      final manifest = UiFeatureManifest.fallback().copyWithFeature(
+        platform: UiFeaturePlatform.desktop,
+        module: 'assistant',
+        feature: 'task_dialog_mode_auto',
+        enabled: true,
+        releaseTier: UiFeatureReleaseTier.stable,
+      );
+      final controller = await createTestController(
+        tester,
+        uiFeatureManifest: manifest,
+      );
+
+      await pumpPage(
+        tester,
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+        platform: TargetPlatform.macOS,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('assistant-execution-target-button')),
+      );
+      await pumpForUiSyncInternal(tester);
+
+      expect(
+        executionTargetMenuItemInternal(AssistantExecutionTarget.auto),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('AssistantPage composer input area can be resized vertically', (
     WidgetTester tester,
   ) async {
@@ -823,10 +917,22 @@ void registerAssistantPageSuiteComposerTestsInternal() {
       final controller = await createControllerWithThreadRecordsInternal(
         records: <TaskThread>[
           TaskThread(
-            sessionKey: 'main',
+            threadId: 'main',
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: '/tmp/main-thread',
+              displayPath: '/tmp/main-thread',
+              writable: true,
+            ),
             title: '研发任务',
             archived: false,
-            executionTarget: AssistantExecutionTarget.singleAgent,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.localAgent,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.raw,
             updatedAtMs: 1700000000000,
             messages: <GatewayChatMessage>[
@@ -842,7 +948,6 @@ void registerAssistantPageSuiteComposerTestsInternal() {
                     'Execution context:\n'
                     '- target: single-agent\n'
                     '- provider: codex\n'
-                    '- workspace_root: /opt/data/workspace\n'
                     '- permission: full-access\n\n'
                     '结合项目代码制作一份用户手册',
                 timestampMs: 1700000000000,
@@ -937,10 +1042,22 @@ void registerAssistantPageSuiteComposerTestsInternal() {
     final controller = await createControllerWithThreadRecordsInternal(
       records: <TaskThread>[
         TaskThread(
-          sessionKey: 'main',
+          threadId: 'main',
+          workspaceBinding: const WorkspaceBinding(
+            workspaceId: 'main',
+            workspaceKind: WorkspaceKind.localFs,
+            workspacePath: '/tmp/main-thread',
+            displayPath: '/tmp/main-thread',
+            writable: true,
+          ),
           title: '研发任务',
           archived: false,
-          executionTarget: AssistantExecutionTarget.singleAgent,
+          executionBinding: const ExecutionBinding(
+            executionMode: ThreadExecutionMode.localAgent,
+            executorId: 'auto',
+            providerId: 'auto',
+            endpointId: '',
+          ),
           messageViewMode: AssistantMessageViewMode.rendered,
           updatedAtMs: 1700000000000,
           messages: <GatewayChatMessage>[

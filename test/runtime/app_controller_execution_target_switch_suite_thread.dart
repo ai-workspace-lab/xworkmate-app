@@ -398,7 +398,9 @@ void registerExecutionTargetSwitchThreadTests() {
         expect(reloadedThreads, hasLength(1));
         expect(reloadedThreads.single.sessionKey, 'main');
         expect(
-          reloadedThreads.single.executionTarget,
+          assistantExecutionTargetFromExecutionMode(
+            reloadedThreads.single.executionBinding.executionMode,
+          ),
           AssistantExecutionTarget.auto,
         );
       },
