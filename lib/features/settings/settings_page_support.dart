@@ -556,10 +556,13 @@ XWorkmate Privacy Policy
     SettingsSnapshot settings,
     GatewayConnectionProfile profile,
   ) async {
-    final nextSettings = settings.copyWithGatewayProfileAt(
-      selectedGatewayProfileIndexInternal,
-      profile,
-    );
+    final executionTarget =
+        selectedGatewayProfileIndexInternal == kGatewayLocalProfileIndex
+        ? AssistantExecutionTarget.local
+        : AssistantExecutionTarget.remote;
+    final nextSettings = settings
+        .copyWithGatewayProfileAt(selectedGatewayProfileIndexInternal, profile)
+        .markGatewayTargetSaved(executionTarget);
     await saveSettingsInternal(controller, nextSettings);
     if (!mounted) {
       return;
