@@ -210,13 +210,10 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
     );
 
     test(
-      'AppController updates the current thread workspace from execution context for local single-agent threads',
+      'AppController executes local single-agent threads from the bound workspace path',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
-          'xworkmate-single-agent-workspace-bootstrap-',
-        );
-        final workspaceRoot = Directory(
-          '${tempDirectory.path}/thread-workspace',
+          'xworkmate-single-agent-bound-workspace-',
         );
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
         await store.initialize();
@@ -266,34 +263,27 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
 
         final initialWorkspacePath = controller
             .assistantWorkspacePathForSession(controller.currentSessionKey);
-        expect(initialWorkspacePath, isNot(workspaceRoot.path));
+        expect(initialWorkspacePath, isNotEmpty);
 
-        await controller.sendChatMessage(
-          'Execution context:\n'
-          '- target: single-agent\n'
-          '- workspace_root: ${workspaceRoot.path}\n'
-          '- permission: full-access\n\n'
-          '请输出 WORKSPACE_OK',
-          thinking: 'low',
-        );
+        await controller.sendChatMessage('请输出 WORKSPACE_OK', thinking: 'low');
 
         expect(client.executeCalls, 1);
-        expect(client.lastRequest?.workingDirectory, workspaceRoot.path);
-        expect(await workspaceRoot.exists(), isTrue);
+        expect(client.lastRequest?.workingDirectory, initialWorkspacePath);
+        expect(await Directory(initialWorkspacePath).exists(), isTrue);
         expect(
           controller.assistantWorkspacePathForSession(
             controller.currentSessionKey,
           ),
-          workspaceRoot.path,
+          initialWorkspacePath,
         );
       },
     );
 
     test(
-      'AppController ignores placeholder workspace_root markers during single-agent send',
+      'AppController does not let prompt text override the bound workspace path during single-agent send',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
-          'xworkmate-single-agent-workspace-placeholder-',
+          'xworkmate-single-agent-bound-workspace-text-',
         );
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
         await store.initialize();
@@ -339,28 +329,23 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         final beforeWorkspacePath = controller.assistantWorkspacePathForSession(
           controller.currentSessionKey,
         );
-        final placeholderDir = Directory('${Directory.current.path}/not-set');
-        if (await placeholderDir.exists()) {
-          await placeholderDir.delete(recursive: true);
-        }
 
         await controller.sendChatMessage(
           'Execution context:\n'
           '- target: single-agent\n'
-          '- workspace_root: not-set\n'
           '- permission: full-access\n\n'
           '请输出 WORKSPACE_PLACEHOLDER_OK',
           thinking: 'low',
         );
 
         expect(client.executeCalls, 1);
+        expect(client.lastRequest?.workingDirectory, beforeWorkspacePath);
         expect(
           controller.assistantWorkspacePathForSession(
             controller.currentSessionKey,
           ),
           beforeWorkspacePath,
         );
-        expect(await placeholderDir.exists(), isFalse);
       },
     );
 
@@ -500,7 +485,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
     );
 
     test(
-      'AppController auto-binds a thread workspace in AI Chat fallback when workspace root is missing',
+      'AppController auto-binds a thread workspace in AI Chat fallback when the thread binding is missing',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
           'xworkmate-single-agent-fallback-missing-workspace-',
@@ -594,7 +579,12 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             updatedAtMs: 1,
             title: 'Main',
             archived: false,
-            executionTarget: AssistantExecutionTarget.singleAgent,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.localAgent,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
           ),
         ]);
@@ -715,7 +705,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
     );
 
     test(
-      'AppController keeps isolated thread workspace even when runner reports another directory',
+      'AppController rebinds local Single Agent threads to the structured resolved directory',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
           'xworkmate-single-agent-remote-thread-cwd-',
@@ -780,7 +770,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         );
         expect(
           controller.assistantWorkspacePathForSession('draft:remote-thread'),
-          '${defaultWorkspace.path}/.xworkmate/threads/draft-remote-thread',
+          '/opt/data/.xworkmate/threads/draft-remote-thread',
         );
         expect(
           controller.assistantWorkspaceKindForSession('draft:remote-thread'),
@@ -790,7 +780,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         await controller.sendChatMessage('第二次运行', thinking: 'low');
         expect(
           client.requests.last.workingDirectory,
-          '${defaultWorkspace.path}/.xworkmate/threads/draft-remote-thread',
+          '/opt/data/.xworkmate/threads/draft-remote-thread',
         );
       },
     );

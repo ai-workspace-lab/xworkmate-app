@@ -50,6 +50,24 @@ import 'app_controller_desktop_thread_sessions_collaboration_impl.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 extension AppControllerDesktopThreadSessions on AppController {
+  TaskThread? taskThreadForSessionInternal(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    return taskThreadRepositoryInternal.taskThreadForSession(
+      normalizedSessionKey,
+    );
+  }
+
+  TaskThread requireTaskThreadForSessionInternal(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    return taskThreadRepositoryInternal.requireTaskThreadForSession(
+      normalizedSessionKey,
+    );
+  }
+
   Map<String, dynamic> latestRoutingResolutionForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -146,7 +164,7 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    return assistantThreadRecordsInternal[normalizedSessionKey]
+    return taskThreadForSessionInternal(normalizedSessionKey)
             ?.workspaceBinding
             .workspacePath
             .trim() ??
@@ -154,16 +172,8 @@ extension AppControllerDesktopThreadSessions on AppController {
   }
 
   WorkspaceRefKind assistantWorkspaceKindForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final record = assistantThreadRecordsInternal[normalizedSessionKey];
-    if (record == null || !record.workspaceBinding.isComplete) {
-      throw StateError(
-        'TaskThread $normalizedSessionKey is missing a complete workspaceBinding.',
-      );
-    }
-    return record.workspaceKind == WorkspaceKind.localFs
+    final record = requireTaskThreadForSessionInternal(sessionKey);
+    return record.workspaceBinding.workspaceKind == WorkspaceKind.localFs
         ? WorkspaceRefKind.localPath
         : WorkspaceRefKind.remotePath;
   }
@@ -172,7 +182,7 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    return assistantThreadRecordsInternal[normalizedSessionKey]
+    return taskThreadForSessionInternal(normalizedSessionKey)
             ?.workspaceBinding
             .displayPath
             .trim() ??
@@ -209,10 +219,12 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final stored =
-        assistantThreadRecordsInternal[normalizedSessionKey]
-            ?.singleAgentProvider ??
-        SingleAgentProvider.auto;
+    final stored = SingleAgentProviderCopy.fromJsonValue(
+      taskThreadForSessionInternal(normalizedSessionKey)
+              ?.executionBinding
+              .providerId ??
+          '',
+    );
     return settings.resolveSingleAgentProvider(stored);
   }
 
@@ -652,9 +664,13 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    final record = taskThreadForSessionInternal(normalizedSessionKey);
     return sanitizeExecutionTargetInternal(
-      assistantThreadRecordsInternal[normalizedSessionKey]?.executionTarget ??
-          settings.assistantExecutionTarget,
+      record == null
+          ? settings.assistantExecutionTarget
+          : assistantExecutionTargetFromExecutionMode(
+              record.executionBinding.executionMode,
+            ),
     );
   }
 

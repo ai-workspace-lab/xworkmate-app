@@ -276,7 +276,7 @@ extension AppControllerDesktopThreadStorage on AppController {
   }
 
   Future<void> flushAssistantThreadPersistenceInternal() async {
-    await assistantThreadPersistQueueInternal.catchError((_) {});
+    await taskThreadRepositoryInternal.flush();
   }
 
   void appendLocalSessionMessageInternal(
@@ -411,13 +411,13 @@ extension AppControllerDesktopThreadStorage on AppController {
 
   Future<List<AssistantThreadSkillEntry>> scanSingleAgentSkillEntriesInternal(
     List<SingleAgentSkillScanRootInternal> roots, {
-    String workspaceRef = '',
+    String workspacePath = '',
   }) async {
     final dedupedByName = <String, AssistantThreadSkillEntry>{};
     for (final rootSpec in roots) {
       var resolvedRootPath = resolveSingleAgentSkillRootPathInternal(
         rootSpec.path,
-        workspaceRef: workspaceRef,
+        workspacePath: workspacePath,
       );
       if (resolvedRootPath.isEmpty) {
         continue;
@@ -537,7 +537,7 @@ extension AppControllerDesktopThreadStorage on AppController {
     }
     return scanSingleAgentSkillEntriesInternal(
       AppController.defaultSingleAgentWorkspaceSkillScanRootsInternal,
-      workspaceRef: assistantWorkspacePathForSession(sessionKey),
+      workspacePath: assistantWorkspacePathForSession(sessionKey),
     );
   }
 
@@ -570,7 +570,7 @@ extension AppControllerDesktopThreadStorage on AppController {
 
   String resolveSingleAgentSkillRootPathInternal(
     String rawPath, {
-    String workspaceRef = '',
+    String workspacePath = '',
   }) {
     final trimmed = rawPath.trim().replaceFirst(RegExp(r'^\./'), '');
     if (trimmed.isEmpty) {
@@ -583,7 +583,7 @@ extension AppControllerDesktopThreadStorage on AppController {
       final home = resolvedUserHomeDirectoryInternal.trim();
       return home.isEmpty ? trimmed : '$home/${trimmed.substring(2)}';
     }
-    final normalizedWorkspace = workspaceRef.trim();
+    final normalizedWorkspace = workspacePath.trim();
     if (normalizedWorkspace.isEmpty) {
       return '';
     }
@@ -654,7 +654,7 @@ extension AppControllerDesktopThreadStorage on AppController {
   }
 
   void restoreAssistantThreadsInternal(List<TaskThread> records) {
-    assistantThreadRecordsInternal.clear();
+    taskThreadRepositoryInternal.clear();
     assistantThreadMessagesInternal.clear();
     singleAgentSharedImportedSkillsInternal =
         const <AssistantThreadSkillEntry>[];
@@ -673,6 +673,12 @@ extension AppControllerDesktopThreadStorage on AppController {
         continue;
       }
       final titleFromSettings = assistantCustomTaskTitle(sessionKey);
+      final recordExecutionTarget = assistantExecutionTargetFromExecutionMode(
+        record.executionBinding.executionMode,
+      );
+      final recordProvider = SingleAgentProviderCopy.fromJsonValue(
+        record.executionBinding.providerId,
+      );
       final workspaceBinding = record.workspaceBinding.copyWith(
         workspaceId: sessionKey,
         displayPath: record.workspaceKind == WorkspaceKind.localFs
@@ -687,7 +693,6 @@ extension AppControllerDesktopThreadStorage on AppController {
             ? record.title.trim()
             : titleFromSettings,
         archived: record.archived || archivedKeys.contains(sessionKey),
-        executionTarget: record.executionTarget,
         messageViewMode: record.messageViewMode,
         selectedSkillKeys: record.selectedSkillKeys
             .where(
@@ -695,13 +700,19 @@ extension AppControllerDesktopThreadStorage on AppController {
             )
             .toList(growable: false),
         assistantModelId: record.assistantModelId.trim().isEmpty
-            ? resolvedAssistantModelForTargetInternal(record.executionTarget)
+            ? resolvedAssistantModelForTargetInternal(recordExecutionTarget)
             : record.assistantModelId.trim(),
-        singleAgentProvider: record.singleAgentProvider,
         gatewayEntryState: (record.gatewayEntryState ?? '').trim().isEmpty
-            ? gatewayEntryStateForTargetInternal(record.executionTarget)
+            ? gatewayEntryStateForTargetInternal(recordExecutionTarget)
             : record.gatewayEntryState,
         workspaceBinding: workspaceBinding,
+        executionBinding: record.executionBinding.copyWith(
+          executionMode: threadExecutionModeFromAssistantExecutionTarget(
+            recordExecutionTarget,
+          ),
+          executorId: recordProvider.providerId,
+          providerId: recordProvider.providerId,
+        ),
         lifecycleState: record.lifecycleState.copyWith(status: 'ready'),
       );
       if (normalizedRecord.workspaceKind == WorkspaceKind.localFs &&
@@ -713,7 +724,7 @@ extension AppControllerDesktopThreadStorage on AppController {
           // directory cannot be recreated immediately.
         }
       }
-      assistantThreadRecordsInternal[sessionKey] = normalizedRecord;
+      taskThreadRepositoryInternal.replace(normalizedRecord, persist: false);
       if (normalizedRecord.messages.isNotEmpty) {
         assistantThreadMessagesInternal[sessionKey] =
             List<GatewayChatMessage>.from(normalizedRecord.messages);

@@ -28,7 +28,6 @@ class WebArtifactProxyClient {
             'artifacts.list',
             params: <String, dynamic>{
               'sessionKey': sessionKey,
-              'workspaceRef': workspacePath,
               'workspacePath': workspacePath,
             },
           ),
@@ -36,7 +35,6 @@ class WebArtifactProxyClient {
             'artifacts.files',
             params: <String, dynamic>{
               'sessionKey': sessionKey,
-              'workspaceRef': workspacePath,
               'workspacePath': workspacePath,
             },
           ),
@@ -44,7 +42,6 @@ class WebArtifactProxyClient {
             'artifacts.changes',
             params: <String, dynamic>{
               'sessionKey': sessionKey,
-              'workspaceRef': workspacePath,
               'workspacePath': workspacePath,
             },
           ),
@@ -101,7 +98,6 @@ class WebArtifactProxyClient {
         'artifacts.preview',
         params: <String, dynamic>{
           'sessionKey': sessionKey,
-          'workspaceRef': entry.workspacePath,
           'workspacePath': entry.workspacePath,
           'path': entry.relativePath,
         },
@@ -125,7 +121,6 @@ class WebArtifactProxyClient {
         'artifacts.read',
         params: <String, dynamic>{
           'sessionKey': sessionKey,
-          'workspaceRef': entry.workspacePath,
           'workspacePath': entry.workspacePath,
           'path': entry.relativePath,
         },

@@ -41,6 +41,7 @@ import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import '../runtime/single_agent_runner.dart';
 import '../runtime/skill_directory_access.dart';
+import 'task_thread_repositories.dart';
 import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
@@ -305,8 +306,8 @@ class AppController extends ChangeNotifier {
       const <SingleAgentProvider, DirectSingleAgentCapabilities>{};
   final Map<String, List<GatewayChatMessage>> assistantThreadMessagesInternal =
       <String, List<GatewayChatMessage>>{};
-  final Map<String, TaskThread> assistantThreadRecordsInternal =
-      <String, TaskThread>{};
+  late final DesktopTaskThreadRepository taskThreadRepositoryInternal =
+      DesktopTaskThreadRepository(saveRecords: storeInternal.saveTaskThreads);
   final Map<String, List<GatewayChatMessage>> localSessionMessagesInternal =
       <String, List<GatewayChatMessage>>{};
   final Map<String, List<GatewayChatMessage>> gatewayHistoryCacheInternal =
@@ -358,6 +359,9 @@ class AppController extends ChangeNotifier {
   bool initializingInternal = true;
   String? bootstrapErrorInternal;
   String? startupTaskThreadWarningInternal;
+
+  Map<String, TaskThread> get assistantThreadRecordsInternal =>
+      taskThreadRepositoryInternal.recordsView;
   StreamSubscription<GatewayPushEvent>? runtimeEventsSubscriptionInternal;
   bool disposedInternal = false;
   String resolvedUserHomeDirectoryInternal = resolveUserHomeDirectory();

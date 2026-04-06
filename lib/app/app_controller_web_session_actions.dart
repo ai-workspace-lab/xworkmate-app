@@ -28,10 +28,7 @@ extension AppControllerWebSessionActions on AppController {
     final inheritedTarget =
         sanitizeTargetInternal(target) ??
         assistantExecutionTargetForSession(currentSessionKeyInternal);
-    final inheritedRecord =
-        threadRecordsInternal[normalizedSessionKeyInternal(
-          currentSessionKeyInternal,
-        )];
+    final inheritedRecord = taskThreadForSessionInternal(currentSessionKeyInternal);
     final baseRecord = newRecordInternal(
       target: inheritedTarget,
       title: appText('新对话', 'New conversation'),
@@ -39,14 +36,20 @@ extension AppControllerWebSessionActions on AppController {
     final record = baseRecord.copyWith(
       messageViewMode:
           inheritedRecord?.messageViewMode ?? AssistantMessageViewMode.rendered,
-      singleAgentProvider:
-          inheritedRecord?.singleAgentProvider ?? SingleAgentProvider.auto,
+      executionBinding: baseRecord.executionBinding.copyWith(
+        providerId:
+            inheritedRecord?.executionBinding.providerId ??
+            SingleAgentProvider.auto.providerId,
+        executorId:
+            inheritedRecord?.executionBinding.executorId ??
+            SingleAgentProvider.auto.providerId,
+      ),
       assistantModelId: inheritedRecord?.assistantModelId ?? '',
       importedSkills: inheritedRecord?.importedSkills ?? const [],
       selectedSkillKeys: inheritedRecord?.selectedSkillKeys ?? const [],
       gatewayEntryState: gatewayEntryStateForTargetInternal(inheritedTarget),
     );
-    threadRecordsInternal[record.sessionKey] = record;
+    threadRepositoryInternal.replace(record);
     await ensureWebTaskThreadBindingInternal(
       record.sessionKey,
       executionTarget: inheritedTarget,
@@ -280,7 +283,7 @@ extension AppControllerWebSessionActions on AppController {
           target: settingsInternal.assistantExecutionTarget,
           title: appText('新对话', 'New conversation'),
         );
-        threadRecordsInternal[newRecord.sessionKey] = newRecord;
+        threadRepositoryInternal.replace(newRecord);
         currentSessionKeyInternal = newRecord.sessionKey;
       }
     }

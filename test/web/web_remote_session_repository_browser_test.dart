@@ -69,7 +69,12 @@ void main() {
           updatedAtMs: 1,
           title: 'hello',
           archived: false,
-          executionTarget: AssistantExecutionTarget.singleAgent,
+          executionBinding: const ExecutionBinding(
+            executionMode: ThreadExecutionMode.localAgent,
+            executorId: 'auto',
+            providerId: 'auto',
+            endpointId: '',
+          ),
           messageViewMode: AssistantMessageViewMode.rendered,
         ),
       ];

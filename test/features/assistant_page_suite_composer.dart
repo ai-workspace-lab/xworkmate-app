@@ -266,7 +266,12 @@ void registerAssistantPageSuiteComposerTestsInternal() {
             updatedAtMs: 1,
             title: 'Main',
             archived: false,
-            executionTarget: AssistantExecutionTarget.singleAgent,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.localAgent,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
           ),
           TaskThread(
@@ -282,7 +287,12 @@ void registerAssistantPageSuiteComposerTestsInternal() {
             updatedAtMs: 2,
             title: 'Artifact Thread',
             archived: false,
-            executionTarget: AssistantExecutionTarget.singleAgent,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.localAgent,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
           ),
         ]);
@@ -843,7 +853,12 @@ void registerAssistantPageSuiteComposerTestsInternal() {
             ),
             title: '研发任务',
             archived: false,
-            executionTarget: AssistantExecutionTarget.singleAgent,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.localAgent,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.raw,
             updatedAtMs: 1700000000000,
             messages: <GatewayChatMessage>[
@@ -859,7 +874,6 @@ void registerAssistantPageSuiteComposerTestsInternal() {
                     'Execution context:\n'
                     '- target: single-agent\n'
                     '- provider: codex\n'
-                    '- workspace_root: /opt/data/workspace\n'
                     '- permission: full-access\n\n'
                     '结合项目代码制作一份用户手册',
                 timestampMs: 1700000000000,
@@ -964,7 +978,12 @@ void registerAssistantPageSuiteComposerTestsInternal() {
           ),
           title: '研发任务',
           archived: false,
-          executionTarget: AssistantExecutionTarget.singleAgent,
+          executionBinding: const ExecutionBinding(
+            executionMode: ThreadExecutionMode.localAgent,
+            executorId: 'auto',
+            providerId: 'auto',
+            endpointId: '',
+          ),
           messageViewMode: AssistantMessageViewMode.rendered,
           updatedAtMs: 1700000000000,
           messages: <GatewayChatMessage>[

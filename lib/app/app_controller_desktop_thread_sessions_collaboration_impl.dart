@@ -315,10 +315,14 @@ List<String> assistantModelChoicesForSessionThreadSessionInternal(
     sessionKey,
   );
   final target = controller.sanitizeExecutionTargetInternal(
-    controller
-            .assistantThreadRecordsInternal[normalizedSessionKey]
-            ?.executionTarget ??
-        controller.settings.assistantExecutionTarget,
+    controller.taskThreadForSessionInternal(normalizedSessionKey) == null
+        ? controller.settings.assistantExecutionTarget
+        : assistantExecutionTargetFromExecutionMode(
+            controller
+                .requireTaskThreadForSessionInternal(normalizedSessionKey)
+                .executionBinding
+                .executionMode,
+          ),
   );
   if (target == AssistantExecutionTarget.singleAgent) {
     final singleAgentUsesAiGatewayFallback =
