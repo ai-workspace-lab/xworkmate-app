@@ -341,7 +341,7 @@ void registerAssistantPageSuiteCoreTestsInternal() {
     skip: true,
   );
 
-  testWidgets('AssistantPage shows four collapsed task groups by default', (
+  testWidgets('AssistantPage hides task groups when no target is saved', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
@@ -353,33 +353,23 @@ void registerAssistantPageSuiteCoreTestsInternal() {
 
     expect(
       find.byKey(const ValueKey<String>('assistant-task-group-auto')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey<String>('assistant-task-group-singleAgent')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey<String>('assistant-task-group-local')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey<String>('assistant-task-group-remote')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey<String>('assistant-task-item-main')),
       findsNothing,
-    );
-
-    await tester.tap(
-      find.byKey(const ValueKey<String>('assistant-task-group-auto')),
-    );
-    await pumpForUiSyncInternal(tester);
-
-    expect(
-      find.byKey(const ValueKey<String>('assistant-task-item-main')),
-      findsOneWidget,
     );
   });
 
@@ -465,7 +455,9 @@ void registerAssistantPageSuiteCoreTestsInternal() {
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
-    await controller.setAssistantExecutionTarget(AssistantExecutionTarget.local);
+    await controller.setAssistantExecutionTarget(
+      AssistantExecutionTarget.local,
+    );
 
     await pumpPage(
       tester,

@@ -89,7 +89,14 @@ extension AppControllerWebGatewayChat on AppController {
         sessionKey,
         messages: nextMessages,
         executionTarget: target,
-        title: deriveThreadTitleInternal(current.title, nextMessages),
+        title: deriveThreadTitleInternal(
+          current.title,
+          nextMessages,
+          hasCustomTitle:
+              (settingsInternal.assistantCustomTaskTitles[sessionKey]?.trim() ??
+                      '')
+                  .isNotEmpty,
+        ),
         updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       );
       pendingSessionKeysInternal.add(sessionKey);

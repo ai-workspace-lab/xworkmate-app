@@ -116,9 +116,9 @@ extension AppControllerDesktopThreadSessions on AppController {
     );
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
     final latestResolvedModel =
-        taskThreadForSessionInternal(normalizedSessionKey)
-            ?.latestResolvedRuntimeModel
-            .trim() ??
+        taskThreadForSessionInternal(
+          normalizedSessionKey,
+        )?.latestResolvedRuntimeModel.trim() ??
         '';
     if (target == AssistantExecutionTarget.singleAgent ||
         target == AssistantExecutionTarget.auto) {
@@ -156,15 +156,19 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    return taskThreadForSessionInternal(normalizedSessionKey)
-            ?.workspaceBinding
-            .workspacePath
-            .trim() ??
+    return taskThreadForSessionInternal(
+          normalizedSessionKey,
+        )?.workspaceBinding.workspacePath.trim() ??
         '';
   }
 
   WorkspaceRefKind assistantWorkspaceKindForSession(String sessionKey) {
-    final record = requireTaskThreadForSessionInternal(sessionKey);
+    final record = taskThreadForSessionInternal(
+      normalizedAssistantSessionKeyInternal(sessionKey),
+    );
+    if (record == null) {
+      return WorkspaceRefKind.localPath;
+    }
     return record.workspaceBinding.workspaceKind == WorkspaceKind.localFs
         ? WorkspaceRefKind.localPath
         : WorkspaceRefKind.remotePath;
@@ -174,10 +178,9 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    return taskThreadForSessionInternal(normalizedSessionKey)
-            ?.workspaceBinding
-            .displayPath
-            .trim() ??
+    return taskThreadForSessionInternal(
+          normalizedSessionKey,
+        )?.workspaceBinding.displayPath.trim() ??
         '';
   }
 
@@ -212,9 +215,9 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final stored = SingleAgentProviderCopy.fromJsonValue(
-      taskThreadForSessionInternal(normalizedSessionKey)
-              ?.executionBinding
-              .providerId ??
+      taskThreadForSessionInternal(
+            normalizedSessionKey,
+          )?.executionBinding.providerId ??
           '',
     );
     return settings.resolveSingleAgentProvider(stored);
@@ -310,9 +313,9 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    return taskThreadForSessionInternal(normalizedSessionKey)
-            ?.latestResolvedRuntimeModel
-            .trim() ??
+    return taskThreadForSessionInternal(
+          normalizedSessionKey,
+        )?.latestResolvedRuntimeModel.trim() ??
         '';
   }
 
@@ -403,13 +406,13 @@ extension AppControllerDesktopThreadSessions on AppController {
     if (target == AssistantExecutionTarget.singleAgent ||
         target == AssistantExecutionTarget.auto) {
       final thread = taskThreadForSessionInternal(normalizedSessionKey);
-      final resolvedGatewayEntryState = switch (
-        thread?.gatewayEntryState?.trim() ?? ''
-      ) {
-        'auto' => '',
-        final value => value,
-      };
-      final latestResolvedModel = thread?.latestResolvedRuntimeModel.trim() ?? '';
+      final resolvedGatewayEntryState =
+          switch (thread?.gatewayEntryState?.trim() ?? '') {
+            'auto' => '',
+            final value => value,
+          };
+      final latestResolvedModel =
+          thread?.latestResolvedRuntimeModel.trim() ?? '';
       final primaryLabel = target == AssistantExecutionTarget.auto
           ? 'Auto'
           : target.label;
@@ -444,11 +447,13 @@ extension AppControllerDesktopThreadSessions on AppController {
             latestResolvedModel,
           ]),
           _ => joinConnectionPartsInternal(<String>[
-            singleAgentResolvedProviderForSession(normalizedSessionKey)
-                        ?.label
-                        .isNotEmpty ==
+            singleAgentResolvedProviderForSession(
+                      normalizedSessionKey,
+                    )?.label.isNotEmpty ==
                     true
-                ? singleAgentResolvedProviderForSession(normalizedSessionKey)!.label
+                ? singleAgentResolvedProviderForSession(
+                    normalizedSessionKey,
+                  )!.label
                 : appText('Single Agent', 'Single Agent'),
             latestResolvedModel,
           ]),

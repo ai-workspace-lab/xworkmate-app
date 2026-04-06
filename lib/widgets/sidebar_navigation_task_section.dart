@@ -26,6 +26,7 @@ class SidebarTaskSection extends StatefulWidget {
   const SidebarTaskSection({
     super.key,
     required this.items,
+    required this.visibleExecutionTargets,
     required this.skillCount,
     required this.showCollapseControl,
     required this.onCycleSidebarState,
@@ -37,6 +38,7 @@ class SidebarTaskSection extends StatefulWidget {
   });
 
   final List<SidebarTaskItem> items;
+  final List<AssistantExecutionTarget> visibleExecutionTargets;
   final int skillCount;
   final bool showCollapseControl;
   final VoidCallback onCycleSidebarState;
@@ -267,13 +269,17 @@ class _SidebarTaskSectionState extends State<SidebarTaskSection> {
 
   List<_SidebarTaskGroup> _groupedItems(List<SidebarTaskItem> items) {
     final grouped = <AssistantExecutionTarget, List<SidebarTaskItem>>{
-      for (final target in AssistantExecutionTarget.values)
+      for (final target in widget.visibleExecutionTargets)
         target: <SidebarTaskItem>[],
     };
     for (final item in items) {
-      grouped[item.executionTarget]!.add(item);
+      final bucket = grouped[item.executionTarget];
+      if (bucket == null) {
+        continue;
+      }
+      bucket.add(item);
     }
-    return AssistantExecutionTarget.values
+    return widget.visibleExecutionTargets
         .map(
           (target) => _SidebarTaskGroup(
             executionTarget: target,
