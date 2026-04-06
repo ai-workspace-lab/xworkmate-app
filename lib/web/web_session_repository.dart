@@ -60,13 +60,15 @@ class RemoteWebSessionRepository implements WebSessionRepository {
       Map<String, dynamic> map => map['threads'] as List<dynamic>? ?? const [],
       _ => const <dynamic>[],
     };
-    return rawThreads
-        .whereType<Map>()
-        .map(
-          (item) =>
-              TaskThread.fromJson(item.cast<String, dynamic>()),
-        )
-        .toList(growable: false);
+    final records = <TaskThread>[];
+    for (final item in rawThreads.whereType<Map>()) {
+      try {
+        records.add(TaskThread.fromJson(item.cast<String, dynamic>()));
+      } catch (_) {
+        continue;
+      }
+    }
+    return List<TaskThread>.unmodifiable(records);
   }
 
   @override
