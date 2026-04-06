@@ -308,7 +308,9 @@ extension AppControllerDesktopSettings on AppController {
     modelsControllerInternal.restoreFromSettings(defaults.aiGateway);
     initializeAssistantThreadContext(
       'main',
-      executionTarget: defaults.assistantExecutionTarget,
+      executionTarget: sanitizePersistedExecutionTargetInternal(
+        defaults.assistantExecutionTarget,
+      ),
       messageViewMode: AssistantMessageViewMode.rendered,
       singleAgentProvider: SingleAgentProvider.auto,
     );

@@ -683,9 +683,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     if (visibleTargets.contains(currentTarget)) {
       return currentTarget;
     }
-    if (currentTarget == AssistantExecutionTarget.auto) {
-      return currentTarget;
-    }
     if (visibleTargets.isNotEmpty) {
       return visibleTargets.first;
     }
