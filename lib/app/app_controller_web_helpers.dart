@@ -369,6 +369,9 @@ extension AppControllerWebHelpers on AppController {
     if (sessionKey.isEmpty) {
       return;
     }
+    if (goTaskServiceManagedRelaySessionsInternal.contains(sessionKey)) {
+      return;
+    }
     final state = payload['state']?.toString().trim() ?? '';
     final message = castMapInternal(payload['message']);
     final text = extractMessageTextInternal(message);

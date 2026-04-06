@@ -1,9 +1,9 @@
-import '../runtime/go_agent_core_client.dart';
+import '../runtime/go_task_service_client.dart';
 import '../runtime/runtime_models.dart';
 import 'web_acp_client.dart';
 
-class GoAgentCoreWebTransport implements GoAgentCoreClient {
-  const GoAgentCoreWebTransport({
+class ExternalCodeAgentAcpWebTransport implements ExternalCodeAgentAcpTransport {
+  const ExternalCodeAgentAcpWebTransport({
     required WebAcpClient acpClient,
     required Uri? Function(AssistantExecutionTarget target) endpointResolver,
   }) : _acpClient = acpClient,
@@ -15,7 +15,9 @@ class GoAgentCoreWebTransport implements GoAgentCoreClient {
   Uri? get _goCoreEndpoint => _endpointResolver(AssistantExecutionTarget.singleAgent);
 
   @override
-  Future<void> syncProviders(List<GoAgentCoreSyncedProvider> providers) async {
+  Future<void> syncExternalProviders(
+    List<ExternalCodeAgentAcpSyncedProvider> providers,
+  ) async {
     final endpoint = _goCoreEndpoint;
     if (endpoint == null) {
       return;
@@ -30,16 +32,16 @@ class GoAgentCoreWebTransport implements GoAgentCoreClient {
   }
 
   @override
-  Future<GoAgentCoreCapabilities> loadCapabilities({
+  Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
   }) async {
     final endpoint = _goCoreEndpoint;
     if (endpoint == null) {
-      return const GoAgentCoreCapabilities.empty();
+      return const ExternalCodeAgentAcpCapabilities.empty();
     }
     final capabilities = await _acpClient.loadCapabilities(endpoint: endpoint);
-    return GoAgentCoreCapabilities(
+    return ExternalCodeAgentAcpCapabilities(
       singleAgent: capabilities.singleAgent,
       multiAgent: capabilities.multiAgent,
       providers: capabilities.providers,
@@ -48,9 +50,9 @@ class GoAgentCoreWebTransport implements GoAgentCoreClient {
   }
 
   @override
-  Future<GoAgentCoreRunResult> executeSession(
-    GoAgentCoreSessionRequest request, {
-    required void Function(GoAgentCoreSessionUpdate update) onUpdate,
+  Future<GoTaskServiceResult> executeTask(
+    GoTaskServiceRequest request, {
+    required void Function(GoTaskServiceUpdate update) onUpdate,
   }) async {
     final endpoint = _goCoreEndpoint;
     if (endpoint == null) {
@@ -64,9 +66,9 @@ class GoAgentCoreWebTransport implements GoAgentCoreClient {
     final response = await _acpClient.request(
       endpoint: endpoint,
       method: request.resumeSession ? 'session.message' : 'session.start',
-      params: request.toAcpParams(),
+      params: request.toExternalAcpParams(),
       onNotification: (notification) {
-        final update = goAgentCoreUpdateFromNotification(notification);
+        final update = goTaskServiceUpdateFromAcpNotification(notification);
         if (update == null) {
           return;
         }
@@ -79,15 +81,16 @@ class GoAgentCoreWebTransport implements GoAgentCoreClient {
         onUpdate(update);
       },
     );
-    return goAgentCoreRunResultFromResponse(
+    return goTaskServiceResultFromAcpResponse(
       response,
+      route: request.route,
       streamedText: streamedText,
       completedMessage: completedMessage,
     );
   }
 
   @override
-  Future<void> cancelSession({
+  Future<void> cancelTask({
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
@@ -104,7 +107,7 @@ class GoAgentCoreWebTransport implements GoAgentCoreClient {
   }
 
   @override
-  Future<void> closeSession({
+  Future<void> closeTask({
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,

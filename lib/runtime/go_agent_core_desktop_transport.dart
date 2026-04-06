@@ -3,11 +3,11 @@ import 'dart:io';
 
 import 'embedded_agent_launch_policy.dart';
 import 'gateway_acp_client.dart';
-import 'go_agent_core_client.dart';
 import 'go_core.dart';
+import 'go_task_service_client.dart';
 import 'runtime_models.dart';
 
-typedef GoAgentCoreProcessStarter =
+typedef ExternalCodeAgentAcpProcessStarter =
     Future<Process> Function(
       String executable,
       List<String> arguments, {
@@ -15,12 +15,12 @@ typedef GoAgentCoreProcessStarter =
       String? workingDirectory,
     });
 
-class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
-  GoAgentCoreDesktopTransport({
+class ExternalCodeAgentAcpDesktopTransport implements ExternalCodeAgentAcpTransport {
+  ExternalCodeAgentAcpDesktopTransport({
     required GatewayAcpClient acpClient,
     required Uri? Function(AssistantExecutionTarget target) endpointResolver,
     GoCoreLocator? goCoreLocator,
-    GoAgentCoreProcessStarter? processStarter,
+    ExternalCodeAgentAcpProcessStarter? processStarter,
   }) : _acpClient = acpClient,
        _endpointResolver = endpointResolver,
        _goCoreLocator = goCoreLocator ?? GoCoreLocator(),
@@ -38,14 +38,16 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
   final GatewayAcpClient _acpClient;
   final Uri? Function(AssistantExecutionTarget target) _endpointResolver;
   final GoCoreLocator _goCoreLocator;
-  final GoAgentCoreProcessStarter _processStarter;
+  final ExternalCodeAgentAcpProcessStarter _processStarter;
 
   Process? _localProcess;
   Uri? _localEndpoint;
   Future<Uri?>? _localEndpointFuture;
 
   @override
-  Future<void> syncProviders(List<GoAgentCoreSyncedProvider> providers) async {
+  Future<void> syncExternalProviders(
+    List<ExternalCodeAgentAcpSyncedProvider> providers,
+  ) async {
     final endpoint = await _ensureLocalEndpoint();
     if (endpoint == null) {
       return;
@@ -60,19 +62,19 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
   }
 
   @override
-  Future<GoAgentCoreCapabilities> loadCapabilities({
+  Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
   }) async {
     final endpoint = await _resolveEndpoint(target);
     if (endpoint == null) {
-      return const GoAgentCoreCapabilities.empty();
+      return const ExternalCodeAgentAcpCapabilities.empty();
     }
     final capabilities = await _acpClient.loadCapabilities(
       forceRefresh: forceRefresh,
       endpointOverride: endpoint,
     );
-    return GoAgentCoreCapabilities(
+    return ExternalCodeAgentAcpCapabilities(
       singleAgent: capabilities.singleAgent,
       multiAgent: capabilities.multiAgent,
       providers: capabilities.providers,
@@ -81,9 +83,9 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
   }
 
   @override
-  Future<GoAgentCoreRunResult> executeSession(
-    GoAgentCoreSessionRequest request, {
-    required void Function(GoAgentCoreSessionUpdate update) onUpdate,
+  Future<GoTaskServiceResult> executeTask(
+    GoTaskServiceRequest request, {
+    required void Function(GoTaskServiceUpdate update) onUpdate,
   }) async {
     final endpoint = await _resolveEndpoint(request.target);
     if (endpoint == null) {
@@ -96,10 +98,10 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
     String? completedMessage;
     final response = await _acpClient.request(
       method: request.resumeSession ? 'session.message' : 'session.start',
-      params: request.toAcpParams(),
+      params: request.toExternalAcpParams(),
       endpointOverride: endpoint,
       onNotification: (notification) {
-        final update = goAgentCoreUpdateFromNotification(notification);
+        final update = goTaskServiceUpdateFromAcpNotification(notification);
         if (update == null) {
           return;
         }
@@ -112,15 +114,16 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
         onUpdate(update);
       },
     );
-    return goAgentCoreRunResultFromResponse(
+    return goTaskServiceResultFromAcpResponse(
       response,
+      route: request.route,
       streamedText: streamedText,
       completedMessage: completedMessage,
     );
   }
 
   @override
-  Future<void> cancelSession({
+  Future<void> cancelTask({
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
@@ -137,7 +140,7 @@ class GoAgentCoreDesktopTransport implements GoAgentCoreClient {
   }
 
   @override
-  Future<void> closeSession({
+  Future<void> closeTask({
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,

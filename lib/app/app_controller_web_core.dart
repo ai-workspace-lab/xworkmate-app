@@ -5,10 +5,11 @@ import 'package:flutter/material.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/assistant_artifacts.dart';
-import '../runtime/go_agent_core_client.dart';
+import '../runtime/go_task_service_client.dart';
 import '../runtime/runtime_models.dart';
 import '../web/web_acp_client.dart';
 import '../web/go_agent_core_web_transport.dart';
+import '../web/go_task_service_web_service.dart';
 import '../web/web_ai_gateway_client.dart';
 import '../web/web_artifact_proxy_client.dart';
 import '../web/web_relay_gateway_client.dart';
@@ -38,7 +39,7 @@ class AppController extends ChangeNotifier {
     WebStore? store,
     WebAiGatewayClient? aiGatewayClient,
     WebAcpClient? acpClient,
-    GoAgentCoreClient? goAgentCoreClient,
+    GoTaskServiceClient? goTaskServiceClient,
     WebRelayGatewayClient? relayClient,
     RemoteWebSessionRepositoryBuilder? remoteSessionRepositoryBuilder,
     UiFeatureManifest? uiFeatureManifest,
@@ -51,11 +52,14 @@ class AppController extends ChangeNotifier {
            remoteSessionRepositoryBuilder ??
            defaultRemoteSessionRepositoryInternal {
     relayClientInternal = relayClient ?? WebRelayGatewayClient(storeInternal);
-    goAgentCoreClientInternal =
-        goAgentCoreClient ??
-        GoAgentCoreWebTransport(
-          acpClient: acpClientInternal,
-          endpointResolver: acpEndpointForTargetInternal,
+    goTaskServiceClientInternal =
+        goTaskServiceClient ??
+        WebGoTaskService(
+          relayClient: relayClientInternal,
+          acpTransport: ExternalCodeAgentAcpWebTransport(
+            acpClient: acpClientInternal,
+            endpointResolver: acpEndpointForTargetInternal,
+          ),
         );
     artifactProxyClientInternal = WebArtifactProxyClient(relayClientInternal);
     relayEventsSubscriptionInternal = relayClientInternal.events.listen(
@@ -68,7 +72,7 @@ class AppController extends ChangeNotifier {
   final UiFeatureManifest uiFeatureManifestInternal;
   final WebAiGatewayClient aiGatewayClientInternal;
   final WebAcpClient acpClientInternal;
-  late final GoAgentCoreClient goAgentCoreClientInternal;
+  late final GoTaskServiceClient goTaskServiceClientInternal;
   final RemoteWebSessionRepositoryBuilder
   remoteSessionRepositoryBuilderInternal;
   late final WebRelayGatewayClient relayClientInternal;
@@ -97,6 +101,7 @@ class AppController extends ChangeNotifier {
   final WebTaskThreadRepository threadRepositoryInternal =
       WebTaskThreadRepository();
   final Set<String> pendingSessionKeysInternal = <String>{};
+  final Set<String> goTaskServiceManagedRelaySessionsInternal = <String>{};
   final Map<String, String> streamingTextBySessionInternal = <String, String>{};
   final Map<String, Future<void>> threadTurnQueuesInternal =
       <String, Future<void>>{};
@@ -330,7 +335,7 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     unawaited(relayEventsSubscriptionInternal.cancel());
-    unawaited(goAgentCoreClientInternal.dispose());
+    unawaited(goTaskServiceClientInternal.dispose());
     unawaited(relayClientInternal.dispose());
     super.dispose();
   }

@@ -28,7 +28,7 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
-import '../runtime/go_agent_core_client.dart';
+import '../runtime/go_task_service_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
@@ -84,9 +84,10 @@ extension AppControllerDesktopSingleAgent on AppController {
       notifyIfActiveInternal();
 
       try {
-        final routing = buildGoAgentCoreRoutingForSessionInternal(sessionKey);
+        final routing = buildExternalAcpRoutingForSessionInternal(sessionKey);
         final selection = singleAgentProviderForSession(sessionKey);
-        final capabilities = await goAgentCoreClientInternal.loadCapabilities(
+        final capabilities = await goTaskServiceClientInternal
+            .loadExternalAcpCapabilities(
           target: AssistantExecutionTarget.singleAgent,
           forceRefresh: true,
         );
@@ -175,8 +176,8 @@ extension AppControllerDesktopSingleAgent on AppController {
             .map((item) => item.label.trim().isNotEmpty ? item.label : item.key)
             .where((item) => item.trim().isNotEmpty)
             .toList(growable: false);
-        final result = await goAgentCoreClientInternal.executeSession(
-          GoAgentCoreSessionRequest(
+        final result = await goTaskServiceClientInternal.executeTask(
+          GoTaskServiceRequest(
             sessionId: sessionKey,
             threadId: sessionKey,
             target: AssistantExecutionTarget.singleAgent,
@@ -838,7 +839,7 @@ extension AppControllerDesktopSingleAgent on AppController {
           );
   }
 
-  GoAgentCoreRoutingConfig buildGoAgentCoreRoutingForSessionInternal(
+  ExternalCodeAgentAcpRoutingConfig buildExternalAcpRoutingForSessionInternal(
     String sessionKey, {
     String? explicitExecutionTarget,
   }) {
@@ -861,7 +862,7 @@ extension AppControllerDesktopSingleAgent on AppController {
     final availableSkills =
         assistantImportedSkillsForSession(normalizedSessionKey)
             .map(
-              (item) => GoAgentCoreAvailableSkill(
+              (item) => ExternalCodeAgentAcpAvailableSkill(
                 id: item.key,
                 label: item.label,
                 description: item.description,
@@ -905,14 +906,14 @@ extension AppControllerDesktopSingleAgent on AppController {
         resolvedExplicitSkills.isNotEmpty;
 
     if (!hasExplicitSelection) {
-      return GoAgentCoreRoutingConfig.auto(
+      return ExternalCodeAgentAcpRoutingConfig.auto(
         preferredGatewayTarget: preferredGatewayTarget,
         availableSkills: availableSkills,
       );
     }
 
-    return GoAgentCoreRoutingConfig(
-      mode: GoAgentCoreRoutingMode.explicit,
+    return ExternalCodeAgentAcpRoutingConfig(
+      mode: ExternalCodeAgentAcpRoutingMode.explicit,
       preferredGatewayTarget: preferredGatewayTarget,
       explicitExecutionTarget: resolvedExplicitExecutionTarget,
       explicitProviderId: resolvedExplicitProviderId,
