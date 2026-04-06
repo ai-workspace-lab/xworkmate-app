@@ -26,8 +26,10 @@ ditto "$BRIDGE_BUILD_PATH" "$HELPER_PATH"
 chmod +x "$HELPER_PATH"
 
 SIGN_IDENTITY="${EXPANDED_CODE_SIGN_IDENTITY:-${CODE_SIGN_IDENTITY:--}}"
-if [[ -n "$SIGN_IDENTITY" ]]; then
+if [[ -n "$SIGN_IDENTITY" && "$SIGN_IDENTITY" != "-" ]]; then
   codesign --force --sign "$SIGN_IDENTITY" --timestamp=none "$HELPER_PATH"
+else
+  echo "Skipping helper codesign: no explicit signing identity provided."
 fi
 
 echo "Embedded go-core helper: $HELPER_PATH"
