@@ -603,10 +603,18 @@ class AppController extends ChangeNotifier {
   List<AssistantExecutionTarget> visibleAssistantExecutionTargets(
     Iterable<AssistantExecutionTarget> supportedTargets,
   ) {
-    return settings.visibleAssistantExecutionTargets(
+    final visible = settings.visibleAssistantExecutionTargets(
       supportedTargets: supportedTargets,
       availableSingleAgentProviders: availableSingleAgentProviders,
     );
+    if (!supportedTargets.contains(AssistantExecutionTarget.singleAgent) ||
+        visible.contains(AssistantExecutionTarget.singleAgent)) {
+      return visible;
+    }
+    return <AssistantExecutionTarget>[
+      AssistantExecutionTarget.singleAgent,
+      ...visible.where((target) => target != AssistantExecutionTarget.singleAgent),
+    ];
   }
 
   bool get hasAnyAvailableSingleAgentProvider =>

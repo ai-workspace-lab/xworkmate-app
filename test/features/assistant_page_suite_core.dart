@@ -341,7 +341,7 @@ void registerAssistantPageSuiteCoreTestsInternal() {
     skip: true,
   );
 
-  testWidgets('AssistantPage hides task groups when no target is saved', (
+  testWidgets('AssistantPage shows singleAgent task group when no target is saved', (
     WidgetTester tester,
   ) async {
     final controller = await createTestController(tester);
@@ -357,7 +357,7 @@ void registerAssistantPageSuiteCoreTestsInternal() {
     );
     expect(
       find.byKey(const ValueKey<String>('assistant-task-group-singleAgent')),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.byKey(const ValueKey<String>('assistant-task-group-local')),

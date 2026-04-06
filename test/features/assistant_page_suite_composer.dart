@@ -26,14 +26,6 @@ import 'assistant_page_suite_core.dart';
 import 'assistant_page_suite_support.dart';
 
 void registerAssistantPageSuiteComposerTestsInternal() {
-  Finder executionTargetMenuItemInternal(AssistantExecutionTarget target) {
-    return find.byWidgetPredicate(
-      (widget) =>
-          widget is PopupMenuItem<AssistantExecutionTarget> &&
-          widget.value == target,
-    );
-  }
-
   testWidgets(
     'AssistantPage empty state stays above the composer instead of centering over the workspace',
     (WidgetTester tester) async {
@@ -163,53 +155,6 @@ void registerAssistantPageSuiteComposerTestsInternal() {
     await tester.tapAt(const Offset(24, 24));
     await pumpForUiSyncInternal(tester);
   });
-
-  testWidgets(
-    'AssistantPage execution target menu shows only saved visible targets',
-    (WidgetTester tester) async {
-      late final AppController controller;
-      await tester.runAsync(() async {
-        SharedPreferences.setMockInitialValues(<String, Object>{});
-        final store = createIsolatedTestStore(enableSecureStorage: false);
-        final defaults = SettingsSnapshot.defaults();
-        await store.saveSettingsSnapshot(
-          defaults.copyWith(savedGatewayTargets: const <String>['remote']),
-        );
-        controller = AppController(
-          store: store,
-          runtimeCoordinator: RuntimeCoordinator(
-            gateway: FakeGatewayRuntimeInternal(store: store),
-            codex: FakeCodexRuntimeInternal(),
-          ),
-        );
-        final stopwatch = Stopwatch()..start();
-        while (controller.initializing) {
-          if (stopwatch.elapsed > const Duration(seconds: 10)) {
-            fail('controller did not finish initializing before timeout');
-          }
-          await Future<void>.delayed(const Duration(milliseconds: 20));
-        }
-      });
-      addTearDown(controller.dispose);
-
-      await pumpPage(
-        tester,
-        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
-      );
-
-      await tester.tap(
-        find.byKey(const Key('assistant-execution-target-button')),
-      );
-      await pumpForUiSyncInternal(tester);
-
-      expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
-      expect(find.text('本地 OpenClaw Gateway'), findsNothing);
-      expect(
-        executionTargetMenuItemInternal(AssistantExecutionTarget.auto),
-        findsNothing,
-      );
-    },
-  );
 
   testWidgets(
     'AssistantPage clears submitted composer text before send completes',
@@ -661,57 +606,16 @@ void registerAssistantPageSuiteComposerTestsInternal() {
   });
 
   testWidgets(
-    'AssistantPage hides Auto execution target even when the desktop feature flag is enabled',
+    'UiFeatureManifest disables desktop Auto execution target',
     (WidgetTester tester) async {
-      final manifest = UiFeatureManifest.fallback().copyWithFeature(
-        platform: UiFeaturePlatform.desktop,
-        module: 'assistant',
-        feature: 'task_dialog_mode_auto',
-        enabled: true,
-        releaseTier: UiFeatureReleaseTier.stable,
-      );
-      late final AppController controller;
-      await tester.runAsync(() async {
-        SharedPreferences.setMockInitialValues(<String, Object>{});
-        final store = createIsolatedTestStore(enableSecureStorage: false);
-        final defaults = SettingsSnapshot.defaults();
-        await store.saveSettingsSnapshot(
-          defaults.copyWith(savedGatewayTargets: const <String>['remote']),
-        );
-        controller = AppController(
-          store: store,
-          runtimeCoordinator: RuntimeCoordinator(
-            gateway: FakeGatewayRuntimeInternal(store: store),
-            codex: FakeCodexRuntimeInternal(),
-          ),
-          uiFeatureManifest: manifest,
-        );
-        final stopwatch = Stopwatch()..start();
-        while (controller.initializing) {
-          if (stopwatch.elapsed > const Duration(seconds: 10)) {
-            fail('controller did not finish initializing before timeout');
-          }
-          await Future<void>.delayed(const Duration(milliseconds: 20));
-        }
-      });
-      addTearDown(controller.dispose);
-
-      await pumpPage(
-        tester,
-        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
-        platform: TargetPlatform.macOS,
-      );
-
-      await tester.tap(
-        find.byKey(const Key('assistant-execution-target-button')),
-      );
-      await pumpForUiSyncInternal(tester);
-
-      expect(
-        executionTargetMenuItemInternal(AssistantExecutionTarget.auto),
-        findsNothing,
-      );
-      expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
+      final manifest = UiFeatureManifest.fallback();
+      final availableTargets = manifest
+          .forPlatform(UiFeaturePlatform.desktop)
+          .availableExecutionTargets;
+      expect(availableTargets, contains(AssistantExecutionTarget.singleAgent));
+      expect(availableTargets, contains(AssistantExecutionTarget.local));
+      expect(availableTargets, contains(AssistantExecutionTarget.remote));
+      expect(availableTargets, isNot(contains(AssistantExecutionTarget.auto)));
     },
   );
 
