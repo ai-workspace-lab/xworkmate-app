@@ -21,7 +21,7 @@ currentSessionKey
 -> normalizedAssistantSessionKeyInternal(sessionKey)
 -> assistantWorkspacePathForSession(sessionKey)
 -> resolveSingleAgentWorkingDirectoryForSessionInternal(sessionKey)
--> GoAgentCoreSessionRequest.workingDirectory
+-> GoTaskServiceRequest.workingDirectory
 ```
 
 这条链路说明：
@@ -201,7 +201,7 @@ flowchart LR
   J --> L["executionBinding"]
   J --> M["contextState"]
 
-  K --> N["GoAgentCoreSessionRequest.workingDirectory"]
+  K --> N["GoTaskServiceRequest.workingDirectory"]
   L --> O["provider / execution mode"]
   M --> P["messages / model / skills"]
 

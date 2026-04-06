@@ -68,14 +68,6 @@ extension AppControllerDesktopThreadSessions on AppController {
     );
   }
 
-  Map<String, dynamic> latestRoutingResolutionForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    return latestRoutingResolutionBySessionInternal[normalizedSessionKey] ??
-        const <String, dynamic>{};
-  }
-
   int assistantSkillCountForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -123,11 +115,11 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
-    final latestRouting = latestRoutingResolutionForSession(
-      normalizedSessionKey,
-    );
     final latestResolvedModel =
-        latestRouting['resolvedModel']?.toString().trim() ?? '';
+        taskThreadForSessionInternal(normalizedSessionKey)
+            ?.latestResolvedRuntimeModel
+            .trim() ??
+        '';
     if (target == AssistantExecutionTarget.singleAgent ||
         target == AssistantExecutionTarget.auto) {
       if (latestResolvedModel.isNotEmpty) {
@@ -318,8 +310,9 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    return singleAgentRuntimeModelBySessionInternal[normalizedSessionKey]
-            ?.trim() ??
+    return taskThreadForSessionInternal(normalizedSessionKey)
+            ?.latestResolvedRuntimeModel
+            .trim() ??
         '';
   }
 
@@ -409,17 +402,14 @@ extension AppControllerDesktopThreadSessions on AppController {
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
     if (target == AssistantExecutionTarget.singleAgent ||
         target == AssistantExecutionTarget.auto) {
-      final latestRouting = latestRoutingResolutionForSession(
-        normalizedSessionKey,
-      );
-      final latestResolvedExecutionTarget =
-          latestRouting['resolvedExecutionTarget']?.toString().trim() ?? '';
-      final latestResolvedEndpointTarget =
-          latestRouting['resolvedEndpointTarget']?.toString().trim() ?? '';
-      final latestResolvedProviderId =
-          latestRouting['resolvedProviderId']?.toString().trim() ?? '';
-      final latestResolvedModel =
-          latestRouting['resolvedModel']?.toString().trim() ?? '';
+      final thread = taskThreadForSessionInternal(normalizedSessionKey);
+      final resolvedGatewayEntryState = switch (
+        thread?.gatewayEntryState?.trim() ?? ''
+      ) {
+        'auto' => '',
+        final value => value,
+      };
+      final latestResolvedModel = thread?.latestResolvedRuntimeModel.trim() ?? '';
       final primaryLabel = target == AssistantExecutionTarget.auto
           ? 'Auto'
           : target.label;
@@ -427,7 +417,7 @@ extension AppControllerDesktopThreadSessions on AppController {
           ? appText('当前: ', 'Current: ')
           : '';
       if (target == AssistantExecutionTarget.auto &&
-          latestResolvedExecutionTarget.isEmpty) {
+          resolvedGatewayEntryState.isEmpty) {
         final autoReady = autoRouteReadyForSession(normalizedSessionKey);
         return AssistantThreadConnectionState(
           executionTarget: target,
@@ -443,22 +433,23 @@ extension AppControllerDesktopThreadSessions on AppController {
         );
       }
       if (target == AssistantExecutionTarget.auto &&
-          latestResolvedExecutionTarget.isNotEmpty) {
-        final detail = switch (latestResolvedExecutionTarget) {
-          'gateway' => joinConnectionPartsInternal(<String>[
-            latestResolvedEndpointTarget.isEmpty
-                ? appText('OpenClaw Gateway', 'OpenClaw Gateway')
-                : latestResolvedEndpointTarget,
+          resolvedGatewayEntryState.isNotEmpty) {
+        final detail = switch (resolvedGatewayEntryState) {
+          'local' => joinConnectionPartsInternal(<String>[
+            appText('OpenClaw Gateway', 'OpenClaw Gateway'),
             latestResolvedModel,
           ]),
-          'multi-agent' => joinConnectionPartsInternal(<String>[
-            appText('Multi-Agent', 'Multi-Agent'),
+          'remote' => joinConnectionPartsInternal(<String>[
+            appText('OpenClaw Gateway', 'OpenClaw Gateway'),
             latestResolvedModel,
           ]),
           _ => joinConnectionPartsInternal(<String>[
-            latestResolvedProviderId.isEmpty
-                ? appText('Single Agent', 'Single Agent')
-                : latestResolvedProviderId,
+            singleAgentResolvedProviderForSession(normalizedSessionKey)
+                        ?.label
+                        .isNotEmpty ==
+                    true
+                ? singleAgentResolvedProviderForSession(normalizedSessionKey)!.label
+                : appText('Single Agent', 'Single Agent'),
             latestResolvedModel,
           ]),
         };

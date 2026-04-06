@@ -11,8 +11,9 @@
 3. UI 选中线程后，系统必须读取完整 `TaskThread`，而不是从页面状态拼装线程信息。
 4. `TaskThread` 持久化 schema 保持不变，但 `workspaceBinding` 在 create/load 时必须完整；缺失 binding 的旧记录按非法数据处理并跳过加载。
 5. 执行请求由 controller / runtime 根据 `ownerScope / workspaceBinding / executionBinding / contextState` 构造。
-6. controller / runtime 统一通过 `Go Agent-core` 调度执行：Desktop 走 App 内 local bridge，Web 走远端 ACP / RPC endpoint。
+6. controller / runtime 统一通过 `GoTaskService` 调度执行：OpenClaw task 走 `TaskThread -> GoTaskService -> GatewayRuntime / Web relay -> OpenClaw gateway`；`singleAgent / multiAgent` 走 `TaskThread -> GoTaskService -> ExternalCodeAgentAcp* -> ACP/provider route`。
 7. 执行结果先回写 `TaskThread.contextState`，主体区域同步显示；UI 与执行始终只读取当前 `TaskThread.workspaceBinding`，不再存在 runtime first-binding 或 fallback 到 `main`。
+8. `contextState` 是线程上下文真相源；`lifecycleState` 只表达生命周期摘要；controller 侧缓存不承载线程持久语义。
 
 ## 2. TaskThread 结构
 
@@ -77,7 +78,7 @@ ExecutionBinding
 
 - 定义线程当前执行模式
 - 定义 provider / endpoint 绑定
-- 为 agent-core / runtime 协调层提供调度输入
+- 为 `GoTaskService / runtime` 协调层提供调度输入
 
 ### 2.4 contextState
 
@@ -132,7 +133,7 @@ flowchart LR
   D3 --> E
   D4 --> E
 
-  E --> F["Go Agent-core\nDesktop: local bridge\nWeb: remote ACP / RPC"]
+  E --> F["GoTaskService\nDesktop: GatewayRuntime / ExternalCodeAgentAcpDesktopTransport\nWeb: relay / ExternalCodeAgentAcpWebTransport"]
   F --> G["执行结果"]
 
   G --> H["回写线程上下文\n(主体区域 同步显示)"]
@@ -146,8 +147,8 @@ flowchart LR
 
 1. UI 仍保持现有形态，但只负责选择 `threadId` 与消费回写结果。
 2. 线程的执行输入来自完整 `TaskThread`。
-3. `构造执行请求` 属于 agent-core / runtime 协调层，不属于 UI。
-4. `Go Agent-core` 是唯一执行调度面；Desktop / Web 共用同一套 session 语义，只在 transport 上有差异。
+3. `构造执行请求` 属于 `GoTaskService / runtime` 协调层，不属于 UI。
+4. `GoTaskService` 是唯一执行调度面；Desktop / Web 共用同一套 session 语义，只在 transport 上有差异。
 5. `回写线程上下文` 是执行结束后的第一落点；主体区域同步显示依赖这一回写。
 6. `workspaceBinding` 不是运行时补齐对象；线程在 create/load 时必须已经完整。
 7. `右栏显示` 与执行请求都读取当前 `TaskThread.workspaceBinding`，因此它与主体区域共享同一线程事实来源。
@@ -161,10 +162,10 @@ flowchart LR
 - UI 不是工作空间推断器。
 - UI 不是线程状态的独立真相源。
 
-### 4.2 agent-core / runtime 协调层约束
+### 4.2 GoTaskService / runtime 协调层约束
 
 - 根据 `ownerScope / workspaceBinding / executionBinding / contextState` 构造执行请求。
-- 负责把线程请求调度到 `Go Agent-core`，而不是让 Flutter UI 直接承担 runtime 职责。
+- 负责把线程请求调度到 `GoTaskService`，而不是让 Flutter UI 直接承担 runtime 职责。
 - 接收执行结果并驱动 `TaskThread` 回写。
 
 ### 4.3 TaskThread 约束
@@ -179,7 +180,7 @@ flowchart LR
 - [task-thread-session-key-isolation-20260329.md](task-thread-session-key-isolation-20260329.md)
   补充“任务线必须先成为真实 `TaskThread/sessionKey`”的隔离约束，说明为什么 single-agent 的工作目录只能围绕当前线程身份解析。
 - [assistant-thread-information-architecture.md](assistant-thread-information-architecture.md)
-  说明线程信息如何进入 UI、agent-core / runtime 请求构造、结果回写和右栏展示。
+  说明线程信息如何进入 UI、`GoTaskService / runtime` 请求构造、结果回写和右栏展示。
 - [xworkmate-internal-state-architecture.md](xworkmate-internal-state-architecture.md)
   说明控制器、状态存储和派生 UI 状态如何围绕 `TaskThread` 组织。
 

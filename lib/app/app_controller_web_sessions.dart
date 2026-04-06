@@ -150,10 +150,11 @@ extension AppControllerWebSessions on AppController {
       singleAgentUsesAiChatFallbackForSession(currentSessionKeyInternal);
 
   String singleAgentRuntimeModelForSession(String sessionKey) {
-    return singleAgentRuntimeModelBySessionInternal[normalizedSessionKeyInternal(
-              sessionKey,
-            )]
-            ?.trim() ??
+    return taskThreadForSessionInternal(
+              normalizedSessionKeyInternal(sessionKey),
+            )
+            ?.latestResolvedRuntimeModel
+            .trim() ??
         '';
   }
 

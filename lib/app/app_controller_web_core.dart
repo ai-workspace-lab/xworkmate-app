@@ -8,7 +8,7 @@ import '../runtime/assistant_artifacts.dart';
 import '../runtime/go_task_service_client.dart';
 import '../runtime/runtime_models.dart';
 import '../web/web_acp_client.dart';
-import '../web/go_agent_core_web_transport.dart';
+import '../web/external_code_agent_acp_web_transport.dart';
 import '../web/go_task_service_web_service.dart';
 import '../web/web_ai_gateway_client.dart';
 import '../web/web_artifact_proxy_client.dart';
@@ -105,8 +105,6 @@ class AppController extends ChangeNotifier {
   final Map<String, String> streamingTextBySessionInternal = <String, String>{};
   final Map<String, Future<void>> threadTurnQueuesInternal =
       <String, Future<void>>{};
-  final Map<String, String> singleAgentRuntimeModelBySessionInternal =
-      <String, String>{};
   final WebTasksController tasksControllerInternal = WebTasksController();
   String currentSessionKeyInternal = '';
   String? lastAssistantErrorInternal;

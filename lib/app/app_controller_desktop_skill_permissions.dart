@@ -273,6 +273,10 @@ extension AppControllerDesktopSkillPermissions on AppController {
     ThreadSelectionSource? assistantModelSource,
     ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
+    String? latestResolvedRuntimeModel,
+    String? lifecycleStatus,
+    double? lastRunAtMs,
+    String? lastResultCode,
   }) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -385,10 +389,14 @@ extension AppControllerDesktopSkillPermissions on AppController {
               selectedSkillsSource:
                   selectedSkillsSource ??
                   existing?.contextState.selectedSkillsSource,
+              latestResolvedRuntimeModel: latestResolvedRuntimeModel,
               gatewayEntryState: gatewayEntryState,
             );
     final nextStatus =
-        lifecycleState?.status ?? existing?.lifecycleState.status ?? 'ready';
+        lifecycleStatus ??
+        lifecycleState?.status ??
+        existing?.lifecycleState.status ??
+        'ready';
     final nextLifecycleState =
         (lifecycleState ??
                 existing?.lifecycleState ??
@@ -407,6 +415,8 @@ extension AppControllerDesktopSkillPermissions on AppController {
                   existing?.archived ??
                   isAssistantTaskArchived(normalizedSessionKey),
               status: nextStatus,
+              lastRunAtMs: lastRunAtMs,
+              lastResultCode: lastResultCode,
             );
     final nextRecord = TaskThread(
       threadId: normalizedSessionKey,
