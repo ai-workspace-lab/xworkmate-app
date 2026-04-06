@@ -358,13 +358,16 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     final visibleExecutionTargets = controller.visibleAssistantExecutionTargets(
       uiFeatures.availableExecutionTargets,
     );
+    final currentExecutionTarget = controller.assistantExecutionTarget;
     final executionTarget = visibleExecutionTargets.contains(
-      controller.assistantExecutionTarget,
+      currentExecutionTarget,
     )
-        ? controller.assistantExecutionTarget
+        ? currentExecutionTarget
+        : currentExecutionTarget == AssistantExecutionTarget.auto
+        ? currentExecutionTarget
         : (visibleExecutionTargets.isNotEmpty
               ? visibleExecutionTargets.first
-              : controller.assistantExecutionTarget);
+              : currentExecutionTarget);
     final permissionLevel = controller.assistantPermissionLevel;
     final selectedSkills = widget.availableSkills
         .where((skill) => widget.selectedSkillKeys.contains(skill.key))
