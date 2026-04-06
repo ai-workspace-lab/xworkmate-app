@@ -132,13 +132,21 @@ class FakeGoTaskServiceClientInternal implements GoTaskServiceClient {
   int capabilitiesCalls = 0;
   int executeCalls = 0;
   int cancelCalls = 0;
+  int syncProvidersCalls = 0;
   GoTaskServiceRequest? lastRequest;
   final List<GoTaskServiceRequest> requests = <GoTaskServiceRequest>[];
+  final List<List<ExternalCodeAgentAcpSyncedProvider>> syncedProvidersHistory =
+      <List<ExternalCodeAgentAcpSyncedProvider>>[];
 
   @override
   Future<void> syncExternalProviders(
     List<ExternalCodeAgentAcpSyncedProvider> providers,
-  ) async {}
+  ) async {
+    syncProvidersCalls += 1;
+    syncedProvidersHistory.add(
+      List<ExternalCodeAgentAcpSyncedProvider>.unmodifiable(providers),
+    );
+  }
 
   @override
   Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({

@@ -15,7 +15,8 @@ typedef ExternalCodeAgentAcpProcessStarter =
       String? workingDirectory,
     });
 
-class ExternalCodeAgentAcpDesktopTransport implements ExternalCodeAgentAcpTransport {
+class ExternalCodeAgentAcpDesktopTransport
+    implements ExternalCodeAgentAcpTransport {
   ExternalCodeAgentAcpDesktopTransport({
     required GatewayAcpClient acpClient,
     required Uri? Function(AssistantExecutionTarget target) endpointResolver,
@@ -32,7 +33,7 @@ class ExternalCodeAgentAcpDesktopTransport implements ExternalCodeAgentAcpTransp
                arguments,
                environment: environment,
                workingDirectory: workingDirectory,
-            );
+             );
            });
 
   final GatewayAcpClient _acpClient;
@@ -43,22 +44,21 @@ class ExternalCodeAgentAcpDesktopTransport implements ExternalCodeAgentAcpTransp
   Process? _localProcess;
   Uri? _localEndpoint;
   Future<Uri?>? _localEndpointFuture;
+  List<ExternalCodeAgentAcpSyncedProvider> _syncedProviders =
+      const <ExternalCodeAgentAcpSyncedProvider>[];
 
   @override
   Future<void> syncExternalProviders(
     List<ExternalCodeAgentAcpSyncedProvider> providers,
   ) async {
+    _syncedProviders = List<ExternalCodeAgentAcpSyncedProvider>.unmodifiable(
+      providers,
+    );
     final endpoint = await _ensureLocalEndpoint();
     if (endpoint == null) {
       return;
     }
-    await _acpClient.request(
-      method: 'xworkmate.providers.sync',
-      params: <String, dynamic>{
-        'providers': providers.map((item) => item.toJson()).toList(growable: false),
-      },
-      endpointOverride: endpoint,
-    );
+    await _syncProvidersToEndpoint(endpoint, _syncedProviders);
   }
 
   @override
@@ -69,6 +69,10 @@ class ExternalCodeAgentAcpDesktopTransport implements ExternalCodeAgentAcpTransp
     final endpoint = await _resolveEndpoint(target);
     if (endpoint == null) {
       return const ExternalCodeAgentAcpCapabilities.empty();
+    }
+    if (target == AssistantExecutionTarget.singleAgent ||
+        target == AssistantExecutionTarget.auto) {
+      await _syncProvidersToEndpoint(endpoint, _syncedProviders);
     }
     final capabilities = await _acpClient.loadCapabilities(
       forceRefresh: forceRefresh,
@@ -93,6 +97,10 @@ class ExternalCodeAgentAcpDesktopTransport implements ExternalCodeAgentAcpTransp
         'Missing external ACP endpoint',
         code: 'EXTERNAL_ACP_ENDPOINT_MISSING',
       );
+    }
+    if (request.target == AssistantExecutionTarget.singleAgent ||
+        request.target == AssistantExecutionTarget.auto) {
+      await _syncProvidersToEndpoint(endpoint, _syncedProviders);
     }
     var streamedText = '';
     String? completedMessage;
@@ -250,5 +258,23 @@ class ExternalCodeAgentAcpDesktopTransport implements ExternalCodeAgentAcpTransp
     }
     await dispose();
     return null;
+  }
+
+  Future<void> _syncProvidersToEndpoint(
+    Uri endpoint,
+    List<ExternalCodeAgentAcpSyncedProvider> providers,
+  ) async {
+    if (providers.isEmpty) {
+      return;
+    }
+    await _acpClient.request(
+      method: 'xworkmate.providers.sync',
+      params: <String, dynamic>{
+        'providers': providers
+            .map((item) => item.toJson())
+            .toList(growable: false),
+      },
+      endpointOverride: endpoint,
+    );
   }
 }
