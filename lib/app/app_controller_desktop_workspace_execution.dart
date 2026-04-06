@@ -53,11 +53,15 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     AssistantExecutionTarget target,
   ) async {
     final resolvedTarget = sanitizePersistedExecutionTargetInternal(target);
+    final currentThread = taskThreadForSessionInternal(
+      sessionsControllerInternal.currentSessionKey,
+    );
     final currentTarget = assistantExecutionTargetForSession(
       sessionsControllerInternal.currentSessionKey,
     );
     if (currentTarget == resolvedTarget &&
-        settings.assistantExecutionTarget == resolvedTarget) {
+        settings.assistantExecutionTarget == resolvedTarget &&
+        (currentThread?.hasExplicitExecutionTargetSelection ?? false)) {
       return;
     }
     if (!assistantThreadRecordsInternal.containsKey(

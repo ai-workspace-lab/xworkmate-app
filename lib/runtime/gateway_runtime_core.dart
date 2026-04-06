@@ -56,6 +56,8 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
   bool manualDisconnectInternal = false;
   bool suppressReconnectInternal = false;
   int requestCounterInternal = 0;
+  String? pairingRequestFingerprintInternal;
+  int? pairingRequestSuppressUntilMsInternal;
 
   GatewayConnectionSnapshot snapshotInternal =
       GatewayConnectionSnapshot.initial(
@@ -218,6 +220,55 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
     );
     final usedStoredDeviceTokenOnly =
         sharedToken.isEmpty && deviceToken.isNotEmpty;
+    final pairingRequestFingerprint = [
+      profile.mode.name,
+      endpoint?.$1 ?? '',
+      '${endpoint?.$2 ?? 0}',
+      '${endpoint?.$3 ?? false}',
+      identity.deviceId,
+      authToken,
+      deviceToken,
+      password,
+    ].join('|');
+
+    if (pairingRequestFingerprintInternal == pairingRequestFingerprint &&
+        (pairingRequestSuppressUntilMsInternal ?? 0) >
+            DateTime.now().millisecondsSinceEpoch) {
+      final retryAfterMs =
+          (pairingRequestSuppressUntilMsInternal ?? 0) -
+          DateTime.now().millisecondsSinceEpoch;
+      appendLogInternal(
+        this,
+        'info',
+        'pairing',
+        'reusing pending pairing request; suppress repeated connect for ${max(1, retryAfterMs ~/ 1000)}s',
+      );
+      snapshotInternal = GatewayConnectionSnapshot.initial(mode: profile.mode)
+          .copyWith(
+            status: RuntimeConnectionStatus.error,
+            statusText: 'Connection pending approval',
+            remoteAddress: endpoint == null
+                ? null
+                : '${endpoint.$1}:${endpoint.$2}',
+            deviceId: identity.deviceId,
+            authRole: 'operator',
+            authScopes: kDefaultOperatorConnectScopes,
+            lastError: 'pairing required',
+            lastErrorCode: 'NOT_PAIRED',
+            lastErrorDetailCode: 'PAIRING_REQUIRED',
+            connectAuthMode: connectAuthMode,
+            connectAuthFields: connectAuthFields,
+            connectAuthSources: connectAuthSources,
+            hasSharedAuth: sharedToken.isNotEmpty || password.isNotEmpty,
+            hasDeviceToken: deviceToken.isNotEmpty,
+          );
+      notifyListeners();
+      throw GatewayRuntimeException(
+        'pairing required',
+        code: 'NOT_PAIRED',
+        details: const <String, dynamic>{'code': 'PAIRING_REQUIRED'},
+      );
+    }
 
     if (endpoint == null) {
       appendLogInternal(
@@ -309,6 +360,8 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
           );
         }
         snapshotInternal = connectResult.snapshot;
+        pairingRequestFingerprintInternal = null;
+        pairingRequestSuppressUntilMsInternal = null;
         notifyListeners();
         return;
       } on GatewayRuntimeException catch (error) {
@@ -448,9 +501,23 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
         'connect',
         'connected ${endpoint.$1}:${endpoint.$2} | role: $negotiatedRole | scopes: ${negotiatedScopes.length}',
       );
+      pairingRequestFingerprintInternal = null;
+      pairingRequestSuppressUntilMsInternal = null;
       notifyListeners();
     } catch (error) {
       final runtimeError = error is GatewayRuntimeException ? error : null;
+      if (isPairingRequiredErrorInternal(
+        runtimeError?.code,
+        runtimeError?.detailCode,
+      )) {
+        pairingRequestFingerprintInternal = pairingRequestFingerprint;
+        pairingRequestSuppressUntilMsInternal = DateTime.now()
+            .add(const Duration(seconds: 8))
+            .millisecondsSinceEpoch;
+      } else {
+        pairingRequestFingerprintInternal = null;
+        pairingRequestSuppressUntilMsInternal = null;
+      }
       if (runtimeError?.detailCode == 'AUTH_DEVICE_TOKEN_MISMATCH' &&
           deviceToken.isNotEmpty &&
           sharedToken.isEmpty) {
@@ -518,6 +585,8 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
 
   Future<void> disconnect({bool clearDesiredProfile = true}) async {
     manualDisconnectInternal = true;
+    pairingRequestFingerprintInternal = null;
+    pairingRequestSuppressUntilMsInternal = null;
     appendLogInternal(this, 'info', 'connect', 'manual disconnect');
     if (clearDesiredProfile) {
       desiredProfileInternal = null;

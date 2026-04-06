@@ -97,6 +97,74 @@ void main() {
   );
 
   test(
+    'SettingsController uses synced account defaults only when local settings are empty',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-settings-account-local-priority-',
+      );
+      addTearDown(() async => _deleteDirectoryBestEffort(tempDirectory));
+      final store = _createIsolatedStore(tempDirectory.path);
+      addTearDown(store.dispose);
+
+      final client = _MutableAccountRuntimeClient();
+      final controller = SettingsController(
+        store,
+        accountClientFactory: (_) => client,
+      );
+      await controller.initialize();
+      await controller.saveSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          accountBaseUrl: _MutableAccountRuntimeClient.accountBaseUrl,
+          accountUsername: _MutableAccountRuntimeClient.loginEmail,
+          gatewayProfiles: replaceGatewayProfileAt(
+            SettingsSnapshot.defaults().gatewayProfiles,
+            kGatewayRemoteProfileIndex,
+            GatewayConnectionProfile.defaultsRemote().copyWith(
+              host: 'gateway.local.example',
+              port: 8443,
+              tls: true,
+              tokenRef: 'custom_remote_token',
+            ),
+          ),
+          vault: SettingsSnapshot.defaults().vault.copyWith(
+            address: 'https://vault.local.example',
+            namespace: 'local-team',
+          ),
+          aiGateway: SettingsSnapshot.defaults().aiGateway.copyWith(
+            baseUrl: 'https://ai.local.example/v1',
+            apiKeyRef: 'local_ai_key_ref',
+          ),
+          ollamaCloud: SettingsSnapshot.defaults().ollamaCloud.copyWith(
+            apiKeyRef: 'local_ollama_key_ref',
+          ),
+        ),
+      );
+
+      await controller.loginAccount(
+        baseUrl: _MutableAccountRuntimeClient.accountBaseUrl,
+        identifier: _MutableAccountRuntimeClient.loginEmail,
+        password: _MutableAccountRuntimeClient.loginPassword,
+      );
+
+      final remoteProfile =
+          controller.snapshot.gatewayProfiles[kGatewayRemoteProfileIndex];
+      expect(remoteProfile.host, 'gateway.local.example');
+      expect(remoteProfile.port, 8443);
+      expect(remoteProfile.tokenRef, 'custom_remote_token');
+      expect(controller.snapshot.vault.address, 'https://vault.local.example');
+      expect(controller.snapshot.vault.namespace, 'local-team');
+      expect(
+        controller.snapshot.aiGateway.baseUrl,
+        'https://ai.local.example/v1',
+      );
+      expect(controller.snapshot.aiGateway.apiKeyRef, 'local_ai_key_ref');
+      expect(controller.snapshot.ollamaCloud.apiKeyRef, 'local_ollama_key_ref');
+      expect(controller.snapshot.accountLocalMode, isFalse);
+    },
+  );
+
+  test(
     'SettingsController completes MFA verification before restoring the account session',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -216,7 +284,7 @@ void main() {
   );
 
   test(
-    'SettingsController logout clears session but keeps synced defaults and override flags',
+    'SettingsController logout clears session, restores stored local settings, and keeps sync metadata',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -236,6 +304,22 @@ void main() {
         SettingsSnapshot.defaults().copyWith(
           accountBaseUrl: _MutableAccountRuntimeClient.accountBaseUrl,
           accountUsername: _MutableAccountRuntimeClient.loginEmail,
+          gatewayProfiles: replaceGatewayProfileAt(
+            SettingsSnapshot.defaults().gatewayProfiles,
+            kGatewayRemoteProfileIndex,
+            GatewayConnectionProfile.defaultsRemote().copyWith(
+              host: 'gateway.logout.local',
+              port: 9443,
+              tls: true,
+            ),
+          ),
+          vault: SettingsSnapshot.defaults().vault.copyWith(
+            address: 'https://vault.logout.local',
+            namespace: 'logout-team',
+          ),
+          aiGateway: SettingsSnapshot.defaults().aiGateway.copyWith(
+            baseUrl: 'https://ai.logout.local/v1',
+          ),
         ),
       );
 
@@ -243,13 +327,6 @@ void main() {
         baseUrl: _MutableAccountRuntimeClient.accountBaseUrl,
         identifier: _MutableAccountRuntimeClient.loginEmail,
         password: _MutableAccountRuntimeClient.loginPassword,
-      );
-      await controller.saveSnapshot(
-        controller.snapshot.copyWith(
-          aiGateway: controller.snapshot.aiGateway.copyWith(
-            baseUrl: 'https://local-ai.example.com/v1',
-          ),
-        ),
       );
 
       await controller.logoutAccount();
@@ -260,12 +337,20 @@ void main() {
       expect(await store.loadAccountSessionIdentifier(), isNull);
       expect(await store.loadAccountSessionSummary(), isNull);
       expect(await store.loadAccountSyncState(), isNotNull);
-      expect(controller.snapshot.aiGateway.baseUrl, 'https://local-ai.example.com/v1');
+      expect(
+        controller.snapshot.gatewayProfiles[kGatewayRemoteProfileIndex].host,
+        'gateway.logout.local',
+      );
+      expect(controller.snapshot.vault.address, 'https://vault.logout.local');
+      expect(controller.snapshot.vault.namespace, 'logout-team');
+      expect(
+        controller.snapshot.aiGateway.baseUrl,
+        'https://ai.logout.local/v1',
+      );
       expect(controller.snapshot.accountLocalMode, isTrue);
       expect(
-        (await store.loadAccountSyncState())
-            ?.overrideFlags[kAccountOverrideAiGatewayBaseUrl],
-        isTrue,
+        controller.accountSyncState?.syncedDefaults.apisixUrl,
+        'https://apisix.account.example/v1',
       );
     },
   );

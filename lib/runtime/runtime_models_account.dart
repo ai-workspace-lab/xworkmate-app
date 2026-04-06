@@ -1,3 +1,5 @@
+import 'runtime_models_configs.dart';
+
 class AccountSessionSummary {
   const AccountSessionSummary({
     required this.userId,
@@ -69,11 +71,7 @@ class AccountTokenConfigured {
     );
   }
 
-  AccountTokenConfigured copyWith({
-    bool? openclaw,
-    bool? vault,
-    bool? apisix,
-  }) {
+  AccountTokenConfigured copyWith({bool? openclaw, bool? vault, bool? apisix}) {
     return AccountTokenConfigured(
       openclaw: openclaw ?? this.openclaw,
       vault: vault ?? this.vault,
@@ -82,11 +80,7 @@ class AccountTokenConfigured {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'openclaw': openclaw,
-      'vault': vault,
-      'apisix': apisix,
-    };
+    return {'openclaw': openclaw, 'vault': vault, 'apisix': apisix};
   }
 
   factory AccountTokenConfigured.fromJson(Map<String, dynamic> json) {
@@ -223,7 +217,8 @@ class AccountRemoteProfile {
       return value
           .whereType<Map>()
           .map(
-            (item) => AccountSecretLocator.fromJson(item.cast<String, dynamic>()),
+            (item) =>
+                AccountSecretLocator.fromJson(item.cast<String, dynamic>()),
           )
           .toList(growable: false);
     }
@@ -267,9 +262,86 @@ class AccountProfileResponse {
   final AccountTokenConfigured tokenConfigured;
 }
 
+class AccountStoredSettingsSnapshot {
+  const AccountStoredSettingsSnapshot({
+    required this.gatewayRemoteProfile,
+    required this.vaultAddress,
+    required this.vaultNamespace,
+    required this.aiGatewayBaseUrl,
+    required this.aiGatewayApiKeyRef,
+    required this.ollamaCloudApiKeyRef,
+  });
+
+  final GatewayConnectionProfile gatewayRemoteProfile;
+  final String vaultAddress;
+  final String vaultNamespace;
+  final String aiGatewayBaseUrl;
+  final String aiGatewayApiKeyRef;
+  final String ollamaCloudApiKeyRef;
+
+  factory AccountStoredSettingsSnapshot.defaults() {
+    return AccountStoredSettingsSnapshot(
+      gatewayRemoteProfile: GatewayConnectionProfile.defaultsRemote(),
+      vaultAddress: '',
+      vaultNamespace: '',
+      aiGatewayBaseUrl: '',
+      aiGatewayApiKeyRef: AiGatewayProfile.defaults().apiKeyRef,
+      ollamaCloudApiKeyRef: OllamaCloudConfig.defaults().apiKeyRef,
+    );
+  }
+
+  AccountStoredSettingsSnapshot copyWith({
+    GatewayConnectionProfile? gatewayRemoteProfile,
+    String? vaultAddress,
+    String? vaultNamespace,
+    String? aiGatewayBaseUrl,
+    String? aiGatewayApiKeyRef,
+    String? ollamaCloudApiKeyRef,
+  }) {
+    return AccountStoredSettingsSnapshot(
+      gatewayRemoteProfile: gatewayRemoteProfile ?? this.gatewayRemoteProfile,
+      vaultAddress: vaultAddress ?? this.vaultAddress,
+      vaultNamespace: vaultNamespace ?? this.vaultNamespace,
+      aiGatewayBaseUrl: aiGatewayBaseUrl ?? this.aiGatewayBaseUrl,
+      aiGatewayApiKeyRef: aiGatewayApiKeyRef ?? this.aiGatewayApiKeyRef,
+      ollamaCloudApiKeyRef: ollamaCloudApiKeyRef ?? this.ollamaCloudApiKeyRef,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'gatewayRemoteProfile': gatewayRemoteProfile.toJson(),
+      'vaultAddress': vaultAddress,
+      'vaultNamespace': vaultNamespace,
+      'aiGatewayBaseUrl': aiGatewayBaseUrl,
+      'aiGatewayApiKeyRef': aiGatewayApiKeyRef,
+      'ollamaCloudApiKeyRef': ollamaCloudApiKeyRef,
+    };
+  }
+
+  factory AccountStoredSettingsSnapshot.fromJson(Map<String, dynamic> json) {
+    return AccountStoredSettingsSnapshot(
+      gatewayRemoteProfile: GatewayConnectionProfile.fromJson(
+        (json['gatewayRemoteProfile'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
+      ),
+      vaultAddress: json['vaultAddress'] as String? ?? '',
+      vaultNamespace: json['vaultNamespace'] as String? ?? '',
+      aiGatewayBaseUrl: json['aiGatewayBaseUrl'] as String? ?? '',
+      aiGatewayApiKeyRef:
+          json['aiGatewayApiKeyRef'] as String? ??
+          AiGatewayProfile.defaults().apiKeyRef,
+      ollamaCloudApiKeyRef:
+          json['ollamaCloudApiKeyRef'] as String? ??
+          OllamaCloudConfig.defaults().apiKeyRef,
+    );
+  }
+}
+
 class AccountSyncState {
   const AccountSyncState({
     required this.syncedDefaults,
+    required this.localSettings,
     required this.overrideFlags,
     required this.syncState,
     required this.syncMessage,
@@ -281,6 +353,7 @@ class AccountSyncState {
   });
 
   final AccountRemoteProfile syncedDefaults;
+  final AccountStoredSettingsSnapshot localSettings;
   final Map<String, bool> overrideFlags;
   final String syncState;
   final String syncMessage;
@@ -293,6 +366,7 @@ class AccountSyncState {
   factory AccountSyncState.defaults() {
     return AccountSyncState(
       syncedDefaults: AccountRemoteProfile.defaults(),
+      localSettings: AccountStoredSettingsSnapshot.defaults(),
       overrideFlags: const <String, bool>{},
       syncState: 'idle',
       syncMessage: 'Remote config not synced yet',
@@ -306,6 +380,7 @@ class AccountSyncState {
 
   AccountSyncState copyWith({
     AccountRemoteProfile? syncedDefaults,
+    AccountStoredSettingsSnapshot? localSettings,
     Map<String, bool>? overrideFlags,
     String? syncState,
     String? syncMessage,
@@ -317,6 +392,7 @@ class AccountSyncState {
   }) {
     return AccountSyncState(
       syncedDefaults: syncedDefaults ?? this.syncedDefaults,
+      localSettings: localSettings ?? this.localSettings,
       overrideFlags: overrideFlags ?? this.overrideFlags,
       syncState: syncState ?? this.syncState,
       syncMessage: syncMessage ?? this.syncMessage,
@@ -331,6 +407,7 @@ class AccountSyncState {
   Map<String, dynamic> toJson() {
     return {
       'syncedDefaults': syncedDefaults.toJson(),
+      'localSettings': localSettings.toJson(),
       'overrideFlags': overrideFlags,
       'syncState': syncState,
       'syncMessage': syncMessage,
@@ -357,6 +434,10 @@ class AccountSyncState {
         (json['syncedDefaults'] as Map?)?.cast<String, dynamic>() ??
             const <String, dynamic>{},
       ),
+      localSettings: AccountStoredSettingsSnapshot.fromJson(
+        (json['localSettings'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
+      ),
       overrideFlags: decodeOverrideFlags(json['overrideFlags']),
       syncState: json['syncState'] as String? ?? 'idle',
       syncMessage:
@@ -374,10 +455,7 @@ class AccountSyncState {
 }
 
 class AccountSyncResult {
-  const AccountSyncResult({
-    required this.state,
-    required this.message,
-  });
+  const AccountSyncResult({required this.state, required this.message});
 
   final String state;
   final String message;

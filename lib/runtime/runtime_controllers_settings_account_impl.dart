@@ -256,8 +256,14 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     final previousState =
         await loadAccountSyncStateWithLegacyMigrationInternal(controller) ??
         AccountSyncState.defaults();
+    final localSettings = controller.snapshotInternal.accountLocalMode
+        ? captureAccountStoredSettingsSnapshotInternal(
+            controller.snapshotInternal,
+          )
+        : previousState.localSettings;
     final nextState = previousState.copyWith(
       syncedDefaults: response.profile,
+      localSettings: localSettings,
       syncState: 'ready',
       syncMessage: 'Remote defaults synced',
       lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
@@ -311,13 +317,26 @@ Future<void> applyAccountSyncedDefaultsSettingsInternal(
   final previous = controller.snapshotInternal;
   var next = previous;
   final defaults = state.syncedDefaults;
+  final localSettings = state.localSettings;
   final overrideFlags = state.overrideFlags;
+  final localRemoteProfile =
+      _isOverrideDisabled(overrideFlags, kAccountOverrideGatewayRemoteEndpoint)
+      ? localSettings.gatewayRemoteProfile
+      : previous.gatewayProfiles[kGatewayRemoteProfileIndex];
 
-  if (_isOverrideDisabled(
-        overrideFlags,
-        kAccountOverrideGatewayRemoteEndpoint,
-      ) &&
-      defaults.openclawUrl.trim().isNotEmpty) {
+  if (_gatewayRemoteEndpointConfiguredInternal(localRemoteProfile)) {
+    next = next.copyWithGatewayProfileAt(
+      kGatewayRemoteProfileIndex,
+      next.gatewayProfiles[kGatewayRemoteProfileIndex].copyWith(
+        mode: RuntimeConnectionMode.remote,
+        useSetupCode: localRemoteProfile.useSetupCode,
+        setupCode: localRemoteProfile.setupCode,
+        host: localRemoteProfile.host,
+        port: localRemoteProfile.port,
+        tls: localRemoteProfile.tls,
+      ),
+    );
+  } else if (defaults.openclawUrl.trim().isNotEmpty) {
     final remoteProfile = previous.gatewayProfiles[kGatewayRemoteProfileIndex];
     final normalized = normalizeGatewayManualEndpointInternal(
       host: defaults.openclawUrl,
@@ -340,6 +359,19 @@ Future<void> applyAccountSyncedDefaultsSettingsInternal(
   final gatewayTokenLocator = defaults.locatorForTarget(
     kAccountManagedSecretTargetOpenclawGatewayToken,
   );
+  final preferredGatewayTokenRef = _effectiveAccountManagedRefInternal(
+    currentRef: previous.gatewayProfiles[kGatewayRemoteProfileIndex].tokenRef
+        .trim(),
+    storedRef: localSettings.gatewayRemoteProfile.tokenRef.trim(),
+    defaultRef: GatewayConnectionProfile.defaultsRemote().tokenRef,
+  );
+  if (preferredGatewayTokenRef.isNotEmpty) {
+    final remoteProfile = next.gatewayProfiles[kGatewayRemoteProfileIndex];
+    next = next.copyWithGatewayProfileAt(
+      kGatewayRemoteProfileIndex,
+      remoteProfile.copyWith(tokenRef: preferredGatewayTokenRef),
+    );
+  }
   if (gatewayTokenLocator != null) {
     final remoteProfile = next.gatewayProfiles[kGatewayRemoteProfileIndex];
     final currentTokenRef = remoteProfile.tokenRef.trim();
@@ -353,22 +385,56 @@ Future<void> applyAccountSyncedDefaultsSettingsInternal(
     }
   }
 
-  if (_isOverrideDisabled(overrideFlags, kAccountOverrideVaultAddress) &&
-      defaults.vaultUrl.trim().isNotEmpty) {
+  final preferredVaultAddress = _effectiveAccountManagedValueInternal(
+    currentValue: previous.vault.address.trim(),
+    storedValue: localSettings.vaultAddress.trim(),
+    allowCurrentOverride: !_isOverrideDisabled(
+      overrideFlags,
+      kAccountOverrideVaultAddress,
+    ),
+    defaultValue: VaultConfig.defaults().address,
+  );
+  if (preferredVaultAddress.isNotEmpty) {
+    next = next.copyWith(
+      vault: next.vault.copyWith(address: preferredVaultAddress),
+    );
+  } else if (defaults.vaultUrl.trim().isNotEmpty) {
     next = next.copyWith(
       vault: next.vault.copyWith(address: defaults.vaultUrl.trim()),
     );
   }
 
-  if (_isOverrideDisabled(overrideFlags, kAccountOverrideVaultNamespace) &&
-      defaults.vaultNamespace.trim().isNotEmpty) {
+  final preferredVaultNamespace = _effectiveAccountManagedValueInternal(
+    currentValue: previous.vault.namespace.trim(),
+    storedValue: localSettings.vaultNamespace.trim(),
+    allowCurrentOverride: !_isOverrideDisabled(
+      overrideFlags,
+      kAccountOverrideVaultNamespace,
+    ),
+  );
+  if (preferredVaultNamespace.isNotEmpty) {
+    next = next.copyWith(
+      vault: next.vault.copyWith(namespace: preferredVaultNamespace),
+    );
+  } else if (defaults.vaultNamespace.trim().isNotEmpty) {
     next = next.copyWith(
       vault: next.vault.copyWith(namespace: defaults.vaultNamespace.trim()),
     );
   }
 
-  if (_isOverrideDisabled(overrideFlags, kAccountOverrideAiGatewayBaseUrl) &&
-      defaults.apisixUrl.trim().isNotEmpty) {
+  final preferredAiGatewayBaseUrl = _effectiveAccountManagedValueInternal(
+    currentValue: previous.aiGateway.baseUrl.trim(),
+    storedValue: localSettings.aiGatewayBaseUrl.trim(),
+    allowCurrentOverride: !_isOverrideDisabled(
+      overrideFlags,
+      kAccountOverrideAiGatewayBaseUrl,
+    ),
+  );
+  if (preferredAiGatewayBaseUrl.isNotEmpty) {
+    next = next.copyWith(
+      aiGateway: next.aiGateway.copyWith(baseUrl: preferredAiGatewayBaseUrl),
+    );
+  } else if (defaults.apisixUrl.trim().isNotEmpty) {
     next = next.copyWith(
       aiGateway: next.aiGateway.copyWith(baseUrl: defaults.apisixUrl.trim()),
     );
@@ -377,8 +443,22 @@ Future<void> applyAccountSyncedDefaultsSettingsInternal(
   final aiGatewayLocator = defaults.locatorForTarget(
     kAccountManagedSecretTargetAIGatewayAccessToken,
   );
-  if (_isOverrideDisabled(overrideFlags, kAccountOverrideAiGatewayApiKeyRef) &&
-      aiGatewayLocator != null) {
+  final preferredAiGatewayApiKeyRef = _effectiveAccountManagedRefInternal(
+    currentRef: previous.aiGateway.apiKeyRef.trim(),
+    storedRef: localSettings.aiGatewayApiKeyRef.trim(),
+    defaultRef: AiGatewayProfile.defaults().apiKeyRef,
+    allowCurrentOverride: !_isOverrideDisabled(
+      overrideFlags,
+      kAccountOverrideAiGatewayApiKeyRef,
+    ),
+  );
+  if (preferredAiGatewayApiKeyRef.isNotEmpty) {
+    next = next.copyWith(
+      aiGateway: next.aiGateway.copyWith(
+        apiKeyRef: preferredAiGatewayApiKeyRef,
+      ),
+    );
+  } else if (aiGatewayLocator != null) {
     next = next.copyWith(
       aiGateway: next.aiGateway.copyWith(apiKeyRef: aiGatewayLocator.target),
     );
@@ -387,11 +467,22 @@ Future<void> applyAccountSyncedDefaultsSettingsInternal(
   final ollamaLocator = defaults.locatorForTarget(
     kAccountManagedSecretTargetOllamaCloudApiKey,
   );
-  if (_isOverrideDisabled(
-        overrideFlags,
-        kAccountOverrideOllamaCloudApiKeyRef,
-      ) &&
-      ollamaLocator != null) {
+  final preferredOllamaCloudApiKeyRef = _effectiveAccountManagedRefInternal(
+    currentRef: previous.ollamaCloud.apiKeyRef.trim(),
+    storedRef: localSettings.ollamaCloudApiKeyRef.trim(),
+    defaultRef: OllamaCloudConfig.defaults().apiKeyRef,
+    allowCurrentOverride: !_isOverrideDisabled(
+      overrideFlags,
+      kAccountOverrideOllamaCloudApiKeyRef,
+    ),
+  );
+  if (preferredOllamaCloudApiKeyRef.isNotEmpty) {
+    next = next.copyWith(
+      ollamaCloud: next.ollamaCloud.copyWith(
+        apiKeyRef: preferredOllamaCloudApiKeyRef,
+      ),
+    );
+  } else if (ollamaLocator != null) {
     next = next.copyWith(
       ollamaCloud: next.ollamaCloud.copyWith(apiKeyRef: ollamaLocator.target),
     );
@@ -422,11 +513,18 @@ Future<void> logoutAccountSettingsInternal(
   await controller.storeInternal.clearAccountSessionUserId();
   await controller.storeInternal.clearAccountSessionIdentifier();
   await controller.storeInternal.clearAccountSessionSummary();
+  final syncState = await loadAccountSyncStateWithLegacyMigrationInternal(
+    controller,
+  );
   if (!controller.snapshotInternal.accountLocalMode) {
-    await controller.saveSnapshot(
-      controller.snapshotInternal.copyWith(accountLocalMode: true),
-      recordAccountOverrides: false,
-    );
+    final localSettings = syncState?.localSettings;
+    final nextSnapshot = localSettings == null
+        ? controller.snapshotInternal.copyWith(accountLocalMode: true)
+        : restoreAccountStoredSettingsSnapshotInternal(
+            controller.snapshotInternal,
+            localSettings: localSettings,
+          ).copyWith(accountLocalMode: true);
+    await controller.saveSnapshot(nextSnapshot, recordAccountOverrides: false);
   } else {
     await controller.reloadDerivedStateInternal();
   }
@@ -481,6 +579,93 @@ Future<AccountSyncState?> loadAccountSyncStateWithLegacyMigrationInternal(
   await controller.storeInternal.saveAccountSyncState(migrated);
   await controller.storeInternal.clearAccountProfile();
   return migrated;
+}
+
+AccountStoredSettingsSnapshot captureAccountStoredSettingsSnapshotInternal(
+  SettingsSnapshot snapshot,
+) {
+  return AccountStoredSettingsSnapshot(
+    gatewayRemoteProfile: snapshot.gatewayProfiles[kGatewayRemoteProfileIndex],
+    vaultAddress: snapshot.vault.address,
+    vaultNamespace: snapshot.vault.namespace,
+    aiGatewayBaseUrl: snapshot.aiGateway.baseUrl,
+    aiGatewayApiKeyRef: snapshot.aiGateway.apiKeyRef,
+    ollamaCloudApiKeyRef: snapshot.ollamaCloud.apiKeyRef,
+  );
+}
+
+SettingsSnapshot restoreAccountStoredSettingsSnapshotInternal(
+  SettingsSnapshot snapshot, {
+  required AccountStoredSettingsSnapshot localSettings,
+}) {
+  return snapshot
+      .copyWithGatewayProfileAt(
+        kGatewayRemoteProfileIndex,
+        localSettings.gatewayRemoteProfile,
+      )
+      .copyWith(
+        vault: snapshot.vault.copyWith(
+          address: localSettings.vaultAddress,
+          namespace: localSettings.vaultNamespace,
+        ),
+        aiGateway: snapshot.aiGateway.copyWith(
+          baseUrl: localSettings.aiGatewayBaseUrl,
+          apiKeyRef: localSettings.aiGatewayApiKeyRef,
+        ),
+        ollamaCloud: snapshot.ollamaCloud.copyWith(
+          apiKeyRef: localSettings.ollamaCloudApiKeyRef,
+        ),
+      );
+}
+
+bool _gatewayRemoteEndpointConfiguredInternal(
+  GatewayConnectionProfile profile,
+) {
+  final defaults = GatewayConnectionProfile.defaultsRemote();
+  return profile.useSetupCode ||
+      profile.setupCode.trim().isNotEmpty ||
+      profile.host.trim().isNotEmpty && profile.host.trim() != defaults.host ||
+      profile.port != defaults.port ||
+      profile.tls != defaults.tls;
+}
+
+String _effectiveAccountManagedValueInternal({
+  required String currentValue,
+  required String storedValue,
+  bool allowCurrentOverride = true,
+  String defaultValue = '',
+}) {
+  final normalizedCurrent = currentValue.trim();
+  final normalizedStored = storedValue.trim();
+  final normalizedDefault = defaultValue.trim();
+  if (allowCurrentOverride &&
+      normalizedCurrent.isNotEmpty &&
+      normalizedCurrent != normalizedDefault) {
+    return normalizedCurrent;
+  }
+  if (normalizedStored.isNotEmpty && normalizedStored != normalizedDefault) {
+    return normalizedStored;
+  }
+  return '';
+}
+
+String _effectiveAccountManagedRefInternal({
+  required String currentRef,
+  required String storedRef,
+  required String defaultRef,
+  bool allowCurrentOverride = false,
+}) {
+  final normalizedCurrent = currentRef.trim();
+  final normalizedStored = storedRef.trim();
+  if (allowCurrentOverride &&
+      normalizedCurrent.isNotEmpty &&
+      normalizedCurrent != defaultRef) {
+    return normalizedCurrent;
+  }
+  if (normalizedStored.isNotEmpty && normalizedStored != defaultRef) {
+    return normalizedStored;
+  }
+  return '';
 }
 
 Future<void> markAccountOverrideSettingsInternal(

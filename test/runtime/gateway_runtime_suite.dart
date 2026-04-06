@@ -379,7 +379,10 @@ void main() {
 
       expect(server.connectAuth, isNull);
       expect(runtime.snapshot.status, RuntimeConnectionStatus.error);
-      expect(runtime.snapshot.lastErrorCode, 'GO_GATEWAY_RUNTIME_ENDPOINT_MISSING');
+      expect(
+        runtime.snapshot.lastErrorCode,
+        'GO_GATEWAY_RUNTIME_ENDPOINT_MISSING',
+      );
     },
   );
 
@@ -580,6 +583,60 @@ void main() {
           (entry) =>
               entry.category == 'auth' &&
               entry.message.contains('cleared stale device token'),
+        ),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'GatewayRuntime suppresses repeated pairing requests for the same device during cooldown',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final store = createIsolatedTestStore();
+      final runtime = GatewayRuntime(
+        store: store,
+        identityStore: DeviceIdentityStore(store),
+      );
+      final server = await FakeGatewayRuntimeServerInternal.start(
+        connectErrorCode: 'NOT_PAIRED',
+        connectErrorDetailCode: 'PAIRING_REQUIRED',
+        connectErrorMessage: 'pairing required',
+        closeAfterConnectError: true,
+      );
+      addTearDown(runtime.dispose);
+      addTearDown(server.close);
+
+      final profile = GatewayConnectionProfile.defaults().copyWith(
+        mode: RuntimeConnectionMode.remote,
+        host: '127.0.0.1',
+        port: server.port,
+        tls: false,
+        useSetupCode: false,
+      );
+
+      await expectLater(
+        () => runtime.connectProfile(
+          profile,
+          authTokenOverride: 'shared-token-from-form',
+        ),
+        throwsA(isA<GatewayRuntimeException>()),
+      );
+      await expectLater(
+        () => runtime.connectProfile(
+          profile,
+          authTokenOverride: 'shared-token-from-form',
+        ),
+        throwsA(isA<GatewayRuntimeException>()),
+      );
+
+      expect(server.connectRequestCount, 1);
+      expect(runtime.snapshot.pairingRequired, isTrue);
+      expect(
+        runtime.logs.any(
+          (entry) =>
+              entry.category == 'pairing' &&
+              entry.message.contains('reusing pending pairing request'),
         ),
         isTrue,
       );
