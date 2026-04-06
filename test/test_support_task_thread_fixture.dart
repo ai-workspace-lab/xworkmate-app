@@ -9,7 +9,7 @@ TaskThread buildTaskThreadFixture({
   AssistantExecutionTarget executionTarget =
       AssistantExecutionTarget.singleAgent,
   SingleAgentProvider singleAgentProvider = SingleAgentProvider.auto,
-  String workspacePath = '',
+  String workspacePath = '/tmp/task-thread-fixture',
   WorkspaceKind workspaceKind = WorkspaceKind.localFs,
   bool writable = true,
   String? displayPath,
@@ -29,9 +29,7 @@ TaskThread buildTaskThreadFixture({
   String? lastResultCode,
 }) {
   final normalizedDisplayPath = displayPath ?? workspacePath;
-  final normalizedStatus =
-      lifecycleStatus ??
-      (workspacePath.trim().isEmpty ? 'needs_workspace' : 'ready');
+  final normalizedStatus = lifecycleStatus ?? 'ready';
   return TaskThread(
     threadId: threadId,
     title: title,

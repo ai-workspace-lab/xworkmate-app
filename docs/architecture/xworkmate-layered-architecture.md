@@ -304,7 +304,7 @@ flowchart LR
     H --> I
 
     I --> J["回写 contextState / lifecycleState"]
-    I --> K["必要时回写 workspaceBinding"]
+    I --> K["仅显式回写当前已完整线程的 workspaceBinding"]
 
     J --> L["持久化 TaskThread"]
     K --> L
@@ -317,7 +317,8 @@ flowchart LR
 - 线程先绑定，再执行
 - 执行模式由 `executionBinding` 决定
 - 结果先回写线程，再刷新 UI
-- 远端返回新的 working directory 时，应该回写 `workspaceBinding`
+- 远端返回新的 working directory 时，只能显式回写当前已完整线程的 `workspaceBinding`
+- 这类回写不能创建 first binding，也不能改变线程身份
 
 ## 当前代码里的真实组件映射
 
