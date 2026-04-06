@@ -449,6 +449,13 @@ extension AppControllerDesktopSettingsRuntime on AppController {
           await skillDirectoryAccessServiceInternal.resolveUserHomeDirectory();
       await settingsControllerInternal.initialize();
       final storedAssistantThreads = await storeInternal.loadTaskThreads();
+      final skippedInvalidThreadIds = storeInternal.lastSkippedInvalidTaskThreadIds;
+      startupTaskThreadWarningInternal = skippedInvalidThreadIds.isEmpty
+          ? null
+          : appText(
+              '已跳过 ${skippedInvalidThreadIds.length} 个缺少完整 workspaceBinding 的旧任务线程: ${skippedInvalidThreadIds.join(', ')}',
+              'Skipped ${skippedInvalidThreadIds.length} persisted task threads missing a complete workspaceBinding: ${skippedInvalidThreadIds.join(', ')}',
+            );
       if (disposedInternal) {
         return;
       }

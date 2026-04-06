@@ -260,9 +260,8 @@ extension AppControllerDesktopSettings on AppController {
     await flushAssistantThreadPersistenceInternal();
     await storeInternal.clearAssistantLocalState();
     await storeInternal.saveTaskThreads(const <TaskThread>[]);
-    assistantThreadPersistQueueInternal = Future<void>.value();
     final defaults = SettingsSnapshot.defaults();
-    assistantThreadRecordsInternal.clear();
+    taskThreadRepositoryInternal.clear();
     assistantThreadMessagesInternal.clear();
     localSessionMessagesInternal.clear();
     gatewayHistoryCacheInternal.clear();
@@ -290,11 +289,14 @@ extension AppControllerDesktopSettings on AppController {
       'main',
       persistSelection: false,
     );
-    assistantThreadRecordsInternal.removeWhere((key, _) => key != 'main');
+    taskThreadRepositoryInternal.removeWhere(
+      (key, _) => key != 'main',
+      persist: false,
+    );
     assistantThreadMessagesInternal.removeWhere((key, _) => key != 'main');
     await flushAssistantThreadPersistenceInternal();
     await storeInternal.saveTaskThreads(
-      assistantThreadRecordsInternal.values.toList(growable: false),
+      taskThreadRepositoryInternal.snapshot(),
     );
     chatControllerInternal.clear();
     recomputeTasksInternal();

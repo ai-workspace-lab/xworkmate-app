@@ -2,6 +2,7 @@ package router
 
 import (
 	"os"
+	"sort"
 	"strings"
 
 	"xworkmate/go_core/internal/memory"
@@ -32,7 +33,9 @@ type Request struct {
 	ExplicitModel           string
 	ExplicitSkills          []string
 	AllowSkillInstall       bool
+	InstallApproval         skills.InstallApproval
 	AvailableSkills         []skills.Candidate
+	AvailableProviders      []string
 	AIGatewayBaseURL        string
 	AIGatewayAPIKey         string
 }
@@ -46,7 +49,11 @@ type Result struct {
 	SkillResolutionSource   string
 	SkillCandidates         []skills.Candidate
 	NeedsSkillInstall       bool
+	SkillInstallRequestID   string
 	MemorySources           []memory.Source
+	Unavailable             bool
+	UnavailableCode         string
+	UnavailableMessage      string
 }
 
 type Resolver struct {
@@ -68,14 +75,20 @@ func NewResolver() Resolver {
 
 func (r Resolver) Resolve(req Request) Result {
 	mem := r.MemoryService.Load(req.WorkingDirectory)
+	availableProviders := normalizeProviders(req.AvailableProviders)
 
 	result := Result{
-		ResolvedProviderID: strings.TrimSpace(req.ExplicitProviderID),
-		ResolvedModel:      strings.TrimSpace(req.ExplicitModel),
-		MemorySources:      mem.Sources,
+		ResolvedModel: strings.TrimSpace(req.ExplicitModel),
+		MemorySources: mem.Sources,
 	}
 
 	result.ResolvedExecutionTarget, result.ResolvedEndpointTarget = r.resolveExecution(req, mem.Preferences)
+	result.ResolvedProviderID, result.Unavailable, result.UnavailableCode, result.UnavailableMessage = resolveProvider(
+		req,
+		mem.Preferences,
+		availableProviders,
+		result.ResolvedExecutionTarget,
+	)
 	if result.ResolvedModel == "" {
 		result.ResolvedModel = strings.TrimSpace(mem.Preferences.PreferredModel)
 	}
@@ -85,12 +98,14 @@ func (r Resolver) Resolve(req Request) Result {
 		ExplicitSkills:    req.ExplicitSkills,
 		AvailableSkills:   req.AvailableSkills,
 		AllowSkillInstall: req.AllowSkillInstall,
+		InstallApproval:   req.InstallApproval,
 	}
 	skillResult := skills.Resolve(skillRequest, r.SkillFinder, r.SkillInstaller)
 	result.ResolvedSkills = skillResult.ResolvedSkills
 	result.SkillResolutionSource = skillResult.Source
 	result.SkillCandidates = skillResult.Candidates
 	result.NeedsSkillInstall = skillResult.NeedsInstall
+	result.SkillInstallRequestID = skillResult.InstallRequestID
 
 	if len(result.ResolvedSkills) == 0 && len(mem.Preferences.PreferredSkills) > 0 {
 		result.ResolvedSkills = append([]string(nil), mem.Preferences.PreferredSkills...)
@@ -102,10 +117,18 @@ func (r Resolver) Resolve(req Request) Result {
 		result.SkillResolutionSource = "none"
 	}
 	if result.ResolvedExecutionTarget == "" {
-		result.ResolvedExecutionTarget = ExecutionTargetSingleAgent
+		if len(availableProviders) > 0 {
+			result.ResolvedExecutionTarget = ExecutionTargetSingleAgent
+		} else {
+			result.ResolvedExecutionTarget = ExecutionTargetGateway
+		}
 	}
 	if result.ResolvedEndpointTarget == "" {
-		result.ResolvedEndpointTarget = EndpointTargetSingleAgent
+		if result.ResolvedExecutionTarget == ExecutionTargetGateway {
+			result.ResolvedEndpointTarget = normalizeGatewayTarget(req.PreferredGatewayTarget)
+		} else {
+			result.ResolvedEndpointTarget = EndpointTargetSingleAgent
+		}
 	}
 	return result
 }
@@ -149,8 +172,15 @@ func (r Resolver) resolveExecution(req Request, prefs memory.Preferences) (strin
 		return ExecutionTargetGateway, normalizeGatewayTarget(req.PreferredGatewayTarget)
 	case ExecutionTargetMultiAgent:
 		return ExecutionTargetMultiAgent, EndpointTargetSingleAgent
+	case ExecutionTargetSingleAgent:
+		if len(normalizeProviders(req.AvailableProviders)) > 0 {
+			return ExecutionTargetSingleAgent, EndpointTargetSingleAgent
+		}
 	}
-	return ExecutionTargetSingleAgent, EndpointTargetSingleAgent
+	if len(normalizeProviders(req.AvailableProviders)) > 0 {
+		return ExecutionTargetSingleAgent, EndpointTargetSingleAgent
+	}
+	return ExecutionTargetGateway, normalizeGatewayTarget(req.PreferredGatewayTarget)
 }
 
 func (r Resolver) classify(req Request) string {
@@ -181,11 +211,77 @@ func mapExplicitTarget(value string) (string, string) {
 
 func normalizeGatewayTarget(value string) string {
 	switch strings.TrimSpace(value) {
-	case EndpointTargetLocal:
+	case EndpointTargetLocal, "":
 		return EndpointTargetLocal
 	default:
 		return EndpointTargetRemote
 	}
+}
+
+func resolveProvider(
+	req Request,
+	prefs memory.Preferences,
+	availableProviders []string,
+	executionTarget string,
+) (string, bool, string, string) {
+	explicitProviderID := normalize(strings.TrimSpace(req.ExplicitProviderID))
+	if explicitProviderID != "" {
+		if containsProvider(availableProviders, explicitProviderID) {
+			return explicitProviderID, false, "", ""
+		}
+		return "", true, "PROVIDER_UNAVAILABLE", "explicit provider is unavailable"
+	}
+
+	if executionTarget != ExecutionTargetSingleAgent {
+		preferredProvider := normalize(strings.TrimSpace(prefs.Provider))
+		if containsProvider(availableProviders, preferredProvider) {
+			return preferredProvider, false, "", ""
+		}
+		return "", false, "", ""
+	}
+
+	preferredProvider := normalize(strings.TrimSpace(prefs.Provider))
+	if containsProvider(availableProviders, preferredProvider) {
+		return preferredProvider, false, "", ""
+	}
+	if len(availableProviders) > 0 {
+		return availableProviders[0], false, "", ""
+	}
+	return "", true, "PROVIDER_UNAVAILABLE", "no single-agent provider is available"
+}
+
+func normalizeProviders(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	unique := make(map[string]struct{}, len(values))
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		providerID := normalize(value)
+		if providerID == "" {
+			continue
+		}
+		if _, ok := unique[providerID]; ok {
+			continue
+		}
+		unique[providerID] = struct{}{}
+		normalized = append(normalized, providerID)
+	}
+	sort.Strings(normalized)
+	return normalized
+}
+
+func containsProvider(values []string, want string) bool {
+	want = normalize(want)
+	if want == "" {
+		return false
+	}
+	for _, value := range values {
+		if normalize(value) == want {
+			return true
+		}
+	}
+	return false
 }
 
 func looksLocal(prompt string) bool {

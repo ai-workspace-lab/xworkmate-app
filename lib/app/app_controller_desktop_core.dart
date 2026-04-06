@@ -29,8 +29,9 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
-import '../runtime/go_agent_core_client.dart';
-import '../runtime/go_agent_core_desktop_transport.dart';
+import '../runtime/external_code_agent_acp_desktop_transport.dart';
+import '../runtime/go_task_service_client.dart';
+import '../runtime/go_task_service_desktop_service.dart';
 import '../runtime/go_gateway_runtime_desktop_client.dart';
 import '../runtime/go_multi_agent_mount_desktop_client.dart';
 import '../runtime/go_runtime_dispatch_desktop_client.dart';
@@ -41,6 +42,7 @@ import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import '../runtime/single_agent_runner.dart';
 import '../runtime/skill_directory_access.dart';
+import 'task_thread_repositories.dart';
 import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
@@ -126,7 +128,7 @@ class AppController extends ChangeNotifier {
     List<String>? singleAgentSharedSkillScanRootOverrides,
     List<SingleAgentProvider>? availableSingleAgentProvidersOverride,
     ArisBundleRepository? arisBundleRepository,
-    GoAgentCoreClient? goAgentCoreClient,
+    GoTaskServiceClient? goTaskServiceClient,
     MultiAgentMountManager? multiAgentMountManager,
   }) {
     storeInternal = store ?? SecureConfigStore();
@@ -213,12 +215,15 @@ class AppController extends ChangeNotifier {
         goCoreLocator: goCoreLocatorInternal,
       ),
     );
-    goAgentCoreClientInternal =
-        goAgentCoreClient ??
-        GoAgentCoreDesktopTransport(
-          acpClient: gatewayAcpClientInternal,
-          endpointResolver: resolveGoAgentCoreEndpointForTargetInternal,
-          goCoreLocator: goCoreLocatorInternal,
+    goTaskServiceClientInternal =
+        goTaskServiceClient ??
+        DesktopGoTaskService(
+          gateway: runtimeCoordinatorInternal.gateway,
+          acpTransport: ExternalCodeAgentAcpDesktopTransport(
+            acpClient: gatewayAcpClientInternal,
+            endpointResolver: resolveExternalAcpEndpointForTargetInternal,
+            goCoreLocator: goCoreLocatorInternal,
+          ),
         );
     multiAgentOrchestratorInternal = MultiAgentOrchestrator(
       config: resolveMultiAgentConfigInternal(
@@ -266,7 +271,7 @@ class AppController extends ChangeNotifier {
     storeInternal.dispose();
     desktopPlatformServiceInternal.dispose();
     unawaited(multiAgentMountManagerInternal.dispose());
-    unawaited(goAgentCoreClientInternal.dispose());
+    unawaited(goTaskServiceClientInternal.dispose());
     unawaited(gatewayAcpClientInternal.dispose());
     super.dispose();
   }
@@ -297,7 +302,7 @@ class AppController extends ChangeNotifier {
   availableSingleAgentProvidersOverrideInternal;
   late final ArisBundleRepository arisBundleRepositoryInternal;
   late final GoCoreLocator goCoreLocatorInternal;
-  late final GoAgentCoreClient goAgentCoreClientInternal;
+  late final GoTaskServiceClient goTaskServiceClientInternal;
   late final MultiAgentOrchestrator multiAgentOrchestratorInternal;
   late final MultiAgentMountManager multiAgentMountManagerInternal;
   Map<SingleAgentProvider, DirectSingleAgentCapabilities>
@@ -305,16 +310,16 @@ class AppController extends ChangeNotifier {
       const <SingleAgentProvider, DirectSingleAgentCapabilities>{};
   final Map<String, List<GatewayChatMessage>> assistantThreadMessagesInternal =
       <String, List<GatewayChatMessage>>{};
-  final Map<String, TaskThread> assistantThreadRecordsInternal =
-      <String, TaskThread>{};
+  late final DesktopTaskThreadRepository taskThreadRepositoryInternal =
+      DesktopTaskThreadRepository(saveRecords: storeInternal.saveTaskThreads);
   final Map<String, List<GatewayChatMessage>> localSessionMessagesInternal =
       <String, List<GatewayChatMessage>>{};
   final Map<String, List<GatewayChatMessage>> gatewayHistoryCacheInternal =
       <String, List<GatewayChatMessage>>{};
   final Map<String, String> aiGatewayStreamingTextBySessionInternal =
       <String, String>{};
-  final Map<String, String> singleAgentRuntimeModelBySessionInternal =
-      <String, String>{};
+  final Map<String, ExternalCodeAgentAcpSyncedProvider>
+  syncedGoAgentProvidersInternal = <String, ExternalCodeAgentAcpSyncedProvider>{};
   final DesktopThreadArtifactService threadArtifactServiceInternal =
       DesktopThreadArtifactService();
   List<AssistantThreadSkillEntry> singleAgentSharedImportedSkillsInternal =
@@ -352,6 +357,10 @@ class AppController extends ChangeNotifier {
   String settingsDraftStatusMessageInternal = '';
   bool initializingInternal = true;
   String? bootstrapErrorInternal;
+  String? startupTaskThreadWarningInternal;
+
+  Map<String, TaskThread> get assistantThreadRecordsInternal =>
+      taskThreadRepositoryInternal.recordsView;
   StreamSubscription<GatewayPushEvent>? runtimeEventsSubscriptionInternal;
   bool disposedInternal = false;
   String resolvedUserHomeDirectoryInternal = resolveUserHomeDirectory();
@@ -409,6 +418,15 @@ class AppController extends ChangeNotifier {
   DetailPanelData? get detailPanel => detailPanelInternal;
   bool get initializing => initializingInternal;
   String? get bootstrapError => bootstrapErrorInternal;
+  String? get startupTaskThreadWarning => startupTaskThreadWarningInternal;
+
+  void dismissStartupTaskThreadWarning() {
+    if ((startupTaskThreadWarningInternal ?? '').trim().isEmpty) {
+      return;
+    }
+    startupTaskThreadWarningInternal = null;
+    notifyIfActiveInternal();
+  }
 
   UiFeatureAccess featuresFor(UiFeaturePlatform platform) {
     final manifest = applyAppleAppStorePolicy(

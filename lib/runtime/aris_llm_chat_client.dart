@@ -88,16 +88,17 @@ class ArisLlmChatClient {
     required Map<String, String> environment,
     required Map<String, dynamic> arguments,
   }) async {
-    if (shouldBlockEmbeddedAgentLaunch(
-      isAppleHost: Platform.isIOS || Platform.isMacOS,
-    )) {
-      throw UnsupportedError(
-        'App Store builds do not allow launching the bundled Go core process.',
-      );
-    }
     final launch = await _bridgeLocator.locate();
     if (launch == null) {
       throw StateError('Go core is unavailable.');
+    }
+    if (shouldBlockGoCoreLaunch(
+      launch,
+      isAppleHost: Platform.isIOS || Platform.isMacOS,
+    )) {
+      throw UnsupportedError(
+        'App Store builds only allow the bundled Go core helper inside the app bundle.',
+      );
     }
 
     final process = await _processStarter(

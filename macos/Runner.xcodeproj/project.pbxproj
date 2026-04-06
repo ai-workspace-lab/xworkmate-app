@@ -248,6 +248,7 @@
 				33CC10EB2044A3C60003C045 /* Resources */,
 				33CC110E2044A8840003C045 /* Bundle Framework */,
 				3399D490228B24CF009A79C7 /* ShellScript */,
+				A1B2C3084F0A000100000001 /* Embed Bundled Go Core Helper */,
 				93B26977D4D2EC7AFAB54C8E /* [CP] Embed Pods Frameworks */,
 				A1B2C3074F0A000100000001 /* Generate Missing Framework dSYMs */,
 			);
@@ -449,6 +450,26 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/bash \"${PROJECT_DIR}/../scripts/macos_generate_missing_dsyms.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		A1B2C3084F0A000100000001 /* Embed Bundled Go Core Helper */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Bundled Go Core Helper";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/bash \"${PROJECT_DIR}/../scripts/embed-go-core-helper.sh\" \"${TARGET_BUILD_DIR}/${WRAPPER_NAME}\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */

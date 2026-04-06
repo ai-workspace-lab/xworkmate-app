@@ -187,10 +187,24 @@ void registerSecureConfigStoreSuiteSettingsTestsInternal() {
 
         await store.saveTaskThreads(<TaskThread>[
           TaskThread(
-            sessionKey: 'draft:memory-only',
+            threadId: 'draft:memory-only',
+            workspaceBinding: const WorkspaceBinding(
+              workspaceId: 'draft:memory-only',
+              workspaceKind: WorkspaceKind.remoteFs,
+              workspacePath:
+                  '/owners/remote/user/memory/threads/draft:memory-only',
+              displayPath:
+                  '/owners/remote/user/memory/threads/draft:memory-only',
+              writable: true,
+            ),
             title: 'Memory only',
             archived: false,
-            executionTarget: AssistantExecutionTarget.local,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.gatewayLocal,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
             updatedAtMs: 1700000000000,
             messages: <GatewayChatMessage>[],

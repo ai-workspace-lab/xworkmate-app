@@ -131,12 +131,26 @@ void main() {
       );
       await store.saveTaskThreads(<TaskThread>[
         TaskThread(
-          sessionKey: 'direct:stale-browser-cache',
+          threadId: 'direct:stale-browser-cache',
+          workspaceBinding: const WorkspaceBinding(
+            workspaceId: 'direct:stale-browser-cache',
+            workspaceKind: WorkspaceKind.remoteFs,
+            workspacePath:
+                '/owners/remote/user/direct/threads/direct:stale-browser-cache',
+            displayPath:
+                '/owners/remote/user/direct/threads/direct:stale-browser-cache',
+            writable: true,
+          ),
           messages: const <GatewayChatMessage>[],
           updatedAtMs: 1,
           title: 'stale browser cache',
           archived: false,
-          executionTarget: AssistantExecutionTarget.singleAgent,
+          executionBinding: const ExecutionBinding(
+            executionMode: ThreadExecutionMode.localAgent,
+            executorId: 'auto',
+            providerId: 'auto',
+            endpointId: '',
+          ),
           messageViewMode: AssistantMessageViewMode.rendered,
         ),
       ]);

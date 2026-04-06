@@ -273,17 +273,25 @@ extension AppControllerDesktopSkillPermissions on AppController {
     ThreadSelectionSource? assistantModelSource,
     ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
-    String? workspaceRef,
-    WorkspaceRefKind? workspaceRefKind,
+    String? latestResolvedRuntimeModel,
+    String? lifecycleStatus,
+    double? lastRunAtMs,
+    String? lastResultCode,
   }) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final existing = assistantThreadRecordsInternal[normalizedSessionKey];
+    final existing = taskThreadForSessionInternal(normalizedSessionKey);
     final nextExecutionTarget =
         executionTarget ??
-        existing?.executionTarget ??
-        settings.assistantExecutionTarget;
+        switch (existing?.executionBinding.executionMode) {
+          ThreadExecutionMode.auto => AssistantExecutionTarget.auto,
+          ThreadExecutionMode.localAgent =>
+            AssistantExecutionTarget.singleAgent,
+          ThreadExecutionMode.gatewayLocal => AssistantExecutionTarget.local,
+          ThreadExecutionMode.gatewayRemote => AssistantExecutionTarget.remote,
+          null => settings.assistantExecutionTarget,
+        };
     final nextImportedSkills =
         importedSkills ??
         existing?.importedSkills ??
@@ -307,40 +315,13 @@ extension AppControllerDesktopSkillPermissions on AppController {
           subjectId: '',
           displayName: '',
         );
-    final explicitWorkspaceKind = workspaceRefKind == null
-        ? null
-        : (workspaceRefKind == WorkspaceRefKind.localPath
-              ? WorkspaceKind.localFs
-              : WorkspaceKind.remoteFs);
-    final baseWorkspaceBinding =
-        workspaceBinding ??
-        existing?.workspaceBinding ??
-        WorkspaceBinding(
-          workspaceId: normalizedSessionKey,
-          workspaceKind:
-              explicitWorkspaceKind ??
-              (nextExecutionTarget == AssistantExecutionTarget.singleAgent
-                  ? WorkspaceKind.localFs
-                  : WorkspaceKind.remoteFs),
-          workspacePath: '',
-          displayPath: '',
-          writable: true,
-        );
-    final nextWorkspacePath =
-        workspaceRef ?? baseWorkspaceBinding.workspacePath;
-    final nextDisplayPath =
-        workspaceRef ??
-        (baseWorkspaceBinding.displayPath.trim().isNotEmpty
-            ? baseWorkspaceBinding.displayPath
-            : nextWorkspacePath);
-    final nextWorkspaceBinding = baseWorkspaceBinding.copyWith(
-      workspaceId: baseWorkspaceBinding.workspaceId.trim().isEmpty
-          ? normalizedSessionKey
-          : baseWorkspaceBinding.workspaceId,
-      workspaceKind: explicitWorkspaceKind,
-      workspacePath: nextWorkspacePath,
-      displayPath: nextDisplayPath,
-    );
+    final nextWorkspaceBinding =
+        workspaceBinding ?? existing?.workspaceBinding;
+    if (nextWorkspaceBinding == null || !nextWorkspaceBinding.isComplete) {
+      throw StateError(
+        'TaskThread $normalizedSessionKey is missing a complete workspaceBinding.',
+      );
+    }
     final nextProvider =
         singleAgentProvider ??
         SingleAgentProviderCopy.fromJsonValue(
@@ -408,13 +389,14 @@ extension AppControllerDesktopSkillPermissions on AppController {
               selectedSkillsSource:
                   selectedSkillsSource ??
                   existing?.contextState.selectedSkillsSource,
+              latestResolvedRuntimeModel: latestResolvedRuntimeModel,
               gatewayEntryState: gatewayEntryState,
             );
-    final nextStatus = nextWorkspaceBinding.workspacePath.trim().isEmpty
-        ? 'needs_workspace'
-        : (lifecycleState?.status ??
-              existing?.lifecycleState.status ??
-              'ready');
+    final nextStatus =
+        lifecycleStatus ??
+        lifecycleState?.status ??
+        existing?.lifecycleState.status ??
+        'ready';
     final nextLifecycleState =
         (lifecycleState ??
                 existing?.lifecycleState ??
@@ -433,6 +415,8 @@ extension AppControllerDesktopSkillPermissions on AppController {
                   existing?.archived ??
                   isAssistantTaskArchived(normalizedSessionKey),
               status: nextStatus,
+              lastRunAtMs: lastRunAtMs,
+              lastResultCode: lastResultCode,
             );
     final nextRecord = TaskThread(
       threadId: normalizedSessionKey,
@@ -450,30 +434,11 @@ extension AppControllerDesktopSkillPermissions on AppController {
           existing?.updatedAtMs ??
           (nextMessages.isNotEmpty ? nextMessages.last.timestampMs : null),
     );
-    assistantThreadRecordsInternal[normalizedSessionKey] = nextRecord;
+    taskThreadRepositoryInternal.replace(nextRecord);
     if (messages != null) {
       assistantThreadMessagesInternal[normalizedSessionKey] =
           List<GatewayChatMessage>.from(messages);
     }
-    final snapshot = assistantThreadRecordsInternal.values.toList(
-      growable: false,
-    );
-    final nextPersist = assistantThreadPersistQueueInternal
-        .catchError((_) {})
-        .then((_) async {
-          if (disposedInternal) {
-            return;
-          }
-          try {
-            await storeInternal.saveTaskThreads(snapshot);
-          } catch (_) {
-            // Assistant thread persistence is background best-effort. Keep the
-            // in-memory session usable even when teardown or temp-directory
-            // cleanup races with the durable write.
-          }
-        });
-    assistantThreadPersistQueueInternal = nextPersist;
-    unawaited(nextPersist);
   }
 
   Future<void> setCurrentAssistantSessionKeyInternal(

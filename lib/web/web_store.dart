@@ -61,10 +61,15 @@ class WebStore {
         await clearTaskThreadState();
         return const <TaskThread>[];
       }
-      return threads
-          .whereType<Map>()
-          .map((item) => TaskThread.fromJson(item.cast<String, dynamic>()))
-          .toList(growable: false);
+      final records = <TaskThread>[];
+      for (final item in threads.whereType<Map>()) {
+        try {
+          records.add(TaskThread.fromJson(item.cast<String, dynamic>()));
+        } catch (_) {
+          continue;
+        }
+      }
+      return List<TaskThread>.unmodifiable(records);
     } catch (_) {
       await clearTaskThreadState();
       return const <TaskThread>[];

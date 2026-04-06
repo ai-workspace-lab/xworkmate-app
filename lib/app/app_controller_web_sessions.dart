@@ -24,13 +24,30 @@ import 'app_controller_web_gateway_chat.dart';
 import 'app_controller_web_helpers.dart';
 
 extension AppControllerWebSessions on AppController {
+  TaskThread? taskThreadForSessionInternal(String sessionKey) {
+    final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
+    return threadRepositoryInternal.taskThreadForSession(normalizedSessionKey);
+  }
+
+  TaskThread requireTaskThreadForSessionInternal(String sessionKey) {
+    final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
+    return threadRepositoryInternal.requireTaskThreadForSession(
+      normalizedSessionKey,
+    );
+  }
+
   AssistantExecutionTarget assistantExecutionTargetForSession(
     String sessionKey,
   ) {
     final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
-    final recordTarget = sanitizeTargetInternal(
-      threadRecordsInternal[normalizedSessionKey]?.executionTarget,
-    );
+    final record = taskThreadForSessionInternal(normalizedSessionKey);
+    final recordTarget = switch (record?.executionBinding.executionMode) {
+      ThreadExecutionMode.auto => AssistantExecutionTarget.auto,
+      ThreadExecutionMode.localAgent => AssistantExecutionTarget.singleAgent,
+      ThreadExecutionMode.gatewayLocal => AssistantExecutionTarget.local,
+      ThreadExecutionMode.gatewayRemote => AssistantExecutionTarget.remote,
+      null => null,
+    };
     final fallback = sanitizeTargetInternal(
       settingsInternal.assistantExecutionTarget,
     );
@@ -58,7 +75,7 @@ extension AppControllerWebSessions on AppController {
 
   String assistantWorkspacePathForSession(String sessionKey) {
     final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
-    return threadRecordsInternal[normalizedSessionKey]
+    return taskThreadForSessionInternal(normalizedSessionKey)
             ?.workspaceBinding
             .workspacePath
             .trim() ??
@@ -66,19 +83,15 @@ extension AppControllerWebSessions on AppController {
   }
 
   WorkspaceRefKind assistantWorkspaceKindForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
-    final record = threadRecordsInternal[normalizedSessionKey];
-    if (record != null) {
-      return record.workspaceKind == WorkspaceKind.localFs
-          ? WorkspaceRefKind.localPath
-          : WorkspaceRefKind.remotePath;
-    }
-    return WorkspaceRefKind.remotePath;
+    final record = requireTaskThreadForSessionInternal(sessionKey);
+    return record.workspaceBinding.workspaceKind == WorkspaceKind.localFs
+        ? WorkspaceRefKind.localPath
+        : WorkspaceRefKind.remotePath;
   }
 
   String assistantWorkspaceDisplayPathForSession(String sessionKey) {
     final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
-    return threadRecordsInternal[normalizedSessionKey]
+    return taskThreadForSessionInternal(normalizedSessionKey)
             ?.workspaceBinding
             .displayPath
             .trim() ??
@@ -113,9 +126,12 @@ extension AppControllerWebSessions on AppController {
 
   SingleAgentProvider singleAgentProviderForSession(String sessionKey) {
     final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
-    final stored =
-        threadRecordsInternal[normalizedSessionKey]?.singleAgentProvider ??
-        SingleAgentProvider.auto;
+    final stored = SingleAgentProviderCopy.fromJsonValue(
+      taskThreadForSessionInternal(normalizedSessionKey)
+              ?.executionBinding
+              .providerId ??
+          '',
+    );
     return settingsInternal.resolveSingleAgentProvider(stored);
   }
 
@@ -134,10 +150,11 @@ extension AppControllerWebSessions on AppController {
       singleAgentUsesAiChatFallbackForSession(currentSessionKeyInternal);
 
   String singleAgentRuntimeModelForSession(String sessionKey) {
-    return singleAgentRuntimeModelBySessionInternal[normalizedSessionKeyInternal(
-              sessionKey,
-            )]
-            ?.trim() ??
+    return taskThreadForSessionInternal(
+              normalizedSessionKeyInternal(sessionKey),
+            )
+            ?.latestResolvedRuntimeModel
+            .trim() ??
         '';
   }
 
@@ -556,16 +573,6 @@ extension AppControllerWebSessions on AppController {
       titleForRecordInternal(currentRecordInternal);
 
   TaskThread get currentRecordInternal {
-    final existing = threadRecordsInternal[currentSessionKeyInternal];
-    if (existing != null) {
-      return existing;
-    }
-    final target =
-        sanitizeTargetInternal(settingsInternal.assistantExecutionTarget) ??
-        AssistantExecutionTarget.singleAgent;
-    final record = newRecordInternal(target: target);
-    threadRecordsInternal[record.threadId] = record;
-    currentSessionKeyInternal = record.threadId;
-    return record;
+    return requireTaskThreadForSessionInternal(currentSessionKeyInternal);
   }
 }

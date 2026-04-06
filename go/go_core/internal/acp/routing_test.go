@@ -1,6 +1,7 @@
 package acp
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +11,36 @@ import (
 
 	"xworkmate/go_core/internal/shared"
 )
+
+func newExternalSingleAgentProvider(
+	t *testing.T,
+	providerID string,
+	output string,
+) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/acp/rpc" {
+			http.NotFound(w, r)
+			return
+		}
+		defer r.Body.Close()
+		var request map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"jsonrpc": "2.0",
+			"id":      request["id"],
+			"result": map[string]any{
+				"success":  true,
+				"output":   output,
+				"turnId":   "turn-" + providerID,
+				"provider": providerID,
+				"mode":     "single-agent",
+			},
+		})
+	}))
+}
 
 func TestHandleRoutingResolveCoversNineScenarioBuckets(t *testing.T) {
 	localAvailableSkills := []map[string]any{
@@ -139,25 +170,22 @@ func TestExecuteSessionTaskAutoRoutingRecordsProjectMemory(t *testing.T) {
 		t.Fatalf("create workspace: %v", err)
 	}
 
-	fakeProvider := filepath.Join(t.TempDir(), "fake-claude.sh")
-	if err := os.WriteFile(
-		fakeProvider,
-		[]byte("#!/bin/sh\nprintf 'done'\n"),
-		0o755,
-	); err != nil {
-		t.Fatalf("write fake provider: %v", err)
-	}
-
 	t.Setenv("HOME", homeDir)
-	t.Setenv("ACP_CLAUDE_BIN", fakeProvider)
 
 	server := NewServer()
+	providerServer := newExternalSingleAgentProvider(t, "claude", "done")
+	defer providerServer.Close()
+	server.syncProviders([]syncedProvider{{
+		ProviderID: "claude",
+		Label:      "Claude",
+		Endpoint:   providerServer.URL,
+		Enabled:    true,
+	}})
 	response, rpcErr := server.executeSessionTask(task{
 		req: shared.RPCRequest{
 			Params: map[string]any{
 				"sessionId":        "session-auto",
 				"threadId":         "thread-auto",
-				"mode":             "single-agent",
 				"provider":         "claude",
 				"taskPrompt":       "create a powerpoint deck for launch",
 				"workingDirectory": workspaceDir,
@@ -183,25 +211,26 @@ func TestExecuteSessionTaskAutoRoutingRecordsProjectMemory(t *testing.T) {
 		t.Fatalf("expected success response, got %#v", response)
 	}
 
+	projectLocalMemory := filepath.Join(workspaceDir, ".xworkmate", "memory.md")
+	content, err := os.ReadFile(projectLocalMemory)
+	if err != nil {
+		t.Fatalf("expected memory file %s: %v", projectLocalMemory, err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "preferred-route: single-agent") {
+		t.Fatalf("expected preferred route in %s, got %q", projectLocalMemory, text)
+	}
+	if !strings.Contains(text, "preferred-skills: PPTX") {
+		t.Fatalf("expected preferred skills in %s, got %q", projectLocalMemory, text)
+	}
 	projectHomeMemory := filepath.Join(
 		homeDir,
 		"self-improving",
 		"projects",
 		filepath.Base(workspaceDir)+".md",
 	)
-	projectLocalMemory := filepath.Join(workspaceDir, ".xworkmate", "memory.md")
-	for _, target := range []string{projectHomeMemory, projectLocalMemory} {
-		content, err := os.ReadFile(target)
-		if err != nil {
-			t.Fatalf("expected memory file %s: %v", target, err)
-		}
-		text := string(content)
-		if !strings.Contains(text, "preferred-route: single-agent") {
-			t.Fatalf("expected preferred route in %s, got %q", target, text)
-		}
-		if !strings.Contains(text, "preferred-skills: PPTX") {
-			t.Fatalf("expected preferred skills in %s, got %q", target, text)
-		}
+	if _, err := os.Stat(projectHomeMemory); !os.IsNotExist(err) {
+		t.Fatalf("expected auto memory write to stay project-local only, got stat err=%v", err)
 	}
 }
 
@@ -212,25 +241,22 @@ func TestExecuteSessionTaskExplicitRoutingDoesNotRecordProjectMemory(t *testing.
 		t.Fatalf("create workspace: %v", err)
 	}
 
-	fakeProvider := filepath.Join(t.TempDir(), "fake-claude.sh")
-	if err := os.WriteFile(
-		fakeProvider,
-		[]byte("#!/bin/sh\nprintf 'done'\n"),
-		0o755,
-	); err != nil {
-		t.Fatalf("write fake provider: %v", err)
-	}
-
 	t.Setenv("HOME", homeDir)
-	t.Setenv("ACP_CLAUDE_BIN", fakeProvider)
 
 	server := NewServer()
+	providerServer := newExternalSingleAgentProvider(t, "claude", "done")
+	defer providerServer.Close()
+	server.syncProviders([]syncedProvider{{
+		ProviderID: "claude",
+		Label:      "Claude",
+		Endpoint:   providerServer.URL,
+		Enabled:    true,
+	}})
 	response, rpcErr := server.executeSessionTask(task{
 		req: shared.RPCRequest{
 			Params: map[string]any{
 				"sessionId":        "session-explicit",
 				"threadId":         "thread-explicit",
-				"mode":             "single-agent",
 				"provider":         "claude",
 				"taskPrompt":       "create a powerpoint deck for launch",
 				"workingDirectory": workspaceDir,
@@ -271,6 +297,55 @@ func TestExecuteSessionTaskExplicitRoutingDoesNotRecordProjectMemory(t *testing.
 	}
 }
 
+func TestExecuteSessionTaskExplicitProviderRequiresSyncedCatalog(t *testing.T) {
+	server := NewServer()
+	response, rpcErr := server.executeSessionTask(task{
+		req: shared.RPCRequest{
+			Method: "session.start",
+			Params: map[string]any{
+				"sessionId":  "session-explicit-provider",
+				"threadId":   "thread-explicit-provider",
+				"taskPrompt": "create a powerpoint deck for launch",
+				"routing": map[string]any{
+					"routingMode":             "explicit",
+					"explicitExecutionTarget": "singleAgent",
+					"explicitProviderId":      "claude",
+				},
+			},
+		},
+	})
+	if rpcErr != nil {
+		t.Fatalf("expected structured unavailable response, got rpc error: %v", rpcErr)
+	}
+	if got := response["unavailable"]; got != true {
+		t.Fatalf("expected unavailable response, got %#v", response)
+	}
+	if got := response["unavailableCode"]; got != "PROVIDER_UNAVAILABLE" {
+		t.Fatalf("expected PROVIDER_UNAVAILABLE, got %#v", response)
+	}
+}
+
+func TestExecuteSessionTaskRequiresRouting(t *testing.T) {
+	server := NewServer()
+	_, rpcErr := server.executeSessionTask(task{
+		req: shared.RPCRequest{
+			ID:     "request-1",
+			Method: "session.start",
+			Params: map[string]any{
+				"sessionId":  "session-missing-routing",
+				"threadId":   "thread-missing-routing",
+				"taskPrompt": "hello",
+			},
+		},
+	})
+	if rpcErr == nil {
+		t.Fatalf("expected routing-required error")
+	}
+	if rpcErr.Message != "ROUTING_REQUIRED" {
+		t.Fatalf("expected ROUTING_REQUIRED, got %#v", rpcErr)
+	}
+}
+
 func TestExecuteSessionTaskAutoRoutingPromotesComplexRequestToMultiAgent(t *testing.T) {
 	workspaceDir := filepath.Join(t.TempDir(), "workspace")
 	if err := os.MkdirAll(workspaceDir, 0o755); err != nil {
@@ -291,7 +366,6 @@ func TestExecuteSessionTaskAutoRoutingPromotesComplexRequestToMultiAgent(t *test
 			Params: map[string]any{
 				"sessionId":        "session-complex",
 				"threadId":         "thread-complex",
-				"mode":             "single-agent",
 				"provider":         "claude",
 				"taskPrompt":       "collect latest news and summarize it into a report for review",
 				"workingDirectory": workspaceDir,
@@ -359,11 +433,40 @@ func TestHandleRoutingResolveAllowsSkillInstallRetry(t *testing.T) {
 	if got := result["skillResolutionSource"]; got != "find_skills" {
 		t.Fatalf("expected find_skills source, got %#v", got)
 	}
-	if got := result["needsSkillInstall"]; got != false {
+	if got := result["needsSkillInstall"]; got != true {
+		t.Fatalf("expected first pass to request install approval, got %#v", got)
+	}
+	requestID, _ := result["skillInstallRequestId"].(string)
+	if strings.TrimSpace(requestID) == "" {
+		t.Fatalf("expected install request id, got %#v", result)
+	}
+
+	retried := handleRoutingResolve(map[string]any{
+		"taskPrompt":       "translate and dub this video with subtitles",
+		"workingDirectory": "/tmp/workspace",
+		"routing": map[string]any{
+			"routingMode":       "auto",
+			"allowSkillInstall": true,
+			"installApproval": map[string]any{
+				"requestId":         requestID,
+				"approvedSkillKeys": []any{"video-translator"},
+			},
+			"availableSkills": []any{
+				map[string]any{
+					"id":          "docx",
+					"label":       "docx",
+					"description": "docs",
+					"installed":   true,
+				},
+			},
+		},
+	})
+
+	if got := retried["needsSkillInstall"]; got != false {
 		t.Fatalf("expected install retry to clear needsSkillInstall, got %#v", got)
 	}
-	resolvedSkills, _ := result["resolvedSkills"].([]string)
+	resolvedSkills, _ := retried["resolvedSkills"].([]string)
 	if len(resolvedSkills) != 1 || resolvedSkills[0] != "video-translator" {
-		t.Fatalf("expected installed skill to resolve, got %#v", result["resolvedSkills"])
+		t.Fatalf("expected installed skill to resolve, got %#v", retried["resolvedSkills"])
 	}
 }

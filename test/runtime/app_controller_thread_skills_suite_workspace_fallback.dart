@@ -19,7 +19,7 @@ import 'app_controller_thread_skills_suite_fakes.dart';
 void registerThreadSkillsWorkspaceFallbackTests() {
   group('AppController workspace fallback and repo-local precedence', () {
     test(
-      'AppController uses thread workspaceRef for repo-local fallback',
+      'AppController uses the thread workspace path for repo-local fallback',
       () async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
         final tempDirectory = await Directory.systemTemp.createTemp(
@@ -54,15 +54,25 @@ void registerThreadSkillsWorkspaceFallbackTests() {
         );
         await store.saveTaskThreads(<TaskThread>[
           TaskThread(
-            sessionKey: 'main',
+            threadId: 'main',
+            workspaceBinding: WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: workspaceRoot.path,
+              displayPath: workspaceRoot.path,
+              writable: true,
+            ),
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,
             title: '',
             archived: false,
-            executionTarget: AssistantExecutionTarget.singleAgent,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.localAgent,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
-            workspaceRef: workspaceRoot.path,
-            workspaceRefKind: WorkspaceRefKind.localPath,
           ),
         ]);
 
@@ -146,15 +156,25 @@ void registerThreadSkillsWorkspaceFallbackTests() {
         );
         await store.saveTaskThreads(<TaskThread>[
           TaskThread(
-            sessionKey: 'main',
+            threadId: 'main',
+            workspaceBinding: WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: workspaceRoot.path,
+              displayPath: workspaceRoot.path,
+              writable: true,
+            ),
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,
             title: '',
             archived: false,
-            executionTarget: AssistantExecutionTarget.singleAgent,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.localAgent,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
-            workspaceRef: workspaceRoot.path,
-            workspaceRefKind: WorkspaceRefKind.localPath,
           ),
         ]);
 
@@ -235,15 +255,25 @@ void registerThreadSkillsWorkspaceFallbackTests() {
         );
         await store.saveTaskThreads(<TaskThread>[
           TaskThread(
-            sessionKey: 'main',
+            threadId: 'main',
+            workspaceBinding: WorkspaceBinding(
+              workspaceId: 'main',
+              workspaceKind: WorkspaceKind.localFs,
+              workspacePath: workspaceRoot.path,
+              displayPath: workspaceRoot.path,
+              writable: true,
+            ),
             messages: const <GatewayChatMessage>[],
             updatedAtMs: 1,
             title: '',
             archived: false,
-            executionTarget: AssistantExecutionTarget.singleAgent,
+            executionBinding: const ExecutionBinding(
+              executionMode: ThreadExecutionMode.localAgent,
+              executorId: 'auto',
+              providerId: 'auto',
+              endpointId: '',
+            ),
             messageViewMode: AssistantMessageViewMode.rendered,
-            workspaceRef: workspaceRoot.path,
-            workspaceRefKind: WorkspaceRefKind.localPath,
           ),
         ]);
 

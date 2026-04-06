@@ -8,11 +8,11 @@ Last Updated: 2026-03-29
 
 - Settings 中心配置状态
 - 当前 `TaskThread` 状态
-- agent-core / runtime 协调状态
+- `GoTaskService / runtime` 协调状态
 - 派生 UI 状态
 - 技能、模型、执行通道与会话内容
 
-本文以 Desktop 为主说明，因为 Desktop 控制器拥有最完整的运行时与持久化路径；Web 保持同一 `TaskThread` 与 session 语义，但 transport 走远端 ACP / RPC。
+本文以 Desktop 为主说明，因为 Desktop 控制器拥有最完整的运行时与持久化路径；Web 保持同一 `TaskThread` 与 session 语义，但 transport 走远端 ACP / relay。
 
 ## 1. Core Rule
 
@@ -58,10 +58,10 @@ graph TB
         webCurrentThreadId["_currentThreadId"]
     end
 
-    subgraph R["Agent-Core / Runtime Coordination"]
+    subgraph R["GoTaskService / Runtime Coordination"]
         threadReader["read TaskThread by threadId"]
         requestBuilder["build execution request"]
-        dispatcher["dispatch to Go Agent-core\nDesktop: local bridge\nWeb: remote ACP / RPC"]
+        dispatcher["dispatch to GoTaskService\nDesktop: GatewayRuntime / ExternalCodeAgentAcpDesktopTransport\nWeb: relay / ExternalCodeAgentAcpWebTransport"]
         resultWriter["write result back to TaskThread"]
     end
 
@@ -104,7 +104,7 @@ graph TB
 
 - `TaskThread` 是线程主状态，不再由散落 session 字段共同充当
 - `threadId` 是读取线程状态的唯一入口键
-- `build execution request` 属于 agent-core / runtime 协调层
+- `build execution request` 属于 `GoTaskService / runtime` 协调层
 - UI 只消费当前 `TaskThread` 与派生状态
 
 ## 3. State Ownership
@@ -181,14 +181,16 @@ Ownership summary:
 
 - 如果值已经存在于 `TaskThread`，则线程值优先于 Settings 默认值
 - `TaskThread` 是当前线程展示与执行的唯一主对象
+- `TaskThread` 在 create/load 时必须已经拥有完整 `workspaceBinding`
+- 缺少 `workspaceBinding` 的旧记录属于非法线程数据，应在恢复阶段跳过并通过启动告警暴露
 
-### 3.3 Agent-Core / Runtime 协调状态
+### 3.3 GoTaskService / Runtime 协调状态
 
 Primary responsibilities:
 
 - 根据 `threadId` 读取完整 `TaskThread`
 - 基于 `ownerScope / workspaceBinding / executionBinding / contextState` 构造执行请求
-- 调度到 `Go Agent-core`
+- 调度到 `GoTaskService`
 - 接收执行结果并回写 `TaskThread`
 
 重要规则：
@@ -196,7 +198,9 @@ Primary responsibilities:
 - 请求构造不属于 UI
 - Flutter UI 不直接承担 runtime dispatch 职责
 - 工作空间选择不再通过旧式运行前猜测获得
+- 不允许 runtime fallback 到 `main`、`Directory.current` 或 prompt first-binding
 - 结果回写先更新线程上下文，再驱动主体区域与右栏刷新
+- controller 侧 runtime cache 只允许承载瞬时 streaming / pending / preview 状态，不承载线程长期语义
 - Desktop / Web 共用相同 session 生命周期；不再单独发明 relay-only 执行协议
 
 ### 3.4 Derived UI State
@@ -226,12 +230,13 @@ Examples:
 
 1. UI 选择 `threadId`
 2. 控制器 / runtime 读取 `TaskThread`
-3. 若线程字段缺失，才回退到 Settings 中心默认值用于初始化或补全
+3. 若线程缺失或 `workspaceBinding` 不完整，则该线程视为非法或不可执行状态，必须显式失败或在恢复阶段跳过
 
 这意味着：
 
 - Settings 是默认值来源，不是当前线程真相源
 - 当前线程的执行模式、模型、技能、工作空间都以 `TaskThread` 为准
+- Settings 不能用于补全已存在线程的缺失字段
 
 ### 4.2 执行请求构造优先级
 
@@ -240,13 +245,13 @@ Examples:
 3. `executionBinding`
 4. `contextState`
 
-然后由 agent-core / runtime 协调层构造执行请求并调度运行。
+然后由 `GoTaskService / runtime` 协调层构造执行请求并调度运行。
 
 ### 4.3 结果回写优先级
 
 1. 回写 `contextState`
 2. 主体区域同步显示
-3. 必要时更新 `workspaceBinding`
+3. 仅在当前线程已经完整时，显式更新该线程 `workspaceBinding`
 4. 右栏读取最新 `TaskThread` 记录并刷新
 
 ## 5. Lifecycle Baseline
@@ -266,11 +271,11 @@ flowchart LR
   D3 --> E
   D4 --> E
 
-  E --> F["Go Agent-core\nDesktop: local bridge\nWeb: remote ACP / RPC"]
+  E --> F["GoTaskService\nDesktop: GatewayRuntime / ExternalCodeAgentAcpDesktopTransport\nWeb: relay / ExternalCodeAgentAcpWebTransport"]
   F --> G["执行结果"]
 
   G --> H["回写线程上下文\n(主体区域 同步显示)"]
-  G --> I["必要时更新 workspaceBinding"]
+  G --> I["仅显式更新当前已完整线程的 workspaceBinding"]
 
   H --> J["右栏显示"]
   I --> J
@@ -285,9 +290,9 @@ flowchart LR
 
 ## 6. 文档边界
 
-- [assistant-thread-target-model-20260328.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-taskthread-docs-naming-cleanup/docs/architecture/assistant-thread-target-model-20260328.md)
+- [assistant-thread-target-model-20260328.md](assistant-thread-target-model-20260328.md)
   负责说明 `TaskThread` 当前模型与生命周期主链。
-- [assistant-thread-information-architecture.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-taskthread-docs-naming-cleanup/docs/architecture/assistant-thread-information-architecture.md)
+- [assistant-thread-information-architecture.md](assistant-thread-information-architecture.md)
   负责说明线程信息如何进入 UI、请求构造与结果回写。
 
 归档文档只保留为历史背景，不再作为当前内部状态设计依据。

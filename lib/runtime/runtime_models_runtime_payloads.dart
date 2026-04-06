@@ -588,6 +588,9 @@ class WorkspaceBinding {
   final String displayPath;
   final bool writable;
 
+  bool get isComplete =>
+      workspaceId.trim().isNotEmpty && workspacePath.trim().isNotEmpty;
+
   WorkspaceBinding copyWith({
     String? workspaceId,
     WorkspaceKind? workspaceKind,
@@ -616,11 +619,17 @@ class WorkspaceBinding {
 
   factory WorkspaceBinding.fromJson(Map<String, dynamic> json) {
     final path = json['workspacePath']?.toString() ?? '';
+    final workspaceId = json['workspaceId']?.toString() ?? '';
+    final workspaceKindValue = json['workspaceKind']?.toString();
+    if (workspaceId.trim().isEmpty ||
+        path.trim().isEmpty ||
+        workspaceKindValue == null ||
+        workspaceKindValue.trim().isEmpty) {
+      throw const FormatException('TaskThread.workspaceBinding is incomplete.');
+    }
     return WorkspaceBinding(
-      workspaceId: json['workspaceId']?.toString() ?? '',
-      workspaceKind: WorkspaceKindCopy.fromJsonValue(
-        json['workspaceKind']?.toString(),
-      ),
+      workspaceId: workspaceId,
+      workspaceKind: WorkspaceKindCopy.fromJsonValue(workspaceKindValue),
       workspacePath: path,
       displayPath: json['displayPath']?.toString() ?? path,
       writable: json['writable'] as bool? ?? true,
@@ -690,6 +699,35 @@ class ExecutionBinding {
       ),
     );
   }
+}
+
+ThreadExecutionMode threadExecutionModeFromAssistantExecutionTarget(
+  AssistantExecutionTarget target,
+) {
+  return switch (target) {
+    AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
+    AssistantExecutionTarget.singleAgent => ThreadExecutionMode.localAgent,
+    AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
+    AssistantExecutionTarget.remote => ThreadExecutionMode.gatewayRemote,
+  };
+}
+
+AssistantExecutionTarget assistantExecutionTargetFromExecutionMode(
+  ThreadExecutionMode mode,
+) {
+  return switch (mode) {
+    ThreadExecutionMode.auto => AssistantExecutionTarget.auto,
+    ThreadExecutionMode.localAgent => AssistantExecutionTarget.singleAgent,
+    ThreadExecutionMode.gatewayLocal => AssistantExecutionTarget.local,
+    ThreadExecutionMode.gatewayRemote => AssistantExecutionTarget.remote,
+  };
+}
+
+WorkspaceRefKind workspaceRefKindFromWorkspaceKind(WorkspaceKind kind) {
+  return switch (kind) {
+    WorkspaceKind.localFs => WorkspaceRefKind.localPath,
+    WorkspaceKind.remoteFs => WorkspaceRefKind.remotePath,
+  };
 }
 
 class ThreadContextState {
@@ -877,11 +915,10 @@ class ThreadLifecycleState {
 
 class TaskThread {
   TaskThread({
-    String? threadId,
-    String? sessionKey,
+    required String threadId,
     String? title,
     ThreadOwnerScope? ownerScope,
-    WorkspaceBinding? workspaceBinding,
+    required WorkspaceBinding workspaceBinding,
     ExecutionBinding? executionBinding,
     ThreadContextState? contextState,
     ThreadLifecycleState? lifecycleState,
@@ -889,22 +926,16 @@ class TaskThread {
     this.updatedAtMs,
     List<GatewayChatMessage>? messages,
     bool? archived,
-    AssistantExecutionTarget? executionTarget,
     AssistantMessageViewMode? messageViewMode,
     List<AssistantThreadSkillEntry>? importedSkills,
     List<String>? selectedSkillKeys,
     String? assistantModelId,
-    SingleAgentProvider? singleAgentProvider,
     String? gatewayEntryState,
-    String? workspaceRef,
-    WorkspaceRefKind? workspaceRefKind,
-    String? displayPath,
     AssistantPermissionLevel? permissionLevel,
     String? latestResolvedRuntimeModel,
-    String? lifecycleStatus,
     double? lastRunAtMs,
     String? lastResultCode,
-  }) : threadId = _resolveThreadId(threadId, sessionKey),
+  }) : threadId = _resolveThreadId(threadId),
        title = title ?? '',
        ownerScope =
            ownerScope ??
@@ -914,23 +945,13 @@ class TaskThread {
              subjectId: '',
              displayName: '',
            ),
-       workspaceBinding =
-           workspaceBinding ??
-           WorkspaceBinding(
-             workspaceId: _resolveThreadId(threadId, sessionKey),
-             workspaceKind: _workspaceKindFromLegacy(workspaceRefKind),
-             workspacePath: workspaceRef?.trim() ?? '',
-             displayPath: (displayPath ?? workspaceRef ?? '').trim(),
-             writable: true,
-           ),
+       workspaceBinding = _validateWorkspaceBinding(workspaceBinding),
        executionBinding =
            executionBinding ??
            ExecutionBinding(
-             executionMode: _executionModeFromLegacy(executionTarget),
-             executorId:
-                 (singleAgentProvider ?? SingleAgentProvider.auto).providerId,
-             providerId:
-                 (singleAgentProvider ?? SingleAgentProvider.auto).providerId,
+             executionMode: ThreadExecutionMode.auto,
+             executorId: SingleAgentProvider.auto.providerId,
+             providerId: SingleAgentProvider.auto.providerId,
              endpointId: '',
            ),
        contextState =
@@ -953,11 +974,7 @@ class TaskThread {
            lifecycleState ??
            ThreadLifecycleState(
              archived: archived ?? false,
-             status:
-                 lifecycleStatus ??
-                 ((workspaceRef?.trim().isEmpty ?? true)
-                     ? 'needs_workspace'
-                     : 'ready'),
+             status: 'ready',
              lastRunAtMs: lastRunAtMs,
              lastResultCode: lastResultCode?.trim(),
            ),
@@ -995,28 +1012,12 @@ class TaskThread {
   bool get hasExplicitSkillSelection =>
       contextState.selectedSkillsSource == ThreadSelectionSource.explicit;
   bool get archived => lifecycleState.archived;
-  String get workspaceRef => workspaceBinding.workspacePath;
   String get workspacePath => workspaceBinding.workspacePath;
   String get displayPath => workspaceBinding.displayPath;
-  WorkspaceRefKind get workspaceRefKind =>
-      switch (workspaceBinding.workspaceKind) {
-        WorkspaceKind.localFs => WorkspaceRefKind.localPath,
-        WorkspaceKind.remoteFs => WorkspaceRefKind.remotePath,
-      };
   WorkspaceKind get workspaceKind => workspaceBinding.workspaceKind;
-  SingleAgentProvider get singleAgentProvider =>
-      SingleAgentProviderCopy.fromJsonValue(executionBinding.providerId);
-  AssistantExecutionTarget get executionTarget =>
-      switch (executionBinding.executionMode) {
-        ThreadExecutionMode.auto => AssistantExecutionTarget.auto,
-        ThreadExecutionMode.localAgent => AssistantExecutionTarget.singleAgent,
-        ThreadExecutionMode.gatewayLocal => AssistantExecutionTarget.local,
-        ThreadExecutionMode.gatewayRemote => AssistantExecutionTarget.remote,
-      };
 
   TaskThread copyWith({
     String? threadId,
-    String? sessionKey,
     String? title,
     ThreadOwnerScope? ownerScope,
     WorkspaceBinding? workspaceBinding,
@@ -1027,62 +1028,22 @@ class TaskThread {
     double? updatedAtMs,
     List<GatewayChatMessage>? messages,
     bool? archived,
-    AssistantExecutionTarget? executionTarget,
-    bool clearExecutionTarget = false,
     AssistantMessageViewMode? messageViewMode,
     List<AssistantThreadSkillEntry>? importedSkills,
     List<String>? selectedSkillKeys,
     String? assistantModelId,
-    SingleAgentProvider? singleAgentProvider,
-    ThreadSelectionSource? executionTargetSource,
-    ThreadSelectionSource? singleAgentProviderSource,
     ThreadSelectionSource? assistantModelSource,
     ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
-    String? workspaceRef,
-    WorkspaceRefKind? workspaceRefKind,
-    String? workspacePath,
-    String? displayPath,
-    WorkspaceKind? workspaceKind,
-    bool? writable,
-    String? lifecycleStatus,
     String? latestResolvedRuntimeModel,
   }) {
-    final nextExecutionBinding = executionBinding ?? this.executionBinding;
-    final nextExecutionMode = clearExecutionTarget
-        ? nextExecutionBinding.executionMode
-        : executionTarget == null
-        ? nextExecutionBinding.executionMode
-        : switch (executionTarget) {
-            AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
-            AssistantExecutionTarget.singleAgent =>
-              ThreadExecutionMode.localAgent,
-            AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
-            AssistantExecutionTarget.remote =>
-              ThreadExecutionMode.gatewayRemote,
-          };
     return TaskThread(
-      threadId: threadId ?? sessionKey ?? this.threadId,
+      threadId: threadId ?? this.threadId,
       title: title ?? this.title,
       ownerScope: ownerScope ?? this.ownerScope,
-      workspaceBinding: (workspaceBinding ?? this.workspaceBinding).copyWith(
-        workspacePath: workspacePath ?? workspaceRef,
-        displayPath: displayPath,
-        workspaceKind:
-            workspaceKind ??
-            (workspaceRefKind == null
-                ? null
-                : _workspaceKindFromLegacy(workspaceRefKind)),
-        writable: writable,
-      ),
-      executionBinding: nextExecutionBinding.copyWith(
-        executionMode: nextExecutionMode,
-        executorId: singleAgentProvider?.providerId,
-        providerId: singleAgentProvider?.providerId,
-        executionModeSource: executionTargetSource,
-        providerSource: singleAgentProviderSource,
-      ),
+      workspaceBinding: workspaceBinding ?? this.workspaceBinding,
+      executionBinding: executionBinding ?? this.executionBinding,
       contextState: (contextState ?? this.contextState).copyWith(
         messages: messages,
         messageViewMode: messageViewMode,
@@ -1097,34 +1058,25 @@ class TaskThread {
       ),
       lifecycleState: (lifecycleState ?? this.lifecycleState).copyWith(
         archived: archived,
-        status: lifecycleStatus,
       ),
       createdAtMs: createdAtMs ?? this.createdAtMs,
       updatedAtMs: updatedAtMs ?? this.updatedAtMs,
     );
   }
 
-  static String _resolveThreadId(String? threadId, String? sessionKey) {
-    return (threadId ?? sessionKey ?? '').trim();
+  static String _resolveThreadId(String threadId) {
+    return threadId.trim();
   }
 
-  static WorkspaceKind _workspaceKindFromLegacy(WorkspaceRefKind? kind) {
-    return switch (kind) {
-      WorkspaceRefKind.remotePath ||
-      WorkspaceRefKind.objectStore => WorkspaceKind.remoteFs,
-      _ => WorkspaceKind.localFs,
-    };
-  }
-
-  static ThreadExecutionMode _executionModeFromLegacy(
-    AssistantExecutionTarget? target,
+  static WorkspaceBinding _validateWorkspaceBinding(
+    WorkspaceBinding workspaceBinding,
   ) {
-    return switch (target ?? AssistantExecutionTarget.auto) {
-      AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
-      AssistantExecutionTarget.singleAgent => ThreadExecutionMode.localAgent,
-      AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
-      AssistantExecutionTarget.remote => ThreadExecutionMode.gatewayRemote,
-    };
+    if (!workspaceBinding.isComplete) {
+      throw StateError(
+        'TaskThread requires a complete workspaceBinding at create/load time.',
+      );
+    }
+    return workspaceBinding;
   }
 
   Map<String, dynamic> toJson() {
@@ -1150,6 +1102,97 @@ class TaskThread {
       return double.tryParse(value?.toString() ?? '');
     }
 
+    Map<String, dynamic> workspaceBindingJson() {
+      final nested =
+          (json['workspaceBinding'] as Map?)?.cast<String, dynamic>() ??
+          const <String, dynamic>{};
+      if (nested.isNotEmpty) {
+        return nested;
+      }
+      final workspacePath =
+          json['workspacePath']?.toString().trim().isNotEmpty == true
+          ? json['workspacePath'].toString().trim()
+          : (json['workspaceRef']?.toString().trim() ?? '');
+      final workspaceKindValue =
+          json['workspaceKind']?.toString().trim().isNotEmpty == true
+          ? json['workspaceKind'].toString().trim()
+          : (json['workspaceRefKind']?.toString().trim() ?? '');
+      return <String, dynamic>{
+        'workspaceId':
+            json['workspaceId']?.toString().trim().isNotEmpty == true
+            ? json['workspaceId']
+            : (json['threadId']?.toString().trim() ?? ''),
+        'workspaceKind': workspaceKindValue,
+        'workspacePath': workspacePath,
+        'displayPath':
+            json['displayPath']?.toString().trim().isNotEmpty == true
+            ? json['displayPath']
+            : workspacePath,
+        'writable': json['writable'] as bool? ?? true,
+      };
+    }
+
+    Map<String, dynamic> executionBindingJson() {
+      final nested =
+          (json['executionBinding'] as Map?)?.cast<String, dynamic>() ??
+          const <String, dynamic>{};
+      if (nested.isNotEmpty) {
+        return nested;
+      }
+      final legacyTarget = AssistantExecutionTargetCopy.fromJsonValue(
+        json['executionTarget']?.toString(),
+      );
+      final legacyProvider = SingleAgentProviderCopy.fromJsonValue(
+        json['singleAgentProvider']?.toString(),
+      );
+      return <String, dynamic>{
+        'executionMode': threadExecutionModeFromAssistantExecutionTarget(
+          legacyTarget,
+        ).name,
+        'executorId': legacyProvider.providerId,
+        'providerId': legacyProvider.providerId,
+        'endpointId': json['endpointId']?.toString() ?? '',
+        'executionModeSource': json['executionTargetSource']?.toString(),
+        'providerSource': json['singleAgentProviderSource']?.toString(),
+      };
+    }
+
+    Map<String, dynamic> contextStateJson() {
+      final nested =
+          (json['contextState'] as Map?)?.cast<String, dynamic>() ??
+          const <String, dynamic>{};
+      if (nested.isNotEmpty) {
+        return nested;
+      }
+      return <String, dynamic>{
+        'messages': json['messages'],
+        'selectedModelId': json['assistantModelId'],
+        'selectedSkillKeys': json['selectedSkillKeys'],
+        'importedSkills': json['importedSkills'],
+        'permissionLevel': json['permissionLevel'],
+        'messageViewMode': json['messageViewMode'],
+        'latestResolvedRuntimeModel': json['latestResolvedRuntimeModel'],
+        'selectedModelSource': json['assistantModelSource'],
+        'selectedSkillsSource': json['selectedSkillsSource'],
+        'gatewayEntryState': json['gatewayEntryState'],
+      };
+    }
+
+    Map<String, dynamic> lifecycleStateJson() {
+      final nested =
+          (json['lifecycleState'] as Map?)?.cast<String, dynamic>() ??
+          const <String, dynamic>{};
+      if (nested.isNotEmpty) {
+        return nested;
+      }
+      return <String, dynamic>{
+        'archived': json['archived'],
+        'status': json['status'],
+        'lastRunAtMs': json['lastRunAtMs'],
+        'lastResultCode': json['lastResultCode'],
+      };
+    }
+
     return TaskThread(
       threadId: json['threadId']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
@@ -1157,22 +1200,10 @@ class TaskThread {
         (json['ownerScope'] as Map?)?.cast<String, dynamic>() ??
             const <String, dynamic>{},
       ),
-      workspaceBinding: WorkspaceBinding.fromJson(
-        (json['workspaceBinding'] as Map?)?.cast<String, dynamic>() ??
-            const <String, dynamic>{},
-      ),
-      executionBinding: ExecutionBinding.fromJson(
-        (json['executionBinding'] as Map?)?.cast<String, dynamic>() ??
-            const <String, dynamic>{},
-      ),
-      contextState: ThreadContextState.fromJson(
-        (json['contextState'] as Map?)?.cast<String, dynamic>() ??
-            const <String, dynamic>{},
-      ),
-      lifecycleState: ThreadLifecycleState.fromJson(
-        (json['lifecycleState'] as Map?)?.cast<String, dynamic>() ??
-            const <String, dynamic>{},
-      ),
+      workspaceBinding: WorkspaceBinding.fromJson(workspaceBindingJson()),
+      executionBinding: ExecutionBinding.fromJson(executionBindingJson()),
+      contextState: ThreadContextState.fromJson(contextStateJson()),
+      lifecycleState: ThreadLifecycleState.fromJson(lifecycleStateJson()),
       createdAtMs:
           asDouble(json['createdAtMs']) ??
           asDouble(json['updatedAtMs']) ??
