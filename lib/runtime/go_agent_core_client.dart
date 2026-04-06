@@ -214,7 +214,8 @@ class GoAgentCoreSessionRequest {
       if (_usesGatewaySessionMode(mode)) ...<String, dynamic>{
         'executionTarget': target.promptValue,
         if (agentId.trim().isNotEmpty) 'agentId': agentId.trim(),
-        if (metadata.isNotEmpty) 'metadata': metadata,
+        if (metadata.isNotEmpty && _supportsGatewayMetadata(target))
+          'metadata': metadata,
       },
     };
     return params;
@@ -226,6 +227,10 @@ const String _gatewaySessionMode = 'gateway-chat';
 bool _usesGatewaySessionMode(String mode) {
   final normalized = mode.trim();
   return normalized == 'gateway' || normalized == _gatewaySessionMode;
+}
+
+bool _supportsGatewayMetadata(AssistantExecutionTarget target) {
+  return target == AssistantExecutionTarget.remote;
 }
 
 class GoAgentCoreSessionUpdate {
