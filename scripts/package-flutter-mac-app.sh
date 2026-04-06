@@ -8,6 +8,7 @@ DIST_DIR="$ROOT_DIR/dist"
 APP_NAME="${APP_NAME:-XWorkmate}"
 BUILD_MODE="${BUILD_MODE:-release}"
 APP_STORE_DEFINE="${APP_STORE_DEFINE:---dart-define=XWORKMATE_APP_STORE=${XWORKMATE_APP_STORE:-true}}"
+SIGN_IDENTITY="${XWORKMATE_SIGN_IDENTITY:-}"
 PRODUCTS_DIR_NAME="$(tr '[:lower:]' '[:upper:]' <<< "${BUILD_MODE:0:1}")${BUILD_MODE:1}"
 FLUTTER_BUILD_STATE_DIR="${ROOT_DIR}/.dart_tool/flutter_build"
 MACOS_BUILD_DIR="${ROOT_DIR}/build/macos"
@@ -61,16 +62,28 @@ if [[ ! -d "$BUILD_APP_PATH" ]]; then
   exit 1
 fi
 
+verify_bundle_signature() {
+  local app_path="$1"
+  echo "Verifying code signature: $app_path"
+  codesign --verify --deep --verbose=2 "$app_path"
+}
+
 echo "Validating export compliance metadata..."
 bash "$ROOT_DIR/scripts/check-apple-export-compliance.sh" "$BUILD_APP_PATH"
 
 rm -rf "$DIST_APP_PATH" "$DIST_DMG_PATH"
 ditto "$BUILD_APP_PATH" "$DIST_APP_PATH"
-bash "$ROOT_DIR/scripts/embed-go-core-helper.sh" "$DIST_APP_PATH"
+if [[ -n "$SIGN_IDENTITY" ]]; then
+  echo "Refreshing bundled helper and re-signing with explicit identity..."
+  XWORKMATE_SIGN_IDENTITY="$SIGN_IDENTITY" bash "$ROOT_DIR/scripts/embed-go-core-helper.sh" "$DIST_APP_PATH"
+  codesign --force --deep --sign "$SIGN_IDENTITY" \
+    --preserve-metadata=entitlements,requirements,flags,runtime \
+    --timestamp=none "$DIST_APP_PATH"
+else
+  echo "Preserving Flutter build output signature and embedded helper."
+fi
 
-echo "Re-signing bundled helper and app..."
-SIGN_IDENTITY="${XWORKMATE_SIGN_IDENTITY:--}"
-codesign --force --deep --sign "$SIGN_IDENTITY" --preserve-metadata=entitlements,requirements,flags,runtime --timestamp=none "$DIST_APP_PATH"
+verify_bundle_signature "$DIST_APP_PATH"
 
 echo "Packaging DMG..."
 DMG_VOLUME_NAME="$APP_NAME" "$ROOT_DIR/scripts/create-dmg.sh" "$DIST_APP_PATH" "$DIST_DMG_PATH"
