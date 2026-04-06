@@ -197,7 +197,7 @@ void registerExecutionTargetSwitchThreadTests() {
         expect(controller.assistantConnectionStatusLabel, '单机智能体');
         expect(
           controller.assistantConnectionTargetLabel,
-          SingleAgentProvider.opencode.label,
+          '没有可用的外部 Agent ACP 端点，请配置 LLM API fallback。',
         );
       },
     );
@@ -387,8 +387,7 @@ void registerExecutionTargetSwitchThreadTests() {
           fallbackDirectoryPathResolver: () async => tempDirectory.path,
         );
         final reloadedSnapshot = await reloadedStore.loadSettingsSnapshot();
-        final reloadedThreads = await reloadedStore
-            .loadTaskThreads();
+        final reloadedThreads = await reloadedStore.loadTaskThreads();
 
         expect(
           reloadedSnapshot.accountUsername,
@@ -401,7 +400,7 @@ void registerExecutionTargetSwitchThreadTests() {
           assistantExecutionTargetFromExecutionMode(
             reloadedThreads.single.executionBinding.executionMode,
           ),
-          AssistantExecutionTarget.auto,
+          AssistantExecutionTarget.local,
         );
       },
     );
