@@ -359,11 +359,8 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
       uiFeatures.availableExecutionTargets,
     );
     final currentExecutionTarget = controller.assistantExecutionTarget;
-    final executionTarget = visibleExecutionTargets.contains(
-      currentExecutionTarget,
-    )
-        ? currentExecutionTarget
-        : currentExecutionTarget == AssistantExecutionTarget.auto
+    final executionTarget =
+        visibleExecutionTargets.contains(currentExecutionTarget)
         ? currentExecutionTarget
         : (visibleExecutionTargets.isNotEmpty
               ? visibleExecutionTargets.first
