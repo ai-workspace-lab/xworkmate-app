@@ -105,7 +105,13 @@ extension AppControllerWebHelpers on AppController {
     final target =
         sanitizeTargetInternal(record.executionTarget) ??
         AssistantExecutionTarget.singleAgent;
-    final workspacePath = record.workspacePath.trim();
+    final workspaceBinding = record.workspaceBinding;
+    if (!workspaceBinding.isComplete) {
+      throw StateError(
+        'TaskThread ${record.threadId} is missing a complete workspaceBinding.',
+      );
+    }
+    final workspacePath = workspaceBinding.workspacePath.trim();
     return record.copyWith(
       executionTarget: target,
       title: record.title.trim().isEmpty
@@ -113,12 +119,12 @@ extension AppControllerWebHelpers on AppController {
           : record.title.trim(),
       workspaceBinding: WorkspaceBinding(
         workspaceId: record.threadId,
-        workspaceKind: WorkspaceKind.remoteFs,
+        workspaceKind: workspaceBinding.workspaceKind,
         workspacePath: workspacePath,
         displayPath: record.displayPath.trim().isEmpty
             ? workspacePath
             : record.displayPath.trim(),
-        writable: record.workspaceBinding.writable,
+        writable: workspaceBinding.writable,
       ),
       lifecycleState: record.lifecycleState.copyWith(status: 'ready'),
     );
@@ -303,11 +309,7 @@ extension AppControllerWebHelpers on AppController {
                         lastRunAtMs: null,
                         lastResultCode: null,
                       ))
-                  .copyWith(
-                    status: workspaceBinding.workspacePath.trim().isEmpty
-                        ? 'needs_workspace'
-                        : 'ready',
-                  ),
+                  .copyWith(status: 'ready'),
           executionTarget: resolvedTarget,
           updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
         );
