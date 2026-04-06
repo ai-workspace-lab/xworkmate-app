@@ -109,8 +109,8 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
         const customProvider = SingleAgentProvider(
           providerId: 'custom-agent-1',
-          label: 'Codex',
-          badge: 'C',
+          label: 'Lab Agent',
+          badge: 'LA',
         );
         final client = FakeGoTaskServiceClientInternal(
           capabilities: ExternalCodeAgentAcpCapabilities(
@@ -146,8 +146,8 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
               profiles: const <ExternalAcpEndpointProfile>[
                 ExternalAcpEndpointProfile(
                   providerKey: 'custom-agent-1',
-                  label: 'Codex',
-                  badge: 'C',
+                  label: 'Lab Agent',
+                  badge: 'LA',
                   endpoint: 'ws://127.0.0.1:9101/acp',
                   authRef: '',
                   enabled: true,
@@ -180,6 +180,104 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
               (provider) =>
                   provider.providerId == 'custom-agent-1' &&
                   provider.endpoint == 'ws://127.0.0.1:9101/acp',
+            ),
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'AppController drops stale custom-agent thread bindings and starts new single-agent tasks with the canonical provider',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-single-agent-stale-provider-',
+        );
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+        final client = FakeGoTaskServiceClientInternal(
+          capabilities: ExternalCodeAgentAcpCapabilities(
+            singleAgent: true,
+            multiAgent: false,
+            providers: <SingleAgentProvider>{SingleAgentProvider.codex},
+            raw: <String, dynamic>{},
+          ),
+          result: const GoTaskServiceResult(
+            success: true,
+            message: 'CANONICAL_CODEX_REPLY',
+            turnId: 'turn-canonical',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: 'codex-sonnet',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        final controller = await createAppControllerInternal(
+          store: store,
+          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+          ],
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+          goTaskServiceClient: client,
+        );
+        await controller.saveSettings(
+          controller.settings.copyWith(
+            externalAcpEndpoints: normalizeExternalAcpEndpoints(
+              profiles: <ExternalAcpEndpointProfile>[
+                ...controller.settings.externalAcpEndpoints,
+                ExternalAcpEndpointProfile.defaultsForProvider(
+                  SingleAgentProvider.codex,
+                ).copyWith(endpoint: 'ws://127.0.0.1:9102/acp'),
+              ],
+            ),
+            multiAgent: controller.settings.multiAgent.copyWith(
+              autoSync: false,
+            ),
+          ),
+          refreshAfterSave: false,
+        );
+
+        controller.upsertTaskThreadInternal(
+          'main',
+          singleAgentProvider: const SingleAgentProvider(
+            providerId: 'custom-agent-1',
+            label: 'Codex',
+            badge: 'C',
+          ),
+          singleAgentProviderSource: ThreadSelectionSource.explicit,
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        );
+
+        expect(controller.currentSingleAgentProvider.providerId, 'codex');
+
+        controller.initializeAssistantThreadContext(
+          'draft:new-single-agent-thread',
+          title: 'New conversation',
+          executionTarget: AssistantExecutionTarget.singleAgent,
+          messageViewMode: controller.currentAssistantMessageViewMode,
+          singleAgentProvider: controller.currentSingleAgentProvider,
+        );
+        await controller.switchSession('draft:new-single-agent-thread');
+
+        expect(controller.currentSingleAgentProvider.providerId, 'codex');
+
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.singleAgent,
+        );
+        await controller.sendChatMessage(
+          '请输出 CANONICAL_CODEX_REPLY',
+          thinking: 'low',
+        );
+
+        expect(client.lastRequest?.provider, SingleAgentProvider.codex);
+        expect(
+          client.syncedProvidersHistory.any(
+            (batch) => batch.any(
+              (provider) =>
+                  provider.providerId == 'codex' &&
+                  provider.endpoint == 'ws://127.0.0.1:9102/acp',
             ),
           ),
           isTrue,

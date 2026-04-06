@@ -102,11 +102,12 @@ extension AppControllerWebHelpers on AppController {
   }
 
   TaskThread sanitizeRecordInternal(TaskThread record) {
-    final target = sanitizeTargetInternal(
-      assistantExecutionTargetFromExecutionMode(
-        record.executionBinding.executionMode,
-      ),
-    ) ??
+    final target =
+        sanitizeTargetInternal(
+          assistantExecutionTargetFromExecutionMode(
+            record.executionBinding.executionMode,
+          ),
+        ) ??
         AssistantExecutionTarget.singleAgent;
     final workspaceBinding = record.workspaceBinding;
     if (!workspaceBinding.isComplete) {
@@ -259,11 +260,13 @@ extension AppControllerWebHelpers on AppController {
     required SingleAgentProvider singleAgentProvider,
     ExecutionBinding? existingBinding,
   }) {
+    final sanitizedProvider = settingsInternal
+        .sanitizeSingleAgentProviderSelection(singleAgentProvider);
     return (existingBinding ??
             ExecutionBinding(
               executionMode: ThreadExecutionMode.localAgent,
-              executorId: singleAgentProvider.providerId,
-              providerId: singleAgentProvider.providerId,
+              executorId: sanitizedProvider.providerId,
+              providerId: sanitizedProvider.providerId,
               endpointId: '',
             ))
         .copyWith(
@@ -275,8 +278,8 @@ extension AppControllerWebHelpers on AppController {
             AssistantExecutionTarget.remote =>
               ThreadExecutionMode.gatewayRemote,
           },
-          executorId: singleAgentProvider.providerId,
-          providerId: singleAgentProvider.providerId,
+          executorId: sanitizedProvider.providerId,
+          providerId: sanitizedProvider.providerId,
         );
   }
 
@@ -296,29 +299,31 @@ extension AppControllerWebHelpers on AppController {
       existingBinding: existing?.workspaceBinding,
     );
     threadRepositoryInternal.replace(
-        (existing ?? newRecordInternal(target: resolvedTarget)).copyWith(
-          threadId: key,
-          ownerScope: ownerScope,
-          workspaceBinding: workspaceBinding,
-          executionBinding: buildWebExecutionBindingInternal(
-            executionTarget: resolvedTarget,
-            singleAgentProvider:
+      (existing ?? newRecordInternal(target: resolvedTarget)).copyWith(
+        threadId: key,
+        ownerScope: ownerScope,
+        workspaceBinding: workspaceBinding,
+        executionBinding: buildWebExecutionBindingInternal(
+          executionTarget: resolvedTarget,
+          singleAgentProvider: settingsInternal
+              .sanitizeSingleAgentProviderSelection(
                 SingleAgentProviderCopy.fromJsonValue(
                   existing?.executionBinding.providerId ?? '',
                 ),
-            existingBinding: existing?.executionBinding,
-          ),
-          lifecycleState:
-              (existing?.lifecycleState ??
-                      const ThreadLifecycleState(
-                        archived: false,
-                        status: 'ready',
-                        lastRunAtMs: null,
-                        lastResultCode: null,
-                      ))
-                  .copyWith(status: 'ready'),
-          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+              ),
+          existingBinding: existing?.executionBinding,
         ),
+        lifecycleState:
+            (existing?.lifecycleState ??
+                    const ThreadLifecycleState(
+                      archived: false,
+                      status: 'ready',
+                      lastRunAtMs: null,
+                      lastResultCode: null,
+                    ))
+                .copyWith(status: 'ready'),
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      ),
     );
   }
 
@@ -500,7 +505,8 @@ extension AppControllerWebHelpers on AppController {
         sanitizeTargetInternal(executionTarget) ??
         assistantExecutionTargetForSession(key);
     final existing =
-        taskThreadForSessionInternal(key) ?? newRecordInternal(target: resolvedTarget);
+        taskThreadForSessionInternal(key) ??
+        newRecordInternal(target: resolvedTarget);
     final nextWorkspaceBinding = existing.workspaceBinding;
     if (!nextWorkspaceBinding.isComplete) {
       throw StateError(
@@ -525,34 +531,35 @@ extension AppControllerWebHelpers on AppController {
         latestResolvedRuntimeModel: latestResolvedRuntimeModel,
         gatewayEntryState: gatewayEntryState ?? existing.gatewayEntryState,
         clearGatewayEntryState: clearGatewayEntryState,
-        workspaceBinding:
-            (workspacePath != null || workspaceKind != null)
-                ? nextWorkspaceBinding.copyWith(
-                    workspacePath: workspacePath,
-                    displayPath:
-                        workspacePath ?? nextWorkspaceBinding.displayPath,
-                    workspaceKind: workspaceKind,
-                  )
-                : nextWorkspaceBinding,
+        workspaceBinding: (workspacePath != null || workspaceKind != null)
+            ? nextWorkspaceBinding.copyWith(
+                workspacePath: workspacePath,
+                displayPath: workspacePath ?? nextWorkspaceBinding.displayPath,
+                workspaceKind: workspaceKind,
+              )
+            : nextWorkspaceBinding,
         executionBinding: existing.executionBinding.copyWith(
           executionMode: threadExecutionModeFromAssistantExecutionTarget(
             resolvedTarget,
           ),
           executorId:
-              (singleAgentProvider ?? SingleAgentProviderCopy.fromJsonValue(
-                    existing.executionBinding.providerId,
-                  ))
+              (singleAgentProvider ??
+                      SingleAgentProviderCopy.fromJsonValue(
+                        existing.executionBinding.providerId,
+                      ))
                   .providerId,
           providerId:
-              (singleAgentProvider ?? SingleAgentProviderCopy.fromJsonValue(
-                    existing.executionBinding.providerId,
-                  ))
+              (singleAgentProvider ??
+                      SingleAgentProviderCopy.fromJsonValue(
+                        existing.executionBinding.providerId,
+                      ))
                   .providerId,
           executionModeSource:
               executionTargetSource ??
               existing.executionBinding.executionModeSource,
           providerSource:
-              singleAgentProviderSource ?? existing.executionBinding.providerSource,
+              singleAgentProviderSource ??
+              existing.executionBinding.providerSource,
         ),
         lifecycleState: existing.lifecycleState.copyWith(
           status: lifecycleStatus ?? 'ready',

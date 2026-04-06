@@ -99,7 +99,9 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
 
   Future<void> setSingleAgentProvider(SingleAgentProvider provider) async {
     final sessionKey = normalizedAssistantSessionKeyInternal(currentSessionKey);
-    final sanitizedProvider = settings.resolveSingleAgentProvider(provider);
+    final sanitizedProvider = settings.sanitizeSingleAgentProviderSelection(
+      provider,
+    );
     if (singleAgentProviderForSession(sessionKey) == sanitizedProvider) {
       return;
     }
@@ -278,9 +280,15 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     if (!assistantThreadRecordsInternal.containsKey(normalizedSessionKey)) {
       initializeAssistantThreadContext(
         normalizedSessionKey,
-        executionTarget: assistantExecutionTargetForSession(normalizedSessionKey),
-        messageViewMode: assistantMessageViewModeForSession(normalizedSessionKey),
-        singleAgentProvider: singleAgentProviderForSession(normalizedSessionKey),
+        executionTarget: assistantExecutionTargetForSession(
+          normalizedSessionKey,
+        ),
+        messageViewMode: assistantMessageViewModeForSession(
+          normalizedSessionKey,
+        ),
+        singleAgentProvider: singleAgentProviderForSession(
+          normalizedSessionKey,
+        ),
       );
     }
     upsertTaskThreadInternal(
@@ -331,8 +339,8 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       normalizedSessionKey,
       executionTarget: resolvedTarget,
       ownerScope: initialOwnerScope,
-      existingBinding:
-          assistantThreadRecordsInternal[normalizedSessionKey]?.workspaceBinding,
+      existingBinding: assistantThreadRecordsInternal[normalizedSessionKey]
+          ?.workspaceBinding,
     );
     upsertTaskThreadInternal(
       normalizedSessionKey,
