@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
+import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
@@ -106,13 +107,19 @@ class _FakeDesktopPlatformService implements DesktopPlatformService {
 }
 
 class _ThrowingSecureConfigStore extends SecureConfigStore {
-  _ThrowingSecureConfigStore(String rootPath)
-    : super(
-        enableSecureStorage: false,
-        databasePathResolver: () async => '$rootPath/settings.sqlite3',
-        fallbackDirectoryPathResolver: () async => rootPath,
-        defaultSupportDirectoryPathResolver: () async => rootPath,
-      );
+  _ThrowingSecureConfigStore(
+    String rootPath, {
+    this.identity,
+    this.operatorDeviceToken,
+  }) : super(
+         enableSecureStorage: false,
+         databasePathResolver: () async => '$rootPath/settings.sqlite3',
+         fallbackDirectoryPathResolver: () async => rootPath,
+         defaultSupportDirectoryPathResolver: () async => rootPath,
+       );
+
+  LocalDeviceIdentity? identity;
+  String? operatorDeviceToken;
 
   @override
   Future<String?> loadGatewayToken({int? profileIndex}) async {
@@ -126,12 +133,12 @@ class _ThrowingSecureConfigStore extends SecureConfigStore {
 
   @override
   Future<LocalDeviceIdentity?> loadDeviceIdentity() async {
-    throw StateError('main store identity should not be used');
+    return identity;
   }
 
   @override
   Future<void> saveDeviceIdentity(LocalDeviceIdentity identity) async {
-    throw StateError('main store identity save should not be used');
+    this.identity = identity;
   }
 
   @override
@@ -139,7 +146,10 @@ class _ThrowingSecureConfigStore extends SecureConfigStore {
     required String deviceId,
     required String role,
   }) async {
-    throw StateError('main store device token should not be used');
+    if (identity?.deviceId == deviceId && role == 'operator') {
+      return operatorDeviceToken;
+    }
+    return null;
   }
 
   @override
@@ -148,7 +158,9 @@ class _ThrowingSecureConfigStore extends SecureConfigStore {
     required String role,
     required String token,
   }) async {
-    throw StateError('main store device token save should not be used');
+    if (identity?.deviceId == deviceId && role == 'operator') {
+      operatorDeviceToken = token;
+    }
   }
 }
 
@@ -156,6 +168,8 @@ class _FakeGatewayTestServer {
   _FakeGatewayTestServer._(this._server);
 
   final HttpServer _server;
+  String? lastConnectDeviceId;
+  String? lastAuthDeviceToken;
 
   int get port => _server.port;
 
@@ -189,6 +203,13 @@ class _FakeGatewayTestServer {
         final method = frame['method'] as String? ?? '';
         switch (method) {
           case 'connect':
+            final payload =
+                frame['params'] as Map<String, dynamic>? ?? const {};
+            final device =
+                payload['device'] as Map<String, dynamic>? ?? const {};
+            final auth = payload['auth'] as Map<String, dynamic>? ?? const {};
+            lastConnectDeviceId = device['id']?.toString();
+            lastAuthDeviceToken = auth['deviceToken']?.toString();
             socket.add(
               jsonEncode(<String, dynamic>{
                 'type': 'res',
@@ -278,18 +299,27 @@ void main() {
   );
 
   test(
-    'AppController tests gateway connectivity without touching the main secure store',
+    'AppController tests gateway connectivity with the persisted device identity',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final server = await _FakeGatewayTestServer.start();
       final tempDirectory = await Directory.systemTemp.createTemp(
         'xworkmate-desktop-platform-tests-',
       );
+      final identitySeedStore = createIsolatedTestStore(
+        enableSecureStorage: false,
+      );
+      final identity = await DeviceIdentityStore(
+        identitySeedStore,
+      ).loadOrCreate();
       final controller = AppController(
-        store: _ThrowingSecureConfigStore(tempDirectory.path),
+        store: _ThrowingSecureConfigStore(
+          tempDirectory.path,
+          identity: identity,
+          operatorDeviceToken: 'paired-device-token',
+        ),
       );
       addTearDown(server.close);
-      addTearDown(controller.dispose);
       addTearDown(() async {
         if (await tempDirectory.exists()) {
           await tempDirectory.delete(recursive: true);
@@ -307,12 +337,13 @@ void main() {
           useSetupCode: false,
         ),
         executionTarget: AssistantExecutionTarget.local,
-        tokenOverride: 'draft-token',
       );
 
       expect(result.state, 'success');
       expect(result.endpoint, '127.0.0.1:${server.port}');
       expect(result.message, isNot(contains('main store')));
+      expect(server.lastConnectDeviceId, identity.deviceId);
+      expect(server.lastAuthDeviceToken, 'paired-device-token');
     },
   );
 }

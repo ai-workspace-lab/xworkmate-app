@@ -313,6 +313,23 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     );
     await runtime.initialize();
     try {
+      final existingIdentity = await storeInternal.loadDeviceIdentity();
+      if (existingIdentity != null) {
+        await temporaryStore.saveDeviceIdentity(existingIdentity);
+        final existingOperatorDeviceToken = await storeInternal.loadDeviceToken(
+          deviceId: existingIdentity.deviceId,
+          role: 'operator',
+        );
+        final trimmedExistingOperatorDeviceToken =
+            existingOperatorDeviceToken?.trim() ?? '';
+        if (trimmedExistingOperatorDeviceToken.isNotEmpty) {
+          await temporaryStore.saveDeviceToken(
+            deviceId: existingIdentity.deviceId,
+            role: 'operator',
+            token: trimmedExistingOperatorDeviceToken,
+          );
+        }
+      }
       await runtime.connectProfile(
         profile,
         authTokenOverride: tokenOverride,
@@ -449,7 +466,8 @@ extension AppControllerDesktopSettingsRuntime on AppController {
           await skillDirectoryAccessServiceInternal.resolveUserHomeDirectory();
       await settingsControllerInternal.initialize();
       final storedAssistantThreads = await storeInternal.loadTaskThreads();
-      final skippedInvalidThreadIds = storeInternal.lastSkippedInvalidTaskThreadIds;
+      final skippedInvalidThreadIds =
+          storeInternal.lastSkippedInvalidTaskThreadIds;
       startupTaskThreadWarningInternal = skippedInvalidThreadIds.isEmpty
           ? null
           : appText(
