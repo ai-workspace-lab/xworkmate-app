@@ -263,8 +263,7 @@ extension AppControllerDesktopThreadStorage on AppController {
     final key = normalizedAssistantSessionKeyInternal(sessionKey);
     final existingTitle =
         assistantThreadRecordsInternal[key]?.title.trim() ?? '';
-    final customTitle =
-        settings.assistantCustomTaskTitles[key]?.trim() ?? '';
+    final customTitle = settings.assistantCustomTaskTitles[key]?.trim() ?? '';
     final next = List<GatewayChatMessage>.from(
       assistantThreadMessagesInternal[key] ?? const <GatewayChatMessage>[],
     )..add(message);
@@ -686,8 +685,10 @@ extension AppControllerDesktopThreadStorage on AppController {
       final recordExecutionTarget = assistantExecutionTargetFromExecutionMode(
         record.executionBinding.executionMode,
       );
-      final recordProvider = SingleAgentProviderCopy.fromJsonValue(
-        record.executionBinding.providerId,
+      final recordProvider = settings.sanitizeSingleAgentProviderSelection(
+        SingleAgentProviderCopy.fromJsonValue(
+          record.executionBinding.providerId,
+        ),
       );
       final workspaceBinding = record.workspaceBinding.copyWith(
         workspaceId: sessionKey,

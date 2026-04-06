@@ -522,16 +522,6 @@ class SettingsSnapshot {
         return item;
       }
     }
-    if (kLegacyExternalAcpProviderIds.contains(normalized)) {
-      final canonical = SingleAgentProvider.fromJsonValue(normalized);
-      for (final item in externalAcpEndpoints) {
-        if (!item.isPreset &&
-            item.label.trim() == canonical.label &&
-            item.badge.trim() == canonical.badge) {
-          return item;
-        }
-      }
-    }
     return null;
   }
 
@@ -566,6 +556,29 @@ class SettingsSnapshot {
     return normalizedSelection;
   }
 
+  SingleAgentProvider sanitizeSingleAgentProviderSelection(
+    SingleAgentProvider provider,
+  ) {
+    final resolved = resolveSingleAgentProvider(provider);
+    if (resolved.isAuto) {
+      return SingleAgentProvider.auto;
+    }
+    for (final saved in savedSingleAgentProviders) {
+      if (saved.providerId == resolved.providerId) {
+        return saved;
+      }
+    }
+    if (kKnownSingleAgentProviders.any(
+      (item) => item.providerId == resolved.providerId,
+    )) {
+      return resolved;
+    }
+    if (savedSingleAgentProviders.isNotEmpty) {
+      return savedSingleAgentProviders.first;
+    }
+    return SingleAgentProvider.auto;
+  }
+
   List<SingleAgentProvider> get availableSingleAgentProviders =>
       normalizeSingleAgentProviderList(
         externalAcpEndpoints.map((item) => item.toProvider()),
@@ -574,11 +587,7 @@ class SettingsSnapshot {
   List<SingleAgentProvider> get savedSingleAgentProviders =>
       normalizeSingleAgentProviderList(
         externalAcpEndpoints
-            .where(
-              (item) =>
-                  item.enabled &&
-                  item.endpoint.trim().isNotEmpty,
-            )
+            .where((item) => item.enabled && item.endpoint.trim().isNotEmpty)
             .map((item) => item.toProvider()),
       );
 

@@ -152,8 +152,12 @@ extension AppControllerDesktopThreadBinding on AppController {
         executionTarget == AssistantExecutionTarget.singleAgent) {
       if (existingBinding != null &&
           existingBinding.workspaceKind == WorkspaceKind.localFs &&
-          ensureLocalWorkspaceDirectoryInternal(existingBinding.workspacePath)) {
-        return existingBinding.copyWith(displayPath: existingBinding.workspacePath);
+          ensureLocalWorkspaceDirectoryInternal(
+            existingBinding.workspacePath,
+          )) {
+        return existingBinding.copyWith(
+          displayPath: existingBinding.workspacePath,
+        );
       }
       final localPath = localThreadWorkspacePathInternal(sessionKey);
       if (localPath.isEmpty) {
@@ -187,24 +191,27 @@ extension AppControllerDesktopThreadBinding on AppController {
     required SingleAgentProvider singleAgentProvider,
     ExecutionBinding? existingBinding,
   }) {
+    final sanitizedProvider = settings.sanitizeSingleAgentProviderSelection(
+      singleAgentProvider,
+    );
     return (existingBinding ??
             ExecutionBinding(
               executionMode: ThreadExecutionMode.localAgent,
-              executorId: singleAgentProvider.providerId,
-              providerId: singleAgentProvider.providerId,
+              executorId: sanitizedProvider.providerId,
+              providerId: sanitizedProvider.providerId,
               endpointId: '',
             ))
         .copyWith(
-        executionMode: switch (executionTarget) {
-          AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
-          AssistantExecutionTarget.singleAgent =>
-            ThreadExecutionMode.localAgent,
-          AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
+          executionMode: switch (executionTarget) {
+            AssistantExecutionTarget.auto => ThreadExecutionMode.auto,
+            AssistantExecutionTarget.singleAgent =>
+              ThreadExecutionMode.localAgent,
+            AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
             AssistantExecutionTarget.remote =>
               ThreadExecutionMode.gatewayRemote,
           },
-          executorId: singleAgentProvider.providerId,
-          providerId: singleAgentProvider.providerId,
+          executorId: sanitizedProvider.providerId,
+          providerId: sanitizedProvider.providerId,
         );
   }
 
@@ -239,10 +246,11 @@ extension AppControllerDesktopThreadBinding on AppController {
       workspaceBinding: workspaceBinding,
       executionBinding: buildDesktopExecutionBindingInternal(
         executionTarget: resolvedExecutionTarget,
-        singleAgentProvider:
-            SingleAgentProviderCopy.fromJsonValue(
-              existing?.executionBinding.providerId ?? '',
-            ),
+        singleAgentProvider: settings.sanitizeSingleAgentProviderSelection(
+          SingleAgentProviderCopy.fromJsonValue(
+            existing?.executionBinding.providerId ?? '',
+          ),
+        ),
         existingBinding: existing?.executionBinding,
       ),
       lifecycleState:
