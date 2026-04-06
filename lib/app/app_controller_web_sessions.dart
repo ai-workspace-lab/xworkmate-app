@@ -68,12 +68,14 @@ extension AppControllerWebSessions on AppController {
   WorkspaceRefKind assistantWorkspaceKindForSession(String sessionKey) {
     final normalizedSessionKey = normalizedSessionKeyInternal(sessionKey);
     final record = threadRecordsInternal[normalizedSessionKey];
-    if (record != null) {
-      return record.workspaceKind == WorkspaceKind.localFs
-          ? WorkspaceRefKind.localPath
-          : WorkspaceRefKind.remotePath;
+    if (record == null || !record.workspaceBinding.isComplete) {
+      throw StateError(
+        'TaskThread $normalizedSessionKey is missing a complete workspaceBinding.',
+      );
     }
-    return WorkspaceRefKind.remotePath;
+    return record.workspaceKind == WorkspaceKind.localFs
+        ? WorkspaceRefKind.localPath
+        : WorkspaceRefKind.remotePath;
   }
 
   String assistantWorkspaceDisplayPathForSession(String sessionKey) {
@@ -560,12 +562,8 @@ extension AppControllerWebSessions on AppController {
     if (existing != null) {
       return existing;
     }
-    final target =
-        sanitizeTargetInternal(settingsInternal.assistantExecutionTarget) ??
-        AssistantExecutionTarget.singleAgent;
-    final record = newRecordInternal(target: target);
-    threadRecordsInternal[record.threadId] = record;
-    currentSessionKeyInternal = record.threadId;
-    return record;
+    throw StateError(
+      'Current session $currentSessionKeyInternal has no TaskThread record.',
+    );
   }
 }

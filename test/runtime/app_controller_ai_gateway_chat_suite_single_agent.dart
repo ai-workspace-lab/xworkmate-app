@@ -210,7 +210,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
     );
 
     test(
-      'AppController bootstraps the current thread workspace from execution context before single-agent send',
+      'AppController updates the current thread workspace from execution context for local single-agent threads',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
           'xworkmate-single-agent-workspace-bootstrap-',
@@ -221,7 +221,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
         await store.initialize();
         await store.saveSettingsSnapshot(
-          SettingsSnapshot.defaults().copyWith(workspacePath: ''),
+          SettingsSnapshot.defaults().copyWith(workspacePath: tempDirectory.path),
         );
         final client = FakeGoAgentCoreClientInternal(
           capabilities: GoAgentCoreCapabilities(
@@ -527,7 +527,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         await controller.settingsController.saveAiGatewayApiKey('live-key');
         await controller.saveSettings(
           controller.settings.copyWith(
-            workspacePath: '',
+            workspacePath: tempDirectory.path,
             aiGateway: controller.settings.aiGateway.copyWith(
               baseUrl: server.baseUrl,
               availableModels: const <String>['moonshotai/kimi-k2.5'],

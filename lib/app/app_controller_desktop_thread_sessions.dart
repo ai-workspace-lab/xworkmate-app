@@ -158,14 +158,14 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final record = assistantThreadRecordsInternal[normalizedSessionKey];
-    if (record != null) {
-      return record.workspaceKind == WorkspaceKind.localFs
-          ? WorkspaceRefKind.localPath
-          : WorkspaceRefKind.remotePath;
+    if (record == null || !record.workspaceBinding.isComplete) {
+      throw StateError(
+        'TaskThread $normalizedSessionKey is missing a complete workspaceBinding.',
+      );
     }
-    return defaultWorkspaceRefKindForTargetInternal(
-      assistantExecutionTargetForSession(normalizedSessionKey),
-    );
+    return record.workspaceKind == WorkspaceKind.localFs
+        ? WorkspaceRefKind.localPath
+        : WorkspaceRefKind.remotePath;
   }
 
   String assistantWorkspaceDisplayPathForSession(String sessionKey) {

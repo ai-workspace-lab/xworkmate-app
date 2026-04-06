@@ -472,7 +472,7 @@ void main() {
   );
 
   test(
-    'AppController rebinds the current single-agent thread after configuring a workspace root',
+    'AppController keeps the current single-agent thread workspace stable when saving workspace settings',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -494,46 +494,14 @@ void main() {
       );
       await store.initialize();
       await store.saveSettingsSnapshot(
-        seededSettingsSnapshot(workspacePath: ''),
+        seededSettingsSnapshot(workspacePath: workspaceRoot.path),
       );
       final controller = AppController(store: store);
       addTearDown(controller.dispose);
       await waitForControllerInternal(controller);
-      final existingMain = controller
-          .assistantThreadRecordsInternal[controller.currentSessionKey]!;
-      controller.assistantThreadRecordsInternal[controller.currentSessionKey] =
-          existingMain.copyWith(
-            workspaceBinding: const WorkspaceBinding(
-              workspaceId: 'main',
-              workspaceKind: WorkspaceKind.localFs,
-              workspacePath: '',
-              displayPath: '',
-              writable: true,
-            ),
-            lifecycleState: existingMain.lifecycleState.copyWith(
-              status: 'needs_workspace',
-            ),
-            executionTarget: AssistantExecutionTarget.singleAgent,
-          );
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.singleAgent,
       );
-      controller.assistantThreadRecordsInternal[controller
-          .currentSessionKey] = controller
-          .assistantThreadRecordsInternal[controller.currentSessionKey]!
-          .copyWith(
-            workspaceBinding: const WorkspaceBinding(
-              workspaceId: 'main',
-              workspaceKind: WorkspaceKind.localFs,
-              workspacePath: '',
-              displayPath: '',
-              writable: true,
-            ),
-            lifecycleState: controller
-                .assistantThreadRecordsInternal[controller.currentSessionKey]!
-                .lifecycleState
-                .copyWith(status: 'needs_workspace'),
-          );
       final derivedBeforeSave = controller.assistantWorkspacePathForSession(
         controller.currentSessionKey,
       );
@@ -544,7 +512,7 @@ void main() {
             .assistantThreadRecordsInternal[controller.currentSessionKey]
             ?.lifecycleState
             .status,
-        'needs_workspace',
+        'ready',
       );
 
       await controller.saveSettingsDraft(
@@ -564,7 +532,7 @@ void main() {
         controller.assistantWorkspacePathForSession(
           controller.currentSessionKey,
         ),
-        '${workspaceRoot.path}/.xworkmate/threads/main',
+        derivedBeforeSave,
       );
       expect(controller.hasPendingSettingsApply, isFalse);
       expect(controller.hasSettingsDraftChanges, isFalse);
@@ -572,7 +540,7 @@ void main() {
         controller
             .assistantThreadRecordsInternal[controller.currentSessionKey]
             ?.displayPath,
-        '${workspaceRoot.path}/.xworkmate/threads/main',
+        derivedBeforeSave,
       );
       expect(
         controller
@@ -585,7 +553,7 @@ void main() {
   );
 
   test(
-    'AppController derives a thread workspace path when single-agent binding is empty but workspace root is configured',
+    'AppController rejects missing workspace bindings when reading workspace kind',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -616,33 +584,20 @@ void main() {
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.singleAgent,
       );
-      final existingMain =
-          controller.assistantThreadRecordsInternal[controller.currentSessionKey]!;
-      controller.assistantThreadRecordsInternal[controller.currentSessionKey] =
-          existingMain.copyWith(
-            workspaceBinding: const WorkspaceBinding(
-              workspaceId: 'main',
-              workspaceKind: WorkspaceKind.localFs,
-              workspacePath: '',
-              displayPath: '',
-              writable: true,
-            ),
-            lifecycleState: existingMain.lifecycleState.copyWith(
-              status: 'needs_workspace',
-            ),
-          );
-
+      controller.assistantThreadRecordsInternal.remove(
+        controller.currentSessionKey,
+      );
       expect(
-        controller.assistantWorkspacePathForSession(
+        () => controller.assistantWorkspaceKindForSession(
           controller.currentSessionKey,
         ),
-        '${workspaceRoot.path}/.xworkmate/threads/main',
+        throwsA(isA<StateError>()),
       );
     },
   );
 
   test(
-    'AppController keeps single-agent threads unbound when the workspace root cannot create thread directories',
+    'AppController fails fast when a single-agent thread cannot allocate a writable workspace',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -674,30 +629,12 @@ void main() {
         AssistantExecutionTarget.singleAgent,
       );
 
-      controller.initializeAssistantThreadContext(
-        'draft:invalid-root',
-        title: 'Invalid Root',
-        executionTarget: AssistantExecutionTarget.singleAgent,
-      );
-
-      final expectedThreadWorkspace = Directory(
-        '${invalidRootFile.path}/.xworkmate/threads/draft-invalid-root',
-      );
-      expect(await expectedThreadWorkspace.exists(), isFalse);
-      expect(
-        controller.assistantWorkspacePathForSession('draft:invalid-root'),
-        isEmpty,
-      );
-      expect(
-        controller
-            .assistantThreadRecordsInternal['draft:invalid-root']
-            ?.lifecycleState
-            .status,
-        'needs_workspace',
-      );
-
       await expectLater(
-        () => controller.sendChatMessage('请输出 SHOULD_NOT_RUN', thinking: 'low'),
+        () async => controller.initializeAssistantThreadContext(
+          'draft:invalid-root',
+          title: 'Invalid Root',
+          executionTarget: AssistantExecutionTarget.singleAgent,
+        ),
         throwsA(isA<StateError>()),
       );
     },
