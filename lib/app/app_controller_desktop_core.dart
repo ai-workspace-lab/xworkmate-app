@@ -590,7 +590,7 @@ class AppController extends ChangeNotifier {
   List<SingleAgentProvider> get configuredSingleAgentProviders =>
       normalizeSingleAgentProviderList(
         (availableSingleAgentProvidersOverrideInternal ??
-                settings.availableSingleAgentProviders)
+                settings.savedSingleAgentProviders)
             .where((item) => item != SingleAgentProvider.auto)
             .map(settings.resolveSingleAgentProvider),
       );
@@ -599,6 +599,15 @@ class AppController extends ChangeNotifier {
       configuredSingleAgentProviders
           .where(canUseSingleAgentProviderInternal)
           .toList(growable: false);
+
+  List<AssistantExecutionTarget> visibleAssistantExecutionTargets(
+    Iterable<AssistantExecutionTarget> supportedTargets,
+  ) {
+    return settings.visibleAssistantExecutionTargets(
+      supportedTargets: supportedTargets,
+      availableSingleAgentProviders: availableSingleAgentProviders,
+    );
+  }
 
   bool get hasAnyAvailableSingleAgentProvider =>
       availableSingleAgentProviders.isNotEmpty;

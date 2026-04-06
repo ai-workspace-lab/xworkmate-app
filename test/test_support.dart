@@ -7,6 +7,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/runtime/account_runtime_client.dart';
+import 'package:xworkmate/runtime/codex_runtime.dart';
+import 'package:xworkmate/runtime/device_identity_store.dart';
+import 'package:xworkmate/runtime/gateway_runtime.dart';
+import 'package:xworkmate/runtime/runtime_coordinator.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
@@ -53,11 +58,16 @@ Future<AppController> createTestController(
   SharedPreferences.setMockInitialValues(<String, Object>{});
   final testRoot =
       '${Directory.systemTemp.path}/xworkmate-widget-tests-${DateTime.now().microsecondsSinceEpoch}';
+  final store = SecureConfigStore(
+    enableSecureStorage: false,
+    databasePathResolver: () async => '$testRoot/settings.sqlite3',
+    fallbackDirectoryPathResolver: () async => testRoot,
+  );
   final controller = AppController(
-    store: SecureConfigStore(
-      enableSecureStorage: false,
-      databasePathResolver: () async => '$testRoot/settings.sqlite3',
-      fallbackDirectoryPathResolver: () async => testRoot,
+    store: store,
+    runtimeCoordinator: RuntimeCoordinator(
+      gateway: _TestFakeGatewayRuntime(store: store),
+      codex: _TestFakeCodexRuntime(),
     ),
     desktopPlatformService: desktopPlatformService,
     uiFeatureManifest: uiFeatureManifest,
@@ -69,6 +79,101 @@ Future<AppController> createTestController(
   await tester.pump(const Duration(milliseconds: 100));
   await tester.pumpAndSettle();
   return controller;
+}
+
+class _TestFakeGatewayRuntime extends GatewayRuntime {
+  _TestFakeGatewayRuntime({required super.store})
+    : super(identityStore: DeviceIdentityStore(store));
+
+  GatewayConnectionSnapshot _snapshot = GatewayConnectionSnapshot.initial();
+
+  @override
+  bool get isConnected => _snapshot.status == RuntimeConnectionStatus.connected;
+
+  @override
+  GatewayConnectionSnapshot get snapshot => _snapshot;
+
+  @override
+  Stream<GatewayPushEvent> get events => const Stream<GatewayPushEvent>.empty();
+
+  @override
+  Future<void> connectProfile(
+    GatewayConnectionProfile profile, {
+    int? profileIndex,
+    String authTokenOverride = '',
+    String authPasswordOverride = '',
+  }) async {
+    _snapshot = GatewayConnectionSnapshot.initial(mode: profile.mode).copyWith(
+      status: RuntimeConnectionStatus.connected,
+      statusText: 'Connected',
+      remoteAddress: '${profile.host}:${profile.port}',
+      connectAuthMode: 'none',
+    );
+    notifyListeners();
+  }
+
+  @override
+  Future<void> disconnect({bool clearDesiredProfile = true}) async {
+    _snapshot = _snapshot.copyWith(
+      status: RuntimeConnectionStatus.offline,
+      statusText: 'Offline',
+      remoteAddress: null,
+      clearLastError: true,
+      clearLastErrorCode: true,
+      clearLastErrorDetailCode: true,
+    );
+    notifyListeners();
+  }
+
+  @override
+  Future<dynamic> request(
+    String method, {
+    Map<String, dynamic>? params,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    switch (method) {
+      case 'health':
+      case 'status':
+        return <String, dynamic>{'ok': true};
+      case 'agents.list':
+        return <String, dynamic>{'agents': const <Object>[], 'mainKey': 'main'};
+      case 'sessions.list':
+        return <String, dynamic>{'sessions': const <Object>[]};
+      case 'chat.history':
+        return <String, dynamic>{'messages': const <Object>[]};
+      case 'skills.status':
+        return <String, dynamic>{'skills': const <Object>[]};
+      case 'channels.status':
+        return <String, dynamic>{
+          'channelMeta': const <Object>[],
+          'channelLabels': const <String, dynamic>{},
+          'channelDetailLabels': const <String, dynamic>{},
+          'channelAccounts': const <String, dynamic>{},
+          'channelOrder': const <Object>[],
+        };
+      case 'models.list':
+        return <String, dynamic>{'models': const <Object>[]};
+      case 'cron.list':
+        return <String, dynamic>{'jobs': const <Object>[]};
+      case 'device.pair.list':
+        return <String, dynamic>{
+          'pending': const <Object>[],
+          'paired': const <Object>[],
+        };
+      case 'system-presence':
+        return const <Object>[];
+      default:
+        return <String, dynamic>{};
+    }
+  }
+}
+
+class _TestFakeCodexRuntime extends CodexRuntime {
+  @override
+  Future<String?> findCodexBinary() async => null;
+
+  @override
+  Future<void> stop() async {}
 }
 
 Future<void> pumpPage(

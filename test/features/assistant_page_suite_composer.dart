@@ -139,7 +139,7 @@ void registerAssistantPageSuiteComposerTestsInternal() {
     );
     expect(
       find.byKey(const Key('assistant-execution-target-button')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const Key('assistant-skill-picker-button')),
@@ -149,7 +149,6 @@ void registerAssistantPageSuiteComposerTestsInternal() {
       find.byKey(const Key('assistant-permission-button')),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('assistant-model-button')), findsNothing);
     expect(find.byKey(const Key('assistant-thinking-button')), findsOneWidget);
     expect(find.byTooltip('模式'), findsNothing);
 
@@ -163,20 +162,54 @@ void registerAssistantPageSuiteComposerTestsInternal() {
 
     await tester.tapAt(const Offset(24, 24));
     await pumpForUiSyncInternal(tester);
-
-    await tester.tap(
-      find.byKey(const Key('assistant-execution-target-button')),
-    );
-    await pumpForUiSyncInternal(tester);
-
-    expect(
-      executionTargetMenuItemInternal(AssistantExecutionTarget.auto),
-      findsNothing,
-    );
-    expect(find.text('单机智能体'), findsWidgets);
-    expect(find.text('本地 OpenClaw Gateway'), findsWidgets);
-    expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
   });
+
+  testWidgets(
+    'AssistantPage execution target menu shows only saved visible targets',
+    (WidgetTester tester) async {
+      late final AppController controller;
+      await tester.runAsync(() async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        final store = createIsolatedTestStore(enableSecureStorage: false);
+        final defaults = SettingsSnapshot.defaults();
+        await store.saveSettingsSnapshot(
+          defaults.copyWith(savedGatewayTargets: const <String>['remote']),
+        );
+        controller = AppController(
+          store: store,
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+        );
+        final stopwatch = Stopwatch()..start();
+        while (controller.initializing) {
+          if (stopwatch.elapsed > const Duration(seconds: 10)) {
+            fail('controller did not finish initializing before timeout');
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+      });
+      addTearDown(controller.dispose);
+
+      await pumpPage(
+        tester,
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+      );
+
+      await tester.tap(
+        find.byKey(const Key('assistant-execution-target-button')),
+      );
+      await pumpForUiSyncInternal(tester);
+
+      expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
+      expect(find.text('本地 OpenClaw Gateway'), findsNothing);
+      expect(
+        executionTargetMenuItemInternal(AssistantExecutionTarget.auto),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets(
     'AssistantPage clears submitted composer text before send completes',
@@ -628,37 +661,7 @@ void registerAssistantPageSuiteComposerTestsInternal() {
   });
 
   testWidgets(
-    'AssistantPage hides Auto execution target when desktop flag is disabled',
-    (WidgetTester tester) async {
-      final controller = await createTestController(tester);
-
-      await pumpPage(
-        tester,
-        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
-        platform: TargetPlatform.macOS,
-      );
-
-      await tester.tap(
-        find.byKey(const Key('assistant-execution-target-button')),
-      );
-      await pumpForUiSyncInternal(tester);
-
-      expect(
-        controller.assistantExecutionTarget,
-        isNot(AssistantExecutionTarget.auto),
-      );
-      expect(
-        executionTargetMenuItemInternal(AssistantExecutionTarget.auto),
-        findsNothing,
-      );
-      expect(find.text('单机智能体'), findsWidgets);
-      expect(find.text('本地 OpenClaw Gateway'), findsWidgets);
-      expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
-    },
-  );
-
-  testWidgets(
-    'AssistantPage shows Auto execution target when desktop flag is enabled',
+    'AssistantPage hides Auto execution target even when the desktop feature flag is enabled',
     (WidgetTester tester) async {
       final manifest = UiFeatureManifest.fallback().copyWithFeature(
         platform: UiFeaturePlatform.desktop,
@@ -667,10 +670,31 @@ void registerAssistantPageSuiteComposerTestsInternal() {
         enabled: true,
         releaseTier: UiFeatureReleaseTier.stable,
       );
-      final controller = await createTestController(
-        tester,
-        uiFeatureManifest: manifest,
-      );
+      late final AppController controller;
+      await tester.runAsync(() async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        final store = createIsolatedTestStore(enableSecureStorage: false);
+        final defaults = SettingsSnapshot.defaults();
+        await store.saveSettingsSnapshot(
+          defaults.copyWith(savedGatewayTargets: const <String>['remote']),
+        );
+        controller = AppController(
+          store: store,
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+          uiFeatureManifest: manifest,
+        );
+        final stopwatch = Stopwatch()..start();
+        while (controller.initializing) {
+          if (stopwatch.elapsed > const Duration(seconds: 10)) {
+            fail('controller did not finish initializing before timeout');
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+      });
+      addTearDown(controller.dispose);
 
       await pumpPage(
         tester,
@@ -685,8 +709,9 @@ void registerAssistantPageSuiteComposerTestsInternal() {
 
       expect(
         executionTargetMenuItemInternal(AssistantExecutionTarget.auto),
-        findsOneWidget,
+        findsNothing,
       );
+      expect(find.text('远程 OpenClaw Gateway'), findsWidgets);
     },
   );
 

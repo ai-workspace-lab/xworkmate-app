@@ -113,52 +113,55 @@ void main() {
     await tester.pumpAndSettle();
     expect(accountOpened, 1);
 
-    await tester.tap(find.byKey(const Key('workspace-sidebar-collapse-button')));
+    await tester.tap(
+      find.byKey(const Key('workspace-sidebar-collapse-button')),
+    );
     await tester.pumpAndSettle();
     expect(sidebarCycled, 1);
   });
 
-  testWidgets('SidebarNavigation no longer expands settings sub navigation in sidebar', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light(),
-        home: Scaffold(
-          body: SidebarNavigation(
-            currentSection: WorkspaceDestination.settings,
-            sidebarState: AppSidebarState.expanded,
-            appLanguage: AppLanguage.zh,
-            themeMode: ThemeMode.light,
-            onSectionChanged: (_) {},
-            onToggleLanguage: () {},
-            onCycleSidebarState: () {},
-            onExpandFromCollapsed: () {},
-            onOpenHome: () {},
-            onOpenAccount: () {},
-            onOpenThemeToggle: () {},
-            accountName: 'Tester',
-            accountSubtitle: 'Workspace',
-            onToggleAccountWorkspaceFollowed: () async {},
+  testWidgets(
+    'SidebarNavigation no longer expands settings sub navigation in sidebar',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: SidebarNavigation(
+              currentSection: WorkspaceDestination.settings,
+              sidebarState: AppSidebarState.expanded,
+              appLanguage: AppLanguage.zh,
+              themeMode: ThemeMode.light,
+              onSectionChanged: (_) {},
+              onToggleLanguage: () {},
+              onCycleSidebarState: () {},
+              onExpandFromCollapsed: () {},
+              onOpenHome: () {},
+              onOpenAccount: () {},
+              onOpenThemeToggle: () {},
+              accountName: 'Tester',
+              accountSubtitle: 'Workspace',
+              onToggleAccountWorkspaceFollowed: () async {},
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const ValueKey<String>('sidebar-settings-tab-general')),
-      findsNothing,
-    );
-    expect(
-      find.byKey(const ValueKey<String>('sidebar-settings-tab-workspace')),
-      findsNothing,
-    );
-    expect(
-      find.byKey(const ValueKey<String>('sidebar-settings-tab-gateway')),
-      findsNothing,
-    );
-  });
+      expect(
+        find.byKey(const ValueKey<String>('sidebar-settings-tab-general')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('sidebar-settings-tab-workspace')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('sidebar-settings-tab-gateway')),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets('SidebarNavigation shows collapsed expand button at the top', (
     WidgetTester tester,
@@ -190,7 +193,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('sidebar-header-expand-button')), findsOneWidget);
+    expect(
+      find.byKey(const Key('sidebar-header-expand-button')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey<String>('sidebar-footer-collapse')),
       findsNothing,
@@ -201,66 +207,152 @@ void main() {
     expect(expanded, 1);
   });
 
-  testWidgets('SidebarNavigation merges task controls into the global left bar', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light(),
-        home: Scaffold(
-          body: SidebarNavigation(
-            currentSection: WorkspaceDestination.assistant,
-            sidebarState: AppSidebarState.expanded,
-            appLanguage: AppLanguage.zh,
-            themeMode: ThemeMode.light,
-            onSectionChanged: (_) {},
-            onToggleLanguage: () {},
-            onCycleSidebarState: () {},
-            onExpandFromCollapsed: () {},
-            onOpenHome: () {},
-            onOpenAccount: () {},
-            onOpenThemeToggle: () {},
-            accountName: 'Tester',
-            accountSubtitle: 'Workspace',
-            onToggleAccountWorkspaceFollowed: () async {},
-            assistantSkillCount: 3,
-            taskItems: const <SidebarTaskItem>[
-              SidebarTaskItem(
-                sessionKey: 'draft:1',
-                title: '新的任务',
-                preview: '等待输入',
-                updatedAtMs: 1710000000000,
-                executionTarget: AssistantExecutionTarget.singleAgent,
-                isCurrent: true,
-                pending: false,
-                draft: true,
-              ),
-            ],
+  testWidgets(
+    'SidebarNavigation merges task controls into the global left bar',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: SidebarNavigation(
+              currentSection: WorkspaceDestination.assistant,
+              sidebarState: AppSidebarState.expanded,
+              appLanguage: AppLanguage.zh,
+              themeMode: ThemeMode.light,
+              onSectionChanged: (_) {},
+              onToggleLanguage: () {},
+              onCycleSidebarState: () {},
+              onExpandFromCollapsed: () {},
+              onOpenHome: () {},
+              onOpenAccount: () {},
+              onOpenThemeToggle: () {},
+              accountName: 'Tester',
+              accountSubtitle: 'Workspace',
+              onToggleAccountWorkspaceFollowed: () async {},
+              assistantSkillCount: 3,
+              taskItems: const <SidebarTaskItem>[
+                SidebarTaskItem(
+                  sessionKey: 'draft:1',
+                  title: '新的任务',
+                  preview: '等待输入',
+                  updatedAtMs: 1710000000000,
+                  executionTarget: AssistantExecutionTarget.singleAgent,
+                  isCurrent: true,
+                  pending: false,
+                  draft: true,
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const Key('workspace-sidebar-task-search')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('workspace-sidebar-new-task-button')),
-      findsOneWidget,
-    );
-    expect(find.text('任务列表'), findsOneWidget);
-    expect(find.text('自动化'), findsNothing);
-    expect(find.text('MCP Hub'), findsNothing);
-    expect(find.text('新的任务'), findsOneWidget);
-    expect(
-      find.byKey(
-        const ValueKey<String>('workspace-sidebar-task-group-singleAgent'),
-      ),
-      findsOneWidget,
-    );
-  });
+      expect(
+        find.byKey(const Key('workspace-sidebar-task-search')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('workspace-sidebar-new-task-button')),
+        findsOneWidget,
+      );
+      expect(find.text('任务列表'), findsOneWidget);
+      expect(find.text('自动化'), findsNothing);
+      expect(find.text('MCP Hub'), findsNothing);
+      expect(find.text('新的任务'), findsOneWidget);
+      expect(
+        find.byKey(
+          const ValueKey<String>('workspace-sidebar-task-group-singleAgent'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'SidebarNavigation only shows configured execution target groups',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(
+            body: SidebarNavigation(
+              currentSection: WorkspaceDestination.assistant,
+              sidebarState: AppSidebarState.expanded,
+              appLanguage: AppLanguage.zh,
+              themeMode: ThemeMode.light,
+              onSectionChanged: (_) {},
+              onToggleLanguage: () {},
+              onCycleSidebarState: () {},
+              onExpandFromCollapsed: () {},
+              onOpenHome: () {},
+              onOpenAccount: () {},
+              onOpenThemeToggle: () {},
+              accountName: 'Tester',
+              accountSubtitle: 'Workspace',
+              onToggleAccountWorkspaceFollowed: () async {},
+              visibleExecutionTargets: const <AssistantExecutionTarget>[
+                AssistantExecutionTarget.singleAgent,
+                AssistantExecutionTarget.remote,
+              ],
+              taskItems: const <SidebarTaskItem>[
+                SidebarTaskItem(
+                  sessionKey: 'single-agent-task',
+                  title: '单机任务',
+                  preview: '已保存 provider',
+                  updatedAtMs: 1710000000000,
+                  executionTarget: AssistantExecutionTarget.singleAgent,
+                  isCurrent: true,
+                  pending: false,
+                ),
+                SidebarTaskItem(
+                  sessionKey: 'remote-task',
+                  title: '远程任务',
+                  preview: '已保存远程 gateway',
+                  updatedAtMs: 1710000001000,
+                  executionTarget: AssistantExecutionTarget.remote,
+                  isCurrent: false,
+                  pending: false,
+                ),
+                SidebarTaskItem(
+                  sessionKey: 'local-task',
+                  title: '本地任务',
+                  preview: '未保存本地 gateway',
+                  updatedAtMs: 1710000002000,
+                  executionTarget: AssistantExecutionTarget.local,
+                  isCurrent: false,
+                  pending: false,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(
+          const ValueKey<String>('workspace-sidebar-task-group-singleAgent'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey<String>('workspace-sidebar-task-group-remote'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey<String>('workspace-sidebar-task-group-local'),
+        ),
+        findsNothing,
+      );
+      expect(find.text('单机任务'), findsOneWidget);
+      expect(find.text('远程任务'), findsOneWidget);
+      expect(find.text('本地任务'), findsNothing);
+    },
+  );
 
   testWidgets('SidebarNavigation keeps footer pinned while task list scrolls', (
     WidgetTester tester,
