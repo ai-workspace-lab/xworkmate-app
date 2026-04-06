@@ -46,7 +46,9 @@ TaskThread
 约束：
 
 - `workspaceBinding` 是线程记录的一部分
-- 它只在必要时更新
+- 它只能在当前线程已完整时被显式更新
+- 它不能用于 create first binding
+- 它不能跨线程覆盖
 - 它不再承担运行前 fallback 猜测语义
 
 ### 2.3 executionBinding
@@ -100,7 +102,7 @@ flowchart LR
   F --> G["执行结果"]
 
   G --> H["回写线程上下文\n(主体区域 同步显示)"]
-  G --> I["必要时更新 workspaceBinding"]
+  G --> I["仅显式更新当前已完整线程的 workspaceBinding"]
 
   H --> J["右栏显示"]
   I --> J
@@ -111,7 +113,8 @@ flowchart LR
 - `读取 TaskThread` 是 UI 与执行层共享的唯一线程信息入口
 - `构造执行请求` 在 agent-core / runtime 协调层完成
 - `右栏显示` 明确依赖 `TaskThread` 当前记录
-- `必要时更新 workspaceBinding` 是条件分支，不是固定步骤
+- `workspaceBinding` 更新只允许发生在当前线程已完整的前提下
+- `workspace_root` 不是线程身份，也不是运行时 override
 
 ## 4. UI 信息来源矩阵
 

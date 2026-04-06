@@ -229,12 +229,13 @@ Examples:
 
 1. UI 选择 `threadId`
 2. 控制器 / runtime 读取 `TaskThread`
-3. 若线程字段缺失，才回退到 Settings 中心默认值用于初始化或补全
+3. 若线程缺失或 `workspaceBinding` 不完整，则该线程视为非法或不可执行状态，必须显式失败或在恢复阶段跳过
 
 这意味着：
 
 - Settings 是默认值来源，不是当前线程真相源
 - 当前线程的执行模式、模型、技能、工作空间都以 `TaskThread` 为准
+- Settings 不能用于补全已存在线程的缺失字段
 
 ### 4.2 执行请求构造优先级
 
@@ -249,7 +250,7 @@ Examples:
 
 1. 回写 `contextState`
 2. 主体区域同步显示
-3. 必要时更新 `workspaceBinding`
+3. 仅在当前线程已经完整时，显式更新该线程 `workspaceBinding`
 4. 右栏读取最新 `TaskThread` 记录并刷新
 
 ## 5. Lifecycle Baseline
@@ -273,7 +274,7 @@ flowchart LR
   F --> G["执行结果"]
 
   G --> H["回写线程上下文\n(主体区域 同步显示)"]
-  G --> I["必要时更新 workspaceBinding"]
+  G --> I["仅显式更新当前已完整线程的 workspaceBinding"]
 
   H --> J["右栏显示"]
   I --> J
@@ -288,9 +289,9 @@ flowchart LR
 
 ## 6. 文档边界
 
-- [assistant-thread-target-model-20260328.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-taskthread-docs-naming-cleanup/docs/architecture/assistant-thread-target-model-20260328.md)
+- [assistant-thread-target-model-20260328.md](assistant-thread-target-model-20260328.md)
   负责说明 `TaskThread` 当前模型与生命周期主链。
-- [assistant-thread-information-architecture.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-taskthread-docs-naming-cleanup/docs/architecture/assistant-thread-information-architecture.md)
+- [assistant-thread-information-architecture.md](assistant-thread-information-architecture.md)
   负责说明线程信息如何进入 UI、请求构造与结果回写。
 
 归档文档只保留为历史背景，不再作为当前内部状态设计依据。
