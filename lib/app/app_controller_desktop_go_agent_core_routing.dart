@@ -28,7 +28,7 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
-import '../runtime/go_agent_core_client.dart';
+import '../runtime/go_task_service_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
@@ -39,9 +39,9 @@ import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 
 extension AppControllerDesktopGoAgentCoreRouting on AppController {
-  Future<List<GoAgentCoreSyncedProvider>>
-  buildGoAgentCoreSyncedProvidersInternal() async {
-    final providers = <GoAgentCoreSyncedProvider>[];
+  Future<List<ExternalCodeAgentAcpSyncedProvider>>
+  buildExternalAcpSyncedProvidersInternal() async {
+    final providers = <ExternalCodeAgentAcpSyncedProvider>[];
     for (final profile in settings.externalAcpEndpoints) {
       final providerId = profile.providerKey.trim();
       final endpoint = profile.endpoint.trim();
@@ -54,7 +54,7 @@ extension AppControllerDesktopGoAgentCoreRouting on AppController {
               refName: profile.authRef.trim(),
             );
       providers.add(
-        GoAgentCoreSyncedProvider(
+        ExternalCodeAgentAcpSyncedProvider(
           providerId: providerId,
           label: profile.label,
           endpoint: endpoint,
@@ -66,19 +66,19 @@ extension AppControllerDesktopGoAgentCoreRouting on AppController {
     return providers;
   }
 
-  Future<void> syncGoAgentCoreProvidersInternal() async {
-    final providers = await buildGoAgentCoreSyncedProvidersInternal();
+  Future<void> syncExternalAcpProvidersInternal() async {
+    final providers = await buildExternalAcpSyncedProvidersInternal();
     syncedGoAgentProvidersInternal
       ..clear()
       ..addEntries(
         providers.map((item) => MapEntry(item.providerId.trim(), item)),
       );
-    await goAgentCoreClientInternal.syncProviders(providers);
+    await goTaskServiceClientInternal.syncExternalProviders(providers);
   }
 
   void updateLatestRoutingResolutionInternal(
     String sessionKey,
-    GoAgentCoreRunResult result,
+    GoTaskServiceResult result,
   ) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,

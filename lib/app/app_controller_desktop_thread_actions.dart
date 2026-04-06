@@ -28,7 +28,7 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
-import '../runtime/go_agent_core_client.dart';
+import '../runtime/go_task_service_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
@@ -313,8 +313,8 @@ extension AppControllerDesktopThreadActions on AppController {
         try {
           final dispatch = await codeAgentNodeOrchestratorInternal
               .buildGatewayDispatch(buildCodeAgentNodeStateInternal());
-          final result = await goAgentCoreClientInternal.executeSession(
-            GoAgentCoreSessionRequest(
+          final result = await goTaskServiceClientInternal.executeTask(
+            GoTaskServiceRequest(
               sessionId: sessionKey,
               threadId: sessionKey,
               target: currentTarget,
@@ -331,7 +331,7 @@ extension AppControllerDesktopThreadActions on AppController {
               aiGatewayApiKey: await loadAiGatewayApiKey(),
               agentId: dispatch.agentId ?? '',
               metadata: dispatch.metadata,
-              routing: buildGoAgentCoreRoutingForSessionInternal(sessionKey),
+              routing: buildExternalAcpRoutingForSessionInternal(sessionKey),
             ),
             onUpdate: (update) {
               if (update.isDelta) {
@@ -426,7 +426,8 @@ extension AppControllerDesktopThreadActions on AppController {
         sessionsControllerInternal.currentSessionKey,
       );
       if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
-        await goAgentCoreClientInternal.cancelSession(
+        await goTaskServiceClientInternal.cancelTask(
+          route: GoTaskServiceRoute.externalAcpSingle,
           target: AssistantExecutionTarget.singleAgent,
           sessionId: sessionKey,
           threadId: sessionKey,
@@ -444,7 +445,13 @@ extension AppControllerDesktopThreadActions on AppController {
       sessionsControllerInternal.currentSessionKey,
     );
     if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
-      await goAgentCoreClientInternal.cancelSession(
+      await goTaskServiceClientInternal.cancelTask(
+        route: assistantExecutionTargetForSession(sessionKey) ==
+                AssistantExecutionTarget.singleAgent ||
+            assistantExecutionTargetForSession(sessionKey) ==
+                AssistantExecutionTarget.auto
+            ? GoTaskServiceRoute.externalAcpSingle
+            : GoTaskServiceRoute.openClawTask,
         target: assistantExecutionTargetForSession(sessionKey),
         sessionId: sessionKey,
         threadId: sessionKey,

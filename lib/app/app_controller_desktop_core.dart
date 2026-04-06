@@ -29,8 +29,9 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
-import '../runtime/go_agent_core_client.dart';
 import '../runtime/go_agent_core_desktop_transport.dart';
+import '../runtime/go_task_service_client.dart';
+import '../runtime/go_task_service_desktop_service.dart';
 import '../runtime/go_gateway_runtime_desktop_client.dart';
 import '../runtime/go_multi_agent_mount_desktop_client.dart';
 import '../runtime/go_runtime_dispatch_desktop_client.dart';
@@ -127,7 +128,7 @@ class AppController extends ChangeNotifier {
     List<String>? singleAgentSharedSkillScanRootOverrides,
     List<SingleAgentProvider>? availableSingleAgentProvidersOverride,
     ArisBundleRepository? arisBundleRepository,
-    GoAgentCoreClient? goAgentCoreClient,
+    GoTaskServiceClient? goTaskServiceClient,
     MultiAgentMountManager? multiAgentMountManager,
   }) {
     storeInternal = store ?? SecureConfigStore();
@@ -214,12 +215,15 @@ class AppController extends ChangeNotifier {
         goCoreLocator: goCoreLocatorInternal,
       ),
     );
-    goAgentCoreClientInternal =
-        goAgentCoreClient ??
-        GoAgentCoreDesktopTransport(
-          acpClient: gatewayAcpClientInternal,
-          endpointResolver: resolveGoAgentCoreEndpointForTargetInternal,
-          goCoreLocator: goCoreLocatorInternal,
+    goTaskServiceClientInternal =
+        goTaskServiceClient ??
+        DesktopGoTaskService(
+          gateway: runtimeCoordinatorInternal.gateway,
+          acpTransport: ExternalCodeAgentAcpDesktopTransport(
+            acpClient: gatewayAcpClientInternal,
+            endpointResolver: resolveGoAgentCoreEndpointForTargetInternal,
+            goCoreLocator: goCoreLocatorInternal,
+          ),
         );
     multiAgentOrchestratorInternal = MultiAgentOrchestrator(
       config: resolveMultiAgentConfigInternal(
@@ -267,7 +271,7 @@ class AppController extends ChangeNotifier {
     storeInternal.dispose();
     desktopPlatformServiceInternal.dispose();
     unawaited(multiAgentMountManagerInternal.dispose());
-    unawaited(goAgentCoreClientInternal.dispose());
+    unawaited(goTaskServiceClientInternal.dispose());
     unawaited(gatewayAcpClientInternal.dispose());
     super.dispose();
   }
@@ -298,7 +302,7 @@ class AppController extends ChangeNotifier {
   availableSingleAgentProvidersOverrideInternal;
   late final ArisBundleRepository arisBundleRepositoryInternal;
   late final GoCoreLocator goCoreLocatorInternal;
-  late final GoAgentCoreClient goAgentCoreClientInternal;
+  late final GoTaskServiceClient goTaskServiceClientInternal;
   late final MultiAgentOrchestrator multiAgentOrchestratorInternal;
   late final MultiAgentMountManager multiAgentMountManagerInternal;
   Map<SingleAgentProvider, DirectSingleAgentCapabilities>
@@ -319,8 +323,8 @@ class AppController extends ChangeNotifier {
   final Map<String, Map<String, dynamic>>
   latestRoutingResolutionBySessionInternal =
       <String, Map<String, dynamic>>{};
-  final Map<String, GoAgentCoreSyncedProvider> syncedGoAgentProvidersInternal =
-      <String, GoAgentCoreSyncedProvider>{};
+  final Map<String, ExternalCodeAgentAcpSyncedProvider>
+  syncedGoAgentProvidersInternal = <String, ExternalCodeAgentAcpSyncedProvider>{};
   final DesktopThreadArtifactService threadArtifactServiceInternal =
       DesktopThreadArtifactService();
   List<AssistantThreadSkillEntry> singleAgentSharedImportedSkillsInternal =

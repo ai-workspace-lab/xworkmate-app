@@ -7,17 +7,17 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/gateway_acp_client.dart';
-import 'package:xworkmate/runtime/go_agent_core_client.dart';
 import 'package:xworkmate/runtime/go_agent_core_desktop_transport.dart';
+import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
-  group('GoAgentCoreDesktopTransport', () {
+  group('ExternalCodeAgentAcpDesktopTransport', () {
     test('uses resolved gateway endpoint for local gateway sessions', () async {
       final server = await _AcpFakeServer.start();
       addTearDown(server.close);
 
-      final transport = GoAgentCoreDesktopTransport(
+      final transport = ExternalCodeAgentAcpDesktopTransport(
         acpClient: GatewayAcpClient(endpointResolver: () => null),
         endpointResolver: (target) => switch (target) {
           AssistantExecutionTarget.local => server.baseHttpUri,
@@ -25,8 +25,8 @@ void main() {
         },
       );
 
-      final result = await transport.executeSession(
-        const GoAgentCoreSessionRequest(
+      final result = await transport.executeTask(
+        const GoTaskServiceRequest(
           sessionId: 'session-local',
           threadId: 'thread-local',
           target: AssistantExecutionTarget.local,
@@ -53,14 +53,14 @@ void main() {
     });
 
     test('reports missing endpoint when gateway target cannot resolve', () async {
-      final transport = GoAgentCoreDesktopTransport(
+      final transport = ExternalCodeAgentAcpDesktopTransport(
         acpClient: GatewayAcpClient(endpointResolver: () => null),
         endpointResolver: (_) => null,
       );
 
       await expectLater(
-        () => transport.executeSession(
-          const GoAgentCoreSessionRequest(
+        () => transport.executeTask(
+          const GoTaskServiceRequest(
             sessionId: 'session-local',
             threadId: 'thread-local',
             target: AssistantExecutionTarget.local,
