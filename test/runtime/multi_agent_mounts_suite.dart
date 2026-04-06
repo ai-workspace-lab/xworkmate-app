@@ -89,7 +89,6 @@ void main() {
       await Process.run('chmod', <String>['+x', helper.path]);
       final locator = GoCoreLocator(
         workspaceRoot: tempDir.path,
-        binaryExistsResolver: (_) async => false,
         resolvedExecutableResolver: () =>
             '${tempDir.path}/XWorkmate.app/Contents/MacOS/XWorkmate',
       );
