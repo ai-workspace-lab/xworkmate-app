@@ -341,14 +341,26 @@ extension AppControllerDesktopThreadActions on AppController {
             },
           );
           clearAiGatewayStreamingTextInternal(sessionKey);
+          upsertTaskThreadInternal(
+            sessionKey,
+            gatewayEntryState: goTaskServiceGatewayEntryState(
+              requestedTarget: currentTarget,
+              result: result,
+            ),
+            latestResolvedRuntimeModel: result.resolvedModel.trim(),
+            lifecycleStatus: 'ready',
+            lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            lastResultCode: result.success ? 'success' : 'error',
+            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          );
           if (!result.success) {
             appendLocalSessionMessageInternal(
               sessionKey,
               assistantErrorMessageInternal(
                 result.errorMessage.trim().isEmpty
                     ? appText(
-                        'Go Agent-core 执行失败。',
-                        'Go Agent-core execution failed.',
+                        'GoTaskService 执行失败。',
+                        'GoTaskService execution failed.',
                       )
                     : result.errorMessage,
               ),
@@ -362,8 +374,8 @@ extension AppControllerDesktopThreadActions on AppController {
               sessionKey,
               assistantErrorMessageInternal(
                 appText(
-                  'Go Agent-core 没有返回可显示的输出。',
-                  'Go Agent-core returned no displayable output.',
+                  'GoTaskService 没有返回可显示的输出。',
+                  'GoTaskService returned no displayable output.',
                 ),
               ),
               persistInThreadContext: true,
@@ -387,6 +399,13 @@ extension AppControllerDesktopThreadActions on AppController {
           );
         } catch (error) {
           clearAiGatewayStreamingTextInternal(sessionKey);
+          upsertTaskThreadInternal(
+            sessionKey,
+            lifecycleStatus: 'ready',
+            lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            lastResultCode: 'error',
+            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          );
           appendLocalSessionMessageInternal(
             sessionKey,
             assistantErrorMessageInternal(error.toString()),
@@ -417,6 +436,13 @@ extension AppControllerDesktopThreadActions on AppController {
         // Best effort cancellation only.
       }
       multiAgentRunPendingInternal = false;
+      upsertTaskThreadInternal(
+        sessionKey,
+        lifecycleStatus: 'ready',
+        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastResultCode: 'aborted',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
       recomputeTasksInternal();
       notifyIfActiveInternal();
       return;
@@ -434,6 +460,13 @@ extension AppControllerDesktopThreadActions on AppController {
         );
         aiGatewayPendingSessionKeysInternal.remove(sessionKey);
         clearAiGatewayStreamingTextInternal(sessionKey);
+        upsertTaskThreadInternal(
+          sessionKey,
+          lifecycleStatus: 'ready',
+          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          lastResultCode: 'aborted',
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        );
         recomputeTasksInternal();
         notifyIfActiveInternal();
         return;
@@ -458,6 +491,13 @@ extension AppControllerDesktopThreadActions on AppController {
       );
       aiGatewayPendingSessionKeysInternal.remove(sessionKey);
       clearAiGatewayStreamingTextInternal(sessionKey);
+      upsertTaskThreadInternal(
+        sessionKey,
+        lifecycleStatus: 'ready',
+        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastResultCode: 'aborted',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
       recomputeTasksInternal();
       notifyIfActiveInternal();
       return;

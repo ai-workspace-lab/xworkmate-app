@@ -142,6 +142,13 @@ extension AppControllerWebGatewayChat on AppController {
           text: error.toString(),
           error: true,
         );
+        upsertThreadRecordInternal(
+          sessionKey,
+          lifecycleStatus: 'ready',
+          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          lastResultCode: 'error',
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        );
         lastAssistantErrorInternal = error.toString();
         pendingSessionKeysInternal.remove(sessionKey);
         streamingTextBySessionInternal.remove(sessionKey);
@@ -213,6 +220,13 @@ extension AppControllerWebGatewayChat on AppController {
         acpBusyInternal = false;
         pendingSessionKeysInternal.remove(sessionKey);
         clearStreamingTextInternal(sessionKey);
+        upsertThreadRecordInternal(
+          sessionKey,
+          lifecycleStatus: 'ready',
+          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          lastResultCode: lastAssistantErrorInternal == null ? 'success' : 'error',
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        );
         await persistThreadsInternal();
         notifyChangedInternal();
       }
@@ -294,6 +308,18 @@ extension AppControllerWebGatewayChat on AppController {
           ),
         );
       }
+      upsertThreadRecordInternal(
+        sessionKey,
+        gatewayEntryState: goTaskServiceGatewayEntryState(
+          requestedTarget: target,
+          result: result,
+        ),
+        latestResolvedRuntimeModel: result.resolvedModel.trim(),
+        lifecycleStatus: 'ready',
+        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastResultCode: 'success',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
       appendAssistantMessageInternal(
         sessionKey: sessionKey,
         text: message,

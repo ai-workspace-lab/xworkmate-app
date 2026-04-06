@@ -433,6 +433,35 @@ class GoTaskServiceResult {
   }
 }
 
+String? goTaskServiceGatewayEntryState({
+  required AssistantExecutionTarget requestedTarget,
+  required GoTaskServiceResult result,
+}) {
+  final resolvedExecutionTarget = result.resolvedExecutionTarget.trim().toLowerCase();
+  switch (resolvedExecutionTarget) {
+    case 'gateway':
+      final resolvedEndpointTarget = result.resolvedEndpointTarget.trim().toLowerCase();
+      if (resolvedEndpointTarget == AssistantExecutionTarget.remote.promptValue.toLowerCase()) {
+        return AssistantExecutionTarget.remote.promptValue;
+      }
+      if (resolvedEndpointTarget == AssistantExecutionTarget.local.promptValue.toLowerCase()) {
+        return AssistantExecutionTarget.local.promptValue;
+      }
+      return requestedTarget == AssistantExecutionTarget.remote
+          ? AssistantExecutionTarget.remote.promptValue
+          : AssistantExecutionTarget.local.promptValue;
+    case 'single-agent':
+      return AssistantExecutionTarget.singleAgent.promptValue;
+    case 'multi-agent':
+      return AssistantExecutionTarget.singleAgent.promptValue;
+    default:
+      if (requestedTarget == AssistantExecutionTarget.auto) {
+        return null;
+      }
+      return requestedTarget.promptValue;
+  }
+}
+
 abstract class ExternalCodeAgentAcpTransport {
   Future<void> syncExternalProviders(
     List<ExternalCodeAgentAcpSyncedProvider> providers,

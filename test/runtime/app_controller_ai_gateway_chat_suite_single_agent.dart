@@ -27,7 +27,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           'xworkmate-single-agent-provider-',
         );
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
-        final client = FakeGoAgentCoreClientInternal(
+        final client = FakeGoTaskServiceClientInternal(
           capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
@@ -107,7 +107,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           'xworkmate-auto-route-ready-',
         );
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
-        final client = FakeGoAgentCoreClientInternal(
+        final client = FakeGoTaskServiceClientInternal(
           capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
@@ -159,7 +159,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           'xworkmate-single-agent-provider-debug-',
         );
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
-        final client = FakeGoAgentCoreClientInternal(
+        final client = FakeGoTaskServiceClientInternal(
           capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
@@ -222,7 +222,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         await store.saveSettingsSnapshot(
           SettingsSnapshot.defaults().copyWith(workspacePath: tempDirectory.path),
         );
-        final client = FakeGoAgentCoreClientInternal(
+        final client = FakeGoTaskServiceClientInternal(
           capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
@@ -297,7 +297,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             ),
           ),
         );
-        final client = FakeGoAgentCoreClientInternal(
+        final client = FakeGoTaskServiceClientInternal(
           capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
@@ -367,7 +367,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         });
 
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
-        final client = FallbackOnlyGoAgentCoreClientInternal();
+        final client = FallbackOnlyGoTaskServiceClientInternal();
         final controller = await createAppControllerInternal(
           store: store,
           availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
@@ -433,7 +433,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         });
 
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
-        final client = FallbackOnlyGoAgentCoreClientInternal();
+        final client = FallbackOnlyGoTaskServiceClientInternal();
         final controller = await createAppControllerInternal(
           store: store,
           availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
@@ -502,7 +502,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         });
 
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
-        final client = FallbackOnlyGoAgentCoreClientInternal();
+        final client = FallbackOnlyGoTaskServiceClientInternal();
         final controller = await createAppControllerInternal(
           store: store,
           availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
@@ -593,7 +593,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           ),
         ]);
 
-        final client = FakeGoAgentCoreClientInternal(
+        final client = FakeGoTaskServiceClientInternal(
           capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
@@ -653,7 +653,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           ),
         );
 
-        final client = FakeGoAgentCoreClientInternal(
+        final client = FakeGoTaskServiceClientInternal(
           capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
@@ -730,7 +730,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           ),
         );
 
-        final client = FakeGoAgentCoreClientInternal(
+        final client = FakeGoTaskServiceClientInternal(
           capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
@@ -822,7 +822,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           ),
         );
 
-        final client = FakeGoAgentCoreClientInternal(
+        final client = FakeGoTaskServiceClientInternal(
           capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,

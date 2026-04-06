@@ -111,11 +111,11 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         singleAgentProvider: currentSingleAgentProvider,
       );
     }
-    singleAgentRuntimeModelBySessionInternal.remove(sessionKey);
     upsertTaskThreadInternal(
       sessionKey,
       singleAgentProvider: sanitizedProvider,
       singleAgentProviderSource: ThreadSelectionSource.explicit,
+      latestResolvedRuntimeModel: '',
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     recomputeTasksInternal();
@@ -180,7 +180,11 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       sessionKey,
     );
     if (resolvedTarget != AssistantExecutionTarget.singleAgent) {
-      singleAgentRuntimeModelBySessionInternal.remove(normalizedSessionKey);
+      upsertTaskThreadInternal(
+        normalizedSessionKey,
+        latestResolvedRuntimeModel: '',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
     }
     if (!matchesSessionKey(
       normalizedSessionKey,

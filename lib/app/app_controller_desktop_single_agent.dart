@@ -45,7 +45,7 @@ import 'app_controller_desktop_workspace_execution.dart';
 import 'app_controller_desktop_settings_runtime.dart';
 import 'app_controller_desktop_thread_storage.dart';
 import 'app_controller_desktop_skill_permissions.dart';
-import 'app_controller_desktop_go_agent_core_routing.dart';
+import 'app_controller_desktop_external_acp_routing.dart';
 import 'app_controller_desktop_runtime_helpers.dart';
 
 extension AppControllerDesktopSingleAgent on AppController {
@@ -100,12 +100,12 @@ extension AppControllerDesktopSingleAgent on AppController {
         final fallbackReason = provider == null
             ? (selection == SingleAgentProvider.auto
                   ? appText(
-                      '当前没有可用的 Go Agent-core Provider。',
-                      'No Go Agent-core provider is currently available.',
+                      '当前没有可用的 GoTaskService Provider。',
+                      'No GoTaskService provider is currently available.',
                     )
                   : appText(
-                      '当前 Go Agent-core 不支持 ${selection.label}。',
-                      'Go Agent-core does not currently support ${selection.label}.',
+                      '当前 GoTaskService 不支持 ${selection.label}。',
+                      'GoTaskService does not currently support ${selection.label}.',
                     ))
             : null;
         if (provider == null && !routing.isAuto) {
@@ -205,25 +205,17 @@ extension AppControllerDesktopSingleAgent on AppController {
           },
         );
         final resolvedRuntimeModel = result.resolvedModel.trim();
-        updateLatestRoutingResolutionInternal(sessionKey, result);
-        if (resolvedRuntimeModel.isNotEmpty) {
-          singleAgentRuntimeModelBySessionInternal[sessionKey] =
-              resolvedRuntimeModel;
-        }
-        final resolvedGatewayEntryState =
-            (result.resolvedExecutionTarget == 'gateway' ||
-                result.resolvedExecutionTarget == 'gateway-chat')
-            ? (result.resolvedEndpointTarget.trim().isNotEmpty
-                  ? result.resolvedEndpointTarget.trim()
-                  : AssistantExecutionTarget.local.promptValue)
-            : result.resolvedExecutionTarget == 'single-agent'
-            ? AssistantExecutionTarget.singleAgent.promptValue
-            : (sessionTarget == AssistantExecutionTarget.auto
-                  ? AssistantExecutionTarget.auto.promptValue
-                  : AssistantExecutionTarget.singleAgent.promptValue);
+        final resolvedGatewayEntryState = goTaskServiceGatewayEntryState(
+          requestedTarget: sessionTarget,
+          result: result,
+        );
         upsertTaskThreadInternal(
           sessionKey,
           gatewayEntryState: resolvedGatewayEntryState,
+          latestResolvedRuntimeModel: resolvedRuntimeModel,
+          lifecycleStatus: 'ready',
+          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          lastResultCode: result.success ? 'success' : 'error',
           updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
         );
         final resolvedWorkspaceKind = result.resolvedWorkspaceRefKind;
@@ -256,6 +248,10 @@ extension AppControllerDesktopSingleAgent on AppController {
             upsertTaskThreadInternal(
               sessionKey,
               gatewayEntryState: 'only-chat',
+              latestResolvedRuntimeModel: resolvedAiGatewayModel,
+              lifecycleStatus: 'ready',
+              lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+              lastResultCode: 'fallback',
               updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
             );
             await sendAiGatewayMessageInternal(
@@ -295,8 +291,8 @@ extension AppControllerDesktopSingleAgent on AppController {
             sessionKey,
             assistantErrorMessageInternal(
               appText(
-                'Go Agent-core 执行失败：${result.errorMessage}',
-                'Go Agent-core execution failed: ${result.errorMessage}',
+                'GoTaskService 执行失败：${result.errorMessage}',
+                'GoTaskService execution failed: ${result.errorMessage}',
               ),
             ),
           );
@@ -308,8 +304,8 @@ extension AppControllerDesktopSingleAgent on AppController {
             sessionKey,
             assistantErrorMessageInternal(
               appText(
-                'Go Agent-core 没有返回可显示的输出。',
-                'Go Agent-core returned no displayable output.',
+                'GoTaskService 没有返回可显示的输出。',
+                'GoTaskService returned no displayable output.',
               ),
             ),
           );
@@ -332,6 +328,13 @@ extension AppControllerDesktopSingleAgent on AppController {
         );
       } catch (error) {
         clearAiGatewayStreamingTextInternal(sessionKey);
+        upsertTaskThreadInternal(
+          sessionKey,
+          lifecycleStatus: 'ready',
+          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          lastResultCode: 'error',
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        );
         appendAssistantThreadMessageInternal(
           sessionKey,
           assistantErrorMessageInternal(error.toString()),
@@ -452,6 +455,15 @@ extension AppControllerDesktopSingleAgent on AppController {
           error: false,
         ),
       );
+      upsertTaskThreadInternal(
+        sessionKey,
+        gatewayEntryState: 'only-chat',
+        latestResolvedRuntimeModel: model,
+        lifecycleStatus: 'ready',
+        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastResultCode: 'success',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
     } on AiGatewayAbortExceptionInternal catch (error) {
       final partial = error.partialText.trim();
       if (partial.isNotEmpty) {
@@ -470,7 +482,21 @@ extension AppControllerDesktopSingleAgent on AppController {
           ),
         );
       }
+      upsertTaskThreadInternal(
+        sessionKey,
+        lifecycleStatus: 'ready',
+        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastResultCode: 'aborted',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
     } catch (error) {
+      upsertTaskThreadInternal(
+        sessionKey,
+        lifecycleStatus: 'ready',
+        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastResultCode: 'error',
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
       appendAssistantThreadMessageInternal(
         sessionKey,
         assistantErrorMessageInternal(aiGatewayErrorLabelInternal(error)),
@@ -698,6 +724,13 @@ extension AppControllerDesktopSingleAgent on AppController {
     }
     aiGatewayPendingSessionKeysInternal.remove(normalizedSessionKey);
     clearAiGatewayStreamingTextInternal(normalizedSessionKey);
+    upsertTaskThreadInternal(
+      normalizedSessionKey,
+      lifecycleStatus: 'ready',
+      lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastResultCode: 'aborted',
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
     recomputeTasksInternal();
     notifyIfActiveInternal();
   }

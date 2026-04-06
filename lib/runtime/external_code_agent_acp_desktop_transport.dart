@@ -90,8 +90,8 @@ class ExternalCodeAgentAcpDesktopTransport implements ExternalCodeAgentAcpTransp
     final endpoint = await _resolveEndpoint(request.target);
     if (endpoint == null) {
       throw const GatewayAcpException(
-        'Missing Go Agent-core endpoint',
-        code: 'GO_AGENT_CORE_ENDPOINT_MISSING',
+        'Missing external ACP endpoint',
+        code: 'EXTERNAL_ACP_ENDPOINT_MISSING',
       );
     }
     var streamedText = '';

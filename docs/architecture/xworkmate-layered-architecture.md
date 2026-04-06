@@ -9,7 +9,7 @@ Last Updated: 2026-03-29
 
 - 本地用户、Web 用户、远程租户如何进入系统
 - 任务线程如何成为 UI 与执行之间的控制面主对象
-- Desktop / Mobile / Web 三个界面层如何共用同一套 agent core
+- Desktop / Mobile / Web 三个界面层如何共用同一套 `GoTaskService` 执行主链
 - 本地 agent、OpenClaw Gateway、ACP endpoint、AI Gateway、Skills / MCP
   等扩展能力应该落在哪一层
 
@@ -21,7 +21,7 @@ Last Updated: 2026-03-29
 
 ## 为什么要重新规划
 
-如果只用“用户 -> UI -> Agent-core -> 服务”四层表达，当前项目里最关键的
+如果只用“用户 -> UI -> GoTaskService -> 服务”四层表达，当前项目里最关键的
 一个事实会被隐藏掉：
 
 **XWorkmate 的运行主对象不是某个页面，也不是某个 gateway session，而是
@@ -40,7 +40,7 @@ Last Updated: 2026-03-29
 1. 访问与归属层
 2. 多端 UI 层
 3. 线程控制面
-4. Agent-core 调度层
+4. `GoTaskService` 调度层
 5. 对接服务与扩展层
 6. 安全与持久化基座（横切，不单独作为主业务层）
 
@@ -48,8 +48,8 @@ Last Updated: 2026-03-29
 
 - UI 不是执行状态真值源
 - `TaskThread` 才是线程级控制面真值源
-- Agent-core 负责把线程状态翻译成可执行请求
-- 真正的 provider / gateway / ACP / Skills / MCP 都应放在 Agent-core 之下
+- `GoTaskService` 负责把线程状态翻译成可执行请求
+- 真正的 provider / gateway / ACP / Skills / MCP 都应放在 `GoTaskService` 之下
 
 ## 整体架构
 
@@ -77,16 +77,16 @@ flowchart TB
         C7["线程持久化<br/>SettingsStore / WebSessionRepository"]
     end
 
-    subgraph L4["④ Agent-core 调度层"]
+    subgraph L4["④ GoTaskService 调度层"]
         D1["AppControllerDesktop / AppControllerWeb"]
-        D2["GoAgentCoreClient 抽象"]
+        D2["GoTaskService / GoTaskServiceClient"]
         D3["RuntimeCoordinator / GatewayRuntime / ModeSwitcher"]
         D4["CodeAgentNodeOrchestrator"]
         D5["SingleAgentRunner / DirectSingleAgentAppServerClient / CodexRuntime"]
         D6["MultiAgentOrchestrator / MultiAgentMountManager"]
         D7["CodexConfigBridge / OpencodeConfigBridge"]
-        D8["Desktop transport<br/>GoAgentCoreDesktopTransport / go_core / codex_ffi_bindings"]
-        D9["Web transport<br/>GoAgentCoreWebTransport / WebAcpClient / Relay"]
+        D8["Desktop ACP transport<br/>ExternalCodeAgentAcpDesktopTransport / go_core / codex_ffi_bindings"]
+        D9["Web ACP transport<br/>ExternalCodeAgentAcpWebTransport / WebAcpClient / Relay"]
     end
 
     subgraph L5["⑤ 对接服务与扩展层"]
@@ -215,9 +215,9 @@ flowchart TB
 - `RuntimeCoordinator`
 - `GatewayRuntime`
 - `CodeAgentNodeOrchestrator`
-- `GoAgentCoreClient`
-- `GoAgentCoreDesktopTransport`
-- `GoAgentCoreWebTransport`
+- `GoTaskServiceClient`
+- `ExternalCodeAgentAcpDesktopTransport`
+- `ExternalCodeAgentAcpWebTransport`
 - `SingleAgentRunner`
 - `MultiAgentOrchestrator`
 - `MultiAgentMountManager`
@@ -227,7 +227,7 @@ flowchart TB
 重规划后的职责边界应当是：
 
 - `AppController*` 负责从 `TaskThread` 解析出当前线程的执行上下文
-- `GoAgentCoreClient` 负责统一 Desktop / Web 的 agent-core 会话调用抽象
+- `GoTaskServiceClient` 负责统一 Desktop / Web 的执行请求与结果映射抽象
 - `RuntimeCoordinator` / `GatewayRuntime` 负责 runtime 与 gateway 连接能力
 - `CodeAgentNodeOrchestrator` 负责 app-mediated cooperative node metadata
 - `MultiAgentOrchestrator` / `MultiAgentMountManager` 负责协作执行与挂载
@@ -289,17 +289,15 @@ flowchart LR
     C --> C3["executionBinding"]
     C --> C4["contextState"]
 
-    C1 --> D["构造 GoAgentCoreSessionRequest<br/>或 Gateway 执行请求"]
+    C1 --> D["构造 GoTaskServiceRequest<br/>或 Gateway 执行请求"]
     C2 --> D
     C3 --> D
     C4 --> D
 
     D --> E{"executionMode"}
-    E -->|localAgent| F["GoAgentCoreDesktopTransport / SingleAgentRunner"]
-    E -->|gatewayLocal| G["GatewayRuntime / OpenClaw local"]
-    E -->|gatewayRemote| H["GatewayAcpClient / WebAcpClient / Remote ACP"]
+    E -->|openclaw task| G["GoTaskService -> GatewayRuntime / Web relay"]
+    E -->|singleAgent / multiAgent| H["GoTaskService -> ExternalCodeAgentAcp* / ACP route"]
 
-    F --> I["执行结果 / delta / resolvedWorkingDirectory"]
     G --> I
     H --> I
 
@@ -327,17 +325,17 @@ flowchart LR
 | 访问与归属层 | `ThreadOwnerScope`、`DeviceIdentityStore`、Web session identity | `lib/runtime/runtime_models_runtime_payloads.dart`, `lib/runtime/device_identity_store.dart`, `lib/web/web_session_repository.dart` | 定义线程归属、设备身份、远程会话身份 |
 | 多端 UI 层 | `AppShellDesktop`、`mobile_shell_*`、`AppShellWeb`、`AssistantPage`、`SettingsPage` | `lib/app/`, `lib/features/assistant/`, `lib/features/mobile/`, `lib/features/settings/` | 接收用户操作、展示线程与设置 |
 | 线程控制面 | `TaskThread` + thread records | `lib/runtime/runtime_models_runtime_payloads.dart`, `lib/runtime/settings_store.dart`, `lib/web/web_session_repository.dart` | 保存线程级真值状态 |
-| Agent-core 调度层 | `AppControllerDesktop/Web`、`GoAgentCoreClient`、`RuntimeCoordinator`、`CodeAgentNodeOrchestrator`、`MultiAgentOrchestrator` | `lib/app/`, `lib/runtime/`, `lib/web/` | 把线程状态翻译为执行请求并协调 transport |
-| 对接服务与扩展层 | local agent、OpenClaw Gateway、ACP endpoint、AI Gateway、Skills / MCP / adapters | `lib/runtime/go_agent_core_desktop_transport.dart`, `lib/web/go_agent_core_web_transport.dart`, `lib/runtime/multi_agent_mounts.dart` | 真实执行与扩展接入 |
+| `GoTaskService` 调度层 | `AppControllerDesktop/Web`、`GoTaskServiceClient`、`RuntimeCoordinator`、`CodeAgentNodeOrchestrator`、`MultiAgentOrchestrator` | `lib/app/`, `lib/runtime/`, `lib/web/` | 把线程状态翻译为执行请求并协调 transport |
+| 对接服务与扩展层 | local agent、OpenClaw Gateway、ACP endpoint、AI Gateway、Skills / MCP / adapters | `lib/runtime/external_code_agent_acp_desktop_transport.dart`, `lib/web/external_code_agent_acp_web_transport.dart`, `lib/runtime/multi_agent_mounts.dart` | 真实执行与扩展接入 |
 | 安全与持久化基座 | `SettingsStore`、`SecretStore`、`SecureConfigStore`、`WebStore` | `lib/runtime/`, `lib/web/web_store.dart` | 提供持久化与 secret 保护 |
 
 ## 三端职责矩阵
 
-| 平台 | UI 入口 | 线程控制面 | agent-core 重点 | 当前执行特点 |
+| 平台 | UI 入口 | 线程控制面 | `GoTaskService` 重点 | 当前执行特点 |
 | --- | --- | --- | --- | --- |
 | Desktop | `AppShellDesktop` + workspace 页面 | `TaskThread` 持久化最完整 | `AppControllerDesktop` + `RuntimeCoordinator` + Desktop transport | 支持本地 single-agent、gateway local、gateway remote |
 | Mobile | `mobile_shell_*` | 复用同一线程模型 | 仍走 native host/controller 体系 | 当前以 remote gateway 场景为主 |
-| Web | `AppShellWeb` | 同 schema 的 thread records | `AppControllerWeb` + `GoAgentCoreWebTransport` + relay/acp client | 远程 ACP / relay / AI Gateway 路径 |
+| Web | `AppShellWeb` | 同 schema 的 thread records | `AppControllerWeb` + `ExternalCodeAgentAcpWebTransport` + relay/acp client | 远程 ACP / relay / AI Gateway 路径 |
 
 ## 对你给出的旧图，按代码需要做的三个修正
 
@@ -358,14 +356,14 @@ flowchart LR
 
 从代码现实出发，当前更准确的 seam 是：
 
-- `GoAgentCoreClient`
-- `GoAgentCoreDesktopTransport`
-- `GoAgentCoreWebTransport`
+- `GoTaskServiceClient`
+- `ExternalCodeAgentAcpDesktopTransport`
+- `ExternalCodeAgentAcpWebTransport`
 - `GatewayAcpClient`
 - `WebAcpClient`
 - `MultiAgentOrchestrator`
 
-因此，新的整体架构里应把“broker / ACP / transport”归到 Agent-core 调度层内部，
+因此，新的整体架构里应把“broker / ACP / transport”归到 `GoTaskService` 调度层内部，
 而不是单独挂成一个与 UI 并列的主系统。
 
 ### 修正 3：`Assistant composer / Settings / Feature flags` 属于 UI 层，不属于运行时层
@@ -395,7 +393,7 @@ flowchart LR
 如果未来新增新的执行目标或新的 gateway 类型：
 
 - 先扩展 `executionBinding`
-- 再扩展 `GoAgentCoreClient` transport 或 runtime coordinator
+- 再扩展 `GoTaskServiceClient` transport 或 runtime coordinator
 - 不要先改页面分支逻辑
 
 ### 新 provider / adapter / MCP / skill capability
@@ -425,7 +423,7 @@ flowchart LR
 - 一个以 `TaskThread` 为控制面核心的多端 agent workspace App
 - UI 负责交互
 - 线程控制面负责真值
-- Agent-core 负责调度与 transport
+- `GoTaskService` 负责调度与 transport
 - Gateway / ACP / local agent / Skills / MCP 负责实际执行与扩展
 
 一句话概括：
