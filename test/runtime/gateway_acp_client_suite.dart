@@ -118,6 +118,27 @@ void main() {
     );
 
     test(
+      'falls back to websocket when HTTP bridge returns plain-text 404',
+      () async {
+        final server = await _AcpFakeServer.start(
+          respondWithPlainTextNotFound: true,
+        );
+        addTearDown(server.close);
+
+        final client = GatewayAcpClient(
+          endpointResolver: () => server.baseHttpUri,
+        );
+
+        final capabilities = await client.loadCapabilities(forceRefresh: true);
+
+        expect(capabilities.singleAgent, isTrue);
+        expect(server.lastHttpRequestPath, '/acp/rpc');
+        expect(server.lastWebSocketRequestPath, '/acp');
+        expect(server.rpcMethods, contains('acp.capabilities'));
+      },
+    );
+
+    test(
       'forwards ACP authorization resolver headers over websocket',
       () async {
         final server = await _AcpFakeServer.start();
@@ -234,12 +255,14 @@ class _AcpFakeServer {
     this._server, {
     required this.disableWebSocket,
     required this.respondWithHtmlError,
+    required this.respondWithPlainTextNotFound,
     required this.pathPrefix,
   });
 
   final HttpServer _server;
   final bool disableWebSocket;
   final bool respondWithHtmlError;
+  final bool respondWithPlainTextNotFound;
   final String pathPrefix;
   final List<String> rpcMethods = <String>[];
   String? lastWebSocketAuthorization;
@@ -253,6 +276,7 @@ class _AcpFakeServer {
   static Future<_AcpFakeServer> start({
     bool disableWebSocket = false,
     bool respondWithHtmlError = false,
+    bool respondWithPlainTextNotFound = false,
     String pathPrefix = '',
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -260,6 +284,7 @@ class _AcpFakeServer {
       server,
       disableWebSocket: disableWebSocket,
       respondWithHtmlError: respondWithHtmlError,
+      respondWithPlainTextNotFound: respondWithPlainTextNotFound,
       pathPrefix: _normalizePathPrefix(pathPrefix),
     );
     unawaited(fake._listen());
@@ -330,6 +355,13 @@ class _AcpFakeServer {
       request.response.write(
         '<!doctype html><script>var key = "opencode-theme-id"</script>',
       );
+      await request.response.close();
+      return;
+    }
+    if (respondWithPlainTextNotFound) {
+      request.response.statusCode = HttpStatus.notFound;
+      request.response.headers.set(HttpHeaders.contentTypeHeader, 'text/plain');
+      request.response.write('not found');
       await request.response.close();
       return;
     }

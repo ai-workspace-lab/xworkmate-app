@@ -321,7 +321,22 @@ class GatewayAcpClient {
         );
       } catch (error) {
         if (error is GatewayAcpException) {
-          rethrow;
+          if (!_shouldRetryViaWebSocketAfterHttpFailure(
+            error,
+            endpoint: resolvedEndpoint,
+          )) {
+            rethrow;
+          }
+          try {
+            return await _requestViaWebSocket(
+              request,
+              onNotification: onNotification,
+              endpointOverride: resolvedEndpoint,
+              authorizationOverride: authorizationOverride,
+            );
+          } catch (_) {
+            rethrow;
+          }
         }
         return _requestViaWebSocket(
           request,
@@ -542,6 +557,22 @@ class GatewayAcpClient {
       return '$base · $detail';
     }
     return base;
+  }
+
+  bool _shouldRetryViaWebSocketAfterHttpFailure(
+    GatewayAcpException error, {
+    required Uri? endpoint,
+  }) {
+    if (resolveAcpWebSocketEndpoint(endpoint) == null) {
+      return false;
+    }
+    final details = asMap(error.details);
+    final statusCode = intValue(details['statusCode']);
+    final contentType = (stringValue(details['contentType']) ?? '')
+        .trim()
+        .toLowerCase();
+    return statusCode == HttpStatus.notFound &&
+        (contentType.isEmpty || contentType.contains('text/plain'));
   }
 
   bool _contentTypeLooksJsonOrSse(String contentType) {
