@@ -9,7 +9,6 @@ import '../runtime/runtime_models.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_external_acp_routing.dart';
 import 'app_controller_desktop_runtime_helpers.dart';
-import 'app_controller_desktop_single_agent_ai_gateway.dart';
 import 'app_controller_desktop_single_agent_status_messages.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_storage.dart';
@@ -69,7 +68,7 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
       final provider = selection == SingleAgentProvider.auto
           ? (availableProviders.isEmpty ? null : availableProviders.first)
           : (capabilities.providers.contains(selection) ? selection : null);
-      final fallbackReason = provider == null
+      final unavailableReason = provider == null
           ? (selection == SingleAgentProvider.auto
                 ? appText(
                     '当前没有可用的 GoTaskService Provider。',
@@ -80,48 +79,28 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
                     'GoTaskService does not currently support ${selection.label}.',
                   ))
           : null;
-      if (provider == null && !routing.isAuto) {
-        if (controller.singleAgentUsesAiChatFallbackForSession(sessionKey)) {
-          appendSingleAgentFallbackStatusDesktopInternal(
+      if (provider == null) {
+        controller.upsertTaskThreadInternal(
+          sessionKey,
+          lifecycleStatus: 'ready',
+          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          lastResultCode: 'error',
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        );
+        controller.appendAssistantThreadMessageInternal(
+          sessionKey,
+          assistantErrorMessageSingleAgentDesktopInternal(
             controller,
-            sessionKey,
-            fallbackReason,
-          );
-          await sendAiGatewaySingleAgentMessageDesktopInternal(
-            controller,
-            message,
-            thinking: thinking,
-            attachments: attachments,
-            sessionKeyOverride: sessionKey,
-            appendUserMessage: false,
-            managePendingState: false,
-          );
-        } else {
-          controller.appendAssistantThreadMessageInternal(
-            sessionKey,
-            GatewayChatMessage(
-              id: controller.nextLocalMessageIdInternal(),
-              role: 'assistant',
-              text: singleAgentUnavailableLabelDesktopInternal(
-                controller,
-                sessionKey,
-                fallbackReason,
-              ),
-              timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-              toolCallId: null,
-              toolName: singleAgentRuntimeDebugToolNameDesktopInternal(
-                controller,
-                provider?.label ?? selection.label,
-              ),
-              stopReason: null,
-              pending: false,
-              error: false,
+            singleAgentUnavailableLabelDesktopInternal(
+              controller,
+              sessionKey,
+              unavailableReason,
             ),
-          );
-        }
+          ),
+        );
         return;
       }
-      final effectiveProvider = provider ?? SingleAgentProvider.auto;
+      final effectiveProvider = provider;
 
       appendSingleAgentRuntimeStatusDesktopInternal(
         controller,
@@ -248,36 +227,6 @@ void _applySingleAgentGoTaskResultDesktopInternal(
     result,
   );
   controller.clearAiGatewayStreamingTextInternal(sessionKey);
-  if (!result.success &&
-      controller.singleAgentUsesAiChatFallbackForSession(sessionKey)) {
-    appendSingleAgentFallbackStatusDesktopInternal(
-      controller,
-      sessionKey,
-      result.errorMessage,
-    );
-    controller.upsertTaskThreadInternal(
-      sessionKey,
-      gatewayEntryState: 'only-chat',
-      latestResolvedRuntimeModel: controller.resolvedAiGatewayModel,
-      lifecycleStatus: 'ready',
-      lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      lastResultCode: 'fallback',
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
-    unawaited(
-      sendAiGatewaySingleAgentMessageDesktopInternal(
-        controller,
-        message,
-        thinking: thinking,
-        attachments: attachments,
-        sessionKeyOverride: sessionKey,
-        appendUserMessage: false,
-        managePendingState: false,
-      ),
-    );
-    return;
-  }
-
   if (!result.success) {
     controller.appendAssistantThreadMessageInternal(
       sessionKey,

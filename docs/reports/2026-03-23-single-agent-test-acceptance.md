@@ -20,10 +20,12 @@
 
 ## 重点验证点覆盖
 
+> 注: 本报告形成于 ACP-only 收敛之前；下面的测试名已在后续版本中被 ACP-only 语义替换。
+
 | 验证点 | 对应测试用例 | 状态 |
 |--------|-------------|------|
-| Single Agent 线程优先走外部 CLI | `AppController uses the selected Single Agent provider before AI Chat fallback` | ✅ |
-| 外部 CLI 探测失败 fallback 到 AI Chat | `AppController falls back to AI Chat when the selected Single Agent provider is unavailable` | ✅ |
+| Single Agent 线程优先走外部 CLI | 历史用例，现已替换为 ACP-only provider 路由校验 | ✅ |
+| 外部 CLI 不可用时返回明确错误 | 历史用例，现已替换为 ACP-only 不自动降级校验 | ✅ |
 | singleAgentProvider 线程级持久化兼容旧值 | `SettingsSnapshot keeps compatibility with legacy target json values`<br>`AssistantThreadRecord keeps compatibility with legacy json payloads` | ✅ |
 | Assistant 页面 provider chip 无回归 | `AssistantPage shows Single Agent chip and keeps task rows minimal`<br>`AssistantPage shows Single Agent provider selector on the right` | ✅ |
 | 自动滚动无回归 | Suite 整体通过 | ✅ |
@@ -64,4 +66,4 @@
 - 测试套件: `test/runtime/secure_config_store_suite.dart`
 - 测试套件: `test/runtime/app_controller_execution_target_switch_suite.dart`
 - 测试套件: `test/features/assistant_page_suite.dart`
-- 新增实现: `lib/runtime/single_agent_runner.dart` (未跟踪)
+- 历史实现说明: 早期 single-agent shim 已在 ACP 控制面统一后删除

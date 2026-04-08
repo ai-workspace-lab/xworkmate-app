@@ -49,7 +49,7 @@ void main() {
   );
 
   test(
-    'AppController keeps the current thread model source when only the global default target changes',
+    'AppController does not borrow LLM API model choices when single-agent has no ACP provider',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -82,10 +82,8 @@ void main() {
         AssistantExecutionTarget.singleAgent,
       );
 
-      expect(controller.assistantModelChoices, const <String>[
-        'qwen2.5-coder:latest',
-      ]);
-      expect(controller.resolvedAssistantModel, 'qwen2.5-coder:latest');
+      expect(controller.assistantModelChoices, isEmpty);
+      expect(controller.resolvedAssistantModel, isEmpty);
       expect(controller.canUseAiGatewayConversation, isTrue);
 
       await controller.saveSettings(
@@ -100,10 +98,8 @@ void main() {
         ),
         AssistantExecutionTarget.singleAgent,
       );
-      expect(controller.resolvedAssistantModel, 'qwen2.5-coder:latest');
-      expect(controller.assistantModelChoices, const <String>[
-        'qwen2.5-coder:latest',
-      ]);
+      expect(controller.resolvedAssistantModel, isEmpty);
+      expect(controller.assistantModelChoices, isEmpty);
     },
   );
 
@@ -143,7 +139,6 @@ void main() {
       await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
 
       expect(controller.currentSingleAgentHasResolvedProvider, isTrue);
-      expect(controller.currentSingleAgentUsesAiChatFallback, isFalse);
       expect(controller.currentSingleAgentShouldShowModelControl, isFalse);
       expect(controller.assistantModelChoices, isEmpty);
       expect(controller.resolvedAssistantModel, isEmpty);

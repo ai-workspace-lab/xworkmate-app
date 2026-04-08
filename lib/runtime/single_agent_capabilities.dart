@@ -1,14 +1,14 @@
 import 'runtime_models.dart';
 
-class DirectSingleAgentCapabilities {
-  const DirectSingleAgentCapabilities({
+class SingleAgentCapabilities {
+  const SingleAgentCapabilities({
     required this.available,
     required this.supportedProviders,
     required this.endpoint,
     this.errorMessage,
   });
 
-  const DirectSingleAgentCapabilities.unavailable({
+  const SingleAgentCapabilities.unavailable({
     required this.endpoint,
     this.errorMessage,
   }) : available = false,

@@ -140,14 +140,42 @@ func (s *Server) runSingleAgentViaExternalProvider(
 	if endpoint == "" {
 		return nil, fmt.Errorf("external provider endpoint is missing")
 	}
+	forwardParams := sanitizeExternalACPParams(method, params)
 	return requestExternalACP(
 		ctx,
 		endpoint,
 		provider.AuthorizationHeader,
 		method,
-		params,
+		forwardParams,
 		notify,
 	)
+}
+
+func sanitizeExternalACPParams(method string, params map[string]any) map[string]any {
+	if len(params) == 0 {
+		return map[string]any{}
+	}
+	next := make(map[string]any, len(params))
+	for key, value := range params {
+		next[key] = value
+	}
+	// Internal routing/runtime fields must not leak into external provider payloads.
+	delete(next, "metadata")
+	delete(next, "resolvedExecutionTarget")
+	delete(next, "resolvedEndpointTarget")
+	delete(next, "resolvedProviderId")
+	delete(next, "resolvedModel")
+	delete(next, "resolvedSkills")
+	delete(next, externalProviderEndpointKey)
+	delete(next, externalProviderAuthorizationHeaderKey)
+	delete(next, externalProviderLabelKey)
+	// Gateway-only fields are irrelevant in ACP single-agent forwarding.
+	normalizedMethod := strings.TrimSpace(method)
+	if normalizedMethod == "session.start" || normalizedMethod == "session.message" {
+		delete(next, "executionTarget")
+		delete(next, "agentId")
+	}
+	return next
 }
 
 func externalProviderFromParams(params map[string]any) (syncedProvider, bool) {

@@ -78,6 +78,7 @@ func TestProvidersSyncUpdatesCapabilities(t *testing.T) {
 }
 
 func TestExecuteSessionTaskUsesSyncedExternalProvider(t *testing.T) {
+	var lastForwardedParams map[string]any
 	externalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/acp/rpc" {
 			http.NotFound(w, r)
@@ -88,6 +89,7 @@ func TestExecuteSessionTaskUsesSyncedExternalProvider(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			t.Fatalf("decode request: %v", err)
 		}
+		lastForwardedParams = asMap(request["params"])
 		method, _ := request["method"].(string)
 		switch method {
 		case "session.start":
@@ -147,6 +149,12 @@ func TestExecuteSessionTaskUsesSyncedExternalProvider(t *testing.T) {
 	}
 	if got := response["resolvedProviderId"]; got != "claude" {
 		t.Fatalf("expected resolved provider claude, got %#v", response)
+	}
+	if _, exists := lastForwardedParams["metadata"]; exists {
+		t.Fatalf("expected metadata to be stripped for external provider request, got %#v", lastForwardedParams)
+	}
+	if _, exists := lastForwardedParams[externalProviderEndpointKey]; exists {
+		t.Fatalf("expected internal endpoint key to be stripped, got %#v", lastForwardedParams)
 	}
 }
 
