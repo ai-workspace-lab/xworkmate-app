@@ -5,6 +5,11 @@ import 'go_task_service_client.dart';
 import 'runtime_models.dart';
 
 class DesktopGoTaskService implements GoTaskServiceClient {
+  static const Duration _openClawTaskRecoveryTimeout = Duration(seconds: 35);
+  static const Duration _openClawTaskRecoveryPollInterval = Duration(
+    milliseconds: 800,
+  );
+
   DesktopGoTaskService({
     required GatewayRuntime gateway,
     required ExternalCodeAgentAcpTransport acpTransport,
@@ -111,6 +116,7 @@ class DesktopGoTaskService implements GoTaskServiceClient {
     if (!_gateway.isConnected) {
       throw GatewayRuntimeException('gateway not connected');
     }
+    final historyBaseline = await _gateway.loadHistory(request.sessionId);
     final runId = await _gateway.sendChat(
       sessionKey: request.sessionId,
       message: request.prompt,
@@ -126,6 +132,13 @@ class DesktopGoTaskService implements GoTaskServiceClient {
     );
     _pendingOpenClawTasksByRunId[runId] = pending;
     _openClawRunIdsBySession[request.sessionId] = runId;
+    final recovered = await _recoverOpenClawTaskFromHistory(
+      pending,
+      historyBaseline,
+    );
+    if (recovered != null) {
+      return recovered;
+    }
     return pending.completer.future;
   }
 
@@ -201,6 +214,75 @@ class DesktopGoTaskService implements GoTaskServiceClient {
         route: GoTaskServiceRoute.openClawTask,
       ),
     );
+  }
+
+  Future<GoTaskServiceResult?> _recoverOpenClawTaskFromHistory(
+    _PendingOpenClawTask pending,
+    List<GatewayChatMessage> historyBaseline,
+  ) async {
+    final baselineAssistantFingerprint = _assistantMessageFingerprint(
+      historyBaseline,
+    );
+    final deadline = DateTime.now().add(_openClawTaskRecoveryTimeout);
+    while (!pending.completer.isCompleted && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(_openClawTaskRecoveryPollInterval);
+      if (pending.completer.isCompleted) {
+        return null;
+      }
+      final history = await _gateway.loadHistory(pending.request.sessionId);
+      final latestAssistant = _latestAssistantMessage(history);
+      if (latestAssistant == null) {
+        continue;
+      }
+      final fingerprint = _messageFingerprint(latestAssistant);
+      if (fingerprint == baselineAssistantFingerprint) {
+        continue;
+      }
+      final result = GoTaskServiceResult(
+        success: true,
+        message: latestAssistant.text.trim(),
+        turnId: pending.runId,
+        raw: <String, dynamic>{
+          'recoveredFromHistory': true,
+          'sessionId': pending.request.sessionId,
+        },
+        errorMessage: '',
+        resolvedModel: '',
+        route: GoTaskServiceRoute.openClawTask,
+      );
+      _pendingOpenClawTasksByRunId.remove(pending.runId);
+      _openClawRunIdsBySession.remove(pending.request.sessionId);
+      if (!pending.completer.isCompleted) {
+        pending.completer.complete(result);
+      }
+      return result;
+    }
+    return null;
+  }
+
+  GatewayChatMessage? _latestAssistantMessage(List<GatewayChatMessage> history) {
+    for (final message in history.reversed) {
+      if (message.role.trim().toLowerCase() != 'assistant') {
+        continue;
+      }
+      if (message.text.trim().isEmpty) {
+        continue;
+      }
+      return message;
+    }
+    return null;
+  }
+
+  String _assistantMessageFingerprint(List<GatewayChatMessage> history) {
+    final latest = _latestAssistantMessage(history);
+    if (latest == null) {
+      return '';
+    }
+    return _messageFingerprint(latest);
+  }
+
+  String _messageFingerprint(GatewayChatMessage message) {
+    return '${message.timestampMs ?? 0}|${message.text.trim()}';
   }
 }
 

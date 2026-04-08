@@ -146,10 +146,9 @@ class GatewayConnectionSnapshot {
     final detailCode = lastErrorDetailCode?.trim().toUpperCase();
     final errorCode = lastErrorCode?.trim().toUpperCase();
     final errorText = lastError?.toLowerCase() ?? '';
-    return status != RuntimeConnectionStatus.connected &&
-        (detailCode == 'PAIRING_REQUIRED' ||
-            errorCode == 'NOT_PAIRED' ||
-            errorText.contains('pairing required'));
+    return detailCode == 'PAIRING_REQUIRED' ||
+        errorCode == 'NOT_PAIRED' ||
+        errorText.contains('pairing required');
   }
 
   bool get gatewayTokenMissing {
