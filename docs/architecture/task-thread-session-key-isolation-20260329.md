@@ -9,8 +9,7 @@
 
 本文是对现有 `TaskThread` 主模型的补充，不替代：
 
-- `assistant-thread-target-model-20260328.md`
-- `assistant-thread-information-architecture.md`
+- `task-control-plane-unification.md`
 
 ## 1. 问题定义
 
@@ -315,6 +314,5 @@ single-agent 入口必须在执行前验证：
 
 推荐阅读顺序：
 
-1. `assistant-thread-target-model-20260328.md`
-2. `assistant-thread-information-architecture.md`
+1. `task-control-plane-unification.md`
 3. `task-thread-session-key-isolation-20260329.md`（本文）
