@@ -16,6 +16,10 @@ func main() {
 		}
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "acp-stdio" {
+		acp.RunStdio(os.Stdin, os.Stdout)
+		return
+	}
 
 	toolbridge.Run(os.Stdin, os.Stdout)
 }
