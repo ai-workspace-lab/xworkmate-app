@@ -22,18 +22,21 @@ class GatewayAcpCapabilities {
     required this.multiAgent,
     required this.providers,
     required this.raw,
+    this.diagnostics = const <String, dynamic>{},
   });
 
   const GatewayAcpCapabilities.empty()
     : singleAgent = false,
       multiAgent = false,
       providers = const <SingleAgentProvider>{},
-      raw = const <String, dynamic>{};
+      raw = const <String, dynamic>{},
+      diagnostics = const <String, dynamic>{};
 
   final bool singleAgent;
   final bool multiAgent;
   final Set<SingleAgentProvider> providers;
   final Map<String, dynamic> raw;
+  final Map<String, dynamic> diagnostics;
 }
 
 class _GatewayAcpSessionUpdate {
@@ -148,6 +151,7 @@ class GatewayAcpClient {
       multiAgent: multiAgent,
       providers: providers,
       raw: result,
+      diagnostics: asMap(response['_xworkmateDiagnostics']),
     );
     _capabilitiesRefreshedAt = DateTime.now();
     return _cachedCapabilities;
@@ -426,7 +430,16 @@ class GatewayAcpClient {
         const Duration(seconds: 120),
       );
       _throwIfJsonRpcError(response);
-      return response;
+      return <String, dynamic>{
+        ...response,
+        '_xworkmateDiagnostics': <String, dynamic>{
+          'transport': 'websocket',
+          'requestUrl': endpoint.toString(),
+          'statusCode': null,
+          'contentType': '',
+          'bodyRead': true,
+        },
+      };
     } finally {
       await subscription.cancel();
       await socket.close();
@@ -448,6 +461,9 @@ class GatewayAcpClient {
     }
 
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+    var statusCode = 0;
+    var contentType = '';
+    var bodyRead = false;
     try {
       final httpRequest = await client.postUrl(endpoint);
       httpRequest.headers.set(
@@ -478,7 +494,8 @@ class GatewayAcpClient {
       final response = await httpRequest.close().timeout(
         const Duration(seconds: 120),
       );
-      final contentType =
+      statusCode = response.statusCode;
+      contentType =
           response.headers.contentType?.mimeType.toLowerCase() ??
           response.headers
               .value(HttpHeaders.contentTypeHeader)
@@ -486,6 +503,7 @@ class GatewayAcpClient {
           '';
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final body = await response.transform(utf8.decoder).join();
+        bodyRead = body.isNotEmpty;
         throw GatewayAcpException(
           _describeHttpError(
             statusCode: response.statusCode,
@@ -494,25 +512,71 @@ class GatewayAcpClient {
           ),
           code: 'ACP_HTTP_${response.statusCode}',
           details: <String, dynamic>{
+            'requestUrl': endpoint.toString(),
             'statusCode': response.statusCode,
             'contentType': contentType,
+            'bodyRead': bodyRead,
           },
         );
       }
       if (contentType.contains('text/event-stream')) {
-        return _consumeSseRpcResponse(
+        final decoded = await _consumeSseRpcResponse(
           response: response,
           requestId: request.id,
           onNotification: onNotification,
         );
+        return <String, dynamic>{
+          ...decoded,
+          '_xworkmateDiagnostics': <String, dynamic>{
+            'transport': 'http-sse',
+            'requestUrl': endpoint.toString(),
+            'statusCode': response.statusCode,
+            'contentType': contentType,
+            'bodyRead': true,
+          },
+        };
       }
       final body = await response.transform(utf8.decoder).join();
+      bodyRead = body.isNotEmpty;
       final decoded = _decodeMap(body);
       _throwIfJsonRpcError(decoded);
-      return decoded;
+      return <String, dynamic>{
+        ...decoded,
+        '_xworkmateDiagnostics': <String, dynamic>{
+          'transport': 'http',
+          'requestUrl': endpoint.toString(),
+          'statusCode': response.statusCode,
+          'contentType': contentType,
+          'bodyRead': bodyRead,
+        },
+      };
+    } on GatewayAcpException {
+      rethrow;
+    } on HttpException catch (error) {
+      if (_looksLikeConnectionClosedWhileReceivingData(error.toString())) {
+        throw GatewayAcpException(
+          'ACP HTTP response stream closed before the body finished arriving',
+          code: 'ACP_HTTP_STREAM_CLOSED',
+          details: <String, dynamic>{
+            'requestUrl': endpoint.toString(),
+            'statusCode': statusCode,
+            'contentType': contentType,
+            'bodyRead': bodyRead,
+            'originalError': error.toString(),
+          },
+        );
+      }
+      rethrow;
     } finally {
       client.close(force: true);
     }
+  }
+
+  bool _looksLikeConnectionClosedWhileReceivingData(String raw) {
+    final lowered = raw.toLowerCase();
+    return lowered.contains('connection closed while receiving data') ||
+        lowered.contains('connection terminated during body read') ||
+        lowered.contains('stream closed');
   }
 
   String _describeHttpError({

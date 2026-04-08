@@ -194,10 +194,13 @@ String? resolveSingleAgentWorkingDirectoryForSessionRuntimeInternal(
   String sessionKey, {
   SingleAgentProvider? provider,
 }) {
+  final requiresLocalPath =
+      provider == null ||
+      singleAgentProviderRequiresLocalPathRuntimeInternal(controller, provider);
   final record =
       controller.assistantThreadRecordsInternal[controller
           .normalizedAssistantSessionKeyInternal(sessionKey)];
-  if (record?.workspaceKind == WorkspaceKind.remoteFs) {
+  if (!requiresLocalPath && record?.workspaceKind == WorkspaceKind.remoteFs) {
     return assistantWorkingDirectoryForSessionRuntimeInternal(
       controller,
       sessionKey,
@@ -206,12 +209,7 @@ String? resolveSingleAgentWorkingDirectoryForSessionRuntimeInternal(
   return resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal(
     controller,
     sessionKey,
-    requireLocalExistence:
-        provider == null ||
-        singleAgentProviderRequiresLocalPathRuntimeInternal(
-          controller,
-          provider,
-        ),
+    requireLocalExistence: requiresLocalPath,
   );
 }
 

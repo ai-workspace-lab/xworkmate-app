@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/features/settings/settings_page_gateway_acp.dart';
 import 'package:xworkmate/i18n/app_language.dart';
+import 'package:xworkmate/runtime/gateway_acp_client.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   group('external ACP desktop UI copy', () {
@@ -72,6 +74,54 @@ void main() {
       expect(text, contains('TLS handshake failed'));
       expect(text, contains('curl or openssl'));
       expect(text, contains('subpath'));
+    });
+
+    test('transient body-read close prints normalized diagnostics', () {
+      setActiveAppLanguage(AppLanguage.en);
+      addTearDown(() => setActiveAppLanguage(AppLanguage.zh));
+
+      final text = describeExternalAcpTestFailure(
+        const GatewayAcpException(
+          'ACP HTTP response stream closed before the body finished arriving',
+          code: 'ACP_HTTP_STREAM_CLOSED',
+          details: <String, dynamic>{
+            'requestUrl': 'https://acp-server.svc.plus/codex/acp/rpc',
+            'statusCode': 200,
+            'contentType': 'application/json',
+            'bodyRead': false,
+          },
+        ),
+      );
+
+      expect(text, contains('HTTP: 200'));
+      expect(text, contains('content-type: application/json'));
+      expect(text, contains('body received: no'));
+      expect(text, contains('retries this transient error once automatically'));
+    });
+
+    test('success copy shows actual transport status and providers', () {
+      setActiveAppLanguage(AppLanguage.en);
+      addTearDown(() => setActiveAppLanguage(AppLanguage.zh));
+
+      final text = describeExternalAcpTestSuccess(
+        GatewayAcpCapabilities(
+          singleAgent: true,
+          multiAgent: true,
+          providers: <SingleAgentProvider>{
+            SingleAgentProvider.codex,
+            SingleAgentProvider.opencode,
+          },
+          raw: <String, dynamic>{},
+          diagnostics: <String, dynamic>{
+            'transport': 'http',
+            'statusCode': 200,
+          },
+        ),
+      );
+
+      expect(text, contains('HTTP 200'));
+      expect(text, contains('ACP capabilities ok'));
+      expect(text, contains('providers: codex/opencode'));
     });
   });
 }

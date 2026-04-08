@@ -356,7 +356,10 @@ extension AppControllerDesktopThreadActions on AppController {
                         'GoTaskService 执行失败。',
                         'GoTaskService execution failed.',
                       )
-                    : result.errorMessage,
+                    : gatewayExecutionErrorLabelInternal(
+                        result.errorMessage,
+                        target: currentTarget,
+                      ),
               ),
               persistInThreadContext: true,
             );
@@ -402,7 +405,12 @@ extension AppControllerDesktopThreadActions on AppController {
           );
           appendLocalSessionMessageInternal(
             sessionKey,
-            assistantErrorMessageInternal(error.toString()),
+            assistantErrorMessageInternal(
+              gatewayExecutionErrorLabelInternal(
+                error,
+                target: currentTarget,
+              ),
+            ),
             persistInThreadContext: true,
           );
         } finally {
