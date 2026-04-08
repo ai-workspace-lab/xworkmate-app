@@ -639,4 +639,50 @@ void main() {
       );
     },
   );
+
+  test(
+    'AppController keeps single-agent selection when workspace binding cannot be allocated immediately',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-workspace-switch-invalid-root-',
+      );
+      final invalidRootFile = File('${tempDirectory.path}/workspace-root-file');
+      await invalidRootFile.writeAsString('not-a-directory');
+      addTearDown(() async {
+        if (await tempDirectory.exists()) {
+          try {
+            await tempDirectory.delete(recursive: true);
+          } catch (_) {}
+        }
+      });
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+        fallbackDirectoryPathResolver: () async => tempDirectory.path,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        seededSettingsSnapshot(workspacePath: invalidRootFile.path),
+      );
+
+      final controller = AppController(store: store);
+      addTearDown(controller.dispose);
+      await waitForControllerInternal(controller);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.remote,
+      );
+
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.singleAgent,
+      );
+
+      expect(
+        controller.assistantExecutionTargetForSession(
+          controller.currentSessionKey,
+        ),
+        AssistantExecutionTarget.singleAgent,
+      );
+    },
+  );
 }

@@ -70,10 +70,18 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         singleAgentProvider: currentSingleAgentProvider,
       );
     }
-    await ensureDesktopTaskThreadBindingInternal(
-      sessionsControllerInternal.currentSessionKey,
-      executionTarget: resolvedTarget,
-    );
+    StateError? bindingError;
+    try {
+      await ensureDesktopTaskThreadBindingInternal(
+        sessionsControllerInternal.currentSessionKey,
+        executionTarget: resolvedTarget,
+      );
+    } on StateError catch (error) {
+      // Keep the user-selected mode even if this thread cannot allocate a
+      // writable local workspace yet. Execution-time checks still block runs
+      // and surface a clear error when workspace setup is required.
+      bindingError = error;
+    }
     upsertTaskThreadInternal(
       sessionsControllerInternal.currentSessionKey,
       executionTarget: resolvedTarget,
@@ -93,6 +101,9 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       await refreshSingleAgentSkillsForSession(
         sessionsControllerInternal.currentSessionKey,
       );
+    }
+    if (bindingError != null) {
+      debugPrint('setAssistantExecutionTarget binding fallback: $bindingError');
     }
     recomputeTasksInternal();
     notifyIfActiveInternal();
