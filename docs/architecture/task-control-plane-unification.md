@@ -45,6 +45,20 @@ flowchart TD
     Q --> R["UI stream render"]
 ```
 
+## 端侧桥接规则
+
+### Desktop App
+
+- Desktop App 直接桥接 Go 代码
+- Desktop 正常执行链路不以“先启动一个本地 HTTP server，再由 Desktop 自己回连”作为目标架构
+- Desktop 的 `sendMessage -> GoTaskService.executeTask -> ACP` 应理解为进程内或直接桥接语义，不是 Web server 回环语义
+
+### Web / Mobile
+
+- Web / Mobile UI 连接的是 Go 代码启动出来的 server
+- Web / Mobile 通过标准 ACP contract 与该 server 通信
+- 对 Web / Mobile 来说，`/acp` 与 `/acp/rpc` 是稳定的网络协议入口
+
 ## 协议约束
 
 ### 传输协议
@@ -58,6 +72,8 @@ flowchart TD
 - websocket endpoint 规范路径：`/acp`
 - RPC endpoint 规范路径：`/acp/rpc`
 - base URL 派生时必须避免重复拼接 `/acp`
+- 以上 endpoint contract 主要适用于 Web / Mobile 与外部 ACP server 的通信语义
+- Desktop 目标态不要求为自身 UI 再额外启动一层本地 HTTP ACP server
 
 ## 收敛原则
 
@@ -70,6 +86,8 @@ flowchart TD
 
 - 所有正常发送请求都先进入 `GoTaskService.executeTask`
 - 所有任务都先进入 ACP 控制面，再解析到 executor
+- Desktop 采用直接桥接 Go 代码的控制面接入方式
+- Web / Mobile 采用连接 Go server 的控制面接入方式
 
 ### Compatibility route (removed from target)
 

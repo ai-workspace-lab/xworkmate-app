@@ -456,11 +456,11 @@ sequenceDiagram
 
 ## 12. 与现有文档的关系
 
-- [`/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/assistant-thread-target-model-20260328.md`](file:///Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/assistant-thread-target-model-20260328.md)
+- [`/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/task-control-plane-unification.md`](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/task-control-plane-unification.md)
   说明当前 `TaskThread` 主模型。
 - [`/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/task-thread-session-key-isolation-20260329.md`](file:///Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/task-thread-session-key-isolation-20260329.md)
   说明 `sessionKey` 与线程身份隔离约束。
-- [`/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/xworkmate-internal-state-architecture.md`](file:///Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/xworkmate-internal-state-architecture.md)
+- [`/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/xworkmate-layered-architecture.md`](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/xworkmate-layered-architecture.md)
   说明当前内部状态如何围绕 `TaskThread` 组织。
 
 本文在这些基础上进一步上升一层，定义跨设备会话的目标架构。
