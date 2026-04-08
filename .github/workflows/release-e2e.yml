@@ -1,0 +1,48 @@
+name: Release E2E Gates
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: 3.41.4
+
+jobs:
+  flutter-integration:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Setup Flutter
+        uses: ./.github/actions/setup-flutter-sdk
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Install Linux deps
+        run: bash ./scripts/ci/setup_platform_deps.sh linux
+
+      - name: Run integration layer
+        run: bash ./scripts/ci/run_layered_tests.sh e2e
+
+  patrol:
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Setup Flutter
+        uses: ./.github/actions/setup-flutter-sdk
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Install Linux deps
+        run: bash ./scripts/ci/setup_platform_deps.sh linux
+
+      - name: Run Patrol layer (non-blocking template)
+        run: bash ./scripts/ci/run_layered_tests.sh e2e
