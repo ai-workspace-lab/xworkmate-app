@@ -43,6 +43,9 @@ dart tool/configure_external_acp.dart
 - 这些值只是默认槽位，不代表脚本会安装或启动任何 provider。
 - `Codex` / `OpenCode` 的本地地址被保留为示例默认值。
 - `Claude` / `Gemini` 仅保留 endpoint 占位，不再绑定第三方桥接包说明。
+- ACP contract 的规范路径统一为 `/acp` 与 `/acp/rpc`。
+- local / loopback 可使用 `ws://` 或 `http://`。
+- remote endpoint 必须使用 `wss://` 或 `https://`，不能静默降级到非 TLS。
 
 ## macOS 路径策略
 
@@ -98,6 +101,13 @@ dart tool/configure_external_acp.dart apply \
   --claude-endpoint ws://127.0.0.1:19111 \
   --gemini-endpoint ws://127.0.0.1:19112
 ```
+
+协议边界：
+
+- 如果你提供的是 base URL，运行时应派生：
+  - websocket endpoint：`/acp`
+  - RPC endpoint：`/acp/rpc`
+- 如果你提供的 URL 已经包含 `/acp` 或 `/acp/rpc`，运行时不得重复拼接。
 
 只打印结果 YAML，不落盘：
 

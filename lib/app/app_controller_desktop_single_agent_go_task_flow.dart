@@ -172,6 +172,7 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
           agentId: '',
           metadata: const <String, dynamic>{},
           routing: routing,
+          routingHint: 'single-agent',
           provider: effectiveProvider,
         ),
         onUpdate: (update) {

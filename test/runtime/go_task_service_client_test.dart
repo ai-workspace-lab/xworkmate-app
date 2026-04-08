@@ -27,14 +27,14 @@ void main() {
       );
     }
 
-    test('routes local and remote targets to the OpenClaw lane', () {
+    test('routes local and remote targets to the ACP single lane', () {
       expect(
         buildRequest(target: AssistantExecutionTarget.local).route,
-        GoTaskServiceRoute.openClawTask,
+        GoTaskServiceRoute.externalAcpSingle,
       );
       expect(
         buildRequest(target: AssistantExecutionTarget.remote).route,
-        GoTaskServiceRoute.openClawTask,
+        GoTaskServiceRoute.externalAcpSingle,
       );
     });
 
@@ -178,42 +178,43 @@ void main() {
       });
     });
 
-    test(
-      'request keeps gateway ACP compatibility while controller semantics stay route-based',
-      () {
-        const request = GoTaskServiceRequest(
-          sessionId: 'session-2',
-          threadId: 'thread-2',
-          target: AssistantExecutionTarget.local,
-          prompt: 'search latest news',
-          workingDirectory: '/tmp/workspace',
-          model: '',
-          thinking: '',
-          selectedSkills: <String>[],
-          inlineAttachments: <GatewayChatAttachmentPayload>[],
-          localAttachments: <CollaborationAttachment>[],
-          aiGatewayBaseUrl: '',
-          aiGatewayApiKey: '',
-          agentId: 'agent-1',
-          metadata: <String, dynamic>{'source': 'test'},
-        );
+    test('request maps gateway intents onto the ACP single lane', () {
+      const request = GoTaskServiceRequest(
+        sessionId: 'session-2',
+        threadId: 'thread-2',
+        target: AssistantExecutionTarget.local,
+        prompt: 'search latest news',
+        workingDirectory: '/tmp/workspace',
+        model: '',
+        thinking: '',
+        selectedSkills: <String>[],
+        inlineAttachments: <GatewayChatAttachmentPayload>[],
+        localAttachments: <CollaborationAttachment>[],
+        aiGatewayBaseUrl: '',
+        aiGatewayApiKey: '',
+        agentId: 'agent-1',
+        metadata: <String, dynamic>{'source': 'test'},
+        routingHint: 'gateway',
+      );
 
-        final params = request.toExternalAcpParams();
+      final params = request.toExternalAcpParams();
 
-        expect(request.routingExecutionTarget, 'gateway');
-        expect(params['mode'], 'gateway-chat');
-        expect(params['executionTarget'], 'local');
-        expect(params['agentId'], 'agent-1');
-        expect(params['routing'], <String, dynamic>{
-          'routingMode': 'explicit',
-          'preferredGatewayTarget': 'local',
-          'explicitExecutionTarget': 'local',
-          'explicitSkills': const <String>[],
-          'allowSkillInstall': false,
-          'availableSkills': const <Map<String, dynamic>>[],
-        });
-      },
-    );
+      expect(request.route, GoTaskServiceRoute.externalAcpSingle);
+      expect(request.routingExecutionTarget, 'gateway');
+      expect(params['mode'], 'gateway-chat');
+      expect(params['executionTarget'], 'local');
+      expect(params['agentId'], 'agent-1');
+      expect(params['routingHint'], 'gateway');
+      expect(params['requestedExecutionTarget'], 'local');
+      expect(params['routing'], <String, dynamic>{
+        'routingMode': 'explicit',
+        'preferredGatewayTarget': 'local',
+        'explicitExecutionTarget': 'local',
+        'explicitSkills': const <String>[],
+        'allowSkillInstall': false,
+        'availableSkills': const <Map<String, dynamic>>[],
+      });
+    });
 
     test(
       'run result prefers completion text and preserves resolved workspace',
@@ -251,6 +252,7 @@ void main() {
           'threadId': 'thread-2',
           'turnId': 'turn-2',
           'type': 'delta',
+          'mode': 'multi-agent',
           'delta': 'hello',
           'pending': true,
         },
@@ -260,6 +262,7 @@ void main() {
       expect(update!.sessionId, 'session-2');
       expect(update.threadId, 'thread-2');
       expect(update.turnId, 'turn-2');
+      expect(update.route, GoTaskServiceRoute.externalAcpMulti);
       expect(update.isDelta, isTrue);
       expect(update.text, 'hello');
       expect(update.pending, isTrue);

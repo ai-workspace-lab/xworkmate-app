@@ -331,6 +331,7 @@ extension AppControllerDesktopThreadActions on AppController {
               agentId: dispatch.agentId ?? '',
               metadata: dispatch.metadata,
               routing: buildExternalAcpRoutingForSessionInternal(sessionKey),
+              routingHint: 'gateway',
             ),
             onUpdate: (update) {
               if (update.isDelta) {
@@ -427,7 +428,9 @@ extension AppControllerDesktopThreadActions on AppController {
         sessionsControllerInternal.currentSessionKey,
       );
       try {
-        await gatewayAcpClientInternal.cancelSession(
+        await goTaskServiceClientInternal.cancelTask(
+          route: GoTaskServiceRoute.externalAcpMulti,
+          target: assistantExecutionTargetForSession(sessionKey),
           sessionId: sessionKey,
           threadId: sessionKey,
         );
@@ -478,11 +481,7 @@ extension AppControllerDesktopThreadActions on AppController {
     );
     if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
       await goTaskServiceClientInternal.cancelTask(
-        route:
-            assistantExecutionTargetForSession(sessionKey) ==
-                AssistantExecutionTarget.singleAgent
-            ? GoTaskServiceRoute.externalAcpSingle
-            : GoTaskServiceRoute.openClawTask,
+        route: GoTaskServiceRoute.externalAcpSingle,
         target: assistantExecutionTargetForSession(sessionKey),
         sessionId: sessionKey,
         threadId: sessionKey,

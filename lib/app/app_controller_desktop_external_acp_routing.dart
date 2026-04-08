@@ -110,14 +110,6 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
             .where((item) => item.trim().isNotEmpty)
             .toList(growable: false);
 
-    final resolvedExplicitExecutionTarget =
-        explicitExecutionTarget?.trim().isNotEmpty == true
-        ? explicitExecutionTarget!.trim()
-        : (thread?.hasExplicitExecutionTargetSelection ?? false)
-        ? _routingExecutionTargetValueInternal(
-            assistantExecutionTargetForSession(normalizedSessionKey),
-          )
-        : '';
     final resolvedExplicitProviderId =
         thread?.hasExplicitProviderSelection ?? false
         ? singleAgentProviderForSession(normalizedSessionKey).providerId
@@ -128,6 +120,19 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
     final resolvedExplicitSkills = thread?.hasExplicitSkillSelection ?? false
         ? selectedSkills
         : const <String>[];
+    final hasAnyExplicitSelection =
+        (thread?.hasExplicitExecutionTargetSelection ?? false) ||
+        resolvedExplicitProviderId.isNotEmpty ||
+        resolvedExplicitModel.trim().isNotEmpty ||
+        resolvedExplicitSkills.isNotEmpty;
+    final resolvedExplicitExecutionTarget =
+        explicitExecutionTarget?.trim().isNotEmpty == true
+        ? explicitExecutionTarget!.trim()
+        : hasAnyExplicitSelection
+        ? _routingExecutionTargetValueInternal(
+            assistantExecutionTargetForSession(normalizedSessionKey),
+          )
+        : '';
     final hasExplicitSelection =
         resolvedExplicitExecutionTarget.isNotEmpty ||
         resolvedExplicitProviderId.isNotEmpty ||

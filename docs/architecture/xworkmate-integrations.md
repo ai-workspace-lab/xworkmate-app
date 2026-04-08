@@ -2,7 +2,14 @@
 
 ## 概述
 
-XWorkmate 现阶段已经不只是“单一 Codex bridge”，但当前实现也不是一个单独的 “Discovery / Distribution Catalog” 模块。
+XWorkmate 现阶段已经不只是“单一 Codex bridge”，但当前实现也不是一个单独的
+“Discovery / Distribution Catalog” 模块。
+
+本文件只说明集成能力与 adapter 边界，不承担任务工作流主叙事。
+
+任务工作流主叙事统一以
+[任务执行链路统一收敛](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-task-control-plane-unification/docs/architecture/task-control-plane-unification.md)
+为准。
 
 当前集成能力分散在几条明确的实现路径里：
 
@@ -18,6 +25,7 @@ XWorkmate 现阶段已经不只是“单一 Codex bridge”，但当前实现也
    - 决定当前哪些集成入口真实对用户可见
 
 也就是说，当前架构更接近“分布式集成面”，不是单一 catalog service。
+这些能力应被理解为控制面之下的 adapter / executor 能力，而不是 UI 规范直连入口。
 
 ## 当前架构基线
 
@@ -46,6 +54,7 @@ flowchart LR
 - `OpenClaw` 既是现有 Gateway 集成面，也是当前 app-mediated code-agent dispatch 的宿主控制面。
 - `AI Gateway` 既可以是 direct AI 对话入口，也可以是协作运行的注入式模型入口。
 - 当前没有一个单独命名为 `Discovery / Distribution Catalog` 的实现模块。
+- `GatewayRuntime`、relay、`GatewayAcpClient` 在统一收敛目标下都应视为 adapter/executor 能力。
 
 ## 1. OpenClaw Gateway / Host
 
