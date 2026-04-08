@@ -498,7 +498,6 @@ class AssistantEmptyStateInternal extends StatelessWidget {
     final connectionState = controller.currentAssistantConnectionState;
     final singleAgent = connectionState.isSingleAgent;
     final connected = connectionState.connected;
-    final singleAgentFallback = controller.currentSingleAgentUsesAiChatFallback;
     final singleAgentNeedsAiGateway =
         controller.currentSingleAgentNeedsAiGatewayConfiguration;
     final singleAgentSuggestsAcpSwitch =
@@ -509,7 +508,7 @@ class AssistantEmptyStateInternal extends StatelessWidget {
         ? connected
               ? appText('开始 ACP Server 任务', 'Start an ACP Server task')
               : singleAgentNeedsAiGateway
-              ? appText('先配置 LLM API', 'Configure LLM API first')
+              ? appText('先配置 ACP Server', 'Configure ACP Server first')
               : appText('先准备 ACP Server', 'Prepare the ACP Server first')
         : connected
         ? appText('开始对话或运行任务', 'Start a chat or run a task')
@@ -518,15 +517,10 @@ class AssistantEmptyStateInternal extends StatelessWidget {
         : appText('先连接 Gateway', 'Connect a gateway first');
     final description = singleAgent
         ? connected
-              ? (singleAgentFallback
-                    ? appText(
-                        '当前没有可用的外部 Agent ACP 连接，这个线程已降级到 AI Chat fallback，不会建立 OpenClaw Gateway 会话。',
-                        'No external Agent ACP connection is available for this thread, so it is running in AI Chat fallback without opening an OpenClaw Gateway session.',
-                      )
-                    : appText(
-                        '当前线程通过 ACP Server 处理任务，不会建立 OpenClaw Gateway 会话。',
-                        'This thread runs through the ACP Server path and does not open an OpenClaw Gateway session.',
-                      ))
+              ? appText(
+                  '当前线程通过 ACP Server 处理任务，不会建立 OpenClaw Gateway 会话。',
+                  'This thread runs through the ACP Server path and does not open an OpenClaw Gateway session.',
+                )
               : singleAgentSuggestsAcpSwitch
               ? appText(
                   '当前线程固定为 $providerLabel，但它在这台设备上不可用。请改成可用的 ACP Server。',
@@ -534,8 +528,8 @@ class AssistantEmptyStateInternal extends StatelessWidget {
                 )
               : singleAgentNeedsAiGateway
               ? appText(
-                  '请先在 设置 -> 集成 中配置 LLM API Endpoint、LLM API Token 和默认模型，然后以 ACP Server 模式继续当前任务。',
-                  'Set the LLM API Endpoint, LLM API Token, and default model in Settings -> Integrations, then continue this task in ACP Server mode.',
+                  '请先在 设置 -> 集成 中配置可用的外部 Agent ACP 端点，然后以 ACP Server 模式继续当前任务。',
+                  'Configure an external Agent ACP endpoint in Settings -> Integrations, then continue this task in ACP Server mode.',
                 )
               : appText(
                   '当前线程的外部 Agent ACP 连接尚未就绪。请先配置 $providerLabel 对应端点。',

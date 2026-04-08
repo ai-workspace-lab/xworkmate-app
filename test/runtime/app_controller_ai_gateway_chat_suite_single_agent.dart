@@ -14,14 +14,13 @@ import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'app_controller_ai_gateway_chat_suite_core.dart';
-import 'app_controller_ai_gateway_chat_suite_chat.dart';
 import 'app_controller_ai_gateway_chat_suite_fakes.dart';
 import 'app_controller_ai_gateway_chat_suite_fixtures.dart';
 
 void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
   group('Single Agent provider resolution', () {
     test(
-      'AppController uses the selected Single Agent provider before AI Chat fallback',
+      'AppController uses the selected Single Agent provider before ACP execution',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
           'xworkmate-single-agent-provider-',
@@ -607,10 +606,10 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
     );
 
     test(
-      'AppController falls back to AI Chat when no external CLI is available',
+      'AppController returns an ACP-only error when no provider is available',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
-          'xworkmate-single-agent-fallback-',
+          'xworkmate-single-agent-acp-unavailable-',
         );
         final server = await FakeAiGatewayServerInternal.start(
           responseMode: AiGatewayResponseModeInternal.json,
@@ -652,23 +651,12 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
 
         expect(client.capabilitiesCalls, greaterThanOrEqualTo(1));
         expect(client.executeCalls, 0);
-        expect(server.requestCount, 1);
-        expect(
-          controller.chatMessages.any(
-            (message) => message.text.contains('Codex CLI is unavailable'),
-          ),
-          isFalse,
-        );
-        expect(
-          controller.chatMessages.any(
-            (message) => message.toolName == 'AI Chat fallback',
-          ),
-          isFalse,
-        );
+        expect(server.requestCount, 0);
         expect(
           controller.chatMessages.any(
             (message) =>
-                message.role == 'assistant' && message.text == 'FIRST_REPLY',
+                message.role == 'assistant' &&
+                message.text.contains('当前没有可用的外部 Agent ACP 端点'),
           ),
           isTrue,
         );
@@ -676,10 +664,10 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
     );
 
     test(
-      'AppController auto-binds a thread workspace in AI Chat fallback when the thread binding is missing',
+      'AppController auto-binds a thread workspace before reporting ACP unavailability',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
-          'xworkmate-single-agent-fallback-missing-workspace-',
+          'xworkmate-single-agent-acp-unavailable-missing-workspace-',
         );
         final server = await FakeAiGatewayServerInternal.start(
           responseMode: AiGatewayResponseModeInternal.json,
@@ -725,9 +713,17 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         );
         expect(client.capabilitiesCalls, greaterThanOrEqualTo(1));
         expect(client.executeCalls, 0);
-        expect(server.requestCount, 1);
+        expect(server.requestCount, 0);
         expect(workspacePath, isNotEmpty);
         expect(workspacePath, contains('.xworkmate/threads/'));
+        expect(
+          controller.chatMessages.any(
+            (message) =>
+                message.role == 'assistant' &&
+                message.text.contains('当前没有可用的外部 Agent ACP 端点'),
+          ),
+          isTrue,
+        );
       },
     );
   });

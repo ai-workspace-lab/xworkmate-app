@@ -21,7 +21,6 @@ import '../runtime/runtime_models.dart';
 import '../runtime/secure_config_store.dart';
 import '../runtime/embedded_agent_launch_policy.dart';
 import '../runtime/runtime_coordinator.dart';
-import '../runtime/direct_single_agent_app_server_client.dart';
 import '../runtime/gateway_acp_client.dart';
 import '../runtime/codex_runtime.dart';
 import '../runtime/codex_config_bridge.dart';
@@ -32,7 +31,7 @@ import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
-import '../runtime/single_agent_runner.dart';
+import '../runtime/single_agent_capabilities.dart';
 import '../runtime/skill_directory_access.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
@@ -90,15 +89,15 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
         target: AssistantExecutionTarget.singleAgent,
         forceRefresh: forceRefresh,
       );
-  final next = <SingleAgentProvider, DirectSingleAgentCapabilities>{};
+  final next = <SingleAgentProvider, SingleAgentCapabilities>{};
   for (final provider in controller.configuredSingleAgentProviders) {
     if (!capabilities.providers.contains(provider)) {
-      next[provider] = const DirectSingleAgentCapabilities.unavailable(
+      next[provider] = const SingleAgentCapabilities.unavailable(
         endpoint: '',
       );
       continue;
     }
-    next[provider] = DirectSingleAgentCapabilities(
+    next[provider] = SingleAgentCapabilities(
       available: true,
       supportedProviders: <SingleAgentProvider>[provider],
       endpoint: 'go-task-service',

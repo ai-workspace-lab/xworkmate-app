@@ -14,7 +14,6 @@ import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'app_controller_ai_gateway_chat_suite_core.dart';
-import 'app_controller_ai_gateway_chat_suite_chat.dart';
 import 'app_controller_ai_gateway_chat_suite_single_agent.dart';
 import 'app_controller_ai_gateway_chat_suite_fakes.dart';
 
