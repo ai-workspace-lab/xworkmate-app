@@ -673,7 +673,7 @@ paths:
       ValueKey('external-acp-test-${customProfile.providerKey}'),
     );
     final applyButton = find.byKey(
-      ValueKey('external-acp-apply-${customProfile.providerKey}'),
+      ValueKey('external-acp-save-${customProfile.providerKey}'),
     );
 
     expect(labelField, findsOneWidget);

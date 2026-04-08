@@ -11,6 +11,20 @@ import 'package:xworkmate/runtime/runtime_models_profiles.dart';
 
 import '../test_support.dart';
 
+Future<void> _waitForText(
+  WidgetTester tester,
+  Finder finder, {
+  Duration timeout = const Duration(seconds: 10),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (finder.evaluate().isEmpty) {
+    if (DateTime.now().isAfter(deadline)) {
+      fail('Timed out waiting for ${finder.description}');
+    }
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+}
+
 void main() {
   testWidgets('SettingsPage Codex external ACP can test and save', (
     WidgetTester tester,
@@ -47,20 +61,21 @@ void main() {
       const ValueKey<String>('external-acp-test-Codex'),
     );
     final saveButton = find.byKey(
-      const ValueKey<String>('external-acp-apply-Codex'),
+      const ValueKey<String>('external-acp-save-Codex'),
     );
 
     expect(endpointField, findsOneWidget);
     await tester.enterText(endpointField, server.baseUri.toString());
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     await tester.tap(testButton);
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 100));
+    await _waitForText(tester, find.textContaining('连接成功'));
 
     expect(find.textContaining('连接成功'), findsOneWidget);
 
     await tester.tap(saveButton);
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     final saved = controller.settings.externalAcpEndpointForProviderId('codex');
     expect(saved?.endpoint, server.baseUri.toString());
@@ -110,7 +125,9 @@ class _AcpServer {
         HttpHeaders.contentTypeHeader,
         'text/event-stream; charset=utf-8',
       );
+      request.response.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
       request.response.write('data: ${jsonEncode(response)}\n\n');
+      await request.response.flush();
       await request.response.close();
     }
   }

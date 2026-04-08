@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../test/helpers/test_keys.dart';
 import 'test_support.dart';
 
 Finder _textEither(String zh, String en) {
@@ -45,6 +46,7 @@ void main() {
     'desktop shell exposes settings entry for gateway configuration',
     (WidgetTester tester) async {
       await pumpDesktopApp(tester);
+      await waitForIntegrationFinder(tester, find.byKey(TestKeys.assistantTaskRail));
 
       await tester.tap(
         find.byKey(const Key('assistant-side-pane-tab-navigation')),
