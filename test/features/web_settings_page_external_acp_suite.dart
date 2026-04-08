@@ -51,13 +51,13 @@ void main() {
     final testButton = find.byKey(
       ValueKey('web-external-acp-test-${customProfile.providerKey}'),
     );
-    final applyButton = find.byKey(
-      ValueKey('web-external-acp-apply-${customProfile.providerKey}'),
+    final saveButton = find.byKey(
+      ValueKey('web-external-acp-save-${customProfile.providerKey}'),
     );
 
     expect(labelField, findsOneWidget);
     expect(testButton, findsOneWidget);
-    expect(applyButton, findsOneWidget);
+    expect(saveButton, findsOneWidget);
 
     await tester.enterText(labelField, 'A');
     await tester.pump();

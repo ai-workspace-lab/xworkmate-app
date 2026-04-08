@@ -86,6 +86,10 @@ class _TestFakeGatewayRuntime extends GatewayRuntime {
     : super(identityStore: DeviceIdentityStore(store));
 
   GatewayConnectionSnapshot _snapshot = GatewayConnectionSnapshot.initial();
+  GatewayDevicePairingList _pairingList = const GatewayDevicePairingList(
+    pending: <GatewayPendingDevice>[],
+    paired: <GatewayPairedDevice>[],
+  );
 
   @override
   bool get isConnected => _snapshot.status == RuntimeConnectionStatus.connected;
@@ -109,6 +113,16 @@ class _TestFakeGatewayRuntime extends GatewayRuntime {
       remoteAddress: '${profile.host}:${profile.port}',
       connectAuthMode: 'none',
     );
+    notifyListeners();
+  }
+
+  void setSnapshotForTest(GatewayConnectionSnapshot snapshot) {
+    _snapshot = snapshot.normalizedForConnectedState();
+    notifyListeners();
+  }
+
+  void setDevicePairingForTest(GatewayDevicePairingList pairingList) {
+    _pairingList = pairingList;
     notifyListeners();
   }
 
@@ -157,8 +171,40 @@ class _TestFakeGatewayRuntime extends GatewayRuntime {
         return <String, dynamic>{'jobs': const <Object>[]};
       case 'device.pair.list':
         return <String, dynamic>{
-          'pending': const <Object>[],
-          'paired': const <Object>[],
+          'pending': _pairingList.pending
+              .map((item) => <String, dynamic>{
+                    'requestId': item.requestId,
+                    'deviceId': item.deviceId,
+                    'label': item.label,
+                    'role': item.role,
+                    'scopes': item.scopes,
+                    'remoteIp': item.remoteIp,
+                    'requestedAtMs': item.requestedAtMs,
+                    'repair': item.isRepair,
+                  })
+              .toList(growable: false),
+          'paired': _pairingList.paired
+              .map((item) => <String, dynamic>{
+                    'deviceId': item.deviceId,
+                    'displayName': item.displayName,
+                    'roles': item.roles,
+                    'scopes': item.scopes,
+                    'remoteIp': item.remoteIp,
+                    'tokens': item.tokens
+                        .map((token) => <String, dynamic>{
+                              'role': token.role,
+                              'scopes': token.scopes,
+                              'createdAtMs': token.createdAtMs,
+                              'rotatedAtMs': token.rotatedAtMs,
+                              'revokedAtMs': token.revokedAtMs,
+                              'lastUsedAtMs': token.lastUsedAtMs,
+                            })
+                        .toList(growable: false),
+                    'createdAtMs': item.createdAtMs,
+                    'approvedAtMs': item.approvedAtMs,
+                    'currentDevice': item.currentDevice,
+                  })
+              .toList(growable: false),
         };
       case 'system-presence':
         return const <Object>[];
@@ -166,6 +212,28 @@ class _TestFakeGatewayRuntime extends GatewayRuntime {
         return <String, dynamic>{};
     }
   }
+}
+
+void setGatewaySnapshotForTest(
+  AppController controller,
+  GatewayConnectionSnapshot snapshot,
+) {
+  final runtime = controller.runtime;
+  if (runtime is! _TestFakeGatewayRuntime) {
+    throw StateError('createTestController() runtime does not support mutation');
+  }
+  runtime.setSnapshotForTest(snapshot);
+}
+
+void setGatewayPairingListForTest(
+  AppController controller,
+  GatewayDevicePairingList pairingList,
+) {
+  final runtime = controller.runtime;
+  if (runtime is! _TestFakeGatewayRuntime) {
+    throw StateError('createTestController() runtime does not support mutation');
+  }
+  runtime.setDevicePairingForTest(pairingList);
 }
 
 class _TestFakeCodexRuntime extends CodexRuntime {

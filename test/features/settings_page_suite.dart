@@ -2,14 +2,17 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/features/assistant/assistant_page_message_widgets.dart';
 import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/features/settings/settings_page.dart';
 import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/skill_directory_access.dart';
+import 'package:xworkmate/theme/app_theme.dart';
 import 'package:xworkmate/widgets/section_tabs.dart';
 
 import '../test_support.dart';
@@ -146,6 +149,29 @@ Future<void> _pumpSettingsPage(
     child: SettingsPage(controller: controller),
     platform: platform,
   );
+}
+
+Future<void> _pumpWithoutSettling(
+  WidgetTester tester, {
+  required Widget child,
+}) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = const Size(1600, 1000);
+  addTearDown(() {
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+  await tester.pumpWidget(
+    MaterialApp(
+      locale: const Locale('zh'),
+      supportedLocales: const [Locale('zh'), Locale('en')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      theme: AppTheme.light(platform: TargetPlatform.macOS),
+      darkTheme: AppTheme.dark(platform: TargetPlatform.macOS),
+      home: Scaffold(body: child),
+    ),
+  );
+  await tester.pump();
 }
 
 Future<void> _ensureVisible(WidgetTester tester, Finder finder) async {
@@ -672,13 +698,13 @@ paths:
     final testButton = find.byKey(
       ValueKey('external-acp-test-${customProfile.providerKey}'),
     );
-    final applyButton = find.byKey(
-      ValueKey('external-acp-apply-${customProfile.providerKey}'),
+    final saveButton = find.byKey(
+      ValueKey('external-acp-save-${customProfile.providerKey}'),
     );
 
     expect(labelField, findsOneWidget);
     expect(testButton, findsOneWidget);
-    expect(applyButton, findsOneWidget);
+    expect(saveButton, findsOneWidget);
 
     await tester.enterText(labelField, 'A');
     await tester.pump();
@@ -823,6 +849,51 @@ paths:
 
     expect(controller.runtimeLogs, isEmpty);
   });
+
+  testWidgets(
+    'Assistant homepage chip and settings pairing card stay globally consistent for a connected gateway snapshot',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.remote,
+      );
+      final remoteProfile = controller.settings.primaryRemoteGatewayProfile;
+      setGatewaySnapshotForTest(
+        controller,
+        GatewayConnectionSnapshot.initial(mode: RuntimeConnectionMode.remote)
+            .copyWith(
+              status: RuntimeConnectionStatus.connected,
+              statusText: 'Connected',
+              remoteAddress: '${remoteProfile.host}:${remoteProfile.port}',
+              lastError: 'NOT_PAIRED: pairing required',
+              lastErrorCode: 'NOT_PAIRED',
+              lastErrorDetailCode: 'PAIRING_REQUIRED',
+            ),
+      );
+
+      await _pumpWithoutSettling(
+        tester,
+        child: ConnectionChipInternal(controller: controller),
+      );
+
+      expect(find.byKey(const Key('assistant-connection-chip')), findsOneWidget);
+      expect(
+        find.textContaining(
+          '已连接 · ${remoteProfile.host}:${remoteProfile.port}',
+        ),
+        findsOneWidget,
+      );
+
+      controller.setSettingsTab(SettingsTab.gateway);
+      await _pumpWithoutSettling(
+        tester,
+        child: SettingsPage(controller: controller),
+      );
+
+      expect(find.text('需要设备审批'), findsNothing);
+      expect(find.text('Pairing Required'), findsNothing);
+    },
+  );
 
   testWidgets('SettingsPage hides tabs disabled by feature manifest', (
     WidgetTester tester,
