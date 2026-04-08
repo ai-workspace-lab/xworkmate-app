@@ -47,7 +47,7 @@ void main() {
       const ValueKey<String>('external-acp-test-Codex'),
     );
     final saveButton = find.byKey(
-      const ValueKey<String>('external-acp-apply-Codex'),
+      const ValueKey<String>('external-acp-save-Codex'),
     );
 
     expect(endpointField, findsOneWidget);

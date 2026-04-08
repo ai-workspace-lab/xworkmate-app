@@ -14,7 +14,7 @@ class TestKeys {
   );
   static const Key settingsExternalAcpAuth = Key('external-acp-auth-Codex');
   static const Key settingsExternalAcpTest = Key('external-acp-test-Codex');
-  static const Key settingsExternalAcpSave = Key('external-acp-apply-Codex');
+  static const Key settingsExternalAcpSave = Key('external-acp-save-Codex');
 
   static const Key assistantTaskRail = Key('assistant-task-rail');
   static const Key assistantExecutionTargetButton = Key(

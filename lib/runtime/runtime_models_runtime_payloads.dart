@@ -142,7 +142,26 @@ class GatewayConnectionSnapshot {
     );
   }
 
+  GatewayConnectionSnapshot normalizedForConnectedState() {
+    if (status != RuntimeConnectionStatus.connected) {
+      return this;
+    }
+    if (lastError == null &&
+        lastErrorCode == null &&
+        lastErrorDetailCode == null) {
+      return this;
+    }
+    return copyWith(
+      clearLastError: true,
+      clearLastErrorCode: true,
+      clearLastErrorDetailCode: true,
+    );
+  }
+
   bool get pairingRequired {
+    if (status == RuntimeConnectionStatus.connected) {
+      return false;
+    }
     final detailCode = lastErrorDetailCode?.trim().toUpperCase();
     final errorCode = lastErrorCode?.trim().toUpperCase();
     final errorText = lastError?.toLowerCase() ?? '';
@@ -152,6 +171,9 @@ class GatewayConnectionSnapshot {
   }
 
   bool get gatewayTokenMissing {
+    if (status == RuntimeConnectionStatus.connected) {
+      return false;
+    }
     final detailCode = lastErrorDetailCode?.trim().toUpperCase();
     final errorText = lastError?.toLowerCase() ?? '';
     return detailCode == 'AUTH_TOKEN_MISSING' ||
