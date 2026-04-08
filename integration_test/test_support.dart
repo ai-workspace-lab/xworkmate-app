@@ -109,7 +109,14 @@ Future<void> switchNewConversationExecutionTargetForIntegration(
   WidgetTester tester,
   Finder menuItemFinder,
 ) async {
-  await tester.tap(find.byKey(const Key('assistant-new-task-button')));
+  final desktopNewTaskButton = find.byKey(
+    const Key('workspace-sidebar-new-task-button'),
+  );
+  if (desktopNewTaskButton.evaluate().isNotEmpty) {
+    await tester.tap(desktopNewTaskButton);
+  } else {
+    await tester.tap(find.byKey(const Key('assistant-new-task-button')));
+  }
   await settleIntegrationUi(tester);
   await tester.tap(find.byKey(const Key('assistant-execution-target-button')));
   await settleIntegrationUi(tester);

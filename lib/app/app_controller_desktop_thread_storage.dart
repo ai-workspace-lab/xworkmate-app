@@ -446,7 +446,7 @@ extension AppControllerDesktopThreadStorage on AppController {
                   path: resolvedRootPath,
                   bookmark: rootSpec.bookmark,
                 ),
-              );
+                );
           if (accessHandle == null) {
             continue;
           }
@@ -544,6 +544,7 @@ extension AppControllerDesktopThreadStorage on AppController {
 
   Future<List<AssistantThreadSkillEntry>>
   scanSingleAgentWorkspaceSkillEntriesInternal(String sessionKey) {
+    final workspacePath = assistantWorkspacePathForSession(sessionKey);
     if (assistantWorkspaceKindForSession(sessionKey) !=
         WorkspaceRefKind.localPath) {
       return Future<List<AssistantThreadSkillEntry>>.value(
@@ -552,7 +553,7 @@ extension AppControllerDesktopThreadStorage on AppController {
     }
     return scanSingleAgentSkillEntriesInternal(
       AppController.defaultSingleAgentWorkspaceSkillScanRootsInternal,
-      workspacePath: assistantWorkspacePathForSession(sessionKey),
+      workspacePath: workspacePath,
     );
   }
 

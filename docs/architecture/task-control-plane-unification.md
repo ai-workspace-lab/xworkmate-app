@@ -20,23 +20,8 @@ Last Updated: 2026-04-08
 - ACP 是统一控制面
 - `single-agent / multi-agent / gateway` 是 ACP 解析后的执行器分支
 
-## 当前事实
-
-| 客户端 | 非 App Store Desktop | App Store Desktop | Web | Mobile |
-| --- | --- | --- | --- | --- |
-| 启动/入口 | Desktop UI 可桥接到 bundled / build artifact 的 `xworkmate-go-core` | 不启动任何本机 `xworkmate-go-core` / `codex app-server` 进程 | 通过 `GoTaskService.executeTask` 连接本地或远程 ACP `xworkmate-go-core` | 通过 `GoTaskService.executeTask` 连接远程 ACP `xworkmate-go-core` |
-| 执行语义 | 仍然收敛到 ACP Control Plane / `resolvedExecutionTarget` | 只保留 remote ACP / gateway 路由 | local / remote ACP 都是同一执行面 | remote ACP 是唯一允许的执行面 |
-
-补充说明：
-
-- Desktop 非 App Store 构建可以保留本机 go-core 桥接能力。
-- App Store 构建必须把本机 `xworkmate-go-core` / `codex app-server` 启动路径全部关掉。
-- Web 的 `local / remote` 只是 ACP 接入目标的差异，不是另一套执行模型。
-- Mobile 只允许远程 ACP，不能走本机 go-core 进程。
-- `single-agent / multi-agent / gateway` 仍然只是 ACP 解析后的执行器分支，不是 UI 产品线。
 
 ## 目标态
-
 ```mermaid
 flowchart TD
     A["Desktop / Web / Mobile UI"] --> B["sendMessage<br/>统一 Task Envelope"]

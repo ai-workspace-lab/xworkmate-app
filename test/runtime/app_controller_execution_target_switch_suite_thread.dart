@@ -98,7 +98,7 @@ void registerExecutionTargetSwitchThreadTests() {
           AssistantExecutionTarget.singleAgent,
         );
         expect(gateway.disconnectCount, 1);
-        expect(controller.assistantConnectionStatusLabel, 'ACP Server');
+        expect(controller.assistantConnectionStatusLabel, 'ACP Server Local');
         expect(
           controller.settings.assistantExecutionTarget,
           AssistantExecutionTarget.local,
@@ -195,7 +195,7 @@ void registerExecutionTargetSwitchThreadTests() {
         );
         await controller.switchSession('main');
 
-        expect(controller.assistantConnectionStatusLabel, 'ACP Server');
+        expect(controller.assistantConnectionStatusLabel, 'ACP Server Local');
         expect(
           controller.assistantConnectionTargetLabel,
           '没有可用的外部 Agent ACP 端点，请配置 LLM API fallback。',

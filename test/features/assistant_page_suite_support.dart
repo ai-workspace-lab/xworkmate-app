@@ -15,6 +15,9 @@ import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
+import 'package:xworkmate/runtime/go_task_service_client.dart';
+import 'package:xworkmate/runtime/multi_agent_mount_resolver.dart';
+import 'package:xworkmate/runtime/multi_agent_mounts.dart';
 import 'package:xworkmate/runtime/multi_agent_orchestrator.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
@@ -25,6 +28,318 @@ import '../test_support.dart';
 import '../runtime/app_controller_thread_skills_suite_fixtures.dart';
 import 'assistant_page_suite_core.dart';
 import 'assistant_page_suite_composer.dart';
+
+class AssistantPageMemorySecureConfigStoreInternal extends SecureConfigStore {
+  AssistantPageMemorySecureConfigStoreInternal({
+    required SettingsSnapshot initialSettingsSnapshot,
+    List<TaskThread> initialTaskThreads = const <TaskThread>[],
+  }) : _settingsSnapshot = initialSettingsSnapshot,
+       _taskThreads = List<TaskThread>.from(initialTaskThreads),
+       super(enableSecureStorage: false);
+
+  SettingsSnapshot _settingsSnapshot;
+  List<TaskThread> _taskThreads;
+  Map<String, String> _secretValueByRef = <String, String>{};
+  Map<String, dynamic> _supportJsonByPath = <String, dynamic>{};
+  LocalDeviceIdentity? _deviceIdentity;
+
+  @override
+  Future<void> initialize() async {}
+
+  @override
+  Future<SettingsSnapshot> loadSettingsSnapshot() async {
+    return _settingsSnapshot;
+  }
+
+  @override
+  Future<SettingsSnapshot> reloadSettingsSnapshot() async {
+    return _settingsSnapshot;
+  }
+
+  @override
+  Future<SettingsSnapshotReloadResult> reloadSettingsSnapshotResult() async {
+    return SettingsSnapshotReloadResult(
+      snapshot: _settingsSnapshot,
+      status: SettingsSnapshotReloadStatus.applied,
+    );
+  }
+
+  @override
+  Future<void> saveSettingsSnapshot(SettingsSnapshot snapshot) async {
+    _settingsSnapshot = snapshot;
+  }
+
+  @override
+  Future<List<File>> resolvedSettingsFiles() async => const <File>[];
+
+  @override
+  Future<List<Directory>> resolvedSettingsWatchDirectories() async =>
+      const <Directory>[];
+
+  @override
+  Future<List<TaskThread>> loadTaskThreads() async {
+    return List<TaskThread>.from(_taskThreads);
+  }
+
+  @override
+  Future<void> saveTaskThreads(List<TaskThread> records) async {
+    _taskThreads = List<TaskThread>.from(records);
+  }
+
+  @override
+  Future<void> clearAssistantLocalState() async {
+    _settingsSnapshot = _settingsSnapshot.copyWith(
+      assistantCustomTaskTitles: const <String, String>{},
+      assistantArchivedTaskKeys: const <String>[],
+      assistantLastSessionKey: '',
+    );
+    _taskThreads = const <TaskThread>[];
+  }
+
+  @override
+  Future<List<SecretAuditEntry>> loadAuditTrail() async =>
+      const <SecretAuditEntry>[];
+
+  @override
+  Future<void> appendAudit(SecretAuditEntry entry) async {}
+
+  @override
+  Future<Map<String, String>> loadSecureRefs() async =>
+      Map<String, String>.unmodifiable(_secretValueByRef);
+
+  @override
+  Future<Map<String, dynamic>?> loadSupportJson(String relativePath) async {
+    final payload = _supportJsonByPath[relativePath.trim()];
+    return payload is Map<String, dynamic> ? payload : null;
+  }
+
+  @override
+  Future<void> saveSupportJson(
+    String relativePath,
+    Map<String, dynamic> payload,
+  ) async {
+    _supportJsonByPath = <String, dynamic>{
+      ..._supportJsonByPath,
+      relativePath.trim(): Map<String, dynamic>.from(payload),
+    };
+  }
+
+  @override
+  Future<AccountSyncState?> loadAccountSyncState() async => null;
+
+  @override
+  Future<void> saveAccountSyncState(AccountSyncState value) async {}
+
+  @override
+  Future<void> clearAccountSyncState() async {}
+
+  @override
+  Future<AccountRemoteProfile?> loadAccountProfile() async => null;
+
+  @override
+  Future<void> saveAccountProfile(AccountRemoteProfile value) async {}
+
+  @override
+  Future<void> clearAccountProfile() async {}
+
+  @override
+  Future<String?> loadAccountManagedSecret({required String target}) async =>
+      null;
+
+  @override
+  Future<void> saveAccountManagedSecret({
+    required String target,
+    required String value,
+  }) async {}
+
+  @override
+  Future<void> clearAccountManagedSecret({required String target}) async {}
+
+  @override
+  Future<void> clearAccountManagedSecrets() async {}
+
+  @override
+  Future<LocalDeviceIdentity?> loadDeviceIdentity() async => _deviceIdentity;
+
+  @override
+  Future<void> saveDeviceIdentity(LocalDeviceIdentity identity) async {
+    _deviceIdentity = identity;
+  }
+
+  @override
+  Future<String?> loadDeviceToken({
+    required String deviceId,
+    required String role,
+  }) async =>
+      null;
+
+  @override
+  Future<void> saveDeviceToken({
+    required String deviceId,
+    required String role,
+    required String token,
+  }) async {}
+
+  @override
+  Future<void> clearDeviceToken({
+    required String deviceId,
+    required String role,
+  }) async {}
+
+  @override
+  Future<String?> loadGatewayToken({int? profileIndex}) async => null;
+
+  @override
+  Future<void> saveGatewayToken(String value, {int? profileIndex}) async {}
+
+  @override
+  Future<void> clearGatewayToken({int? profileIndex}) async {}
+
+  @override
+  Future<String?> loadGatewayPassword({int? profileIndex}) async => null;
+
+  @override
+  Future<void> saveGatewayPassword(String value, {int? profileIndex}) async {}
+
+  @override
+  Future<void> clearGatewayPassword({int? profileIndex}) async {}
+
+  @override
+  Future<String?> loadOllamaCloudApiKey() async => null;
+
+  @override
+  Future<void> saveOllamaCloudApiKey(String value) async {}
+
+  @override
+  Future<String?> loadVaultToken() async => null;
+
+  @override
+  Future<void> saveVaultToken(String value) async {}
+
+  @override
+  Future<String?> loadAiGatewayApiKey() async =>
+      _getSecretValue('ai_gateway_api_key');
+
+  @override
+  Future<void> saveAiGatewayApiKey(String value) async {
+    _setSecretValue('ai_gateway_api_key', value);
+  }
+
+  @override
+  Future<void> clearAiGatewayApiKey() async {
+    _clearSecretValue('ai_gateway_api_key');
+  }
+
+  @override
+  Future<String?> loadAccountSessionToken() async => null;
+
+  @override
+  Future<void> saveAccountSessionToken(String value) async {}
+
+  @override
+  Future<void> clearAccountSessionToken() async {}
+
+  @override
+  Future<int> loadAccountSessionExpiresAtMs() async => 0;
+
+  @override
+  Future<void> saveAccountSessionExpiresAtMs(int value) async {}
+
+  @override
+  Future<void> clearAccountSessionExpiresAtMs() async {}
+
+  @override
+  Future<String?> loadAccountSessionUserId() async => null;
+
+  @override
+  Future<void> saveAccountSessionUserId(String value) async {}
+
+  @override
+  Future<void> clearAccountSessionUserId() async {}
+
+  @override
+  Future<String?> loadAccountSessionIdentifier() async => null;
+
+  @override
+  Future<void> saveAccountSessionIdentifier(String value) async {}
+
+  @override
+  Future<void> clearAccountSessionIdentifier() async {}
+
+  @override
+  Future<AccountSessionSummary?> loadAccountSessionSummary() async => null;
+
+  @override
+  Future<void> saveAccountSessionSummary(AccountSessionSummary value) async {}
+
+  @override
+  Future<void> clearAccountSessionSummary() async {}
+
+  @override
+  Future<String?> loadSecretValueByRef(String refName) async =>
+      _getSecretValue(refName);
+
+  @override
+  Future<void> saveSecretValueByRef(String refName, String value) async {
+    _setSecretValue(refName, value);
+  }
+
+  @override
+  Future<void> clearSecretValueByRef(String refName) async {
+    _clearSecretValue(refName);
+  }
+
+  @override
+  void dispose() {}
+
+  @override
+  PersistentWriteFailures get persistentWriteFailures =>
+      const PersistentWriteFailures();
+
+  void _setSecretValue(String refName, String value) {
+    final normalizedRef = refName.trim();
+    final trimmedValue = value.trim();
+    if (normalizedRef.isEmpty || trimmedValue.isEmpty) {
+      return;
+    }
+    _secretValueByRef = <String, String>{
+      ..._secretValueByRef,
+      normalizedRef: trimmedValue,
+    };
+  }
+
+  String? _getSecretValue(String refName) {
+    final normalizedRef = refName.trim();
+    if (normalizedRef.isEmpty) {
+      return null;
+    }
+    return _secretValueByRef[normalizedRef];
+  }
+
+  void _clearSecretValue(String refName) {
+    final normalizedRef = refName.trim();
+    if (normalizedRef.isEmpty || !_secretValueByRef.containsKey(normalizedRef)) {
+      return;
+    }
+    _secretValueByRef = <String, String>{
+      for (final entry in _secretValueByRef.entries)
+        if (entry.key != normalizedRef) entry.key: entry.value,
+    };
+  }
+}
+
+class NoopMultiAgentMountManagerInternal extends MultiAgentMountManager {
+  NoopMultiAgentMountManagerInternal() : super();
+
+  @override
+  Future<MultiAgentConfig> reconcile({
+    required MultiAgentConfig config,
+    required String aiGatewayUrl,
+    String configuredCodexCliPath = '',
+  }) async {
+    return config;
+  }
+}
 
 void registerAssistantPageSuiteSupportTestsInternal() {
   testWidgets(
@@ -69,21 +384,114 @@ void registerAssistantPageSuiteSupportTestsInternal() {
   );
 }
 
+SettingsSnapshot buildAssistantPageTestSettingsSnapshotInternal(
+  SettingsSnapshot defaults, {
+  required String workspacePath,
+  required bool disableGatewayProfileEndpoints,
+  required AssistantExecutionTarget assistantExecutionTarget,
+}) {
+  final gatewayProfiles = disableGatewayProfileEndpoints
+      ? <GatewayConnectionProfile>[
+          GatewayConnectionProfile(
+            mode: RuntimeConnectionMode.local,
+            useSetupCode: false,
+            setupCode: '',
+            host: '',
+            port: 0,
+            tls: false,
+            tokenRef: defaults.primaryLocalGatewayProfile.tokenRef,
+            passwordRef: defaults.primaryLocalGatewayProfile.passwordRef,
+            selectedAgentId: defaults.primaryLocalGatewayProfile.selectedAgentId,
+          ),
+          GatewayConnectionProfile(
+            mode: RuntimeConnectionMode.remote,
+            useSetupCode: false,
+            setupCode: '',
+            host: '',
+            port: 0,
+            tls: false,
+            tokenRef: defaults.primaryRemoteGatewayProfile.tokenRef,
+            passwordRef: defaults.primaryRemoteGatewayProfile.passwordRef,
+            selectedAgentId: defaults.primaryRemoteGatewayProfile.selectedAgentId,
+          ),
+          ...defaults.gatewayProfiles.skip(2),
+        ]
+      : defaults.gatewayProfiles;
+  return SettingsSnapshot(
+    appLanguage: defaults.appLanguage,
+    appActive: defaults.appActive,
+    launchAtLogin: defaults.launchAtLogin,
+    showDockIcon: defaults.showDockIcon,
+    workspacePath: workspacePath,
+    remoteProjectRoot: defaults.remoteProjectRoot,
+    cliPath: defaults.cliPath,
+    codeAgentRuntimeMode: defaults.codeAgentRuntimeMode,
+    codexCliPath: defaults.codexCliPath,
+    defaultModel: 'qwen2.5-coder:latest',
+    defaultProvider: defaults.defaultProvider,
+    gatewayProfiles: gatewayProfiles,
+    externalAcpEndpoints: defaults.externalAcpEndpoints,
+    authorizedSkillDirectories: defaults.authorizedSkillDirectories,
+    ollamaLocal: defaults.ollamaLocal.copyWith(
+      endpoint: 'http://127.0.0.1:11434',
+      defaultModel: 'qwen2.5-coder:latest',
+      autoDiscover: true,
+    ),
+    ollamaCloud: defaults.ollamaCloud,
+    vault: defaults.vault,
+    aiGateway: defaults.aiGateway.copyWith(
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      availableModels: const <String>['qwen2.5-coder:latest'],
+      selectedModels: const <String>['qwen2.5-coder:latest'],
+    ),
+    webSessionPersistence: defaults.webSessionPersistence,
+    multiAgent: defaults.multiAgent.copyWith(
+      enabled: defaults.multiAgent.enabled,
+    ),
+    experimentalCanvas: defaults.experimentalCanvas,
+    experimentalBridge: defaults.experimentalBridge,
+    experimentalDebug: defaults.experimentalDebug,
+    accountBaseUrl: defaults.accountBaseUrl,
+    accountUsername: defaults.accountUsername,
+    accountWorkspace: defaults.accountWorkspace,
+    accountWorkspaceFollowed: defaults.accountWorkspaceFollowed,
+    accountLocalMode: defaults.accountLocalMode,
+    linuxDesktop: defaults.linuxDesktop,
+    assistantExecutionTarget: assistantExecutionTarget,
+    assistantPermissionLevel: defaults.assistantPermissionLevel,
+    assistantNavigationDestinations: defaults.assistantNavigationDestinations,
+    assistantCustomTaskTitles: defaults.assistantCustomTaskTitles,
+    assistantArchivedTaskKeys: defaults.assistantArchivedTaskKeys,
+    savedGatewayTargets: defaults.savedGatewayTargets,
+    assistantLastSessionKey: defaults.assistantLastSessionKey,
+  );
+}
+
 Future<AppController> createControllerWithThreadRecordsInternal({
   WidgetTester? tester,
   required List<TaskThread> records,
   bool useFakeGatewayRuntime = false,
+  AssistantExecutionTarget assistantExecutionTargetOverride =
+      AssistantExecutionTarget.singleAgent,
+  List<SingleAgentProvider>? availableSingleAgentProvidersOverride,
+  GoTaskServiceClient? goTaskServiceClient,
+  MultiAgentMountManager? multiAgentMountManager,
   List<String>? singleAgentSharedSkillScanRootOverrides,
+  bool disableGatewayProfileEndpoints = false,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
-  final tempDirectory = await Directory.systemTemp.createTemp(
+  final tempDirectory = Directory.systemTemp.createTempSync(
     'xworkmate-assistant-page-tests-',
   );
-  final store = SecureConfigStore(
-    enableSecureStorage: false,
-    databasePathResolver: () async => '${tempDirectory.path}/settings.db',
-    fallbackDirectoryPathResolver: () async => tempDirectory.path,
-    defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
+  final settingsSnapshot = buildAssistantPageTestSettingsSnapshotInternal(
+    SettingsSnapshot.defaults(),
+    workspacePath: tempDirectory.path,
+    disableGatewayProfileEndpoints: disableGatewayProfileEndpoints,
+    assistantExecutionTarget: assistantExecutionTargetOverride,
+  );
+  final store = AssistantPageMemorySecureConfigStoreInternal(
+    initialSettingsSnapshot: settingsSnapshot,
+    initialTaskThreads: records,
   );
   addTearDown(() async {
     if (await tempDirectory.exists()) {
@@ -92,37 +500,6 @@ Future<AppController> createControllerWithThreadRecordsInternal({
       } catch (_) {}
     }
   });
-  final defaults = SettingsSnapshot.defaults();
-  await store.saveSettingsSnapshot(
-    defaults.copyWith(
-      gatewayProfiles: replaceGatewayProfileAt(
-        replaceGatewayProfileAt(
-          defaults.gatewayProfiles,
-          kGatewayLocalProfileIndex,
-          defaults.primaryLocalGatewayProfile.copyWith(
-            host: '127.0.0.1',
-            port: 9,
-            tls: false,
-          ),
-        ),
-        kGatewayRemoteProfileIndex,
-        defaults.primaryRemoteGatewayProfile.copyWith(
-          host: '127.0.0.1',
-          port: 9,
-          tls: false,
-        ),
-      ),
-      aiGateway: defaults.aiGateway.copyWith(
-        baseUrl: 'http://127.0.0.1:11434/v1',
-        availableModels: const <String>['qwen2.5-coder:latest'],
-        selectedModels: const <String>['qwen2.5-coder:latest'],
-      ),
-      assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
-      defaultModel: 'qwen2.5-coder:latest',
-      workspacePath: tempDirectory.path,
-    ),
-  );
-  await store.saveTaskThreads(records);
   final controller = AppController(
     store: store,
     runtimeCoordinator: useFakeGatewayRuntime
@@ -131,9 +508,14 @@ Future<AppController> createControllerWithThreadRecordsInternal({
             codex: FakeCodexRuntimeInternal(),
           )
         : null,
+    availableSingleAgentProvidersOverride:
+        availableSingleAgentProvidersOverride,
+    goTaskServiceClient: goTaskServiceClient,
+    multiAgentMountManager: multiAgentMountManager,
     singleAgentSharedSkillScanRootOverrides:
         singleAgentSharedSkillScanRootOverrides,
   );
+  addTearDown(controller.dispose);
   final stopwatch = Stopwatch()..start();
   while (controller.initializing) {
     if (stopwatch.elapsed > const Duration(seconds: 10)) {
@@ -323,15 +705,10 @@ createInstalledSkillE2EControllerInternal(
   required InstalledSkillE2ECaseInternal testCase,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
-  final store = SecureConfigStore(
-    enableSecureStorage: false,
-    databasePathResolver: () async => '${tempDirectory.path}/settings.db',
-    fallbackDirectoryPathResolver: () async => tempDirectory.path,
-    defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
-  );
-  await store.initialize();
-  await store.saveSettingsSnapshot(
-    singleAgentTestSettingsInternal(workspacePath: workspaceRoot.path).copyWith(
+  final store = AssistantPageMemorySecureConfigStoreInternal(
+    initialSettingsSnapshot: singleAgentTestSettingsInternal(
+      workspacePath: workspaceRoot.path,
+    ).copyWith(
       assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
       multiAgent: MultiAgentConfig.defaults().copyWith(enabled: false),
     ),
@@ -376,15 +753,10 @@ createInstalledSkillE2EControllerSimpleInternal({
   required InstalledSkillE2ECaseInternal testCase,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
-  final store = SecureConfigStore(
-    enableSecureStorage: false,
-    databasePathResolver: () async => '${tempDirectory.path}/settings.db',
-    fallbackDirectoryPathResolver: () async => tempDirectory.path,
-    defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
-  );
-  await store.initialize();
-  await store.saveSettingsSnapshot(
-    singleAgentTestSettingsInternal(workspacePath: workspaceRoot.path).copyWith(
+  final store = AssistantPageMemorySecureConfigStoreInternal(
+    initialSettingsSnapshot: singleAgentTestSettingsInternal(
+      workspacePath: workspaceRoot.path,
+    ).copyWith(
       assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
       multiAgent: MultiAgentConfig.defaults().copyWith(enabled: false),
     ),

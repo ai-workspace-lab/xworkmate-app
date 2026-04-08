@@ -1,39 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../test/helpers/test_keys.dart';
 import 'test_support.dart';
-
-Finder _textEither(String zh, String en) {
-  return find.byWidgetPredicate(
-    (widget) => widget is Text && (widget.data == zh || widget.data == en),
-  );
-}
-
-Future<void> _ensureSettingsFocused(WidgetTester tester) async {
-  final activeSettings = find.byKey(
-    const ValueKey<String>('assistant-focus-active-title-settings'),
-  );
-  if (activeSettings.evaluate().isNotEmpty) {
-    return;
-  }
-  final addSettingsChip = find.byKey(
-    const ValueKey<String>('assistant-focus-add-settings'),
-  );
-  if (addSettingsChip.evaluate().isNotEmpty) {
-    await tester.tap(addSettingsChip);
-    await settleIntegrationUi(tester);
-    return;
-  }
-  final addMenu = find.byKey(const Key('assistant-focus-add-menu'));
-  expect(addMenu, findsOneWidget);
-  await tester.tap(addMenu);
-  await settleIntegrationUi(tester);
-  final settingsItem = _textEither('设置', 'Settings');
-  expect(settingsItem, findsWidgets);
-  await tester.tap(settingsItem.last);
-  await settleIntegrationUi(tester);
-}
 
 void main() {
   initializeIntegrationHarness();
@@ -42,30 +10,37 @@ void main() {
     await resetIntegrationPreferences();
   });
 
-  testWidgets('desktop shell opens focused navigation surface', (
+  testWidgets('desktop shell can navigate from assistant to settings and back', (
     WidgetTester tester,
   ) async {
     await pumpDesktopApp(tester);
-    await waitForIntegrationFinder(tester, find.byKey(TestKeys.assistantTaskRail));
-
-    expect(_textEither('新对话', 'New conversation'), findsWidgets);
-    await tester.tap(
-      find.byKey(const Key('assistant-side-pane-tab-navigation')),
-    );
-    await settleIntegrationUi(tester);
-    expect(
-      find.byKey(const Key('assistant-focus-panel-title')),
-      findsOneWidget,
-    );
-    await _ensureSettingsFocused(tester);
-    expect(
-      find.byKey(
-        const ValueKey<String>('assistant-focus-active-title-settings'),
-      ),
-      findsOneWidget,
+    await waitForIntegrationFinder(
+      tester,
+      find.byKey(TestKeys.assistantConversationShell),
     );
 
-    await tester.pumpWidget(const SizedBox.shrink());
+    expect(find.byKey(TestKeys.workspaceSidebarNewTaskButton), findsOneWidget);
+    expect(find.byKey(TestKeys.assistantExecutionTargetButton), findsOneWidget);
+
+    await tester.tap(find.byKey(TestKeys.sidebarFooterSettings));
     await settleIntegrationUi(tester);
+    expect(
+      find.byKey(TestKeys.settingsGatewayTab),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(TestKeys.settingsIntegrationsTab),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey<String>('workspace-breadcrumb-0')));
+    await settleIntegrationUi(tester);
+    await waitForIntegrationFinder(
+      tester,
+      find.byKey(TestKeys.assistantConversationShell),
+    );
+
+    expect(find.byKey(TestKeys.assistantConversationShell), findsOneWidget);
+    expect(find.byKey(TestKeys.assistantComposerInput), findsOneWidget);
   });
 }
