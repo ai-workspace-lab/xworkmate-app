@@ -1,5 +1,4 @@
 import 'app_controller_desktop_core.dart';
-import 'app_controller_desktop_single_agent_ai_gateway.dart';
 import 'app_controller_desktop_single_agent_go_task_flow.dart';
 import '../runtime/runtime_models.dart';
 
@@ -17,10 +16,6 @@ extension AppControllerDesktopSingleAgent on AppController {
       attachments: attachments,
       localAttachments: localAttachments,
     );
-  }
-
-  Future<void> abortAiGatewayRunInternal(String sessionKey) {
-    return abortAiGatewaySingleAgentRunDesktopInternal(this, sessionKey);
   }
 
   GatewayChatMessage assistantErrorMessageInternal(String text) {
