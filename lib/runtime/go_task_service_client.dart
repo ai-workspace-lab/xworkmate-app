@@ -579,16 +579,21 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
   String? completedMessage,
 }) {
   final result = _castMap(response['result']);
+  final responseText =
+      (result['output']?.toString().trim().isNotEmpty == true
+              ? result['output'].toString().trim()
+              : result['summary']?.toString().trim().isNotEmpty == true
+              ? result['summary'].toString().trim()
+              : result['message']?.toString().trim() ?? '')
+          .trim();
   final primaryText =
       (completedMessage?.trim().isNotEmpty == true
               ? completedMessage!.trim()
+              : responseText.isNotEmpty
+              ? responseText
               : streamedText.trim().isNotEmpty
               ? streamedText.trim()
-              : (result['output']?.toString().trim().isNotEmpty == true
-                    ? result['output'].toString().trim()
-                    : result['summary']?.toString().trim().isNotEmpty == true
-                    ? result['summary'].toString().trim()
-                    : result['message']?.toString().trim() ?? ''))
+              : '')
           .trim();
   return GoTaskServiceResult(
     success: _boolValue(result['success']) ?? true,
