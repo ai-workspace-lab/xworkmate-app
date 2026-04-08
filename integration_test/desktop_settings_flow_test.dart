@@ -46,22 +46,24 @@ void main() {
     (WidgetTester tester) async {
       await pumpDesktopApp(tester);
 
-    await tester.tap(
-      find.byKey(const Key('assistant-side-pane-tab-navigation')),
-    );
-    await settleIntegrationUi(tester);
-    expect(
-      find.byKey(const Key('assistant-focus-panel-title')),
-      findsOneWidget,
-    );
-    await _ensureSettingsFocused(tester);
-    expect(
-      find.byKey(const ValueKey<String>('assistant-focus-active-title-settings')),
-      findsOneWidget,
-    );
+      await tester.tap(
+        find.byKey(const Key('assistant-side-pane-tab-navigation')),
+      );
+      await settleIntegrationUi(tester);
+      expect(
+        find.byKey(const Key('assistant-focus-panel-title')),
+        findsOneWidget,
+      );
+      await _ensureSettingsFocused(tester);
+      expect(
+        find.byKey(
+          const ValueKey<String>('assistant-focus-active-title-settings'),
+        ),
+        findsOneWidget,
+      );
 
-    await tester.pumpWidget(const SizedBox.shrink());
-    await settleIntegrationUi(tester);
-  },
+      await tester.pumpWidget(const SizedBox.shrink());
+      await settleIntegrationUi(tester);
+    },
   );
 }

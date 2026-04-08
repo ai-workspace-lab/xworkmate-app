@@ -37,6 +37,8 @@ dev_dependencies:
     sdk: flutter
   integration_test:
     sdk: flutter
+  golden_toolkit: ^0.15.0
+  patrol: ^3.13.0
   flutter_lints: ^6.0.0
 
 dependency_overrides:
