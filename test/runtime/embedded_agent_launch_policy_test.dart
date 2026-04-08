@@ -14,7 +14,7 @@ void main() {
     );
   });
 
-  test('apple app store policy blocks all go core launches', () {
+  test('apple app store policy allows only bundled go core helpers', () {
     const bundled = GoCoreLaunch(
       executable: '/Applications/XWorkmate.app/Contents/Helpers/xworkmate-go-core',
       source: GoCoreLaunchSource.bundledHelper,
@@ -26,7 +26,7 @@ void main() {
 
     expect(
       shouldBlockGoCoreLaunch(bundled, isAppleHost: true, enabled: true),
-      isTrue,
+      isFalse,
     );
     expect(
       shouldBlockGoCoreLaunch(buildArtifact, isAppleHost: true, enabled: true),

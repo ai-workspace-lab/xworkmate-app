@@ -3,7 +3,14 @@ import 'package:flutter/widgets.dart';
 class TestKeys {
   const TestKeys._();
 
-  static const Key settingsGatewayTab = Key('sidebar-settings-tab-gateway');
+  static const Key assistantConversationShell = Key(
+    'assistant-conversation-shell',
+  );
+  static const Key workspaceSidebarNewTaskButton = Key(
+    'workspace-sidebar-new-task-button',
+  );
+  static const Key sidebarFooterSettings = Key('sidebar-footer-settings');
+  static const Key settingsGatewayTab = Key('section-tab-OpenClaw Gateway');
   static const Key settingsIntegrationsTab = Key('section-tab-ACP 外部接入');
   static const Key settingsGatewayIntegrationTab = Key(
     'section-tab-OpenClaw Gateway',
@@ -20,6 +27,7 @@ class TestKeys {
   static const Key assistantExecutionTargetButton = Key(
     'assistant-execution-target-button',
   );
+  static const Key assistantSendButton = Key('assistant-send-button');
   static const Key assistantSingleAgentProviderButton = Key(
     'assistant-single-agent-provider-button',
   );
@@ -35,7 +43,7 @@ class TestKeys {
   static const Key assistantComposerInput = Key(
     'assistant-composer-input-area',
   );
-  static const Key assistantSubmitButton = Key('assistant-submit-button');
+  static const Key assistantSubmitButton = assistantSendButton;
   static const Key assistantNewTaskButton = Key('assistant-new-task-button');
   static const Key assistantTaskItemMain = ValueKey<String>(
     'assistant-task-item-main',

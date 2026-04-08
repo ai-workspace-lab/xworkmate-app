@@ -63,7 +63,6 @@
 ### `MANUAL-ACP-003` local ACP / local 模式接入
 
 - 前置条件
-  - 非 App Store 桌面构建，或 Web 端 local ACP 验证
   - 本机已有 local / loopback ACP 服务
   - 确认监听地址与端口
 - 操作步骤
@@ -75,8 +74,6 @@
   - local / loopback 非 TLS 允许通过
   - 页面明确显示当前为本地配置
   - 不会把 local endpoint 错误识别为 remote insecure endpoint
-- 备注
-  - App Store 桌面构建不执行此 case，只保留 remote ACP 验证。
 - 建议记录项
   - 当前模式
   - loopback endpoint

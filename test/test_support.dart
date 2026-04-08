@@ -10,6 +10,7 @@ import 'package:xworkmate/runtime/account_runtime_client.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
+import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
@@ -53,7 +54,11 @@ Future<AppController> createTestController(
   DesktopPlatformService? desktopPlatformService,
   UiFeatureManifest? uiFeatureManifest,
   AccountRuntimeClient Function(String baseUrl)? accountClientFactory,
+  SettingsSnapshot? initialSettingsSnapshot,
+  List<SingleAgentProvider>? availableSingleAgentProvidersOverride,
+  GoTaskServiceClient? goTaskServiceClient,
   List<String>? singleAgentSharedSkillScanRootOverrides,
+  bool settle = true,
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   final testRoot =
@@ -63,6 +68,11 @@ Future<AppController> createTestController(
     databasePathResolver: () async => '$testRoot/settings.sqlite3',
     fallbackDirectoryPathResolver: () async => testRoot,
   );
+  if (initialSettingsSnapshot != null) {
+    await Directory(testRoot).create(recursive: true);
+    await store.initialize();
+    await store.saveSettingsSnapshot(initialSettingsSnapshot);
+  }
   final controller = AppController(
     store: store,
     runtimeCoordinator: RuntimeCoordinator(
@@ -72,12 +82,17 @@ Future<AppController> createTestController(
     desktopPlatformService: desktopPlatformService,
     uiFeatureManifest: uiFeatureManifest,
     accountClientFactory: accountClientFactory,
+    availableSingleAgentProvidersOverride:
+        availableSingleAgentProvidersOverride,
+    goTaskServiceClient: goTaskServiceClient,
     singleAgentSharedSkillScanRootOverrides:
         singleAgentSharedSkillScanRootOverrides,
   );
   addTearDown(controller.dispose);
   await tester.pump(const Duration(milliseconds: 100));
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  }
   return controller;
 }
 

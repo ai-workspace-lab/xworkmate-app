@@ -77,7 +77,7 @@ void registerAssistantPageSuiteComposerTestsInternal() {
 
       final pageRect = tester.getRect(find.byType(AssistantPage));
       final composerShell = find.byKey(const Key('assistant-composer-shell'));
-      final submitButton = find.byKey(const Key('assistant-submit-button'));
+      final submitButton = find.byKey(const Key('assistant-send-button'));
 
       expect(composerShell, findsOneWidget);
       expect(submitButton, findsOneWidget);
@@ -212,22 +212,14 @@ void registerAssistantPageSuiteComposerTestsInternal() {
     'AssistantPage submits from the selected task thread workspace after switching tasks',
     (WidgetTester tester) async {
       late final Directory tempDirectory;
-      late final SecureConfigStore store;
       late final CaptureSendAppControllerInternal controller;
       await tester.runAsync(() async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
         tempDirectory = await Directory.systemTemp.createTemp(
           'xworkmate-assistant-page-thread-cwd-ui-',
         );
-        store = SecureConfigStore(
-          enableSecureStorage: false,
-          databasePathResolver: () async => '${tempDirectory.path}/settings.db',
-          fallbackDirectoryPathResolver: () async => tempDirectory.path,
-          defaultSupportDirectoryPathResolver: () async => tempDirectory.path,
-        );
-        await store.initialize();
-        await store.saveSettingsSnapshot(
-          SettingsSnapshot.defaults().copyWith(
+        final store = AssistantPageMemorySecureConfigStoreInternal(
+          initialSettingsSnapshot: SettingsSnapshot.defaults().copyWith(
             assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
             workspacePath: '${tempDirectory.path}/workspace-root',
           ),
@@ -336,7 +328,7 @@ void registerAssistantPageSuiteComposerTestsInternal() {
       expect(composerInput, findsOneWidget);
 
       await tester.enterText(composerInput, '检查线程目录');
-      await tester.tap(find.byKey(const Key('assistant-submit-button')));
+      await tester.tap(find.byKey(const Key('assistant-send-button')));
       await pumpForUiSyncInternal(tester);
 
       expect(controller.sendCallCount, 1);
