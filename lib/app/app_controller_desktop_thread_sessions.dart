@@ -451,17 +451,27 @@ extension AppControllerDesktopThreadSessions on AppController {
               ? connection.remoteAddress!.trim()
               : fallbackAddress)
         : fallbackAddress;
-    final status = matchesTarget
+    final rawStatus = matchesTarget
         ? connection.status
         : RuntimeConnectionStatus.offline;
+    final pairingRequired = matchesTarget && connection.pairingRequired;
+    final gatewayTokenMissing = matchesTarget && connection.gatewayTokenMissing;
+    final status = pairingRequired || gatewayTokenMissing
+        ? RuntimeConnectionStatus.error
+        : rawStatus;
+    final primaryLabel = pairingRequired
+        ? appText('需配对', 'Pairing Required')
+        : gatewayTokenMissing
+        ? appText('缺少令牌', 'Missing Token')
+        : status.label;
     return AssistantThreadConnectionState(
       executionTarget: target,
       status: status,
-      primaryLabel: status.label,
+      primaryLabel: primaryLabel,
       detailLabel: detail,
       ready: status == RuntimeConnectionStatus.connected,
-      pairingRequired: matchesTarget && connection.pairingRequired,
-      gatewayTokenMissing: matchesTarget && connection.gatewayTokenMissing,
+      pairingRequired: pairingRequired,
+      gatewayTokenMissing: gatewayTokenMissing,
       lastError: matchesTarget ? connection.lastError?.trim() : null,
     );
   }

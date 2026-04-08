@@ -178,8 +178,6 @@ class GatewayChatController extends ChangeNotifier {
   List<GatewayChatMessage> messagesInternal = const <GatewayChatMessage>[];
   String sessionKeyInternal = 'main';
   bool loadingInternal = false;
-  bool sendingInternal = false;
-  bool abortingInternal = false;
   String? errorInternal;
   String? streamingAssistantTextInternal;
   final Set<String> pendingRunsInternal = <String>{};
@@ -187,8 +185,6 @@ class GatewayChatController extends ChangeNotifier {
   List<GatewayChatMessage> get messages => messagesInternal;
   String get sessionKey => sessionKeyInternal;
   bool get loading => loadingInternal;
-  bool get sending => sendingInternal;
-  bool get aborting => abortingInternal;
   String? get error => errorInternal;
   String? get streamingAssistantText => streamingAssistantTextInternal;
   bool get hasPendingRun => pendingRunsInternal.isNotEmpty;
@@ -215,79 +211,6 @@ class GatewayChatController extends ChangeNotifier {
       errorInternal = error.toString();
     } finally {
       loadingInternal = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> sendMessage({
-    required String sessionKey,
-    required String message,
-    required String thinking,
-    List<GatewayChatAttachmentPayload> attachments =
-        const <GatewayChatAttachmentPayload>[],
-    String? agentId,
-    Map<String, dynamic>? metadata,
-  }) async {
-    final trimmed = message.trim();
-    if ((trimmed.isEmpty && attachments.isEmpty) ||
-        !runtimeInternal.isConnected) {
-      return;
-    }
-    sessionKeyInternal = sessionKey.trim().isEmpty ? 'main' : sessionKey.trim();
-    sendingInternal = true;
-    errorInternal = null;
-    streamingAssistantTextInternal = null;
-    messagesInternal = List<GatewayChatMessage>.from(messagesInternal)
-      ..add(
-        GatewayChatMessage(
-          id: ephemeralIdInternal(),
-          role: 'user',
-          text: trimmed.isEmpty ? 'See attached.' : trimmed,
-          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          toolCallId: null,
-          toolName: null,
-          stopReason: null,
-          pending: false,
-          error: false,
-        ),
-      );
-    notifyListeners();
-    try {
-      final runId = await runtimeInternal.sendChat(
-        sessionKey: sessionKeyInternal,
-        message: trimmed.isEmpty ? 'See attached.' : trimmed,
-        thinking: thinking,
-        attachments: attachments,
-        agentId: agentId,
-        metadata: metadata,
-      );
-      pendingRunsInternal.add(runId);
-    } catch (error) {
-      errorInternal = error.toString();
-    } finally {
-      sendingInternal = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> abortRun() async {
-    if (pendingRunsInternal.isEmpty || !runtimeInternal.isConnected) {
-      return;
-    }
-    abortingInternal = true;
-    notifyListeners();
-    try {
-      final runIds = pendingRunsInternal.toList(growable: false);
-      for (final runId in runIds) {
-        await runtimeInternal.abortChat(
-          sessionKey: sessionKeyInternal,
-          runId: runId,
-        );
-      }
-    } catch (error) {
-      errorInternal = error.toString();
-    } finally {
-      abortingInternal = false;
       notifyListeners();
     }
   }
