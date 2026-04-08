@@ -22,76 +22,18 @@ Last Updated: 2026-04-08
 
 ## 当前事实
 
-### Desktop
+| 客户端 | 非 App Store Desktop | App Store Desktop | Web | Mobile |
+| --- | --- | --- | --- | --- |
+| 启动/入口 | Desktop UI 可桥接到 bundled / build artifact 的 `xworkmate-go-core` | 不启动任何本机 `xworkmate-go-core` / `codex app-server` 进程 | 通过 `GoTaskService.executeTask` 连接本地或远程 ACP `xworkmate-go-core` | 通过 `GoTaskService.executeTask` 连接远程 ACP `xworkmate-go-core` |
+| 执行语义 | 仍然收敛到 ACP Control Plane / `resolvedExecutionTarget` | 只保留 remote ACP / gateway 路由 | local / remote ACP 都是同一执行面 | remote ACP 是唯一允许的执行面 |
 
-```mermaid
-flowchart LR
-    subgraph NOW["Current Implementation"]
-        A1["Flutter Desktop UI"] --> B1{"requested target"}
-        B1 -->|"single-agent"| C1["GoTaskService.executeTask"]
-        C1 --> D1["Local Go ACP"]
-        D1 --> E1["Router + Skills + Memory"]
+补充说明：
 
-        B1 -->|"local / remote"| F1["历史上曾直分 gateway lane"]
-
-        B1 -->|"explicit multi-agent"| G1["历史上曾直分 collaboration lane"]
-    end
-
-    subgraph TARGET["Target Rule"]
-        A2["Flutter Desktop UI"] --> B2["sendMessage(...)"]
-        B2 --> C2["GoTaskService.executeTask"]
-        C2 --> D2["ACP Control Plane"]
-        D2 --> E2["resolvedExecutionTarget"]
-        E2 --> F2["single-agent executor"]
-        E2 --> G2["multi-agent executor"]
-        E2 --> H2["gateway executor"]
-    end
-```
-
-### Web
-
-```mermaid
-flowchart LR
-    subgraph NOW["Current Implementation"]
-        A1["Web Console UI"] --> B1{"requested target"}
-        B1 -->|"single-agent"| C1["GoTaskService.executeTask"]
-        C1 --> D1["Browser ACP endpoint"]
-        D1 --> E1["Router + Skills + Memory"]
-
-        B1 -->|"multi-agent"| F1["已能经由 ACP 发送"]
-        B1 -->|"gateway"| G1["历史上曾保留 relay 直连语义"]
-    end
-
-    subgraph TARGET["Target Rule"]
-        A2["Web Console UI"] --> B2["sendMessage(...)"]
-        B2 --> C2["GoTaskService.executeTask"]
-        C2 --> D2["ACP Control Plane"]
-        D2 --> E2["resolvedExecutionTarget"]
-        E2 --> F2["single-agent executor"]
-        E2 --> G2["multi-agent executor"]
-        E2 --> H2["gateway executor / relay adapter"]
-    end
-```
-
-### Mobile
-
-```mermaid
-flowchart LR
-    subgraph NOW["Current Implementation"]
-        A1["Mobile UI / Mobile Shell"] --> B1["Native AppController reuse"]
-        B1 --> C1["跟随 Desktop native task flow"]
-    end
-
-    subgraph TARGET["Target Rule"]
-        A2["Mobile UI"] --> B2["sendMessage(...)"]
-        B2 --> C2["GoTaskService.executeTask"]
-        C2 --> D2["ACP Control Plane"]
-        D2 --> E2["resolvedExecutionTarget"]
-        E2 --> F2["single-agent executor"]
-        E2 --> G2["multi-agent executor"]
-        E2 --> H2["gateway executor"]
-    end
-```
+- Desktop 非 App Store 构建可以保留本机 go-core 桥接能力。
+- App Store 构建必须把本机 `xworkmate-go-core` / `codex app-server` 启动路径全部关掉。
+- Web 的 `local / remote` 只是 ACP 接入目标的差异，不是另一套执行模型。
+- Mobile 只允许远程 ACP，不能走本机 go-core 进程。
+- `single-agent / multi-agent / gateway` 仍然只是 ACP 解析后的执行器分支，不是 UI 产品线。
 
 ## 目标态
 

@@ -7,6 +7,13 @@ XWorkmate 现阶段已经不只是“单一 Codex bridge”，但当前实现也
 
 本文件只说明集成能力与 adapter 边界，不承担任务工作流主叙事。
 
+### 平台入口矩阵
+
+- Desktop 非 App Store：可桥接 bundled / build artifact 的 `xworkmate-go-core`
+- Desktop App Store：不启动任何本机 `xworkmate-go-core` / `codex app-server`
+- Web：可连接本地或远程 ACP `xworkmate-go-core`
+- Mobile：只连接远程 ACP `xworkmate-go-core`
+
 任务工作流主叙事统一以
 [任务执行链路统一收敛](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-task-control-plane-unification/docs/architecture/task-control-plane-unification.md)
 为准。

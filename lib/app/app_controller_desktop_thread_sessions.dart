@@ -387,7 +387,7 @@ extension AppControllerDesktopThreadSessions on AppController {
     );
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
     if (target == AssistantExecutionTarget.singleAgent) {
-      final primaryLabel = appText('ACP Server Local', 'ACP Server Local');
+      final primaryLabel = appText('ACP Server', 'ACP Server');
       final provider = singleAgentProviderForSession(normalizedSessionKey);
       final resolvedProvider = singleAgentResolvedProviderForSession(
         normalizedSessionKey,

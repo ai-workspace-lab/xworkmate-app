@@ -16,11 +16,8 @@ bool shouldBlockGoCoreLaunch(
   required bool isAppleHost,
   bool? enabled,
 }) {
-  if (!shouldApplyAppleAppStorePolicy(
+  return shouldApplyAppleAppStorePolicy(
     isAppleHost: isAppleHost,
     enabled: enabled,
-  )) {
-    return false;
-  }
-  return launch.source != GoCoreLaunchSource.bundledHelper;
+  );
 }
