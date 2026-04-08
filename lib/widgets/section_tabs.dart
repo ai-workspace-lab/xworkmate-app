@@ -56,6 +56,7 @@ class SectionTabs extends StatelessWidget {
             return Padding(
               padding: const EdgeInsets.only(right: AppSpacing.xxs),
               child: _SectionTabChip(
+                key: ValueKey<String>('section-tab-$item'),
                 label: item,
                 selected: selected,
                 padding: padding,
@@ -71,6 +72,7 @@ class SectionTabs extends StatelessWidget {
 
 class _SectionTabChip extends StatefulWidget {
   const _SectionTabChip({
+    super.key,
     required this.label,
     required this.selected,
     required this.padding,

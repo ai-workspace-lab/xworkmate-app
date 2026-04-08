@@ -120,6 +120,7 @@ class _CodexIntegrationCardState extends State<CodexIntegrationCard> {
             ),
             const SizedBox(height: 16),
             TextField(
+              key: const ValueKey('codex-cli-path-field'),
               controller: _pathController,
               decoration: InputDecoration(
                 labelText: appText('Codex CLI 路径', 'Codex CLI path'),
@@ -128,6 +129,7 @@ class _CodexIntegrationCardState extends State<CodexIntegrationCard> {
                   '/opt/homebrew/bin/codex',
                 ),
                 suffixIcon: IconButton(
+                  key: const ValueKey('codex-cli-path-save-button'),
                   onPressed: controller.isCodexBridgeBusy
                       ? null
                       : _savePathOverride,
@@ -175,6 +177,7 @@ class _CodexIntegrationCardState extends State<CodexIntegrationCard> {
               children: [
                 Expanded(
                   child: FilledButton.icon(
+                    key: const ValueKey('codex-bridge-toggle-button'),
                     onPressed: controller.isCodexBridgeBusy
                         ? null
                         : controller.isCodexBridgeEnabled
