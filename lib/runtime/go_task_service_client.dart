@@ -1,6 +1,8 @@
 import 'runtime_models.dart';
 
-enum GoTaskServiceRoute { openClawTask, externalAcpSingle, externalAcpMulti }
+enum GoTaskServiceRoute { externalAcpSingle, externalAcpMulti }
+
+enum GoTaskServiceCollaborationMode { standard, multiAgent }
 
 class ExternalCodeAgentAcpCapabilities {
   const ExternalCodeAgentAcpCapabilities({
@@ -170,8 +172,10 @@ class GoTaskServiceRequest {
     required this.agentId,
     required this.metadata,
     this.routing,
+    this.routingHint = '',
     this.provider = SingleAgentProvider.auto,
     this.resumeSession = false,
+    this.collaborationMode = GoTaskServiceCollaborationMode.standard,
     this.multiAgent = false,
   });
 
@@ -190,19 +194,21 @@ class GoTaskServiceRequest {
   final String agentId;
   final Map<String, dynamic> metadata;
   final ExternalCodeAgentAcpRoutingConfig? routing;
+  final String routingHint;
   final SingleAgentProvider provider;
   final bool resumeSession;
+  final GoTaskServiceCollaborationMode collaborationMode;
   final bool multiAgent;
 
+  bool get isMultiAgentRequest =>
+      multiAgent ||
+      collaborationMode == GoTaskServiceCollaborationMode.multiAgent;
+
   GoTaskServiceRoute get route {
-    if (multiAgent) {
+    if (isMultiAgentRequest) {
       return GoTaskServiceRoute.externalAcpMulti;
     }
-    return switch (target) {
-      AssistantExecutionTarget.local => GoTaskServiceRoute.openClawTask,
-      AssistantExecutionTarget.remote => GoTaskServiceRoute.openClawTask,
-      AssistantExecutionTarget.singleAgent => GoTaskServiceRoute.externalAcpSingle,
-    };
+    return GoTaskServiceRoute.externalAcpSingle;
   }
 
   String get acpMode {
@@ -276,6 +282,8 @@ class GoTaskServiceRequest {
       if (aiGatewayApiKey.trim().isNotEmpty)
         'aiGatewayApiKey': aiGatewayApiKey.trim(),
       'routing': resolvedRouting.toJson(),
+      if (routingHint.trim().isNotEmpty) 'routingHint': routingHint.trim(),
+      'requestedExecutionTarget': target.promptValue,
       if (_usesGatewaySessionMode(acpMode)) ...<String, dynamic>{
         'executionTarget': target.promptValue,
         if (agentId.trim().isNotEmpty) 'agentId': agentId.trim(),
@@ -433,14 +441,20 @@ String? goTaskServiceGatewayEntryState({
   required AssistantExecutionTarget requestedTarget,
   required GoTaskServiceResult result,
 }) {
-  final resolvedExecutionTarget = result.resolvedExecutionTarget.trim().toLowerCase();
+  final resolvedExecutionTarget = result.resolvedExecutionTarget
+      .trim()
+      .toLowerCase();
   switch (resolvedExecutionTarget) {
     case 'gateway':
-      final resolvedEndpointTarget = result.resolvedEndpointTarget.trim().toLowerCase();
-      if (resolvedEndpointTarget == AssistantExecutionTarget.remote.promptValue.toLowerCase()) {
+      final resolvedEndpointTarget = result.resolvedEndpointTarget
+          .trim()
+          .toLowerCase();
+      if (resolvedEndpointTarget ==
+          AssistantExecutionTarget.remote.promptValue.toLowerCase()) {
         return AssistantExecutionTarget.remote.promptValue;
       }
-      if (resolvedEndpointTarget == AssistantExecutionTarget.local.promptValue.toLowerCase()) {
+      if (resolvedEndpointTarget ==
+          AssistantExecutionTarget.local.promptValue.toLowerCase()) {
         return AssistantExecutionTarget.local.promptValue;
       }
       return requestedTarget == AssistantExecutionTarget.remote
@@ -548,7 +562,12 @@ GoTaskServiceUpdate? goTaskServiceUpdateFromAcpNotification(
     message: payload['message']?.toString() ?? '',
     pending: _boolValue(payload['pending']) ?? false,
     error: _boolValue(payload['error']) ?? false,
-    route: GoTaskServiceRoute.externalAcpSingle,
+    route:
+        (payload['mode']?.toString().trim() == 'multi-agent' ||
+            payload['resolvedExecutionTarget']?.toString().trim() ==
+                'multi-agent')
+        ? GoTaskServiceRoute.externalAcpMulti
+        : GoTaskServiceRoute.externalAcpSingle,
     payload: payload,
   );
 }

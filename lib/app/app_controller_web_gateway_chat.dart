@@ -172,26 +172,21 @@ extension AppControllerWebGatewayChat on AppController {
       notifyChangedInternal();
       try {
         final result = await goTaskServiceClientInternal.executeTask(
-          GoTaskServiceRequest(
-            sessionId: sessionKey,
-            threadId: sessionKey,
-            target: assistantExecutionTargetForSession(sessionKey),
+          _buildGoTaskServiceRequestInternal(
+            sessionKey: sessionKey,
             prompt: composedPrompt,
-            workingDirectory: assistantWorkspacePathForSession(sessionKey),
+            target: assistantExecutionTargetForSession(sessionKey),
+            provider: SingleAgentProvider.auto,
             model: assistantModelForSession(sessionKey),
             thinking: 'medium',
+            attachments: attachments,
             selectedSkills: selectedSkillLabels,
-            inlineAttachments: attachments,
-            localAttachments: const <CollaborationAttachment>[],
-            aiGatewayBaseUrl: settingsInternal.aiGateway.baseUrl.trim(),
-            aiGatewayApiKey: aiGatewayApiKeyCacheInternal.trim(),
-            agentId: selectedAgentId,
-            metadata: const <String, dynamic>{},
             routing: buildWebExternalAcpRoutingForSessionInternal(
               sessionKey,
               explicitExecutionTarget: 'multiAgent',
             ),
-            multiAgent: true,
+            routingHint: 'multi-agent',
+            collaborationMode: GoTaskServiceCollaborationMode.multiAgent,
           ),
           onUpdate: (update) {
             if (update.isDelta) {
@@ -224,7 +219,9 @@ extension AppControllerWebGatewayChat on AppController {
           sessionKey,
           lifecycleStatus: 'ready',
           lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          lastResultCode: lastAssistantErrorInternal == null ? 'success' : 'error',
+          lastResultCode: lastAssistantErrorInternal == null
+              ? 'success'
+              : 'error',
           updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
         );
         await persistThreadsInternal();
@@ -258,30 +255,20 @@ extension AppControllerWebGatewayChat on AppController {
         .map((item) => item.trim())
         .where((item) => item.isNotEmpty)
         .toList(growable: false);
-    final request = GoTaskServiceRequest(
-        sessionId: sessionKey,
-        threadId: sessionKey,
-        target: target,
-        prompt: prompt,
-        workingDirectory: assistantWorkspacePathForSession(sessionKey),
-        model: model,
-        thinking: thinking,
-        selectedSkills: selectedSkills,
-        inlineAttachments: attachments,
-        localAttachments: const <CollaborationAttachment>[],
-        aiGatewayBaseUrl: settingsInternal.aiGateway.baseUrl.trim(),
-        aiGatewayApiKey: aiGatewayApiKeyCacheInternal.trim(),
-        agentId: selectedAgentId,
-        metadata: <String, dynamic>{
-          if (selectedSkills.isNotEmpty) 'selectedSkills': selectedSkills,
-        },
-        routing: buildWebExternalAcpRoutingForSessionInternal(sessionKey),
-        provider: provider,
-      );
-    final route = request.route;
-    if (route == GoTaskServiceRoute.openClawTask) {
-      goTaskServiceManagedRelaySessionsInternal.add(sessionKey);
-    }
+    final request = _buildGoTaskServiceRequestInternal(
+      sessionKey: sessionKey,
+      prompt: prompt,
+      target: target,
+      provider: provider,
+      model: model,
+      thinking: thinking,
+      attachments: attachments,
+      selectedSkills: selectedSkills,
+      routing: buildWebExternalAcpRoutingForSessionInternal(sessionKey),
+      routingHint: target == AssistantExecutionTarget.singleAgent
+          ? 'single-agent'
+          : 'gateway',
+    );
     try {
       final result = await goTaskServiceClientInternal.executeTask(
         request,
@@ -299,12 +286,8 @@ extension AppControllerWebGatewayChat on AppController {
       if (message.isEmpty) {
         throw Exception(
           appText(
-            route == GoTaskServiceRoute.openClawTask
-                ? 'OpenClaw task 没有返回可显示的输出。'
-                : 'Go Task Service 没有返回可显示的输出。',
-            route == GoTaskServiceRoute.openClawTask
-                ? 'OpenClaw task returned no displayable output.'
-                : 'Go Task Service returned no displayable output.',
+            'Go Task Service 没有返回可显示的输出。',
+            'Go Task Service returned no displayable output.',
           ),
         );
       }
@@ -327,13 +310,49 @@ extension AppControllerWebGatewayChat on AppController {
       );
     } finally {
       clearStreamingTextInternal(sessionKey);
-      if (route == GoTaskServiceRoute.openClawTask) {
-        goTaskServiceManagedRelaySessionsInternal.remove(sessionKey);
-      }
     }
   }
 
-  ExternalCodeAgentAcpRoutingConfig buildWebExternalAcpRoutingForSessionInternal(
+  GoTaskServiceRequest _buildGoTaskServiceRequestInternal({
+    required String sessionKey,
+    required String prompt,
+    required AssistantExecutionTarget target,
+    required SingleAgentProvider provider,
+    required String model,
+    required String thinking,
+    required List<GatewayChatAttachmentPayload> attachments,
+    required List<String> selectedSkills,
+    required ExternalCodeAgentAcpRoutingConfig routing,
+    required String routingHint,
+    GoTaskServiceCollaborationMode collaborationMode =
+        GoTaskServiceCollaborationMode.standard,
+  }) {
+    return GoTaskServiceRequest(
+      sessionId: sessionKey,
+      threadId: sessionKey,
+      target: target,
+      prompt: prompt,
+      workingDirectory: assistantWorkspacePathForSession(sessionKey),
+      model: model,
+      thinking: thinking,
+      selectedSkills: selectedSkills,
+      inlineAttachments: attachments,
+      localAttachments: const <CollaborationAttachment>[],
+      aiGatewayBaseUrl: settingsInternal.aiGateway.baseUrl.trim(),
+      aiGatewayApiKey: aiGatewayApiKeyCacheInternal.trim(),
+      agentId: selectedAgentId,
+      metadata: <String, dynamic>{
+        if (selectedSkills.isNotEmpty) 'selectedSkills': selectedSkills,
+      },
+      routing: routing,
+      routingHint: routingHint,
+      provider: provider,
+      collaborationMode: collaborationMode,
+    );
+  }
+
+  ExternalCodeAgentAcpRoutingConfig
+  buildWebExternalAcpRoutingForSessionInternal(
     String sessionKey, {
     String? explicitExecutionTarget,
   }) {
@@ -366,14 +385,6 @@ extension AppControllerWebGatewayChat on AppController {
             .map((item) => item.label.trim().isNotEmpty ? item.label : item.key)
             .where((item) => item.trim().isNotEmpty)
             .toList(growable: false);
-    final resolvedExplicitExecutionTarget =
-        explicitExecutionTarget?.trim().isNotEmpty == true
-        ? explicitExecutionTarget!.trim()
-        : (thread?.hasExplicitExecutionTargetSelection ?? false)
-        ? _webRoutingExecutionTargetValue(
-            assistantExecutionTargetForSession(normalizedSessionKey),
-          )
-        : '';
     final resolvedExplicitProviderId =
         thread?.hasExplicitProviderSelection ?? false
         ? singleAgentProviderForSession(normalizedSessionKey).providerId
@@ -384,6 +395,19 @@ extension AppControllerWebGatewayChat on AppController {
     final resolvedExplicitSkills = thread?.hasExplicitSkillSelection ?? false
         ? selectedSkills
         : const <String>[];
+    final hasAnyExplicitSelection =
+        (thread?.hasExplicitExecutionTargetSelection ?? false) ||
+        resolvedExplicitProviderId.isNotEmpty ||
+        resolvedExplicitModel.trim().isNotEmpty ||
+        resolvedExplicitSkills.isNotEmpty;
+    final resolvedExplicitExecutionTarget =
+        explicitExecutionTarget?.trim().isNotEmpty == true
+        ? explicitExecutionTarget!.trim()
+        : hasAnyExplicitSelection
+        ? _webRoutingExecutionTargetValue(
+            assistantExecutionTargetForSession(normalizedSessionKey),
+          )
+        : '';
     final hasExplicitSelection =
         resolvedExplicitExecutionTarget.isNotEmpty ||
         resolvedExplicitProviderId.isNotEmpty ||

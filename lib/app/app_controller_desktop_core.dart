@@ -32,7 +32,6 @@ import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/external_code_agent_acp_desktop_transport.dart';
 import '../runtime/go_task_service_client.dart';
 import '../runtime/go_task_service_desktop_service.dart';
-import '../runtime/go_gateway_runtime_desktop_client.dart';
 import '../runtime/go_multi_agent_mount_desktop_client.dart';
 import '../runtime/go_runtime_dispatch_desktop_client.dart';
 import '../runtime/mode_switcher.dart';
@@ -144,7 +143,6 @@ class AppController extends ChangeNotifier {
           gateway: GatewayRuntime(
             store: storeInternal,
             identityStore: DeviceIdentityStore(storeInternal),
-            sessionClient: GoGatewayRuntimeDesktopClient(),
             allowDirectSocketFallbackOnSessionClientFailure:
                 shouldBlockEmbeddedAgentLaunch(
                   isAppleHost: Platform.isIOS || Platform.isMacOS,

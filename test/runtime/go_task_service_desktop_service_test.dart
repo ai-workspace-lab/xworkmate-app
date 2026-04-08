@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
@@ -14,54 +12,6 @@ class _FakeGatewayRuntime extends GatewayRuntime {
         store: SecureConfigStore(),
         identityStore: DeviceIdentityStoreForTest(),
       );
-
-  final StreamController<GatewayPushEvent> controller =
-      StreamController<GatewayPushEvent>.broadcast();
-  final List<Map<String, Object?>> sendChatCalls = <Map<String, Object?>>[];
-  final List<Map<String, String>> abortChatCalls = <Map<String, String>>[];
-  List<GatewayChatMessage> history = const <GatewayChatMessage>[];
-
-  @override
-  Stream<GatewayPushEvent> get events => controller.stream;
-
-  @override
-  bool get isConnected => true;
-
-  @override
-  Future<String> sendChat({
-    required String sessionKey,
-    required String message,
-    required String thinking,
-    List<GatewayChatAttachmentPayload> attachments =
-        const <GatewayChatAttachmentPayload>[],
-    String? agentId,
-    Map<String, dynamic>? metadata,
-  }) async {
-    sendChatCalls.add(<String, Object?>{
-      'sessionKey': sessionKey,
-      'message': message,
-      'thinking': thinking,
-      'agentId': agentId,
-      'metadata': metadata,
-    });
-    return 'run-1';
-  }
-
-  @override
-  Future<void> abortChat({required String sessionKey, required String runId}) async {
-    abortChatCalls.add(<String, String>{
-      'sessionKey': sessionKey,
-      'runId': runId,
-    });
-  }
-
-  @override
-  Future<List<GatewayChatMessage>> loadHistory(
-    String sessionKey, {
-    int limit = 120,
-  }) async {
-    return history;
-  }
 }
 
 class DeviceIdentityStoreForTest extends DeviceIdentityStore {
@@ -103,7 +53,7 @@ class _FakeExternalAcpTransport implements ExternalCodeAgentAcpTransport {
         message: '',
         pending: false,
         error: false,
-        route: GoTaskServiceRoute.externalAcpSingle,
+        route: request.route,
         payload: const <String, dynamic>{'type': 'delta'},
       ),
     );
@@ -163,102 +113,49 @@ GoTaskServiceRequest _request({
 
 void main() {
   group('DesktopGoTaskService', () {
-    test('routes OpenClaw tasks through GatewayRuntime', () async {
-      final gateway = _FakeGatewayRuntime();
-      final acp = _FakeExternalAcpTransport();
-      final service = DesktopGoTaskService(gateway: gateway, acpTransport: acp);
-
-      final updates = <GoTaskServiceUpdate>[];
-      final future = service.executeTask(
-        _request(target: AssistantExecutionTarget.local),
-        onUpdate: updates.add,
-      );
-
-      await Future<void>.delayed(Duration.zero);
-      gateway.controller.add(
-        GatewayPushEvent(
-          event: 'chat',
-          payload: <String, dynamic>{
-            'runId': 'run-1',
-            'sessionKey': 'thread-1',
-            'state': 'final',
-            'message': <String, dynamic>{
-              'role': 'assistant',
-              'content': <Map<String, dynamic>>[
-                <String, dynamic>{'type': 'text', 'text': 'OPENCLAW_OK'},
-              ],
-            },
-          },
-        ),
-      );
-
-      final result = await future;
-
-      expect(acp.executeCalls, 0);
-      expect(gateway.sendChatCalls, hasLength(1));
-      expect(gateway.sendChatCalls.single['metadata'], isNull);
-      expect(result.route, GoTaskServiceRoute.openClawTask);
-      expect(result.message, 'OPENCLAW_OK');
-      expect(updates.last.route, GoTaskServiceRoute.openClawTask);
-    });
-
-    test('routes single-agent and multi-agent tasks through ACP transport', () async {
-      final gateway = _FakeGatewayRuntime();
-      final acp = _FakeExternalAcpTransport();
-      final service = DesktopGoTaskService(gateway: gateway, acpTransport: acp);
-
-      final singleResult = await service.executeTask(
-        _request(target: AssistantExecutionTarget.singleAgent),
-        onUpdate: (_) {},
-      );
-      final multiResult = await service.executeTask(
-        _request(
-          target: AssistantExecutionTarget.remote,
-          multiAgent: true,
-        ),
-        onUpdate: (_) {},
-      );
-
-      expect(gateway.sendChatCalls, isEmpty);
-      expect(acp.executeCalls, 2);
-      expect(singleResult.route, GoTaskServiceRoute.externalAcpSingle);
-      expect(multiResult.route, GoTaskServiceRoute.externalAcpMulti);
-    });
-
     test(
-      'recovers OpenClaw task completion from chat history when push events do not arrive',
+      'routes standard and multi-agent tasks through ACP transport',
       () async {
         final gateway = _FakeGatewayRuntime();
         final acp = _FakeExternalAcpTransport();
-        final service = DesktopGoTaskService(gateway: gateway, acpTransport: acp);
-
-        unawaited(
-          Future<void>.delayed(const Duration(milliseconds: 1200), () {
-            gateway.history = <GatewayChatMessage>[
-              GatewayChatMessage(
-                id: 'assistant-1',
-                role: 'assistant',
-                text: 'RECOVERED_FROM_HISTORY',
-                timestampMs: 2,
-                toolCallId: null,
-                toolName: null,
-                stopReason: null,
-                pending: false,
-                error: false,
-              ),
-            ];
-          }),
+        final service = DesktopGoTaskService(
+          gateway: gateway,
+          acpTransport: acp,
         );
 
-        final result = await service.executeTask(
+        final singleResult = await service.executeTask(
+          _request(target: AssistantExecutionTarget.singleAgent),
+          onUpdate: (_) {},
+        );
+        final gatewayResult = await service.executeTask(
           _request(target: AssistantExecutionTarget.local),
           onUpdate: (_) {},
         );
+        final multiResult = await service.executeTask(
+          _request(target: AssistantExecutionTarget.remote, multiAgent: true),
+          onUpdate: (_) {},
+        );
 
-        expect(result.route, GoTaskServiceRoute.openClawTask);
-        expect(result.message, 'RECOVERED_FROM_HISTORY');
-        expect(result.raw['recoveredFromHistory'], isTrue);
+        expect(acp.executeCalls, 3);
+        expect(singleResult.route, GoTaskServiceRoute.externalAcpSingle);
+        expect(gatewayResult.route, GoTaskServiceRoute.externalAcpSingle);
+        expect(multiResult.route, GoTaskServiceRoute.externalAcpMulti);
       },
     );
+
+    test('cancel delegates to ACP transport', () async {
+      final gateway = _FakeGatewayRuntime();
+      final acp = _FakeExternalAcpTransport();
+      final service = DesktopGoTaskService(gateway: gateway, acpTransport: acp);
+
+      await service.cancelTask(
+        route: GoTaskServiceRoute.externalAcpSingle,
+        target: AssistantExecutionTarget.remote,
+        sessionId: 'thread-1',
+        threadId: 'thread-1',
+      );
+
+      expect(acp.cancelCalls, 1);
+    });
   });
 }
