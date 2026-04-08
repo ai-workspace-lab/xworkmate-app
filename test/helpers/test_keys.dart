@@ -23,6 +23,15 @@ class TestKeys {
   static const Key assistantSingleAgentProviderButton = Key(
     'assistant-single-agent-provider-button',
   );
+  static const Key assistantExecutionTargetMenuItemSingleAgent = Key(
+    'assistant-execution-target-menu-item-singleAgent',
+  );
+  static const Key assistantExecutionTargetMenuItemLocal = Key(
+    'assistant-execution-target-menu-item-local',
+  );
+  static const Key assistantExecutionTargetMenuItemRemote = Key(
+    'assistant-execution-target-menu-item-remote',
+  );
   static const Key assistantComposerInput = Key(
     'assistant-composer-input-area',
   );
