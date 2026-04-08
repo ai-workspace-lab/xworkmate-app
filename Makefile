@@ -16,7 +16,7 @@ APP_BUILD_NUMBER := $(if $(APP_BUILD_NUMBER_RAW),$(APP_BUILD_NUMBER_RAW),1)
 APP_DART_DEFINE_VERSION ?= --dart-define=XWORKMATE_DISPLAY_VERSION=$(APP_VERSION)
 APP_DART_DEFINE_BUILD ?= --dart-define=XWORKMATE_BUILD_NUMBER=$(APP_BUILD_NUMBER)
 
-.PHONY: help deps analyze test check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs check-export-compliance
+.PHONY: help deps analyze test test-all test-flutter test-golden test-integration test-integration-macos test-patrol test-go test-ci check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs check-export-compliance
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -29,6 +29,30 @@ analyze: ## Run static analysis
 
 test: ## Run Flutter tests
 	$(FLUTTER) test
+
+test-flutter: ## Run the full Flutter unit/widget test suite
+	$(FLUTTER) test
+
+test-golden: ## Run Flutter Golden tests
+	$(FLUTTER) test test/golden
+
+test-integration: ## Run Flutter integration tests
+	$(FLUTTER) test integration_test
+
+test-integration-macos: ## Run macOS integration tests serially for the desktop app
+	$(FLUTTER) test integration_test/desktop_navigation_flow_test.dart -d macos
+	$(FLUTTER) test integration_test/desktop_settings_flow_test.dart -d macos
+
+test-patrol: ## Run Patrol end-to-end tests
+	dart pub global activate patrol_cli
+	patrol test
+
+test-go: ## Run Go API unit tests
+	cd go_service && go test ./...
+
+test-ci: test-flutter test-golden test-integration test-go ## Run the PR validation chain
+
+test-all: test-ci test-patrol ## Run the full local validation chain
 
 check: analyze test ## Run the standard validation suite
 

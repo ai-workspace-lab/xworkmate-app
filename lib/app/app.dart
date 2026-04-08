@@ -84,6 +84,7 @@ class _XWorkmateAppState extends State<XWorkmateApp> {
       animation: _controller,
       builder: (context, _) {
         return MaterialApp(
+          key: const Key('xworkmate-app-shell'),
           title: kSystemAppName,
           debugShowCheckedModeBanner: false,
           locale: Locale(_controller.appLanguage.code),
