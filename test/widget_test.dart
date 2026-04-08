@@ -16,8 +16,9 @@ void main() {
     await tester.pumpWidget(const XWorkmateApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('新对话'), findsWidgets);
-    expect(find.byKey(const Key('assistant-task-rail')), findsOneWidget);
+    expect(find.byKey(const Key('assistant-conversation-shell')), findsOneWidget);
+    expect(find.byKey(const Key('workspace-sidebar-new-task-button')), findsOneWidget);
+    expect(find.byKey(const Key('assistant-send-button')), findsOneWidget);
     expect(find.textContaining('输入需求、补充上下文'), findsOneWidget);
 
     if (kIsWeb) {

@@ -36,7 +36,7 @@ void main() {
           AssistantExecutionTarget.singleAgent,
         );
         expect(controller.currentAssistantConnectionState.isSingleAgent, isTrue);
-        expect(controller.assistantConnectionStatusLabel, 'ACP Server');
+        expect(controller.assistantConnectionStatusLabel, 'ACP Server Local');
       },
     );
 

@@ -26,7 +26,7 @@ class RuntimeBootstrapConfig {
       workspaceRoot,
       cliPathHint: cliPathHint,
     );
-    final env = await _loadEnvFile(
+    final env = _loadEnvFile(
       workspacePathHint: workspacePathHint,
       cliPathHint: cliPathHint,
       workspaceRoot: workspaceRoot,
@@ -176,12 +176,12 @@ class GatewayBootstrapTarget {
   }
 }
 
-Future<Map<String, String>> _loadEnvFile({
+Map<String, String> _loadEnvFile({
   String? workspacePathHint,
   String? cliPathHint,
   Directory? workspaceRoot,
   Directory? openClawRoot,
-}) async {
+}) {
   final candidateDirectories = <Directory>{
     Directory.current,
     ..._ancestorDirectories(Directory.current),
@@ -199,11 +199,11 @@ Future<Map<String, String>> _loadEnvFile({
       .toList(growable: false);
 
   for (final file in candidates) {
-    if (!await file.exists()) {
+    if (!file.existsSync()) {
       continue;
     }
     final values = <String, String>{};
-    for (final line in await file.readAsLines()) {
+    for (final line in file.readAsLinesSync()) {
       final trimmed = line.trim();
       if (trimmed.isEmpty || trimmed.startsWith('#')) {
         continue;
