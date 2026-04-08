@@ -97,13 +97,12 @@ flowchart TB
 
 ### 当前实现观察
 
-- [Assistant TaskThread 当前模型（2026-03-28）](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-task-control-plane-unification/docs/architecture/assistant-thread-target-model-20260328.md)
-- [Assistant TaskThread 信息架构](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-task-control-plane-unification/docs/architecture/assistant-thread-information-architecture.md)
-- [XWorkmate App Internal State Architecture](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-task-control-plane-unification/docs/architecture/xworkmate-internal-state-architecture.md)
+- 当前实现观察不再保留独立主设计文档
+- 如需判断规范，以 [任务执行链路统一收敛](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-task-control-plane-unification/docs/architecture/task-control-plane-unification.md) 为准
 
 ### 边界与适配器说明
 
-- [XWorkmate 集成架构](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-task-control-plane-unification/docs/architecture/xworkmate-integrations.md)
+- 适配器边界统一收敛到本文件与主文档，不再保留旧的并列设计稿
 
 ## Compatibility route (removed from target)
 

@@ -121,31 +121,9 @@ void main() {
     );
 
     test(
-      'falls back to websocket when HTTP bridge returns plain-text 404',
+      'keeps HTTP 404 as the final error when HTTP ACP bridge is missing',
       () async {
         final server = await _AcpFakeServer.start(
-          respondWithPlainTextNotFound: true,
-        );
-        addTearDown(server.close);
-
-        final client = GatewayAcpClient(
-          endpointResolver: () => server.baseHttpUri,
-        );
-
-        final capabilities = await client.loadCapabilities(forceRefresh: true);
-
-        expect(capabilities.singleAgent, isTrue);
-        expect(server.lastHttpRequestPath, '/acp/rpc');
-        expect(server.lastWebSocketRequestPath, '/acp');
-        expect(server.rpcMethods, contains('acp.capabilities'));
-      },
-    );
-
-    test(
-      'keeps HTTP 404 as primary error when websocket fallback also fails',
-      () async {
-        final server = await _AcpFakeServer.start(
-          disableWebSocket: true,
           respondWithPlainTextNotFound: true,
         );
         addTearDown(server.close);
@@ -166,29 +144,7 @@ void main() {
                 ),
           ),
         );
-      },
-    );
-
-    test(
-      'falls back to raw websocket path when derived ACP path is unavailable',
-      () async {
-        final server = await _AcpFakeServer.start(
-          respondWithPlainTextNotFound: true,
-          pathPrefix: '/opencode',
-          useRawWebSocketPathOnly: true,
-        );
-        addTearDown(server.close);
-
-        final client = GatewayAcpClient(
-          endpointResolver: () => server.baseHttpUri,
-        );
-
-        final capabilities = await client.loadCapabilities(forceRefresh: true);
-
-        expect(capabilities.singleAgent, isTrue);
-        expect(server.lastHttpRequestPath, '/opencode/acp/rpc');
-        expect(server.lastWebSocketRequestPath, '/opencode');
-        expect(server.rpcMethods, contains('acp.capabilities'));
+        expect(server.lastWebSocketRequestPath, isNull);
       },
     );
 
@@ -310,7 +266,6 @@ class _AcpFakeServer {
     required this.disableWebSocket,
     required this.respondWithHtmlError,
     required this.respondWithPlainTextNotFound,
-    required this.useRawWebSocketPathOnly,
     required this.pathPrefix,
   });
 
@@ -318,7 +273,6 @@ class _AcpFakeServer {
   final bool disableWebSocket;
   final bool respondWithHtmlError;
   final bool respondWithPlainTextNotFound;
-  final bool useRawWebSocketPathOnly;
   final String pathPrefix;
   final List<String> rpcMethods = <String>[];
   String? lastWebSocketAuthorization;
@@ -333,7 +287,6 @@ class _AcpFakeServer {
     bool disableWebSocket = false,
     bool respondWithHtmlError = false,
     bool respondWithPlainTextNotFound = false,
-    bool useRawWebSocketPathOnly = false,
     String pathPrefix = '',
   }) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -342,7 +295,6 @@ class _AcpFakeServer {
       disableWebSocket: disableWebSocket,
       respondWithHtmlError: respondWithHtmlError,
       respondWithPlainTextNotFound: respondWithPlainTextNotFound,
-      useRawWebSocketPathOnly: useRawWebSocketPathOnly,
       pathPrefix: _normalizePathPrefix(pathPrefix),
     );
     unawaited(fake._listen());
@@ -355,12 +307,8 @@ class _AcpFakeServer {
 
   Future<void> _listen() async {
     await for (final request in _server) {
-      final wsPaths = <String>[
-        if (!useRawWebSocketPathOnly) '$pathPrefix/acp',
-        if (useRawWebSocketPathOnly) (pathPrefix.isEmpty ? '/' : pathPrefix),
-      ];
       if (!disableWebSocket &&
-          wsPaths.contains(request.uri.path) &&
+          request.uri.path == '$pathPrefix/acp' &&
           WebSocketTransformer.isUpgradeRequest(request)) {
         lastWebSocketRequestPath = request.uri.path;
         lastWebSocketAuthorization = request.headers.value(
