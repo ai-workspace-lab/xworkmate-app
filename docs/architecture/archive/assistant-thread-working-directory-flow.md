@@ -5,7 +5,7 @@
 > 已过时：本文记录的是 `workspaceRef / workspaceRefKind / cwd fallback` 主导时期的线程目录流转。
 >
 > 当前实现请优先参考：
-> [docs/architecture/assistant-thread-target-model-20260328.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/assistant-thread-target-model-20260328.md)
+> [docs/architecture/task-control-plane-unification.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/task-control-plane-unification.md)
 >
 > 新文档已经把 TaskThread 的主流程图和状态图重画为基于 `workspaceBinding / executionBinding / lifecycleState` 的 Mermaid 版本。
 
