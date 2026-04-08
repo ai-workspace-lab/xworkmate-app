@@ -1,5 +1,6 @@
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_single_agent_go_task_flow.dart';
+import 'app_controller_desktop_single_agent_status_messages.dart';
 import '../runtime/runtime_models.dart';
 
 extension AppControllerDesktopSingleAgent on AppController {
