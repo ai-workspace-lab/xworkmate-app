@@ -28,6 +28,7 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
+import '../runtime/go_task_service_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
@@ -161,63 +162,73 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
     );
     controller.recomputeTasksInternal();
     try {
-      final taskStream = controller.gatewayAcpClientInternal.runMultiAgent(
-        GatewayAcpMultiAgentRequest(
+      final result = await controller.goTaskServiceClientInternal.executeTask(
+        GoTaskServiceRequest(
           sessionId: sessionKey,
           threadId: sessionKey,
+          target: controller.assistantExecutionTargetForSession(sessionKey),
           prompt: composedPrompt,
           workingDirectory: workingDirectory,
-          attachments: attachments,
+          model: controller.assistantModelForSession(sessionKey),
+          thinking: 'medium',
           selectedSkills: selectedSkillLabels,
+          inlineAttachments: const <GatewayChatAttachmentPayload>[],
+          localAttachments: attachments,
           aiGatewayBaseUrl: controller.aiGatewayUrl,
           aiGatewayApiKey: aiGatewayApiKey,
+          agentId: '',
+          metadata: const <String, dynamic>{},
+          routingHint: 'multi-agent',
+          collaborationMode: GoTaskServiceCollaborationMode.multiAgent,
           resumeSession: true,
         ),
-      );
-      await for (final event in taskStream) {
-        if (event.type == 'result') {
-          final success = event.data['success'] == true;
-          final finalScore = event.data['finalScore'];
-          final iterations = event.data['iterations'];
+        onUpdate: (update) {
+          final text = update.text.trim().isNotEmpty
+              ? update.text.trim()
+              : update.message.trim();
+          if (text.isEmpty) {
+            return;
+          }
           controller.appendLocalSessionMessageInternal(
             sessionKey,
             GatewayChatMessage(
               id: controller.nextLocalMessageIdInternal(),
               role: 'assistant',
-              text: success
-                  ? appText(
-                      '多 Agent 协作完成，评分 ${finalScore ?? '-'}，迭代 ${iterations ?? 0} 次。',
-                      'Multi-agent collaboration completed with score ${finalScore ?? '-'} after ${iterations ?? 0} iteration(s).',
-                    )
-                  : appText(
-                      '多 Agent 协作失败：${event.data['error'] ?? event.message}',
-                      'Multi-agent collaboration failed: ${event.data['error'] ?? event.message}',
-                    ),
+              text: text,
               timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
               toolCallId: null,
-              toolName: null,
+              toolName: 'Multi-Agent',
               stopReason: null,
-              pending: false,
-              error: !success,
+              pending: update.pending,
+              error: update.error,
             ),
           );
-          continue;
-        }
-        controller.appendLocalSessionMessageInternal(
-          sessionKey,
-          GatewayChatMessage(
-            id: controller.nextLocalMessageIdInternal(),
-            role: 'assistant',
-            text: event.message,
-            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-            toolCallId: null,
-            toolName: event.title,
-            stopReason: null,
-            pending: event.pending,
-            error: event.error,
-          ),
-        );
-      }
+        },
+      );
+      controller.appendLocalSessionMessageInternal(
+        sessionKey,
+        GatewayChatMessage(
+          id: controller.nextLocalMessageIdInternal(),
+          role: 'assistant',
+          text: result.success
+              ? (result.message.trim().isNotEmpty
+                    ? result.message.trim()
+                    : appText(
+                        '多 Agent 协作完成。',
+                        'Multi-agent collaboration completed.',
+                      ))
+              : appText(
+                  '多 Agent 协作失败：${result.errorMessage.trim().isEmpty ? result.message : result.errorMessage}',
+                  'Multi-agent collaboration failed: ${result.errorMessage.trim().isEmpty ? result.message : result.errorMessage}',
+                ),
+          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          toolCallId: null,
+          toolName: 'Multi-Agent',
+          stopReason: null,
+          pending: false,
+          error: !result.success,
+        ),
+      );
     } on GatewayAcpException catch (error) {
       controller.appendLocalSessionMessageInternal(
         sessionKey,
@@ -225,8 +236,8 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
           id: controller.nextLocalMessageIdInternal(),
           role: 'assistant',
           text: appText(
-            '多 Agent 协作不可用（Gateway ACP）：${error.message}',
-            'Multi-agent collaboration is unavailable (Gateway ACP): ${error.message}',
+            '多 Agent 协作不可用（ACP）：${error.message}',
+            'Multi-agent collaboration is unavailable (ACP): ${error.message}',
           ),
           timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
           toolCallId: null,

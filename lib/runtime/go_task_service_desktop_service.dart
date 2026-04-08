@@ -1,30 +1,14 @@
-import 'dart:async';
-
 import 'gateway_runtime.dart';
 import 'go_task_service_client.dart';
 import 'runtime_models.dart';
 
 class DesktopGoTaskService implements GoTaskServiceClient {
-  static const Duration _openClawTaskRecoveryTimeout = Duration(seconds: 35);
-  static const Duration _openClawTaskRecoveryPollInterval = Duration(
-    milliseconds: 800,
-  );
-
   DesktopGoTaskService({
     required GatewayRuntime gateway,
     required ExternalCodeAgentAcpTransport acpTransport,
-  }) : _gateway = gateway,
-       _acpTransport = acpTransport {
-    _gatewayEventsSubscription = _gateway.events.listen(_handleGatewayEvent);
-  }
+  }) : _acpTransport = acpTransport;
 
-  final GatewayRuntime _gateway;
   final ExternalCodeAgentAcpTransport _acpTransport;
-
-  late final StreamSubscription<GatewayPushEvent> _gatewayEventsSubscription;
-  final Map<String, _PendingOpenClawTask> _pendingOpenClawTasksByRunId =
-      <String, _PendingOpenClawTask>{};
-  final Map<String, String> _openClawRunIdsBySession = <String, String>{};
 
   @override
   Future<void> syncExternalProviders(
@@ -44,15 +28,7 @@ class DesktopGoTaskService implements GoTaskServiceClient {
   Future<GoTaskServiceResult> executeTask(
     GoTaskServiceRequest request, {
     required void Function(GoTaskServiceUpdate update) onUpdate,
-  }) async {
-    switch (request.route) {
-      case GoTaskServiceRoute.openClawTask:
-        return _executeOpenClawTask(request, onUpdate: onUpdate);
-      case GoTaskServiceRoute.externalAcpSingle:
-      case GoTaskServiceRoute.externalAcpMulti:
-        return _acpTransport.executeTask(request, onUpdate: onUpdate);
-    }
-  }
+  }) => _acpTransport.executeTask(request, onUpdate: onUpdate);
 
   @override
   Future<void> cancelTask({
@@ -60,21 +36,11 @@ class DesktopGoTaskService implements GoTaskServiceClient {
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
-  }) async {
-    if (route == GoTaskServiceRoute.openClawTask) {
-      final runId = _openClawRunIdsBySession[sessionId];
-      if (runId == null || runId.trim().isEmpty) {
-        return;
-      }
-      await _gateway.abortChat(sessionKey: sessionId, runId: runId);
-      return;
-    }
-    await _acpTransport.cancelTask(
-      target: target,
-      sessionId: sessionId,
-      threadId: threadId,
-    );
-  }
+  }) => _acpTransport.cancelTask(
+    target: target,
+    sessionId: sessionId,
+    threadId: threadId,
+  );
 
   @override
   Future<void> closeTask({
@@ -82,221 +48,14 @@ class DesktopGoTaskService implements GoTaskServiceClient {
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
-  }) async {
-    if (route == GoTaskServiceRoute.openClawTask) {
-      _openClawRunIdsBySession.remove(sessionId);
-      return;
-    }
-    await _acpTransport.closeTask(
-      target: target,
-      sessionId: sessionId,
-      threadId: threadId,
-    );
-  }
+  }) => _acpTransport.closeTask(
+    target: target,
+    sessionId: sessionId,
+    threadId: threadId,
+  );
 
   @override
   Future<void> dispose() async {
-    for (final pending in _pendingOpenClawTasksByRunId.values) {
-      if (!pending.completer.isCompleted) {
-        pending.completer.completeError(
-          GatewayRuntimeException('task service disposed'),
-        );
-      }
-    }
-    _pendingOpenClawTasksByRunId.clear();
-    _openClawRunIdsBySession.clear();
-    await _gatewayEventsSubscription.cancel();
     await _acpTransport.dispose();
   }
-
-  Future<GoTaskServiceResult> _executeOpenClawTask(
-    GoTaskServiceRequest request, {
-    required void Function(GoTaskServiceUpdate update) onUpdate,
-  }) async {
-    if (!_gateway.isConnected) {
-      throw GatewayRuntimeException('gateway not connected');
-    }
-    final historyBaseline = await _gateway.loadHistory(request.sessionId);
-    final runId = await _gateway.sendChat(
-      sessionKey: request.sessionId,
-      message: request.prompt,
-      thinking: request.thinking,
-      attachments: request.inlineAttachments,
-      agentId: request.agentId.trim().isEmpty ? null : request.agentId.trim(),
-    );
-    final pending = _PendingOpenClawTask(
-      request: request,
-      runId: runId,
-      onUpdate: onUpdate,
-      completer: Completer<GoTaskServiceResult>(),
-    );
-    _pendingOpenClawTasksByRunId[runId] = pending;
-    _openClawRunIdsBySession[request.sessionId] = runId;
-    final recovered = await _recoverOpenClawTaskFromHistory(
-      pending,
-      historyBaseline,
-    );
-    if (recovered != null) {
-      return recovered;
-    }
-    return pending.completer.future;
-  }
-
-  void _handleGatewayEvent(GatewayPushEvent event) {
-    if (event.event == 'chat.run') {
-      _handleOpenClawRunPayload(asMap(event.payload));
-      return;
-    }
-    if (event.event == 'chat') {
-      final payload = asMap(event.payload);
-      final message = asMap(payload['message']);
-      _handleOpenClawRunPayload(<String, dynamic>{
-        'runId': payload['runId'],
-        'sessionKey': payload['sessionKey'],
-        'state': payload['state'],
-        'assistantText': extractMessageText(message),
-        'errorMessage': payload['errorMessage'],
-      });
-    }
-  }
-
-  void _handleOpenClawRunPayload(Map<String, dynamic> payload) {
-    final runId = stringValue(payload['runId']) ?? '';
-    if (runId.isEmpty) {
-      return;
-    }
-    final pending = _pendingOpenClawTasksByRunId[runId];
-    if (pending == null) {
-      return;
-    }
-    final state = stringValue(payload['state']) ?? '';
-    final assistantText = stringValue(payload['assistantText']) ?? '';
-    final errorMessage = stringValue(payload['errorMessage']) ?? '';
-    if (assistantText.isNotEmpty && (state == 'delta' || state == 'final')) {
-      pending.streamedText = assistantText;
-      pending.onUpdate(
-        GoTaskServiceUpdate(
-          sessionId: pending.request.sessionId,
-          threadId: pending.request.threadId,
-          turnId: runId,
-          type: 'delta',
-          text: assistantText,
-          message: '',
-          pending: state != 'final',
-          error: false,
-          route: GoTaskServiceRoute.openClawTask,
-          payload: payload,
-        ),
-      );
-    }
-    final terminal =
-        boolValue(payload['terminal']) ?? false ||
-        state == 'final' ||
-        state == 'aborted' ||
-        state == 'error';
-    if (!terminal || pending.completer.isCompleted) {
-      return;
-    }
-    _pendingOpenClawTasksByRunId.remove(runId);
-    _openClawRunIdsBySession.remove(pending.request.sessionId);
-    final success = state != 'error' && state != 'aborted';
-    pending.completer.complete(
-      GoTaskServiceResult(
-        success: success,
-        message: pending.streamedText.trim(),
-        turnId: runId,
-        raw: payload,
-        errorMessage: errorMessage,
-        resolvedModel:
-            stringValue(payload['model']) ??
-            stringValue(payload['resolvedModel']) ??
-            '',
-        route: GoTaskServiceRoute.openClawTask,
-      ),
-    );
-  }
-
-  Future<GoTaskServiceResult?> _recoverOpenClawTaskFromHistory(
-    _PendingOpenClawTask pending,
-    List<GatewayChatMessage> historyBaseline,
-  ) async {
-    final baselineAssistantFingerprint = _assistantMessageFingerprint(
-      historyBaseline,
-    );
-    final deadline = DateTime.now().add(_openClawTaskRecoveryTimeout);
-    while (!pending.completer.isCompleted && DateTime.now().isBefore(deadline)) {
-      await Future<void>.delayed(_openClawTaskRecoveryPollInterval);
-      if (pending.completer.isCompleted) {
-        return null;
-      }
-      final history = await _gateway.loadHistory(pending.request.sessionId);
-      final latestAssistant = _latestAssistantMessage(history);
-      if (latestAssistant == null) {
-        continue;
-      }
-      final fingerprint = _messageFingerprint(latestAssistant);
-      if (fingerprint == baselineAssistantFingerprint) {
-        continue;
-      }
-      final result = GoTaskServiceResult(
-        success: true,
-        message: latestAssistant.text.trim(),
-        turnId: pending.runId,
-        raw: <String, dynamic>{
-          'recoveredFromHistory': true,
-          'sessionId': pending.request.sessionId,
-        },
-        errorMessage: '',
-        resolvedModel: '',
-        route: GoTaskServiceRoute.openClawTask,
-      );
-      _pendingOpenClawTasksByRunId.remove(pending.runId);
-      _openClawRunIdsBySession.remove(pending.request.sessionId);
-      if (!pending.completer.isCompleted) {
-        pending.completer.complete(result);
-      }
-      return result;
-    }
-    return null;
-  }
-
-  GatewayChatMessage? _latestAssistantMessage(List<GatewayChatMessage> history) {
-    for (final message in history.reversed) {
-      if (message.role.trim().toLowerCase() != 'assistant') {
-        continue;
-      }
-      if (message.text.trim().isEmpty) {
-        continue;
-      }
-      return message;
-    }
-    return null;
-  }
-
-  String _assistantMessageFingerprint(List<GatewayChatMessage> history) {
-    final latest = _latestAssistantMessage(history);
-    if (latest == null) {
-      return '';
-    }
-    return _messageFingerprint(latest);
-  }
-
-  String _messageFingerprint(GatewayChatMessage message) {
-    return '${message.timestampMs ?? 0}|${message.text.trim()}';
-  }
-}
-
-class _PendingOpenClawTask {
-  _PendingOpenClawTask({
-    required this.request,
-    required this.runId,
-    required this.onUpdate,
-    required this.completer,
-  });
-
-  final GoTaskServiceRequest request;
-  final String runId;
-  final void Function(GoTaskServiceUpdate update) onUpdate;
-  final Completer<GoTaskServiceResult> completer;
-  String streamedText = '';
 }
