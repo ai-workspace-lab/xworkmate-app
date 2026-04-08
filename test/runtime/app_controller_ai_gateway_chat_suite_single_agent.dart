@@ -1069,5 +1069,79 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         );
       },
     );
+
+    test(
+      'AppController keeps local Codex-style working directories for remote thread refs',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-single-agent-local-codex-remote-ref-',
+        );
+        final defaultWorkspace = Directory(
+          '${tempDirectory.path}/default-workspace',
+        );
+        await defaultWorkspace.create(recursive: true);
+
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(
+            workspacePath: defaultWorkspace.path,
+            assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
+          ),
+        );
+
+        final client = FakeGoTaskServiceClientInternal(
+          capabilities: ExternalCodeAgentAcpCapabilities(
+            singleAgent: true,
+            multiAgent: false,
+            providers: <SingleAgentProvider>{SingleAgentProvider.codex},
+            raw: <String, dynamic>{},
+          ),
+          result: const GoTaskServiceResult(
+            success: true,
+            message: 'THREAD_OK',
+            turnId: 'turn-1',
+            raw: <String, dynamic>{
+              'resolvedWorkingDirectory':
+                  '/owners/local/user/example/threads/draft:remote-thread',
+              'resolvedWorkspaceRefKind': 'remotePath',
+            },
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        final controller = await createAppControllerInternal(
+          store: store,
+          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+          ],
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+          goTaskServiceClient: client,
+        );
+
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.singleAgent,
+        );
+        await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+        controller.initializeAssistantThreadContext(
+          'draft:remote-thread',
+          title: 'Remote Thread',
+          executionTarget: AssistantExecutionTarget.singleAgent,
+        );
+        await controller.switchSession('draft:remote-thread');
+
+        await controller.sendChatMessage('第一次运行', thinking: 'low');
+        final expectedLocalThreadDir =
+            '${defaultWorkspace.path}/.xworkmate/threads/draft-remote-thread';
+        expect(client.requests.first.workingDirectory, expectedLocalThreadDir);
+
+        await controller.sendChatMessage('第二次运行', thinking: 'low');
+        expect(client.requests.last.workingDirectory, expectedLocalThreadDir);
+      },
+    );
   });
 }

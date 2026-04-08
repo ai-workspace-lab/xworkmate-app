@@ -550,6 +550,11 @@ class AssistantEmptyStateInternal extends StatelessWidget {
             '首次连接需要共享 Token；配对完成后可继续使用本机的 device token。',
             'The first connection requires a shared token; after pairing, this device can continue with its device token.',
           )
+        : !connected
+        ? appText(
+            '当前线程目标网关尚未连接。请先连接对应 Gateway，再继续当前任务。',
+            'The selected gateway target for this thread is not connected yet. Connect that Gateway first, then continue this task.',
+          )
         : (connectionState.lastError?.trim().isNotEmpty == true
               ? connectionState.lastError!.trim()
               : appText(

@@ -57,6 +57,8 @@ void main() {
       final capabilities = await client.loadCapabilities(forceRefresh: true);
 
       expect(capabilities.singleAgent, isTrue);
+      expect(capabilities.diagnostics['transport'], 'http-sse');
+      expect(capabilities.diagnostics['statusCode'], 200);
       expect(server.lastHttpRequestPath, '/acp/rpc');
       expect(server.lastWebSocketRequestPath, isNull);
     });

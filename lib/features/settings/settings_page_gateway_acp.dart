@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
+import '../../runtime/gateway_acp_client.dart';
 import '../../runtime/runtime_models.dart';
 import 'settings_page_core.dart';
 import 'settings_page_support.dart';
@@ -19,6 +20,36 @@ String externalAcpEndpointExamplesText() {
 }
 
 String describeExternalAcpTestFailure(Object error, {Uri? endpoint}) {
+  Map<String, dynamic> detailMap = const <String, dynamic>{};
+  if (error is GatewayAcpException) {
+    final details = error.details;
+    detailMap = details is Map<String, dynamic>
+        ? details
+        : details is Map
+        ? details.cast<String, dynamic>()
+        : const <String, dynamic>{};
+    if (error.code == 'ACP_HTTP_STREAM_CLOSED') {
+      final requestUrl = detailMap['requestUrl']?.toString().trim() ?? '';
+      final statusCode = detailMap['statusCode']?.toString().trim() ?? 'n/a';
+      final contentType = detailMap['contentType']?.toString().trim();
+      final bodyRead = detailMap['bodyRead'] == true ? 'yes' : 'no';
+      return appText(
+        '连接不稳定：服务端在响应体接收完成前提前关闭了连接。'
+        '${requestUrl.isEmpty ? '' : '\nURL: $requestUrl'}'
+        '\nHTTP: $statusCode'
+        '\ncontent-type: ${contentType == null || contentType.isEmpty ? 'n/a' : contentType}'
+        '\nbody received: $bodyRead'
+        '\n应用会对这类瞬时错误自动重试一次；如果仍失败，请检查上游服务或反向代理是否提前断流。',
+        'Connection was interrupted before the response body finished arriving.'
+        '${requestUrl.isEmpty ? '' : '\nURL: $requestUrl'}'
+        '\nHTTP: $statusCode'
+        '\ncontent-type: ${contentType == null || contentType.isEmpty ? 'n/a' : contentType}'
+        '\nbody received: $bodyRead'
+        '\nThe app retries this transient error once automatically. If it still fails, inspect the upstream service or reverse proxy for early connection termination.',
+      );
+    }
+  }
+
   final raw = error.toString().trim();
   final lowered = raw.toLowerCase();
   final scheme = endpoint?.scheme.trim().toLowerCase() ?? '';
@@ -58,7 +89,60 @@ String describeExternalAcpTestFailure(Object error, {Uri? endpoint}) {
     );
   }
 
-  return raw;
+  return _appendExternalAcpFailureDiagnostics(raw, detailMap);
+}
+
+String _appendExternalAcpFailureDiagnostics(
+  String message,
+  Map<String, dynamic> details,
+) {
+  final requestUrl = details['requestUrl']?.toString().trim() ?? '';
+  final statusCode = details['statusCode']?.toString().trim() ?? '';
+  final contentType = details['contentType']?.toString().trim() ?? '';
+  final hasBodyRead = details.containsKey('bodyRead');
+  final bodyRead = details['bodyRead'] == true ? 'yes' : 'no';
+  final buffer = StringBuffer(message);
+  if (requestUrl.isNotEmpty) {
+    buffer.write('\nURL: $requestUrl');
+  }
+  if (statusCode.isNotEmpty) {
+    buffer.write('\nHTTP: $statusCode');
+  }
+  if (contentType.isNotEmpty) {
+    buffer.write('\ncontent-type: $contentType');
+  }
+  if (hasBodyRead) {
+    buffer.write('\nbody received: $bodyRead');
+  }
+  return buffer.toString();
+}
+
+String describeExternalAcpTestSuccess(GatewayAcpCapabilities capabilities) {
+  final diagnostics = capabilities.diagnostics;
+  final transport =
+      diagnostics['transport']?.toString().trim().toLowerCase() ?? '';
+  final statusCode = diagnostics['statusCode'];
+  final providerNames = capabilities.providers
+      .map((item) => item.providerId)
+      .toList(growable: false);
+  final providerLine = providerNames.isEmpty
+      ? appText('providers: none declared', 'providers: none declared')
+      : 'providers: ${providerNames.join('/')}';
+  if (transport.startsWith('http')) {
+    final resolvedStatus = statusCode?.toString().trim();
+    return appText(
+      'HTTP ${resolvedStatus == null || resolvedStatus.isEmpty ? 200 : resolvedStatus}\nACP capabilities ok\n$providerLine',
+      'HTTP ${resolvedStatus == null || resolvedStatus.isEmpty ? 200 : resolvedStatus}\nACP capabilities ok\n$providerLine',
+    );
+  }
+  return appText(
+    'WebSocket connected\nACP capabilities ok\n$providerLine',
+    'WebSocket connected\nACP capabilities ok\n$providerLine',
+  );
+}
+
+bool shouldRetryExternalAcpTestFailure(Object error) {
+  return error is GatewayAcpException && error.code == 'ACP_HTTP_STREAM_CLOSED';
 }
 
 extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
@@ -312,24 +396,29 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
           : await controller.settingsController.resolveSecretValueInternal(
               refName: authRef,
             );
-      final capabilities = await controller.gatewayAcpClientInternal
-          .loadCapabilities(
-            forceRefresh: true,
-            endpointOverride: endpoint,
-            authorizationOverride: authorization,
-          );
+      GatewayAcpCapabilities capabilities;
+      try {
+        capabilities = await controller.gatewayAcpClientInternal.loadCapabilities(
+          forceRefresh: true,
+          endpointOverride: endpoint,
+          authorizationOverride: authorization,
+        );
+      } catch (error) {
+        if (!shouldRetryExternalAcpTestFailure(error)) {
+          rethrow;
+        }
+        capabilities = await controller.gatewayAcpClientInternal.loadCapabilities(
+          forceRefresh: true,
+          endpointOverride: endpoint,
+          authorizationOverride: authorization,
+        );
+      }
       if (!mounted) {
         return;
       }
       setStateInternal(() {
-        externalAcpMessageByProviderInternal[providerKey] = appText(
-          capabilities.providers.isEmpty
-              ? '连接成功。'
-              : '连接成功，可用 Provider: ${capabilities.providers.map((item) => item.label).join(' / ')}',
-          capabilities.providers.isEmpty
-              ? 'Connection succeeded.'
-              : 'Connection succeeded. Providers: ${capabilities.providers.map((item) => item.label).join(' / ')}',
-        );
+        externalAcpMessageByProviderInternal[providerKey] =
+            describeExternalAcpTestSuccess(capabilities);
       });
     } catch (error) {
       if (!mounted) {

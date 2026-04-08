@@ -186,7 +186,10 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
         sessionKey,
         assistantErrorMessageSingleAgentDesktopInternal(
           controller,
-          error.toString(),
+          controller.gatewayExecutionErrorLabelInternal(
+            error,
+            target: sessionTarget,
+          ),
         ),
       );
     } finally {
