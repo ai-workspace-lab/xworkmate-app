@@ -583,7 +583,7 @@ void main() {
   );
 
   test(
-    'GatewayConnectionSnapshot keeps pairing-required visible even when status remains connected',
+    'GatewayConnectionSnapshot clears pairing-required and missing-token flags once connected',
     () {
       final snapshot = GatewayConnectionSnapshot.initial(
         mode: RuntimeConnectionMode.local,
@@ -594,7 +594,56 @@ void main() {
         lastErrorDetailCode: 'PAIRING_REQUIRED',
       );
 
-      expect(snapshot.pairingRequired, isTrue);
+      expect(snapshot.pairingRequired, isFalse);
+      expect(snapshot.gatewayTokenMissing, isFalse);
+    },
+  );
+
+  test(
+    'GatewayRuntime normalizes connected session snapshots before exposing them globally',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final store = createIsolatedTestStore();
+      final sessionClient = _FakeGatewayRuntimeSessionClient(
+        connectResult: GatewayRuntimeSessionConnectResult(
+          snapshot: GatewayConnectionSnapshot.initial(
+            mode: RuntimeConnectionMode.remote,
+          ).copyWith(
+            status: RuntimeConnectionStatus.connected,
+            statusText: 'Connected',
+            remoteAddress: 'gateway.example.com:443',
+            lastError: 'NOT_PAIRED: pairing required',
+            lastErrorCode: 'NOT_PAIRED',
+            lastErrorDetailCode: 'PAIRING_REQUIRED',
+          ),
+          auth: const <String, dynamic>{'role': 'operator'},
+          returnedDeviceToken: '',
+          raw: const <String, dynamic>{},
+        ),
+      );
+      final runtime = GatewayRuntime(
+        store: store,
+        identityStore: DeviceIdentityStore(store),
+        sessionClient: sessionClient,
+      );
+      addTearDown(runtime.dispose);
+
+      await runtime.connectProfile(
+        GatewayConnectionProfile.defaults().copyWith(
+          mode: RuntimeConnectionMode.remote,
+          host: 'gateway.example.com',
+          port: 443,
+          tls: true,
+          useSetupCode: false,
+        ),
+        authTokenOverride: 'shared-token-from-form',
+      );
+
+      expect(runtime.snapshot.status, RuntimeConnectionStatus.connected);
+      expect(runtime.snapshot.pairingRequired, isFalse);
+      expect(runtime.snapshot.lastError, isNull);
+      expect(runtime.snapshot.lastErrorCode, isNull);
+      expect(runtime.snapshot.lastErrorDetailCode, isNull);
     },
   );
 }

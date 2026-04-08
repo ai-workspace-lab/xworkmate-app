@@ -382,7 +382,7 @@ extension WebSettingsPageGatewayMixinInternal on WebSettingsPageStateInternal {
                 ),
               ),
               FilledButton(
-                key: ValueKey('web-external-acp-apply-${profile.providerKey}'),
+                key: ValueKey('web-external-acp-save-${profile.providerKey}'),
                 onPressed: () => saveExternalAcpEndpointInternal(
                   controller,
                   profile.providerKey,
