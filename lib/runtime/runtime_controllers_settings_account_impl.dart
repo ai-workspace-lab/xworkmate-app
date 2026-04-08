@@ -268,6 +268,35 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     );
     await controller.storeInternal.saveAccountSyncState(nextState);
     await controller.storeInternal.clearAccountProfile();
+    final currentSettings = controller.snapshotInternal;
+    final currentModeConfig = currentSettings.acpBridgeServerModeConfig;
+    final nextModeConfig = currentModeConfig.copyWith(
+      cloudSynced: currentModeConfig.cloudSynced.copyWith(
+        accountBaseUrl: normalizedBaseUrl,
+        accountIdentifier: currentSettings.accountUsername.trim().isNotEmpty
+            ? currentSettings.accountUsername.trim()
+            : controller.accountSessionInternal?.email.trim() ?? '',
+        lastSyncAt: nextState.lastSyncAtMs,
+        remoteServerSummary: currentModeConfig.cloudSynced.remoteServerSummary
+            .copyWith(
+              endpoint: response.profile.openclawUrl.trim().isNotEmpty
+                  ? response.profile.openclawUrl.trim()
+                  : response.profile.apisixUrl.trim(),
+              hasAdvancedOverrides:
+                  currentModeConfig.mode == AcpBridgeServerMode.advancedCustom,
+            ),
+      ),
+    );
+    if (nextModeConfig.toJson().toString() !=
+        currentModeConfig.toJson().toString()) {
+      await controller.saveSnapshot(
+        currentSettings.copyWith(
+          accountLocalMode: false,
+          acpBridgeServerModeConfig: nextModeConfig,
+        ),
+        recordAccountOverrides: false,
+      );
+    }
     await applyAccountSyncedDefaultsSettingsInternal(
       controller,
       state: nextState,
@@ -400,6 +429,25 @@ Future<void> applyAccountSyncedDefaultsSettingsInternal(
   if (next.accountLocalMode) {
     next = next.copyWith(accountLocalMode: false);
   }
+  next = next.copyWith(
+    acpBridgeServerModeConfig: next.acpBridgeServerModeConfig.copyWith(
+      cloudSynced: next.acpBridgeServerModeConfig.cloudSynced.copyWith(
+        accountBaseUrl: next.accountBaseUrl,
+        accountIdentifier: next.accountUsername,
+        lastSyncAt: state.lastSyncAtMs,
+        remoteServerSummary:
+            next.acpBridgeServerModeConfig.cloudSynced.remoteServerSummary
+                .copyWith(
+                  endpoint: defaults.openclawUrl.trim().isNotEmpty
+                      ? defaults.openclawUrl.trim()
+                      : defaults.apisixUrl.trim(),
+                  hasAdvancedOverrides:
+                      next.acpBridgeServerModeConfig.mode ==
+                      AcpBridgeServerMode.advancedCustom,
+                ),
+      ),
+    ),
+  );
 
   if (next.toJsonString() != previous.toJsonString()) {
     await controller.saveSnapshot(next, recordAccountOverrides: false);
@@ -424,7 +472,17 @@ Future<void> logoutAccountSettingsInternal(
   await controller.storeInternal.clearAccountSessionSummary();
   if (!controller.snapshotInternal.accountLocalMode) {
     await controller.saveSnapshot(
-      controller.snapshotInternal.copyWith(accountLocalMode: true),
+      controller.snapshotInternal.copyWith(
+        accountLocalMode: true,
+        acpBridgeServerModeConfig:
+            controller.snapshotInternal.acpBridgeServerModeConfig.copyWith(
+              cloudSynced: controller
+                  .snapshotInternal
+                  .acpBridgeServerModeConfig
+                  .cloudSynced
+                  .copyWith(accountIdentifier: ''),
+            ),
+      ),
       recordAccountOverrides: false,
     );
   } else {

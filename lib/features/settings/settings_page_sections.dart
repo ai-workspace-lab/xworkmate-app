@@ -306,15 +306,6 @@ extension SettingsPageSectionsMixinInternal on SettingsPageStateInternal {
                 settings.copyWith(showDockIcon: value),
               ),
             ),
-            if (uiFeatures.supportsAccountAccess)
-              SwitchRowInternal(
-                label: appText('账号本地模式', 'Account local mode'),
-                value: settings.accountLocalMode,
-                onChanged: (value) => saveSettingsInternal(
-                  controller,
-                  settings.copyWith(accountLocalMode: value),
-                ),
-              ),
           ],
         ),
       ),

@@ -3,6 +3,7 @@
 import 'dart:convert';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
+import 'runtime_models_account.dart';
 import 'runtime_models_connection.dart';
 import 'runtime_models_profiles.dart';
 import 'runtime_models_configs.dart';
@@ -40,6 +41,7 @@ class SettingsSnapshot {
     required this.accountWorkspace,
     required this.accountWorkspaceFollowed,
     required this.accountLocalMode,
+    required this.acpBridgeServerModeConfig,
     required this.linuxDesktop,
     required this.assistantExecutionTarget,
     required this.assistantPermissionLevel,
@@ -78,6 +80,7 @@ class SettingsSnapshot {
   final String accountWorkspace;
   final bool accountWorkspaceFollowed;
   final bool accountLocalMode;
+  final AcpBridgeServerModeConfig acpBridgeServerModeConfig;
   final LinuxDesktopConfig linuxDesktop;
   final AssistantExecutionTarget assistantExecutionTarget;
   final AssistantPermissionLevel assistantPermissionLevel;
@@ -117,6 +120,7 @@ class SettingsSnapshot {
       accountWorkspace: 'Default Workspace',
       accountWorkspaceFollowed: false,
       accountLocalMode: true,
+      acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults(),
       linuxDesktop: LinuxDesktopConfig.defaults(),
       assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
       assistantPermissionLevel: AssistantPermissionLevel.defaultAccess,
@@ -157,6 +161,7 @@ class SettingsSnapshot {
     String? accountWorkspace,
     bool? accountWorkspaceFollowed,
     bool? accountLocalMode,
+    AcpBridgeServerModeConfig? acpBridgeServerModeConfig,
     LinuxDesktopConfig? linuxDesktop,
     AssistantExecutionTarget? assistantExecutionTarget,
     AssistantPermissionLevel? assistantPermissionLevel,
@@ -209,6 +214,8 @@ class SettingsSnapshot {
       accountWorkspaceFollowed:
           accountWorkspaceFollowed ?? this.accountWorkspaceFollowed,
       accountLocalMode: accountLocalMode ?? this.accountLocalMode,
+      acpBridgeServerModeConfig:
+          acpBridgeServerModeConfig ?? this.acpBridgeServerModeConfig,
       linuxDesktop: linuxDesktop ?? this.linuxDesktop,
       assistantExecutionTarget:
           assistantExecutionTarget ?? this.assistantExecutionTarget,
@@ -265,6 +272,7 @@ class SettingsSnapshot {
       'accountWorkspace': accountWorkspace,
       'accountWorkspaceFollowed': accountWorkspaceFollowed,
       'accountLocalMode': accountLocalMode,
+      'acpBridgeServerModeConfig': acpBridgeServerModeConfig.toJson(),
       'linuxDesktop': linuxDesktop.toJson(),
       'assistantExecutionTarget': assistantExecutionTarget.name,
       'assistantPermissionLevel': assistantPermissionLevel.name,
@@ -424,6 +432,10 @@ class SettingsSnapshot {
       accountWorkspaceFollowed:
           json['accountWorkspaceFollowed'] as bool? ?? false,
       accountLocalMode: json['accountLocalMode'] as bool? ?? true,
+      acpBridgeServerModeConfig: AcpBridgeServerModeConfig.fromJson(
+        (json['acpBridgeServerModeConfig'] as Map?)?.cast<String, dynamic>() ??
+            const {},
+      ),
       linuxDesktop: LinuxDesktopConfig.fromJson(
         (json['linuxDesktop'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
@@ -650,6 +662,20 @@ class SettingsSnapshot {
         externalAcpEndpoints,
         provider,
         profile,
+      ),
+    );
+  }
+
+  SettingsSnapshot captureAcpBridgeServerAdvancedOverrides() {
+    return copyWith(
+      acpBridgeServerModeConfig: acpBridgeServerModeConfig.copyWith(
+        advancedOverrides: AcpBridgeServerAdvancedOverrides(
+          gatewayProfiles: gatewayProfiles,
+          vault: vault,
+          aiGateway: aiGateway,
+          acpBridgeServerProfiles: externalAcpEndpoints,
+          authorizedSkillDirectories: authorizedSkillDirectories,
+        ),
       ),
     );
   }
