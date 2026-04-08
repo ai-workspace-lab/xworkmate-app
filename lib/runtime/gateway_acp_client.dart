@@ -309,58 +309,8 @@ class GatewayAcpClient {
   }) async {
     final resolvedEndpoint = endpointOverride ?? endpointResolver();
     final scheme = resolvedEndpoint?.scheme.trim().toLowerCase() ?? '';
-    final canUseHttp = resolveAcpHttpRpcEndpoint(resolvedEndpoint) != null;
 
     if (scheme == 'http' || scheme == 'https') {
-      try {
-        return await _requestViaHttp(
-          request,
-          onNotification: onNotification,
-          endpointOverride: resolvedEndpoint,
-          authorizationOverride: authorizationOverride,
-        );
-      } catch (error) {
-        if (error is GatewayAcpException) {
-          if (!_shouldRetryViaWebSocketAfterHttpFailure(
-            error,
-            endpoint: resolvedEndpoint,
-          )) {
-            rethrow;
-          }
-          try {
-            return await _requestViaWebSocket(
-              request,
-              onNotification: onNotification,
-              endpointOverride: resolvedEndpoint,
-              authorizationOverride: authorizationOverride,
-            );
-          } catch (wsError) {
-            throw _toPreferredHttpFailureAfterWebSocketFallback(
-              httpError: error,
-              webSocketError: wsError,
-            );
-          }
-        }
-        return _requestViaWebSocket(
-          request,
-          onNotification: onNotification,
-          endpointOverride: resolvedEndpoint,
-          authorizationOverride: authorizationOverride,
-        );
-      }
-    }
-
-    try {
-      return await _requestViaWebSocket(
-        request,
-        onNotification: onNotification,
-        endpointOverride: resolvedEndpoint,
-        authorizationOverride: authorizationOverride,
-      );
-    } catch (_) {
-      if (!canUseHttp) {
-        rethrow;
-      }
       return _requestViaHttp(
         request,
         onNotification: onNotification,
@@ -368,6 +318,13 @@ class GatewayAcpClient {
         authorizationOverride: authorizationOverride,
       );
     }
+
+    return _requestViaWebSocket(
+      request,
+      onNotification: onNotification,
+      endpointOverride: resolvedEndpoint,
+      authorizationOverride: authorizationOverride,
+    );
   }
 
   Future<Map<String, dynamic>> _requestViaWebSocket(
@@ -376,35 +333,20 @@ class GatewayAcpClient {
     Uri? endpointOverride,
     String authorizationOverride = '',
   }) async {
-    final endpoints = _resolveWebSocketRpcEndpoints(endpointOverride);
-    if (endpoints.isEmpty) {
+    final endpoint = resolveAcpWebSocketEndpoint(
+      endpointOverride ?? endpointResolver(),
+    );
+    if (endpoint == null) {
       throw const GatewayAcpException(
         'Missing ACP endpoint',
         code: 'ACP_ENDPOINT_MISSING',
       );
     }
-
-    Object? lastError;
-    for (var index = 0; index < endpoints.length; index += 1) {
-      final endpoint = endpoints[index];
-      try {
-        return await _requestViaWebSocketEndpoint(
-          request,
-          endpoint: endpoint,
-          onNotification: onNotification,
-          authorizationOverride: authorizationOverride,
-        );
-      } catch (error) {
-        lastError = error;
-        if (index == endpoints.length - 1 ||
-            !_shouldTryNextWebSocketCandidate(error)) {
-          rethrow;
-        }
-      }
-    }
-    throw GatewayAcpException(
-      lastError?.toString() ?? 'ACP websocket request failed',
-      code: 'ACP_WS_RUNTIME_ERROR',
+    return _requestViaWebSocketEndpoint(
+      request,
+      endpoint: endpoint,
+      onNotification: onNotification,
+      authorizationOverride: authorizationOverride,
     );
   }
 
@@ -590,54 +532,6 @@ class GatewayAcpClient {
       return '$base · $detail';
     }
     return base;
-  }
-
-  bool _shouldRetryViaWebSocketAfterHttpFailure(
-    GatewayAcpException error, {
-    required Uri? endpoint,
-  }) {
-    if (resolveAcpWebSocketEndpoint(endpoint) == null) {
-      return false;
-    }
-    final details = asMap(error.details);
-    final statusCode = intValue(details['statusCode']);
-    final contentType = (stringValue(details['contentType']) ?? '')
-        .trim()
-        .toLowerCase();
-    return statusCode == HttpStatus.notFound &&
-        (contentType.isEmpty || contentType.contains('text/plain'));
-  }
-
-  bool _shouldTryNextWebSocketCandidate(Object error) {
-    if (error is WebSocketException ||
-        error is SocketException ||
-        error is HandshakeException ||
-        error is HttpException) {
-      return true;
-    }
-    if (error is! GatewayAcpException) {
-      return false;
-    }
-    return error.code == 'ACP_WS_EARLY_CLOSE' ||
-        error.code == 'ACP_WS_RUNTIME_ERROR' ||
-        error.code == 'ACP_WS_CONNECT_TIMEOUT';
-  }
-
-  GatewayAcpException _toPreferredHttpFailureAfterWebSocketFallback({
-    required GatewayAcpException httpError,
-    required Object webSocketError,
-  }) {
-    final wsError = webSocketError is GatewayAcpException
-        ? webSocketError
-        : null;
-    return GatewayAcpException(
-      httpError.message,
-      code: httpError.code,
-      details: <String, dynamic>{
-        ...asMap(httpError.details),
-        if (wsError?.code != null) 'websocketFallbackCode': wsError!.code,
-      },
-    );
   }
 
   bool _contentTypeLooksJsonOrSse(String contentType) {
@@ -877,30 +771,6 @@ class GatewayAcpClient {
       return decoded.cast<String, dynamic>();
     }
     return const <String, dynamic>{};
-  }
-
-  List<Uri> _resolveWebSocketRpcEndpoints([Uri? endpointOverride]) {
-    final endpoint = endpointOverride ?? endpointResolver();
-    if (endpoint == null || endpoint.host.trim().isEmpty) {
-      return const <Uri>[];
-    }
-    final candidates = <Uri>[];
-    final derived = resolveAcpWebSocketEndpoint(endpoint);
-    if (derived != null) {
-      candidates.add(derived);
-    }
-    final scheme = switch (endpoint.scheme.trim().toLowerCase()) {
-      'https' || 'wss' => 'wss',
-      _ => 'ws',
-    };
-    final raw = endpoint.replace(scheme: scheme, query: null, fragment: null);
-    final duplicate = candidates.any(
-      (candidate) => candidate.toString() == raw.toString(),
-    );
-    if (!duplicate) {
-      candidates.add(raw);
-    }
-    return candidates;
   }
 
   Uri? _resolveHttpRpcEndpoint([Uri? endpointOverride]) {

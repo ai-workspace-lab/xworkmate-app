@@ -691,39 +691,14 @@ extension AppControllerWebHelpers on AppController {
   Future<Map<String, dynamic>> requestAcpSessionMessageInternal({
     required Uri endpoint,
     required Map<String, dynamic> params,
-    required bool hasInlineAttachments,
     void Function(Map<String, dynamic> notification)? onNotification,
   }) async {
-    try {
-      return await acpClientInternal.request(
-        endpoint: endpoint,
-        method: 'session.message',
-        params: params,
-        onNotification: onNotification,
-      );
-    } on WebAcpException catch (error) {
-      if (!hasInlineAttachments ||
-          !canFallbackInlineAttachmentsInternal(error)) {
-        rethrow;
-      }
-      final fallbackParams = Map<String, dynamic>.from(params)
-        ..remove('inlineAttachments');
-      try {
-        return await acpClientInternal.request(
-          endpoint: endpoint,
-          method: 'session.message',
-          params: fallbackParams,
-          onNotification: onNotification,
-        );
-      } on Object catch (fallbackError) {
-        throw Exception(
-          appText(
-            'ACP 暂不支持 inline 附件，回退旧协议也失败：$fallbackError',
-            'ACP does not support inline attachments, and fallback to legacy attachment payload failed: $fallbackError',
-          ),
-        );
-      }
-    }
+    return acpClientInternal.request(
+      endpoint: endpoint,
+      method: 'session.message',
+      params: params,
+      onNotification: onNotification,
+    );
   }
 
   Future<void> refreshAcpCapabilitiesInternal(Uri endpoint) async {
@@ -734,18 +709,6 @@ extension AppControllerWebHelpers on AppController {
     } catch (_) {
       acpCapabilitiesInternal = const WebAcpCapabilities.empty();
     }
-  }
-
-  bool canFallbackInlineAttachmentsInternal(WebAcpException error) {
-    final code = (error.code ?? '').trim();
-    if (code == '-32602' || code == 'INVALID_PARAMS') {
-      return true;
-    }
-    final message = error.toString().toLowerCase();
-    return message.contains('inlineattachment') ||
-        message.contains('unexpected field') ||
-        message.contains('unknown field') ||
-        message.contains('invalid params');
   }
 
   bool unsupportedAcpSkillsStatusInternal(WebAcpException error) {
