@@ -1,13 +1,17 @@
 // ignore_for_file: unused_import, unnecessary_import
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
 import '../../runtime/gateway_acp_client.dart';
+import '../../runtime/runtime_controllers.dart';
 import '../../runtime/runtime_models.dart';
+import '../../models/app_models.dart';
+import '../../widgets/surface_card.dart';
 import 'settings_page_core.dart';
 import 'settings_page_support.dart';
 import 'settings_page_widgets.dart';
@@ -146,6 +150,294 @@ bool shouldRetryExternalAcpTestFailure(Object error) {
 }
 
 extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
+  Widget buildAcpBridgeServerModeCardInternal(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
+    syncAcpBridgeServerModeDraftControllersInternal(settings);
+    final modeConfig = settings.acpBridgeServerModeConfig;
+    final accountController = controller.settingsController;
+    final accountSyncState = accountController.accountSyncState;
+    final accountSignedIn = accountController.accountSignedIn;
+    final accountBusy = accountController.accountBusy;
+    final cloudSync = modeConfig.cloudSynced;
+    final remoteSummary = cloudSync.remoteServerSummary;
+    final currentSource = switch (modeConfig.sourceTag) {
+      'cloudSynced' => appText('云端同步', 'Cloud Sync'),
+      'selfHosted' => appText('本地 Server', 'Self-hosted Server'),
+      _ => appText('高级覆盖', 'Advanced Override'),
+    };
+    final syncStatus = accountSyncState?.syncState.trim().isNotEmpty == true
+        ? accountSyncState!.syncState
+        : appText('未同步', 'Not synced');
+    final lastSyncLabel = cloudSync.lastSyncAt <= 0
+        ? appText('尚未同步', 'Not synced yet')
+        : DateTime.fromMillisecondsSinceEpoch(
+            cloudSync.lastSyncAt,
+          ).toLocal().toIso8601String();
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'XWorkmate ACP Bridge Server',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            appText(
+              'XWorkmate App 继续只承担纯客户端职责：配置、会话、安全存储与连接编排。云端、自托管和高级自定义都通过这里统一收口，不在 App 内承载服务端逻辑。',
+              'XWorkmate App remains a pure client: configuration, session, secure storage, and connection orchestration only. Cloud, self-hosted, and advanced custom flows are unified here without embedding server responsibilities into the app.',
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              ChoiceChip(
+                key: const ValueKey('acp-bridge-mode-cloud'),
+                label: Text(appText('在线同步配置', 'Cloud Sync')),
+                selected: modeConfig.mode == AcpBridgeServerMode.cloudSynced,
+                onSelected: (_) => saveSettingsInternal(
+                  controller,
+                  settings.copyWith(
+                    accountLocalMode: false,
+                    acpBridgeServerModeConfig: modeConfig.copyWith(
+                      mode: AcpBridgeServerMode.cloudSynced,
+                    ),
+                  ),
+                ),
+              ),
+              ChoiceChip(
+                key: const ValueKey('acp-bridge-mode-self-hosted'),
+                label: Text(appText('本地模式', 'Self-hosted')),
+                selected: modeConfig.mode == AcpBridgeServerMode.selfHosted,
+                onSelected: (_) => saveSettingsInternal(
+                  controller,
+                  settings.copyWith(
+                    accountLocalMode: true,
+                    acpBridgeServerModeConfig: modeConfig.copyWith(
+                      mode: AcpBridgeServerMode.selfHosted,
+                    ),
+                  ),
+                ),
+              ),
+              ChoiceChip(
+                key: const ValueKey('acp-bridge-mode-advanced'),
+                label: Text(appText('高级自定义', 'Advanced Custom')),
+                selected: modeConfig.mode == AcpBridgeServerMode.advancedCustom,
+                onSelected: (_) => saveSettingsInternal(
+                  controller,
+                  settings.captureAcpBridgeServerAdvancedOverrides().copyWith(
+                    acpBridgeServerModeConfig: settings
+                        .captureAcpBridgeServerAdvancedOverrides()
+                        .acpBridgeServerModeConfig
+                        .copyWith(mode: AcpBridgeServerMode.advancedCustom),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              StatusChipInternal(
+                label: '${appText('当前来源', 'Source')}: $currentSource',
+                tone: StatusChipToneInternal.ready,
+              ),
+              StatusChipInternal(
+                label: '${appText('同步状态', 'Sync')}: $syncStatus',
+                tone: accountSignedIn
+                    ? StatusChipToneInternal.ready
+                    : StatusChipToneInternal.idle,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...switch (modeConfig.mode) {
+            AcpBridgeServerMode.cloudSynced => <Widget>[
+              Text(
+                accountSignedIn
+                    ? appText(
+                        '已登录云账户，可直接同步远端 ACP Bridge Server 配置。',
+                        'Signed in to the cloud account. You can sync the remote ACP Bridge Server configuration directly.',
+                      )
+                    : appText(
+                        '当前未登录云账户。普通用户建议先登录，再从云端同步默认配置。',
+                        'No cloud account is signed in. For most users, sign in first and sync the default configuration from the cloud.',
+                      ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '${appText('服务地址', 'Service URL')}: ${cloudSync.accountBaseUrl.trim().isEmpty ? settings.accountBaseUrl : cloudSync.accountBaseUrl}',
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${appText('账号', 'Account')}: ${cloudSync.accountIdentifier.trim().isEmpty ? settings.accountUsername : cloudSync.accountIdentifier}',
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${appText('远端摘要', 'Remote Summary')}: ${remoteSummary.endpoint.trim().isEmpty ? appText('待同步', 'Pending sync') : remoteSummary.endpoint}',
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${appText('最近同步', 'Last Sync')}: $lastSyncLabel',
+                key: const ValueKey('acp-bridge-cloud-last-sync'),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${appText('高级覆盖', 'Advanced Override')}: ${remoteSummary.hasAdvancedOverrides ? appText('存在', 'Present') : appText('无', 'None')}',
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  FilledButton.tonal(
+                    key: const ValueKey('acp-bridge-cloud-open-account'),
+                    onPressed: () =>
+                        controller.navigateTo(WorkspaceDestination.account),
+                    child: Text(appText('登录 / 管理账号', 'Open Account')),
+                  ),
+                  FilledButton.tonal(
+                    key: const ValueKey('acp-bridge-cloud-sync'),
+                    onPressed: accountBusy || !accountSignedIn
+                        ? null
+                        : () => accountController.syncAccountSettings(
+                            baseUrl: settings.accountBaseUrl,
+                          ),
+                    child: Text(appText('重新同步', 'Sync Again')),
+                  ),
+                  FilledButton.tonal(
+                    key: const ValueKey('acp-bridge-cloud-disconnect'),
+                    onPressed: accountBusy || !accountSignedIn
+                        ? null
+                        : accountController.logoutAccount,
+                    child: Text(appText('断开', 'Disconnect')),
+                  ),
+                ],
+              ),
+            ],
+            AcpBridgeServerMode.selfHosted => <Widget>[
+              buildAcpBridgeServerSelfHostedPanelInternal(
+                context,
+                controller,
+                settings,
+              ),
+            ],
+            AcpBridgeServerMode.advancedCustom => <Widget>[
+              Text(
+                appText(
+                  '高级自定义会把下面的 OpenClaw Gateway / Vault Server / LLM Endpoint / 外部 ACP Server endpoint / SKILLS 目录 当作覆盖层。未覆盖的值继续继承当前基础模式。',
+                  'Advanced custom mode treats the OpenClaw Gateway / Vault Server / LLM Endpoint / external ACP server endpoint / SKILLS directory below as overrides. Fields you do not override keep inheriting from the current base mode.',
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.tonal(
+                key: const ValueKey('acp-bridge-advanced-reset'),
+                onPressed: () => resetAcpBridgeServerAdvancedOverridesInternal(
+                  controller,
+                  settings,
+                ),
+                child: Text(appText('清空高级覆盖', 'Clear Advanced Overrides')),
+              ),
+            ],
+          },
+        ],
+      ),
+    );
+  }
+
+  Widget buildAcpBridgeServerSelfHostedPanelInternal(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+  ) {
+    final selfHosted = settings.acpBridgeServerModeConfig.selfHosted;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          key: const ValueKey('acp-bridge-self-hosted-url'),
+          controller: acpBridgeServerUrlControllerInternal,
+          decoration: InputDecoration(
+            labelText: appText(
+              'ACP Bridge Server URL',
+              'ACP Bridge Server URL',
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('acp-bridge-self-hosted-username'),
+          controller: acpBridgeServerUsernameControllerInternal,
+          decoration: InputDecoration(
+            labelText: appText('用户', 'Username'),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const ValueKey('acp-bridge-self-hosted-password'),
+          controller: acpBridgeServerPasswordControllerInternal,
+          obscureText: true,
+          decoration: InputDecoration(
+            labelText: appText('密码', 'Password'),
+            helperText: appText(
+              '密码只进入平台 secure storage，不写入普通 settings。',
+              'The password is stored only in platform secure storage and never in plain settings.',
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '${appText('密码引用', 'Password Ref')}: ${selfHosted.passwordRef}',
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            OutlinedButton(
+              key: const ValueKey('acp-bridge-self-hosted-test'),
+              onPressed: acpBridgeServerSelfHostedTestingInternal
+                  ? null
+                  : () => testAcpBridgeServerSelfHostedInternal(controller),
+              child: Text(
+                acpBridgeServerSelfHostedTestingInternal
+                    ? appText('测试中...', 'Testing...')
+                    : appText('测试连接', 'Test Connection'),
+              ),
+            ),
+            FilledButton.tonal(
+              key: const ValueKey('acp-bridge-self-hosted-save'),
+              onPressed: () => saveAcpBridgeServerSelfHostedInternal(
+                controller,
+                settings,
+              ),
+              child: Text(appText('保存', 'Save')),
+            ),
+            FilledButton(
+              key: const ValueKey('acp-bridge-self-hosted-connect'),
+              onPressed: () => connectAcpBridgeServerSelfHostedInternal(
+                controller,
+                settings,
+              ),
+              child: Text(appText('连接', 'Connect')),
+            ),
+          ],
+        ),
+        if (acpBridgeServerSelfHostedMessageInternal.trim().isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text(acpBridgeServerSelfHostedMessageInternal),
+        ],
+      ],
+    );
+  }
+
   Widget buildExternalAcpEndpointManagerInternal(
     BuildContext context,
     AppController controller,
@@ -192,6 +484,152 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
         ),
       ],
     );
+  }
+
+  Future<void> saveAcpBridgeServerSelfHostedInternal(
+    AppController controller,
+    SettingsSnapshot settings,
+  ) async {
+    final modeConfig = settings.acpBridgeServerModeConfig;
+    final nextSelfHosted = modeConfig.selfHosted.copyWith(
+      serverUrl: acpBridgeServerUrlControllerInternal.text,
+      username: acpBridgeServerUsernameControllerInternal.text,
+    );
+    final password = acpBridgeServerPasswordControllerInternal.text.trim();
+    if (password.isNotEmpty) {
+      await controller.settingsController.saveSecretValueByRef(
+        nextSelfHosted.passwordRef,
+        password,
+        provider: 'ACP Bridge Server',
+        module: 'Settings',
+      );
+    }
+    final nextSettings = settings.captureAcpBridgeServerAdvancedOverrides().copyWith(
+      accountLocalMode: true,
+      acpBridgeServerModeConfig: settings
+          .captureAcpBridgeServerAdvancedOverrides()
+          .acpBridgeServerModeConfig
+          .copyWith(
+            mode: AcpBridgeServerMode.selfHosted,
+            selfHosted: nextSelfHosted,
+          ),
+    );
+    await saveSettingsInternal(controller, nextSettings);
+    if (!mounted) {
+      return;
+    }
+    acpBridgeServerPasswordControllerInternal.clear();
+    setStateInternal(() {
+      acpBridgeServerSelfHostedMessageInternal = appText(
+        'Self-hosted 配置已保存，密码已进入 secure storage。',
+        'The self-hosted configuration was saved and the password is now in secure storage.',
+      );
+    });
+  }
+
+  Future<void> connectAcpBridgeServerSelfHostedInternal(
+    AppController controller,
+    SettingsSnapshot settings,
+  ) async {
+    await saveAcpBridgeServerSelfHostedInternal(controller, settings);
+    if (!mounted) {
+      return;
+    }
+    await testAcpBridgeServerSelfHostedInternal(controller);
+  }
+
+  Future<void> testAcpBridgeServerSelfHostedInternal(
+    AppController controller,
+  ) async {
+    final endpointText = acpBridgeServerUrlControllerInternal.text.trim();
+    final username = acpBridgeServerUsernameControllerInternal.text.trim();
+    if (endpointText.isEmpty || username.isEmpty) {
+      setStateInternal(() {
+        acpBridgeServerSelfHostedMessageInternal = appText(
+          '请先填写 URL 和用户。',
+          'Enter the URL and username first.',
+        );
+      });
+      return;
+    }
+    final endpoint = Uri.tryParse(endpointText);
+    if (endpoint == null || endpoint.host.trim().isEmpty) {
+      setStateInternal(() {
+        acpBridgeServerSelfHostedMessageInternal = appText(
+          '请输入有效的 ACP Bridge Server URL。',
+          'Enter a valid ACP Bridge Server URL.',
+        );
+      });
+      return;
+    }
+    final password =
+        acpBridgeServerPasswordControllerInternal.text.trim().isNotEmpty
+        ? acpBridgeServerPasswordControllerInternal.text.trim()
+        : await controller.settingsController.loadSecretValueByRef(
+            controller.settings.acpBridgeServerModeConfig.selfHosted.passwordRef,
+          );
+    final authorization = password.isEmpty
+        ? ''
+        : 'Basic ${base64Encode(utf8.encode('$username:$password'))}';
+    setStateInternal(() {
+      acpBridgeServerSelfHostedTestingInternal = true;
+      acpBridgeServerSelfHostedMessageInternal = '';
+    });
+    try {
+      final capabilities = await controller.gatewayAcpClientInternal
+          .loadCapabilities(
+            forceRefresh: true,
+            endpointOverride: endpoint,
+            authorizationOverride: authorization,
+          );
+      if (!mounted) {
+        return;
+      }
+      setStateInternal(() {
+        acpBridgeServerSelfHostedMessageInternal =
+            describeExternalAcpTestSuccess(capabilities);
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setStateInternal(() {
+        acpBridgeServerSelfHostedMessageInternal =
+            describeExternalAcpTestFailure(error, endpoint: endpoint);
+      });
+    } finally {
+      if (mounted) {
+        setStateInternal(() {
+          acpBridgeServerSelfHostedTestingInternal = false;
+        });
+      }
+    }
+  }
+
+  Future<void> resetAcpBridgeServerAdvancedOverridesInternal(
+    AppController controller,
+    SettingsSnapshot settings,
+  ) async {
+    var next = settings.copyWith(
+      gatewayProfiles: SettingsSnapshot.defaults().gatewayProfiles,
+      vault: VaultConfig.defaults(),
+      aiGateway: AiGatewayProfile.defaults(),
+      externalAcpEndpoints: SettingsSnapshot.defaults().externalAcpEndpoints,
+      authorizedSkillDirectories:
+          SettingsSnapshot.defaults().authorizedSkillDirectories,
+      acpBridgeServerModeConfig: settings.acpBridgeServerModeConfig.copyWith(
+        mode: settings.acpBridgeServerModeConfig.usesSelfHostedBase
+            ? AcpBridgeServerMode.selfHosted
+            : AcpBridgeServerMode.cloudSynced,
+      ),
+    );
+    await saveSettingsInternal(controller, next);
+    if (controller.settingsController.accountSignedIn &&
+        next.acpBridgeServerModeConfig.usesCloudSyncBase) {
+      await controller.settingsController.syncAccountSettings(
+        baseUrl: next.accountBaseUrl,
+      );
+    }
   }
 
   Widget buildExternalAcpProviderCardInternal(
