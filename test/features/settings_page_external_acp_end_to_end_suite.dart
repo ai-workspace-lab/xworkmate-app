@@ -19,7 +19,7 @@ Future<void> _waitForText(
   final deadline = DateTime.now().add(timeout);
   while (finder.evaluate().isEmpty) {
     if (DateTime.now().isAfter(deadline)) {
-      fail('Timed out waiting for ${finder.description}');
+      fail('Timed out waiting for $finder');
     }
     await tester.pump(const Duration(milliseconds: 50));
   }
