@@ -407,6 +407,27 @@ XWorkmate Privacy Policy
     );
   }
 
+  void syncAcpBridgeServerModeDraftControllersInternal(
+    SettingsSnapshot settings,
+  ) {
+    final selfHosted = settings.acpBridgeServerModeConfig.selfHosted;
+    syncDraftControllerValueInternal(
+      acpBridgeServerUrlControllerInternal,
+      selfHosted.serverUrl,
+      syncedValue: acpBridgeServerUrlSyncedValueInternal,
+      onSyncedValueChanged: (value) =>
+          acpBridgeServerUrlSyncedValueInternal = value,
+    );
+    syncDraftControllerValueInternal(
+      acpBridgeServerUsernameControllerInternal,
+      selfHosted.username,
+      syncedValue: acpBridgeServerUsernameSyncedValueInternal,
+      onSyncedValueChanged: (value) =>
+          acpBridgeServerUsernameSyncedValueInternal = value,
+    );
+    acpBridgeServerPasswordRefSyncedValueInternal = selfHosted.passwordRef;
+  }
+
   void disposeRemovedExternalAcpDraftsInternal(
     Map<String, TextEditingController> controllers,
     Set<String> activeKeys,
