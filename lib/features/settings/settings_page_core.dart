@@ -70,6 +70,9 @@ class SettingsPageStateInternal extends State<SettingsPage> {
   late final TextEditingController vaultTokenControllerInternal;
   late final TextEditingController ollamaApiKeyControllerInternal;
   late final TextEditingController runtimeLogFilterControllerInternal;
+  late final TextEditingController acpBridgeServerUrlControllerInternal;
+  late final TextEditingController acpBridgeServerUsernameControllerInternal;
+  late final TextEditingController acpBridgeServerPasswordControllerInternal;
   late final Map<String, TextEditingController>
   externalAcpLabelControllersInternal;
   late final Map<String, TextEditingController>
@@ -102,6 +105,11 @@ class SettingsPageStateInternal extends State<SettingsPage> {
   String aiGatewayTestStateInternal = 'idle';
   String aiGatewayTestMessageInternal = '';
   String aiGatewayTestEndpointInternal = '';
+  String acpBridgeServerUrlSyncedValueInternal = '';
+  String acpBridgeServerUsernameSyncedValueInternal = '';
+  String acpBridgeServerPasswordRefSyncedValueInternal = '';
+  bool acpBridgeServerSelfHostedTestingInternal = false;
+  String acpBridgeServerSelfHostedMessageInternal = '';
   GatewayIntegrationSubTabInternal integrationSubTabInternal =
       GatewayIntegrationSubTabInternal.gateway;
   int llmEndpointSlotLimitInternal = 1;
@@ -174,6 +182,9 @@ class SettingsPageStateInternal extends State<SettingsPage> {
     vaultTokenControllerInternal = TextEditingController();
     ollamaApiKeyControllerInternal = TextEditingController();
     runtimeLogFilterControllerInternal = TextEditingController();
+    acpBridgeServerUrlControllerInternal = TextEditingController();
+    acpBridgeServerUsernameControllerInternal = TextEditingController();
+    acpBridgeServerPasswordControllerInternal = TextEditingController();
     externalAcpLabelControllersInternal = <String, TextEditingController>{};
     externalAcpEndpointControllersInternal = <String, TextEditingController>{};
     externalAcpAuthControllersInternal = <String, TextEditingController>{};
@@ -251,6 +262,9 @@ class SettingsPageStateInternal extends State<SettingsPage> {
     vaultTokenControllerInternal.dispose();
     ollamaApiKeyControllerInternal.dispose();
     runtimeLogFilterControllerInternal.dispose();
+    acpBridgeServerUrlControllerInternal.dispose();
+    acpBridgeServerUsernameControllerInternal.dispose();
+    acpBridgeServerPasswordControllerInternal.dispose();
     for (final controller in externalAcpLabelControllersInternal.values) {
       controller.dispose();
     }

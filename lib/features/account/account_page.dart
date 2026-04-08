@@ -229,7 +229,13 @@ class _AccountPageState extends State<AccountPage> {
     String profileDescription,
     String sessionStatusText,
     String syncStatusText,
+    AccountSyncState? accountSyncState,
   ) {
+    final cloudSync = settings.acpBridgeServerModeConfig.cloudSynced;
+    final remoteSummary = cloudSync.remoteServerSummary;
+    final syncSummaryText = remoteSummary.endpoint.trim().isEmpty
+        ? appText('还没有云端 ACP Bridge Server 摘要。', 'No cloud ACP Bridge Server summary yet.')
+        : remoteSummary.endpoint;
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -257,6 +263,51 @@ class _AccountPageState extends State<AccountPage> {
             syncStatusText,
             key: const ValueKey('account-sync-status'),
             style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  appText('云端 ACP Bridge Server 摘要', 'Cloud ACP Bridge Server Summary'),
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${appText('服务地址', 'Service URL')}: ${cloudSync.accountBaseUrl.trim().isEmpty ? settings.accountBaseUrl : cloudSync.accountBaseUrl}',
+                  key: const ValueKey('account-acp-sync-summary-url'),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${appText('同步目标', 'Synced Target')}: $syncSummaryText',
+                  key: const ValueKey('account-acp-sync-summary-endpoint'),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${appText('最近同步', 'Last Sync')}: ${accountSyncState == null || cloudSync.lastSyncAt <= 0 ? appText('尚未同步', 'Not synced yet') : DateTime.fromMillisecondsSinceEpoch(cloudSync.lastSyncAt).toLocal().toIso8601String()}',
+                ),
+                const SizedBox(height: 10),
+                FilledButton.tonal(
+                  key: const ValueKey('account-open-settings-acp'),
+                  onPressed: () => widget.controller.openSettings(
+                    tab: SettingsTab.gateway,
+                  ),
+                  child: Text(
+                    appText(
+                      '前往设置中的 ACP Bridge Server',
+                      'Open ACP Bridge Server in Settings',
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -364,22 +415,17 @@ class _AccountPageState extends State<AccountPage> {
             : '${accountSyncState.syncState} · ${accountSyncState.syncMessage}';
         final profileDescription = accountSignedIn
             ? appText(
-                '已登录，远端配置作为默认值；本地保存项优先',
-                'Signed in. Remote defaults apply first, and local saved values win.',
+                '这里继续只负责账号身份、MFA、工作区与同步摘要。ACP Bridge Server 的三模式配置已统一收口到设置页。',
+                'This page now focuses on identity, MFA, workspace, and sync summary only. ACP Bridge Server mode configuration now lives in Settings.',
               )
             : accountMfaRequired
             ? appText(
                 '请输入 MFA 验证码完成同步，也可以返回编辑账号信息。',
                 'Enter the MFA code to finish sync, or return to edit account details.',
               )
-            : settings.accountLocalMode
-            ? appText(
-                '本地模式 · 仅保存工作区偏好',
-                'Local mode · saves workspace preferences only',
-              )
             : appText(
-                '登录后会同步远端默认配置，本地保存项可以覆盖远端默认值。',
-                'Signing in syncs remote defaults, and local saved values can override them.',
+                '登录后会同步云端默认配置；更细粒度的 Bridge Server、自托管和高级自定义请前往设置页。',
+                'Signing in syncs the cloud defaults. For bridge server self-hosting and advanced overrides, use the Settings page.',
               );
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
@@ -427,6 +473,7 @@ class _AccountPageState extends State<AccountPage> {
                     profileDescription,
                     sessionStatusText,
                     syncStatusText,
+                    accountSyncState,
                   ),
               if (_tab == AccountTab.workspace)
                 SurfaceCard(

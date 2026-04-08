@@ -456,6 +456,7 @@ SettingsSnapshot buildAssistantPageTestSettingsSnapshotInternal(
     accountWorkspace: defaults.accountWorkspace,
     accountWorkspaceFollowed: defaults.accountWorkspaceFollowed,
     accountLocalMode: defaults.accountLocalMode,
+    acpBridgeServerModeConfig: defaults.acpBridgeServerModeConfig,
     linuxDesktop: defaults.linuxDesktop,
     assistantExecutionTarget: assistantExecutionTarget,
     assistantPermissionLevel: defaults.assistantPermissionLevel,
