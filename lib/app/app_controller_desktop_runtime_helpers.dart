@@ -208,6 +208,31 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     return error.toString();
   }
 
+  String gatewayExecutionErrorLabelInternal(
+    Object error, {
+    required AssistantExecutionTarget target,
+  }) {
+    final raw = error.toString().trim();
+    final lowered = raw.toLowerCase();
+    if (lowered.contains('gateway not connected') ||
+        lowered.contains('code: offline') ||
+        lowered.contains('offlin') && lowered.contains('gateway')) {
+      final profile = gatewayProfileForAssistantExecutionTargetInternal(target);
+      final address = gatewayAddressLabelInternal(profile);
+      final targetLabel = target.label;
+      return address == appText('未连接目标', 'No target')
+          ? appText(
+              '当前线程目标网关未连接。请先连接 $targetLabel，然后再重试。',
+              'The selected gateway target for this thread is not connected. Connect $targetLabel first, then try again.',
+            )
+          : appText(
+              '当前线程目标网关未连接：$address。请先连接后再重试。',
+              'The selected gateway target for this thread is not connected: $address. Connect it first, then try again.',
+            );
+    }
+    return raw;
+  }
+
   String formatAiGatewayHttpErrorInternal(int statusCode, String detail) {
     final base = switch (statusCode) {
       400 => appText(
