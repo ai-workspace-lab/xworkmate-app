@@ -25,7 +25,7 @@ extension SettingsControllerAccountExtension on SettingsController {
     if (local.isNotEmpty) {
       return local;
     }
-    if (snapshotInternal.accountLocalMode) {
+    if (!snapshotInternal.acpBridgeServerModeConfig.usesCloudSyncBase) {
       return '';
     }
     return accountSyncStateInternal?.syncedDefaults.apisixUrl.trim() ?? '';

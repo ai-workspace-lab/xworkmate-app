@@ -1,3 +1,6 @@
+import 'runtime_models_configs.dart';
+import 'runtime_models_profiles.dart';
+
 class AccountSessionSummary {
   const AccountSessionSummary({
     required this.userId,
@@ -252,6 +255,346 @@ class AccountRemoteProfile {
       }
     }
     return null;
+  }
+}
+
+enum AcpBridgeServerMode { cloudSynced, selfHosted, advancedCustom }
+
+class AcpBridgeServerRemoteServerSummary {
+  const AcpBridgeServerRemoteServerSummary({
+    required this.endpoint,
+    required this.hasAdvancedOverrides,
+  });
+
+  final String endpoint;
+  final bool hasAdvancedOverrides;
+
+  factory AcpBridgeServerRemoteServerSummary.defaults() {
+    return const AcpBridgeServerRemoteServerSummary(
+      endpoint: '',
+      hasAdvancedOverrides: false,
+    );
+  }
+
+  AcpBridgeServerRemoteServerSummary copyWith({
+    String? endpoint,
+    bool? hasAdvancedOverrides,
+  }) {
+    return AcpBridgeServerRemoteServerSummary(
+      endpoint: endpoint ?? this.endpoint,
+      hasAdvancedOverrides: hasAdvancedOverrides ?? this.hasAdvancedOverrides,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'endpoint': endpoint,
+      'hasAdvancedOverrides': hasAdvancedOverrides,
+    };
+  }
+
+  factory AcpBridgeServerRemoteServerSummary.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return AcpBridgeServerRemoteServerSummary(
+      endpoint: json['endpoint'] as String? ?? '',
+      hasAdvancedOverrides: json['hasAdvancedOverrides'] as bool? ?? false,
+    );
+  }
+}
+
+class AcpBridgeServerCloudSyncConfig {
+  const AcpBridgeServerCloudSyncConfig({
+    required this.accountBaseUrl,
+    required this.accountIdentifier,
+    required this.lastSyncAt,
+    required this.remoteServerSummary,
+  });
+
+  final String accountBaseUrl;
+  final String accountIdentifier;
+  final int lastSyncAt;
+  final AcpBridgeServerRemoteServerSummary remoteServerSummary;
+
+  factory AcpBridgeServerCloudSyncConfig.defaults() {
+    return AcpBridgeServerCloudSyncConfig(
+      accountBaseUrl: '',
+      accountIdentifier: '',
+      lastSyncAt: 0,
+      remoteServerSummary: AcpBridgeServerRemoteServerSummary.defaults(),
+    );
+  }
+
+  AcpBridgeServerCloudSyncConfig copyWith({
+    String? accountBaseUrl,
+    String? accountIdentifier,
+    int? lastSyncAt,
+    AcpBridgeServerRemoteServerSummary? remoteServerSummary,
+  }) {
+    return AcpBridgeServerCloudSyncConfig(
+      accountBaseUrl: accountBaseUrl ?? this.accountBaseUrl,
+      accountIdentifier: accountIdentifier ?? this.accountIdentifier,
+      lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+      remoteServerSummary: remoteServerSummary ?? this.remoteServerSummary,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'accountBaseUrl': accountBaseUrl,
+      'accountIdentifier': accountIdentifier,
+      'lastSyncAt': lastSyncAt,
+      'remoteServerSummary': remoteServerSummary.toJson(),
+    };
+  }
+
+  factory AcpBridgeServerCloudSyncConfig.fromJson(Map<String, dynamic> json) {
+    return AcpBridgeServerCloudSyncConfig(
+      accountBaseUrl: json['accountBaseUrl'] as String? ?? '',
+      accountIdentifier: json['accountIdentifier'] as String? ?? '',
+      lastSyncAt: (json['lastSyncAt'] as num?)?.toInt() ?? 0,
+      remoteServerSummary: AcpBridgeServerRemoteServerSummary.fromJson(
+        (json['remoteServerSummary'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
+      ),
+    );
+  }
+}
+
+class AcpBridgeServerSelfHostedConfig {
+  const AcpBridgeServerSelfHostedConfig({
+    required this.serverUrl,
+    required this.username,
+    required this.passwordRef,
+  });
+
+  final String serverUrl;
+  final String username;
+  final String passwordRef;
+
+  factory AcpBridgeServerSelfHostedConfig.defaults() {
+    return const AcpBridgeServerSelfHostedConfig(
+      serverUrl: '',
+      username: '',
+      passwordRef: 'acp_bridge_server_password',
+    );
+  }
+
+  AcpBridgeServerSelfHostedConfig copyWith({
+    String? serverUrl,
+    String? username,
+    String? passwordRef,
+  }) {
+    return AcpBridgeServerSelfHostedConfig(
+      serverUrl: (serverUrl ?? this.serverUrl).trim(),
+      username: (username ?? this.username).trim(),
+      passwordRef: (passwordRef ?? this.passwordRef).trim(),
+    );
+  }
+
+  bool get isConfigured =>
+      serverUrl.trim().isNotEmpty && username.trim().isNotEmpty;
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'serverUrl': serverUrl,
+      'username': username,
+      'passwordRef': passwordRef,
+    };
+  }
+
+  factory AcpBridgeServerSelfHostedConfig.fromJson(Map<String, dynamic> json) {
+    return AcpBridgeServerSelfHostedConfig(
+      serverUrl: json['serverUrl'] as String? ?? '',
+      username: json['username'] as String? ?? '',
+      passwordRef:
+          json['passwordRef'] as String? ??
+          AcpBridgeServerSelfHostedConfig.defaults().passwordRef,
+    );
+  }
+}
+
+class AcpBridgeServerAdvancedOverrides {
+  const AcpBridgeServerAdvancedOverrides({
+    required this.gatewayProfiles,
+    required this.vault,
+    required this.aiGateway,
+    required this.acpBridgeServerProfiles,
+    required this.authorizedSkillDirectories,
+  });
+
+  final List<GatewayConnectionProfile> gatewayProfiles;
+  final VaultConfig vault;
+  final AiGatewayProfile aiGateway;
+  final List<ExternalAcpEndpointProfile> acpBridgeServerProfiles;
+  final List<AuthorizedSkillDirectory> authorizedSkillDirectories;
+
+  factory AcpBridgeServerAdvancedOverrides.defaults() {
+    return AcpBridgeServerAdvancedOverrides(
+      gatewayProfiles: normalizeGatewayProfiles(),
+      vault: VaultConfig.defaults(),
+      aiGateway: AiGatewayProfile.defaults(),
+      acpBridgeServerProfiles: normalizeExternalAcpEndpoints(),
+      authorizedSkillDirectories: normalizeAuthorizedSkillDirectories(),
+    );
+  }
+
+  AcpBridgeServerAdvancedOverrides copyWith({
+    List<GatewayConnectionProfile>? gatewayProfiles,
+    VaultConfig? vault,
+    AiGatewayProfile? aiGateway,
+    List<ExternalAcpEndpointProfile>? acpBridgeServerProfiles,
+    List<AuthorizedSkillDirectory>? authorizedSkillDirectories,
+  }) {
+    return AcpBridgeServerAdvancedOverrides(
+      gatewayProfiles: gatewayProfiles != null
+          ? normalizeGatewayProfiles(profiles: gatewayProfiles)
+          : this.gatewayProfiles,
+      vault: vault ?? this.vault,
+      aiGateway: aiGateway ?? this.aiGateway,
+      acpBridgeServerProfiles: acpBridgeServerProfiles != null
+          ? normalizeExternalAcpEndpoints(profiles: acpBridgeServerProfiles)
+          : this.acpBridgeServerProfiles,
+      authorizedSkillDirectories: authorizedSkillDirectories != null
+          ? normalizeAuthorizedSkillDirectories(
+              directories: authorizedSkillDirectories,
+            )
+          : this.authorizedSkillDirectories,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'gatewayProfiles': gatewayProfiles
+          .map((item) => item.toJson())
+          .toList(growable: false),
+      'vault': vault.toJson(),
+      'aiGateway': aiGateway.toJson(),
+      'acpBridgeServerProfiles': acpBridgeServerProfiles
+          .map((item) => item.toJson())
+          .toList(growable: false),
+      'authorizedSkillDirectories': authorizedSkillDirectories
+          .map((item) => item.toJson())
+          .toList(growable: false),
+    };
+  }
+
+  factory AcpBridgeServerAdvancedOverrides.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return AcpBridgeServerAdvancedOverrides(
+      gatewayProfiles: normalizeGatewayProfiles(
+        profiles: ((json['gatewayProfiles'] as List?) ?? const <Object>[])
+            .whereType<Map>()
+            .map(
+              (item) => GatewayConnectionProfile.fromJson(
+                item.cast<String, dynamic>(),
+              ),
+            ),
+      ),
+      vault: VaultConfig.fromJson(
+        (json['vault'] as Map?)?.cast<String, dynamic>() ?? const {},
+      ),
+      aiGateway: AiGatewayProfile.fromJson(
+        (json['aiGateway'] as Map?)?.cast<String, dynamic>() ?? const {},
+      ),
+      acpBridgeServerProfiles: normalizeExternalAcpEndpoints(
+        profiles:
+            ((json['acpBridgeServerProfiles'] as List?) ?? const <Object>[])
+                .whereType<Map>()
+                .map(
+                  (item) => ExternalAcpEndpointProfile.fromJson(
+                    item.cast<String, dynamic>(),
+                  ),
+                ),
+      ),
+      authorizedSkillDirectories: normalizeAuthorizedSkillDirectories(
+        directories:
+            ((json['authorizedSkillDirectories'] as List?) ?? const <Object>[])
+                .whereType<Map>()
+                .map(
+                  (item) => AuthorizedSkillDirectory.fromJson(
+                    item.cast<String, dynamic>(),
+                  ),
+                ),
+      ),
+    );
+  }
+}
+
+class AcpBridgeServerModeConfig {
+  const AcpBridgeServerModeConfig({
+    required this.mode,
+    required this.cloudSynced,
+    required this.selfHosted,
+    required this.advancedOverrides,
+  });
+
+  final AcpBridgeServerMode mode;
+  final AcpBridgeServerCloudSyncConfig cloudSynced;
+  final AcpBridgeServerSelfHostedConfig selfHosted;
+  final AcpBridgeServerAdvancedOverrides advancedOverrides;
+
+  factory AcpBridgeServerModeConfig.defaults() {
+    return AcpBridgeServerModeConfig(
+      mode: AcpBridgeServerMode.cloudSynced,
+      cloudSynced: AcpBridgeServerCloudSyncConfig.defaults(),
+      selfHosted: AcpBridgeServerSelfHostedConfig.defaults(),
+      advancedOverrides: AcpBridgeServerAdvancedOverrides.defaults(),
+    );
+  }
+
+  AcpBridgeServerModeConfig copyWith({
+    AcpBridgeServerMode? mode,
+    AcpBridgeServerCloudSyncConfig? cloudSynced,
+    AcpBridgeServerSelfHostedConfig? selfHosted,
+    AcpBridgeServerAdvancedOverrides? advancedOverrides,
+  }) {
+    return AcpBridgeServerModeConfig(
+      mode: mode ?? this.mode,
+      cloudSynced: cloudSynced ?? this.cloudSynced,
+      selfHosted: selfHosted ?? this.selfHosted,
+      advancedOverrides: advancedOverrides ?? this.advancedOverrides,
+    );
+  }
+
+  bool get usesSelfHostedBase =>
+      mode == AcpBridgeServerMode.selfHosted ||
+      (mode == AcpBridgeServerMode.advancedCustom && selfHosted.isConfigured);
+
+  bool get usesCloudSyncBase => !usesSelfHostedBase;
+
+  String get sourceTag => switch (mode) {
+    AcpBridgeServerMode.cloudSynced => 'cloudSynced',
+    AcpBridgeServerMode.selfHosted => 'selfHosted',
+    AcpBridgeServerMode.advancedCustom => 'advancedOverride',
+  };
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'mode': mode.name,
+      'cloudSynced': cloudSynced.toJson(),
+      'selfHosted': selfHosted.toJson(),
+      'advancedOverrides': advancedOverrides.toJson(),
+    };
+  }
+
+  factory AcpBridgeServerModeConfig.fromJson(Map<String, dynamic> json) {
+    return AcpBridgeServerModeConfig(
+      mode: AcpBridgeServerMode.values.firstWhere(
+        (item) => item.name == json['mode'],
+        orElse: () => AcpBridgeServerMode.cloudSynced,
+      ),
+      cloudSynced: AcpBridgeServerCloudSyncConfig.fromJson(
+        (json['cloudSynced'] as Map?)?.cast<String, dynamic>() ?? const {},
+      ),
+      selfHosted: AcpBridgeServerSelfHostedConfig.fromJson(
+        (json['selfHosted'] as Map?)?.cast<String, dynamic>() ?? const {},
+      ),
+      advancedOverrides: AcpBridgeServerAdvancedOverrides.fromJson(
+        (json['advancedOverrides'] as Map?)?.cast<String, dynamic>() ?? const {},
+      ),
+    );
   }
 }
 

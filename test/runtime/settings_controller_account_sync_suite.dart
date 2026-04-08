@@ -85,6 +85,19 @@ void main() {
       );
       expect(controller.snapshot.accountLocalMode, isFalse);
       expect(
+        controller.snapshot.acpBridgeServerModeConfig.cloudSynced.accountBaseUrl,
+        server.accountBaseUrl,
+      );
+      expect(
+        controller
+            .snapshot
+            .acpBridgeServerModeConfig
+            .cloudSynced
+            .remoteServerSummary
+            .endpoint,
+        'https://openclaw.account.example',
+      );
+      expect(
         (await store.loadSettingsSnapshot()).toJsonString(),
         allOf(
           isNot(contains(server.sessionToken)),
@@ -262,6 +275,10 @@ void main() {
       expect(await store.loadAccountSyncState(), isNotNull);
       expect(controller.snapshot.aiGateway.baseUrl, 'https://local-ai.example.com/v1');
       expect(controller.snapshot.accountLocalMode, isTrue);
+      expect(
+        controller.snapshot.acpBridgeServerModeConfig.cloudSynced.accountIdentifier,
+        '',
+      );
       expect(
         (await store.loadAccountSyncState())
             ?.overrideFlags[kAccountOverrideAiGatewayBaseUrl],

@@ -27,6 +27,10 @@ void main() {
     expect(find.byKey(const ValueKey('account-password-field')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '登录'), findsOneWidget);
     expect(find.text('保存本地入口'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('account-open-settings-acp')),
+      findsNothing,
+    );
   });
 
   testWidgets('AccountPage logs in and shows remote sync status inline', (
@@ -76,6 +80,11 @@ void main() {
     expect(find.byKey(const ValueKey('account-login-button')), findsNothing);
     expect(find.byKey(const ValueKey('account-sync-button')), findsOneWidget);
     expect(find.byKey(const ValueKey('account-logout-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-open-settings-acp')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('account-acp-sync-summary-endpoint')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('AccountPage completes MFA verification and can log out', (
