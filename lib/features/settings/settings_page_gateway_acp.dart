@@ -227,7 +227,7 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
                 ),
               ),
               FilledButton(
-                key: ValueKey('external-acp-apply-${profile.providerKey}'),
+                key: ValueKey('external-acp-save-${profile.providerKey}'),
                 onPressed: () => saveExternalAcpEndpointInternal(
                   controller,
                   settings,

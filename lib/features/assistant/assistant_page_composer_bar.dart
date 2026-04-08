@@ -628,6 +628,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                   ),
                 },
                 child: TextField(
+                  key: const Key('assistant-input-field'),
                   controller: widget.inputController,
                   focusNode: widget.focusNode,
                   autofocus: true,
@@ -789,8 +790,8 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
               const SizedBox(width: 8),
               Tooltip(
                 message: submitLabel,
-                child: FilledButton(
-                  key: const Key('assistant-submit-button'),
+              child: FilledButton(
+                  key: const Key('assistant-send-button'),
                   onPressed: connecting
                       ? null
                       : connected
