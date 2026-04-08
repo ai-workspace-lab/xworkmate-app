@@ -207,20 +207,13 @@ class AppController extends ChangeNotifier {
         arisBundleRepository ?? ArisBundleRepository();
     goCoreLocatorInternal = GoCoreLocator();
     runtimeCoordinatorInternal.attachDispatchResolver(
-      GoRuntimeDispatchDesktopClient(
-        acpClient: gatewayAcpClientInternal,
-        goCoreLocator: goCoreLocatorInternal,
-      ),
+      GoRuntimeDispatchDesktopClient(),
     );
     goTaskServiceClientInternal =
         goTaskServiceClient ??
         DesktopGoTaskService(
           gateway: runtimeCoordinatorInternal.gateway,
-          acpTransport: ExternalCodeAgentAcpDesktopTransport(
-            acpClient: gatewayAcpClientInternal,
-            endpointResolver: resolveExternalAcpEndpointForTargetInternal,
-            goCoreLocator: goCoreLocatorInternal,
-          ),
+          acpTransport: ExternalCodeAgentAcpDesktopTransport(),
         );
     multiAgentOrchestratorInternal = MultiAgentOrchestrator(
       config: resolveMultiAgentConfigInternal(
@@ -234,10 +227,7 @@ class AppController extends ChangeNotifier {
         MultiAgentMountManager(
           arisBundleRepository: arisBundleRepositoryInternal,
           goCoreLocator: goCoreLocatorInternal,
-          resolver: GoMultiAgentMountDesktopClient(
-            acpClient: gatewayAcpClientInternal,
-            goCoreLocator: goCoreLocatorInternal,
-          ),
+          resolver: GoMultiAgentMountDesktopClient(),
         );
 
     attachChildListenersInternal();
