@@ -19,6 +19,7 @@ class _FakeGatewayRuntime extends GatewayRuntime {
       StreamController<GatewayPushEvent>.broadcast();
   final List<Map<String, Object?>> sendChatCalls = <Map<String, Object?>>[];
   final List<Map<String, String>> abortChatCalls = <Map<String, String>>[];
+  List<GatewayChatMessage> history = const <GatewayChatMessage>[];
 
   @override
   Stream<GatewayPushEvent> get events => controller.stream;
@@ -52,6 +53,14 @@ class _FakeGatewayRuntime extends GatewayRuntime {
       'sessionKey': sessionKey,
       'runId': runId,
     });
+  }
+
+  @override
+  Future<List<GatewayChatMessage>> loadHistory(
+    String sessionKey, {
+    int limit = 120,
+  }) async {
+    return history;
   }
 }
 
@@ -215,5 +224,41 @@ void main() {
       expect(singleResult.route, GoTaskServiceRoute.externalAcpSingle);
       expect(multiResult.route, GoTaskServiceRoute.externalAcpMulti);
     });
+
+    test(
+      'recovers OpenClaw task completion from chat history when push events do not arrive',
+      () async {
+        final gateway = _FakeGatewayRuntime();
+        final acp = _FakeExternalAcpTransport();
+        final service = DesktopGoTaskService(gateway: gateway, acpTransport: acp);
+
+        unawaited(
+          Future<void>.delayed(const Duration(milliseconds: 1200), () {
+            gateway.history = <GatewayChatMessage>[
+              GatewayChatMessage(
+                id: 'assistant-1',
+                role: 'assistant',
+                text: 'RECOVERED_FROM_HISTORY',
+                timestampMs: 2,
+                toolCallId: null,
+                toolName: null,
+                stopReason: null,
+                pending: false,
+                error: false,
+              ),
+            ];
+          }),
+        );
+
+        final result = await service.executeTask(
+          _request(target: AssistantExecutionTarget.local),
+          onUpdate: (_) {},
+        );
+
+        expect(result.route, GoTaskServiceRoute.openClawTask);
+        expect(result.message, 'RECOVERED_FROM_HISTORY');
+        expect(result.raw['recoveredFromHistory'], isTrue);
+      },
+    );
   });
 }
