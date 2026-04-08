@@ -429,6 +429,9 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                       .map(
                         (value) => PopupMenuItem<AssistantExecutionTarget>(
                           value: value,
+                          key: Key(
+                            'assistant-execution-target-menu-item-${value.name}',
+                          ),
                           child: Row(
                             children: [
                               Icon(value.icon, size: 18),
@@ -465,6 +468,9 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                       .map(
                         (value) => PopupMenuItem<SingleAgentProvider>(
                           value: value,
+                          key: Key(
+                            'assistant-single-agent-provider-menu-item-${value.providerId}',
+                          ),
                           child: Row(
                             children: [
                               SingleAgentProviderBadgeInternal(provider: value),
