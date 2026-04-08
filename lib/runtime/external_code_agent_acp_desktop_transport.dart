@@ -1,49 +1,16 @@
 import 'dart:async';
-import 'dart:io';
 
-import 'embedded_agent_launch_policy.dart';
 import 'gateway_acp_client.dart';
-import 'go_core.dart';
+import 'go_acp_stdio_bridge.dart';
 import 'go_task_service_client.dart';
 import 'runtime_models.dart';
 
-typedef ExternalCodeAgentAcpProcessStarter =
-    Future<Process> Function(
-      String executable,
-      List<String> arguments, {
-      Map<String, String>? environment,
-      String? workingDirectory,
-    });
-
 class ExternalCodeAgentAcpDesktopTransport
     implements ExternalCodeAgentAcpTransport {
-  ExternalCodeAgentAcpDesktopTransport({
-    required GatewayAcpClient acpClient,
-    required Uri? Function(AssistantExecutionTarget target) endpointResolver,
-    GoCoreLocator? goCoreLocator,
-    ExternalCodeAgentAcpProcessStarter? processStarter,
-  }) : _acpClient = acpClient,
-       _endpointResolver = endpointResolver,
-       _goCoreLocator = goCoreLocator ?? GoCoreLocator(),
-       _processStarter =
-           processStarter ??
-           ((executable, arguments, {environment, workingDirectory}) {
-             return Process.start(
-               executable,
-               arguments,
-               environment: environment,
-               workingDirectory: workingDirectory,
-             );
-           });
+  ExternalCodeAgentAcpDesktopTransport({GoAcpStdioBridge? bridge})
+    : _bridge = bridge ?? GoAcpStdioBridge();
 
-  final GatewayAcpClient _acpClient;
-  final Uri? Function(AssistantExecutionTarget target) _endpointResolver;
-  final GoCoreLocator _goCoreLocator;
-  final ExternalCodeAgentAcpProcessStarter _processStarter;
-
-  Process? _localProcess;
-  Uri? _localEndpoint;
-  Future<Uri?>? _localEndpointFuture;
+  final GoAcpStdioBridge _bridge;
   List<ExternalCodeAgentAcpSyncedProvider> _syncedProviders =
       const <ExternalCodeAgentAcpSyncedProvider>[];
 
@@ -54,11 +21,7 @@ class ExternalCodeAgentAcpDesktopTransport
     _syncedProviders = List<ExternalCodeAgentAcpSyncedProvider>.unmodifiable(
       providers,
     );
-    final endpoint = await _ensureLocalEndpoint();
-    if (endpoint == null) {
-      return;
-    }
-    await _syncProvidersToEndpoint(endpoint, _syncedProviders);
+    await _syncProviders();
   }
 
   @override
@@ -66,22 +29,39 @@ class ExternalCodeAgentAcpDesktopTransport
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
   }) async {
-    final endpoint = await _resolveEndpoint(target);
-    if (endpoint == null) {
-      return const ExternalCodeAgentAcpCapabilities.empty();
-    }
-    if (target == AssistantExecutionTarget.singleAgent) {
-      await _syncProvidersToEndpoint(endpoint, _syncedProviders);
-    }
-    final capabilities = await _acpClient.loadCapabilities(
-      forceRefresh: forceRefresh,
-      endpointOverride: endpoint,
+    await _syncProviders();
+    final response = await _bridge.request(
+      method: 'acp.capabilities',
+      params: const <String, dynamic>{},
     );
+    final result = _castMap(response['result']);
+    final caps = _castMap(result['capabilities']);
+    final providers = <SingleAgentProvider>{};
+    for (final raw in <Object?>[
+      ..._asList(result['providers']),
+      ..._asList(caps['providers']),
+    ]) {
+      if (raw == null) {
+        continue;
+      }
+      final provider = SingleAgentProviderCopy.fromJsonValue(
+        raw.toString().trim().toLowerCase(),
+      );
+      if (provider != SingleAgentProvider.auto) {
+        providers.add(provider);
+      }
+    }
     return ExternalCodeAgentAcpCapabilities(
-      singleAgent: capabilities.singleAgent,
-      multiAgent: capabilities.multiAgent,
-      providers: capabilities.providers,
-      raw: capabilities.raw,
+      singleAgent:
+          _boolValue(result['singleAgent']) ??
+          _boolValue(caps['single_agent']) ??
+          providers.isNotEmpty,
+      multiAgent:
+          _boolValue(result['multiAgent']) ??
+          _boolValue(caps['multi_agent']) ??
+          true,
+      providers: providers,
+      raw: result,
     );
   }
 
@@ -90,42 +70,46 @@ class ExternalCodeAgentAcpDesktopTransport
     GoTaskServiceRequest request, {
     required void Function(GoTaskServiceUpdate update) onUpdate,
   }) async {
-    final endpoint = await _resolveEndpoint(request.target);
-    if (endpoint == null) {
-      throw const GatewayAcpException(
-        'Missing external ACP endpoint',
-        code: 'EXTERNAL_ACP_ENDPOINT_MISSING',
-      );
-    }
-    if (request.target == AssistantExecutionTarget.singleAgent) {
-      await _syncProvidersToEndpoint(endpoint, _syncedProviders);
-    }
+    await _syncProviders();
+    late final StreamSubscription<Map<String, dynamic>> subscription;
     var streamedText = '';
     String? completedMessage;
-    final response = await _acpClient.request(
-      method: request.resumeSession ? 'session.message' : 'session.start',
-      params: request.toExternalAcpParams(),
-      endpointOverride: endpoint,
-      onNotification: (notification) {
-        final update = goTaskServiceUpdateFromAcpNotification(notification);
-        if (update == null) {
-          return;
-        }
-        if (update.isDelta) {
-          streamedText += update.text;
-        }
-        if (update.isDone && update.message.trim().isNotEmpty) {
-          completedMessage = update.message.trim();
-        }
-        onUpdate(update);
-      },
-    );
-    return goTaskServiceResultFromAcpResponse(
-      response,
-      route: request.route,
-      streamedText: streamedText,
-      completedMessage: completedMessage,
-    );
+    subscription = _bridge.notifications.listen((notification) {
+      final update = goTaskServiceUpdateFromAcpNotification(notification);
+      if (update == null) {
+        return;
+      }
+      if (update.sessionId != request.sessionId ||
+          update.threadId != request.threadId) {
+        return;
+      }
+      if (update.isDelta) {
+        streamedText += update.text;
+      }
+      if (update.isDone && update.message.trim().isNotEmpty) {
+        completedMessage = update.message.trim();
+      }
+      onUpdate(update);
+    });
+    try {
+      final response = await _bridge.request(
+        method: request.resumeSession ? 'session.message' : 'session.start',
+        params: request.toExternalAcpParams(),
+      );
+      return goTaskServiceResultFromAcpResponse(
+        response,
+        route: request.route,
+        streamedText: streamedText,
+        completedMessage: completedMessage,
+      );
+    } catch (error) {
+      throw GatewayAcpException(
+        error.toString(),
+        code: 'EXTERNAL_ACP_STDIO_ERROR',
+      );
+    } finally {
+      await subscription.cancel();
+    }
   }
 
   @override
@@ -134,14 +118,9 @@ class ExternalCodeAgentAcpDesktopTransport
     required String sessionId,
     required String threadId,
   }) async {
-    final endpoint = await _resolveEndpoint(target);
-    if (endpoint == null) {
-      return;
-    }
-    await _acpClient.cancelSession(
-      sessionId: sessionId,
-      threadId: threadId,
-      endpointOverride: endpoint,
+    await _bridge.request(
+      method: 'session.cancel',
+      params: <String, dynamic>{'sessionId': sessionId, 'threadId': threadId},
     );
   }
 
@@ -151,127 +130,71 @@ class ExternalCodeAgentAcpDesktopTransport
     required String sessionId,
     required String threadId,
   }) async {
-    final endpoint = await _resolveEndpoint(target);
-    if (endpoint == null) {
-      return;
-    }
-    await _acpClient.closeSession(
-      sessionId: sessionId,
-      threadId: threadId,
-      endpointOverride: endpoint,
+    await _bridge.request(
+      method: 'session.close',
+      params: <String, dynamic>{'sessionId': sessionId, 'threadId': threadId},
     );
   }
 
   @override
-  Future<void> dispose() async {
-    final process = _localProcess;
-    _localProcess = null;
-    _localEndpoint = null;
-    _localEndpointFuture = null;
-    if (process != null) {
-      try {
-        process.kill();
-      } catch (_) {
-        // Best effort only.
-      }
-    }
-  }
+  Future<void> dispose() => _bridge.dispose();
 
-  Future<Uri?> _resolveEndpoint(AssistantExecutionTarget target) async {
-    if (target == AssistantExecutionTarget.singleAgent) {
-      return _ensureLocalEndpoint();
-    }
-    return _endpointResolver(target);
-  }
-
-  Future<Uri?> _ensureLocalEndpoint() async {
-    if (_localEndpoint != null) {
-      return _localEndpoint;
-    }
-    final inFlight = _localEndpointFuture;
-    if (inFlight != null) {
-      return inFlight;
-    }
-    final next = _startLocalProcess();
-    _localEndpointFuture = next;
-    try {
-      _localEndpoint = await next;
-      return _localEndpoint;
-    } finally {
-      _localEndpointFuture = null;
-    }
-  }
-
-  Future<Uri?> _startLocalProcess() async {
-    final launch = await _goCoreLocator.locate();
-    if (launch == null) {
-      return null;
-    }
-    if (shouldBlockGoCoreLaunch(
-      launch,
-      isAppleHost: Platform.isIOS || Platform.isMacOS,
-    )) {
-      return null;
-    }
-    final reservedSocket = await ServerSocket.bind(
-      InternetAddress.loopbackIPv4,
-      0,
-    );
-    final port = reservedSocket.port;
-    await reservedSocket.close();
-    final listenAddress = '127.0.0.1:$port';
-    final process = await _processStarter(
-      launch.executable,
-      <String>[...launch.arguments, 'serve', '--listen', listenAddress],
-      environment: Platform.environment,
-      workingDirectory: launch.workingDirectory,
-    );
-    _localProcess = process;
-    unawaited(process.stdout.drain<void>());
-    unawaited(process.stderr.drain<void>());
-    final endpoint = Uri(scheme: 'http', host: '127.0.0.1', port: port);
-    final deadline = DateTime.now().add(const Duration(seconds: 8));
-    while (DateTime.now().isBefore(deadline)) {
-      if (_localProcess != process) {
-        break;
-      }
-      final exitCode = await process.exitCode.timeout(
-        const Duration(milliseconds: 20),
-        onTimeout: () => -1,
-      );
-      if (exitCode != -1) {
-        break;
-      }
-      try {
-        await _acpClient.request(
-          method: 'acp.capabilities',
-          params: const <String, dynamic>{},
-          endpointOverride: endpoint,
-        );
-        return endpoint;
-      } catch (_) {
-        await Future<void>.delayed(const Duration(milliseconds: 120));
-      }
-    }
-    await dispose();
-    return null;
-  }
-
-  Future<void> _syncProvidersToEndpoint(
-    Uri endpoint,
-    List<ExternalCodeAgentAcpSyncedProvider> providers,
-  ) async {
-    if (providers.isEmpty) {
-      return;
-    }
-    await _acpClient.request(
+  Future<void> _syncProviders() async {
+    await _bridge.request(
       method: 'xworkmate.providers.sync',
       params: <String, dynamic>{
-        'providers': providers
-            .map((item) => item.toJson())
+        'providers': _syncedProviders
+            .map(
+              (item) => <String, dynamic>{
+                'providerId': item.providerId,
+                'endpoint': item.endpoint,
+                'label': item.label,
+                'authorizationHeader': item.authorizationHeader,
+                'enabled': item.enabled,
+              },
+            )
             .toList(growable: false),
       },
-      endpointOverride: endpoint,
     );
+  }
+
+  Map<String, dynamic> _castMap(Object? value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return value.cast<String, dynamic>();
+    }
+    return const <String, dynamic>{};
+  }
+
+  List<Object?> _asList(Object? raw) {
+    if (raw is List<Object?>) {
+      return raw;
+    }
+    if (raw is List) {
+      return raw.cast<Object?>();
+    }
+    return const <Object?>[];
+  }
+
+  bool? _boolValue(Object? raw) {
+    if (raw is bool) {
+      return raw;
+    }
+    if (raw is num) {
+      return raw != 0;
+    }
+    final text = raw?.toString().trim().toLowerCase();
+    if (text == null || text.isEmpty) {
+      return null;
+    }
+    if (text == 'true' || text == '1' || text == 'yes') {
+      return true;
+    }
+    if (text == 'false' || text == '0' || text == 'no') {
+      return false;
+    }
+    return null;
   }
 }

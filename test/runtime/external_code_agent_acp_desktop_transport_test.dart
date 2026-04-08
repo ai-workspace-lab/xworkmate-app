@@ -2,29 +2,70 @@
 library;
 
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/external_code_agent_acp_desktop_transport.dart';
-import 'package:xworkmate/runtime/gateway_acp_client.dart';
+import 'package:xworkmate/runtime/go_acp_stdio_bridge.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   group('ExternalCodeAgentAcpDesktopTransport', () {
-    test('uses resolved gateway endpoint for local gateway sessions', () async {
-      final server = await _AcpFakeServer.start();
-      addTearDown(server.close);
-
-      final transport = ExternalCodeAgentAcpDesktopTransport(
-        acpClient: GatewayAcpClient(endpointResolver: () => null),
-        endpointResolver: (target) => switch (target) {
-          AssistantExecutionTarget.local => server.baseHttpUri,
-          _ => null,
+    test('uses direct Go ACP stdio bridge for desktop task execution', () async {
+      late final _FakeGoAcpStdioBridge bridge;
+      bridge = _FakeGoAcpStdioBridge(
+        handler: (method, params) async {
+          switch (method) {
+            case 'acp.capabilities':
+              return <String, dynamic>{
+                'jsonrpc': '2.0',
+                'id': 'capabilities',
+                'result': <String, dynamic>{
+                  'singleAgent': true,
+                  'multiAgent': true,
+                  'providers': <String>['codex'],
+                  'capabilities': <String, dynamic>{
+                    'single_agent': true,
+                    'multi_agent': true,
+                    'providers': <String>['codex'],
+                  },
+                },
+              };
+            case 'xworkmate.providers.sync':
+              return <String, dynamic>{
+                'jsonrpc': '2.0',
+                'id': 'sync',
+                'result': <String, dynamic>{'ok': true},
+              };
+            case 'session.start':
+              bridge.emit(<String, dynamic>{
+                'jsonrpc': '2.0',
+                'method': 'session.update',
+                'params': <String, dynamic>{
+                  'sessionId': 'session-local',
+                  'threadId': 'thread-local',
+                  'turnId': 'turn-1',
+                  'type': 'delta',
+                  'delta': 'gateway-',
+                },
+              });
+              return <String, dynamic>{
+                'jsonrpc': '2.0',
+                'id': 'start',
+                'result': <String, dynamic>{
+                  'success': true,
+                  'message': 'gateway-ok',
+                  'summary': 'gateway-ok',
+                  'turnId': 'turn-1',
+                },
+              };
+          }
+          throw StateError('Unexpected method: $method');
         },
       );
+      final transport = ExternalCodeAgentAcpDesktopTransport(bridge: bridge);
 
+      final updates = <GoTaskServiceUpdate>[];
       final result = await transport.executeTask(
         const GoTaskServiceRequest(
           sessionId: 'session-local',
@@ -42,112 +83,52 @@ void main() {
           agentId: '',
           metadata: <String, dynamic>{},
         ),
-        onUpdate: (_) {},
+        onUpdate: updates.add,
       );
 
       expect(result.success, isTrue);
       expect(result.message, 'gateway-ok');
-      expect(server.lastHttpRequestPath, '/acp/rpc');
-      expect(server.rpcMethods, contains('session.start'));
-      expect(server.lastSessionMode, 'gateway-chat');
-    });
-
-    test('reports missing endpoint when gateway target cannot resolve', () async {
-      final transport = ExternalCodeAgentAcpDesktopTransport(
-        acpClient: GatewayAcpClient(endpointResolver: () => null),
-        endpointResolver: (_) => null,
+      expect(
+        bridge.recordedMethods,
+        containsAll(<String>['xworkmate.providers.sync', 'session.start']),
       );
-
-      await expectLater(
-        () => transport.executeTask(
-          const GoTaskServiceRequest(
-            sessionId: 'session-local',
-            threadId: 'thread-local',
-            target: AssistantExecutionTarget.local,
-            prompt: 'ping local gateway',
-            workingDirectory: '/tmp',
-            model: '',
-            thinking: '',
-            selectedSkills: <String>[],
-            inlineAttachments: <GatewayChatAttachmentPayload>[],
-            localAttachments: <CollaborationAttachment>[],
-            aiGatewayBaseUrl: '',
-            aiGatewayApiKey: '',
-            agentId: '',
-            metadata: <String, dynamic>{},
-          ),
-          onUpdate: (_) {},
-        ),
-        throwsA(
-          isA<GatewayAcpException>().having(
-            (error) => error.code,
-            'code',
-            'EXTERNAL_ACP_ENDPOINT_MISSING',
-          ),
-        ),
-      );
+      expect(updates.single.text, 'gateway-');
     });
   });
 }
 
-class _AcpFakeServer {
-  _AcpFakeServer._(this._server);
+class _FakeGoAcpStdioBridge extends GoAcpStdioBridge {
+  _FakeGoAcpStdioBridge({required this.handler});
 
-  final HttpServer _server;
-  final List<String> rpcMethods = <String>[];
-  String? lastHttpRequestPath;
-  String? lastSessionMode;
+  final Future<Map<String, dynamic>> Function(
+    String method,
+    Map<String, dynamic> params,
+  )
+  handler;
 
-  Uri get baseHttpUri => Uri.parse('http://127.0.0.1:${_server.port}');
+  final StreamController<Map<String, dynamic>> _notificationsController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final List<String> recordedMethods = <String>[];
 
-  static Future<_AcpFakeServer> start() async {
-    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final fake = _AcpFakeServer._(server);
-    unawaited(fake._listen());
-    return fake;
+  @override
+  Stream<Map<String, dynamic>> get notifications => _notificationsController.stream;
+
+  void emit(Map<String, dynamic> notification) {
+    _notificationsController.add(notification);
   }
 
-  Future<void> close() async {
-    await _server.close(force: true);
+  @override
+  Future<Map<String, dynamic>> request({
+    required String method,
+    required Map<String, dynamic> params,
+    Duration timeout = const Duration(seconds: 120),
+  }) async {
+    recordedMethods.add(method);
+    return handler(method, params);
   }
 
-  Future<void> _listen() async {
-    await for (final request in _server) {
-      if (request.uri.path == '/acp/rpc' && request.method == 'POST') {
-        lastHttpRequestPath = request.uri.path;
-        await _handleHttpRpc(request);
-        continue;
-      }
-      request.response.statusCode = HttpStatus.notFound;
-      await request.response.close();
-    }
-  }
-
-  Future<void> _handleHttpRpc(HttpRequest request) async {
-    final body = await utf8.decodeStream(request);
-    final envelope = (jsonDecode(body) as Map).cast<String, dynamic>();
-    final id = envelope['id'];
-    final method = envelope['method']?.toString() ?? '';
-    final params =
-        (envelope['params'] as Map?)?.cast<String, dynamic>() ??
-        const <String, dynamic>{};
-    rpcMethods.add(method);
-
-    request.response.headers.set(
-      HttpHeaders.contentTypeHeader,
-      'text/event-stream; charset=utf-8',
-    );
-    if (method == 'session.start' || method == 'session.message') {
-      lastSessionMode = params['mode']?.toString();
-      request.response.write(
-        'data: ${jsonEncode(<String, dynamic>{'jsonrpc': '2.0', 'id': id, 'result': <String, dynamic>{'success': true, 'message': 'gateway-ok', 'summary': 'gateway-ok', 'turnId': 'turn-1'}})}\n\n',
-      );
-      await request.response.close();
-      return;
-    }
-    request.response.write(
-      'data: ${jsonEncode(<String, dynamic>{'jsonrpc': '2.0', 'id': id, 'result': <String, dynamic>{'singleAgent': true, 'multiAgent': true, 'providers': <String>['codex'], 'capabilities': <String, dynamic>{'single_agent': true, 'multi_agent': true, 'providers': <String>['codex']}}})}\n\n',
-    );
-    await request.response.close();
+  @override
+  Future<void> dispose() async {
+    await _notificationsController.close();
   }
 }
