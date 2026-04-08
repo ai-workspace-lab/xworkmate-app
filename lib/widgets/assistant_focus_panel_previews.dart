@@ -116,14 +116,15 @@ class SkillsFocusPreviewInternal extends StatelessWidget {
         message: typedController.isSingleAgentMode
             ? (typedController.currentSingleAgentNeedsAiGatewayConfiguration
                   ? appText(
-                      '当前没有可用的外部 Agent ACP 端点，请先配置 LLM API fallback。',
-                      'No external Agent ACP endpoint is available. Configure LLM API fallback first.',
+                      '当前没有可用的外部 Agent ACP 端点，请先配置 ACP Server。',
+                      'No external Agent ACP endpoint is available. Configure an ACP server first.',
                     )
                   : appText(
                       '当前线程还没有已加载技能。切换 provider 后会读取该线程自己的 skills 列表。',
                       'No skills are loaded for this thread yet. Switching the provider reloads the thread-owned skills list.',
                     ))
-            : typedController.connection.status == RuntimeConnectionStatus.connected
+            : typedController.connection.status ==
+                  RuntimeConnectionStatus.connected
             ? appText(
                 '当前代理没有已加载技能。',
                 'No skills are loaded for the active agent.',
@@ -306,7 +307,9 @@ class SecretsFocusPreviewInternal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final typedController = castAssistantFocusControllerInternal(controller);
-    final items = typedController.secretReferences.take(4).toList(growable: false);
+    final items = typedController.secretReferences
+        .take(4)
+        .toList(growable: false);
     if (items.isEmpty) {
       return PreviewEmptyStateInternal(
         message: appText(

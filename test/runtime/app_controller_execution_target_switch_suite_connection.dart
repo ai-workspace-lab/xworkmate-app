@@ -147,7 +147,7 @@ void registerExecutionTargetSwitchConnectionTests() {
         expect(controller.assistantConnectionStatusLabel, 'ACP Server Local');
         expect(
           controller.assistantConnectionTargetLabel,
-          '没有可用的外部 Agent ACP 端点，请配置 LLM API fallback。',
+          '没有可用的外部 Agent ACP 端点，请先配置可用的 ACP Server。',
         );
         expect(
           gateway.connectedProfiles,

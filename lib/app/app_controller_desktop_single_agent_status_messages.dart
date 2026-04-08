@@ -8,6 +8,23 @@ import 'app_controller_desktop_runtime_helpers.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_storage.dart';
 
+GatewayChatMessage assistantErrorMessageSingleAgentDesktopInternal(
+  AppController controller,
+  String text,
+) {
+  return GatewayChatMessage(
+    id: controller.nextLocalMessageIdInternal(),
+    role: 'assistant',
+    text: text,
+    timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    toolCallId: null,
+    toolName: null,
+    stopReason: null,
+    pending: false,
+    error: true,
+  );
+}
+
 String? singleAgentRuntimeDebugToolNameDesktopInternal(
   AppController controller,
   String label,
@@ -49,43 +66,6 @@ void appendSingleAgentRuntimeStatusDesktopInternal(
   );
 }
 
-void appendSingleAgentFallbackStatusDesktopInternal(
-  AppController controller,
-  String sessionKey,
-  String? reason,
-) {
-  if (!controller.showsSingleAgentRuntimeDebugMessagesInternal) {
-    return;
-  }
-  controller.appendAssistantThreadMessageInternal(
-    sessionKey,
-    GatewayChatMessage(
-      id: controller.nextLocalMessageIdInternal(),
-      role: 'assistant',
-      text: singleAgentFallbackLabelDesktopInternal(reason),
-      timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      toolCallId: null,
-      toolName: 'AI Chat fallback',
-      stopReason: null,
-      pending: false,
-      error: false,
-    ),
-  );
-}
-
-String singleAgentFallbackLabelDesktopInternal(String? reason) {
-  final detail = reason?.trim() ?? '';
-  return detail.isEmpty
-      ? appText(
-          '未发现可用的外部 Agent ACP 端点，已回退到 AI Chat。',
-          'No external Agent ACP endpoint is available. Falling back to AI Chat.',
-        )
-      : appText(
-          '外部 Agent ACP 连接不可用，已回退到 AI Chat：$detail',
-          'External Agent ACP connection is unavailable. Falling back to AI Chat: $detail',
-        );
-}
-
 String singleAgentUnavailableLabelDesktopInternal(
   AppController controller,
   String sessionKey,
@@ -116,12 +96,12 @@ String singleAgentUnavailableLabelDesktopInternal(
   )) {
     return detail.isEmpty
         ? appText(
-            '当前没有可用的外部 Agent ACP 端点，也没有可用的 AI Chat fallback。请先配置外部 Agent 连接，或配置 LLM API。',
-            'No external Agent ACP endpoint is available, and AI Chat fallback is not configured. Configure an external Agent connection or configure LLM API first.',
+            '当前没有可用的外部 Agent ACP 端点。请先配置外部 Agent 连接。',
+            'No external Agent ACP endpoint is available. Configure an external Agent connection first.',
           )
         : appText(
-            '$detail 当前没有可用的外部 Agent ACP 端点，也没有可用的 AI Chat fallback。请先配置外部 Agent 连接，或配置 LLM API。',
-            '$detail No external Agent ACP endpoint is available, and AI Chat fallback is not configured. Configure an external Agent connection or configure LLM API first.',
+            '$detail 当前没有可用的外部 Agent ACP 端点。请先配置外部 Agent 连接。',
+            '$detail No external Agent ACP endpoint is available. Configure an external Agent connection first.',
           );
   }
   return detail.isEmpty

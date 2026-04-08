@@ -22,7 +22,6 @@ import '../runtime/runtime_models.dart';
 import '../runtime/secure_config_store.dart';
 import '../runtime/embedded_agent_launch_policy.dart';
 import '../runtime/runtime_coordinator.dart';
-import '../runtime/direct_single_agent_app_server_client.dart';
 import '../runtime/gateway_acp_client.dart';
 import '../runtime/codex_runtime.dart';
 import '../runtime/codex_config_bridge.dart';
@@ -39,7 +38,7 @@ import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_mounts.dart';
 import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
-import '../runtime/single_agent_runner.dart';
+import '../runtime/single_agent_capabilities.dart';
 import '../runtime/skill_directory_access.dart';
 import 'task_thread_repositories.dart';
 import 'app_controller_desktop_navigation.dart';
@@ -303,9 +302,9 @@ class AppController extends ChangeNotifier {
   late final GoTaskServiceClient goTaskServiceClientInternal;
   late final MultiAgentOrchestrator multiAgentOrchestratorInternal;
   late final MultiAgentMountManager multiAgentMountManagerInternal;
-  Map<SingleAgentProvider, DirectSingleAgentCapabilities>
+  Map<SingleAgentProvider, SingleAgentCapabilities>
   singleAgentCapabilitiesByProviderInternal =
-      const <SingleAgentProvider, DirectSingleAgentCapabilities>{};
+      const <SingleAgentProvider, SingleAgentCapabilities>{};
   final Map<String, List<GatewayChatMessage>> assistantThreadMessagesInternal =
       <String, List<GatewayChatMessage>>{};
   late final DesktopTaskThreadRepository taskThreadRepositoryInternal =
