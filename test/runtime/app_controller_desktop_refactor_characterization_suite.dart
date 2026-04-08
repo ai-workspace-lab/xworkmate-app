@@ -123,7 +123,7 @@ void main() {
   );
 
   test(
-    'AppController keeps AI Gateway model choices when single-agent falls back to AI chat',
+    'AppController keeps single-agent model controls empty when no ACP provider is available',
     () async {
       final harness = await _DesktopControllerHarness.create(
         availableSingleAgentProvidersOverride: const <SingleAgentProvider>[],
@@ -147,12 +147,10 @@ void main() {
       );
 
       expect(controller.currentSingleAgentHasResolvedProvider, isFalse);
-      expect(controller.currentSingleAgentUsesAiChatFallback, isTrue);
-      expect(controller.currentSingleAgentShouldShowModelControl, isTrue);
-      expect(controller.assistantModelChoices, const <String>[
-        'qwen2.5-coder:latest',
-      ]);
-      expect(controller.resolvedAssistantModel, 'qwen2.5-coder:latest');
+      expect(controller.currentSingleAgentNeedsAiGatewayConfiguration, isTrue);
+      expect(controller.currentSingleAgentShouldShowModelControl, isFalse);
+      expect(controller.assistantModelChoices, isEmpty);
+      expect(controller.resolvedAssistantModel, isEmpty);
     },
   );
 }

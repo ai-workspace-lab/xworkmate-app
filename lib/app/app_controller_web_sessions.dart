@@ -149,14 +149,6 @@ extension AppControllerWebSessions on AppController {
     );
   }
 
-  bool singleAgentUsesAiChatFallbackForSession(String sessionKey) {
-    final provider = singleAgentProviderForSession(sessionKey);
-    return provider == SingleAgentProvider.auto && canUseAiGatewayConversation;
-  }
-
-  bool get currentSingleAgentUsesAiChatFallback =>
-      singleAgentUsesAiChatFallbackForSession(currentSessionKeyInternal);
-
   String singleAgentRuntimeModelForSession(String sessionKey) {
     return taskThreadForSessionInternal(
           normalizedSessionKeyInternal(sessionKey),
@@ -174,12 +166,6 @@ extension AppControllerWebSessions on AppController {
         threadRecordsInternal[normalizedSessionKey]?.assistantModelId.trim() ??
         '';
     if (target == AssistantExecutionTarget.singleAgent) {
-      if (singleAgentUsesAiChatFallbackForSession(normalizedSessionKey)) {
-        if (recordModel.isNotEmpty) {
-          return recordModel;
-        }
-        return resolvedAiGatewayModel;
-      }
       final runtimeModel = singleAgentRuntimeModelForSession(
         normalizedSessionKey,
       );
@@ -189,7 +175,7 @@ extension AppControllerWebSessions on AppController {
       if (recordModel.isNotEmpty) {
         return recordModel;
       }
-      return resolvedAiGatewayModel;
+      return '';
     }
     if (recordModel.isNotEmpty) {
       return recordModel;
@@ -203,9 +189,6 @@ extension AppControllerWebSessions on AppController {
   List<String> assistantModelChoicesForSession(String sessionKey) {
     final target = assistantExecutionTargetForSession(sessionKey);
     if (target == AssistantExecutionTarget.singleAgent) {
-      if (singleAgentUsesAiChatFallbackForSession(sessionKey)) {
-        return aiGatewayConversationModelChoices;
-      }
       final runtime = singleAgentRuntimeModelForSession(sessionKey);
       if (runtime.isNotEmpty) {
         return <String>[runtime];
@@ -214,7 +197,7 @@ extension AppControllerWebSessions on AppController {
       if (recordModel.isNotEmpty) {
         return <String>[recordModel];
       }
-      return aiGatewayConversationModelChoices;
+      return const <String>[];
     }
     final model = settingsInternal.defaultModel.trim();
     if (model.isEmpty) {
@@ -285,7 +268,11 @@ extension AppControllerWebSessions on AppController {
   }
 
   bool get currentSingleAgentNeedsAiGatewayConfiguration =>
-      currentSingleAgentUsesAiChatFallback && !canUseAiGatewayConversation;
+      assistantExecutionTargetForSession(currentSessionKeyInternal) ==
+          AssistantExecutionTarget.singleAgent &&
+      !availableSingleAgentProviders.any(
+        webAcpClientInternal.capabilities.providers.contains,
+      );
 
   List<SecretReferenceEntry> get secretReferences {
     final entries = <SecretReferenceEntry>[
