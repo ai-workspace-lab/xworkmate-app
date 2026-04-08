@@ -21,7 +21,6 @@ import '../runtime/runtime_models.dart';
 import '../runtime/secure_config_store.dart';
 import '../runtime/embedded_agent_launch_policy.dart';
 import '../runtime/runtime_coordinator.dart';
-import '../runtime/direct_single_agent_app_server_client.dart';
 import '../runtime/gateway_acp_client.dart';
 import '../runtime/codex_runtime.dart';
 import '../runtime/codex_config_bridge.dart';
@@ -32,7 +31,6 @@ import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
-import '../runtime/single_agent_runner.dart';
 import '../runtime/skill_directory_access.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
@@ -122,17 +120,6 @@ extension AppControllerDesktopThreadSessions on AppController {
     if (target == AssistantExecutionTarget.singleAgent) {
       if (latestResolvedModel.isNotEmpty) {
         return latestResolvedModel;
-      }
-      if (singleAgentUsesAiChatFallbackForSession(normalizedSessionKey)) {
-        final recordModel =
-            assistantThreadRecordsInternal[normalizedSessionKey]
-                ?.assistantModelId
-                .trim() ??
-            '';
-        if (recordModel.isNotEmpty) {
-          return recordModel;
-        }
-        return resolvedAiGatewayModel;
       }
       return singleAgentRuntimeModelForSession(normalizedSessionKey);
     }
@@ -238,20 +225,6 @@ extension AppControllerDesktopThreadSessions on AppController {
   SingleAgentProvider? get currentSingleAgentResolvedProvider =>
       singleAgentResolvedProviderForSession(currentSessionKey);
 
-  bool singleAgentUsesAiChatFallbackForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    if (assistantExecutionTargetForSession(normalizedSessionKey) !=
-        AssistantExecutionTarget.singleAgent) {
-      return false;
-    }
-    return !hasAnyAvailableSingleAgentProvider && canUseAiGatewayConversation;
-  }
-
-  bool get currentSingleAgentUsesAiChatFallback =>
-      singleAgentUsesAiChatFallbackForSession(currentSessionKey);
-
   bool singleAgentNeedsAiGatewayConfigurationForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -260,7 +233,7 @@ extension AppControllerDesktopThreadSessions on AppController {
         AssistantExecutionTarget.singleAgent) {
       return false;
     }
-    return !hasAnyAvailableSingleAgentProvider && !canUseAiGatewayConversation;
+    return !hasAnyAvailableSingleAgentProvider;
   }
 
   bool get currentSingleAgentNeedsAiGatewayConfiguration =>
@@ -319,9 +292,6 @@ extension AppControllerDesktopThreadSessions on AppController {
     if (model.isNotEmpty) {
       return model;
     }
-    if (singleAgentUsesAiChatFallbackForSession(normalizedSessionKey)) {
-      return appText('AI Chat fallback', 'AI Chat fallback');
-    }
     final provider =
         singleAgentResolvedProviderForSession(normalizedSessionKey) ??
         singleAgentProviderForSession(normalizedSessionKey);
@@ -340,9 +310,6 @@ extension AppControllerDesktopThreadSessions on AppController {
     );
     if (assistantExecutionTargetForSession(normalizedSessionKey) !=
         AssistantExecutionTarget.singleAgent) {
-      return true;
-    }
-    if (singleAgentUsesAiChatFallbackForSession(normalizedSessionKey)) {
       return true;
     }
     return singleAgentRuntimeModelForSession(normalizedSessionKey).isNotEmpty;
@@ -370,9 +337,6 @@ extension AppControllerDesktopThreadSessions on AppController {
     if (provider != SingleAgentProvider.auto) {
       return provider.label;
     }
-    if (currentSingleAgentUsesAiChatFallback) {
-      return appText('AI Chat fallback', 'AI Chat fallback');
-    }
     return appText('单机智能体', 'Single Agent');
   }
 
@@ -393,19 +357,9 @@ extension AppControllerDesktopThreadSessions on AppController {
         normalizedSessionKey,
       );
       final model = assistantModelForSession(normalizedSessionKey);
-      final fallbackReady = singleAgentUsesAiChatFallbackForSession(
-        normalizedSessionKey,
-      );
-      final host = aiGatewayHostLabelInternal(aiGatewayUrl);
       final providerReady = resolvedProvider != null;
       final detail = providerReady
           ? joinConnectionPartsInternal(<String>[resolvedProvider.label, model])
-          : fallbackReady
-          ? joinConnectionPartsInternal(<String>[
-              appText('AI Chat fallback', 'AI Chat fallback'),
-              model,
-              host,
-            ])
           : singleAgentShouldSuggestAcpSwitchForSession(normalizedSessionKey)
           ? appText(
               '${provider.label} 不可用，请切到可用的 ACP Server。',
@@ -415,8 +369,8 @@ extension AppControllerDesktopThreadSessions on AppController {
               normalizedSessionKey,
             )
           ? appText(
-              '没有可用的外部 Agent ACP 端点，请配置 LLM API fallback。',
-              'No external Agent ACP endpoint is available. Configure LLM API fallback.',
+              '没有可用的外部 Agent ACP 端点，请先配置可用的 ACP Server。',
+              'No external Agent ACP endpoint is available. Configure an ACP Server first.',
             )
           : appText(
               '当前线程的外部 Agent ACP 连接尚未就绪。',
@@ -424,14 +378,14 @@ extension AppControllerDesktopThreadSessions on AppController {
             );
       return AssistantThreadConnectionState(
         executionTarget: target,
-        status: providerReady || fallbackReady
+        status: providerReady
             ? RuntimeConnectionStatus.connected
             : RuntimeConnectionStatus.offline,
         primaryLabel: primaryLabel,
         detailLabel: detail.isEmpty
             ? appText('未配置单机智能体', 'Single Agent is not configured')
             : detail,
-        ready: providerReady || fallbackReady,
+        ready: providerReady,
         pairingRequired: false,
         gatewayTokenMissing: false,
         lastError: null,

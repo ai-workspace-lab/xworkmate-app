@@ -198,7 +198,7 @@ void registerExecutionTargetSwitchThreadTests() {
         expect(controller.assistantConnectionStatusLabel, 'ACP Server Local');
         expect(
           controller.assistantConnectionTargetLabel,
-          '没有可用的外部 Agent ACP 端点，请配置 LLM API fallback。',
+          '没有可用的外部 Agent ACP 端点，请先配置可用的 ACP Server。',
         );
       },
     );
@@ -240,19 +240,20 @@ void registerExecutionTargetSwitchThreadTests() {
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.local,
         );
-        controller.chatControllerInternal.messagesInternal = <GatewayChatMessage>[
-          GatewayChatMessage(
-            id: 'gateway-old-message',
-            role: 'assistant',
-            text: 'previous desktop gateway history',
-            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-            toolCallId: null,
-            toolName: null,
-            stopReason: null,
-            pending: false,
-            error: false,
-          ),
-        ];
+        controller.chatControllerInternal.messagesInternal =
+            <GatewayChatMessage>[
+              GatewayChatMessage(
+                id: 'gateway-old-message',
+                role: 'assistant',
+                text: 'previous desktop gateway history',
+                timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+                toolCallId: null,
+                toolName: null,
+                stopReason: null,
+                pending: false,
+                error: false,
+              ),
+            ];
 
         controller.initializeAssistantThreadContext(
           'draft:fresh-thread',
