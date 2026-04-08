@@ -271,7 +271,7 @@ extension AppControllerWebSessions on AppController {
       assistantExecutionTargetForSession(currentSessionKeyInternal) ==
           AssistantExecutionTarget.singleAgent &&
       !availableSingleAgentProviders.any(
-        webAcpClientInternal.capabilities.providers.contains,
+        acpCapabilitiesInternal.providers.contains,
       );
 
   List<SecretReferenceEntry> get secretReferences {
