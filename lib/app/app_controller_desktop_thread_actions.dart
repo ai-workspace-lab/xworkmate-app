@@ -231,6 +231,7 @@ extension AppControllerDesktopThreadActions on AppController {
       nextTarget,
       sessionKey: nextSessionKey,
       persistDefaultSelection: false,
+      preserveGatewayHistoryForSelectedThread: false,
     );
     if (nextTarget == AssistantExecutionTarget.singleAgent) {
       await refreshSingleAgentSkillsForSession(nextSessionKey);

@@ -203,6 +203,76 @@ void registerExecutionTargetSwitchThreadTests() {
       },
     );
 
+    test(
+      'AppController does not attach the previous desktop gateway history to a fresh single-agent task thread',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        final tempDirectory = await Directory.systemTemp.createTemp(
+          'xworkmate-thread-new-task-history-isolation-',
+        );
+        addTearDown(() async {
+          await deleteDirectoryWithRetryInternal(tempDirectory);
+        });
+        final store = SecureConfigStore(
+          enableSecureStorage: false,
+          databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+          fallbackDirectoryPathResolver: () async => tempDirectory.path,
+        );
+        final gateway = FakeGatewayRuntimeInternal(store: store);
+        final controller = AppController(
+          store: store,
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: gateway,
+            codex: FakeCodexRuntimeInternal(),
+          ),
+        );
+        addTearDown(controller.dispose);
+
+        await waitForInternal(() => !controller.initializing);
+        await controller.saveSettings(
+          controller.settings.copyWith(
+            workspacePath: tempDirectory.path,
+            assistantExecutionTarget: AssistantExecutionTarget.local,
+          ),
+          refreshAfterSave: false,
+        );
+
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.local,
+        );
+        controller.chatControllerInternal.messagesInternal = <GatewayChatMessage>[
+          GatewayChatMessage(
+            id: 'gateway-old-message',
+            role: 'assistant',
+            text: 'previous desktop gateway history',
+            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            toolCallId: null,
+            toolName: null,
+            stopReason: null,
+            pending: false,
+            error: false,
+          ),
+        ];
+
+        controller.initializeAssistantThreadContext(
+          'draft:fresh-thread',
+          title: '新对话',
+          executionTarget: AssistantExecutionTarget.singleAgent,
+        );
+        await controller.switchSession('draft:fresh-thread');
+
+        expect(
+          controller.gatewayHistoryCacheInternal['draft:fresh-thread'],
+          isNull,
+        );
+        expect(
+          controller.assistantThreadMessagesInternal['draft:fresh-thread'] ??
+              const <GatewayChatMessage>[],
+          isEmpty,
+        );
+      },
+    );
+
     test('AppController persists markdown view mode per thread', () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(

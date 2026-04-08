@@ -188,6 +188,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     AssistantExecutionTarget target, {
     required String sessionKey,
     required bool persistDefaultSelection,
+    bool preserveGatewayHistoryForSelectedThread = true,
   }) async {
     final resolvedTarget = sanitizePersistedExecutionTargetInternal(target);
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
@@ -215,7 +216,8 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     }
 
     if (resolvedTarget == AssistantExecutionTarget.singleAgent) {
-      if (runtimeInternal.isConnected) {
+      if (preserveGatewayHistoryForSelectedThread &&
+          runtimeInternal.isConnected) {
         preserveGatewayHistoryForSessionInternal(normalizedSessionKey);
       }
       await ensureActiveAssistantThreadInternal();
