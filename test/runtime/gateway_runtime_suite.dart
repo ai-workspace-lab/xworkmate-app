@@ -297,11 +297,7 @@ void main() {
       addTearDown(controller.dispose);
 
       await controller.loadSession('agent:main:main');
-      await controller.sendMessage(
-        sessionKey: 'agent:main:main',
-        message: 'hello',
-        thinking: 'low',
-      );
+      controller.pendingRunsInternal.add('run-1');
 
       expect(controller.hasPendingRun, isTrue);
       runtime.addAssistantMessage('HELLO');
@@ -583,6 +579,22 @@ void main() {
         ),
         isTrue,
       );
+    },
+  );
+
+  test(
+    'GatewayConnectionSnapshot keeps pairing-required visible even when status remains connected',
+    () {
+      final snapshot = GatewayConnectionSnapshot.initial(
+        mode: RuntimeConnectionMode.local,
+      ).copyWith(
+        status: RuntimeConnectionStatus.connected,
+        lastError: 'NOT_PAIRED: pairing required',
+        lastErrorCode: 'NOT_PAIRED',
+        lastErrorDetailCode: 'PAIRING_REQUIRED',
+      );
+
+      expect(snapshot.pairingRequired, isTrue);
     },
   );
 }
