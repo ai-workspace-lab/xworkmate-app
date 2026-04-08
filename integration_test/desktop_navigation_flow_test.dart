@@ -57,7 +57,9 @@ void main() {
     );
     await _ensureSettingsFocused(tester);
     expect(
-      find.byKey(const ValueKey<String>('assistant-focus-active-title-settings')),
+      find.byKey(
+        const ValueKey<String>('assistant-focus-active-title-settings'),
+      ),
       findsOneWidget,
     );
 

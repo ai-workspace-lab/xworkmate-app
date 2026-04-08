@@ -1,0 +1,45 @@
+name: testing
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'release/**'
+
+jobs:
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter test
+      - run: flutter test test/golden
+      - run: flutter test integration_test
+
+  go:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go_service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - run: go test ./...
+
+  patrol:
+    if: startsWith(github.ref, 'refs/heads/release/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: dart pub global activate patrol_cli
+      - run: patrol test

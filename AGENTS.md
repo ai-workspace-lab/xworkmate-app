@@ -119,4 +119,17 @@ A refactor task is complete only when:
 - Any new macOS or iOS entitlement must be least-privilege, justified by the feature, and covered by tests or manual verification notes.
 - Auth, secret, network, or entitlement changes require `flutter analyze`, relevant unit/widget tests, and serial device-run integration tests when integration coverage is needed.
 
+## Testing Rules
+
+- Modify any Flutter UI page, and you must add or update widget tests and golden tests.
+- Modify any core business flow, and you must add or update `integration_test`.
+- Modify permission, camera, file picker, notification, WebView, or native page interaction behavior, and you must add or update Patrol coverage.
+- Modify any Go handler, service, or repository, and you must add or update matching `*_test.go` unit tests.
+- All UI tests must use `Key`-based locators first. Avoid fragile text-only or hierarchy-only selectors unless no Key exists yet.
+- Release/* branches must run the full chain: `flutter test`, `flutter test test/golden`, `flutter test integration_test`, `patrol test`, and `go test ./...`.
+- New features must follow test first, then implementation, then full regression.
+- Keep tests split by module. Do not pile every scenario into one file.
+- Golden baseline refreshes require UI review confirmation before updating reference images.
+- CI failures must be fixed in tests or implementation. Do not skip the failing check in merge workflows.
+
 See [docs/security/secure-development-rules.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/security/secure-development-rules.md) for the full checklist.
