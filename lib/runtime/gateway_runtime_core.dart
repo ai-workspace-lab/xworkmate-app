@@ -308,7 +308,7 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
             'stored device token for role ${connectResult.auth['role']?.toString().trim().isNotEmpty == true ? connectResult.auth['role'].toString().trim() : 'operator'}',
           );
         }
-        snapshotInternal = connectResult.snapshot;
+        snapshotInternal = connectResult.snapshot.normalizedForConnectedState();
         notifyListeners();
         return;
       } on GatewayRuntimeException catch (error) {
@@ -658,7 +658,7 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
     switch (update.type) {
       case GatewayRuntimeSessionUpdateType.snapshot:
         if (update.snapshot != null) {
-          snapshotInternal = update.snapshot!;
+          snapshotInternal = update.snapshot!.normalizedForConnectedState();
           notifyListeners();
         }
         return;
