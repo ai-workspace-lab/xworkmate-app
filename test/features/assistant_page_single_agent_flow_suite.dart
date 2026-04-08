@@ -10,6 +10,20 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 
 import '../test_support.dart';
 
+Future<void> _waitForText(
+  WidgetTester tester,
+  Finder finder, {
+  Duration timeout = const Duration(seconds: 10),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (finder.evaluate().isEmpty) {
+    if (DateTime.now().isAfter(deadline)) {
+      fail('Timed out waiting for ${finder.description}');
+    }
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+}
+
 void main() {
   testWidgets(
     'AssistantPage single agent can be selected and receive streaming reply',
@@ -57,7 +71,7 @@ void main() {
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
-      await tester.pumpAndSettle();
+      await _waitForText(tester, find.textContaining('CODEX_REPLY'));
 
       expect(find.textContaining('CODEX_REPLY'), findsWidgets);
       expect(server.requestCount, greaterThanOrEqualTo(1));
@@ -108,7 +122,9 @@ class _ChatServer {
         HttpHeaders.contentTypeHeader,
         'text/event-stream; charset=utf-8',
       );
+      request.response.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
       request.response.write('data: ${jsonEncode(response)}\n\n');
+      await request.response.flush();
       await request.response.close();
     }
   }
