@@ -471,5 +471,59 @@ void registerExecutionTargetSwitchThreadTests() {
         );
       },
     );
+
+    test(
+      'AppController surfaces pairing-required state on the active assistant thread even if transport still says connected',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        final tempDirectory = await Directory.systemTemp.createTemp(
+          'xworkmate-thread-pairing-state-',
+        );
+        addTearDown(() async {
+          await deleteDirectoryWithRetryInternal(tempDirectory);
+        });
+        final store = SecureConfigStore(
+          enableSecureStorage: false,
+          databasePathResolver: () async => '${tempDirectory.path}/settings.db',
+          fallbackDirectoryPathResolver: () async => tempDirectory.path,
+        );
+        final gateway = FakeGatewayRuntimeInternal(store: store);
+        final controller = AppController(
+          store: store,
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: gateway,
+            codex: FakeCodexRuntimeInternal(),
+          ),
+        );
+        addTearDown(controller.dispose);
+
+        await waitForInternal(() => !controller.initializing);
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.local,
+        );
+
+        final localProfile = controller.settings.primaryLocalGatewayProfile;
+        gateway.fakeSnapshotInternal = gateway.fakeSnapshotInternal.copyWith(
+          status: RuntimeConnectionStatus.connected,
+          remoteAddress: '${localProfile.host}:${localProfile.port}',
+          lastError: 'NOT_PAIRED: pairing required',
+          lastErrorCode: 'NOT_PAIRED',
+          lastErrorDetailCode: 'PAIRING_REQUIRED',
+        );
+        gateway.notifyListeners();
+        await Future<void>.delayed(Duration.zero);
+
+        expect(
+          controller.currentAssistantConnectionState.pairingRequired,
+          isTrue,
+        );
+        expect(controller.currentAssistantConnectionState.connected, isFalse);
+        expect(controller.assistantConnectionStatusLabel, '需配对');
+        expect(
+          controller.assistantConnectionTargetLabel,
+          '${localProfile.host}:${localProfile.port}',
+        );
+      },
+    );
   });
 }
