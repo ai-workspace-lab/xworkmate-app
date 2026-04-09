@@ -7,6 +7,14 @@ XWorkmate is a Flutter-based AI workspace shell for running assistant threads, l
 XWorkmate combines a desktop-first Flutter app, persistent assistant task threads, and optional multi-agent orchestration.
 It is designed for users who want a single workspace for AI chat, gateway-backed execution, and packaged local tooling across macOS, web, and other client surfaces.
 
+## Companion Repository
+
+The ACP Bridge Server and embedded Go helper now live in the standalone companion repository:
+
+- [`xworkmate-bridge`](https://github.com/x-evor/xworkmate-bridge)
+
+For local development, keep `xworkmate-bridge` checked out alongside `xworkmate-app`, or set `XWORKMATE_BRIDGE_DIR` explicitly before building the helper.
+
 ## TL;DR
 
 ```bash
