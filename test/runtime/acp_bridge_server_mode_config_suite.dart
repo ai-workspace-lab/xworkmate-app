@@ -14,6 +14,16 @@ void main() {
     expect(config.selfHosted.passwordRef, 'acp_bridge_server_password');
   });
 
+  test('self hosted mode always uses self hosted base', () {
+    final config = AcpBridgeServerModeConfig.defaults().copyWith(
+      mode: AcpBridgeServerMode.selfHosted,
+    );
+
+    expect(config.usesSelfHostedBase, isTrue);
+    expect(config.usesCloudSyncBase, isFalse);
+    expect(config.sourceTag, 'selfHosted');
+  });
+
   test('advanced custom mode can inherit self hosted base when configured', () {
     final config = AcpBridgeServerModeConfig.defaults().copyWith(
       mode: AcpBridgeServerMode.advancedCustom,
@@ -28,50 +38,68 @@ void main() {
     expect(config.sourceTag, 'advancedOverride');
   });
 
-  test('SettingsSnapshot captures current advanced overrides into mode config', () {
-    final snapshot = SettingsSnapshot.defaults().copyWith(
-      gatewayProfiles: SettingsSnapshot.defaults().gatewayProfiles,
-      vault: VaultConfig.defaults().copyWith(address: 'https://vault.example'),
-      aiGateway: AiGatewayProfile.defaults().copyWith(
-        baseUrl: 'https://llm.example.com/v1',
-      ),
-      externalAcpEndpoints: <ExternalAcpEndpointProfile>[
-        ExternalAcpEndpointProfile.defaultsForProvider(
-          SingleAgentProvider.codex,
-        ).copyWith(endpoint: 'https://agent.example.com'),
-      ],
-      authorizedSkillDirectories: const <AuthorizedSkillDirectory>[
-        AuthorizedSkillDirectory(path: '/tmp/skills'),
-      ],
-    );
+  test(
+    'advanced custom mode falls back to cloud sync when self hosted is empty',
+    () {
+      final config = AcpBridgeServerModeConfig.defaults().copyWith(
+        mode: AcpBridgeServerMode.advancedCustom,
+      );
 
-    final captured = snapshot.captureAcpBridgeServerAdvancedOverrides();
+      expect(config.usesSelfHostedBase, isFalse);
+      expect(config.usesCloudSyncBase, isTrue);
+      expect(config.sourceTag, 'advancedOverride');
+    },
+  );
 
-    expect(
-      captured.acpBridgeServerModeConfig.advancedOverrides.vault.address,
-      'https://vault.example',
-    );
-    expect(
-      captured.acpBridgeServerModeConfig.advancedOverrides.aiGateway.baseUrl,
-      'https://llm.example.com/v1',
-    );
-    expect(
-      captured
-          .acpBridgeServerModeConfig
-          .advancedOverrides
-          .acpBridgeServerProfiles
-          .firstWhere((item) => item.providerKey == 'codex')
-          .endpoint,
-      'https://agent.example.com',
-    );
-    expect(
-      captured
-          .acpBridgeServerModeConfig
-          .advancedOverrides
-          .authorizedSkillDirectories
-          .single
-          .path,
-      '/tmp/skills',
-    );
-  });
+  test(
+    'SettingsSnapshot captures current advanced overrides into mode config',
+    () {
+      final snapshot = SettingsSnapshot.defaults().copyWith(
+        gatewayProfiles: SettingsSnapshot.defaults().gatewayProfiles,
+        vault: VaultConfig.defaults().copyWith(
+          address: 'https://vault.example',
+        ),
+        aiGateway: AiGatewayProfile.defaults().copyWith(
+          baseUrl: 'https://llm.example.com/v1',
+        ),
+        externalAcpEndpoints: <ExternalAcpEndpointProfile>[
+          ExternalAcpEndpointProfile.defaultsForProvider(
+            SingleAgentProvider.codex,
+          ).copyWith(endpoint: 'https://agent.example.com'),
+        ],
+        authorizedSkillDirectories: const <AuthorizedSkillDirectory>[
+          AuthorizedSkillDirectory(path: '/tmp/skills'),
+        ],
+      );
+
+      final captured = snapshot.captureAcpBridgeServerAdvancedOverrides();
+
+      expect(
+        captured.acpBridgeServerModeConfig.advancedOverrides.vault.address,
+        'https://vault.example',
+      );
+      expect(
+        captured.acpBridgeServerModeConfig.advancedOverrides.aiGateway.baseUrl,
+        'https://llm.example.com/v1',
+      );
+      expect(
+        captured
+            .acpBridgeServerModeConfig
+            .advancedOverrides
+            .acpBridgeServerProfiles
+            .firstWhere((item) => item.providerKey == 'codex')
+            .endpoint,
+        'https://agent.example.com',
+      );
+      expect(
+        captured
+            .acpBridgeServerModeConfig
+            .advancedOverrides
+            .authorizedSkillDirectories
+            .single
+            .path,
+        '/tmp/skills',
+      );
+    },
+  );
 }
