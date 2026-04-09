@@ -85,7 +85,7 @@ build-ios-sim: ## Build the iOS app for the simulator
 	$(FLUTTER) build ios --simulator $(APP_STORE_DART_DEFINE) --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD)
 	bash scripts/check-apple-export-compliance.sh build/ios/iphonesimulator/Runner.app
 
-build-go-core: ## Build the Go core helper
+build-go-core: ## Build the external ACP bridge helper from xworkmate-bridge
 	bash scripts/build-go-core.sh
 
 package-deb: ## Create the Linux .deb package
