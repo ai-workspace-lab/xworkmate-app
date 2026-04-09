@@ -24,7 +24,7 @@
 
 - `flutter analyze`
 - `flutter test`
-- `cd go/go_core && go test ./...`
+- `cd ../xworkmate-bridge && go test ./...`
 - `flutter test integration_test/desktop_navigation_flow_test.dart -d macos`
 - `flutter test integration_test/desktop_settings_flow_test.dart -d macos`
 - `flutter build macos`
