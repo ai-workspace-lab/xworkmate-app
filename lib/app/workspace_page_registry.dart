@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../features/account/account_page.dart';
 import '../features/assistant/assistant_page.dart';
 import '../features/claw_hub/claw_hub_page.dart';
 import '../features/mcp_server/mcp_server_page.dart';
@@ -121,22 +120,22 @@ workspacePageSpecsInternal = <WorkspaceDestination, WorkspacePageSpec>{
       initialTab: controller.settingsTab,
       initialDetail: controller.settingsDetail,
       navigationContext: controller.settingsNavigationContext,
-      showSectionTabs: false,
+      showSectionTabs: true,
     ),
     mobileBuilder: (controller, onOpenDetail) => SettingsPage(
       controller: controller,
       initialTab: controller.settingsTab,
       initialDetail: controller.settingsDetail,
       navigationContext: controller.settingsNavigationContext,
-      showSectionTabs: false,
+      showSectionTabs: true,
     ),
   ),
   WorkspaceDestination.account: WorkspacePageSpec(
     destination: WorkspaceDestination.account,
     desktopBuilder: (controller, onOpenDetail) =>
-        AccountPage(controller: controller),
+        SettingsPage(controller: controller, initialTab: SettingsTab.gateway),
     mobileBuilder: (controller, onOpenDetail) =>
-        AccountPage(controller: controller),
+        SettingsPage(controller: controller, initialTab: SettingsTab.gateway),
   ),
 };
 

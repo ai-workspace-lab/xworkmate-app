@@ -68,9 +68,16 @@ extension SettingsPageSectionsMixinInternal on SettingsPageStateInternal {
           settings,
           uiFeatures,
         ),
-        SettingsTab.agents => buildAgentsInternal(context, controller, settings),
+        SettingsTab.agents => buildAgentsInternal(
+          context,
+          controller,
+          settings,
+        ),
         SettingsTab.appearance => buildAppearanceInternal(context, controller),
-        SettingsTab.diagnostics => buildDiagnosticsInternal(context, controller),
+        SettingsTab.diagnostics => buildDiagnosticsInternal(
+          context,
+          controller,
+        ),
         SettingsTab.experimental => buildExperimentalInternal(
           context,
           controller,
@@ -256,10 +263,7 @@ extension SettingsPageSectionsMixinInternal on SettingsPageStateInternal {
               '当前存在待生效更改。保存并生效：立即按当前配置更新。',
               'There are saved changes waiting to be applied. Save & apply updates the current configuration immediately.',
             )
-          : appText(
-              '当前没有待提交更改。',
-              'There are no pending settings changes.',
-            ),
+          : appText('当前没有待提交更改。', 'There are no pending settings changes.'),
       applyLabel: appText('保存并生效', 'Save & apply'),
       onApply: (!hasDraft && !hasPendingApply)
           ? null
@@ -311,43 +315,6 @@ extension SettingsPageSectionsMixinInternal on SettingsPageStateInternal {
       ),
       if (controller.supportsDesktopIntegration)
         buildLinuxDesktopIntegrationInternal(context, controller, settings),
-      if (uiFeatures.supportsAccountAccess)
-        SurfaceCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                appText('账号访问', 'Account Access'),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              EditableFieldInternal(
-                label: appText('账号服务地址', 'Account Base URL'),
-                value: settings.accountBaseUrl,
-                onSubmitted: (value) => saveSettingsInternal(
-                  controller,
-                  settings.copyWith(accountBaseUrl: value),
-                ),
-              ),
-              EditableFieldInternal(
-                label: appText('账号用户名', 'Account Username'),
-                value: settings.accountUsername,
-                onSubmitted: (value) => saveSettingsInternal(
-                  controller,
-                  settings.copyWith(accountUsername: value),
-                ),
-              ),
-              EditableFieldInternal(
-                label: appText('工作区名称', 'Workspace Label'),
-                value: settings.accountWorkspace,
-                onSubmitted: (value) => saveSettingsInternal(
-                  controller,
-                  settings.copyWith(accountWorkspace: value),
-                ),
-              ),
-            ],
-          ),
-        ),
     ];
   }
 

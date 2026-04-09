@@ -72,15 +72,6 @@ class MobileWorkspaceLauncherInternal extends StatelessWidget {
                 iconColor: palette.accent,
                 iconBackground: palette.accentMuted,
               ),
-              WorkspaceEntryInternal(
-                destination: WorkspaceDestination.account,
-                subtitle: appText(
-                  '身份、工作区与会话',
-                  'Identity, workspace and sessions',
-                ),
-                iconColor: palette.success,
-                iconBackground: palette.success.withValues(alpha: 0.12),
-              ),
             ]
             .where(
               (entry) =>

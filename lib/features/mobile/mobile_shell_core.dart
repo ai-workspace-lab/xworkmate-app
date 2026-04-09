@@ -101,10 +101,10 @@ class MobileShellStateInternal extends State<MobileShell> {
       WorkspaceDestination.agents ||
       WorkspaceDestination.mcpServer ||
       WorkspaceDestination.clawHub ||
-      WorkspaceDestination.aiGateway ||
-      WorkspaceDestination.account => MobileShellTab.workspace,
+      WorkspaceDestination.aiGateway => MobileShellTab.workspace,
       WorkspaceDestination.secrets => MobileShellTab.secrets,
       WorkspaceDestination.settings => MobileShellTab.settings,
+      WorkspaceDestination.account => MobileShellTab.settings,
     };
   }
 
