@@ -1,8 +1,0 @@
-:8080 {
-    root * /app/public
-    file_server
-    encode gzip
-
-    # Handle SPA routing
-    try_files {path} /index.html
-}
