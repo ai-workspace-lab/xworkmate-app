@@ -64,10 +64,12 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
         'SKILLS 目录授权',
         'SKILLS Directory Authorization',
       ),
+      GatewayIntegrationSubTabInternal.advancedConfig => appText(
+        '高级自定义配置',
+        'Advanced Custom Configuration',
+      ),
     };
     return [
-      buildAcpBridgeServerModeCardInternal(context, controller, settings),
-      const SizedBox(height: 16),
       SectionTabs(
         items: <String>[
           'OpenClaw Gateway',
@@ -75,6 +77,7 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
           appText('LLM 接入点', 'LLM Endpoints'),
           appText('ACP 外部接入', 'External ACP'),
           appText('SKILLS 目录授权', 'SKILLS Directory Authorization'),
+          appText('高级自定义配置', 'Advanced Custom Configuration'),
         ],
         value: tabLabel,
         onChanged: (value) => setStateInternal(() {
@@ -86,7 +89,11 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
               GatewayIntegrationSubTabInternal.llm,
             _ when value == appText('ACP 外部接入', 'External ACP') =>
               GatewayIntegrationSubTabInternal.acp,
-            _ => GatewayIntegrationSubTabInternal.skills,
+            _
+                when value ==
+                    appText('SKILLS 目录授权', 'SKILLS Directory Authorization') =>
+              GatewayIntegrationSubTabInternal.skills,
+            _ => GatewayIntegrationSubTabInternal.advancedConfig,
           };
         }),
       ),
@@ -210,6 +217,11 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
             ),
           ),
         ],
+        GatewayIntegrationSubTabInternal.advancedConfig => <Widget>[
+          buildOnlineAccountCardInternal(context, controller, settings),
+          const SizedBox(height: 16),
+          buildAcpBridgeServerModeCardInternal(context, controller, settings),
+        ],
       },
     ];
   }
@@ -224,8 +236,6 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
         settings.acpBridgeServerModeConfig.mode ==
         AcpBridgeServerMode.advancedCustom;
     return [
-      buildAcpBridgeServerModeCardInternal(context, controller, settings),
-      const SizedBox(height: 16),
       Opacity(
         opacity: advancedEditable ? 1 : 0.72,
         child: IgnorePointer(
@@ -237,7 +247,11 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
             onChanged: (value) => setStateInternal(() {
               openClawGatewayExpandedInternal = value;
             }),
-            child: buildOpenClawGatewayCardInternal(context, controller, settings),
+            child: buildOpenClawGatewayCardInternal(
+              context,
+              controller,
+              settings,
+            ),
           ),
         ),
       ),
@@ -254,7 +268,11 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
               onChanged: (value) => setStateInternal(() {
                 vaultServerExpandedInternal = value;
               }),
-              child: buildVaultProviderCardInternal(context, controller, settings),
+              child: buildVaultProviderCardInternal(
+                context,
+                controller,
+                settings,
+              ),
             ),
           ),
         )
@@ -280,7 +298,11 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
             onChanged: (value) => setStateInternal(() {
               aiGatewayExpandedInternal = value;
             }),
-            child: buildLlmEndpointManagerInternal(context, controller, settings),
+            child: buildLlmEndpointManagerInternal(
+              context,
+              controller,
+              settings,
+            ),
           ),
         ),
       ),

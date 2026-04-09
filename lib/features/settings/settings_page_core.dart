@@ -60,6 +60,10 @@ class SettingsPageStateInternal extends State<SettingsPage> {
   late final TextEditingController aiGatewayApiKeyRefControllerInternal;
   late final TextEditingController aiGatewayApiKeyControllerInternal;
   late final TextEditingController aiGatewayModelSearchControllerInternal;
+  late final TextEditingController accountBaseUrlControllerInternal;
+  late final TextEditingController accountUsernameControllerInternal;
+  late final TextEditingController accountPasswordControllerInternal;
+  late final TextEditingController accountMfaCodeControllerInternal;
   late final TextEditingController gatewaySetupCodeControllerInternal;
   late final TextEditingController gatewayHostControllerInternal;
   late final TextEditingController gatewayPortControllerInternal;
@@ -73,6 +77,8 @@ class SettingsPageStateInternal extends State<SettingsPage> {
   late final TextEditingController acpBridgeServerUrlControllerInternal;
   late final TextEditingController acpBridgeServerUsernameControllerInternal;
   late final TextEditingController acpBridgeServerPasswordControllerInternal;
+  String accountBaseUrlSyncedValueInternal = '';
+  String accountUsernameSyncedValueInternal = '';
   late final Map<String, TextEditingController>
   externalAcpLabelControllersInternal;
   late final Map<String, TextEditingController>
@@ -135,6 +141,10 @@ class SettingsPageStateInternal extends State<SettingsPage> {
     aiGatewayApiKeyRefControllerInternal = TextEditingController();
     aiGatewayApiKeyControllerInternal = TextEditingController();
     aiGatewayModelSearchControllerInternal = TextEditingController();
+    accountBaseUrlControllerInternal = TextEditingController();
+    accountUsernameControllerInternal = TextEditingController();
+    accountPasswordControllerInternal = TextEditingController();
+    accountMfaCodeControllerInternal = TextEditingController();
     gatewaySetupCodeControllerInternal = TextEditingController();
     gatewayHostControllerInternal = TextEditingController();
     gatewayPortControllerInternal = TextEditingController();
@@ -244,6 +254,10 @@ class SettingsPageStateInternal extends State<SettingsPage> {
     aiGatewayApiKeyRefControllerInternal.dispose();
     aiGatewayApiKeyControllerInternal.dispose();
     aiGatewayModelSearchControllerInternal.dispose();
+    accountBaseUrlControllerInternal.dispose();
+    accountUsernameControllerInternal.dispose();
+    accountPasswordControllerInternal.dispose();
+    accountMfaCodeControllerInternal.dispose();
     gatewaySetupCodeControllerInternal.dispose();
     gatewayHostControllerInternal.dispose();
     gatewayPortControllerInternal.dispose();
