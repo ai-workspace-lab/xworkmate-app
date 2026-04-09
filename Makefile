@@ -47,8 +47,8 @@ test-patrol: ## Run Patrol end-to-end tests
 	dart pub global activate patrol_cli
 	patrol test
 
-test-go: ## Run Go API unit tests
-	cd go_service && go test ./...
+test-go: ## Run xworkmate-bridge Go unit tests
+	cd ../xworkmate-bridge && go test ./...
 
 test-ci: test-flutter test-golden test-integration test-go ## Run the PR validation chain
 

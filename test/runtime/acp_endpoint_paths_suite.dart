@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/acp_endpoint_paths.dart';
-import 'package:xworkmate/web/web_acp_client.dart';
 
 void main() {
   group('AcpEndpointPaths', () {
@@ -62,15 +61,6 @@ void main() {
         );
       },
     );
-
-    test('web ACP client uses shared prefixed websocket resolution', () {
-      expect(
-        WebAcpClient.resolveWebSocketEndpointInternal(
-          Uri.parse('https://acp-server.svc.plus/codex'),
-        ),
-        Uri.parse('wss://acp-server.svc.plus/codex/acp'),
-      );
-    });
 
     test('HTTP RPC resolution rejects websocket-only schemes', () {
       expect(

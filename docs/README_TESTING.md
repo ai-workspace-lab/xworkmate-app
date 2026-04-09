@@ -33,11 +33,12 @@ patrol test
 Run Go unit tests:
 
 ```bash
-cd go_service
+cd ../xworkmate-bridge
 go test ./...
 ```
 
 ## CI Coverage
 
-- Pull requests run Flutter tests, golden tests, integration tests, and Go tests.
+- Pull requests in `xworkmate-app` run Flutter tests, golden tests, and integration tests.
+- `xworkmate-bridge` Go tests run in the companion repository.
 - `release/*` branches run Patrol tests in addition to the PR chain.

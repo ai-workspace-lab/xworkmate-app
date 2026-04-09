@@ -20,18 +20,6 @@ jobs:
       - run: flutter test test/golden
       - run: flutter test integration_test
 
-  go:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: go_service
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-      - run: go test ./...
-
   patrol:
     if: startsWith(github.ref, 'refs/heads/release/')
     runs-on: ubuntu-latest

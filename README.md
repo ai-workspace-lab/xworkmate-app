@@ -5,7 +5,7 @@ XWorkmate is a Flutter-based AI workspace shell for running assistant threads, l
 ## Project
 
 XWorkmate combines a desktop-first Flutter app, persistent assistant task threads, and optional multi-agent orchestration.
-It is designed for users who want a single workspace for AI chat, gateway-backed execution, and packaged local tooling across macOS, web, and other client surfaces.
+It is designed for users who want a single workspace for AI chat, gateway-backed execution, and packaged local tooling across macOS, Windows, Linux, iOS, and Android.
 
 ## Companion Repository
 
@@ -66,9 +66,9 @@ All download buttons currently point to the latest GitHub release page.
 
 ## Snapshots
 
-| Mobile | Desktop | Web |
-| --- | --- | --- |
-| ![XWorkmate Mobile](./images/mobile-app.PNG) | ![XWorkmate Desktop](./images/Desktop-APP.png) | ![XWorkmate Web](./images/web-online-services.png) |
+| Mobile | Desktop |
+| --- | --- |
+| ![XWorkmate Mobile](./images/mobile-app.PNG) | ![XWorkmate Desktop](./images/Desktop-APP.png) |
 
 ## Learn More
 
@@ -77,5 +77,4 @@ All download buttons currently point to the latest GitHub release page.
 - [Feature Matrix](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/plans/xworkmate-ui-feature-matrix.md)
 - [Roadmap](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/plans/xworkmate-ui-feature-roadmap.md)
 - [Gateway Dev Runbook](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/runbooks/gateway-dev-runbook.md)
-- [Web Deployment](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/web-deployment.md)
 - [Security Rules](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/security/secure-development-rules.md)
