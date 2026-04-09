@@ -76,10 +76,12 @@ class _DesktopServiceStub implements DesktopPlatformService {
 Future<AppController> _createControllerWithSkillAccessService(
   WidgetTester tester,
   SkillDirectoryAccessService skillDirectoryAccessService,
+  {UiFeatureManifest? uiFeatureManifest,}
 ) async {
   final controller = AppController(
     store: createIsolatedTestStore(enableSecureStorage: false),
     skillDirectoryAccessService: skillDirectoryAccessService,
+    uiFeatureManifest: uiFeatureManifest,
   );
   addTearDown(controller.dispose);
   await tester.pump(const Duration(milliseconds: 100));
@@ -179,6 +181,24 @@ Future<void> _ensureVisible(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
+UiFeatureManifest _gatewayAdvancedManifestInternal() {
+  return UiFeatureManifest.fallback()
+      .copyWithFeature(
+        platform: UiFeaturePlatform.desktop,
+        module: 'settings',
+        feature: 'gateway_self_hosted_base',
+        enabled: true,
+        releaseTier: UiFeatureReleaseTier.experimental,
+      )
+      .copyWithFeature(
+        platform: UiFeaturePlatform.desktop,
+        module: 'settings',
+        feature: 'gateway_advanced_custom_mode',
+        enabled: true,
+        releaseTier: UiFeatureReleaseTier.experimental,
+      );
+}
+
 void main() {
   testWidgets('SettingsPage theme chips update controller theme mode', (
     WidgetTester tester,
@@ -197,7 +217,7 @@ void main() {
   });
 
   testWidgets(
-    'SettingsPage gateway advanced config tab merges online account and ACP Bridge Server',
+    'SettingsPage gateway home aligns with the architecture model and hides experimental controls by default',
     (WidgetTester tester) async {
       final controller = await createTestController(tester);
       controller.setSettingsTab(SettingsTab.gateway);
@@ -213,31 +233,111 @@ void main() {
       );
 
       expect(
-        find.byKey(const ValueKey('account-base-url-field')),
-        findsNothing,
-      );
-      expect(find.byKey(const ValueKey('acp-bridge-mode-cloud')), findsNothing);
-
-      await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义配置')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('ACP Bridge Server 连接模式'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('account-base-url-field')),
+        find.byKey(const ValueKey('gateway-configuration-overview-card')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const ValueKey('gateway-overview-login-status')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('gateway-overview-default-source')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('gateway-overview-advanced-override')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('section-tab-用户登录状态')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('section-tab-基础连接配置')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('section-tab-高级自定义模式')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('account-base-url-field')), findsOneWidget);
+      expect(find.byKey(const ValueKey('account-username-field')), findsOneWidget);
+      expect(find.byKey(const ValueKey('account-password-field')), findsOneWidget);
+      expect(find.byKey(const ValueKey('acp-bridge-mode-cloud')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('acp-bridge-mode-self-hosted')),
+        findsNothing,
+      );
+      expect(find.text('OpenClaw Gateway'), findsNothing);
+      expect(find.text('Vault Server'), findsNothing);
+      expect(find.text('LLM 接入点'), findsNothing);
+      expect(find.text('外部 ACP Server Endpoint'), findsNothing);
+      expect(find.text('SKILLS 目录授权'), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('section-tab-基础连接配置')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('基础连接配置'), findsWidgets);
       expect(
         find.byKey(const ValueKey('acp-bridge-mode-cloud')),
         findsOneWidget,
       );
       expect(
         find.byKey(const ValueKey('acp-bridge-mode-self-hosted')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const ValueKey('acp-bridge-mode-advanced')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'SettingsPage gateway can show self-hosted and advanced custom controls when feature flags are enabled',
+    (WidgetTester tester) async {
+      final manifest = _gatewayAdvancedManifestInternal();
+      final controller = await createTestController(
+        tester,
+        uiFeatureManifest: manifest,
+      );
+      controller.setSettingsTab(SettingsTab.gateway);
+
+      await pumpPage(
+        tester,
+        child: SettingsPage(
+          controller: controller,
+          initialTab: SettingsTab.gateway,
+          showSectionTabs: true,
+        ),
+        platform: TargetPlatform.macOS,
+      );
+
+      expect(
+        find.byKey(const ValueKey('section-tab-高级自定义模式')),
         findsOneWidget,
       );
+
+      await tester.tap(find.byKey(const ValueKey('section-tab-基础连接配置')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('acp-bridge-mode-self-hosted')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('gateway-advanced-override-intro')),
+        findsOneWidget,
+      );
+      expect(find.text('OpenClaw Gateway'), findsWidgets);
+      expect(find.text('Vault Server'), findsAtLeastNWidgets(1));
+      expect(find.text('LLM 接入点'), findsOneWidget);
+      expect(find.text('外部 ACP Server Endpoint'), findsOneWidget);
+      expect(find.text('SKILLS 目录授权'), findsOneWidget);
     },
   );
 
@@ -309,72 +409,36 @@ void main() {
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
 
-    expect(find.text('OpenClaw Gateway'), findsWidgets);
-    expect(find.text('LLM 接入点'), findsOneWidget);
-    expect(find.text('Vault Server'), findsAtLeastNWidgets(1));
-    expect(find.byKey(const ValueKey('gateway-test-button')), findsOneWidget);
-    expect(find.byKey(const ValueKey('gateway-save-button')), findsNothing);
-    expect(find.byKey(const ValueKey('gateway-apply-button')), findsOneWidget);
+    expect(find.text('用户登录状态'), findsWidgets);
+    expect(find.text('基础连接配置'), findsWidgets);
+    expect(find.text('高级自定义模式'), findsNothing);
+    expect(find.byKey(const ValueKey('account-base-url-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-username-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('account-password-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('acp-bridge-mode-cloud')), findsNothing);
     expect(
-      find.byKey(const ValueKey('gateway-profile-chip-0')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('gateway-profile-chip-1')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('gateway-profile-chip-2')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('gateway-profile-chip-3')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('gateway-profile-chip-4')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('gateway-profile-chip-2')),
-        matching: find.text('连接源 1（空）'),
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('自定义连接源 1（空）'), findsNothing);
-    expect(
-      find.byKey(const ValueKey('gateway-device-security-card')),
-      findsOneWidget,
-    );
-
-    expect(
-      find.byKey(const ValueKey('vault-server-url-field')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('vault-root-access-token-field')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const ValueKey('ai-gateway-url-field')), findsOneWidget);
-    expect(find.byKey(const ValueKey('gateway-mode-field')), findsNothing);
-    expect(find.text('认证诊断'), findsNothing);
-    expect(
-      find.byKey(const ValueKey('external-acp-provider-add-button')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('settings-global-apply-button')),
+      find.byKey(const ValueKey('acp-bridge-mode-self-hosted')),
       findsNothing,
     );
+    expect(find.text('OpenClaw Gateway'), findsNothing);
+    expect(find.text('Vault Server'), findsNothing);
+    expect(find.text('LLM 接入点'), findsNothing);
+    expect(find.text('外部 ACP Server Endpoint'), findsNothing);
+    expect(find.text('SKILLS 目录授权'), findsNothing);
   });
 
   testWidgets('SettingsPage vault card exposes concrete K/V fields', (
     WidgetTester tester,
   ) async {
-    final controller = await createTestController(tester);
+    final controller = await createTestController(
+      tester,
+      uiFeatureManifest: _gatewayAdvancedManifestInternal(),
+    );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
+
+    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
+    await tester.pumpAndSettle();
 
     expect(find.text('Vault Server'), findsAtLeastNWidgets(1));
     expect(find.text('VAULT_SERVER_URL'), findsOneWidget);
@@ -389,9 +453,15 @@ void main() {
   testWidgets('SettingsPage integration tab exposes ACP provider endpoints', (
     WidgetTester tester,
   ) async {
-    final controller = await createTestController(tester);
+    final controller = await createTestController(
+      tester,
+      uiFeatureManifest: _gatewayAdvancedManifestInternal(),
+    );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
+
+    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
+    await tester.pumpAndSettle();
 
     expect(find.text('外部 ACP Server Endpoint'), findsOneWidget);
     expect(find.textContaining('Codex'), findsWidgets);
@@ -419,9 +489,15 @@ void main() {
   testWidgets('SettingsPage ACP wizard adds a custom provider card', (
     WidgetTester tester,
   ) async {
-    final controller = await createTestController(tester);
+    final controller = await createTestController(
+      tester,
+      uiFeatureManifest: _gatewayAdvancedManifestInternal(),
+    );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
+
+    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
+    await tester.pumpAndSettle();
 
     await _ensureVisible(
       tester,
@@ -455,9 +531,13 @@ void main() {
     final controller = await _createControllerWithSkillAccessService(
       tester,
       _FakeSkillDirectoryAccessService(userHomeDirectory: '/Users/tester'),
+      uiFeatureManifest: _gatewayAdvancedManifestInternal(),
     );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
+
+    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
+    await tester.pumpAndSettle();
 
     expect(find.text('~/.agents/skills'), findsOneWidget);
     expect(find.text('/Users/tester/.agents/skills'), findsOneWidget);
@@ -485,9 +565,12 @@ void main() {
           ),
         ],
       ),
+      uiFeatureManifest: _gatewayAdvancedManifestInternal(),
     );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
+    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
+    await tester.pumpAndSettle();
     await _ensureVisible(
       tester,
       find.byKey(const ValueKey('skill-directory-batch-add-button')),
@@ -542,9 +625,12 @@ paths:
           ),
         ],
       ),
+      uiFeatureManifest: _gatewayAdvancedManifestInternal(),
     );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
+    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
+    await tester.pumpAndSettle();
     await _ensureVisible(
       tester,
       find.byKey(const ValueKey('skill-directory-batch-add-button')),
@@ -582,9 +668,12 @@ paths:
       final controller = await _createControllerWithSkillAccessService(
         tester,
         _FakeSkillDirectoryAccessService(userHomeDirectory: '/Users/tester'),
+        uiFeatureManifest: _gatewayAdvancedManifestInternal(),
       );
 
       await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
+      await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
+      await tester.pumpAndSettle();
       await _ensureVisible(
         tester,
         find.byKey(const ValueKey('skill-directory-batch-add-button')),
@@ -651,9 +740,14 @@ paths:
   testWidgets('SettingsPage external ACP section can collapse independently', (
     WidgetTester tester,
   ) async {
-    final controller = await createTestController(tester);
+    final controller = await createTestController(
+      tester,
+      uiFeatureManifest: _gatewayAdvancedManifestInternal(),
+    );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
+    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
+    await tester.pumpAndSettle();
 
     await _ensureVisible(tester, find.text('外部 ACP Server Endpoint'));
     await tester.tap(find.text('外部 ACP Server Endpoint').first);
@@ -678,7 +772,10 @@ paths:
   testWidgets('SettingsPage external ACP card supports continuous input', (
     WidgetTester tester,
   ) async {
-    final controller = await createTestController(tester);
+    final controller = await createTestController(
+      tester,
+      uiFeatureManifest: _gatewayAdvancedManifestInternal(),
+    );
     final customProfile = buildCustomExternalAcpEndpointProfile(
       controller.settingsDraft.externalAcpEndpoints,
       label: 'Initial Name',
@@ -694,6 +791,8 @@ paths:
     );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
+    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
+    await tester.pumpAndSettle();
 
     final labelField = find.byKey(
       ValueKey('external-acp-label-${customProfile.providerKey}'),

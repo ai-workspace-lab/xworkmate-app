@@ -91,8 +91,17 @@ void main() {
       ),
     );
 
-    expect(find.text('OpenClaw Gateway'), findsWidgets);
-    expect(find.text('LLM 接入点'), findsWidgets);
+    expect(find.text('用户登录状态'), findsWidgets);
+    expect(find.text('基础连接配置'), findsWidgets);
+    expect(find.text('高级自定义模式'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('gateway-configuration-overview-card')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('gateway-overview-advanced-override')),
+      findsNothing,
+    );
   });
 
   testWidgets(
