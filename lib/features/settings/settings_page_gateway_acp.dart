@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
+import '../../app/ui_feature_manifest.dart';
 import '../../i18n/app_language.dart';
 import '../../runtime/gateway_acp_client.dart';
 import '../../runtime/runtime_controllers.dart';
@@ -234,7 +235,7 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
         ? accountSession!.email.trim()
         : accountSession?.name.trim().isNotEmpty == true
         ? accountSession!.name.trim()
-        : appText('在线账户', 'Online Account');
+        : appText('用户登录状态', 'User Login State');
     final sessionStatusText = accountSignedIn
         ? appText('已登录：$signedInLabel', 'Signed in: $signedInLabel')
         : accountMfaRequired
@@ -261,15 +262,15 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  appText('在线账户', 'Online Account'),
+                  appText('用户登录状态', 'User Login State'),
                   style: theme.textTheme.headlineMedium,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 10),
                 Text(
                   appText(
-                    '请先登录 ACP Bridge Server',
-                    'Please sign in to ACP Bridge Server',
+                    '先完成账户登录，再同步或校验默认连接配置。',
+                    'Sign in first, then sync or verify the default connection configuration.',
                   ),
                   style: theme.textTheme.titleMedium?.copyWith(
                     color: theme.textTheme.bodyMedium?.color?.withValues(
@@ -343,8 +344,8 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
             const SizedBox(height: 8),
             Text(
               appText(
-                '这里继续只负责在线账户身份、MFA、工作区与同步摘要。ACP Bridge Server 的本地连接与高级配置在下面统一收口。',
-                'This card focuses on online account identity, MFA, workspace, and sync summary. Local ACP Bridge Server connection and advanced config are unified below.',
+                '这里仅描述认证状态本身：登录、MFA、同步状态与当前账户身份。默认连接来源和高级覆盖在下面分别配置。',
+                'This card describes authentication only: sign-in, MFA, sync state, and current account identity. The default connection source and advanced overrides are configured below.',
               ),
             ),
             const SizedBox(height: 16),
@@ -371,7 +372,7 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    appText('在线账户同步摘要', 'Online account sync summary'),
+                    appText('登录状态摘要', 'Login state summary'),
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 8),
@@ -380,7 +381,7 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${appText('在线账户', 'Online Account')}: ${settings.accountUsername.trim().isEmpty ? appText('未填写', 'Not set') : settings.accountUsername}',
+                    '${appText('账户标识', 'Account')}: ${settings.accountUsername.trim().isEmpty ? appText('未填写', 'Not set') : settings.accountUsername}',
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -446,21 +447,24 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
   Widget buildAcpBridgeServerModeCardInternal(
     BuildContext context,
     AppController controller,
-    SettingsSnapshot settings,
-  ) {
+    SettingsSnapshot settings, {
+    required UiFeatureAccess uiFeatures,
+  }) {
     syncAcpBridgeServerModeDraftControllersInternal(settings);
     final modeConfig = settings.acpBridgeServerModeConfig;
+    final supportsSelfHosted = uiFeatures.supportsGatewaySelfHostedBase;
+    final effectiveUsesSelfHosted =
+        supportsSelfHosted && modeConfig.usesSelfHostedBase;
+    final effectiveUsesCloudSync = !effectiveUsesSelfHosted;
     final accountController = controller.settingsController;
     final accountSyncState = accountController.accountSyncState;
     final accountSignedIn = accountController.accountSignedIn;
     final accountBusy = accountController.accountBusy;
     final cloudSync = modeConfig.cloudSynced;
     final remoteSummary = cloudSync.remoteServerSummary;
-    final currentSource = switch (modeConfig.sourceTag) {
-      'cloudSynced' => appText('在线账户', 'Online Account'),
-      'selfHosted' => appText('本地账户', 'Local Account'),
-      _ => appText('高级模式', 'Advanced Mode'),
-    };
+    final currentSource = effectiveUsesSelfHosted
+        ? appText('自建服务', 'Self-hosted')
+        : appText('svc.plus 提供', 'svc.plus provided');
     final syncStatus = accountSyncState?.syncState.trim().isNotEmpty == true
         ? accountSyncState!.syncState
         : appText('未同步', 'Not synced');
@@ -475,17 +479,22 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
         children: [
           Text(
             appText(
-              'ACP Bridge Server 连接模式',
-              'ACP Bridge Server Connection Mode',
+              '基础连接配置',
+              'Base Connection Configuration',
             ),
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
           Text(
-            appText(
-              '在线账户负责云端同步，本地账户负责连接 ACP Bridge Server，高级模式是在本地账户基础上再叠加 advanced config 覆盖层。App 只负责配置、会话、安全存储与连接编排，不承载服务端逻辑。',
-              'Online account handles cloud sync, local account connects to ACP Bridge Server, and advanced mode layers advanced config on top of the local account. The app stays a pure client for configuration, session handling, secure storage, and connection orchestration.',
-            ),
+            supportsSelfHosted
+                ? appText(
+                    '这里维护默认连接来源与默认凭据。默认来源可以是 svc.plus 提供的托管配置，也可以是自建 ACP Bridge Server。高级自定义模式只在这层默认配置上做覆盖。',
+                    'This section maintains the default connection source and default credentials. The default source can come from svc.plus managed configuration or from a self-hosted ACP Bridge Server. Advanced custom mode only overrides this base layer.',
+                  )
+                : appText(
+                    '这里维护默认连接来源与默认凭据。当前默认 UI 仅展示 svc.plus 提供的托管配置入口；实验性的自建与高级覆盖能力保留在代码模块中。',
+                    'This section maintains the default connection source and default credentials. The default UI currently exposes only the svc.plus managed entry point, while experimental self-hosted and advanced override capabilities remain in the codebase.',
+                  ),
           ),
           const SizedBox(height: 16),
           Wrap(
@@ -494,8 +503,8 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
             children: [
               ChoiceChip(
                 key: const ValueKey('acp-bridge-mode-cloud'),
-                label: Text(appText('在线账户', 'Online Account')),
-                selected: modeConfig.mode == AcpBridgeServerMode.cloudSynced,
+                label: Text(appText('svc.plus 提供', 'svc.plus provided')),
+                selected: effectiveUsesCloudSync,
                 onSelected: (_) => saveSettingsInternal(
                   controller,
                   settings.copyWith(
@@ -506,34 +515,21 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
                   ),
                 ),
               ),
-              ChoiceChip(
-                key: const ValueKey('acp-bridge-mode-self-hosted'),
-                label: Text(appText('本地账户', 'Local Account')),
-                selected: modeConfig.mode == AcpBridgeServerMode.selfHosted,
-                onSelected: (_) => saveSettingsInternal(
-                  controller,
-                  settings.copyWith(
-                    accountLocalMode: true,
-                    acpBridgeServerModeConfig: modeConfig.copyWith(
-                      mode: AcpBridgeServerMode.selfHosted,
+              if (supportsSelfHosted)
+                ChoiceChip(
+                  key: const ValueKey('acp-bridge-mode-self-hosted'),
+                  label: Text(appText('自建服务', 'Self-hosted')),
+                  selected: effectiveUsesSelfHosted,
+                  onSelected: (_) => saveSettingsInternal(
+                    controller,
+                    settings.copyWith(
+                      accountLocalMode: true,
+                      acpBridgeServerModeConfig: modeConfig.copyWith(
+                        mode: AcpBridgeServerMode.selfHosted,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              ChoiceChip(
-                key: const ValueKey('acp-bridge-mode-advanced'),
-                label: Text(appText('高级模式', 'Advanced Mode')),
-                selected: modeConfig.mode == AcpBridgeServerMode.advancedCustom,
-                onSelected: (_) => saveSettingsInternal(
-                  controller,
-                  settings.captureAcpBridgeServerAdvancedOverrides().copyWith(
-                    acpBridgeServerModeConfig: settings
-                        .captureAcpBridgeServerAdvancedOverrides()
-                        .acpBridgeServerModeConfig
-                        .copyWith(mode: AcpBridgeServerMode.advancedCustom),
-                  ),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -542,7 +538,8 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
             runSpacing: 12,
             children: [
               StatusChipInternal(
-                label: '${appText('当前模式', 'Mode')}: $currentSource',
+                label:
+                    '${appText('默认连接来源', 'Default Source')}: $currentSource',
                 tone: StatusChipToneInternal.ready,
               ),
               StatusChipInternal(
@@ -551,20 +548,28 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
                     ? StatusChipToneInternal.ready
                     : StatusChipToneInternal.idle,
               ),
+              if (uiFeatures.supportsGatewayAdvancedCustomMode)
+                StatusChipInternal(
+                  label:
+                      '${appText('高级覆盖', 'Advanced Override')}: ${modeConfig.mode == AcpBridgeServerMode.advancedCustom ? appText('已启用', 'Enabled') : appText('未启用', 'Disabled')}',
+                  tone: modeConfig.mode == AcpBridgeServerMode.advancedCustom
+                      ? StatusChipToneInternal.ready
+                      : StatusChipToneInternal.idle,
+                ),
             ],
           ),
           const SizedBox(height: 16),
-          ...switch (modeConfig.mode) {
-            AcpBridgeServerMode.cloudSynced => <Widget>[
+          ...switch (effectiveUsesCloudSync) {
+            true => <Widget>[
               Text(
                 accountSignedIn
                     ? appText(
-                        '已登录在线账户，可直接同步云端 ACP Bridge Server 默认配置。',
-                        'Signed in to the online account. You can sync the cloud ACP Bridge Server defaults directly.',
+                        '当前默认来源为 svc.plus 提供的托管配置。你可以直接同步远端默认配置。',
+                        'The current default source is managed by svc.plus. You can sync the remote defaults directly.',
                       )
                     : appText(
-                        '当前未登录在线账户。建议先登录，再从云端同步默认配置。',
-                        'No online account is signed in. Sign in first, then sync the default configuration from the cloud.',
+                        '当前默认来源为 svc.plus 提供的托管配置，但你还没有登录。建议先完成登录，再同步默认配置。',
+                        'The current default source is managed by svc.plus, but no account is signed in yet. Sign in first, then sync the default configuration.',
                       ),
               ),
               Text(
@@ -576,9 +581,10 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
                 key: const ValueKey('acp-bridge-cloud-last-sync'),
               ),
               const SizedBox(height: 6),
-              Text(
-                '${appText('高级覆盖', 'Advanced Override')}: ${remoteSummary.hasAdvancedOverrides ? appText('存在', 'Present') : appText('无', 'None')}',
-              ),
+              if (uiFeatures.supportsGatewayAdvancedCustomMode)
+                Text(
+                  '${appText('高级覆盖', 'Advanced Override')}: ${remoteSummary.hasAdvancedOverrides ? appText('存在', 'Present') : appText('无', 'None')}',
+                ),
               const SizedBox(height: 14),
               Wrap(
                 spacing: 10,
@@ -601,34 +607,26 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
                 ],
               ),
             ],
-            AcpBridgeServerMode.selfHosted => <Widget>[],
-            AcpBridgeServerMode.advancedCustom => <Widget>[
+            false => <Widget>[
               Text(
                 appText(
-                  '高级模式 = 本地账户 + advanced config。下面先保留本地 ACP Bridge Server 连接，再把 OpenClaw Gateway / Vault Server / LLM Endpoint / 外部 ACP Server endpoint / SKILLS 目录 当作覆盖层。未覆盖的值继续继承当前基础模式。',
-                  'Advanced mode = local account + advanced config. Keep the local ACP Bridge Server connection below, then treat the OpenClaw Gateway / Vault Server / LLM Endpoint / external ACP server endpoint / SKILLS directory as overrides. Fields you do not override keep inheriting from the current base mode.',
+                  '当前默认来源为自建服务。下面的 ACP Bridge Server URL、用户和密码会作为默认连接配置使用；如果启用了高级自定义模式，其它集成项只会覆盖这份默认配置。',
+                  'The current default source is self-hosted. The ACP Bridge Server URL, username, and password below act as the default connection configuration. If advanced custom mode is enabled, the other integrations only override this base layer.',
                 ),
-              ),
-              const SizedBox(height: 12),
-              FilledButton.tonal(
-                key: const ValueKey('acp-bridge-advanced-reset'),
-                onPressed: () => resetAcpBridgeServerAdvancedOverridesInternal(
-                  controller,
-                  settings,
-                ),
-                child: Text(appText('清空高级覆盖', 'Clear Advanced Overrides')),
               ),
             ],
           },
-          const SizedBox(height: 16),
-          buildAcpBridgeServerSelfHostedPanelInternal(
-            context,
-            controller,
-            settings,
-            targetMode: modeConfig.mode == AcpBridgeServerMode.advancedCustom
-                ? AcpBridgeServerMode.advancedCustom
-                : AcpBridgeServerMode.selfHosted,
-          ),
+          if (supportsSelfHosted) ...[
+            const SizedBox(height: 16),
+            buildAcpBridgeServerSelfHostedPanelInternal(
+              context,
+              controller,
+              settings,
+              targetMode: modeConfig.mode == AcpBridgeServerMode.advancedCustom
+                  ? AcpBridgeServerMode.advancedCustom
+                  : AcpBridgeServerMode.selfHosted,
+            ),
+          ],
         ],
       ),
     );

@@ -152,6 +152,18 @@ mobile:
       build_modes: [debug, profile, release]
       description: Mobile Vault server integration section
       ui_surface: settings_page
+    gateway_self_hosted_base:
+      enabled: false
+      release_tier: experimental
+      build_modes: [debug, profile, release]
+      description: Mobile self-hosted base connection controls
+      ui_surface: settings_page
+    gateway_advanced_custom_mode:
+      enabled: false
+      release_tier: experimental
+      build_modes: [debug, profile, release]
+      description: Mobile advanced custom override mode
+      ui_surface: settings_page
     gateway_setup_code:
       enabled: false
       release_tier: experimental
@@ -356,6 +368,18 @@ desktop:
       build_modes: [debug, profile, release]
       description: Desktop Vault server integration section
       ui_surface: settings_page
+    gateway_self_hosted_base:
+      enabled: false
+      release_tier: experimental
+      build_modes: [debug, profile, release]
+      description: Desktop self-hosted base connection controls
+      ui_surface: settings_page
+    gateway_advanced_custom_mode:
+      enabled: false
+      release_tier: experimental
+      build_modes: [debug, profile, release]
+      description: Desktop advanced custom override mode
+      ui_surface: settings_page
     gateway_setup_code:
       enabled: false
       release_tier: experimental
@@ -516,6 +540,18 @@ web:
       release_tier: beta
       build_modes: []
       description: Web does not expose vault server integration
+      ui_surface: web_settings_page
+    gateway_self_hosted_base:
+      enabled: false
+      release_tier: experimental
+      build_modes: []
+      description: Web does not expose self-hosted base connection controls
+      ui_surface: web_settings_page
+    gateway_advanced_custom_mode:
+      enabled: false
+      release_tier: experimental
+      build_modes: []
+      description: Web does not expose advanced custom override mode
       ui_surface: web_settings_page
     gateway_setup_code:
       enabled: false

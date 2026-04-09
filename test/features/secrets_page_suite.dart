@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
 import 'package:xworkmate/features/settings/settings_page.dart';
 import 'package:xworkmate/models/app_models.dart';
 
@@ -27,7 +28,16 @@ void main() {
       ),
     );
 
-    expect(find.text('OpenClaw Gateway'), findsWidgets);
-    expect(find.text('Vault Server'), findsOneWidget);
+    expect(find.text('用户登录状态'), findsWidgets);
+    expect(find.text('基础连接配置'), findsWidgets);
+    expect(find.text('高级自定义模式'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('gateway-configuration-overview-card')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('gateway-overview-advanced-override')),
+      findsNothing,
+    );
   });
 }

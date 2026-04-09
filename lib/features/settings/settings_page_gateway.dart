@@ -36,197 +36,210 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
     UiFeatureAccess uiFeatures,
   ) {
     if (!widget.showSectionTabs) {
-      return buildUnifiedGatewaySectionsInternal(
+      return [
+        buildGatewayOverviewCardInternal(
+          context,
+          controller,
+          settings,
+          uiFeatures,
+        ),
+        const SizedBox(height: 16),
+        buildOnlineAccountCardInternal(context, controller, settings),
+        const SizedBox(height: 16),
+        buildAcpBridgeServerModeCardInternal(
+          context,
+          controller,
+          settings,
+          uiFeatures: uiFeatures,
+        ),
+        if (uiFeatures.supportsGatewayAdvancedCustomMode) ...[
+          const SizedBox(height: 16),
+          ...buildGatewayAdvancedSectionsInternal(
+            context,
+            controller,
+            settings,
+            uiFeatures,
+          ),
+        ],
+      ];
+    }
+    final selectedSubTab =
+        !uiFeatures.supportsGatewayAdvancedCustomMode &&
+            integrationSubTabInternal == GatewayIntegrationSubTabInternal.advancedConfig
+        ? GatewayIntegrationSubTabInternal.vault
+        : integrationSubTabInternal;
+    final effectiveTabLabel = switch (selectedSubTab) {
+      GatewayIntegrationSubTabInternal.gateway => appText(
+        '用户登录状态',
+        'User Login State',
+      ),
+      GatewayIntegrationSubTabInternal.vault => appText(
+        '基础连接配置',
+        'Base Connection Configuration',
+      ),
+      GatewayIntegrationSubTabInternal.llm => appText(
+        '高级自定义模式',
+        'Advanced Custom Mode',
+      ),
+      GatewayIntegrationSubTabInternal.acp => appText(
+        '高级自定义模式',
+        'Advanced Custom Mode',
+      ),
+      GatewayIntegrationSubTabInternal.skills => appText(
+        '高级自定义模式',
+        'Advanced Custom Mode',
+      ),
+      GatewayIntegrationSubTabInternal.advancedConfig => appText(
+        '高级自定义模式',
+        'Advanced Custom Mode',
+      ),
+    };
+    return [
+      buildGatewayOverviewCardInternal(
         context,
         controller,
         settings,
         uiFeatures,
-      );
-    }
-    final advancedEditable =
-        settings.acpBridgeServerModeConfig.mode ==
-        AcpBridgeServerMode.advancedCustom;
-    final tabLabel = switch (integrationSubTabInternal) {
-      GatewayIntegrationSubTabInternal.gateway => 'OpenClaw Gateway',
-      GatewayIntegrationSubTabInternal.vault => appText(
-        'Vault Server',
-        'Vault Server',
       ),
-      GatewayIntegrationSubTabInternal.llm => appText(
-        'LLM 接入点',
-        'LLM Endpoints',
-      ),
-      GatewayIntegrationSubTabInternal.acp => appText(
-        'ACP 外部接入',
-        'External ACP',
-      ),
-      GatewayIntegrationSubTabInternal.skills => appText(
-        'SKILLS 目录授权',
-        'SKILLS Directory Authorization',
-      ),
-      GatewayIntegrationSubTabInternal.advancedConfig => appText(
-        '高级自定义配置',
-        'Advanced Custom Configuration',
-      ),
-    };
-    return [
+      const SizedBox(height: 16),
       SectionTabs(
         items: <String>[
-          'OpenClaw Gateway',
-          appText('Vault Server', 'Vault Server'),
-          appText('LLM 接入点', 'LLM Endpoints'),
-          appText('ACP 外部接入', 'External ACP'),
-          appText('SKILLS 目录授权', 'SKILLS Directory Authorization'),
-          appText('高级自定义配置', 'Advanced Custom Configuration'),
+          appText('用户登录状态', 'User Login State'),
+          appText('基础连接配置', 'Base Connection Configuration'),
+          if (uiFeatures.supportsGatewayAdvancedCustomMode)
+            appText('高级自定义模式', 'Advanced Custom Mode'),
         ],
-        value: tabLabel,
+        value: effectiveTabLabel,
         onChanged: (value) => setStateInternal(() {
           integrationSubTabInternal = switch (value) {
-            'OpenClaw Gateway' => GatewayIntegrationSubTabInternal.gateway,
-            _ when value == appText('Vault Server', 'Vault Server') =>
-              GatewayIntegrationSubTabInternal.vault,
-            _ when value == appText('LLM 接入点', 'LLM Endpoints') =>
-              GatewayIntegrationSubTabInternal.llm,
-            _ when value == appText('ACP 外部接入', 'External ACP') =>
-              GatewayIntegrationSubTabInternal.acp,
+            _ when value == appText('用户登录状态', 'User Login State') =>
+              GatewayIntegrationSubTabInternal.gateway,
             _
                 when value ==
-                    appText('SKILLS 目录授权', 'SKILLS Directory Authorization') =>
-              GatewayIntegrationSubTabInternal.skills,
+                    appText(
+                      '基础连接配置',
+                      'Base Connection Configuration',
+                    ) =>
+              GatewayIntegrationSubTabInternal.vault,
+            _
+                when value ==
+                    appText('高级自定义模式', 'Advanced Custom Mode') =>
+              GatewayIntegrationSubTabInternal.advancedConfig,
             _ => GatewayIntegrationSubTabInternal.advancedConfig,
           };
         }),
       ),
       const SizedBox(height: 16),
-      ...switch (integrationSubTabInternal) {
+      ...switch (selectedSubTab) {
         GatewayIntegrationSubTabInternal.gateway => <Widget>[
-          Opacity(
-            opacity: advancedEditable ? 1 : 0.72,
-            child: IgnorePointer(
-              ignoring: !advancedEditable,
-              child: buildCollapsibleGatewaySectionInternal(
-                context: context,
-                title: 'OpenClaw Gateway',
-                expanded: openClawGatewayExpandedInternal,
-                onChanged: (value) => setStateInternal(() {
-                  openClawGatewayExpandedInternal = value;
-                }),
-                child: buildOpenClawGatewayCardInternal(
-                  context,
-                  controller,
-                  settings,
-                ),
-              ),
-            ),
-          ),
+          buildOnlineAccountCardInternal(context, controller, settings),
         ],
         GatewayIntegrationSubTabInternal.vault => <Widget>[
-          if (uiFeatures.supportsVaultServer)
-            Opacity(
-              opacity: advancedEditable ? 1 : 0.72,
-              child: IgnorePointer(
-                ignoring: !advancedEditable,
-                child: buildCollapsibleGatewaySectionInternal(
-                  context: context,
-                  title: appText('Vault Server', 'Vault Server'),
-                  expanded: vaultServerExpandedInternal,
-                  onChanged: (value) => setStateInternal(() {
-                    vaultServerExpandedInternal = value;
-                  }),
-                  child: buildVaultProviderCardInternal(
-                    context,
-                    controller,
-                    settings,
-                  ),
-                ),
-              ),
-            )
-          else
-            SurfaceCard(
-              borderWidth: settingsHairlineBorderWidthInternal,
-              child: Text(
-                appText(
-                  '当前发布配置未开放 Vault Server 参数。',
-                  'Vault Server settings are disabled in this release configuration.',
-                ),
-              ),
-            ),
-        ],
-        GatewayIntegrationSubTabInternal.llm => <Widget>[
-          Opacity(
-            opacity: advancedEditable ? 1 : 0.72,
-            child: IgnorePointer(
-              ignoring: !advancedEditable,
-              child: buildCollapsibleGatewaySectionInternal(
-                context: context,
-                title: appText('LLM 接入点', 'LLM Endpoints'),
-                expanded: aiGatewayExpandedInternal,
-                onChanged: (value) => setStateInternal(() {
-                  aiGatewayExpandedInternal = value;
-                }),
-                child: buildLlmEndpointManagerInternal(
-                  context,
-                  controller,
-                  settings,
-                ),
-              ),
-            ),
+          buildAcpBridgeServerModeCardInternal(
+            context,
+            controller,
+            settings,
+            uiFeatures: uiFeatures,
           ),
         ],
-        GatewayIntegrationSubTabInternal.acp => <Widget>[
-          Opacity(
-            opacity: advancedEditable ? 1 : 0.72,
-            child: IgnorePointer(
-              ignoring: !advancedEditable,
-              child: buildCollapsibleGatewaySectionInternal(
-                context: context,
-                title: appText(
-                  '外部 ACP Server Endpoint',
-                  'External ACP Server Endpoints',
-                ),
-                expanded: externalAcpExpandedInternal,
-                onChanged: (value) => setStateInternal(() {
-                  externalAcpExpandedInternal = value;
-                }),
-                child: buildExternalAcpEndpointManagerInternal(
-                  context,
-                  controller,
-                  settings,
-                ),
+        GatewayIntegrationSubTabInternal.llm => const <Widget>[],
+        GatewayIntegrationSubTabInternal.acp => const <Widget>[],
+        GatewayIntegrationSubTabInternal.skills => const <Widget>[],
+        GatewayIntegrationSubTabInternal.advancedConfig =>
+          uiFeatures.supportsGatewayAdvancedCustomMode
+          ? <Widget>[
+              ...buildGatewayAdvancedSectionsInternal(
+                context,
+                controller,
+                settings,
+                uiFeatures,
               ),
-            ),
-          ),
-        ],
-        GatewayIntegrationSubTabInternal.skills => <Widget>[
-          Opacity(
-            opacity: advancedEditable ? 1 : 0.72,
-            child: IgnorePointer(
-              ignoring: !advancedEditable,
-              child: buildCollapsibleGatewaySectionInternal(
-                context: context,
-                title: appText('SKILLS 目录授权', 'SKILLS Directory Authorization'),
-                expanded: skillsDirectoryAuthorizationExpandedInternal,
-                onChanged: (value) => setStateInternal(() {
-                  skillsDirectoryAuthorizationExpandedInternal = value;
-                }),
-                child: SkillDirectoryAuthorizationCard(
-                  controller: controller,
-                  showHeader: false,
-                ),
-              ),
-            ),
-          ),
-        ],
-        GatewayIntegrationSubTabInternal.advancedConfig => <Widget>[
-          buildOnlineAccountCardInternal(context, controller, settings),
-          const SizedBox(height: 16),
-          buildAcpBridgeServerModeCardInternal(context, controller, settings),
-        ],
+            ]
+          : <Widget>[],
       },
     ];
   }
 
-  List<Widget> buildUnifiedGatewaySectionsInternal(
+  Widget buildGatewayOverviewCardInternal(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+    UiFeatureAccess uiFeatures,
+  ) {
+    final accountController = controller.settingsController;
+    final modeConfig = settings.acpBridgeServerModeConfig;
+    final supportsSelfHosted = uiFeatures.supportsGatewaySelfHostedBase;
+    final supportsAdvancedOverrides =
+        uiFeatures.supportsGatewayAdvancedCustomMode;
+    final loginStatus = accountController.accountMfaRequired
+        ? appText('MFA 待验证', 'MFA pending')
+        : accountController.accountBusy
+        ? appText('登录中', 'Signing in')
+        : accountController.accountSignedIn
+        ? appText('已登录', 'Signed in')
+        : appText('未登录', 'Signed out');
+    final defaultSource = supportsSelfHosted && modeConfig.usesSelfHostedBase
+        ? appText('自建服务', 'Self-hosted')
+        : appText('svc.plus 提供', 'svc.plus provided');
+    final hasAdvancedOverrides =
+        supportsAdvancedOverrides &&
+        modeConfig.mode == AcpBridgeServerMode.advancedCustom;
+    return SurfaceCard(
+      key: const ValueKey('gateway-configuration-overview-card'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            appText('最终生效配置概览', 'Effective Configuration Overview'),
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            supportsAdvancedOverrides
+                ? appText(
+                    '先确认登录状态，再确定默认连接来源，最后按需用高级自定义模式覆盖默认配置。',
+                    'Confirm login state first, choose the default connection source second, then apply advanced custom overrides only where needed.',
+                  )
+                : appText(
+                    '先确认登录状态，再查看当前默认连接来源。',
+                    'Confirm login state first, then review the current default connection source.',
+                  ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              StatusChipInternal(
+                key: const ValueKey('gateway-overview-login-status'),
+                label: '${appText('登录状态', 'Login')}: $loginStatus',
+                tone: accountController.accountSignedIn
+                    ? StatusChipToneInternal.ready
+                    : StatusChipToneInternal.idle,
+              ),
+              StatusChipInternal(
+                key: const ValueKey('gateway-overview-default-source'),
+                label:
+                    '${appText('默认连接来源', 'Default Source')}: $defaultSource',
+                tone: StatusChipToneInternal.ready,
+              ),
+              if (supportsAdvancedOverrides)
+                StatusChipInternal(
+                  key: const ValueKey('gateway-overview-advanced-override'),
+                  label:
+                      '${appText('高级覆盖', 'Advanced Override')}: ${hasAdvancedOverrides ? appText('已启用', 'Enabled') : appText('未启用', 'Disabled')}',
+                  tone: hasAdvancedOverrides
+                      ? StatusChipToneInternal.ready
+                      : StatusChipToneInternal.idle,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> buildGatewayAdvancedSectionsInternal(
     BuildContext context,
     AppController controller,
     SettingsSnapshot settings,
@@ -235,7 +248,38 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
     final advancedEditable =
         settings.acpBridgeServerModeConfig.mode ==
         AcpBridgeServerMode.advancedCustom;
-    return [
+    final sections = <Widget>[
+      SurfaceCard(
+        key: const ValueKey('gateway-advanced-override-intro'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              appText('高级自定义模式', 'Advanced Custom Mode'),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              appText(
+                '这里的配置只负责覆盖默认配置，不会把基础连接配置替换成另一套平行模式。未覆盖的字段继续继承当前默认连接来源。',
+                'These settings only override the default configuration. They do not replace the base connection model with a parallel mode. Any field you do not override keeps inheriting from the current default source.',
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.tonal(
+              key: const ValueKey('acp-bridge-advanced-reset'),
+              onPressed: advancedEditable
+                  ? () => resetAcpBridgeServerAdvancedOverridesInternal(
+                      controller,
+                      settings,
+                    )
+                  : null,
+              child: Text(appText('清空高级覆盖', 'Clear Advanced Overrides')),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
       Opacity(
         opacity: advancedEditable ? 1 : 0.72,
         child: IgnorePointer(
@@ -349,6 +393,21 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
         ),
       ),
     ];
+    return sections;
+  }
+
+  List<Widget> buildUnifiedGatewaySectionsInternal(
+    BuildContext context,
+    AppController controller,
+    SettingsSnapshot settings,
+    UiFeatureAccess uiFeatures,
+  ) {
+    return buildGatewayAdvancedSectionsInternal(
+      context,
+      controller,
+      settings,
+      uiFeatures,
+    );
   }
 
   Widget buildLlmEndpointManagerInternal(
