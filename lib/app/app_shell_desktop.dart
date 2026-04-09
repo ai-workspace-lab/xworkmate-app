@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../features/account/account_page.dart';
 import '../features/mobile/mobile_shell.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
@@ -189,7 +188,7 @@ class _AppShellState extends State<AppShell> {
                           constraints.maxWidth > 1280;
                       final mobileDestination =
                           controller.destination == WorkspaceDestination.account
-                          ? WorkspaceDestination.assistant
+                          ? WorkspaceDestination.settings
                           : controller.destination;
                       final availableMobileDestinations = _mobileDestinations
                           .where(controller.capabilities.supportsDestination)
@@ -214,33 +213,6 @@ class _AppShellState extends State<AppShell> {
                               child: DetailSheet(
                                 data: detail,
                                 onClose: () => Navigator.of(sheetContext).pop(),
-                              ),
-                            );
-                          },
-                        );
-                      }
-
-                      void openAccountSheet() {
-                        showModalBottomSheet<void>(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (sheetContext) {
-                            return Container(
-                              margin: EdgeInsets.fromLTRB(
-                                12,
-                                MediaQuery.of(sheetContext).padding.top + 12,
-                                12,
-                                12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: palette.surfacePrimary,
-                                borderRadius: BorderRadius.circular(28),
-                                border: Border.all(color: palette.strokeSoft),
-                              ),
-                              child: SafeArea(
-                                top: false,
-                                child: AccountPage(controller: controller),
                               ),
                             );
                           },
@@ -313,21 +285,7 @@ class _AppShellState extends State<AppShell> {
                                 ),
                               ],
                             ),
-                            Positioned(
-                              right: 24,
-                              bottom: 96,
-                              child:
-                                  controller.capabilities.supportsDestination(
-                                    WorkspaceDestination.account,
-                                  )
-                                  ? FloatingActionButton.small(
-                                      onPressed: openAccountSheet,
-                                      child: const Icon(
-                                        Icons.account_circle_rounded,
-                                      ),
-                                    )
-                                  : const SizedBox.shrink(),
-                            ),
+                            const SizedBox.shrink(),
                           ],
                         );
                       }
