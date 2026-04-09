@@ -196,47 +196,50 @@ void main() {
     expect(controller.themeMode, ThemeMode.light);
   });
 
-  testWidgets('SettingsPage hides account access controls by default', (
-    WidgetTester tester,
-  ) async {
-    final controller = await createTestController(tester);
+  testWidgets(
+    'SettingsPage gateway advanced config tab merges online account and ACP Bridge Server',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
+      controller.setSettingsTab(SettingsTab.gateway);
 
-    await pumpPage(
-      tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
-    );
+      await pumpPage(
+        tester,
+        child: SettingsPage(
+          controller: controller,
+          initialTab: SettingsTab.gateway,
+          showSectionTabs: true,
+        ),
+        platform: TargetPlatform.macOS,
+      );
 
-    expect(find.text('账号访问'), findsNothing);
-    expect(find.text('Account Access'), findsNothing);
-    expect(find.text('账号本地模式'), findsNothing);
-    expect(find.text('Account local mode'), findsNothing);
-  });
+      expect(
+        find.byKey(const ValueKey('account-base-url-field')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('acp-bridge-mode-cloud')), findsNothing);
 
-  testWidgets('SettingsPage can expose account access when feature enabled', (
-    WidgetTester tester,
-  ) async {
-    final manifest = UiFeatureManifest.fallback().copyWithFeature(
-      platform: UiFeaturePlatform.desktop,
-      module: 'settings',
-      feature: 'account_access',
-      enabled: true,
-      releaseTier: UiFeatureReleaseTier.experimental,
-    );
-    final controller = await createTestController(
-      tester,
-      uiFeatureManifest: manifest,
-    );
+      await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义配置')));
+      await tester.pumpAndSettle();
 
-    await pumpPage(
-      tester,
-      child: SettingsPage(controller: controller),
-      platform: TargetPlatform.macOS,
-    );
-
-    expect(find.text('账号访问'), findsOneWidget);
-    expect(find.text('账号本地模式'), findsOneWidget);
-  });
+      expect(find.text('ACP Bridge Server 连接模式'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('account-base-url-field')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('acp-bridge-mode-cloud')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('acp-bridge-mode-self-hosted')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('acp-bridge-mode-advanced')),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets(
     'SettingsPage workspace tab no longer exposes remote project root',
@@ -860,15 +863,16 @@ paths:
       final remoteProfile = controller.settings.primaryRemoteGatewayProfile;
       setGatewaySnapshotForTest(
         controller,
-        GatewayConnectionSnapshot.initial(mode: RuntimeConnectionMode.remote)
-            .copyWith(
-              status: RuntimeConnectionStatus.connected,
-              statusText: 'Connected',
-              remoteAddress: '${remoteProfile.host}:${remoteProfile.port}',
-              lastError: 'NOT_PAIRED: pairing required',
-              lastErrorCode: 'NOT_PAIRED',
-              lastErrorDetailCode: 'PAIRING_REQUIRED',
-            ),
+        GatewayConnectionSnapshot.initial(
+          mode: RuntimeConnectionMode.remote,
+        ).copyWith(
+          status: RuntimeConnectionStatus.connected,
+          statusText: 'Connected',
+          remoteAddress: '${remoteProfile.host}:${remoteProfile.port}',
+          lastError: 'NOT_PAIRED: pairing required',
+          lastErrorCode: 'NOT_PAIRED',
+          lastErrorDetailCode: 'PAIRING_REQUIRED',
+        ),
       );
 
       await _pumpWithoutSettling(
@@ -876,7 +880,10 @@ paths:
         child: ConnectionChipInternal(controller: controller),
       );
 
-      expect(find.byKey(const Key('assistant-connection-chip')), findsOneWidget);
+      expect(
+        find.byKey(const Key('assistant-connection-chip')),
+        findsOneWidget,
+      );
       expect(
         find.textContaining(
           '已连接 · ${remoteProfile.host}:${remoteProfile.port}',

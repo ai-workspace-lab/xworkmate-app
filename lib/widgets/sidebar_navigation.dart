@@ -113,10 +113,7 @@ class SidebarNavigation extends StatelessWidget {
           children: [
             const SizedBox(height: 4),
             if (isCollapsed && showCollapseControl) ...[
-              SidebarHeader(
-                isCollapsed: true,
-                onTap: onExpandFromCollapsed,
-              ),
+              SidebarHeader(isCollapsed: true, onTap: onExpandFromCollapsed),
               const SizedBox(height: AppSpacing.xs),
             ],
             Expanded(
@@ -158,13 +155,8 @@ class SidebarNavigation extends StatelessWidget {
                     sidebarState: sidebarState,
                     onCycleSidebarState: onCycleSidebarState,
                     onOpenAccount: onOpenAccount,
-                    showAccountButton:
-                        availableDestinations == null ||
-                        availableDestinations!.contains(
-                          WorkspaceDestination.account,
-                        ),
-                    accountSelected:
-                        currentSection == WorkspaceDestination.account,
+                    showAccountButton: false,
+                    accountSelected: false,
                     showCollapseControl: false,
                   ),
                 ],

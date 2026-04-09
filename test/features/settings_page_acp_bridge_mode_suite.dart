@@ -9,29 +9,45 @@ import 'package:xworkmate/models/app_models.dart';
 import '../test_support.dart';
 
 void main() {
-  testWidgets('SettingsPage shows ACP bridge server mode card on integrations', (
-    WidgetTester tester,
-  ) async {
-    final controller = await createTestController(tester);
-    controller.openSettings(tab: SettingsTab.gateway);
+  testWidgets(
+    'SettingsPage shows ACP bridge server mode card in advanced custom config',
+    (WidgetTester tester) async {
+      final controller = await createTestController(tester);
+      controller.openSettings(tab: SettingsTab.gateway);
 
-    await pumpPage(
-      tester,
-      child: SettingsPage(
-        controller: controller,
-        initialTab: SettingsTab.gateway,
-      ),
-    );
+      await pumpPage(
+        tester,
+        child: SettingsPage(
+          controller: controller,
+          initialTab: SettingsTab.gateway,
+          showSectionTabs: true,
+        ),
+      );
 
-    expect(find.text('XWorkmate ACP Bridge Server'), findsOneWidget);
-    expect(find.byKey(const ValueKey('acp-bridge-mode-cloud')), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('acp-bridge-mode-self-hosted')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('acp-bridge-mode-advanced')),
-      findsOneWidget,
-    );
-  });
+      await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义配置')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ACP Bridge Server 连接模式'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('acp-bridge-mode-cloud')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('acp-bridge-mode-self-hosted')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('acp-bridge-mode-advanced')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('acp-bridge-self-hosted-url')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('acp-bridge-self-hosted-connect')),
+        findsOneWidget,
+      );
+    },
+  );
 }
