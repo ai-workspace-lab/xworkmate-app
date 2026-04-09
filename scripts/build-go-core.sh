@@ -2,7 +2,15 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-BRIDGE_DIR="$ROOT_DIR/go/go_core"
+DEFAULT_BRIDGE_DIR=""
+for candidate in   "$ROOT_DIR/../xworkmate-bridge"   "$ROOT_DIR/../../xworkmate-bridge"
+do
+  if [[ -f "$candidate/go.mod" ]]; then
+    DEFAULT_BRIDGE_DIR="$candidate"
+    break
+  fi
+done
+BRIDGE_DIR="${XWORKMATE_BRIDGE_DIR:-$DEFAULT_BRIDGE_DIR}"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/build/bin}"
 OUTPUT_PATH_BASE="${OUTPUT_DIR}/xworkmate-go-core"
 
@@ -13,7 +21,7 @@ else
 fi
 
 if [[ ! -f "$BRIDGE_DIR/go.mod" ]]; then
-  echo "Missing go.mod in $BRIDGE_DIR" >&2
+  echo "Missing xworkmate-bridge repo or go.mod in $BRIDGE_DIR" >&2
   exit 1
 fi
 
@@ -24,7 +32,7 @@ fi
 
 mkdir -p "$OUTPUT_DIR"
 
-echo "Building xworkmate-go-core..."
+echo "Building xworkmate-go-core from xworkmate-bridge..."
 (
   cd "$BRIDGE_DIR"
   GO111MODULE=on go build -o "$OUTPUT_PATH" .
