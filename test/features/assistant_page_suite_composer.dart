@@ -789,7 +789,7 @@ void registerAssistantPageSuiteComposerTestsInternal() {
       expect(
         find.descendant(
           of: find.byKey(const Key('assistant-execution-target-button')),
-          matching: find.text('本地 OpenClaw Gateway'),
+          matching: find.text('OpenClaw Gateway'),
         ),
         findsOneWidget,
       );
@@ -810,13 +810,54 @@ void registerAssistantPageSuiteComposerTestsInternal() {
       expect(
         find.descendant(
           of: find.byKey(const Key('assistant-execution-target-button')),
-          matching: find.text('单机智能体'),
+          matching: find.text('智能体'),
         ),
         findsOneWidget,
       );
-      expect(find.textContaining('单机智能体'), findsWidgets);
+      expect(find.textContaining('智能体'), findsWidgets);
     },
     skip: true,
+  );
+
+  testWidgets(
+    'AssistantPage collapses execution target menu into agent and gateway modes',
+    (WidgetTester tester) async {
+      final controller = await createControllerWithThreadRecordsInternal(
+        records: <TaskThread>[],
+        useFakeGatewayRuntime: true,
+      );
+      addTearDown(controller.dispose);
+
+      await pumpPage(
+        tester,
+        child: AssistantPage(controller: controller, onOpenDetail: (_) {}),
+      );
+
+      await tester.tap(find.byKey(const Key('assistant-new-task-button')));
+      await pumpForUiSyncInternal(tester);
+
+      await tester.tap(
+        find.byKey(const Key('assistant-execution-target-button')),
+      );
+      await pumpForUiSyncInternal(tester);
+
+      expect(
+        find.byKey(
+          const Key('assistant-execution-target-menu-item-singleAgent'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('assistant-execution-target-menu-item-remote')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('assistant-execution-target-menu-item-local')),
+        findsNothing,
+      );
+      expect(find.text('智能体'), findsWidgets);
+      expect(find.text('OpenClaw Gateway'), findsWidgets);
+    },
   );
 
   testWidgets('AssistantPage shows thread-level message view chip', (
