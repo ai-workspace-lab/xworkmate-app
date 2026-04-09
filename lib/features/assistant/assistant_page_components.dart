@@ -286,18 +286,23 @@ List<AssistantTaskGroupInternal> groupTasksForRailInternal(
   List<AssistantTaskEntryInternal> tasks,
   List<AssistantExecutionTarget> visibleExecutionTargets,
 ) {
+  final compactTargets = compactAssistantExecutionTargets(
+    visibleExecutionTargets,
+  );
   final grouped = <AssistantExecutionTarget, List<AssistantTaskEntryInternal>>{
-    for (final target in visibleExecutionTargets)
-      target: <AssistantTaskEntryInternal>[],
+    for (final target in compactTargets) target: <AssistantTaskEntryInternal>[],
   };
   for (final task in tasks) {
-    final bucket = grouped[task.executionTarget];
+    final bucket =
+        grouped[collapseAssistantExecutionTargetForDisplay(
+          task.executionTarget,
+        )];
     if (bucket == null) {
       continue;
     }
     bucket.add(task);
   }
-  return visibleExecutionTargets
+  return compactTargets
       .map(
         (target) => AssistantTaskGroupInternal(
           executionTarget: target,
@@ -452,7 +457,7 @@ class AssistantTaskGroupHeaderInternal extends StatelessWidget {
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
-                  executionTarget.label,
+                  executionTarget.compactLabel,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelMedium?.copyWith(

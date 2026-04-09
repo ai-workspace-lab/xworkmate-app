@@ -38,7 +38,10 @@ import 'assistant_page_composer_clipboard.dart';
 import 'assistant_page_components_core.dart';
 
 String executionTargetTooltipInternal(AssistantExecutionTarget target) =>
-    appText('任务对话模式: ${target.label}', 'Task dialog mode: ${target.label}');
+    appText(
+      '任务对话模式: ${target.compactLabel}',
+      'Task dialog mode: ${target.compactLabel}',
+    );
 
 String singleAgentProviderTooltipInternal(SingleAgentProvider provider) =>
     appText(
