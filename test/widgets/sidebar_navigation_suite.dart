@@ -270,7 +270,7 @@ void main() {
   );
 
   testWidgets(
-    'SidebarNavigation only shows configured execution target groups',
+    'SidebarNavigation merges local and remote tasks into one gateway group',
     (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -350,7 +350,8 @@ void main() {
       );
       expect(find.text('单机任务'), findsOneWidget);
       expect(find.text('远程任务'), findsOneWidget);
-      expect(find.text('本地任务'), findsNothing);
+      expect(find.text('本地任务'), findsOneWidget);
+      expect(find.text('OpenClaw Gateway'), findsOneWidget);
     },
   );
 

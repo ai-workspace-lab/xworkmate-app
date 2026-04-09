@@ -260,26 +260,33 @@ class _SidebarTaskSectionState extends State<SidebarTaskSection> {
     if (_query.isEmpty) {
       return widget.items;
     }
-    return widget.items.where((item) {
-      final haystack = '${item.title}\n${item.preview}\n${item.sessionKey}'
-          .toLowerCase();
-      return haystack.contains(_query);
-    }).toList(growable: false);
+    return widget.items
+        .where((item) {
+          final haystack = '${item.title}\n${item.preview}\n${item.sessionKey}'
+              .toLowerCase();
+          return haystack.contains(_query);
+        })
+        .toList(growable: false);
   }
 
   List<_SidebarTaskGroup> _groupedItems(List<SidebarTaskItem> items) {
+    final compactTargets = compactAssistantExecutionTargets(
+      widget.visibleExecutionTargets,
+    );
     final grouped = <AssistantExecutionTarget, List<SidebarTaskItem>>{
-      for (final target in widget.visibleExecutionTargets)
-        target: <SidebarTaskItem>[],
+      for (final target in compactTargets) target: <SidebarTaskItem>[],
     };
     for (final item in items) {
-      final bucket = grouped[item.executionTarget];
+      final bucket =
+          grouped[collapseAssistantExecutionTargetForDisplay(
+            item.executionTarget,
+          )];
       if (bucket == null) {
         continue;
       }
       bucket.add(item);
     }
-    return widget.visibleExecutionTargets
+    return compactTargets
         .map(
           (target) => _SidebarTaskGroup(
             executionTarget: target,
@@ -328,15 +335,14 @@ class _SidebarTaskSectionState extends State<SidebarTaskSection> {
     if (_expandedTargets.isNotEmpty) {
       return;
     }
-    _expandedTargets.addAll(AssistantExecutionTarget.values);
+    _expandedTargets.addAll(
+      compactAssistantExecutionTargets(widget.visibleExecutionTargets),
+    );
   }
 }
 
 class _SidebarTaskGroup {
-  const _SidebarTaskGroup({
-    required this.executionTarget,
-    required this.items,
-  });
+  const _SidebarTaskGroup({required this.executionTarget, required this.items});
 
   final AssistantExecutionTarget executionTarget;
   final List<SidebarTaskItem> items;
@@ -362,7 +368,9 @@ class _SidebarTaskGroupHeader extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        key: ValueKey<String>('workspace-sidebar-task-group-${executionTarget.name}'),
+        key: ValueKey<String>(
+          'workspace-sidebar-task-group-${executionTarget.name}',
+        ),
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Padding(
@@ -385,7 +393,7 @@ class _SidebarTaskGroupHeader extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  executionTarget.label,
+                  executionTarget.compactLabel,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelMedium?.copyWith(
@@ -450,7 +458,9 @@ class _SidebarTaskTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
-            color: item.isCurrent ? palette.surfaceSecondary : Colors.transparent,
+            color: item.isCurrent
+                ? palette.surfaceSecondary
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: item.isCurrent ? palette.strokeSoft : Colors.transparent,

@@ -63,6 +63,16 @@ extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
     AssistantExecutionTarget.remote => 'remote',
   };
 
+  bool get isGateway =>
+      this == AssistantExecutionTarget.local ||
+      this == AssistantExecutionTarget.remote;
+
+  String get compactLabel => switch (this) {
+    AssistantExecutionTarget.singleAgent => appText('智能体', 'Agent'),
+    AssistantExecutionTarget.local || AssistantExecutionTarget.remote =>
+      appText('OpenClaw Gateway', 'OpenClaw Gateway'),
+  };
+
   static AssistantExecutionTarget fromJsonValue(String? value) {
     final normalized = value?.trim() ?? '';
     switch (normalized) {
@@ -81,6 +91,49 @@ extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
         return AssistantExecutionTarget.singleAgent;
     }
   }
+}
+
+List<AssistantExecutionTarget> compactAssistantExecutionTargets(
+  Iterable<AssistantExecutionTarget> targets,
+) {
+  final ordered = <AssistantExecutionTarget>[];
+  var addedGateway = false;
+  for (final target in targets) {
+    if (target == AssistantExecutionTarget.singleAgent) {
+      if (!ordered.contains(AssistantExecutionTarget.singleAgent)) {
+        ordered.add(AssistantExecutionTarget.singleAgent);
+      }
+      continue;
+    }
+    if (!addedGateway) {
+      ordered.add(AssistantExecutionTarget.remote);
+      addedGateway = true;
+    }
+  }
+  return List<AssistantExecutionTarget>.unmodifiable(ordered);
+}
+
+AssistantExecutionTarget collapseAssistantExecutionTargetForDisplay(
+  AssistantExecutionTarget target,
+) => target.isGateway ? AssistantExecutionTarget.remote : target;
+
+AssistantExecutionTarget resolveGatewayExecutionTargetFromVisibleTargets(
+  Iterable<AssistantExecutionTarget> visibleTargets, {
+  AssistantExecutionTarget? currentTarget,
+}) {
+  final visible = visibleTargets.toList(growable: false);
+  if (currentTarget != null &&
+      currentTarget.isGateway &&
+      visible.contains(currentTarget)) {
+    return currentTarget;
+  }
+  if (visible.contains(AssistantExecutionTarget.local)) {
+    return AssistantExecutionTarget.local;
+  }
+  if (visible.contains(AssistantExecutionTarget.remote)) {
+    return AssistantExecutionTarget.remote;
+  }
+  return AssistantExecutionTarget.remote;
 }
 
 String normalizeSingleAgentProviderId(String value) {

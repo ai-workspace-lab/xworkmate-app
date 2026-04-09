@@ -365,6 +365,12 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
         : (visibleExecutionTargets.isNotEmpty
               ? visibleExecutionTargets.first
               : currentExecutionTarget);
+    final compactExecutionTargets = compactAssistantExecutionTargets(
+      visibleExecutionTargets,
+    );
+    final compactExecutionTarget = collapseAssistantExecutionTargetForDisplay(
+      executionTarget,
+    );
     final permissionLevel = controller.assistantPermissionLevel;
     final selectedSkills = widget.availableSkills
         .where((skill) => widget.selectedSkillKeys.contains(skill.key))
@@ -418,14 +424,21 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                 ),
                 const SizedBox(width: 6),
               ],
-              if (visibleExecutionTargets.isNotEmpty) ...[
+              if (compactExecutionTargets.isNotEmpty) ...[
                 PopupMenuButton<AssistantExecutionTarget>(
                   key: const Key('assistant-execution-target-button'),
                   tooltip: appText('任务对话模式', 'Task Dialog Mode'),
                   onSelected: (value) {
-                    controller.setAssistantExecutionTarget(value);
+                    final resolvedTarget =
+                        value == AssistantExecutionTarget.singleAgent
+                        ? AssistantExecutionTarget.singleAgent
+                        : resolveGatewayExecutionTargetFromVisibleTargets(
+                            visibleExecutionTargets,
+                            currentTarget: executionTarget,
+                          );
+                    controller.setAssistantExecutionTarget(resolvedTarget);
                   },
-                  itemBuilder: (context) => visibleExecutionTargets
+                  itemBuilder: (context) => compactExecutionTargets
                       .map(
                         (value) => PopupMenuItem<AssistantExecutionTarget>(
                           value: value,
@@ -436,8 +449,8 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                             children: [
                               Icon(value.icon, size: 18),
                               const SizedBox(width: 10),
-                              Expanded(child: Text(value.label)),
-                              if (value == executionTarget)
+                              Expanded(child: Text(value.compactLabel)),
+                              if (value == compactExecutionTarget)
                                 const Icon(Icons.check_rounded, size: 18),
                             ],
                           ),
@@ -445,8 +458,10 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                       )
                       .toList(),
                   child: ComposerToolbarChipInternal(
-                    icon: executionTarget.icon,
-                    tooltip: executionTargetTooltipInternal(executionTarget),
+                    icon: compactExecutionTarget.icon,
+                    tooltip: executionTargetTooltipInternal(
+                      compactExecutionTarget,
+                    ),
                     showChevron: true,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -796,7 +811,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
               const SizedBox(width: 8),
               Tooltip(
                 message: submitLabel,
-              child: FilledButton(
+                child: FilledButton(
                   key: const Key('assistant-send-button'),
                   onPressed: connecting
                       ? null
