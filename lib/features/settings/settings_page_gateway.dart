@@ -37,13 +37,6 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
   ) {
     if (!widget.showSectionTabs) {
       return [
-        buildGatewayOverviewCardInternal(
-          context,
-          controller,
-          settings,
-          uiFeatures,
-        ),
-        const SizedBox(height: 16),
         buildOnlineAccountCardInternal(context, controller, settings),
         const SizedBox(height: 16),
         buildAcpBridgeServerModeCardInternal(
@@ -95,13 +88,6 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
       ),
     };
     return [
-      buildGatewayOverviewCardInternal(
-        context,
-        controller,
-        settings,
-        uiFeatures,
-      ),
-      const SizedBox(height: 16),
       SectionTabs(
         items: <String>[
           appText('用户登录状态', 'User Login State'),
@@ -145,10 +131,10 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
         GatewayIntegrationSubTabInternal.llm => const <Widget>[],
         GatewayIntegrationSubTabInternal.acp => const <Widget>[],
         GatewayIntegrationSubTabInternal.skills => const <Widget>[],
-        GatewayIntegrationSubTabInternal.advancedConfig =>
-          uiFeatures.supportsGatewayAdvancedCustomMode
-          ? <Widget>[
-              ...buildGatewayAdvancedSectionsInternal(
+      GatewayIntegrationSubTabInternal.advancedConfig =>
+        uiFeatures.supportsGatewayAdvancedCustomMode
+        ? <Widget>[
+            ...buildGatewayAdvancedSectionsInternal(
                 context,
                 controller,
                 settings,
@@ -158,85 +144,6 @@ extension SettingsPageGatewayMixinInternal on SettingsPageStateInternal {
           : <Widget>[],
       },
     ];
-  }
-
-  Widget buildGatewayOverviewCardInternal(
-    BuildContext context,
-    AppController controller,
-    SettingsSnapshot settings,
-    UiFeatureAccess uiFeatures,
-  ) {
-    final accountController = controller.settingsController;
-    final modeConfig = settings.acpBridgeServerModeConfig;
-    final supportsSelfHosted = uiFeatures.supportsGatewaySelfHostedBase;
-    final supportsAdvancedOverrides =
-        uiFeatures.supportsGatewayAdvancedCustomMode;
-    final loginStatus = accountController.accountMfaRequired
-        ? appText('MFA 待验证', 'MFA pending')
-        : accountController.accountBusy
-        ? appText('登录中', 'Signing in')
-        : accountController.accountSignedIn
-        ? appText('已登录', 'Signed in')
-        : appText('未登录', 'Signed out');
-    final defaultSource = supportsSelfHosted && modeConfig.usesSelfHostedBase
-        ? appText('自建服务', 'Self-hosted')
-        : appText('svc.plus 提供', 'svc.plus provided');
-    final hasAdvancedOverrides =
-        supportsAdvancedOverrides &&
-        modeConfig.mode == AcpBridgeServerMode.advancedCustom;
-    return SurfaceCard(
-      key: const ValueKey('gateway-configuration-overview-card'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            appText('最终生效配置概览', 'Effective Configuration Overview'),
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            supportsAdvancedOverrides
-                ? appText(
-                    '先确认登录状态，再确定默认连接来源，最后按需用高级自定义模式覆盖默认配置。',
-                    'Confirm login state first, choose the default connection source second, then apply advanced custom overrides only where needed.',
-                  )
-                : appText(
-                    '先确认登录状态，再查看当前默认连接来源。',
-                    'Confirm login state first, then review the current default connection source.',
-                  ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              StatusChipInternal(
-                key: const ValueKey('gateway-overview-login-status'),
-                label: '${appText('登录状态', 'Login')}: $loginStatus',
-                tone: accountController.accountSignedIn
-                    ? StatusChipToneInternal.ready
-                    : StatusChipToneInternal.idle,
-              ),
-              StatusChipInternal(
-                key: const ValueKey('gateway-overview-default-source'),
-                label:
-                    '${appText('默认连接来源', 'Default Source')}: $defaultSource',
-                tone: StatusChipToneInternal.ready,
-              ),
-              if (supportsAdvancedOverrides)
-                StatusChipInternal(
-                  key: const ValueKey('gateway-overview-advanced-override'),
-                  label:
-                      '${appText('高级覆盖', 'Advanced Override')}: ${hasAdvancedOverrides ? appText('已启用', 'Enabled') : appText('未启用', 'Disabled')}',
-                  tone: hasAdvancedOverrides
-                      ? StatusChipToneInternal.ready
-                      : StatusChipToneInternal.idle,
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
   }
 
   List<Widget> buildGatewayAdvancedSectionsInternal(
