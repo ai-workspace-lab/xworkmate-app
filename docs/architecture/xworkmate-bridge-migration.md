@@ -20,6 +20,7 @@ The previous `xworkmate-app/go/go_core` implementation was migrated to `xworkmat
 - ACP stdio entrypoint
 - internal routing, dispatch, mounts, shared RPC helpers, gateway runtime support, memory, skills, and toolbridge packages
 - Go tests for ACP routing/contracts and bridge helper behavior
+- legacy static token auth helper code previously stored under `xworkmate-app/go_service`
 
 ## What Stayed In xworkmate-app
 
