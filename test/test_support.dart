@@ -187,38 +187,44 @@ class _TestFakeGatewayRuntime extends GatewayRuntime {
       case 'device.pair.list':
         return <String, dynamic>{
           'pending': _pairingList.pending
-              .map((item) => <String, dynamic>{
-                    'requestId': item.requestId,
-                    'deviceId': item.deviceId,
-                    'label': item.label,
-                    'role': item.role,
-                    'scopes': item.scopes,
-                    'remoteIp': item.remoteIp,
-                    'requestedAtMs': item.requestedAtMs,
-                    'repair': item.isRepair,
-                  })
+              .map(
+                (item) => <String, dynamic>{
+                  'requestId': item.requestId,
+                  'deviceId': item.deviceId,
+                  'label': item.label,
+                  'role': item.role,
+                  'scopes': item.scopes,
+                  'remoteIp': item.remoteIp,
+                  'requestedAtMs': item.requestedAtMs,
+                  'repair': item.isRepair,
+                },
+              )
               .toList(growable: false),
           'paired': _pairingList.paired
-              .map((item) => <String, dynamic>{
-                    'deviceId': item.deviceId,
-                    'displayName': item.displayName,
-                    'roles': item.roles,
-                    'scopes': item.scopes,
-                    'remoteIp': item.remoteIp,
-                    'tokens': item.tokens
-                        .map((token) => <String, dynamic>{
-                              'role': token.role,
-                              'scopes': token.scopes,
-                              'createdAtMs': token.createdAtMs,
-                              'rotatedAtMs': token.rotatedAtMs,
-                              'revokedAtMs': token.revokedAtMs,
-                              'lastUsedAtMs': token.lastUsedAtMs,
-                            })
-                        .toList(growable: false),
-                    'createdAtMs': item.createdAtMs,
-                    'approvedAtMs': item.approvedAtMs,
-                    'currentDevice': item.currentDevice,
-                  })
+              .map(
+                (item) => <String, dynamic>{
+                  'deviceId': item.deviceId,
+                  'displayName': item.displayName,
+                  'roles': item.roles,
+                  'scopes': item.scopes,
+                  'remoteIp': item.remoteIp,
+                  'tokens': item.tokens
+                      .map(
+                        (token) => <String, dynamic>{
+                          'role': token.role,
+                          'scopes': token.scopes,
+                          'createdAtMs': token.createdAtMs,
+                          'rotatedAtMs': token.rotatedAtMs,
+                          'revokedAtMs': token.revokedAtMs,
+                          'lastUsedAtMs': token.lastUsedAtMs,
+                        },
+                      )
+                      .toList(growable: false),
+                  'createdAtMs': item.createdAtMs,
+                  'approvedAtMs': item.approvedAtMs,
+                  'currentDevice': item.currentDevice,
+                },
+              )
               .toList(growable: false),
         };
       case 'system-presence':
@@ -235,7 +241,9 @@ void setGatewaySnapshotForTest(
 ) {
   final runtime = controller.runtime;
   if (runtime is! _TestFakeGatewayRuntime) {
-    throw StateError('createTestController() runtime does not support mutation');
+    throw StateError(
+      'createTestController() runtime does not support mutation',
+    );
   }
   runtime.setSnapshotForTest(snapshot);
 }
@@ -246,7 +254,9 @@ void setGatewayPairingListForTest(
 ) {
   final runtime = controller.runtime;
   if (runtime is! _TestFakeGatewayRuntime) {
-    throw StateError('createTestController() runtime does not support mutation');
+    throw StateError(
+      'createTestController() runtime does not support mutation',
+    );
   }
   runtime.setDevicePairingForTest(pairingList);
 }
@@ -262,7 +272,7 @@ class _TestFakeCodexRuntime extends CodexRuntime {
 Future<void> pumpPage(
   WidgetTester tester, {
   required Widget child,
-  Size size = const Size(1600, 1000),
+  Size size = const Size(1600, 4000),
   TargetPlatform? platform,
 }) async {
   tester.view.devicePixelRatio = 1;

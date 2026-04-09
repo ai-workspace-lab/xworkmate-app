@@ -85,7 +85,7 @@ void main() {
     expect(find.text('ClawHub'), findsNothing);
     expect(find.text('回到 APP首页'), findsNothing);
     expect(find.text('设置'), findsOneWidget);
-    expect(find.text('账户'), findsOneWidget);
+    expect(find.text('账户'), findsNothing);
     expect(find.text('语言'), findsOneWidget);
     expect(find.text('主题'), findsOneWidget);
 
@@ -107,11 +107,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(themeToggled, 1);
 
-    await tester.tap(
+    expect(
       find.byKey(const ValueKey<String>('sidebar-footer-account')),
+      findsNothing,
     );
-    await tester.pumpAndSettle();
-    expect(accountOpened, 1);
+    expect(accountOpened, 0);
 
     await tester.tap(
       find.byKey(const Key('workspace-sidebar-collapse-button')),

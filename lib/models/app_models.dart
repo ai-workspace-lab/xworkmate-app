@@ -28,7 +28,7 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
     WorkspaceDestination.secrets => appText('密钥', 'Secrets'),
     WorkspaceDestination.aiGateway => 'LLM API',
     WorkspaceDestination.settings => appText('设置', 'Settings'),
-    WorkspaceDestination.account => appText('账号', 'Account'),
+    WorkspaceDestination.account => appText('在线账户', 'Online Account'),
   };
 
   IconData get icon => switch (this) {
@@ -87,8 +87,8 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
       'Global settings and diagnostics, separated from business modules.',
     ),
     WorkspaceDestination.account => appText(
-      '用户身份、工作区切换与登录会话管理。',
-      'Identity, workspace switching, and session management.',
+      '在线账户、工作区切换、登录会话与 ACP Bridge Server 同步管理。',
+      'Online account, workspace switching, login sessions, and ACP Bridge Server sync.',
     ),
   };
 
