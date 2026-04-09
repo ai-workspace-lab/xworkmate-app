@@ -14,6 +14,32 @@ FLUTTER_BUILD_STATE_DIR="${ROOT_DIR}/.dart_tool/flutter_build"
 MACOS_BUILD_DIR="${ROOT_DIR}/build/macos"
 NATIVE_ASSETS_DIR="${ROOT_DIR}/build/native_assets"
 
+remove_tree_with_retries() {
+  local path="$1"
+  local attempts="${2:-5}"
+  local delay_seconds="${3:-1}"
+  local try=1
+
+  [[ -e "$path" ]] || return 0
+
+  while (( try <= attempts )); do
+    chmod -R u+w "$path" 2>/dev/null || true
+    rm -rf "$path" 2>/dev/null || true
+
+    if [[ ! -e "$path" ]]; then
+      return 0
+    fi
+
+    if (( try == attempts )); then
+      echo "Failed to remove generated path after ${attempts} attempts: $path" >&2
+      return 1
+    fi
+
+    sleep "$delay_seconds"
+    ((try++))
+  done
+}
+
 if [[ ! -f "$PUBSPEC_PATH" ]]; then
   echo "Missing pubspec: $PUBSPEC_PATH" >&2
   exit 1
@@ -40,7 +66,9 @@ echo "Building $APP_NAME $APP_VERSION ($APP_BUILD) for macOS..."
 # Flutter caches native-asset installation state under .dart_tool/flutter_build,
 # but Xcode consumes the copied frameworks from build/native_assets/macos.
 # Reset both locations so packaging cannot reuse a stale stamp or stale layout.
-rm -rf "$FLUTTER_BUILD_STATE_DIR" "$MACOS_BUILD_DIR" "$NATIVE_ASSETS_DIR"
+remove_tree_with_retries "$FLUTTER_BUILD_STATE_DIR"
+remove_tree_with_retries "$MACOS_BUILD_DIR"
+remove_tree_with_retries "$NATIVE_ASSETS_DIR"
 
 BUILD_ARGS=(
   flutter build macos

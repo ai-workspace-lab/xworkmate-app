@@ -234,15 +234,15 @@ void main() {
 
       expect(
         find.byKey(const ValueKey('gateway-configuration-overview-card')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const ValueKey('gateway-overview-login-status')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const ValueKey('gateway-overview-default-source')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const ValueKey('gateway-overview-advanced-override')),
@@ -415,7 +415,7 @@ void main() {
     expect(find.byKey(const ValueKey('account-base-url-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('account-username-field')), findsOneWidget);
     expect(find.byKey(const ValueKey('account-password-field')), findsOneWidget);
-    expect(find.byKey(const ValueKey('acp-bridge-mode-cloud')), findsNothing);
+    expect(find.byKey(const ValueKey('acp-bridge-mode-cloud')), findsOneWidget);
     expect(
       find.byKey(const ValueKey('acp-bridge-mode-self-hosted')),
       findsNothing,
@@ -437,9 +437,6 @@ void main() {
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
 
-    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
-    await tester.pumpAndSettle();
-
     expect(find.text('Vault Server'), findsAtLeastNWidgets(1));
     expect(find.text('VAULT_SERVER_URL'), findsOneWidget);
     expect(
@@ -459,9 +456,6 @@ void main() {
     );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
-
-    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
-    await tester.pumpAndSettle();
 
     expect(find.text('外部 ACP Server Endpoint'), findsOneWidget);
     expect(find.textContaining('Codex'), findsWidgets);
@@ -495,9 +489,6 @@ void main() {
     );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
-
-    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
-    await tester.pumpAndSettle();
 
     await _ensureVisible(
       tester,
@@ -536,9 +527,6 @@ void main() {
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
 
-    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
-    await tester.pumpAndSettle();
-
     expect(find.text('~/.agents/skills'), findsOneWidget);
     expect(find.text('/Users/tester/.agents/skills'), findsOneWidget);
     expect(find.text('~/.codex/skills'), findsOneWidget);
@@ -569,8 +557,6 @@ void main() {
     );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
-    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
-    await tester.pumpAndSettle();
     await _ensureVisible(
       tester,
       find.byKey(const ValueKey('skill-directory-batch-add-button')),
@@ -629,8 +615,6 @@ paths:
     );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
-    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
-    await tester.pumpAndSettle();
     await _ensureVisible(
       tester,
       find.byKey(const ValueKey('skill-directory-batch-add-button')),
@@ -672,8 +656,6 @@ paths:
       );
 
       await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
-      await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
-      await tester.pumpAndSettle();
       await _ensureVisible(
         tester,
         find.byKey(const ValueKey('skill-directory-batch-add-button')),
@@ -712,11 +694,14 @@ paths:
   testWidgets('SettingsPage gateway sections can collapse individually', (
     WidgetTester tester,
   ) async {
-    final controller = await createTestController(tester);
+    final controller = await createTestController(
+      tester,
+      uiFeatureManifest: _gatewayAdvancedManifestInternal(),
+    );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
 
-    await tester.tap(find.byTooltip('折叠').first);
+    await tester.tap(find.text('OpenClaw Gateway').first);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('gateway-host-field')), findsNothing);
@@ -726,7 +711,7 @@ paths:
       findsNothing,
     );
 
-    await tester.tap(find.byTooltip('展开').first);
+    await tester.tap(find.text('OpenClaw Gateway').first);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('gateway-host-field')), findsOneWidget);
@@ -746,8 +731,6 @@ paths:
     );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
-    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
-    await tester.pumpAndSettle();
 
     await _ensureVisible(tester, find.text('外部 ACP Server Endpoint'));
     await tester.tap(find.text('外部 ACP Server Endpoint').first);
@@ -791,8 +774,6 @@ paths:
     );
 
     await _pumpSettingsPage(tester, controller, tab: SettingsTab.gateway);
-    await tester.tap(find.byKey(const ValueKey('section-tab-高级自定义模式')));
-    await tester.pumpAndSettle();
 
     final labelField = find.byKey(
       ValueKey('external-acp-label-${customProfile.providerKey}'),
