@@ -90,11 +90,16 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
         forceRefresh: forceRefresh,
       );
   final next = <SingleAgentProvider, SingleAgentCapabilities>{};
-  for (final provider in controller.configuredSingleAgentProviders) {
+  final candidateProviders =
+      normalizeSingleAgentProviderList(<SingleAgentProvider>[
+        ...controller.configuredSingleAgentProviders,
+        ...capabilities.providers.map(
+          controller.settings.resolveSingleAgentProvider,
+        ),
+      ]);
+  for (final provider in candidateProviders) {
     if (!capabilities.providers.contains(provider)) {
-      next[provider] = const SingleAgentCapabilities.unavailable(
-        endpoint: '',
-      );
+      next[provider] = const SingleAgentCapabilities.unavailable(endpoint: '');
       continue;
     }
     next[provider] = SingleAgentCapabilities(
