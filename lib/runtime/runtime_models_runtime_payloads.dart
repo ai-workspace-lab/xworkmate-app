@@ -906,8 +906,8 @@ class ThreadContextState {
         json['selectedSkillsSource']?.toString(),
       ),
       gatewayEntryState: json['gatewayEntryState']?.toString(),
-      lastRemoteWorkingDirectory:
-          json['lastRemoteWorkingDirectory']?.toString(),
+      lastRemoteWorkingDirectory: json['lastRemoteWorkingDirectory']
+          ?.toString(),
       lastRemoteWorkspaceRefKind: (() {
         final rawValue =
             json['lastRemoteWorkspaceRefKind']?.toString().trim() ?? '';
@@ -1211,14 +1211,12 @@ class TaskThread {
           ? json['workspaceKind'].toString().trim()
           : (json['workspaceRefKind']?.toString().trim() ?? '');
       return <String, dynamic>{
-        'workspaceId':
-            json['workspaceId']?.toString().trim().isNotEmpty == true
+        'workspaceId': json['workspaceId']?.toString().trim().isNotEmpty == true
             ? json['workspaceId']
             : (json['threadId']?.toString().trim() ?? ''),
         'workspaceKind': workspaceKindValue,
         'workspacePath': workspacePath,
-        'displayPath':
-            json['displayPath']?.toString().trim().isNotEmpty == true
+        'displayPath': json['displayPath']?.toString().trim().isNotEmpty == true
             ? json['displayPath']
             : workspacePath,
         'writable': json['writable'] as bool? ?? true,
@@ -1240,29 +1238,7 @@ class TaskThread {
       if (nested.isNotEmpty) {
         return nested;
       }
-      if (isLegacyAutoAssistantExecutionTargetValue(
-        json['executionTarget']?.toString(),
-      )) {
-        throw const FormatException(
-          'TaskThread.executionTarget "auto" is no longer supported.',
-        );
-      }
-      final legacyTarget = AssistantExecutionTargetCopy.fromJsonValue(
-        json['executionTarget']?.toString(),
-      );
-      final legacyProvider = SingleAgentProviderCopy.fromJsonValue(
-        json['singleAgentProvider']?.toString(),
-      );
-      return <String, dynamic>{
-        'executionMode': threadExecutionModeFromAssistantExecutionTarget(
-          legacyTarget,
-        ).name,
-        'executorId': legacyProvider.providerId,
-        'providerId': legacyProvider.providerId,
-        'endpointId': json['endpointId']?.toString() ?? '',
-        'executionModeSource': json['executionTargetSource']?.toString(),
-        'providerSource': json['singleAgentProviderSource']?.toString(),
-      };
+      throw const FormatException('TaskThread.executionBinding is required.');
     }
 
     Map<String, dynamic> contextStateJson() {
@@ -1349,7 +1325,9 @@ String firstUserMessageTaskTitle(
     }
     return '${text.substring(0, kDefaultTaskTitleMaxLength)}...';
   }
-  return fallback.trim().isEmpty ? appText('新对话', 'New conversation') : fallback;
+  return fallback.trim().isEmpty
+      ? appText('新对话', 'New conversation')
+      : fallback;
 }
 
 String derivePersistedTaskTitle(
@@ -1362,7 +1340,8 @@ String derivePersistedTaskTitle(
     return currentTitle.trim();
   }
   final trimmedCurrent = currentTitle.trim();
-  if (trimmedCurrent.isNotEmpty && !isNewConversationTaskTitle(trimmedCurrent)) {
+  if (trimmedCurrent.isNotEmpty &&
+      !isNewConversationTaskTitle(trimmedCurrent)) {
     return trimmedCurrent;
   }
   return firstUserMessageTaskTitle(messages, fallback: fallback);

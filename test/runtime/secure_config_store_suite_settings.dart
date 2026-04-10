@@ -72,8 +72,14 @@ void registerSecureConfigStoreSuiteSettingsTestsInternal() {
           'gateway.example.com',
         );
         expect(loadedSnapshot.primaryRemoteGatewayProfile.port, 9443);
-        expect(secureRefs['gateway_token'], 'token-secret');
-        expect(secureRefs['gateway_password'], 'password-secret');
+        expect(
+          secureRefs['gateway_token_$kGatewayRemoteProfileIndex'],
+          'token-secret',
+        );
+        expect(
+          secureRefs['gateway_password_$kGatewayRemoteProfileIndex'],
+          'password-secret',
+        );
         expect(secureRefs['vault_token'], 'vault-secret');
         expect(secureRefs['ai_gateway_api_key'], 'ai-gateway-secret');
         expect(SecureConfigStore.maskValue('token-secret'), 'tok••••ret');

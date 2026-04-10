@@ -134,14 +134,6 @@ class AssistantPageMemorySecureConfigStoreInternal extends SecureConfigStore {
   Future<void> clearAccountSyncState() async {}
 
   @override
-  Future<AccountRemoteProfile?> loadAccountProfile() async => null;
-
-  @override
-  Future<void> saveAccountProfile(AccountRemoteProfile value) async {}
-
-  @override
-  Future<void> clearAccountProfile() async {}
-
   @override
   Future<String?> loadAccountManagedSecret({required String target}) async =>
       null;
@@ -170,8 +162,7 @@ class AssistantPageMemorySecureConfigStoreInternal extends SecureConfigStore {
   Future<String?> loadDeviceToken({
     required String deviceId,
     required String role,
-  }) async =>
-      null;
+  }) async => null;
 
   @override
   Future<void> saveDeviceToken({
@@ -318,7 +309,8 @@ class AssistantPageMemorySecureConfigStoreInternal extends SecureConfigStore {
 
   void _clearSecretValue(String refName) {
     final normalizedRef = refName.trim();
-    if (normalizedRef.isEmpty || !_secretValueByRef.containsKey(normalizedRef)) {
+    if (normalizedRef.isEmpty ||
+        !_secretValueByRef.containsKey(normalizedRef)) {
       return;
     }
     _secretValueByRef = <String, String>{
@@ -401,7 +393,8 @@ SettingsSnapshot buildAssistantPageTestSettingsSnapshotInternal(
             tls: false,
             tokenRef: defaults.primaryLocalGatewayProfile.tokenRef,
             passwordRef: defaults.primaryLocalGatewayProfile.passwordRef,
-            selectedAgentId: defaults.primaryLocalGatewayProfile.selectedAgentId,
+            selectedAgentId:
+                defaults.primaryLocalGatewayProfile.selectedAgentId,
           ),
           GatewayConnectionProfile(
             mode: RuntimeConnectionMode.remote,
@@ -412,7 +405,8 @@ SettingsSnapshot buildAssistantPageTestSettingsSnapshotInternal(
             tls: false,
             tokenRef: defaults.primaryRemoteGatewayProfile.tokenRef,
             passwordRef: defaults.primaryRemoteGatewayProfile.passwordRef,
-            selectedAgentId: defaults.primaryRemoteGatewayProfile.selectedAgentId,
+            selectedAgentId:
+                defaults.primaryRemoteGatewayProfile.selectedAgentId,
           ),
           ...defaults.gatewayProfiles.skip(2),
         ]
@@ -675,9 +669,7 @@ class InstalledSkillE2EAppControllerInternal
     lastSelectedSkillLabelsInternal = List<String>.unmodifiable(
       selectedSkillLabels,
     );
-    lastWorkspacePathInternal = assistantWorkspacePathForSession(
-      sessionKey,
-    );
+    lastWorkspacePathInternal = assistantWorkspacePathForSession(sessionKey);
     final workspacePath = lastWorkspacePathInternal.trim();
     if (workspacePath.isNotEmpty) {
       final outputFile = File('$workspacePath/$outputRelativePath');
@@ -707,12 +699,13 @@ createInstalledSkillE2EControllerInternal(
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   final store = AssistantPageMemorySecureConfigStoreInternal(
-    initialSettingsSnapshot: singleAgentTestSettingsInternal(
-      workspacePath: workspaceRoot.path,
-    ).copyWith(
-      assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
-      multiAgent: MultiAgentConfig.defaults().copyWith(enabled: false),
-    ),
+    initialSettingsSnapshot:
+        singleAgentTestSettingsInternal(
+          workspacePath: workspaceRoot.path,
+        ).copyWith(
+          assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
+          multiAgent: MultiAgentConfig.defaults().copyWith(enabled: false),
+        ),
   );
 
   final controller = InstalledSkillE2EAppControllerInternal(
@@ -755,12 +748,13 @@ createInstalledSkillE2EControllerSimpleInternal({
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   final store = AssistantPageMemorySecureConfigStoreInternal(
-    initialSettingsSnapshot: singleAgentTestSettingsInternal(
-      workspacePath: workspaceRoot.path,
-    ).copyWith(
-      assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
-      multiAgent: MultiAgentConfig.defaults().copyWith(enabled: false),
-    ),
+    initialSettingsSnapshot:
+        singleAgentTestSettingsInternal(
+          workspacePath: workspaceRoot.path,
+        ).copyWith(
+          assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
+          multiAgent: MultiAgentConfig.defaults().copyWith(enabled: false),
+        ),
   );
 
   final controller = InstalledSkillE2EAppControllerInternal(

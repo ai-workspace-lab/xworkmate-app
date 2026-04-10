@@ -648,8 +648,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
         'secret_ref::${profile.tokenRef.trim().isEmpty ? '' : profile.tokenRef.trim()}',
         'secret_ref::${profile.passwordRef.trim().isEmpty ? '' : profile.passwordRef.trim()}',
       ],
-      'secret_ref::gateway_token',
-      'secret_ref::gateway_password',
     }..remove('secret_ref::');
     final aiGatewayDraftKeys = <String>{
       'secret_ref::${next.aiGateway.apiKeyRef.trim().isEmpty ? AppController.draftAiGatewayApiKeyKeyInternal : next.aiGateway.apiKeyRef.trim()}',
@@ -727,8 +725,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
   bool isGatewayDraftKeyInternal(String key) =>
       key.startsWith('secret_ref::gateway_token_') ||
       key.startsWith('secret_ref::gateway_password_') ||
-      key == 'secret_ref::gateway_token' ||
-      key == 'secret_ref::gateway_password' ||
       key.startsWith('gateway_token_') ||
       key.startsWith('gateway_password_');
 

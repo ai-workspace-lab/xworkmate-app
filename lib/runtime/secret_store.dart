@@ -76,8 +76,6 @@ class SecretStore {
 
   static const String legacyLocalStateKey = 'xworkmate.local_state.key';
 
-  static const String _legacyGatewayTokenKey = 'xworkmate.gateway.token';
-  static const String _legacyGatewayPasswordKey = 'xworkmate.gateway.password';
   static const String _gatewayDeviceIdKey = 'xworkmate.gateway.device.id';
   static const String _gatewayDevicePublicKeyKey =
       'xworkmate.gateway.device.public_key';
@@ -98,7 +96,6 @@ class SecretStore {
       'xworkmate.account.session.identifier';
   static const String _accountSessionSummaryKey =
       'xworkmate.account.session.summary';
-  static const String _accountProfileKey = 'xworkmate.account.profile';
   static const String _customSecretRefRegistryKey =
       'xworkmate.secret.ref_registry';
 
@@ -134,17 +131,7 @@ class SecretStore {
 
   Future<String?> loadGatewayToken({int? profileIndex}) async {
     if (profileIndex != null) {
-      final scopedValue = await _readSecure(
-        _gatewayTokenKeyForProfile(profileIndex),
-      );
-      if ((scopedValue ?? '').trim().isNotEmpty) {
-        return scopedValue;
-      }
-      return _readSecure(_legacyGatewayTokenKey);
-    }
-    final legacyValue = await _readSecure(_legacyGatewayTokenKey);
-    if ((legacyValue ?? '').trim().isNotEmpty) {
-      return legacyValue;
+      return _readSecure(_gatewayTokenKeyForProfile(profileIndex));
     }
     for (final index in _gatewayProfileFallbackOrder) {
       final scopedValue = await _readSecure(_gatewayTokenKeyForProfile(index));
@@ -157,31 +144,17 @@ class SecretStore {
 
   Future<void> saveGatewayToken(String value, {int? profileIndex}) =>
       _writeSecure(
-        profileIndex == null
-            ? _legacyGatewayTokenKey
-            : _gatewayTokenKeyForProfile(profileIndex),
+        _gatewayTokenKeyForProfile(profileIndex ?? kGatewayRemoteProfileIndex),
         value,
       );
 
   Future<void> clearGatewayToken({int? profileIndex}) => _deleteSecure(
-    profileIndex == null
-        ? _legacyGatewayTokenKey
-        : _gatewayTokenKeyForProfile(profileIndex),
+    _gatewayTokenKeyForProfile(profileIndex ?? kGatewayRemoteProfileIndex),
   );
 
   Future<String?> loadGatewayPassword({int? profileIndex}) async {
     if (profileIndex != null) {
-      final scopedValue = await _readSecure(
-        _gatewayPasswordKeyForProfile(profileIndex),
-      );
-      if ((scopedValue ?? '').trim().isNotEmpty) {
-        return scopedValue;
-      }
-      return _readSecure(_legacyGatewayPasswordKey);
-    }
-    final legacyValue = await _readSecure(_legacyGatewayPasswordKey);
-    if ((legacyValue ?? '').trim().isNotEmpty) {
-      return legacyValue;
+      return _readSecure(_gatewayPasswordKeyForProfile(profileIndex));
     }
     for (final index in _gatewayProfileFallbackOrder) {
       final scopedValue = await _readSecure(
@@ -196,16 +169,14 @@ class SecretStore {
 
   Future<void> saveGatewayPassword(String value, {int? profileIndex}) =>
       _writeSecure(
-        profileIndex == null
-            ? _legacyGatewayPasswordKey
-            : _gatewayPasswordKeyForProfile(profileIndex),
+        _gatewayPasswordKeyForProfile(
+          profileIndex ?? kGatewayRemoteProfileIndex,
+        ),
         value,
       );
 
   Future<void> clearGatewayPassword({int? profileIndex}) => _deleteSecure(
-    profileIndex == null
-        ? _legacyGatewayPasswordKey
-        : _gatewayPasswordKeyForProfile(profileIndex),
+    _gatewayPasswordKeyForProfile(profileIndex ?? kGatewayRemoteProfileIndex),
   );
 
   Future<String?> loadOllamaCloudApiKey() => _readSecure(_ollamaCloudApiKeyKey);
@@ -283,25 +254,6 @@ class SecretStore {
   Future<void> clearAccountSessionSummary() =>
       _deleteSecure(_accountSessionSummaryKey);
 
-  Future<AccountRemoteProfile?> loadAccountProfile() async {
-    final raw = await _readSecure(_accountProfileKey);
-    if ((raw ?? '').trim().isEmpty) {
-      return null;
-    }
-    try {
-      return AccountRemoteProfile.fromJson(
-        (jsonDecode(raw!) as Map).cast<String, dynamic>(),
-      );
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> saveAccountProfile(AccountRemoteProfile value) =>
-      _writeSecure(_accountProfileKey, jsonEncode(value.toJson()));
-
-  Future<void> clearAccountProfile() => _deleteSecure(_accountProfileKey);
-
   Future<String?> loadAccountManagedSecret({required String target}) =>
       _readSecure(_accountManagedSecretKey(target));
 
@@ -359,14 +311,6 @@ class SecretStore {
   Future<Map<String, String>> loadSecureRefs() async {
     await initialize();
     final secureRefs = <String, String>{};
-    final legacyGatewayToken = await _readSecure(_legacyGatewayTokenKey);
-    final legacyGatewayPassword = await _readSecure(_legacyGatewayPasswordKey);
-    if (legacyGatewayToken case final value?) {
-      secureRefs['gateway_token'] = value;
-    }
-    if (legacyGatewayPassword case final value?) {
-      secureRefs['gateway_password'] = value;
-    }
     for (var index = 0; index < kGatewayProfileListLength; index += 1) {
       final scopedToken = await _readSecure(_gatewayTokenKeyForProfile(index));
       final scopedPassword = await _readSecure(
@@ -545,10 +489,10 @@ class SecretStore {
   static String _secureStorageKeyForRef(String refName) {
     final normalized = refName.trim();
     if (normalized == 'gateway_token') {
-      return _legacyGatewayTokenKey;
+      return _gatewayTokenKeyForProfile(kGatewayRemoteProfileIndex);
     }
     if (normalized == 'gateway_password') {
-      return _legacyGatewayPasswordKey;
+      return _gatewayPasswordKeyForProfile(kGatewayRemoteProfileIndex);
     }
     if (_looksLikeGatewayProfileRef(normalized, 'gateway_token_')) {
       final index = int.parse(normalized.substring('gateway_token_'.length));
