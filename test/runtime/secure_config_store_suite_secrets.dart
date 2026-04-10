@@ -85,8 +85,18 @@ void registerSecureConfigStoreSuiteSecretsTestsInternal() {
         await store.saveGatewayPassword('password-secret');
         await store.saveAiGatewayApiKey('ai-gateway-secret');
 
-        expect(await store.loadGatewayToken(), 'token-secret');
-        expect(await store.loadGatewayPassword(), 'password-secret');
+        expect(
+          await store.loadGatewayToken(
+            profileIndex: kGatewayRemoteProfileIndex,
+          ),
+          'token-secret',
+        );
+        expect(
+          await store.loadGatewayPassword(
+            profileIndex: kGatewayRemoteProfileIndex,
+          ),
+          'password-secret',
+        );
         expect(await store.loadAiGatewayApiKey(), 'ai-gateway-secret');
         final secretDirectory = Directory('${tempDirectory.path}/secrets');
         final secretFiles = await secretDirectory
@@ -217,13 +227,20 @@ void registerSecureConfigStoreSuiteSecretsTestsInternal() {
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
 
         await store.saveGatewayToken('token-secret');
-        expect(await store.loadGatewayToken(), 'token-secret');
+        expect(
+          await store.loadGatewayToken(
+            profileIndex: kGatewayRemoteProfileIndex,
+          ),
+          'token-secret',
+        );
 
         await store.clearGatewayToken();
 
         expect(await store.loadGatewayToken(), isNull);
         expect(
-          (await store.loadSecureRefs()).containsKey('gateway_token'),
+          (await store.loadSecureRefs()).containsKey(
+            'gateway_token_$kGatewayRemoteProfileIndex',
+          ),
           isFalse,
         );
       },

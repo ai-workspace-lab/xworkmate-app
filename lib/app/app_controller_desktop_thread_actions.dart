@@ -406,10 +406,7 @@ extension AppControllerDesktopThreadActions on AppController {
           appendLocalSessionMessageInternal(
             sessionKey,
             assistantErrorMessageInternal(
-              gatewayExecutionErrorLabelInternal(
-                error,
-                target: currentTarget,
-              ),
+              gatewayExecutionErrorLabelInternal(error, target: currentTarget),
             ),
             persistInThreadContext: true,
           );
@@ -558,14 +555,5 @@ extension AppControllerDesktopThreadActions on AppController {
       case RuntimeConnectionStatus.offline:
         return 'disconnected';
     }
-  }
-
-  Future<void> tryBindWorkspaceForOnlyChatFallbackInternal(
-    String sessionKey,
-    AssistantExecutionTarget currentTarget,
-  ) async {
-    throw StateError(
-      'tryBindWorkspaceForOnlyChatFallbackInternal is no longer supported.',
-    );
   }
 }
