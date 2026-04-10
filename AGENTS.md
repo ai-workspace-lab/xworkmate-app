@@ -11,6 +11,31 @@
 - Do not repeatedly ask whether worktree mode or concurrent execution should be used for this repo; treat that as the default unless the user explicitly asks for a different flow.
 - Keep the branch/worktree lifecycle explicit: inspect, implement, verify, merge, clean up.
 
+## Backward Compatibility Policy
+
+Default policy:
+- `No explicit compatibility requirement -> No backward compatibility`.
+
+Forbidden by default:
+- Keeping old and new fields side-by-side without a concrete removal plan.
+- Maintaining old and new API shapes at the same time.
+- Preserving old execution paths, old runtime lanes, or old provider truth sources.
+- Adding or preserving "temporary" fallback/preset backfill/legacy default revival behavior.
+- Preserving controller split paths, adapter bypasses, or dual routing logic for convenience.
+
+Allowed only with explicit requirement:
+- A compatibility layer is allowed only when explicitly required by user request, baseline docs, ADR, API contract, or migration spec.
+- Every allowed compatibility layer must declare owner, scope, exit criteria, and planned removal window.
+- PRs/plans must include explicit test coverage for the compatibility scope and its exit behavior.
+
+Review and enforcement:
+- When compatibility code is discovered, default action is removal.
+- If removal is blocked, the PR/plan must explicitly justify why compatibility is required now.
+- "Maybe someone still uses it" is not an acceptable reason without explicit requirement evidence.
+
+Scope boundary:
+- Legacy recovery paths explicitly retained by architecture/security baselines (for example secure local persistence legacy recovery) are not auto-deleted, but must not expand into current main flows.
+
 ## Refactor Workflow Standard
 
 This section defines the reusable refactor workflow for this repo.
@@ -73,6 +98,13 @@ Baseline commands:
 - `flutter test test/runtime/code_agent_node_orchestrator_test.dart`
 - `flutter test test/runtime/app_controller_thread_skills_test.dart`
 - `flutter test test/quality/wave1_file_size_guard_test.dart`
+
+Cleanup baseline requirements:
+- Every "stale code cleanup" task must include an explicit list of removed compatibility layers; wrapper-only/refactor-only changes are insufficient.
+- Every cleanup regression report must prove:
+  - old truth sources no longer participate in current decisions,
+  - current baseline paths still pass after compatibility removal,
+  - no new behavior is preserved under `legacy` / `fallback` / `compat` by default.
 
 ### Execution Roles
 
