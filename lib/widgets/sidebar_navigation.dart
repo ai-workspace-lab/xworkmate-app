@@ -46,6 +46,7 @@ class SidebarNavigation extends StatelessWidget {
     this.assistantSkillCount = 0,
     this.onRefreshTasks,
     this.onCreateTask,
+    this.onReturnToAssistant,
     this.onSelectTask,
     this.onArchiveTask,
     this.onRenameTask,
@@ -81,6 +82,7 @@ class SidebarNavigation extends StatelessWidget {
   final int assistantSkillCount;
   final Future<void> Function()? onRefreshTasks;
   final Future<void> Function()? onCreateTask;
+  final VoidCallback? onReturnToAssistant;
   final Future<void> Function(String sessionKey)? onSelectTask;
   final Future<void> Function(String sessionKey)? onArchiveTask;
   final Future<void> Function(String sessionKey, String title)? onRenameTask;
@@ -123,6 +125,7 @@ class SidebarNavigation extends StatelessWidget {
                   if (!isCollapsed)
                     Expanded(
                       child: SidebarTaskSection(
+                        currentSection: currentSection,
                         items: taskItems,
                         visibleExecutionTargets: visibleExecutionTargets,
                         skillCount: assistantSkillCount,
@@ -130,6 +133,7 @@ class SidebarNavigation extends StatelessWidget {
                         onCycleSidebarState: onCycleSidebarState,
                         onRefreshTasks: onRefreshTasks,
                         onCreateTask: onCreateTask,
+                        onReturnToAssistant: onReturnToAssistant,
                         onSelectTask: onSelectTask,
                         onArchiveTask: onArchiveTask,
                         onRenameTask: onRenameTask,
