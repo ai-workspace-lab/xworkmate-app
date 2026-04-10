@@ -39,6 +39,7 @@ import 'app_controller_desktop_settings.dart';
 import 'app_controller_desktop_single_agent.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_actions.dart';
+import 'app_controller_desktop_thread_binding.dart';
 import 'app_controller_desktop_workspace_execution.dart';
 import 'app_controller_desktop_settings_runtime.dart';
 import 'app_controller_desktop_thread_storage.dart';
@@ -313,7 +314,16 @@ extension AppControllerDesktopSkillPermissions on AppController {
           displayName: '',
         );
     final nextWorkspaceBinding =
-        workspaceBinding ?? existing?.workspaceBinding;
+        workspaceBinding ??
+        existing?.workspaceBinding ??
+        (nextExecutionTarget == AssistantExecutionTarget.singleAgent
+            ? buildDesktopWorkspaceBindingInternal(
+                normalizedSessionKey,
+                executionTarget: nextExecutionTarget,
+                ownerScope: nextOwnerScope,
+                existingBinding: null,
+              )
+            : null);
     if (nextWorkspaceBinding == null || !nextWorkspaceBinding.isComplete) {
       throw StateError(
         'TaskThread $normalizedSessionKey is missing a complete workspaceBinding.',

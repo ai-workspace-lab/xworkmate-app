@@ -314,6 +314,25 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     final previousState =
         await loadAccountSyncStateWithLegacyMigrationInternal(controller) ??
         AccountSyncState.defaults();
+    if (_isNonBlockingAccountProfileSyncError(error)) {
+      final fallbackState = previousState.copyWith(
+        syncState: 'ready',
+        syncMessage: 'Remote defaults unavailable; using existing settings',
+        lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
+        lastSyncSource: normalizedBaseUrl,
+        lastSyncError: error.message,
+      );
+      await controller.storeInternal.saveAccountSyncState(fallbackState);
+      await controller.reloadDerivedStateInternal();
+      final email = controller.accountSessionInternal?.email.trim() ?? '';
+      controller.accountStatusInternal = email.isEmpty
+          ? 'Signed in'
+          : 'Signed in as $email';
+      return const AccountSyncResult(
+        state: 'ready',
+        message: 'Remote defaults unavailable; using existing settings',
+      );
+    }
     final errorState = previousState.copyWith(
       syncState: 'error',
       syncMessage: error.message,
@@ -331,6 +350,10 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
       controller.notifyListeners();
     }
   }
+}
+
+bool _isNonBlockingAccountProfileSyncError(AccountRuntimeException error) {
+  return error.errorCode == 'xworkmate_secret_read_failed';
 }
 
 Future<void> applyAccountSyncedDefaultsSettingsInternal(
@@ -435,16 +458,18 @@ Future<void> applyAccountSyncedDefaultsSettingsInternal(
         accountBaseUrl: next.accountBaseUrl,
         accountIdentifier: next.accountUsername,
         lastSyncAt: state.lastSyncAtMs,
-        remoteServerSummary:
-            next.acpBridgeServerModeConfig.cloudSynced.remoteServerSummary
-                .copyWith(
-                  endpoint: defaults.openclawUrl.trim().isNotEmpty
-                      ? defaults.openclawUrl.trim()
-                      : defaults.apisixUrl.trim(),
-                  hasAdvancedOverrides:
-                      next.acpBridgeServerModeConfig.mode ==
-                      AcpBridgeServerMode.advancedCustom,
-                ),
+        remoteServerSummary: next
+            .acpBridgeServerModeConfig
+            .cloudSynced
+            .remoteServerSummary
+            .copyWith(
+              endpoint: defaults.openclawUrl.trim().isNotEmpty
+                  ? defaults.openclawUrl.trim()
+                  : defaults.apisixUrl.trim(),
+              hasAdvancedOverrides:
+                  next.acpBridgeServerModeConfig.mode ==
+                  AcpBridgeServerMode.advancedCustom,
+            ),
       ),
     ),
   );
@@ -474,8 +499,10 @@ Future<void> logoutAccountSettingsInternal(
     await controller.saveSnapshot(
       controller.snapshotInternal.copyWith(
         accountLocalMode: true,
-        acpBridgeServerModeConfig:
-            controller.snapshotInternal.acpBridgeServerModeConfig.copyWith(
+        acpBridgeServerModeConfig: controller
+            .snapshotInternal
+            .acpBridgeServerModeConfig
+            .copyWith(
               cloudSynced: controller
                   .snapshotInternal
                   .acpBridgeServerModeConfig

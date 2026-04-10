@@ -85,7 +85,11 @@ void main() {
       );
       expect(controller.snapshot.accountLocalMode, isFalse);
       expect(
-        controller.snapshot.acpBridgeServerModeConfig.cloudSynced.accountBaseUrl,
+        controller
+            .snapshot
+            .acpBridgeServerModeConfig
+            .cloudSynced
+            .accountBaseUrl,
         server.accountBaseUrl,
       );
       expect(
@@ -229,6 +233,69 @@ void main() {
   );
 
   test(
+    'SettingsController keeps the signed-in session when remote profile sync fails with a recoverable vault status error',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'xworkmate-settings-account-soft-fallback-',
+      );
+      addTearDown(() async => _deleteDirectoryBestEffort(tempDirectory));
+      final store = _createIsolatedStore(tempDirectory.path);
+      addTearDown(store.dispose);
+
+      final client = _MutableAccountRuntimeClient()
+        ..profileError = const AccountRuntimeException(
+          statusCode: 500,
+          errorCode: 'xworkmate_secret_read_failed',
+          message: 'failed to load xworkmate secret status',
+        );
+      final controller = SettingsController(
+        store,
+        accountClientFactory: (_) => client,
+      );
+      await controller.initialize();
+      await controller.saveSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          accountBaseUrl: _MutableAccountRuntimeClient.accountBaseUrl,
+          accountUsername: _MutableAccountRuntimeClient.loginEmail,
+          aiGateway: SettingsSnapshot.defaults().aiGateway.copyWith(
+            baseUrl: 'https://local-ai.example.com/v1',
+          ),
+        ),
+      );
+
+      await controller.loginAccount(
+        baseUrl: _MutableAccountRuntimeClient.accountBaseUrl,
+        identifier: _MutableAccountRuntimeClient.loginEmail,
+        password: _MutableAccountRuntimeClient.loginPassword,
+      );
+
+      expect(controller.accountSignedIn, isTrue);
+      expect(
+        controller.accountSession?.email,
+        _MutableAccountRuntimeClient.loginEmail,
+      );
+      expect(controller.accountSyncState?.syncState, 'ready');
+      expect(
+        controller.accountSyncState?.syncMessage,
+        'Remote defaults unavailable; using existing settings',
+      );
+      expect(
+        controller.accountSyncState?.lastSyncError,
+        'failed to load xworkmate secret status',
+      );
+      expect(
+        controller.snapshot.aiGateway.baseUrl,
+        'https://local-ai.example.com/v1',
+      );
+      expect(
+        controller.accountStatus,
+        'Signed in as ${_MutableAccountRuntimeClient.loginEmail}',
+      );
+    },
+  );
+
+  test(
     'SettingsController logout clears session but keeps synced defaults and override flags',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -273,10 +340,17 @@ void main() {
       expect(await store.loadAccountSessionIdentifier(), isNull);
       expect(await store.loadAccountSessionSummary(), isNull);
       expect(await store.loadAccountSyncState(), isNotNull);
-      expect(controller.snapshot.aiGateway.baseUrl, 'https://local-ai.example.com/v1');
+      expect(
+        controller.snapshot.aiGateway.baseUrl,
+        'https://local-ai.example.com/v1',
+      );
       expect(controller.snapshot.accountLocalMode, isTrue);
       expect(
-        controller.snapshot.acpBridgeServerModeConfig.cloudSynced.accountIdentifier,
+        controller
+            .snapshot
+            .acpBridgeServerModeConfig
+            .cloudSynced
+            .accountIdentifier,
         '',
       );
       expect(
@@ -322,6 +396,7 @@ class _MutableAccountRuntimeClient extends AccountRuntimeClient {
   static const String loginPassword = 'correct-password';
   static const String sessionToken = 'account-session-token';
 
+  AccountRuntimeException? profileError;
   AccountProfileResponse profileResponse = AccountProfileResponse(
     profile: AccountRemoteProfile.defaults().copyWith(
       openclawUrl: 'https://openclaw.account.example',
@@ -419,6 +494,10 @@ class _MutableAccountRuntimeClient extends AccountRuntimeClient {
         errorCode: 'session_not_found',
         message: 'session not found',
       );
+    }
+    final profileFailure = profileError;
+    if (profileFailure != null) {
+      throw profileFailure;
     }
     return profileResponse;
   }
