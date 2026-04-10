@@ -472,7 +472,7 @@ void main() {
   );
 
   test(
-    'AppController keeps the current single-agent thread workspace stable when saving workspace settings',
+    'AppController migrates managed single-agent thread workspaces when saving workspace settings',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -524,7 +524,6 @@ void main() {
         ),
         derivedBeforeSave,
       );
-      expect(controller.hasSettingsDraftChanges, isTrue);
 
       await controller.saveWorkspacePath(workspaceRoot.path);
 
@@ -532,7 +531,7 @@ void main() {
         controller.assistantWorkspacePathForSession(
           controller.currentSessionKey,
         ),
-        derivedBeforeSave,
+        '${workspaceRoot.path}/.xworkmate/threads/main',
       );
       expect(controller.hasPendingSettingsApply, isFalse);
       expect(controller.hasSettingsDraftChanges, isFalse);
@@ -540,7 +539,7 @@ void main() {
         controller
             .assistantThreadRecordsInternal[controller.currentSessionKey]
             ?.displayPath,
-        derivedBeforeSave,
+        '${workspaceRoot.path}/.xworkmate/threads/main',
       );
       expect(
         controller
@@ -553,7 +552,7 @@ void main() {
   );
 
   test(
-    'AppController rejects missing workspace bindings when reading workspace kind',
+    'AppController falls back to local workspace kind when the thread record is missing',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final tempDirectory = await Directory.systemTemp.createTemp(
@@ -584,14 +583,15 @@ void main() {
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.singleAgent,
       );
-      controller.assistantThreadRecordsInternal.remove(
-        controller.currentSessionKey,
+      controller.taskThreadRepositoryInternal.removeWhere(
+        (sessionKey, _) => sessionKey == controller.currentSessionKey,
+        persist: false,
       );
       expect(
-        () => controller.assistantWorkspaceKindForSession(
+        controller.assistantWorkspaceKindForSession(
           controller.currentSessionKey,
         ),
-        throwsA(isA<StateError>()),
+        WorkspaceRefKind.localPath,
       );
     },
   );
