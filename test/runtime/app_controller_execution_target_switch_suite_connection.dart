@@ -144,10 +144,10 @@ void registerExecutionTargetSwitchConnectionTests() {
           RuntimeConnectionMode.remote,
         );
         expect(gateway.disconnectCount, 1);
-        expect(controller.assistantConnectionStatusLabel, 'ACP Server Local');
+        expect(controller.assistantConnectionStatusLabel, 'Bridge');
         expect(
           controller.assistantConnectionTargetLabel,
-          '没有可用的外部 Agent ACP 端点，请先配置可用的 ACP Server。',
+          '当前没有可用的 Bridge Provider。请先在设置里配置并同步可用连接。',
         );
         expect(
           gateway.connectedProfiles,
@@ -337,7 +337,7 @@ void registerExecutionTargetSwitchConnectionTests() {
           controller.settings.assistantExecutionTarget,
           AssistantExecutionTarget.remote,
         );
-        expect(controller.assistantConnectionStatusLabel, 'ACP Server Local');
+        expect(controller.assistantConnectionStatusLabel, 'Bridge');
       },
     );
 
@@ -479,7 +479,7 @@ void registerExecutionTargetSwitchConnectionTests() {
             controller.assistantExecutionTarget,
             AssistantExecutionTarget.singleAgent,
           );
-          expect(controller.assistantConnectionStatusLabel, 'ACP Server Local');
+          expect(controller.assistantConnectionStatusLabel, 'Bridge');
           expect(completed, isFalse);
         } finally {
           if (!disconnectGate.isCompleted) {
@@ -497,7 +497,7 @@ void registerExecutionTargetSwitchConnectionTests() {
           controller.assistantExecutionTarget,
           AssistantExecutionTarget.singleAgent,
         );
-        expect(controller.assistantConnectionStatusLabel, 'ACP Server Local');
+        expect(controller.assistantConnectionStatusLabel, 'Bridge');
       },
     );
   });
