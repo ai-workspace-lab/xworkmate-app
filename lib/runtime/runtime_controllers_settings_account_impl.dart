@@ -281,8 +281,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
               endpoint: response.profile.openclawUrl.trim().isNotEmpty
                   ? response.profile.openclawUrl.trim()
                   : response.profile.apisixUrl.trim(),
-              hasAdvancedOverrides:
-                  currentModeConfig.mode == AcpBridgeServerMode.advancedCustom,
+              hasAdvancedOverrides: false,
             ),
       ),
     );
@@ -465,9 +464,7 @@ Future<void> applyAccountSyncedDefaultsSettingsInternal(
               endpoint: defaults.openclawUrl.trim().isNotEmpty
                   ? defaults.openclawUrl.trim()
                   : defaults.apisixUrl.trim(),
-              hasAdvancedOverrides:
-                  next.acpBridgeServerModeConfig.mode ==
-                  AcpBridgeServerMode.advancedCustom,
+              hasAdvancedOverrides: false,
             ),
       ),
     ),

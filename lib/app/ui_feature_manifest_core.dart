@@ -417,21 +417,11 @@ class UiFeatureAccess {
           UiFeatureKeys.navigationNodes: WorkspaceDestination.nodes,
           UiFeatureKeys.navigationSecrets: WorkspaceDestination.secrets,
           UiFeatureKeys.navigationAiGateway: WorkspaceDestination.aiGateway,
-          UiFeatureKeys.navigationSettings: WorkspaceDestination.settings,
         },
       };
 
   static const Map<String, SettingsTab> settingsTabMappingsInternal =
-      <String, SettingsTab>{
-        UiFeatureKeys.settingsGeneral: SettingsTab.general,
-        UiFeatureKeys.settingsWorkspace: SettingsTab.workspace,
-        UiFeatureKeys.settingsGateway: SettingsTab.gateway,
-        UiFeatureKeys.settingsAgents: SettingsTab.agents,
-        UiFeatureKeys.settingsAppearance: SettingsTab.appearance,
-        UiFeatureKeys.settingsDiagnostics: SettingsTab.diagnostics,
-        UiFeatureKeys.settingsExperimental: SettingsTab.experimental,
-        UiFeatureKeys.settingsAbout: SettingsTab.about,
-      };
+      <String, SettingsTab>{UiFeatureKeys.settingsGateway: SettingsTab.gateway};
 
   bool isEnabledPath(String path) {
     final parts = path.split('.');
@@ -522,7 +512,7 @@ class UiFeatureAccess {
     if (available.isNotEmpty) {
       return available.first;
     }
-    return SettingsTab.general;
+    return SettingsTab.gateway;
   }
 
   bool allowsExperimentalSetting(String keyPath) {

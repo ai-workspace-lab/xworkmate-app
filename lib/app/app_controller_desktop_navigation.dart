@@ -176,7 +176,7 @@ extension AppControllerDesktopNavigation on AppController {
   }
 
   void openSettings({
-    SettingsTab tab = SettingsTab.general,
+    SettingsTab tab = SettingsTab.gateway,
     SettingsDetailPage? detail,
     SettingsNavigationContext? navigationContext,
   }) {

@@ -712,7 +712,7 @@ class AppController extends ChangeNotifier {
       AppControllerDesktopNavigation(this).openModules(tab: tab);
 
   void openSettings({
-    SettingsTab tab = SettingsTab.general,
+    SettingsTab tab = SettingsTab.gateway,
     SettingsDetailPage? detail,
     SettingsNavigationContext? navigationContext,
   }) => AppControllerDesktopNavigation(this).openSettings(
