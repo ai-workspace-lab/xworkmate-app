@@ -37,47 +37,6 @@ import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 
 extension AppControllerDesktopExternalAcpRouting on AppController {
-  Future<List<ExternalCodeAgentAcpSyncedProvider>>
-  buildExternalAcpSyncedProvidersInternal() async {
-    final providers = <ExternalCodeAgentAcpSyncedProvider>[];
-    for (final profile in settings.externalAcpEndpoints) {
-      final builtinProvider = profile.builtinProvider;
-      final effectiveProfile = builtinProvider == null
-          ? profile
-          : settings.externalAcpEndpointForProvider(builtinProvider);
-      final providerId = effectiveProfile.providerKey.trim();
-      final endpoint = effectiveProfile.endpoint.trim();
-      if (providerId.isEmpty || endpoint.isEmpty) {
-        continue;
-      }
-      final authorizationHeader = effectiveProfile.authRef.trim().isEmpty
-          ? ''
-          : await settingsControllerInternal.resolveSecretValueInternal(
-              refName: effectiveProfile.authRef.trim(),
-            );
-      providers.add(
-        ExternalCodeAgentAcpSyncedProvider(
-          providerId: providerId,
-          label: effectiveProfile.label,
-          endpoint: endpoint,
-          authorizationHeader: authorizationHeader,
-          enabled: effectiveProfile.enabled,
-        ),
-      );
-    }
-    return providers;
-  }
-
-  Future<void> syncExternalAcpProvidersInternal() async {
-    final providers = await buildExternalAcpSyncedProvidersInternal();
-    syncedGoAgentProvidersInternal
-      ..clear()
-      ..addEntries(
-        providers.map((item) => MapEntry(item.providerId.trim(), item)),
-      );
-    await goTaskServiceClientInternal.syncExternalProviders(providers);
-  }
-
   ExternalCodeAgentAcpRoutingConfig buildExternalAcpRoutingForSessionInternal(
     String sessionKey, {
     String? explicitExecutionTarget,

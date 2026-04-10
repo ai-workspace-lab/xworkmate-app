@@ -140,6 +140,9 @@ class ExternalCodeAgentAcpDesktopTransport
   Future<void> dispose() => _bridge.dispose();
 
   Future<void> _syncProviders() async {
+    if (_syncedProviders.isEmpty) {
+      return;
+    }
     await _bridge.request(
       method: 'xworkmate.providers.sync',
       params: <String, dynamic>{
