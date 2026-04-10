@@ -218,6 +218,26 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (lowered.contains('gateway not connected') ||
         lowered.contains('code: offline') ||
         lowered.contains('offlin') && lowered.contains('gateway')) {
+      if (target == AssistantExecutionTarget.singleAgent) {
+        final selection = singleAgentProviderForSession(
+          sessionsControllerInternal.currentSessionKey,
+        );
+        final provider =
+            resolvedSingleAgentProviderInternal(selection) ?? selection;
+        final providerLabel = provider == SingleAgentProvider.auto
+            ? appText('Bridge Provider', 'Bridge Provider')
+            : provider.label;
+        final address = _extractGatewayAddressFromErrorInternal(raw);
+        return address.isEmpty
+            ? appText(
+                '当前线程的 Bridge Provider（$providerLabel）未连接。请先在设置里连接并同步后再重试。',
+                'The Bridge Provider for this thread ($providerLabel) is not connected. Connect and sync it from Settings, then try again.',
+              )
+            : appText(
+                '当前线程的 Bridge Provider（$providerLabel）未连接：$address。请先在设置里连接并同步后再重试。',
+                'The Bridge Provider for this thread ($providerLabel) is not connected: $address. Connect and sync it from Settings, then try again.',
+              );
+      }
       final profile = gatewayProfileForAssistantExecutionTargetInternal(target);
       final address = gatewayAddressLabelInternal(profile);
       final targetLabel = target.label;
@@ -232,6 +252,13 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
             );
     }
     return raw;
+  }
+
+  String _extractGatewayAddressFromErrorInternal(String raw) {
+    final match = RegExp(
+      r'((?:\d{1,3}\.){3}\d{1,3}:\d+|localhost:\d+|[a-zA-Z0-9.-]+:\d+)',
+    ).firstMatch(raw);
+    return match?.group(1)?.trim() ?? '';
   }
 
   String formatAiGatewayHttpErrorInternal(int statusCode, String detail) {

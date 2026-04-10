@@ -511,10 +511,16 @@ class AssistantEmptyStateInternal extends StatelessWidget {
     final reconnectAvailable = controller.canQuickConnectGateway;
     final title = singleAgent
         ? connected
-              ? appText('开始 ACP Server 任务', 'Start an ACP Server task')
+              ? appText('开始智能体任务', 'Start an agent task')
               : singleAgentNeedsAiGateway
-              ? appText('先配置 ACP Server', 'Configure ACP Server first')
-              : appText('先准备 ACP Server', 'Prepare the ACP Server first')
+              ? appText(
+                  '先配置 Bridge Provider',
+                  'Configure a bridge provider first',
+                )
+              : appText(
+                  '先准备 Bridge Provider',
+                  'Prepare the bridge provider first',
+                )
         : connected
         ? appText('开始对话或运行任务', 'Start a chat or run a task')
         : connectionState.status == RuntimeConnectionStatus.error
@@ -523,22 +529,22 @@ class AssistantEmptyStateInternal extends StatelessWidget {
     final description = singleAgent
         ? connected
               ? appText(
-                  '当前线程通过 ACP Server 处理任务，不会建立 OpenClaw Gateway 会话。',
-                  'This thread runs through the ACP Server path and does not open an OpenClaw Gateway session.',
+                  '当前线程会通过 Bridge 当前广告的 Provider 处理任务，不会建立 OpenClaw Gateway 会话。',
+                  'This thread runs through the provider currently advertised by the bridge and does not open an OpenClaw Gateway session.',
                 )
               : singleAgentSuggestsAcpSwitch
               ? appText(
-                  '当前线程固定为 $providerLabel，但它在这台设备上不可用。请改成可用的 ACP Server。',
-                  'This thread is pinned to $providerLabel, but it is unavailable on this device. Switch to an available ACP Server.',
+                  '当前线程固定为 $providerLabel，但它在这台设备上不可用。请改成 Bridge 当前可用的 Provider。',
+                  'This thread is pinned to $providerLabel, but it is unavailable on this device. Switch to a provider currently advertised by the bridge.',
                 )
               : singleAgentNeedsAiGateway
               ? appText(
-                  '请先在 设置 -> 集成 中配置可用的外部 Agent ACP 端点，然后以 ACP Server 模式继续当前任务。',
-                  'Configure an external Agent ACP endpoint in Settings -> Integrations, then continue this task in ACP Server mode.',
+                  '请先在 设置 -> 集成 中配置并同步可用的外部 Agent 连接，然后再继续当前任务。',
+                  'Configure and sync an available external agent connection in Settings -> Integrations before continuing this task.',
                 )
               : appText(
-                  '当前线程的外部 Agent ACP 连接尚未就绪。请先配置 $providerLabel 对应端点。',
-                  'The external Agent ACP connection for this thread is not ready yet. Configure the endpoint for $providerLabel first.',
+                  '当前线程的 Bridge Provider 尚未就绪。请先检查 $providerLabel 对应连接。',
+                  'The bridge provider for this thread is not ready yet. Check the connection mapped to $providerLabel first.',
                 )
         : connected
         ? appText(

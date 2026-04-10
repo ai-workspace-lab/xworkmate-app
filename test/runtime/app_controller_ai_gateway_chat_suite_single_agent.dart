@@ -620,7 +620,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           controller.chatMessages.any(
             (message) =>
                 message.role == 'assistant' &&
-                message.text.contains('当前没有可用的外部 Agent ACP 端点'),
+                message.text.contains('当前没有可用的 Bridge Provider'),
           ),
           isTrue,
         );
@@ -684,7 +684,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           controller.chatMessages.any(
             (message) =>
                 message.role == 'assistant' &&
-                message.text.contains('当前没有可用的外部 Agent ACP 端点'),
+                message.text.contains('当前没有可用的 Bridge Provider'),
           ),
           isTrue,
         );
