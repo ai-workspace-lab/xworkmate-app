@@ -45,8 +45,8 @@ String executionTargetTooltipInternal(AssistantExecutionTarget target) =>
 
 String singleAgentProviderTooltipInternal(SingleAgentProvider provider) =>
     appText(
-      '单机智能体执行器: ${provider.label}',
-      'Single-agent provider: ${provider.label}',
+      'Bridge Provider: ${provider.label}',
+      'Bridge Provider: ${provider.label}',
     );
 
 String modelTooltipInternal(String modelLabel) =>
