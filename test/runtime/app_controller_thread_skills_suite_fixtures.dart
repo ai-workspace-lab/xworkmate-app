@@ -56,6 +56,8 @@ Future<SecureConfigStore> createStoreInternal(String rootPath) async {
 SettingsSnapshot singleAgentTestSettingsInternal({
   required String workspacePath,
   int gatewayPort = 9,
+  String singleAgentProviderEndpoint = '',
+  String singleAgentProviderAuthRef = '',
 }) {
   final defaults = SettingsSnapshot.defaults();
   return defaults.copyWith(
@@ -78,5 +80,15 @@ SettingsSnapshot singleAgentTestSettingsInternal({
     ),
     assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
     workspacePath: workspacePath,
+    externalAcpEndpoints: replaceExternalAcpEndpointForProvider(
+      defaults.externalAcpEndpoints,
+      SingleAgentProvider.opencode,
+      defaults.externalAcpEndpointForProvider(
+        SingleAgentProvider.opencode,
+      ).copyWith(
+        endpoint: singleAgentProviderEndpoint,
+        authRef: singleAgentProviderAuthRef,
+      ),
+    ),
   );
 }

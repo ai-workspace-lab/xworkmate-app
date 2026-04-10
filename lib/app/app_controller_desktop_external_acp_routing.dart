@@ -50,27 +50,11 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
       if (providerId.isEmpty || endpoint.isEmpty) {
         continue;
       }
-      var authorizationHeader = effectiveProfile.authRef.trim().isEmpty
+      final authorizationHeader = effectiveProfile.authRef.trim().isEmpty
           ? ''
           : await settingsControllerInternal.resolveSecretValueInternal(
               refName: effectiveProfile.authRef.trim(),
             );
-      if (authorizationHeader.isEmpty &&
-          builtinProvider != null &&
-          settings.acpBridgeServerModeConfig.usesSelfHostedBase) {
-        final selfHosted = settings.acpBridgeServerModeConfig.selfHosted;
-        final username = selfHosted.username.trim();
-        final passwordRef = selfHosted.passwordRef.trim();
-        final password = passwordRef.isEmpty
-            ? ''
-            : await settingsControllerInternal.loadSecretValueByRef(
-                passwordRef,
-              );
-        if (username.isNotEmpty && password.trim().isNotEmpty) {
-          authorizationHeader =
-              'Basic ${base64Encode(utf8.encode('$username:${password.trim()}'))}';
-        }
-      }
       providers.add(
         ExternalCodeAgentAcpSyncedProvider(
           providerId: providerId,

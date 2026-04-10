@@ -1,8 +1,6 @@
 @TestOn('vm')
 library;
 
-import 'dart:convert';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
@@ -16,7 +14,7 @@ import 'app_controller_ai_gateway_chat_suite_fakes.dart';
 void main() {
   group('ACP bridge provider hub', () {
     test(
-      'self-hosted ACP bridge base makes builtin single-agent providers visible without per-provider endpoints',
+      'self-hosted ACP bridge base does not override builtin single-agent endpoints',
       () {
         final snapshot = SettingsSnapshot.defaults().copyWith(
           acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
@@ -33,13 +31,13 @@ void main() {
           snapshot
               .externalAcpEndpointForProvider(SingleAgentProvider.codex)
               .endpoint,
-          'https://bridge.example.com',
+          '',
         );
       },
     );
 
     test(
-      'builtin provider sync uses bridge base endpoint and self-hosted basic auth when endpoint auth is empty',
+      'builtin provider sync does not inject self-hosted bridge endpoint or auth fallback',
       () async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
         final store = createIsolatedTestStore(enableSecureStorage: false);
@@ -69,6 +67,13 @@ void main() {
                         username: 'review@example.com',
                       ),
                 ),
+            externalAcpEndpoints: replaceExternalAcpEndpointForProvider(
+              controller.settings.externalAcpEndpoints,
+              SingleAgentProvider.opencode,
+              controller.settings
+                  .externalAcpEndpointForProvider(SingleAgentProvider.opencode)
+                  .copyWith(endpoint: 'https://acp.example.com/opencode'),
+            ),
           ),
           refreshAfterSave: false,
         );
@@ -79,11 +84,8 @@ void main() {
           (item) => item.providerId == 'opencode',
         );
 
-        expect(opencode.endpoint, 'https://bridge.example.com');
-        expect(
-          opencode.authorizationHeader,
-          'Basic ${base64Encode(utf8.encode('review@example.com:top-secret'))}',
-        );
+        expect(opencode.endpoint, 'https://acp.example.com/opencode');
+        expect(opencode.authorizationHeader, '');
       },
     );
 

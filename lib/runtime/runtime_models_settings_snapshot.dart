@@ -516,21 +516,8 @@ class SettingsSnapshot {
   ExternalAcpEndpointProfile externalAcpEndpointForProvider(
     SingleAgentProvider provider,
   ) {
-    final profile =
-        externalAcpEndpointForProviderId(provider.providerId) ??
+    return externalAcpEndpointForProviderId(provider.providerId) ??
         ExternalAcpEndpointProfile.defaultsForProvider(provider);
-    final bridgeBaseUrl = acpBridgeBuiltinEndpointBaseUrl;
-    if (provider.isAuto || bridgeBaseUrl.isEmpty) {
-      return profile;
-    }
-    return profile.copyWith(endpoint: bridgeBaseUrl);
-  }
-
-  String get acpBridgeBuiltinEndpointBaseUrl {
-    if (!acpBridgeServerModeConfig.usesSelfHostedBase) {
-      return '';
-    }
-    return acpBridgeServerModeConfig.selfHosted.serverUrl.trim();
   }
 
   ExternalAcpEndpointProfile? externalAcpEndpointForProviderId(
