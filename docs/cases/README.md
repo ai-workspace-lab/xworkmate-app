@@ -9,6 +9,7 @@
 ## 配套文档
 
 - [核心功能集成测试自动化规划](../testing/core-integration-auto-test-plan.md)
+- [测试 Case 覆盖矩阵](../testing/test-case-coverage-matrix.md)
 - [XWorkmate 测试规范模板与指南](../testing/xworkmate-test-spec.md)
 - [XWorkmate 测试规范](../quality/xworkmate-test-spec.md)
 
