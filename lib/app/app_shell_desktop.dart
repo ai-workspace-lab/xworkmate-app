@@ -379,6 +379,11 @@ class _AppShellState extends State<AppShell> {
                                         controller,
                                         visibleExecutionTargets,
                                       ),
+                                  onReturnToAssistant: () {
+                                    controller.navigateTo(
+                                      WorkspaceDestination.assistant,
+                                    );
+                                  },
                                   onSelectTask: (sessionKey) async {
                                     controller.navigateTo(
                                       WorkspaceDestination.assistant,
