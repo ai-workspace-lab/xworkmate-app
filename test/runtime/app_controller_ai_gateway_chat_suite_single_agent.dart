@@ -858,7 +858,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
     );
 
     test(
-      'AppController rebinds local Single Agent threads to the structured resolved directory',
+      'AppController keeps local Single Agent threads bound to the local workspace while recording remote metadata',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
           'xworkmate-single-agent-remote-thread-cwd-',
@@ -918,29 +918,39 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         await controller.switchSession('draft:remote-thread');
 
         await controller.sendChatMessage('第一次运行', thinking: 'low');
+        final localThreadDir =
+            '${defaultWorkspace.path}/.xworkmate/threads/draft-remote-thread';
+        const remoteThreadDir =
+            '/opt/data/.xworkmate/threads/draft-remote-thread';
         expect(
           client.requests.first.workingDirectory,
-          '${defaultWorkspace.path}/.xworkmate/threads/draft-remote-thread',
+          localThreadDir,
         );
         expect(
           controller.assistantWorkspacePathForSession('draft:remote-thread'),
-          '/opt/data/.xworkmate/threads/draft-remote-thread',
+          localThreadDir,
         );
         expect(
           controller.assistantWorkspaceKindForSession('draft:remote-thread'),
           WorkspaceRefKind.localPath,
         );
+        final thread = controller.requireTaskThreadForSessionInternal(
+          'draft:remote-thread',
+        );
+        expect(thread.lastRemoteWorkingDirectory, remoteThreadDir);
+        expect(thread.lastRemoteWorkspaceRefKind, WorkspaceRefKind.localPath);
 
         await controller.sendChatMessage('第二次运行', thinking: 'low');
         expect(
           client.requests.last.workingDirectory,
-          '/opt/data/.xworkmate/threads/draft-remote-thread',
+          localThreadDir,
         );
+        expect(client.requests.last.remoteWorkingDirectoryHint, remoteThreadDir);
       },
     );
 
     test(
-      'AppController rebinds remote Single Agent threads to the resolved thread directory',
+      'AppController keeps remote Single Agent threads on the local workspace and forwards the remote directory as a hint',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
           'xworkmate-single-agent-remote-rebind-cwd-',
@@ -1013,24 +1023,142 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         await controller.switchSession('draft:remote-thread');
 
         await controller.sendChatMessage('第一次运行', thinking: 'low');
+        final localThreadDir =
+            '${defaultWorkspace.path}/.xworkmate/threads/draft-remote-thread';
         expect(
           client.requests.first.workingDirectory,
-          '${defaultWorkspace.path}/.xworkmate/threads/draft-remote-thread',
+          localThreadDir,
         );
         expect(
           controller.assistantWorkspacePathForSession('draft:remote-thread'),
-          '/remote/threads/task-42',
+          localThreadDir,
         );
         expect(
           controller.assistantWorkspaceKindForSession('draft:remote-thread'),
-          WorkspaceRefKind.remotePath,
+          WorkspaceRefKind.localPath,
         );
+        final thread = controller.requireTaskThreadForSessionInternal(
+          'draft:remote-thread',
+        );
+        expect(thread.lastRemoteWorkingDirectory, '/remote/threads/task-42');
+        expect(thread.lastRemoteWorkspaceRefKind, WorkspaceRefKind.remotePath);
 
         await controller.sendChatMessage('第二次运行', thinking: 'low');
         expect(
           client.requests.last.workingDirectory,
+          localThreadDir,
+        );
+        expect(
+          client.requests.last.remoteWorkingDirectoryHint,
           '/remote/threads/task-42',
         );
+      },
+    );
+
+    test(
+      'AppController writes returned Single Agent artifacts into the local workspace and versions name conflicts',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-single-agent-artifact-sync-',
+        );
+        final defaultWorkspace = Directory(
+          '${tempDirectory.path}/default-workspace',
+        );
+        await defaultWorkspace.create(recursive: true);
+
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(
+            workspacePath: defaultWorkspace.path,
+            assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
+          ),
+        );
+
+        final artifactPayload = base64Encode(utf8.encode('new report body'));
+        final client = FakeGoTaskServiceClientInternal(
+          capabilities: ExternalCodeAgentAcpCapabilities(
+            singleAgent: true,
+            multiAgent: false,
+            providers: <SingleAgentProvider>{SingleAgentProvider.opencode},
+            raw: <String, dynamic>{},
+          ),
+          result: GoTaskServiceResult(
+            success: true,
+            message: 'ARTIFACT_OK',
+            turnId: 'turn-artifact-1',
+            raw: <String, dynamic>{
+              'resolvedWorkingDirectory': '/remote/threads/artifact-thread',
+              'resolvedWorkspaceRefKind': 'remotePath',
+              'artifacts': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'relativePath': 'outputs/report.docx',
+                  'label': 'Report',
+                  'contentType':
+                      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                  'encoding': 'base64',
+                  'content': artifactPayload,
+                },
+              ],
+            },
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        final controller = await createAppControllerInternal(
+          store: store,
+          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+            SingleAgentProvider.opencode,
+          ],
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+          goTaskServiceClient: client,
+        );
+
+        controller.initializeAssistantThreadContext(
+          'draft:artifact-thread',
+          title: 'Artifact Thread',
+          executionTarget: AssistantExecutionTarget.singleAgent,
+        );
+        await controller.switchSession('draft:artifact-thread');
+
+        final localThreadDir = Directory(
+          '${defaultWorkspace.path}/.xworkmate/threads/draft-artifact-thread',
+        );
+        await localThreadDir.create(recursive: true);
+        final existingArtifact = File('${localThreadDir.path}/outputs/report.docx');
+        await existingArtifact.parent.create(recursive: true);
+        await existingArtifact.writeAsString('old report body');
+
+        await controller.sendChatMessage('生成文档', thinking: 'low');
+
+        final versionedArtifact = File(
+          '${localThreadDir.path}/outputs/report.v2.docx',
+        );
+        expect(existingArtifact.existsSync(), isTrue);
+        expect(versionedArtifact.existsSync(), isTrue);
+        expect(await versionedArtifact.readAsString(), 'new report body');
+        expect(
+          controller.assistantWorkspacePathForSession('draft:artifact-thread'),
+          localThreadDir.path,
+        );
+        expect(
+          controller.assistantWorkspaceKindForSession('draft:artifact-thread'),
+          WorkspaceRefKind.localPath,
+        );
+        final thread = controller.requireTaskThreadForSessionInternal(
+          'draft:artifact-thread',
+        );
+        expect(
+          thread.lastRemoteWorkingDirectory,
+          '/remote/threads/artifact-thread',
+        );
+        expect(thread.lastRemoteWorkspaceRefKind, WorkspaceRefKind.remotePath);
+        expect(thread.lastArtifactSyncStatus, 'synced');
+        expect(thread.lastArtifactSyncAtMs, isNotNull);
       },
     );
 

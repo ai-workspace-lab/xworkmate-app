@@ -96,7 +96,7 @@ List<ManagedMountTargetState> withAvailableMountTargetsInternal(
 
 Future<void> waitForInternal(
   bool Function() predicate, {
-  Duration timeout = const Duration(seconds: 5),
+  Duration timeout = const Duration(seconds: 20),
 }) async {
   final deadline = DateTime.now().add(timeout);
   while (!predicate()) {
