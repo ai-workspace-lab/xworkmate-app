@@ -478,10 +478,7 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            appText(
-              '基础连接配置',
-              'Base Connection Configuration',
-            ),
+            appText('基础连接配置', 'Base Connection Configuration'),
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
@@ -538,8 +535,7 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
             runSpacing: 12,
             children: [
               StatusChipInternal(
-                label:
-                    '${appText('默认连接来源', 'Default Source')}: $currentSource',
+                label: '${appText('默认连接来源', 'Default Source')}: $currentSource',
                 tone: StatusChipToneInternal.ready,
               ),
               StatusChipInternal(
@@ -741,8 +737,8 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
       children: [
         Text(
           appText(
-            '这里保留 Codex、OpenCode 作为内建接入。更多 Provider 请通过向导新增自定义 ACP Server Endpoint；历史上真正配置过的 Claude / Gemini 会迁移为自定义条目，空白旧预设会自动清理。',
-            'Codex and OpenCode stay here as built-in integrations. Add more providers through the custom ACP endpoint wizard; configured legacy Claude and Gemini entries are migrated into custom entries, while empty legacy presets are cleaned up automatically.',
+            '这里仅管理 Bridge 侧 catalog 的同步定义与认证信息。助手里的 Provider 列表完全以 Bridge 返回的 capabilities 为准，本页配置不会直接决定下拉里显示什么。',
+            'This section only manages sync definitions and credentials for the Bridge-side catalog. The provider list in Assistant comes entirely from Bridge capabilities; editing settings here does not directly populate the picker.',
           ),
           style: theme.textTheme.bodyMedium,
         ),
@@ -757,7 +753,9 @@ extension SettingsPageGatewayAcpMixinInternal on SettingsPageStateInternal {
               settings,
             ),
             icon: const Icon(Icons.add_rounded),
-            label: Text(appText('添加更多自定义配置', 'Add more custom configurations')),
+            label: Text(
+              appText('添加 Bridge 同步配置', 'Add Bridge sync definition'),
+            ),
           ),
         ),
         const SizedBox(height: 16),

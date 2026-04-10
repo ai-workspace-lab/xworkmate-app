@@ -295,6 +295,8 @@ class AppController extends ChangeNotifier {
   Map<SingleAgentProvider, SingleAgentCapabilities>
   singleAgentCapabilitiesByProviderInternal =
       const <SingleAgentProvider, SingleAgentCapabilities>{};
+  List<SingleAgentProvider> bridgeAdvertisedProvidersInternal =
+      const <SingleAgentProvider>[];
   final Map<String, List<GatewayChatMessage>> assistantThreadMessagesInternal =
       <String, List<GatewayChatMessage>>{};
   late final DesktopTaskThreadRepository taskThreadRepositoryInternal =
@@ -306,7 +308,8 @@ class AppController extends ChangeNotifier {
   final Map<String, String> aiGatewayStreamingTextBySessionInternal =
       <String, String>{};
   final Map<String, ExternalCodeAgentAcpSyncedProvider>
-  syncedGoAgentProvidersInternal = <String, ExternalCodeAgentAcpSyncedProvider>{};
+  syncedGoAgentProvidersInternal =
+      <String, ExternalCodeAgentAcpSyncedProvider>{};
   final DesktopThreadArtifactService threadArtifactServiceInternal =
       DesktopThreadArtifactService();
   List<AssistantThreadSkillEntry> singleAgentSharedImportedSkillsInternal =
@@ -576,7 +579,7 @@ class AppController extends ChangeNotifier {
   List<SingleAgentProvider> get configuredSingleAgentProviders =>
       normalizeSingleAgentProviderList(
         (availableSingleAgentProvidersOverrideInternal ??
-                settings.savedSingleAgentProviders)
+                bridgeAdvertisedProvidersInternal)
             .where((item) => item != SingleAgentProvider.auto)
             .map(settings.resolveSingleAgentProvider),
       );
@@ -599,7 +602,9 @@ class AppController extends ChangeNotifier {
     }
     return <AssistantExecutionTarget>[
       AssistantExecutionTarget.singleAgent,
-      ...visible.where((target) => target != AssistantExecutionTarget.singleAgent),
+      ...visible.where(
+        (target) => target != AssistantExecutionTarget.singleAgent,
+      ),
     ];
   }
 
@@ -697,7 +702,7 @@ class AppController extends ChangeNotifier {
         const <AssistantThreadSkillEntry>[];
   }
 
-  // Keep legacy public APIs as class members for cross-library callers.
+  // Keep these public navigation APIs as class members for cross-library callers.
   void navigateTo(WorkspaceDestination destination) =>
       AppControllerDesktopNavigation(this).navigateTo(destination);
 
