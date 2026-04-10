@@ -243,14 +243,6 @@ class SecureConfigStore {
     }
   }
 
-  Future<AccountRemoteProfile?> loadAccountProfile() =>
-      _secretStore.loadAccountProfile();
-
-  Future<void> saveAccountProfile(AccountRemoteProfile value) =>
-      _secretStore.saveAccountProfile(value);
-
-  Future<void> clearAccountProfile() => _secretStore.clearAccountProfile();
-
   Future<String?> loadAccountManagedSecret({required String target}) =>
       _secretStore.loadAccountManagedSecret(target: target);
 

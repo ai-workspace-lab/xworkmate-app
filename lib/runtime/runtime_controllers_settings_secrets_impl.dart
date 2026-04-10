@@ -171,9 +171,6 @@ bool hasStoredGatewayTokenForProfileSettingsInternal(
     controller.secureRefsInternal.containsKey(
       gatewayTokenRefForProfileSettingsInternal(controller, profileIndex),
     ) ||
-    (gatewayTokenRefForProfileSettingsInternal(controller, profileIndex) ==
-            SecretStore.gatewayTokenRefKey(profileIndex) &&
-        controller.secureRefsInternal.containsKey('gateway_token')) ||
     (!controller.snapshotInternal.accountLocalMode &&
         profileIndex == kGatewayRemoteProfileIndex &&
         controller.secureRefsInternal.containsKey(
@@ -183,13 +180,9 @@ bool hasStoredGatewayTokenForProfileSettingsInternal(
 bool hasStoredGatewayPasswordForProfileSettingsInternal(
   SettingsController controller,
   int profileIndex,
-) =>
-    controller.secureRefsInternal.containsKey(
-      gatewayPasswordRefForProfileSettingsInternal(controller, profileIndex),
-    ) ||
-    (gatewayPasswordRefForProfileSettingsInternal(controller, profileIndex) ==
-            SecretStore.gatewayPasswordRefKey(profileIndex) &&
-        controller.secureRefsInternal.containsKey('gateway_password'));
+) => controller.secureRefsInternal.containsKey(
+  gatewayPasswordRefForProfileSettingsInternal(controller, profileIndex),
+);
 
 String? storedGatewayTokenMaskForProfileSettingsInternal(
   SettingsController controller,
@@ -199,10 +192,6 @@ String? storedGatewayTokenMaskForProfileSettingsInternal(
       controller,
       profileIndex,
     )] ??
-    (gatewayTokenRefForProfileSettingsInternal(controller, profileIndex) ==
-            SecretStore.gatewayTokenRefKey(profileIndex)
-        ? controller.secureRefsInternal['gateway_token']
-        : null) ??
     (!controller.snapshotInternal.accountLocalMode &&
             profileIndex == kGatewayRemoteProfileIndex
         ? controller
@@ -216,11 +205,7 @@ String? storedGatewayPasswordMaskForProfileSettingsInternal(
     controller.secureRefsInternal[gatewayPasswordRefForProfileSettingsInternal(
       controller,
       profileIndex,
-    )] ??
-    (gatewayPasswordRefForProfileSettingsInternal(controller, profileIndex) ==
-            SecretStore.gatewayPasswordRefKey(profileIndex)
-        ? controller.secureRefsInternal['gateway_password']
-        : null);
+    )];
 
 String gatewayTokenRefForProfileSettingsInternal(
   SettingsController controller,

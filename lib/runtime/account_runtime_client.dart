@@ -178,9 +178,7 @@ class AccountRuntimeClient {
       secretLocators: _decodeLocators(profile),
     );
     return AccountProfileResponse(
-      profile: remoteProfile.copyWith(
-        secretLocators: _withLegacyOpenclawLocator(remoteProfile, profile),
-      ),
+      profile: remoteProfile,
       profileScope: _stringValue(payload['profileScope']),
       tokenConfigured: AccountTokenConfigured.fromJson(
         _asMap(payload['tokenConfigured']),
@@ -281,35 +279,6 @@ class AccountRuntimeClient {
               item.target.trim().isNotEmpty,
         )
         .toList(growable: false);
-  }
-
-  List<AccountSecretLocator> _withLegacyOpenclawLocator(
-    AccountRemoteProfile profile,
-    Map<String, dynamic> rawProfile,
-  ) {
-    final existing = profile.secretLocators;
-    final hasOpenclawLocator = existing.any(
-      (item) => item.target == kAccountManagedSecretTargetOpenclawGatewayToken,
-    );
-    if (hasOpenclawLocator) {
-      return existing;
-    }
-    final legacySecretPath = _stringValue(rawProfile['vaultSecretPath']);
-    final legacySecretKey = _stringValue(rawProfile['vaultSecretKey']);
-    if (legacySecretPath.isEmpty || legacySecretKey.isEmpty) {
-      return existing;
-    }
-    return <AccountSecretLocator>[
-      ...existing,
-      AccountSecretLocator(
-        id: 'legacy-openclaw-locator',
-        provider: 'vault',
-        secretPath: legacySecretPath,
-        secretKey: legacySecretKey,
-        target: kAccountManagedSecretTargetOpenclawGatewayToken,
-        required: true,
-      ),
-    ];
   }
 
   Uri _vaultReadUri(String rawBaseUrl, String secretPath) {

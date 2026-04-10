@@ -145,8 +145,7 @@ extension SettingsControllerAccountExtension on SettingsController {
     accountSessionTokenInternal =
         (await storeInternal.loadAccountSessionToken())?.trim() ?? '';
     accountSessionInternal = await storeInternal.loadAccountSessionSummary();
-    accountSyncStateInternal =
-        await loadAccountSyncStateWithLegacyMigrationInternal(this);
+    accountSyncStateInternal = await storeInternal.loadAccountSyncState();
     if (!accountBusyInternal) {
       if (accountSignedIn) {
         final email = accountSessionInternal?.email.trim() ?? '';

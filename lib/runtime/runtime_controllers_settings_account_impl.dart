@@ -254,7 +254,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     final client = controller.buildAccountClient(normalizedBaseUrl);
     final response = await client.loadProfile(token: token);
     final previousState =
-        await loadAccountSyncStateWithLegacyMigrationInternal(controller) ??
+        await controller.storeInternal.loadAccountSyncState() ??
         AccountSyncState.defaults();
     final nextState = previousState.copyWith(
       syncedDefaults: response.profile,
@@ -267,7 +267,6 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
       tokenConfigured: response.tokenConfigured,
     );
     await controller.storeInternal.saveAccountSyncState(nextState);
-    await controller.storeInternal.clearAccountProfile();
     final currentSettings = controller.snapshotInternal;
     final currentModeConfig = currentSettings.acpBridgeServerModeConfig;
     final nextModeConfig = currentModeConfig.copyWith(
@@ -312,7 +311,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     );
   } on AccountRuntimeException catch (error) {
     final previousState =
-        await loadAccountSyncStateWithLegacyMigrationInternal(controller) ??
+        await controller.storeInternal.loadAccountSyncState() ??
         AccountSyncState.defaults();
     if (_isNonBlockingAccountProfileSyncError(error)) {
       final fallbackState = previousState.copyWith(
@@ -546,28 +545,6 @@ String normalizeAccountBaseUrlSettingsInternal(
       : candidate;
 }
 
-Future<AccountSyncState?> loadAccountSyncStateWithLegacyMigrationInternal(
-  SettingsController controller,
-) async {
-  final current = await controller.storeInternal.loadAccountSyncState();
-  if (current != null) {
-    return current;
-  }
-  final legacy = await controller.storeInternal.loadAccountProfile();
-  if (legacy == null) {
-    return null;
-  }
-  final migrated = AccountSyncState.defaults().copyWith(
-    syncedDefaults: legacy,
-    syncState: 'ready',
-    syncMessage: 'Remote config migrated',
-    lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
-  );
-  await controller.storeInternal.saveAccountSyncState(migrated);
-  await controller.storeInternal.clearAccountProfile();
-  return migrated;
-}
-
 Future<void> markAccountOverrideSettingsInternal(
   SettingsController controller, {
   required String fieldKey,
@@ -575,9 +552,7 @@ Future<void> markAccountOverrideSettingsInternal(
   if (!kAccountOverrideFieldKeys.contains(fieldKey)) {
     return;
   }
-  final current = await loadAccountSyncStateWithLegacyMigrationInternal(
-    controller,
-  );
+  final current = await controller.storeInternal.loadAccountSyncState();
   if (current == null) {
     return;
   }
@@ -600,9 +575,7 @@ Future<void> clearAccountOverrideSettingsInternal(
   if (!kAccountOverrideFieldKeys.contains(fieldKey)) {
     return;
   }
-  final current = await loadAccountSyncStateWithLegacyMigrationInternal(
-    controller,
-  );
+  final current = await controller.storeInternal.loadAccountSyncState();
   if (current == null || current.overrideFlags[fieldKey] != true) {
     return;
   }
@@ -620,9 +593,7 @@ Future<void> recordAccountOverridesForSnapshotChangeSettingsInternal(
   required SettingsSnapshot previous,
   required SettingsSnapshot current,
 }) async {
-  final syncState = await loadAccountSyncStateWithLegacyMigrationInternal(
-    controller,
-  );
+  final syncState = await controller.storeInternal.loadAccountSyncState();
   if (syncState == null) {
     return;
   }
