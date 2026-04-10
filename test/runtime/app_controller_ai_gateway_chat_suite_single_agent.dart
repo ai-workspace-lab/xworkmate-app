@@ -43,17 +43,16 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
-        final controller = await createAppControllerInternal(
+        final controller = AppController(
           store: store,
-          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-            SingleAgentProvider.opencode,
-          ],
           runtimeCoordinator: RuntimeCoordinator(
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
           goTaskServiceClient: client,
         );
+        addTearDown(controller.dispose);
+        await waitForInternal(() => !controller.initializing);
         await controller.saveSettings(
           controller.settings.copyWith(
             multiAgent: controller.settings.multiAgent.copyWith(
@@ -96,6 +95,68 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           ),
           isFalse,
         );
+      },
+    );
+
+    test(
+      'AppController resolves auto Single Agent provider from the current bridge capabilities order',
+      () async {
+        final tempDirectory = await createTempDirectoryInternal(
+          'xworkmate-single-agent-auto-bridge-order-',
+        );
+        final store = createStoreFromTempDirectoryInternal(tempDirectory);
+        final client = FakeGoTaskServiceClientInternal(
+          capabilities: ExternalCodeAgentAcpCapabilities(
+            singleAgent: true,
+            multiAgent: false,
+            providers: <SingleAgentProvider>{
+              SingleAgentProvider.codex,
+              SingleAgentProvider.opencode,
+            },
+            raw: <String, dynamic>{},
+          ),
+          result: const GoTaskServiceResult(
+            success: true,
+            message: 'AUTO_PROVIDER_REPLY',
+            turnId: 'turn-auto-provider',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: 'codex-sonnet',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        final controller = AppController(
+          store: store,
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: FakeGatewayRuntimeInternal(store: store),
+            codex: FakeCodexRuntimeInternal(),
+          ),
+          goTaskServiceClient: client,
+        );
+        addTearDown(controller.dispose);
+        await waitForInternal(() => !controller.initializing);
+
+        await controller.saveSettings(
+          controller.settings.copyWith(
+            workspacePath: tempDirectory.path,
+            multiAgent: controller.settings.multiAgent.copyWith(
+              autoSync: false,
+            ),
+          ),
+          refreshAfterSave: false,
+        );
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.singleAgent,
+        );
+        await controller.setSingleAgentProvider(SingleAgentProvider.auto);
+
+        await controller.sendChatMessage(
+          '请输出 AUTO_PROVIDER_REPLY',
+          thinking: 'low',
+        );
+
+        expect(client.executeCalls, 1);
+        expect(client.lastRequest?.provider, SingleAgentProvider.codex);
       },
     );
 
@@ -187,97 +248,66 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
     );
 
     test(
-      'AppController drops stale custom-agent thread bindings and starts new single-agent tasks with the canonical provider',
+      'AppController keeps persisted Single Agent bindings but reports them unavailable when the bridge stops advertising that provider',
       () async {
         final tempDirectory = await createTempDirectoryInternal(
-          'xworkmate-single-agent-stale-provider-',
+          'xworkmate-single-agent-bridge-unavailable-provider-',
         );
         final store = createStoreFromTempDirectoryInternal(tempDirectory);
         final client = FakeGoTaskServiceClientInternal(
           capabilities: ExternalCodeAgentAcpCapabilities(
             singleAgent: true,
             multiAgent: false,
-            providers: <SingleAgentProvider>{SingleAgentProvider.codex},
+            providers: <SingleAgentProvider>{SingleAgentProvider.opencode},
             raw: <String, dynamic>{},
-          ),
-          result: const GoTaskServiceResult(
-            success: true,
-            message: 'CANONICAL_CODEX_REPLY',
-            turnId: 'turn-canonical',
-            raw: <String, dynamic>{},
-            errorMessage: '',
-            resolvedModel: 'codex-sonnet',
-            route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
-        final controller = await createAppControllerInternal(
+        final controller = AppController(
           store: store,
-          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-            SingleAgentProvider.codex,
-          ],
           runtimeCoordinator: RuntimeCoordinator(
             gateway: FakeGatewayRuntimeInternal(store: store),
             codex: FakeCodexRuntimeInternal(),
           ),
           goTaskServiceClient: client,
         );
+        addTearDown(controller.dispose);
+        await waitForInternal(() => !controller.initializing);
+
         await controller.saveSettings(
           controller.settings.copyWith(
-            externalAcpEndpoints: normalizeExternalAcpEndpoints(
-              profiles: <ExternalAcpEndpointProfile>[
-                ...controller.settings.externalAcpEndpoints,
-                ExternalAcpEndpointProfile.defaultsForProvider(
-                  SingleAgentProvider.codex,
-                ).copyWith(endpoint: 'ws://127.0.0.1:9102/acp'),
-              ],
-            ),
+            workspacePath: tempDirectory.path,
             multiAgent: controller.settings.multiAgent.copyWith(
               autoSync: false,
             ),
           ),
           refreshAfterSave: false,
         );
-
-        controller.upsertTaskThreadInternal(
-          'main',
-          singleAgentProvider: const SingleAgentProvider(
-            providerId: 'custom-agent-1',
-            label: 'Codex',
-            badge: 'C',
-          ),
-          singleAgentProviderSource: ThreadSelectionSource.explicit,
-          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        );
-
-        expect(controller.currentSingleAgentProvider.providerId, 'codex');
-
-        controller.initializeAssistantThreadContext(
-          'draft:new-single-agent-thread',
-          title: 'New conversation',
-          executionTarget: AssistantExecutionTarget.singleAgent,
-          messageViewMode: controller.currentAssistantMessageViewMode,
-          singleAgentProvider: controller.currentSingleAgentProvider,
-        );
-        await controller.switchSession('draft:new-single-agent-thread');
-
-        expect(controller.currentSingleAgentProvider.providerId, 'codex');
-
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.singleAgent,
         );
-        await controller.sendChatMessage(
-          '请输出 CANONICAL_CODEX_REPLY',
-          thinking: 'low',
+        await controller.setSingleAgentProvider(SingleAgentProvider.codex);
+
+        expect(
+          controller.currentSingleAgentProvider,
+          SingleAgentProvider.codex,
         );
 
-        expect(client.lastRequest?.provider, SingleAgentProvider.codex);
+        await controller.sendChatMessage('你好', thinking: 'low');
+
+        expect(client.capabilitiesCalls, greaterThanOrEqualTo(1));
+        expect(client.executeCalls, 0);
         expect(
-          client.syncedProvidersHistory.any(
-            (batch) => batch.any(
-              (provider) =>
-                  provider.providerId == 'codex' &&
-                  provider.endpoint == 'ws://127.0.0.1:9102/acp',
-            ),
+          controller.currentSingleAgentProvider,
+          SingleAgentProvider.codex,
+        );
+        expect(
+          controller.chatMessages.any(
+            (message) =>
+                message.role == 'assistant' &&
+                (message.text.contains('当前 GoTaskService 不支持 Codex') ||
+                    message.text.contains(
+                      'GoTaskService does not currently support Codex',
+                    )),
           ),
           isTrue,
         );
@@ -327,7 +357,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           controller.currentAssistantConnectionState.executionTarget,
           AssistantExecutionTarget.singleAgent,
         );
-        expect(controller.currentAssistantConnectionState.connected, isFalse);
+        expect(controller.currentAssistantConnectionState.connected, isTrue);
         expect(controller.currentAssistantConnectionState.ready, isTrue);
         expect(
           controller.currentAssistantConnectionState.detailLabel,
@@ -535,72 +565,6 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
             controller.currentSessionKey,
           ),
           boundWorkspacePath,
-        );
-      },
-    );
-
-    test(
-      'AppController keeps the thread provider strict when another external CLI is available',
-      () async {
-        final tempDirectory = await createTempDirectoryInternal(
-          'xworkmate-single-agent-strict-provider-',
-        );
-        final server = await FakeAiGatewayServerInternal.start(
-          responseMode: AiGatewayResponseModeInternal.json,
-        );
-        addTearDown(() async {
-          await server.close();
-        });
-
-        final store = createStoreFromTempDirectoryInternal(tempDirectory);
-        final client = FallbackOnlyGoTaskServiceClientInternal();
-        final controller = await createAppControllerInternal(
-          store: store,
-          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-            SingleAgentProvider.claude,
-          ],
-          runtimeCoordinator: RuntimeCoordinator(
-            gateway: FakeGatewayRuntimeInternal(store: store),
-            codex: FakeCodexRuntimeInternal(),
-          ),
-          goTaskServiceClient: client,
-        );
-
-        await controller.settingsController.saveAiGatewayApiKey('live-key');
-        await controller.saveSettings(
-          controller.settings.copyWith(
-            aiGateway: controller.settings.aiGateway.copyWith(
-              baseUrl: server.baseUrl,
-              availableModels: const <String>['moonshotai/kimi-k2.5'],
-              selectedModels: const <String>['moonshotai/kimi-k2.5'],
-            ),
-            defaultModel: 'moonshotai/kimi-k2.5',
-            multiAgent: controller.settings.multiAgent.copyWith(
-              autoSync: false,
-              mountTargets: withAvailableMountTargetsInternal(
-                controller.settings.multiAgent.mountTargets,
-                const <String>['claude'],
-              ),
-            ),
-          ),
-          refreshAfterSave: false,
-        );
-        await controller.setAssistantExecutionTarget(
-          AssistantExecutionTarget.singleAgent,
-        );
-        await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
-
-        await controller.sendChatMessage('你好', thinking: 'low');
-
-        expect(client.capabilitiesCalls, greaterThanOrEqualTo(1));
-        expect(client.executeCalls, 0);
-        expect(server.requestCount, 0);
-        expect(controller.currentAssistantConnectionState.connected, isTrue);
-        expect(
-          controller.chatMessages.any(
-            (message) => message.text.contains('可切到可用的 ACP Server'),
-          ),
-          isTrue,
         );
       },
     );
