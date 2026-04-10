@@ -265,6 +265,47 @@ void main() {
       },
     );
 
+    test('run result falls back to error text when failed payload has no message', () {
+      final result = goTaskServiceResultFromAcpResponse(
+        <String, dynamic>{
+          'result': <String, dynamic>{
+            'success': false,
+            'turnId': 'turn-error',
+            'error': 'missing bearer authorization',
+          },
+        },
+        route: GoTaskServiceRoute.externalAcpSingle,
+      );
+
+      expect(result.success, isFalse);
+      expect(result.turnId, 'turn-error');
+      expect(result.message, 'missing bearer authorization');
+    });
+
+    test(
+      'run result includes skill install diagnostics when failed payload requires install',
+      () {
+        final result = goTaskServiceResultFromAcpResponse(
+          <String, dynamic>{
+            'result': <String, dynamic>{
+              'success': false,
+              'turnId': 'turn-skill-install',
+              'error': 'missing bearer authorization',
+              'needsSkillInstall': true,
+              'skillCandidates': <Map<String, dynamic>>[
+                <String, dynamic>{'id': 'pptx', 'label': 'pptx'},
+              ],
+            },
+          },
+          route: GoTaskServiceRoute.externalAcpSingle,
+        );
+
+        expect(result.success, isFalse);
+        expect(result.turnId, 'turn-skill-install');
+        expect(result.message, 'missing bearer authorization (skills: pptx)');
+      },
+    );
+
     test('session update recognizes delta notifications', () {
       final update = goTaskServiceUpdateFromAcpNotification(<String, dynamic>{
         'method': 'session.update',
