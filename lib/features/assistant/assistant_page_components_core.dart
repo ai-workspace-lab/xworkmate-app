@@ -37,5 +37,5 @@ import 'assistant_page_composer_skill_models.dart';
 import 'assistant_page_composer_skill_picker.dart';
 import 'assistant_page_composer_clipboard.dart';
 
-// Lightweight compatibility anchor. The Composer and assistant widgets now
-// live in focused part files under the same library.
+// Composer and assistant widgets live in focused part files under the same
+// library to keep UI ownership local to the assistant feature.

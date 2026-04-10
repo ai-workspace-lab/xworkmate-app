@@ -116,8 +116,8 @@ class SkillsFocusPreviewInternal extends StatelessWidget {
         message: typedController.isSingleAgentMode
             ? (typedController.currentSingleAgentNeedsAiGatewayConfiguration
                   ? appText(
-                      '当前没有可用的外部 Agent ACP 端点，请先配置 ACP Server。',
-                      'No external Agent ACP endpoint is available. Configure an ACP server first.',
+                      '当前没有可用的 Bridge Provider，请先在设置里配置并同步连接。',
+                      'No bridge provider is available. Configure and sync a connection in Settings first.',
                     )
                   : appText(
                       '当前线程还没有已加载技能。切换 provider 后会读取该线程自己的 skills 列表。',

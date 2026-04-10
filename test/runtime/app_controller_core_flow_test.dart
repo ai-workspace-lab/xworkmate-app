@@ -35,8 +35,11 @@ void main() {
           controller.currentAssistantExecutionTarget,
           AssistantExecutionTarget.singleAgent,
         );
-        expect(controller.currentAssistantConnectionState.isSingleAgent, isTrue);
-        expect(controller.assistantConnectionStatusLabel, 'ACP Server Local');
+        expect(
+          controller.currentAssistantConnectionState.isSingleAgent,
+          isTrue,
+        );
+        expect(controller.assistantConnectionStatusLabel, 'Bridge');
       },
     );
 
@@ -63,7 +66,10 @@ void main() {
           controller.currentAssistantExecutionTarget,
           AssistantExecutionTarget.local,
         );
-        expect(controller.currentAssistantConnectionState.isSingleAgent, isFalse);
+        expect(
+          controller.currentAssistantConnectionState.isSingleAgent,
+          isFalse,
+        );
         expect(controller.assistantConnectionStatusLabel, '已连接');
         expect(controller.assistantConnectionTargetLabel, '127.0.0.1:4317');
       },
@@ -92,11 +98,40 @@ void main() {
           controller.currentAssistantExecutionTarget,
           AssistantExecutionTarget.remote,
         );
-        expect(controller.currentAssistantConnectionState.isSingleAgent, isFalse);
+        expect(
+          controller.currentAssistantConnectionState.isSingleAgent,
+          isFalse,
+        );
         expect(controller.assistantConnectionStatusLabel, '已连接');
         expect(
           controller.assistantConnectionTargetLabel,
           'gateway.example.com:9443',
+        );
+      },
+    );
+
+    test(
+      'core flow 04 formats single-agent offline errors with bridge provider wording',
+      () async {
+        final controller = await createCoreFlowControllerInternal();
+        addTearDown(controller.dispose);
+
+        final sessionKey = buildDraftSessionKeyInternal();
+        controller.initializeAssistantThreadContext(
+          sessionKey,
+          title: '新对话',
+          executionTarget: AssistantExecutionTarget.singleAgent,
+        );
+
+        await controller.switchSession(sessionKey);
+        await controller.setSingleAgentProvider(SingleAgentProvider.opencode);
+
+        expect(
+          controller.gatewayExecutionErrorLabelInternal(
+            'gateway not connected: 127.0.0.1:18789',
+            target: AssistantExecutionTarget.singleAgent,
+          ),
+          '当前线程的 Bridge Provider（OpenCode）未连接：127.0.0.1:18789。请先在设置里连接并同步后再重试。',
         );
       },
     );
