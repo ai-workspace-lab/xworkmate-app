@@ -20,7 +20,7 @@ class GatewayAcpCapabilities {
   const GatewayAcpCapabilities({
     required this.singleAgent,
     required this.multiAgent,
-    required this.providers,
+    required this.providerCatalog,
     required this.raw,
     this.diagnostics = const <String, dynamic>{},
   });
@@ -28,13 +28,13 @@ class GatewayAcpCapabilities {
   const GatewayAcpCapabilities.empty()
     : singleAgent = false,
       multiAgent = false,
-      providers = const <SingleAgentProvider>{},
+      providerCatalog = const <SingleAgentProvider>[],
       raw = const <String, dynamic>{},
       diagnostics = const <String, dynamic>{};
 
   final bool singleAgent;
   final bool multiAgent;
-  final Set<SingleAgentProvider> providers;
+  final List<SingleAgentProvider> providerCatalog;
   final Map<String, dynamic> raw;
   final Map<String, dynamic> diagnostics;
 }
@@ -123,25 +123,13 @@ class GatewayAcpClient {
     );
     final result = asMap(response['result']);
     final caps = asMap(result['capabilities']);
-    final providers = <SingleAgentProvider>{};
-    for (final raw in <Object?>[
-      ...asList(result['providers']),
-      ...asList(caps['providers']),
-    ]) {
-      if (raw == null) {
-        continue;
-      }
-      final provider = SingleAgentProviderCopy.fromJsonValue(
-        raw.toString().trim().toLowerCase(),
-      );
-      if (provider != SingleAgentProvider.auto) {
-        providers.add(provider);
-      }
-    }
+    final providerCatalog = _parseProviderCatalog(
+      result['providerCatalog'] ?? caps['providerCatalog'],
+    );
     final singleAgent =
         boolValue(result['singleAgent']) ??
         boolValue(caps['single_agent']) ??
-        providers.isNotEmpty;
+        providerCatalog.isNotEmpty;
     final multiAgent =
         boolValue(result['multiAgent']) ??
         boolValue(caps['multi_agent']) ??
@@ -149,12 +137,32 @@ class GatewayAcpClient {
     _cachedCapabilities = GatewayAcpCapabilities(
       singleAgent: singleAgent,
       multiAgent: multiAgent,
-      providers: providers,
+      providerCatalog: providerCatalog,
       raw: result,
       diagnostics: asMap(response['_xworkmateDiagnostics']),
     );
     _capabilitiesRefreshedAt = DateTime.now();
     return _cachedCapabilities;
+  }
+
+  List<SingleAgentProvider> _parseProviderCatalog(Object? raw) {
+    final providers = <SingleAgentProvider>[];
+    for (final item in asList(raw)) {
+      final entry = asMap(item);
+      final providerId = entry['providerId']?.toString().trim() ?? '';
+      if (providerId.isEmpty) {
+        continue;
+      }
+      final label = entry['label']?.toString().trim();
+      final provider = SingleAgentProviderCopy.fromJsonValue(
+        providerId,
+        label: label?.isNotEmpty == true ? label : null,
+      );
+      if (provider != SingleAgentProvider.auto) {
+        providers.add(provider);
+      }
+    }
+    return normalizeSingleAgentProviderList(providers);
   }
 
   Stream<MultiAgentRunEvent> runMultiAgent(
