@@ -351,7 +351,7 @@ extension AppControllerDesktopThreadSessions on AppController {
     );
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
     if (target == AssistantExecutionTarget.singleAgent) {
-      final primaryLabel = appText('ACP Server Local', 'ACP Server Local');
+      final primaryLabel = appText('Bridge', 'Bridge');
       final provider = singleAgentProviderForSession(normalizedSessionKey);
       final resolvedProvider = singleAgentResolvedProviderForSession(
         normalizedSessionKey,
@@ -362,19 +362,19 @@ extension AppControllerDesktopThreadSessions on AppController {
           ? joinConnectionPartsInternal(<String>[resolvedProvider.label, model])
           : singleAgentShouldSuggestAcpSwitchForSession(normalizedSessionKey)
           ? appText(
-              '${provider.label} 不可用，请切到可用的 ACP Server。',
-              '${provider.label} is unavailable. Switch to an available ACP Server.',
+              '${provider.label} 当前不可用，请改成 Bridge 当前可用的 Provider。',
+              '${provider.label} is unavailable. Switch to a provider currently advertised by the bridge.',
             )
           : singleAgentNeedsAiGatewayConfigurationForSession(
               normalizedSessionKey,
             )
           ? appText(
-              '没有可用的外部 Agent ACP 端点，请先配置可用的 ACP Server。',
-              'No external Agent ACP endpoint is available. Configure an ACP Server first.',
+              '当前没有可用的 Bridge Provider。请先在设置里配置并同步可用连接。',
+              'No bridge provider is currently available. Configure and sync an available upstream connection in Settings first.',
             )
           : appText(
-              '当前线程的外部 Agent ACP 连接尚未就绪。',
-              'The external Agent ACP connection for this thread is not ready yet.',
+              '当前线程的 Bridge Provider 尚未就绪。',
+              'The bridge provider for this thread is not ready yet.',
             );
       return AssistantThreadConnectionState(
         executionTarget: target,
