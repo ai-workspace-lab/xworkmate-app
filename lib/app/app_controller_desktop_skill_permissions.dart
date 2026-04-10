@@ -276,6 +276,10 @@ extension AppControllerDesktopSkillPermissions on AppController {
     String? lifecycleStatus,
     double? lastRunAtMs,
     String? lastResultCode,
+    String? lastRemoteWorkingDirectory,
+    WorkspaceRefKind? lastRemoteWorkspaceRefKind,
+    double? lastArtifactSyncAtMs,
+    String? lastArtifactSyncStatus,
   }) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -379,6 +383,10 @@ extension AppControllerDesktopSkillPermissions on AppController {
                   gatewayEntryState: gatewayEntryStateForTargetInternal(
                     nextExecutionTarget,
                   ),
+                  lastRemoteWorkingDirectory: null,
+                  lastRemoteWorkspaceRefKind: null,
+                  lastArtifactSyncAtMs: null,
+                  lastArtifactSyncStatus: null,
                 ))
             .copyWith(
               messages: nextMessages,
@@ -397,6 +405,10 @@ extension AppControllerDesktopSkillPermissions on AppController {
                   existing?.contextState.selectedSkillsSource,
               latestResolvedRuntimeModel: latestResolvedRuntimeModel,
               gatewayEntryState: gatewayEntryState,
+              lastRemoteWorkingDirectory: lastRemoteWorkingDirectory,
+              lastRemoteWorkspaceRefKind: lastRemoteWorkspaceRefKind,
+              lastArtifactSyncAtMs: lastArtifactSyncAtMs,
+              lastArtifactSyncStatus: lastArtifactSyncStatus,
             );
     final nextStatus =
         lifecycleStatus ??

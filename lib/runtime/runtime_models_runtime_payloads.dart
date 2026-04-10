@@ -765,6 +765,10 @@ class ThreadContextState {
     this.selectedModelSource = ThreadSelectionSource.inherited,
     this.selectedSkillsSource = ThreadSelectionSource.inherited,
     this.gatewayEntryState,
+    this.lastRemoteWorkingDirectory,
+    this.lastRemoteWorkspaceRefKind,
+    this.lastArtifactSyncAtMs,
+    this.lastArtifactSyncStatus,
   });
 
   final List<GatewayChatMessage> messages;
@@ -777,6 +781,10 @@ class ThreadContextState {
   final ThreadSelectionSource selectedModelSource;
   final ThreadSelectionSource selectedSkillsSource;
   final String? gatewayEntryState;
+  final String? lastRemoteWorkingDirectory;
+  final WorkspaceRefKind? lastRemoteWorkspaceRefKind;
+  final double? lastArtifactSyncAtMs;
+  final String? lastArtifactSyncStatus;
 
   ThreadContextState copyWith({
     List<GatewayChatMessage>? messages,
@@ -790,6 +798,10 @@ class ThreadContextState {
     ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
+    String? lastRemoteWorkingDirectory,
+    WorkspaceRefKind? lastRemoteWorkspaceRefKind,
+    double? lastArtifactSyncAtMs,
+    String? lastArtifactSyncStatus,
   }) {
     return ThreadContextState(
       messages: messages ?? this.messages,
@@ -805,6 +817,13 @@ class ThreadContextState {
       gatewayEntryState: clearGatewayEntryState
           ? null
           : (gatewayEntryState ?? this.gatewayEntryState),
+      lastRemoteWorkingDirectory:
+          lastRemoteWorkingDirectory ?? this.lastRemoteWorkingDirectory,
+      lastRemoteWorkspaceRefKind:
+          lastRemoteWorkspaceRefKind ?? this.lastRemoteWorkspaceRefKind,
+      lastArtifactSyncAtMs: lastArtifactSyncAtMs ?? this.lastArtifactSyncAtMs,
+      lastArtifactSyncStatus:
+          lastArtifactSyncStatus ?? this.lastArtifactSyncStatus,
     );
   }
 
@@ -822,10 +841,21 @@ class ThreadContextState {
       'selectedModelSource': selectedModelSource.name,
       'selectedSkillsSource': selectedSkillsSource.name,
       'gatewayEntryState': gatewayEntryState,
+      'lastRemoteWorkingDirectory': lastRemoteWorkingDirectory,
+      'lastRemoteWorkspaceRefKind': lastRemoteWorkspaceRefKind?.name,
+      'lastArtifactSyncAtMs': lastArtifactSyncAtMs,
+      'lastArtifactSyncStatus': lastArtifactSyncStatus,
     };
   }
 
   factory ThreadContextState.fromJson(Map<String, dynamic> json) {
+    double? asDouble(Object? value) {
+      if (value is num) {
+        return value.toDouble();
+      }
+      return double.tryParse(value?.toString() ?? '');
+    }
+
     final rawMessages = json['messages'];
     final messages = rawMessages is List
         ? rawMessages
@@ -876,6 +906,18 @@ class ThreadContextState {
         json['selectedSkillsSource']?.toString(),
       ),
       gatewayEntryState: json['gatewayEntryState']?.toString(),
+      lastRemoteWorkingDirectory:
+          json['lastRemoteWorkingDirectory']?.toString(),
+      lastRemoteWorkspaceRefKind: (() {
+        final rawValue =
+            json['lastRemoteWorkspaceRefKind']?.toString().trim() ?? '';
+        if (rawValue.isEmpty) {
+          return null;
+        }
+        return WorkspaceRefKindCopy.fromJsonValue(rawValue);
+      })(),
+      lastArtifactSyncAtMs: asDouble(json['lastArtifactSyncAtMs']),
+      lastArtifactSyncStatus: json['lastArtifactSyncStatus']?.toString(),
     );
   }
 }
@@ -958,6 +1000,10 @@ class TaskThread {
     String? latestResolvedRuntimeModel,
     double? lastRunAtMs,
     String? lastResultCode,
+    String? lastRemoteWorkingDirectory,
+    WorkspaceRefKind? lastRemoteWorkspaceRefKind,
+    double? lastArtifactSyncAtMs,
+    String? lastArtifactSyncStatus,
   }) : threadId = _resolveThreadId(threadId),
        title = title ?? '',
        ownerScope =
@@ -992,6 +1038,16 @@ class TaskThread {
              latestResolvedRuntimeModel:
                  latestResolvedRuntimeModel?.trim() ?? '',
              gatewayEntryState: gatewayEntryState?.trim(),
+             lastRemoteWorkingDirectory:
+                 lastRemoteWorkingDirectory?.trim().isNotEmpty == true
+                 ? lastRemoteWorkingDirectory!.trim()
+                 : null,
+             lastRemoteWorkspaceRefKind: lastRemoteWorkspaceRefKind,
+             lastArtifactSyncAtMs: lastArtifactSyncAtMs,
+             lastArtifactSyncStatus:
+                 lastArtifactSyncStatus?.trim().isNotEmpty == true
+                 ? lastArtifactSyncStatus!.trim()
+                 : null,
            ),
        lifecycleState =
            lifecycleState ??
@@ -1024,6 +1080,12 @@ class TaskThread {
   String get assistantModelId => contextState.selectedModelId;
   AssistantMessageViewMode get messageViewMode => contextState.messageViewMode;
   String? get gatewayEntryState => contextState.gatewayEntryState;
+  String? get lastRemoteWorkingDirectory =>
+      contextState.lastRemoteWorkingDirectory;
+  WorkspaceRefKind? get lastRemoteWorkspaceRefKind =>
+      contextState.lastRemoteWorkspaceRefKind;
+  double? get lastArtifactSyncAtMs => contextState.lastArtifactSyncAtMs;
+  String? get lastArtifactSyncStatus => contextState.lastArtifactSyncStatus;
   String get latestResolvedRuntimeModel =>
       contextState.latestResolvedRuntimeModel;
   bool get hasExplicitExecutionTargetSelection =>
@@ -1060,6 +1122,10 @@ class TaskThread {
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
     String? latestResolvedRuntimeModel,
+    String? lastRemoteWorkingDirectory,
+    WorkspaceRefKind? lastRemoteWorkspaceRefKind,
+    double? lastArtifactSyncAtMs,
+    String? lastArtifactSyncStatus,
   }) {
     return TaskThread(
       threadId: threadId ?? this.threadId,
@@ -1078,6 +1144,10 @@ class TaskThread {
         latestResolvedRuntimeModel: latestResolvedRuntimeModel,
         gatewayEntryState: gatewayEntryState,
         clearGatewayEntryState: clearGatewayEntryState,
+        lastRemoteWorkingDirectory: lastRemoteWorkingDirectory,
+        lastRemoteWorkspaceRefKind: lastRemoteWorkspaceRefKind,
+        lastArtifactSyncAtMs: lastArtifactSyncAtMs,
+        lastArtifactSyncStatus: lastArtifactSyncStatus,
       ),
       lifecycleState: (lifecycleState ?? this.lifecycleState).copyWith(
         archived: archived,
@@ -1213,6 +1283,10 @@ class TaskThread {
         'selectedModelSource': json['assistantModelSource'],
         'selectedSkillsSource': json['selectedSkillsSource'],
         'gatewayEntryState': json['gatewayEntryState'],
+        'lastRemoteWorkingDirectory': json['lastRemoteWorkingDirectory'],
+        'lastRemoteWorkspaceRefKind': json['lastRemoteWorkspaceRefKind'],
+        'lastArtifactSyncAtMs': json['lastArtifactSyncAtMs'],
+        'lastArtifactSyncStatus': json['lastArtifactSyncStatus'],
       };
     }
 
