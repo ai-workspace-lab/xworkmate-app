@@ -223,96 +223,51 @@ void main() {
     );
 
     test(
-      'available single-agent providers follow normalized endpoint settings',
+      'visible execution targets depend on runtime-supplied providers, not local provider presets',
       () {
-        final snapshot = SettingsSnapshot.defaults().copyWith(
-          externalAcpEndpoints: normalizeExternalAcpEndpoints(
-            profiles: <ExternalAcpEndpointProfile>[
-              ...SettingsSnapshot.defaults().externalAcpEndpoints,
-              buildCustomExternalAcpEndpointProfile(
-                SettingsSnapshot.defaults().externalAcpEndpoints,
-                label: 'Lab Agent',
-                endpoint: 'wss://lab.example.com/acp',
+        final defaults = SettingsSnapshot.defaults();
+        final snapshot = defaults
+            .copyWith(
+              externalAcpEndpoints: normalizeExternalAcpEndpoints(
+                profiles: <ExternalAcpEndpointProfile>[
+                  ...defaults.externalAcpEndpoints,
+                  ExternalAcpEndpointProfile.defaultsForProvider(
+                    SingleAgentProvider.codex,
+                  ).copyWith(endpoint: 'wss://codex.example.com/acp'),
+                ],
               ),
-              const ExternalAcpEndpointProfile(
-                providerKey: 'claude',
-                label: 'Claude',
-                badge: 'Cl',
-                endpoint: '',
-                authRef: '',
-                enabled: true,
-              ),
+            )
+            .markGatewayTargetSaved(AssistantExecutionTarget.remote);
+
+        expect(
+          snapshot.visibleAssistantExecutionTargets(
+            supportedTargets: const <AssistantExecutionTarget>[
+              AssistantExecutionTarget.singleAgent,
+              AssistantExecutionTarget.local,
+              AssistantExecutionTarget.remote,
+            ],
+            availableSingleAgentProviders: const <SingleAgentProvider>[
+              SingleAgentProvider.codex,
             ],
           ),
+          const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.singleAgent,
+            AssistantExecutionTarget.remote,
+          ],
         );
 
         expect(
-          snapshot.availableSingleAgentProviders
-              .map((item) => item.label)
-              .toList(),
-          const <String>['OpenCode', 'Lab Agent'],
+          snapshot.visibleAssistantExecutionTargets(
+            supportedTargets: const <AssistantExecutionTarget>[
+              AssistantExecutionTarget.singleAgent,
+              AssistantExecutionTarget.local,
+              AssistantExecutionTarget.remote,
+            ],
+            availableSingleAgentProviders: const <SingleAgentProvider>[],
+          ),
+          const <AssistantExecutionTarget>[AssistantExecutionTarget.remote],
         );
       },
     );
-
-    test('saved single-agent providers require a non-empty saved endpoint', () {
-      final defaults = SettingsSnapshot.defaults();
-      final snapshot = defaults.copyWith(
-        externalAcpEndpoints: normalizeExternalAcpEndpoints(
-          profiles: <ExternalAcpEndpointProfile>[
-            ...defaults.externalAcpEndpoints,
-            ExternalAcpEndpointProfile.defaultsForProvider(
-              SingleAgentProvider.codex,
-            ).copyWith(endpoint: 'wss://codex.example.com/acp'),
-            const ExternalAcpEndpointProfile(
-              providerKey: 'custom-agent-2',
-              label: 'Empty Agent',
-              badge: 'EA',
-              endpoint: '',
-              authRef: '',
-              enabled: true,
-            ),
-          ],
-        ),
-      );
-
-      expect(
-        snapshot.savedSingleAgentProviders
-            .map((item) => item.label)
-            .toList(growable: false),
-        const <String>['Codex'],
-      );
-    });
-
-    test('visible execution targets only include explicitly saved targets', () {
-      final defaults = SettingsSnapshot.defaults();
-      final snapshot = defaults
-          .copyWith(
-            externalAcpEndpoints: normalizeExternalAcpEndpoints(
-              profiles: <ExternalAcpEndpointProfile>[
-                ...defaults.externalAcpEndpoints,
-                ExternalAcpEndpointProfile.defaultsForProvider(
-                  SingleAgentProvider.codex,
-                ).copyWith(endpoint: 'wss://codex.example.com/acp'),
-              ],
-            ),
-          )
-          .markGatewayTargetSaved(AssistantExecutionTarget.remote);
-
-      expect(
-        snapshot.visibleAssistantExecutionTargets(
-          supportedTargets: const <AssistantExecutionTarget>[
-            AssistantExecutionTarget.singleAgent,
-            AssistantExecutionTarget.local,
-            AssistantExecutionTarget.remote,
-          ],
-          availableSingleAgentProviders: snapshot.availableSingleAgentProviders,
-        ),
-        const <AssistantExecutionTarget>[
-          AssistantExecutionTarget.singleAgent,
-          AssistantExecutionTarget.remote,
-        ],
-      );
-    });
   });
 }
