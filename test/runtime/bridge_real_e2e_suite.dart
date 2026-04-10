@@ -1,7 +1,6 @@
 @TestOn('vm')
 library;
 
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -13,14 +12,14 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 void main() {
   final config = _BridgeRealTestConfig.load();
   final skipReason = config.skipReason;
-  final bridgeClient = config.bridgeClient;
   final artifactService = DesktopThreadArtifactService();
 
   group('xworkmate-bridge real E2E', () {
     test(
       'bridge contract keeps HTTP RPC reachable and advertises single-agent support',
       () async {
-        final capabilities = await bridgeClient.loadCapabilities(
+        await config.syncExternalProviders();
+        final capabilities = await config.bridgeClient.loadCapabilities(
           forceRefresh: true,
         );
 
@@ -35,6 +34,7 @@ void main() {
       test(
         'scenario ${scenario.key} binds thread workdir, supports follow-up, and records artifacts',
         () async {
+          await config.syncExternalProviders();
           final root = await Directory.systemTemp.createTemp(
             'xworkmate-bridge-${scenario.key}-',
           );
@@ -57,7 +57,7 @@ void main() {
             resumeSession: false,
           );
 
-          final firstResponse = await bridgeClient.request(
+          final firstResponse = await config.bridgeClient.request(
             method: 'session.start',
             params: firstRequest.toExternalAcpParams(),
           );
@@ -66,6 +66,12 @@ void main() {
             route: firstRequest.route,
           );
 
+          _expectSuccessfulBridgeResult(
+            firstResponse,
+            firstResult,
+            scenarioKey: scenario.key,
+            phase: 'start',
+          );
           expect(firstResult.turnId, isNotEmpty);
           expect(firstResult.message, isNotEmpty);
           expect(
@@ -85,7 +91,7 @@ void main() {
             prompt: scenario.followUpPrompt,
             resumeSession: true,
           );
-          final resumeResponse = await bridgeClient.request(
+          final resumeResponse = await config.bridgeClient.request(
             method: 'session.message',
             params: resumeRequest.toExternalAcpParams(),
           );
@@ -94,6 +100,12 @@ void main() {
             route: resumeRequest.route,
           );
 
+          _expectSuccessfulBridgeResult(
+            resumeResponse,
+            resumeResult,
+            scenarioKey: scenario.key,
+            phase: 'resume',
+          );
           expect(resumeResult.turnId, isNotEmpty);
           expect(resumeResult.message, isNotEmpty);
           expect(
@@ -237,10 +249,34 @@ class _BridgeRealTestConfig {
   const _BridgeRealTestConfig({
     required this.skipReason,
     required this.bridgeClient,
+    required this.bridgeAuthToken,
+    required this.syncedProviders,
   });
 
   final String? skipReason;
   final GatewayAcpClient bridgeClient;
+  final String bridgeAuthToken;
+  final List<ExternalCodeAgentAcpSyncedProvider> syncedProviders;
+
+  Future<void> syncExternalProviders() async {
+    await bridgeClient.request(
+      method: 'xworkmate.providers.sync',
+      params: <String, dynamic>{
+        'providers': syncedProviders
+            .map(
+              (item) => <String, dynamic>{
+                'providerId': item.providerId,
+                'label': item.label,
+                'endpoint': item.endpoint,
+                'authorizationHeader': item.authorizationHeader,
+                'enabled': item.enabled,
+              },
+            )
+            .toList(growable: false),
+      },
+      authorizationOverride: 'Bearer $bridgeAuthToken',
+    );
+  }
 
   static _BridgeRealTestConfig load() {
     final env = <String, String>{..._loadEnvFile(), ...Platform.environment};
@@ -259,16 +295,66 @@ class _BridgeRealTestConfig {
         skipReason:
             'Set BRIDGE_SERVER_URL and BRIDGE_AUTH_TOKEN (or ACP_AUTH_TOKEN) to run real bridge E2E tests.',
         bridgeClient: GatewayAcpClient(endpointResolver: () => null),
+        bridgeAuthToken: '',
+        syncedProviders: const <ExternalCodeAgentAcpSyncedProvider>[],
       );
     }
 
     final endpoint = _normalizeEndpoint(rawUrl);
+    final normalizedToken = token.trim();
+    final codexProviderEndpoint =
+        env['CODEX_PROVIDER_ENDPOINT'] ?? 'https://acp-server.svc.plus/codex';
     final client = GatewayAcpClient(
       endpointResolver: () => endpoint,
-      authorizationResolver: (_) async => 'Bearer ${token.trim()}',
+      authorizationResolver: (_) async => 'Bearer $normalizedToken',
     );
-    return _BridgeRealTestConfig(skipReason: null, bridgeClient: client);
+    return _BridgeRealTestConfig(
+      skipReason: null,
+      bridgeClient: client,
+      bridgeAuthToken: normalizedToken,
+      syncedProviders: <ExternalCodeAgentAcpSyncedProvider>[
+        ExternalCodeAgentAcpSyncedProvider(
+          providerId: SingleAgentProvider.codex.providerId,
+          label: 'codex',
+          endpoint: codexProviderEndpoint,
+          authorizationHeader: 'Bearer $normalizedToken',
+          enabled: true,
+        ),
+      ],
+    );
   }
+}
+
+void _expectSuccessfulBridgeResult(
+  Map<String, dynamic> response,
+  GoTaskServiceResult result, {
+  required String scenarioKey,
+  required String phase,
+}) {
+  final raw = Map<String, dynamic>.from(result.raw);
+  final success = result.success;
+  final errorText = raw['error']?.toString().trim() ?? '';
+  final needsSkillInstall = raw['needsSkillInstall'] == true;
+  final provider = raw['provider']?.toString().trim() ?? '';
+  final skillCandidates =
+      (raw['skillCandidates'] as List?)
+          ?.map(
+            (item) => item is Map ? item['id']?.toString().trim() ?? '' : '',
+          )
+          .where((item) => item.isNotEmpty)
+          .cast<String>()
+          .toList(growable: false) ??
+      const <String>[];
+
+  expect(
+    success,
+    isTrue,
+    reason:
+        'bridge $phase should succeed for $scenarioKey. '
+        'error="$errorText", needsSkillInstall=$needsSkillInstall, '
+        'provider="$provider", skillCandidates=$skillCandidates, '
+        'response=$response',
+  );
 }
 
 Uri _normalizeEndpoint(String raw) {

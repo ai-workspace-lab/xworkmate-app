@@ -580,6 +580,26 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
   String? completedMessage,
 }) {
   final result = _castMap(response['result']);
+  final skillCandidates = _castMapList(result['skillCandidates'])
+      .map((item) => item['id']?.toString().trim() ?? '')
+      .where((item) => item.isNotEmpty)
+      .toList(growable: false);
+  final fallbackFailureText = () {
+    final success = _boolValue(result['success']) ?? true;
+    if (success) {
+      return '';
+    }
+    final errorText = result['error']?.toString().trim() ?? '';
+    final needsSkillInstall = _boolValue(result['needsSkillInstall']) ?? false;
+    if (needsSkillInstall && skillCandidates.isNotEmpty) {
+      final candidateText = skillCandidates.join(', ');
+      if (errorText.isNotEmpty) {
+        return '$errorText (skills: $candidateText)';
+      }
+      return 'Skill install required: $candidateText';
+    }
+    return errorText;
+  }();
   final responseText =
       (result['output']?.toString().trim().isNotEmpty == true
               ? result['output'].toString().trim()
@@ -592,6 +612,8 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
               ? completedMessage!.trim()
               : responseText.isNotEmpty
               ? responseText
+              : fallbackFailureText.isNotEmpty
+              ? fallbackFailureText
               : streamedText.trim().isNotEmpty
               ? streamedText.trim()
               : '')
