@@ -319,7 +319,9 @@ extension AppControllerDesktopThreadSessions on AppController {
       singleAgentShouldShowModelControlForSession(currentSessionKey);
 
   List<SingleAgentProvider> get singleAgentProviderOptions =>
-      configuredSingleAgentProviders;
+      availableSingleAgentProviders.isNotEmpty
+      ? availableSingleAgentProviders
+      : configuredSingleAgentProviders;
 
   String singleAgentProviderLabelForSession(String sessionKey) {
     return singleAgentProviderForSession(sessionKey).label;
