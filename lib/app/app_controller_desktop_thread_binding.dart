@@ -46,6 +46,23 @@ import 'app_controller_desktop_skill_permissions.dart';
 import 'app_controller_desktop_runtime_helpers.dart';
 
 extension AppControllerDesktopThreadBinding on AppController {
+  String managedLocalThreadWorkspaceSuffixInternal(String sessionKey) =>
+      '/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(sessionKey)}';
+
+  bool isManagedLocalThreadWorkspacePathInternal(
+    String path,
+    String sessionKey,
+  ) {
+    final normalizedPath = trimTrailingPathSeparatorInternal(path.trim());
+    if (normalizedPath.isEmpty) {
+      return false;
+    }
+    final normalizedSuffix = managedLocalThreadWorkspaceSuffixInternal(
+      sessionKey,
+    );
+    return normalizedPath.endsWith(normalizedSuffix);
+  }
+
   String localThreadWorkspacePathInternal(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -161,6 +178,10 @@ extension AppControllerDesktopThreadBinding on AppController {
     if (executionTarget == AssistantExecutionTarget.singleAgent) {
       if (existingBinding != null &&
           existingBinding.workspaceKind == WorkspaceKind.localFs &&
+          !isManagedLocalThreadWorkspacePathInternal(
+            existingBinding.workspacePath,
+            sessionKey,
+          ) &&
           ensureLocalWorkspaceDirectoryInternal(
             existingBinding.workspacePath,
           )) {

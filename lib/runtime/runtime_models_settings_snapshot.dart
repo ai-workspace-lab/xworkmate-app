@@ -516,8 +516,21 @@ class SettingsSnapshot {
   ExternalAcpEndpointProfile externalAcpEndpointForProvider(
     SingleAgentProvider provider,
   ) {
-    return externalAcpEndpointForProviderId(provider.providerId) ??
+    final profile =
+        externalAcpEndpointForProviderId(provider.providerId) ??
         ExternalAcpEndpointProfile.defaultsForProvider(provider);
+    final bridgeBaseUrl = acpBridgeBuiltinEndpointBaseUrl;
+    if (provider.isAuto || bridgeBaseUrl.isEmpty) {
+      return profile;
+    }
+    return profile.copyWith(endpoint: bridgeBaseUrl);
+  }
+
+  String get acpBridgeBuiltinEndpointBaseUrl {
+    if (!acpBridgeServerModeConfig.usesSelfHostedBase) {
+      return '';
+    }
+    return acpBridgeServerModeConfig.selfHosted.serverUrl.trim();
   }
 
   ExternalAcpEndpointProfile? externalAcpEndpointForProviderId(
@@ -591,9 +604,17 @@ class SettingsSnapshot {
 
   List<SingleAgentProvider> get savedSingleAgentProviders =>
       normalizeSingleAgentProviderList(
-        externalAcpEndpoints
-            .where((item) => item.enabled && item.endpoint.trim().isNotEmpty)
-            .map((item) => item.toProvider()),
+        externalAcpEndpoints.map((item) {
+          final provider = item.toProvider();
+          if (provider.isAuto) {
+            return null;
+          }
+          final effective = externalAcpEndpointForProvider(provider);
+          if (!effective.enabled || effective.endpoint.trim().isEmpty) {
+            return null;
+          }
+          return effective.toProvider();
+        }).whereType<SingleAgentProvider>(),
       );
 
   bool isGatewayTargetSaved(AssistantExecutionTarget target) {

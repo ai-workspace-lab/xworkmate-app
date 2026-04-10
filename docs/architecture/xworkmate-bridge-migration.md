@@ -4,7 +4,7 @@
 
 The ACP Bridge Server implementation was migrated out of `xworkmate-app` into the standalone sibling repository `xworkmate-bridge`.
 
-This migration separates the embedded Go bridge/server from the Flutter application repository while preserving the existing helper binary contract used by the app.
+This migration separates the embedded Go bridge/server from the Flutter application repository. The app now depends on the sibling `xworkmate-bridge` repo for the helper/runtime contract instead of carrying an in-repo Go bridge copy.
 
 ## New Repository
 
@@ -33,9 +33,9 @@ The following app-side concerns remain in `xworkmate-app`:
 
 ## Build Contract
 
-`xworkmate-app` still expects a helper named `xworkmate-go-core`.
+`xworkmate-app` expects the helper artifact named `xworkmate-go-core`.
 
-To preserve compatibility, `xworkmate-bridge` continues to build the helper using that binary name.
+This is the current cross-repo runtime contract, not a legacy compatibility shim. The helper is built from `xworkmate-bridge` and consumed by `xworkmate-app`.
 
 ## App Repository Changes
 
@@ -57,3 +57,5 @@ Validated during migration:
 ## Operational Note
 
 For local development and packaging, `xworkmate-bridge` must exist as a sibling repository next to `xworkmate-app`, unless `XWORKMATE_BRIDGE_DIR` is set explicitly.
+
+At runtime, the app treats bridge-related discovery, provider sync, connection metadata, and ACP conversation forwarding as bridge-owned concerns. Account sync only updates bridge-linked configuration attributes and secure secret references; it does not auto-connect the bridge.

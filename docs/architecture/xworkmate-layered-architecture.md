@@ -11,8 +11,9 @@ Last Updated: 2026-04-08
 - `TaskThread` 是线程控制面
 - `GoTaskService.executeTask` 是唯一公开执行入口
 - ACP 是统一控制面
-- `single-agent / multi-agent / gateway` 是 ACP 解析后的执行器分支
-- 兼容旁路不再作为架构目标
+- `bridge` 是 app 客户端侧的发现 / 配置 / 连接 / 对话枢纽
+- 账户同步只同步 bridge 相关配置属性与安全引用，不负责自动连接
+- 历史旁路与旧的直连叙述不再作为目标架构
 
 ## 总览图
 
@@ -51,11 +52,11 @@ flowchart TB
         E5["buildResolvedExecutionParams"]
     end
 
-    subgraph L6["Executors / Adapters"]
-        F1["single-agent executor"]
-        F2["multi-agent executor"]
-        F3["gateway executor"]
-        F4["GatewayRuntime / Web relay / GatewayAcpClient"]
+    subgraph L6["Bridge / Executors / Adapters"]
+        F1["single-agent ACP request"]
+        F2["multi-agent ACP request"]
+        F3["bridge hub<br/>discovery / config / connect / dialogue"]
+        F4["gateway / provider adapters"]
     end
 
     A1 --> B1
@@ -77,7 +78,8 @@ flowchart TB
     E4 --> E5
     E5 --> F1
     E5 --> F2
-    E5 --> F3
+    F1 --> F3
+    F2 --> F3
     F3 --> F4
 ```
 
@@ -87,24 +89,25 @@ flowchart TB
 2. `TaskThread` 承载线程级事实，不由页面局部状态拼装。
 3. `GoTaskService.executeTask` 是唯一公开任务入口。
 4. ACP 是统一控制面，负责 routing / skills / memory / resolved execution。
-5. `gateway` 是执行器分支，不是 UI 旁路目标。
+5. `bridge` 是 app 侧统一枢纽；gateway/provider 适配能力挂在 bridge 后面，不再把历史直连路径写成长期主链。
 
 ## 文档目录
 
 ### 目标规范
 
-- [任务执行链路统一收敛](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-task-control-plane-unification/docs/architecture/task-control-plane-unification.md)
+- [任务执行链路统一收敛](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/task-control-plane-unification.md)
+- [ACP Forwarding Topology](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-bridge/docs/architecture/acp-forwarding-topology.md)
 
 ### 当前实现观察
 
 - 当前实现观察不再保留独立主设计文档
-- 如需判断规范，以 [任务执行链路统一收敛](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-task-control-plane-unification/docs/architecture/task-control-plane-unification.md) 为准
+- 如需判断规范，以 [任务执行链路统一收敛](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/task-control-plane-unification.md) 为准
 
 ### 边界与适配器说明
 
 - 适配器边界统一收敛到本文件与主文档，不再保留旧的并列设计稿
 
-## Compatibility route (removed from target)
+## Removed From Target
 
 - 旧的 `openClawTask` 公开语义不再是目标架构的一部分
-- `GatewayRuntime`、`Web relay`、`GatewayAcpClient` 只作为 adapter/executor 能力存在
+- 不再把“客户端直接围绕旧 gateway 默认值运转”写成长期主设计
