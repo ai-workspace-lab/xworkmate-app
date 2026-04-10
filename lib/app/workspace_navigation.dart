@@ -76,7 +76,7 @@ void openSettingsNavigationContext(
   }
   if (context.settingsTab != null ||
       context.destination == WorkspaceDestination.settings) {
-    controller.openSettings(tab: context.settingsTab ?? SettingsTab.general);
+    controller.openSettings(tab: context.settingsTab ?? SettingsTab.gateway);
     return;
   }
   controller.navigateTo(context.destination);
