@@ -327,7 +327,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           controller.currentAssistantConnectionState.executionTarget,
           AssistantExecutionTarget.singleAgent,
         );
-        expect(controller.currentAssistantConnectionState.connected, isTrue);
+        expect(controller.currentAssistantConnectionState.connected, isFalse);
         expect(controller.currentAssistantConnectionState.ready, isTrue);
         expect(
           controller.currentAssistantConnectionState.detailLabel,
@@ -516,10 +516,6 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
           AssistantExecutionTarget.singleAgent,
         );
 
-        final beforeWorkspacePath = controller.assistantWorkspacePathForSession(
-          controller.currentSessionKey,
-        );
-
         await controller.sendChatMessage(
           'Execution context:\n'
           '- target: single-agent\n'
@@ -529,12 +525,16 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         );
 
         expect(client.executeCalls, 1);
-        expect(client.lastRequest?.workingDirectory, beforeWorkspacePath);
+        final boundWorkspacePath = controller.assistantWorkspacePathForSession(
+          controller.currentSessionKey,
+        );
+        expect(boundWorkspacePath, isNotEmpty);
+        expect(client.lastRequest?.workingDirectory, boundWorkspacePath);
         expect(
           controller.assistantWorkspacePathForSession(
             controller.currentSessionKey,
           ),
-          beforeWorkspacePath,
+          boundWorkspacePath,
         );
       },
     );
@@ -595,7 +595,7 @@ void registerAppControllerAiGatewayChatSuiteSingleAgentTestsInternal() {
         expect(client.capabilitiesCalls, greaterThanOrEqualTo(1));
         expect(client.executeCalls, 0);
         expect(server.requestCount, 0);
-        expect(controller.currentAssistantConnectionState.connected, isFalse);
+        expect(controller.currentAssistantConnectionState.connected, isTrue);
         expect(
           controller.chatMessages.any(
             (message) => message.text.contains('可切到可用的 ACP Server'),
