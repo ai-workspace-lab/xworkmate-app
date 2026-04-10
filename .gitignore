@@ -1,6 +1,7 @@
 # Miscellaneous
 .env
 null/
+test/golden/failures/
 
 *.class
 *.log
