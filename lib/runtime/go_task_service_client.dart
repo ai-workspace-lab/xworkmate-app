@@ -174,6 +174,7 @@ class GoTaskServiceRequest {
     this.routing,
     this.routingHint = '',
     this.provider = SingleAgentProvider.auto,
+    this.remoteWorkingDirectoryHint = '',
     this.resumeSession = false,
     this.collaborationMode = GoTaskServiceCollaborationMode.standard,
     this.multiAgent = false,
@@ -196,6 +197,7 @@ class GoTaskServiceRequest {
   final ExternalCodeAgentAcpRoutingConfig? routing;
   final String routingHint;
   final SingleAgentProvider provider;
+  final String remoteWorkingDirectoryHint;
   final bool resumeSession;
   final GoTaskServiceCollaborationMode collaborationMode;
   final bool multiAgent;
@@ -275,6 +277,8 @@ class GoTaskServiceRequest {
             )
             .toList(growable: false),
       if (provider != SingleAgentProvider.auto) 'provider': provider.providerId,
+      if (remoteWorkingDirectoryHint.trim().isNotEmpty)
+        'remoteWorkingDirectoryHint': remoteWorkingDirectoryHint.trim(),
       if (model.trim().isNotEmpty) 'model': model.trim(),
       if (thinking.trim().isNotEmpty) 'thinking': thinking.trim(),
       if (aiGatewayBaseUrl.trim().isNotEmpty)
@@ -370,6 +374,53 @@ class GoTaskServiceUpdate {
   bool get isDone => type == 'done' || payload['event'] == 'completed';
 }
 
+class GoTaskServiceArtifact {
+  const GoTaskServiceArtifact({
+    required this.relativePath,
+    required this.label,
+    required this.contentType,
+    required this.encoding,
+    required this.content,
+    required this.downloadUrl,
+    required this.sizeBytes,
+    required this.sha256,
+  });
+
+  final String relativePath;
+  final String label;
+  final String contentType;
+  final String encoding;
+  final String content;
+  final String downloadUrl;
+  final int? sizeBytes;
+  final String sha256;
+
+  bool get hasInlineContent => content.trim().isNotEmpty;
+
+  factory GoTaskServiceArtifact.fromJson(Map<String, dynamic> json) {
+    int? parseSize(Object? value) {
+      if (value is int) {
+        return value;
+      }
+      if (value is num) {
+        return value.toInt();
+      }
+      return int.tryParse(value?.toString() ?? '');
+    }
+
+    return GoTaskServiceArtifact(
+      relativePath: json['relativePath']?.toString().trim() ?? '',
+      label: json['label']?.toString().trim() ?? '',
+      contentType: json['contentType']?.toString().trim() ?? '',
+      encoding: json['encoding']?.toString().trim() ?? '',
+      content: json['content']?.toString() ?? '',
+      downloadUrl: json['downloadUrl']?.toString().trim() ?? '',
+      sizeBytes: parseSize(json['sizeBytes'] ?? json['size']),
+      sha256: json['sha256']?.toString().trim() ?? '',
+    );
+  }
+}
+
 class GoTaskServiceResult {
   const GoTaskServiceResult({
     required this.success,
@@ -394,6 +445,11 @@ class GoTaskServiceResult {
       raw['effectiveWorkingDirectory']?.toString().trim() ??
       raw['workingDirectory']?.toString().trim() ??
       '';
+
+  String get resultSummary =>
+      raw['resultSummary']?.toString().trim().isNotEmpty == true
+      ? raw['resultSummary'].toString().trim()
+      : raw['summary']?.toString().trim() ?? '';
 
   String get resolvedExecutionTarget =>
       raw['resolvedExecutionTarget']?.toString().trim() ?? '';
@@ -429,10 +485,45 @@ class GoTaskServiceResult {
   List<Map<String, dynamic>> get memorySources =>
       _castMapList(raw['memorySources']);
 
+  List<GoTaskServiceArtifact> get artifacts {
+    final rawArtifacts = raw['artifacts'];
+    if (rawArtifacts is! List) {
+      return const <GoTaskServiceArtifact>[];
+    }
+    return rawArtifacts
+        .whereType<Map>()
+        .map(
+          (item) => GoTaskServiceArtifact.fromJson(
+            item.cast<String, dynamic>(),
+          ),
+        )
+        .where((item) => item.relativePath.isNotEmpty)
+        .toList(growable: false);
+  }
+
   WorkspaceRefKind? get resolvedWorkspaceRefKind {
     final rawValue = raw['resolvedWorkspaceRefKind']?.toString().trim() ?? '';
     if (rawValue.isEmpty) {
       return null;
+    }
+    return WorkspaceRefKindCopy.fromJsonValue(rawValue);
+  }
+
+  String get remoteWorkingDirectory {
+    final remoteExecution = _castMap(raw['remoteExecution']);
+    return remoteExecution['remoteWorkingDirectory']?.toString().trim() ??
+        raw['remoteWorkingDirectory']?.toString().trim() ??
+        resolvedWorkingDirectory;
+  }
+
+  WorkspaceRefKind? get remoteWorkspaceRefKind {
+    final remoteExecution = _castMap(raw['remoteExecution']);
+    final rawValue =
+        remoteExecution['remoteWorkspaceRefKind']?.toString().trim() ??
+        raw['remoteWorkspaceRefKind']?.toString().trim() ??
+        '';
+    if (rawValue.isEmpty) {
+      return resolvedWorkspaceRefKind;
     }
     return WorkspaceRefKindCopy.fromJsonValue(rawValue);
   }
