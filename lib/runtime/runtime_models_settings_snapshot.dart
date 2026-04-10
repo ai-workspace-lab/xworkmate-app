@@ -581,41 +581,13 @@ class SettingsSnapshot {
     if (resolved.isAuto) {
       return SingleAgentProvider.auto;
     }
-    for (final saved in savedSingleAgentProviders) {
-      if (saved.providerId == resolved.providerId) {
-        return saved;
-      }
-    }
     if (kKnownSingleAgentProviders.any(
       (item) => item.providerId == resolved.providerId,
     )) {
       return resolved;
     }
-    if (savedSingleAgentProviders.isNotEmpty) {
-      return savedSingleAgentProviders.first;
-    }
-    return SingleAgentProvider.auto;
+    return resolved;
   }
-
-  List<SingleAgentProvider> get availableSingleAgentProviders =>
-      normalizeSingleAgentProviderList(
-        externalAcpEndpoints.map((item) => item.toProvider()),
-      );
-
-  List<SingleAgentProvider> get savedSingleAgentProviders =>
-      normalizeSingleAgentProviderList(
-        externalAcpEndpoints.map((item) {
-          final provider = item.toProvider();
-          if (provider.isAuto) {
-            return null;
-          }
-          final effective = externalAcpEndpointForProvider(provider);
-          if (!effective.enabled || effective.endpoint.trim().isEmpty) {
-            return null;
-          }
-          return effective.toProvider();
-        }).whereType<SingleAgentProvider>(),
-      );
 
   bool isGatewayTargetSaved(AssistantExecutionTarget target) {
     final targetKey = switch (target) {
@@ -640,19 +612,6 @@ class SettingsSnapshot {
     );
   }
 
-  List<SingleAgentProvider> visibleSingleAgentProviders(
-    Iterable<SingleAgentProvider> availableProviders,
-  ) {
-    final allowedProviderIds = savedSingleAgentProviders
-        .map((item) => item.providerId)
-        .toSet();
-    return normalizeSingleAgentProviderList(
-      availableProviders.where(
-        (item) => allowedProviderIds.contains(item.providerId),
-      ),
-    );
-  }
-
   List<AssistantExecutionTarget> visibleAssistantExecutionTargets({
     required Iterable<AssistantExecutionTarget> supportedTargets,
     required Iterable<SingleAgentProvider> availableSingleAgentProviders,
@@ -660,7 +619,7 @@ class SettingsSnapshot {
     final supported = supportedTargets.toSet();
     final visible = <AssistantExecutionTarget>[];
     if (supported.contains(AssistantExecutionTarget.singleAgent) &&
-        visibleSingleAgentProviders(availableSingleAgentProviders).isNotEmpty) {
+        availableSingleAgentProviders.isNotEmpty) {
       visible.add(AssistantExecutionTarget.singleAgent);
     }
     if (supported.contains(AssistantExecutionTarget.local) &&

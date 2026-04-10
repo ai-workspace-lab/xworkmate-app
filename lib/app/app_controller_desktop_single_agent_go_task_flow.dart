@@ -62,7 +62,18 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
             target: AssistantExecutionTarget.singleAgent,
             forceRefresh: true,
           );
-      final availableProviders = controller.configuredSingleAgentProviders
+      final advertisedProviders =
+          controller.availableSingleAgentProvidersOverrideInternal != null
+          ? normalizeSingleAgentProviderList(
+              controller.availableSingleAgentProvidersOverrideInternal!,
+            )
+          : normalizeSingleAgentProviderList(
+              capabilities.providers.map(
+                controller.settings.resolveSingleAgentProvider,
+              ),
+            );
+      controller.bridgeAdvertisedProvidersInternal = advertisedProviders;
+      final availableProviders = advertisedProviders
           .where(capabilities.providers.contains)
           .toList(growable: false);
       final provider = selection == SingleAgentProvider.auto
