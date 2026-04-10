@@ -83,12 +83,12 @@ String singleAgentUnavailableLabelDesktopInternal(
   )) {
     return detail.isEmpty
         ? appText(
-            '当前线程固定为 ${selection.label}，但它在这台设备上不可用。检测到其他外部 Agent ACP 端点时不会自动改线，请切到可用的 ACP Server。',
-            'This thread is pinned to ${selection.label}, but it is unavailable on this device. XWorkmate will not reroute to another external Agent ACP endpoint automatically. Switch to an available ACP Server.',
+            '当前线程固定为 ${selection.label}，但它在这台设备上不可用。检测到其他 Bridge Provider 时不会自动改线，请手动切到可用 Provider。',
+            'This thread is pinned to ${selection.label}, but it is unavailable on this device. XWorkmate will not reroute to another bridge provider automatically. Switch to an available provider manually.',
           )
         : appText(
-            '当前线程固定为 ${selection.label}：$detail 检测到其他外部 Agent ACP 端点时不会自动改线，请切到可用的 ACP Server。',
-            'This thread is pinned to ${selection.label}: $detail XWorkmate will not reroute to another external Agent ACP endpoint automatically. Switch to an available ACP Server.',
+            '当前线程固定为 ${selection.label}：$detail 检测到其他 Bridge Provider 时不会自动改线，请手动切到可用 Provider。',
+            'This thread is pinned to ${selection.label}: $detail XWorkmate will not reroute to another bridge provider automatically. Switch to an available provider manually.',
           );
   }
   if (controller.singleAgentNeedsAiGatewayConfigurationForSession(
@@ -96,21 +96,21 @@ String singleAgentUnavailableLabelDesktopInternal(
   )) {
     return detail.isEmpty
         ? appText(
-            '当前没有可用的外部 Agent ACP 端点。请先配置外部 Agent 连接。',
-            'No external Agent ACP endpoint is available. Configure an external Agent connection first.',
+            '当前没有可用的 Bridge Provider。请先在设置里配置并同步外部 Agent 连接。',
+            'No bridge provider is available. Configure and sync an external agent connection in Settings first.',
           )
         : appText(
-            '$detail 当前没有可用的外部 Agent ACP 端点。请先配置外部 Agent 连接。',
-            '$detail No external Agent ACP endpoint is available. Configure an external Agent connection first.',
+            '$detail 当前没有可用的 Bridge Provider。请先在设置里配置并同步外部 Agent 连接。',
+            '$detail No bridge provider is available. Configure and sync an external agent connection in Settings first.',
           );
   }
   return detail.isEmpty
       ? appText(
-          '当前线程的外部 Agent ACP 连接尚未就绪。',
-          'The external Agent ACP connection for this thread is not ready yet.',
+          '当前线程的 Bridge Provider 尚未就绪。',
+          'The bridge provider for this thread is not ready yet.',
         )
       : appText(
-          '当前线程的外部 Agent ACP 连接尚未就绪：$detail',
-          'The external Agent ACP connection for this thread is not ready yet: $detail',
+          '当前线程的 Bridge Provider 尚未就绪：$detail',
+          'The bridge provider for this thread is not ready yet: $detail',
         );
 }
