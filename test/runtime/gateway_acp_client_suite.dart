@@ -187,6 +187,28 @@ void main() {
       },
     );
 
+    test(
+      'routes generic ACP requests through the explicit hosted provider endpoint without fallback',
+      () async {
+        final server = await _AcpFakeServer.start(pathPrefix: '/gemini');
+        addTearDown(server.close);
+
+        final client = GatewayAcpClient(
+          endpointResolver: () => Uri.parse('http://127.0.0.1:9'),
+        );
+
+        await client.request(
+          method: 'skills.status',
+          params: const <String, dynamic>{'provider': 'gemini'},
+          endpointOverride: server.baseHttpUri,
+          authorizationOverride: 'Bearer provider-secret',
+        );
+
+        expect(server.lastHttpRequestPath, '/gemini/acp/rpc');
+        expect(server.lastHttpAuthorization, 'Bearer provider-secret');
+      },
+    );
+
     test('preserves hosted ACP base path for websocket requests', () async {
       final server = await _AcpFakeServer.start(pathPrefix: '/opencode');
       addTearDown(server.close);
@@ -494,6 +516,23 @@ class _AcpFakeServer {
               'success': true,
               'output': 'single-agent result ($provider)',
               'turnId': 'turn-single',
+            },
+          ),
+        );
+        return;
+      case 'skills.status':
+        await respond(
+          _resultEnvelope(
+            id: id,
+            result: const <String, dynamic>{
+              'skills': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'skillKey': 'gemini-remote',
+                  'name': 'Gemini Remote',
+                  'description': 'Hosted ACP skill payload',
+                  'source': 'acp',
+                },
+              ],
             },
           ),
         );
