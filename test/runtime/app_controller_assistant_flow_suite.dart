@@ -152,7 +152,6 @@ void main() {
     },
   );
 
-
   test(
     'AppController connects directly from a setup code and persists gateway auth',
     () async {
@@ -708,6 +707,8 @@ class _FakeGoTaskServiceClient implements GoTaskServiceClient {
   Future<void> dispose() async {}
 }
 
+typedef FakeGatewayServerSupport = _FakeGatewayServer;
+typedef FakeGoTaskServiceClientSupport = _FakeGoTaskServiceClient;
 
 class _AcpSessionPayload {
   const _AcpSessionPayload({required this.notification, required this.result});

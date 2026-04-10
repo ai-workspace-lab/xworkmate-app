@@ -249,6 +249,64 @@ class MobileShellStateInternal extends State<MobileShell> {
     }
   }
 
+  Future<void> promptBridgeVerificationCodeInternal() async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final accountSignedIn =
+        (await widget.controller.storeInternal.loadAccountSessionToken())
+            ?.trim()
+            .isNotEmpty ??
+        false;
+    if (!accountSignedIn) {
+      await openGatewaySetupCodeEntryInternal();
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            appText(
+              '未登录账号时，请先手动输入配置码。登录 accounts.svc.plus 后可使用验证码接入。',
+              'When account sign-in is unavailable, enter a setup code manually. Sign in to accounts.svc.plus first to use bridge verification codes.',
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+    final codeController = TextEditingController();
+    final enteredCode = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(appText('输入验证码', 'Enter Verification Code')),
+          content: TextField(
+            controller: codeController,
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(
+              labelText: appText('验证码', 'Verification Code'),
+              hintText: 'AB12CD34',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(appText('取消', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(codeController.text.trim()),
+              child: Text(appText('连接', 'Connect')),
+            ),
+          ],
+        );
+      },
+    );
+    codeController.dispose();
+    final resolved = enteredCode?.trim() ?? '';
+    if (resolved.isEmpty || !mounted) {
+      return;
+    }
+    await connectWithScannedSetupCodeInternal(resolved);
+  }
+
   void showPairingGuidePageInternal() {
     unawaited(showPairingGuidePageFlowInternal());
   }
@@ -261,6 +319,8 @@ class MobileShellStateInternal extends State<MobileShell> {
         builder: (_) => MobileGatewayPairingGuidePage(
           supportsQrScan: supportsQrScan,
           onManualInput: () => unawaited(openGatewaySetupCodeEntryInternal()),
+          onManualCodeInput: () =>
+              unawaited(promptBridgeVerificationCodeInternal()),
           onScannedSetupCode: (setupCode) async {
             await connectWithScannedSetupCodeInternal(setupCode);
           },
