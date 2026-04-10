@@ -391,6 +391,7 @@ class GoTaskServiceResult {
 
   String get resolvedWorkingDirectory =>
       raw['resolvedWorkingDirectory']?.toString().trim() ??
+      raw['effectiveWorkingDirectory']?.toString().trim() ??
       raw['workingDirectory']?.toString().trim() ??
       '';
 

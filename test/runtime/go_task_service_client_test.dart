@@ -244,6 +244,27 @@ void main() {
       },
     );
 
+    test(
+      'run result falls back to effective working directory when resolved path is absent',
+      () {
+        final result = goTaskServiceResultFromAcpResponse(
+          <String, dynamic>{
+            'result': <String, dynamic>{
+              'success': true,
+              'turnId': 'turn-8',
+              'summary': 'summary text',
+              'effectiveWorkingDirectory': '/tmp/effective-thread',
+            },
+          },
+          route: GoTaskServiceRoute.externalAcpSingle,
+        );
+
+        expect(result.turnId, 'turn-8');
+        expect(result.message, 'summary text');
+        expect(result.resolvedWorkingDirectory, '/tmp/effective-thread');
+      },
+    );
+
     test('session update recognizes delta notifications', () {
       final update = goTaskServiceUpdateFromAcpNotification(<String, dynamic>{
         'method': 'session.update',
