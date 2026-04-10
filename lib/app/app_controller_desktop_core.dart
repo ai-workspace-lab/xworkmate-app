@@ -307,9 +307,6 @@ class AppController extends ChangeNotifier {
       <String, List<GatewayChatMessage>>{};
   final Map<String, String> aiGatewayStreamingTextBySessionInternal =
       <String, String>{};
-  final Map<String, ExternalCodeAgentAcpSyncedProvider>
-  syncedGoAgentProvidersInternal =
-      <String, ExternalCodeAgentAcpSyncedProvider>{};
   final DesktopThreadArtifactService threadArtifactServiceInternal =
       DesktopThreadArtifactService();
   List<AssistantThreadSkillEntry> singleAgentSharedImportedSkillsInternal =
