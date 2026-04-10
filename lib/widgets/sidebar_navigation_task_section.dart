@@ -25,6 +25,7 @@ class SidebarTaskItem {
 class SidebarTaskSection extends StatefulWidget {
   const SidebarTaskSection({
     super.key,
+    required this.currentSection,
     required this.items,
     required this.visibleExecutionTargets,
     required this.skillCount,
@@ -32,11 +33,13 @@ class SidebarTaskSection extends StatefulWidget {
     required this.onCycleSidebarState,
     this.onRefreshTasks,
     this.onCreateTask,
+    this.onReturnToAssistant,
     this.onSelectTask,
     this.onArchiveTask,
     this.onRenameTask,
   });
 
+  final WorkspaceDestination currentSection;
   final List<SidebarTaskItem> items;
   final List<AssistantExecutionTarget> visibleExecutionTargets;
   final int skillCount;
@@ -44,6 +47,7 @@ class SidebarTaskSection extends StatefulWidget {
   final VoidCallback onCycleSidebarState;
   final Future<void> Function()? onRefreshTasks;
   final Future<void> Function()? onCreateTask;
+  final VoidCallback? onReturnToAssistant;
   final Future<void> Function(String sessionKey)? onSelectTask;
   final Future<void> Function(String sessionKey)? onArchiveTask;
   final Future<void> Function(String sessionKey, String title)? onRenameTask;
@@ -157,22 +161,26 @@ class _SidebarTaskSectionState extends State<SidebarTaskSection> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-          child: FilledButton.tonalIcon(
-            key: const Key('workspace-sidebar-new-task-button'),
-            onPressed: widget.onCreateTask == null
-                ? null
-                : () async {
-                    await widget.onCreateTask!();
-                  },
-            icon: const Icon(Icons.edit_note_rounded),
-            label: Text(appText('新对话', 'New conversation')),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(0, 40),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
+          child: widget.currentSection == WorkspaceDestination.settings
+              ? _SidebarBackToAssistantButton(
+                  onPressed: widget.onReturnToAssistant,
+                )
+              : FilledButton.tonalIcon(
+                  key: const Key('workspace-sidebar-new-task-button'),
+                  onPressed: widget.onCreateTask == null
+                      ? null
+                      : () async {
+                          await widget.onCreateTask!();
+                        },
+                  icon: const Icon(Icons.edit_note_rounded),
+                  label: Text(appText('新对话', 'New conversation')),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
@@ -337,6 +345,66 @@ class _SidebarTaskSectionState extends State<SidebarTaskSection> {
     }
     _expandedTargets.addAll(
       compactAssistantExecutionTargets(widget.visibleExecutionTargets),
+    );
+  }
+}
+
+class _SidebarBackToAssistantButton extends StatelessWidget {
+  const _SidebarBackToAssistantButton({required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: const Key('workspace-sidebar-back-to-chat-button'),
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          height: 56,
+          decoration: BoxDecoration(
+            color: palette.surfaceSecondary,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: palette.strokeSoft),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: palette.textPrimary, width: 1.8),
+                  ),
+                  child: Icon(
+                    Icons.arrow_back_rounded,
+                    size: 24,
+                    color: palette.textPrimary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    appText('返回聊天', 'Back to chat'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

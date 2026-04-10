@@ -256,6 +256,10 @@ void main() {
         find.byKey(const Key('workspace-sidebar-new-task-button')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const Key('workspace-sidebar-back-to-chat-button')),
+        findsNothing,
+      );
       expect(find.text('任务列表'), findsOneWidget);
       expect(find.text('自动化'), findsNothing);
       expect(find.text('MCP Hub'), findsNothing);
@@ -268,6 +272,55 @@ void main() {
       );
     },
   );
+
+  testWidgets('SidebarNavigation shows back to chat action on settings page', (
+    WidgetTester tester,
+  ) async {
+    var returnedToAssistant = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: SidebarNavigation(
+            currentSection: WorkspaceDestination.settings,
+            sidebarState: AppSidebarState.expanded,
+            appLanguage: AppLanguage.zh,
+            themeMode: ThemeMode.light,
+            onSectionChanged: (_) {},
+            onToggleLanguage: () {},
+            onCycleSidebarState: () {},
+            onExpandFromCollapsed: () {},
+            onOpenHome: () {},
+            onOpenAccount: () {},
+            onOpenThemeToggle: () {},
+            accountName: 'Tester',
+            accountSubtitle: 'Workspace',
+            onToggleAccountWorkspaceFollowed: () async {},
+            onReturnToAssistant: () => returnedToAssistant++,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('workspace-sidebar-back-to-chat-button')),
+      findsOneWidget,
+    );
+    expect(find.text('返回聊天'), findsOneWidget);
+    expect(
+      find.byKey(const Key('workspace-sidebar-new-task-button')),
+      findsNothing,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('workspace-sidebar-back-to-chat-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(returnedToAssistant, 1);
+  });
 
   testWidgets(
     'SidebarNavigation merges local and remote tasks into one gateway group',
