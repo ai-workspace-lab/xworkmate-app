@@ -72,11 +72,7 @@ class AccountTokenConfigured {
     );
   }
 
-  AccountTokenConfigured copyWith({
-    bool? openclaw,
-    bool? vault,
-    bool? apisix,
-  }) {
+  AccountTokenConfigured copyWith({bool? openclaw, bool? vault, bool? apisix}) {
     return AccountTokenConfigured(
       openclaw: openclaw ?? this.openclaw,
       vault: vault ?? this.vault,
@@ -85,11 +81,7 @@ class AccountTokenConfigured {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'openclaw': openclaw,
-      'vault': vault,
-      'apisix': apisix,
-    };
+    return {'openclaw': openclaw, 'vault': vault, 'apisix': apisix};
   }
 
   factory AccountTokenConfigured.fromJson(Map<String, dynamic> json) {
@@ -226,7 +218,8 @@ class AccountRemoteProfile {
       return value
           .whereType<Map>()
           .map(
-            (item) => AccountSecretLocator.fromJson(item.cast<String, dynamic>()),
+            (item) =>
+                AccountSecretLocator.fromJson(item.cast<String, dynamic>()),
           )
           .toList(growable: false);
     }
@@ -258,7 +251,7 @@ class AccountRemoteProfile {
   }
 }
 
-enum AcpBridgeServerMode { cloudSynced, selfHosted, advancedCustom }
+enum AcpBridgeServerMode { cloudSynced }
 
 class AcpBridgeServerRemoteServerSummary {
   const AcpBridgeServerRemoteServerSummary({
@@ -479,9 +472,7 @@ class AcpBridgeServerAdvancedOverrides {
     };
   }
 
-  factory AcpBridgeServerAdvancedOverrides.fromJson(
-    Map<String, dynamic> json,
-  ) {
+  factory AcpBridgeServerAdvancedOverrides.fromJson(Map<String, dynamic> json) {
     return AcpBridgeServerAdvancedOverrides(
       gatewayProfiles: normalizeGatewayProfiles(
         profiles: ((json['gatewayProfiles'] as List?) ?? const <Object>[])
@@ -558,17 +549,11 @@ class AcpBridgeServerModeConfig {
     );
   }
 
-  bool get usesSelfHostedBase =>
-      mode == AcpBridgeServerMode.selfHosted ||
-      (mode == AcpBridgeServerMode.advancedCustom && selfHosted.isConfigured);
+  bool get usesSelfHostedBase => false;
 
-  bool get usesCloudSyncBase => !usesSelfHostedBase;
+  bool get usesCloudSyncBase => true;
 
-  String get sourceTag => switch (mode) {
-    AcpBridgeServerMode.cloudSynced => 'cloudSynced',
-    AcpBridgeServerMode.selfHosted => 'selfHosted',
-    AcpBridgeServerMode.advancedCustom => 'advancedOverride',
-  };
+  String get sourceTag => 'cloudSynced';
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
@@ -581,10 +566,7 @@ class AcpBridgeServerModeConfig {
 
   factory AcpBridgeServerModeConfig.fromJson(Map<String, dynamic> json) {
     return AcpBridgeServerModeConfig(
-      mode: AcpBridgeServerMode.values.firstWhere(
-        (item) => item.name == json['mode'],
-        orElse: () => AcpBridgeServerMode.cloudSynced,
-      ),
+      mode: AcpBridgeServerMode.cloudSynced,
       cloudSynced: AcpBridgeServerCloudSyncConfig.fromJson(
         (json['cloudSynced'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
@@ -592,7 +574,8 @@ class AcpBridgeServerModeConfig {
         (json['selfHosted'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
       advancedOverrides: AcpBridgeServerAdvancedOverrides.fromJson(
-        (json['advancedOverrides'] as Map?)?.cast<String, dynamic>() ?? const {},
+        (json['advancedOverrides'] as Map?)?.cast<String, dynamic>() ??
+            const {},
       ),
     );
   }
@@ -717,10 +700,7 @@ class AccountSyncState {
 }
 
 class AccountSyncResult {
-  const AccountSyncResult({
-    required this.state,
-    required this.message,
-  });
+  const AccountSyncResult({required this.state, required this.message});
 
   final String state;
   final String message;
