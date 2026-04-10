@@ -9,7 +9,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/runtime/account_runtime_client.dart';
-import 'package:xworkmate/runtime/gateway_acp_client.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_controllers.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
@@ -130,10 +129,7 @@ void main() {
         workingDirectory: tempDir.path,
         prompt: '请检查 ACP 路由和 gateway 路由',
       );
-      expect(
-        routeResolution['result'] != null,
-        isTrue,
-      );
+      expect(routeResolution['result'] != null, isTrue);
       final workspacePath = controller.assistantWorkspacePathForSession(
         controller.currentSessionKey,
       );
@@ -188,14 +184,12 @@ class _SmokeEnv {
         env['BRIDGE_URL'] ??
         'https://xworkmate-bridge.svc.plus';
     final codexProviderEndpoint =
-        env['CODEX_PROVIDER_ENDPOINT'] ??
-        'https://acp-server.svc.plus/codex';
+        env['CODEX_PROVIDER_ENDPOINT'] ?? 'https://acp-server.svc.plus/codex';
     final opencodeProviderEndpoint =
         env['OPENCODE_PROVIDER_ENDPOINT'] ??
         'https://acp-server.svc.plus/opencode';
     final geminiProviderEndpoint =
-        env['GEMINI_PROVIDER_ENDPOINT'] ??
-        'https://acp-server.svc.plus/gemini';
+        env['GEMINI_PROVIDER_ENDPOINT'] ?? 'https://acp-server.svc.plus/gemini';
     if (accountLoginName.trim().isEmpty ||
         accountLoginPassword.trim().isEmpty ||
         bridgeAuthToken.trim().isEmpty) {
@@ -238,16 +232,11 @@ class _BridgeGoTaskServiceClient implements GoTaskServiceClient {
 
   final String bridgeBaseUrl;
   final String bridgeAuthToken;
-  List<ExternalCodeAgentAcpSyncedProvider> _providers =
-      const <ExternalCodeAgentAcpSyncedProvider>[];
 
   @override
   Future<void> syncExternalProviders(
     List<ExternalCodeAgentAcpSyncedProvider> providers,
   ) async {
-    _providers = List<ExternalCodeAgentAcpSyncedProvider>.unmodifiable(
-      providers,
-    );
     await _request(
       method: 'xworkmate.providers.sync',
       params: <String, dynamic>{
@@ -257,7 +246,8 @@ class _BridgeGoTaskServiceClient implements GoTaskServiceClient {
                 'providerId': item.providerId,
                 'label': item.label,
                 'endpoint': item.endpoint,
-                'authorizationHeader': item.authorizationHeader.startsWith('Bearer ')
+                'authorizationHeader':
+                    item.authorizationHeader.startsWith('Bearer ')
                     ? item.authorizationHeader
                     : 'Bearer ${item.authorizationHeader}',
                 'enabled': item.enabled,
@@ -277,14 +267,17 @@ class _BridgeGoTaskServiceClient implements GoTaskServiceClient {
       method: 'acp.capabilities',
       params: const <String, dynamic>{},
     );
-    final result = (response['result'] as Map?)?.cast<String, dynamic>() ??
+    final result =
+        (response['result'] as Map?)?.cast<String, dynamic>() ??
         const <String, dynamic>{};
     final providers = <SingleAgentProvider>{};
     for (final raw in <Object?>[
       ..._asList(result['providers']),
-      ..._asList(result['capabilities'] is Map
-          ? (result['capabilities'] as Map)['providers']
-          : null),
+      ..._asList(
+        result['capabilities'] is Map
+            ? (result['capabilities'] as Map)['providers']
+            : null,
+      ),
     ]) {
       if (raw == null) {
         continue;
@@ -313,7 +306,8 @@ class _BridgeGoTaskServiceClient implements GoTaskServiceClient {
       method: request.resumeSession ? 'session.message' : 'session.start',
       params: request.toExternalAcpParams(),
     );
-    final result = (response['result'] as Map?)?.cast<String, dynamic>() ??
+    final result =
+        (response['result'] as Map?)?.cast<String, dynamic>() ??
         const <String, dynamic>{};
     final message = result['output']?.toString().trim().isNotEmpty == true
         ? result['output'].toString().trim()
@@ -390,11 +384,12 @@ class _BridgeGoTaskServiceClient implements GoTaskServiceClient {
   }) async {
     final client = HttpClient();
     try {
-      final request = await client.postUrl(
-        Uri.parse('$bridgeBaseUrl/acp/rpc'),
-      );
+      final request = await client.postUrl(Uri.parse('$bridgeBaseUrl/acp/rpc'));
       request.headers.contentType = ContentType.json;
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $bridgeAuthToken');
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer $bridgeAuthToken',
+      );
       request.write(
         jsonEncode(<String, dynamic>{
           'jsonrpc': '2.0',

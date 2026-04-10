@@ -18,7 +18,8 @@ Last Updated: 2026-04-08
 - UI 不变
 - `GoTaskService.executeTask` 是唯一公开入口
 - ACP 是统一控制面
-- `single-agent / multi-agent / gateway` 是 ACP 解析后的执行器分支
+- `bridge` 是 app 客户端的发现 / 配置 / 连接 / 对话枢纽
+- 账户同步只同步 bridge 相关配置属性与安全引用，不做自动连接
 
 
 ## 目标态
@@ -32,13 +33,11 @@ flowchart TD
     F --> G["Memory.Inject"]
     G --> H["buildResolvedExecutionParams"]
     H --> I{"resolvedExecutionTarget"}
-    I -->|"single-agent"| J["single-agent executor"]
-    I -->|"multi-agent"| K["multi-agent executor"]
-    I -->|"gateway"| L["gateway executor"]
-    J --> M["Adapter Layer"]
+    I -->|"single-agent"| J["single-agent ACP request"]
+    I -->|"multi-agent"| K["multi-agent ACP request"]
+    J --> M["bridge hub"]
     K --> M
-    L --> M
-    M --> N["External Runtime / Relay / Gateway"]
+    M --> N["Gateway / Provider adapters"]
     N --> O["stream events / result"]
     O --> P["Memory.Record"]
     P --> Q["Update Thread State"]
@@ -51,7 +50,8 @@ flowchart TD
 
 - Desktop App 直接桥接 Go 代码
 - Desktop 正常执行链路不以“先启动一个本地 HTTP server，再由 Desktop 自己回连”作为目标架构
-- Desktop 的 `sendMessage -> GoTaskService.executeTask -> ACP` 应理解为进程内或直接桥接语义，不是 Web server 回环语义
+- Desktop 的 `sendMessage -> GoTaskService.executeTask -> ACP` 应理解为进程内或直接桥接语义
+- 对 app 来说，bridge 是 discovery / config / connect / dialogue 的统一枢纽
 
 ### Web / Mobile
 
@@ -99,5 +99,5 @@ flowchart TD
 1. 文档口径收敛
 2. Dart 请求模型统一
 3. route 决策内收到 `GoTaskService` / ACP
-4. `gateway` 成为 ACP executor
+4. app 侧 bridge 枢纽与 provider / gateway 适配关系收敛
 5. `multi-agent` 成为统一请求语义

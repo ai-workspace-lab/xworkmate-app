@@ -44,6 +44,7 @@ import 'app_controller_desktop_settings_runtime.dart';
 import 'app_controller_desktop_thread_storage.dart';
 import 'app_controller_desktop_skill_permissions.dart';
 import 'app_controller_desktop_runtime_coordination_impl.dart';
+import 'app_controller_desktop_runtime_exceptions.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 extension AppControllerDesktopRuntimeHelpers on AppController {
@@ -758,7 +759,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     RuntimeConnectionMode mode,
   ) {
     return switch (mode) {
-      RuntimeConnectionMode.unconfigured => AssistantExecutionTarget.singleAgent,
+      RuntimeConnectionMode.unconfigured =>
+        AssistantExecutionTarget.singleAgent,
       RuntimeConnectionMode.local => AssistantExecutionTarget.local,
       RuntimeConnectionMode.remote => AssistantExecutionTarget.remote,
     };
@@ -787,19 +789,4 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       ),
     };
   }
-}
-
-class AiGatewayChatExceptionInternal implements Exception {
-  const AiGatewayChatExceptionInternal(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
-}
-
-class AiGatewayAbortExceptionInternal implements Exception {
-  const AiGatewayAbortExceptionInternal(this.partialText);
-
-  final String partialText;
 }
