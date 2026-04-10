@@ -56,8 +56,7 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
     final target = controller.assistantExecutionTargetForSession(
       controller.sessionsControllerInternal.currentSessionKey,
     );
-    final resolvedProvider =
-        target == AssistantExecutionTarget.singleAgent
+    final resolvedProvider = target == AssistantExecutionTarget.singleAgent
         ? (controller.singleAgentResolvedProviderForSession(
                 controller.sessionsControllerInternal.currentSessionKey,
               ) ??
@@ -68,9 +67,10 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
         : controller.resolveSingleAgentEndpointInternal(resolvedProvider);
     final authorizationOverride = resolvedProvider == null
         ? ''
-        : await controller.resolveSingleAgentAuthorizationHeaderForProviderInternal(
-            resolvedProvider,
-          );
+        : await controller
+              .resolveSingleAgentAuthorizationHeaderForProviderInternal(
+                resolvedProvider,
+              );
     await controller.gatewayAcpClientInternal.loadCapabilities(
       forceRefresh: forceRefresh,
       endpointOverride: endpointOverride,
@@ -109,28 +109,9 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
         forceRefresh: forceRefresh,
       );
   controller.bridgeAdvertisedProvidersInternal =
-      controller.availableSingleAgentProvidersOverrideInternal != null
-      ? normalizeSingleAgentProviderList(
-          controller.availableSingleAgentProvidersOverrideInternal!,
-        )
-      : normalizeSingleAgentProviderList(
-          capabilities.providers.map(
-            controller.settings.resolveSingleAgentProvider,
-          ),
-        );
+      normalizeSingleAgentProviderList(capabilities.providerCatalog);
   final next = <SingleAgentProvider, SingleAgentCapabilities>{};
-  final candidateProviders =
-      normalizeSingleAgentProviderList(<SingleAgentProvider>[
-        ...controller.configuredSingleAgentProviders,
-        ...capabilities.providers.map(
-          controller.settings.resolveSingleAgentProvider,
-        ),
-      ]);
-  for (final provider in candidateProviders) {
-    if (!capabilities.providers.contains(provider)) {
-      next[provider] = const SingleAgentCapabilities.unavailable(endpoint: '');
-      continue;
-    }
+  for (final provider in controller.bridgeAdvertisedProvidersInternal) {
     next[provider] = SingleAgentCapabilities(
       available: true,
       supportedProviders: <SingleAgentProvider>[provider],
@@ -150,7 +131,7 @@ mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal(
   GatewayAcpCapabilities capabilities,
 ) {
   final source = current.isEmpty ? ManagedMountTargetState.defaults() : current;
-  final providers = capabilities.providers
+  final providers = capabilities.providerCatalog
       .map((item) => item.providerId)
       .toSet();
   return source

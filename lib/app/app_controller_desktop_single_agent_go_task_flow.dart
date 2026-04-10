@@ -58,30 +58,48 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
         sessionKey,
       );
       final selection = controller.singleAgentProviderForSession(sessionKey);
-      final capabilities = await controller.goTaskServiceClientInternal
-          .loadExternalAcpCapabilities(
-            target: AssistantExecutionTarget.singleAgent,
-            forceRefresh: true,
+      final preflightWorkingDirectory = controller
+          .resolveSingleAgentWorkingDirectoryForSessionInternal(sessionKey);
+      if (preflightWorkingDirectory == null ||
+          preflightWorkingDirectory.trim().isEmpty) {
+        final error = StateError(
+          appText(
+            '当前线程缺少可运行的工作路径，无法启动单机智能体。',
+            'This thread does not have a runnable workspace path, so Single Agent cannot start.',
+          ),
+        );
+        controller.appendAssistantThreadMessageInternal(
+          sessionKey,
+          assistantErrorMessageSingleAgentDesktopInternal(
+            controller,
+            error.message,
+          ),
+        );
+        throw error;
+      }
+
+      final aiGatewayApiKey = await controller.loadAiGatewayApiKey();
+      final routingResolution = await controller.goTaskServiceClientInternal
+          .resolveExternalAcpRouting(
+            taskPrompt: message,
+            workingDirectory: preflightWorkingDirectory,
+            routing: routing,
+            aiGatewayBaseUrl: controller.aiGatewayUrl,
+            aiGatewayApiKey: aiGatewayApiKey,
           );
-      final advertisedProviders =
-          controller.availableSingleAgentProvidersOverrideInternal != null
-          ? normalizeSingleAgentProviderList(
-              controller.availableSingleAgentProvidersOverrideInternal!,
-            )
-          : normalizeSingleAgentProviderList(
-              capabilities.providers.map(
-                controller.settings.resolveSingleAgentProvider,
-              ),
+      final effectiveProvider =
+          routingResolution.resolvedProviderId.trim().isEmpty
+          ? null
+          : SingleAgentProviderCopy.fromJsonValue(
+              routingResolution.resolvedProviderId,
             );
-      controller.bridgeAdvertisedProvidersInternal = advertisedProviders;
-      final availableProviders = advertisedProviders
-          .where(capabilities.providers.contains)
-          .toList(growable: false);
-      final provider = selection == SingleAgentProvider.auto
-          ? (availableProviders.isEmpty ? null : availableProviders.first)
-          : (capabilities.providers.contains(selection) ? selection : null);
-      final unavailableReason = provider == null
-          ? (selection == SingleAgentProvider.auto
+      final unavailableReason =
+          routingResolution.unavailable ||
+              (routingResolution.resolvedExecutionTarget == 'single-agent' &&
+                  effectiveProvider == null)
+          ? (routingResolution.unavailableMessage.isNotEmpty
+                ? routingResolution.unavailableMessage
+                : selection == SingleAgentProvider.auto
                 ? appText(
                     '当前没有可用的 GoTaskService Provider。',
                     'No GoTaskService provider is currently available.',
@@ -91,7 +109,7 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
                     'GoTaskService does not currently support ${selection.label}.',
                   ))
           : null;
-      if (provider == null) {
+      if (unavailableReason != null) {
         controller.upsertTaskThreadInternal(
           sessionKey,
           lifecycleStatus: 'ready',
@@ -112,34 +130,23 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
         );
         return;
       }
-      final effectiveProvider = provider;
 
-      appendSingleAgentRuntimeStatusDesktopInternal(
-        controller,
-        sessionKey,
-        effectiveProvider,
-      );
+      if (effectiveProvider != null) {
+        appendSingleAgentRuntimeStatusDesktopInternal(
+          controller,
+          sessionKey,
+          effectiveProvider,
+        );
+      }
       final workingDirectory = controller
           .resolveSingleAgentWorkingDirectoryForSessionInternal(
             sessionKey,
-            provider: provider,
+            provider: effectiveProvider,
           );
-      if (workingDirectory == null || workingDirectory.trim().isEmpty) {
-        final error = StateError(
-          appText(
-            '当前线程缺少可运行的工作路径，无法启动单机智能体。',
-            'This thread does not have a runnable workspace path, so Single Agent cannot start.',
-          ),
-        );
-        controller.appendAssistantThreadMessageInternal(
-          sessionKey,
-          assistantErrorMessageSingleAgentDesktopInternal(
-            controller,
-            error.message,
-          ),
-        );
-        throw error;
-      }
+      final resolvedWorkingDirectory =
+          workingDirectory == null || workingDirectory.trim().isEmpty
+          ? preflightWorkingDirectory
+          : workingDirectory;
 
       final selectedSkills = controller
           .assistantSelectedSkillsForSession(sessionKey)
@@ -152,19 +159,26 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
           threadId: sessionKey,
           target: AssistantExecutionTarget.singleAgent,
           prompt: message,
-          workingDirectory: workingDirectory,
-          model: controller.assistantModelForSession(sessionKey),
+          workingDirectory: resolvedWorkingDirectory,
+          model: routingResolution.resolvedModel.trim().isNotEmpty
+              ? routingResolution.resolvedModel
+              : controller.assistantModelForSession(sessionKey),
           thinking: thinking,
-          selectedSkills: selectedSkills,
+          selectedSkills: routingResolution.resolvedSkills.isNotEmpty
+              ? routingResolution.resolvedSkills
+              : selectedSkills,
           inlineAttachments: attachments,
           localAttachments: localAttachments,
           aiGatewayBaseUrl: controller.aiGatewayUrl,
-          aiGatewayApiKey: await controller.loadAiGatewayApiKey(),
+          aiGatewayApiKey: aiGatewayApiKey,
           agentId: '',
           metadata: const <String, dynamic>{},
-          routing: routing,
+          routing: _resolvedRoutingConfigDesktopInternal(
+            routing,
+            routingResolution,
+          ),
           routingHint: 'single-agent',
-          provider: effectiveProvider,
+          provider: effectiveProvider ?? SingleAgentProvider.auto,
           remoteWorkingDirectoryHint:
               controller
                   .requireTaskThreadForSessionInternal(sessionKey)
@@ -218,6 +232,33 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
   });
 }
 
+ExternalCodeAgentAcpRoutingConfig _resolvedRoutingConfigDesktopInternal(
+  ExternalCodeAgentAcpRoutingConfig original,
+  ExternalCodeAgentAcpRoutingResolution resolution,
+) {
+  final explicitExecutionTarget = switch (resolution.resolvedExecutionTarget
+      .trim()
+      .toLowerCase()) {
+    'single-agent' => 'singleAgent',
+    'gateway' =>
+      resolution.resolvedEndpointTarget.trim().toLowerCase() == 'remote'
+          ? 'remote'
+          : 'local',
+    _ => original.explicitExecutionTarget,
+  };
+  return ExternalCodeAgentAcpRoutingConfig(
+    mode: ExternalCodeAgentAcpRoutingMode.explicit,
+    preferredGatewayTarget: original.preferredGatewayTarget,
+    explicitExecutionTarget: explicitExecutionTarget,
+    explicitProviderId: resolution.resolvedProviderId,
+    explicitModel: resolution.resolvedModel,
+    explicitSkills: resolution.resolvedSkills,
+    allowSkillInstall: original.allowSkillInstall,
+    availableSkills: original.availableSkills,
+    installApproval: original.installApproval,
+  );
+}
+
 Future<void> _applySingleAgentGoTaskResultDesktopInternal(
   AppController controller, {
   required String sessionKey,
@@ -245,7 +286,11 @@ Future<void> _applySingleAgentGoTaskResultDesktopInternal(
     lastRemoteWorkspaceRefKind: result.remoteWorkspaceRefKind,
     updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
   );
-  await _persistSingleAgentArtifactsDesktopInternal(controller, sessionKey, result);
+  await _persistSingleAgentArtifactsDesktopInternal(
+    controller,
+    sessionKey,
+    result,
+  );
   controller.clearAiGatewayStreamingTextInternal(sessionKey);
   if (!result.success) {
     controller.appendAssistantThreadMessageInternal(
@@ -356,7 +401,9 @@ String _sanitizeArtifactRelativePathInternal(String raw) {
   }
   final cleaned = trimmed
       .split('/')
-      .where((segment) => segment.isNotEmpty && segment != '.' && segment != '..')
+      .where(
+        (segment) => segment.isNotEmpty && segment != '.' && segment != '..',
+      )
       .join('/');
   return cleaned;
 }

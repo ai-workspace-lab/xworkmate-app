@@ -36,32 +36,46 @@ class ExternalCodeAgentAcpDesktopTransport
     );
     final result = _castMap(response['result']);
     final caps = _castMap(result['capabilities']);
-    final providers = <SingleAgentProvider>{};
-    for (final raw in <Object?>[
-      ..._asList(result['providers']),
-      ..._asList(caps['providers']),
-    ]) {
-      if (raw == null) {
-        continue;
-      }
-      final provider = SingleAgentProviderCopy.fromJsonValue(
-        raw.toString().trim().toLowerCase(),
-      );
-      if (provider != SingleAgentProvider.auto) {
-        providers.add(provider);
-      }
-    }
+    final providerCatalog = _parseProviderCatalog(
+      result['providerCatalog'] ?? caps['providerCatalog'],
+    );
     return ExternalCodeAgentAcpCapabilities(
       singleAgent:
           _boolValue(result['singleAgent']) ??
           _boolValue(caps['single_agent']) ??
-          providers.isNotEmpty,
+          providerCatalog.isNotEmpty,
       multiAgent:
           _boolValue(result['multiAgent']) ??
           _boolValue(caps['multi_agent']) ??
           true,
-      providers: providers,
+      providerCatalog: providerCatalog,
       raw: result,
+    );
+  }
+
+  @override
+  Future<ExternalCodeAgentAcpRoutingResolution> resolveExternalAcpRouting({
+    required String taskPrompt,
+    required String workingDirectory,
+    required ExternalCodeAgentAcpRoutingConfig routing,
+    String aiGatewayBaseUrl = '',
+    String aiGatewayApiKey = '',
+  }) async {
+    await _syncProviders();
+    final response = await _bridge.request(
+      method: 'xworkmate.routing.resolve',
+      params: <String, dynamic>{
+        'taskPrompt': taskPrompt,
+        'workingDirectory': workingDirectory.trim(),
+        if (aiGatewayBaseUrl.trim().isNotEmpty)
+          'aiGatewayBaseUrl': aiGatewayBaseUrl.trim(),
+        if (aiGatewayApiKey.trim().isNotEmpty)
+          'aiGatewayApiKey': aiGatewayApiKey.trim(),
+        'routing': routing.toJson(),
+      },
+    );
+    return ExternalCodeAgentAcpRoutingResolution(
+      raw: _castMap(response['result']),
     );
   }
 
@@ -199,5 +213,25 @@ class ExternalCodeAgentAcpDesktopTransport
       return false;
     }
     return null;
+  }
+
+  List<SingleAgentProvider> _parseProviderCatalog(Object? raw) {
+    final providers = <SingleAgentProvider>[];
+    for (final item in _asList(raw)) {
+      final entry = _castMap(item);
+      final providerId = entry['providerId']?.toString().trim() ?? '';
+      if (providerId.isEmpty) {
+        continue;
+      }
+      final label = entry['label']?.toString().trim();
+      final provider = SingleAgentProviderCopy.fromJsonValue(
+        providerId,
+        label: label?.isNotEmpty == true ? label : null,
+      );
+      if (provider != SingleAgentProvider.auto) {
+        providers.add(provider);
+      }
+    }
+    return normalizeSingleAgentProviderList(providers);
   }
 }
