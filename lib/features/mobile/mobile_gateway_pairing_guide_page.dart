@@ -15,11 +15,13 @@ class MobileGatewayPairingGuidePage extends StatelessWidget {
     super.key,
     required this.supportsQrScan,
     required this.onManualInput,
+    required this.onManualCodeInput,
     required this.onScannedSetupCode,
   });
 
   final bool supportsQrScan;
   final VoidCallback onManualInput;
+  final VoidCallback onManualCodeInput;
   final Future<void> Function(String setupCode) onScannedSetupCode;
 
   @override
@@ -193,6 +195,36 @@ class MobileGatewayPairingGuidePage extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
+                        key: const ValueKey('pairing-guide-manual-code-button'),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          onManualCodeInput();
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          backgroundColor: Colors.white,
+                          foregroundColor: palette.textPrimary,
+                          side: BorderSide(
+                            color: Colors.black.withValues(alpha: 0.08),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppRadius.button,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          '输入验证码',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
                         key: const ValueKey('pairing-guide-manual-button'),
                         onPressed: () {
                           Navigator.of(context).pop();
@@ -332,7 +364,13 @@ String? resolveGatewaySetupCodeFromScan(String raw) {
     return null;
   }
   final candidate = _extractSetupCodeFromJsonPayload(trimmed) ?? trimmed;
-  return decodeGatewaySetupCode(candidate) != null ? candidate : null;
+  if (decodeGatewaySetupCode(candidate) != null) {
+    return candidate;
+  }
+  if (decodeBridgeBootstrapEnvelope(candidate) != null) {
+    return candidate;
+  }
+  return isBridgeBootstrapShortCode(candidate) ? candidate : null;
 }
 
 String? _extractSetupCodeFromJsonPayload(String raw) {
