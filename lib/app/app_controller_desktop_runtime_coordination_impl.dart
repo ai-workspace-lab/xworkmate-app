@@ -53,8 +53,28 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
   bool persistMountTargets = false,
 }) async {
   try {
+    final target = controller.assistantExecutionTargetForSession(
+      controller.sessionsControllerInternal.currentSessionKey,
+    );
+    final resolvedProvider =
+        target == AssistantExecutionTarget.singleAgent
+        ? (controller.singleAgentResolvedProviderForSession(
+                controller.sessionsControllerInternal.currentSessionKey,
+              ) ??
+              controller.currentSingleAgentResolvedProvider)
+        : null;
+    final endpointOverride = resolvedProvider == null
+        ? null
+        : controller.resolveSingleAgentEndpointInternal(resolvedProvider);
+    final authorizationOverride = resolvedProvider == null
+        ? ''
+        : await controller.resolveSingleAgentAuthorizationHeaderForProviderInternal(
+            resolvedProvider,
+          );
     await controller.gatewayAcpClientInternal.loadCapabilities(
       forceRefresh: forceRefresh,
+      endpointOverride: endpointOverride,
+      authorizationOverride: authorizationOverride,
     );
   } catch (_) {
     // Keep mount refresh resilient when ACP is temporarily unavailable.

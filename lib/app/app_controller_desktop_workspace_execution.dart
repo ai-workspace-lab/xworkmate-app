@@ -396,6 +396,16 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       );
       return;
     }
+    final endpointOverride = resolveSingleAgentEndpointInternal(provider);
+    if (endpointOverride == null) {
+      await replaceSingleAgentThreadSkillsInternal(
+        normalizedSessionKey,
+        localSkills,
+      );
+      return;
+    }
+    final authorizationOverride =
+        await resolveSingleAgentAuthorizationHeaderForProviderInternal(provider);
     await replaceSingleAgentThreadSkillsInternal(
       normalizedSessionKey,
       localSkills,
@@ -410,6 +420,8 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
           'mode': 'single-agent',
           'provider': provider.providerId,
         },
+        endpointOverride: endpointOverride,
+        authorizationOverride: authorizationOverride,
       );
       final result = asMap(response['result']);
       final payload = result.isNotEmpty ? result : response;

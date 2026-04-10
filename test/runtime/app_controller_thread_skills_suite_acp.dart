@@ -85,6 +85,8 @@ void registerThreadSkillsAcpTests() {
           singleAgentTestSettingsInternal(
             workspacePath: tempDirectory.path,
             gatewayPort: acpServer.port,
+            singleAgentProviderEndpoint:
+                'http://127.0.0.1:${acpServer.port}/opencode',
           ),
         );
         await store.saveTaskThreads(<TaskThread>[
@@ -218,6 +220,8 @@ void registerThreadSkillsAcpTests() {
           singleAgentTestSettingsInternal(
             workspacePath: tempDirectory.path,
             gatewayPort: acpServer.port,
+            singleAgentProviderEndpoint:
+                'http://127.0.0.1:${acpServer.port}/opencode',
           ),
         );
 
