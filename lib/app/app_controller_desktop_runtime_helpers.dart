@@ -702,18 +702,22 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     return '';
   }
 
+  Future<String> resolveSingleAgentAuthorizationHeaderForProviderInternal(
+    SingleAgentProvider provider,
+  ) async {
+    final endpoint = resolveSingleAgentEndpointInternal(provider);
+    if (endpoint == null) {
+      return '';
+    }
+    return resolveSingleAgentAuthorizationHeaderInternal(endpoint);
+  }
+
   Uri? resolveGatewayAcpEndpointInternal() {
     final target = assistantExecutionTargetForSession(
       sessionsControllerInternal.currentSessionKey,
     );
     if (target == AssistantExecutionTarget.singleAgent) {
-      final remote = gatewayProfileBaseUriInternal(
-        settings.primaryRemoteGatewayProfile,
-      );
-      if (remote != null) {
-        return remote;
-      }
-      return gatewayProfileBaseUriInternal(settings.primaryLocalGatewayProfile);
+      return null;
     }
     return gatewayProfileBaseUriInternal(
       gatewayProfileForAssistantExecutionTargetInternal(target),

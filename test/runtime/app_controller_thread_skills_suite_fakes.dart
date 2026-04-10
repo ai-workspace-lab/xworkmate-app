@@ -66,6 +66,8 @@ class AcpSkillsStatusServerInternal {
   final HttpServer serverInternal;
   List<Map<String, dynamic>> skills;
   Map<String, dynamic>? skillsError;
+  String? lastAuthorizationHeader;
+  String? lastRequestPath;
 
   int get port => serverInternal.port;
 
@@ -97,6 +99,10 @@ class AcpSkillsStatusServerInternal {
   }
 
   Future<void> handleRpcInternal(HttpRequest request) async {
+    lastRequestPath = request.uri.path;
+    lastAuthorizationHeader = request.headers.value(
+      HttpHeaders.authorizationHeader,
+    );
     final body = await utf8.decodeStream(request);
     final envelope = jsonDecode(body) as Map<String, dynamic>;
     final id = envelope['id'];
