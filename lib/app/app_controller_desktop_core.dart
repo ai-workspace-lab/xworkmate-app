@@ -306,7 +306,8 @@ class AppController extends ChangeNotifier {
   final Map<String, String> aiGatewayStreamingTextBySessionInternal =
       <String, String>{};
   final Map<String, ExternalCodeAgentAcpSyncedProvider>
-  syncedGoAgentProvidersInternal = <String, ExternalCodeAgentAcpSyncedProvider>{};
+  syncedGoAgentProvidersInternal =
+      <String, ExternalCodeAgentAcpSyncedProvider>{};
   final DesktopThreadArtifactService threadArtifactServiceInternal =
       DesktopThreadArtifactService();
   List<AssistantThreadSkillEntry> singleAgentSharedImportedSkillsInternal =
@@ -575,10 +576,16 @@ class AppController extends ChangeNotifier {
 
   List<SingleAgentProvider> get configuredSingleAgentProviders =>
       normalizeSingleAgentProviderList(
-        (availableSingleAgentProvidersOverrideInternal ??
-                settings.savedSingleAgentProviders)
-            .where((item) => item != SingleAgentProvider.auto)
-            .map(settings.resolveSingleAgentProvider),
+        availableSingleAgentProvidersOverrideInternal ??
+            <SingleAgentProvider>[
+                  ...settings.savedSingleAgentProviders,
+                  ...singleAgentCapabilitiesByProviderInternal.keys,
+                  ...singleAgentCapabilitiesByProviderInternal.values.expand(
+                    (item) => item.supportedProviders,
+                  ),
+                ]
+                .where((item) => item != SingleAgentProvider.auto)
+                .map(settings.resolveSingleAgentProvider),
       );
 
   List<SingleAgentProvider> get availableSingleAgentProviders =>
@@ -599,7 +606,9 @@ class AppController extends ChangeNotifier {
     }
     return <AssistantExecutionTarget>[
       AssistantExecutionTarget.singleAgent,
-      ...visible.where((target) => target != AssistantExecutionTarget.singleAgent),
+      ...visible.where(
+        (target) => target != AssistantExecutionTarget.singleAgent,
+      ),
     ];
   }
 
