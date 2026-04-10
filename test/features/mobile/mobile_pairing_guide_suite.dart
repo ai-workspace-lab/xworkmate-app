@@ -28,6 +28,7 @@ void main() {
     WidgetTester tester, {
     required bool supportsQrScan,
     required VoidCallback onManual,
+    required VoidCallback onManualCode,
     required Future<void> Function(String setupCode) onScanned,
   }) async {
     tester.view.devicePixelRatio = 1;
@@ -44,6 +45,7 @@ void main() {
         home: MobileGatewayPairingGuidePage(
           supportsQrScan: supportsQrScan,
           onManualInput: onManual,
+          onManualCodeInput: onManualCode,
           onScannedSetupCode: onScanned,
         ),
       ),
@@ -56,6 +58,7 @@ void main() {
       tester,
       supportsQrScan: true,
       onManual: () {},
+      onManualCode: () {},
       onScanned: (_) async {},
     );
 
@@ -74,6 +77,7 @@ void main() {
       tester,
       supportsQrScan: true,
       onManual: () => manualTapped = true,
+      onManualCode: () {},
       onScanned: (_) async {},
     );
 
@@ -87,6 +91,7 @@ void main() {
       tester,
       supportsQrScan: false,
       onManual: () {},
+      onManualCode: () {},
       onScanned: (_) async {},
     );
 
@@ -103,5 +108,30 @@ void main() {
       resolveGatewaySetupCodeFromScan(payload),
       '{"url":"wss://gateway.example.com","token":"shared-token"}',
     );
+  });
+
+  testWidgets('manual code button triggers callback', (tester) async {
+    var manualCodeTapped = false;
+    await pumpGuide(
+      tester,
+      supportsQrScan: true,
+      onManual: () {},
+      onManualCode: () => manualCodeTapped = true,
+      onScanned: (_) async {},
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('pairing-guide-manual-code-button')),
+    );
+    await tester.pumpAndSettle();
+    expect(manualCodeTapped, isTrue);
+  });
+
+  test('scan parser accepts bridge bootstrap envelopes and short codes', () {
+    const envelope =
+        '{"scheme":"xworkmate-bridge-bootstrap","ticket":"ticket-1","bridge":"https://xworkmate-bridge.svc.plus"}';
+
+    expect(resolveGatewaySetupCodeFromScan(envelope), envelope);
+    expect(resolveGatewaySetupCodeFromScan('AB12CD34'), 'AB12CD34');
   });
 }

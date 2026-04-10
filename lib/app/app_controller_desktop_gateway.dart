@@ -32,10 +32,12 @@ import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import '../runtime/skill_directory_access.dart';
+import '../runtime/account_runtime_client.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_settings.dart';
 import 'app_controller_desktop_single_agent.dart';
+import 'app_controller_desktop_thread_binding.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_actions.dart';
 import 'app_controller_desktop_workspace_execution.dart';
@@ -45,12 +47,60 @@ import 'app_controller_desktop_skill_permissions.dart';
 import 'app_controller_desktop_runtime_helpers.dart';
 
 extension AppControllerDesktopGateway on AppController {
+  Future<String> resolveConnectSetupCode(String rawInput) async {
+    final trimmed = rawInput.trim();
+    if (trimmed.isEmpty) {
+      return trimmed;
+    }
+    if (decodeGatewaySetupCode(trimmed) != null) {
+      return trimmed;
+    }
+    final bootstrapEnvelope = decodeBridgeBootstrapEnvelope(trimmed);
+    if (bootstrapEnvelope != null) {
+      final bridgeClient = AccountRuntimeClient(
+        baseUrl: bootstrapEnvelope.bridgeOrigin,
+      );
+      final consumed = await bridgeClient.consumeBridgeBootstrapTicket(
+        ticket: bootstrapEnvelope.ticket,
+        bridgeOrigin: bootstrapEnvelope.bridgeOrigin,
+      );
+      return consumed.setupCode.trim();
+    }
+    if (isBridgeBootstrapShortCode(trimmed)) {
+      final sessionToken =
+          (await storeInternal.loadAccountSessionToken())?.trim() ?? '';
+      final accountBaseUrl = settings.accountBaseUrl.trim().isNotEmpty
+          ? settings.accountBaseUrl.trim()
+          : settingsControllerInternal.snapshot.accountBaseUrl.trim();
+      if (sessionToken.isEmpty || accountBaseUrl.isEmpty) {
+        throw StateError(
+          'Account sign-in is required before using a bridge verification code.',
+        );
+      }
+      final accountClient = settingsControllerInternal.buildAccountClient(
+        accountBaseUrl,
+      );
+      final issue = await accountClient.lookupBridgeBootstrapTicket(
+        token: sessionToken,
+        shortCode: trimmed,
+      );
+      final bridgeClient = AccountRuntimeClient(baseUrl: issue.bridgeOrigin);
+      final consumed = await bridgeClient.consumeBridgeBootstrapTicket(
+        ticket: issue.ticket,
+        bridgeOrigin: issue.bridgeOrigin,
+      );
+      return consumed.setupCode.trim();
+    }
+    return trimmed;
+  }
+
   Future<void> connectWithSetupCode({
     required String setupCode,
     String token = '',
     String password = '',
   }) async {
-    final decoded = decodeGatewaySetupCode(setupCode);
+    final resolvedSetupCode = await resolveConnectSetupCode(setupCode);
+    final decoded = decodeGatewaySetupCode(resolvedSetupCode);
     final resolvedToken = token.trim().isNotEmpty
         ? token.trim()
         : (decoded?.token.trim() ?? '');
@@ -79,7 +129,7 @@ extension AppControllerDesktopGateway on AppController {
     );
     final nextProfile = currentProfile.copyWith(
       useSetupCode: true,
-      setupCode: setupCode.trim(),
+      setupCode: resolvedSetupCode.trim(),
       host: decoded?.host ?? currentProfile.host,
       port: decoded?.port ?? currentProfile.port,
       tls: decoded?.tls ?? currentProfile.tls,
@@ -96,9 +146,18 @@ extension AppControllerDesktopGateway on AppController {
           .copyWith(assistantExecutionTarget: resolvedTarget),
       refreshAfterSave: false,
     );
-    upsertTaskThreadInternal(
-      sessionsControllerInternal.currentSessionKey,
+    final sessionKey = sessionsControllerInternal.currentSessionKey;
+    final ownerScope = await ensureDesktopThreadOwnerScopeInternal(sessionKey);
+    final workspaceBinding = buildDesktopWorkspaceBindingInternal(
+      sessionKey,
       executionTarget: resolvedTarget,
+      ownerScope: ownerScope,
+    );
+    upsertTaskThreadInternal(
+      sessionKey,
+      executionTarget: resolvedTarget,
+      ownerScope: ownerScope,
+      workspaceBinding: workspaceBinding,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     await AppControllerDesktopGateway(this).connectProfileInternal(
@@ -154,9 +213,18 @@ extension AppControllerDesktopGateway on AppController {
           .copyWith(assistantExecutionTarget: nextTarget),
       refreshAfterSave: false,
     );
-    upsertTaskThreadInternal(
-      sessionsControllerInternal.currentSessionKey,
+    final sessionKey = sessionsControllerInternal.currentSessionKey;
+    final ownerScope = await ensureDesktopThreadOwnerScopeInternal(sessionKey);
+    final workspaceBinding = buildDesktopWorkspaceBindingInternal(
+      sessionKey,
       executionTarget: nextTarget,
+      ownerScope: ownerScope,
+    );
+    upsertTaskThreadInternal(
+      sessionKey,
+      executionTarget: nextTarget,
+      ownerScope: ownerScope,
+      workspaceBinding: workspaceBinding,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     await AppControllerDesktopGateway(this).connectProfileInternal(
