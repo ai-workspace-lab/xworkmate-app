@@ -89,12 +89,20 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
         target: AssistantExecutionTarget.singleAgent,
         forceRefresh: forceRefresh,
       );
+  controller.bridgeAdvertisedProvidersInternal =
+      controller.availableSingleAgentProvidersOverrideInternal != null
+      ? normalizeSingleAgentProviderList(
+          controller.availableSingleAgentProvidersOverrideInternal!,
+        )
+      : normalizeSingleAgentProviderList(
+          capabilities.providers.map(
+            controller.settings.resolveSingleAgentProvider,
+          ),
+        );
   final next = <SingleAgentProvider, SingleAgentCapabilities>{};
   for (final provider in controller.configuredSingleAgentProviders) {
     if (!capabilities.providers.contains(provider)) {
-      next[provider] = const SingleAgentCapabilities.unavailable(
-        endpoint: '',
-      );
+      next[provider] = const SingleAgentCapabilities.unavailable(endpoint: '');
       continue;
     }
     next[provider] = SingleAgentCapabilities(
