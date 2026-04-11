@@ -29,13 +29,12 @@ The following app-side concerns remain in `xworkmate-app`:
 - Flutter UI and settings pages
 - ACP Bridge client-side configuration and secure-storage handling
 - Dart runtime launch/locator logic for the helper binary
-- packaging logic that embeds the helper into the app bundle
 
 ## Build Contract
 
 `xworkmate-app` expects the helper artifact named `xworkmate-go-core`.
 
-This is the current cross-repo runtime contract, not a legacy compatibility shim. The helper is built from `xworkmate-bridge` and consumed by `xworkmate-app`.
+This is the current cross-repo runtime contract for local development flows, not a legacy compatibility shim. The helper is built from `xworkmate-bridge` and consumed by `xworkmate-app` outside the shipped app bundle.
 
 ## App Repository Changes
 

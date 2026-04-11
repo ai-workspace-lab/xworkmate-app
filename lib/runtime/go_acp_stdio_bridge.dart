@@ -154,7 +154,7 @@ class GoAcpStdioBridge {
       isAppleHost: Platform.isIOS || Platform.isMacOS,
     )) {
       throw UnsupportedError(
-        'App Store builds only allow the bundled Go core helper inside the app bundle.',
+        'App Store builds do not allow launching local Go core processes.',
       );
     }
     final process = await _processStarter(
@@ -183,7 +183,10 @@ class GoAcpStdioBridge {
         );
       }),
     );
-    await request(method: 'acp.capabilities', params: const <String, dynamic>{});
+    await request(
+      method: 'acp.capabilities',
+      params: const <String, dynamic>{},
+    );
   }
 
   void _handleStdoutLine(String line) {
