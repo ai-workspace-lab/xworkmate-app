@@ -70,7 +70,7 @@
 - 任务列表按 `单机智能体 / 本地 OpenClaw Gateway / 远程 OpenClaw Gateway` 分组，保持极简列表布局。
 - Multi-Agent 协作正式升级为 `Architect / Engineer / Tester`，并可选 `ARIS` 作为最强协作框架。
 - ARIS bundle 作为只读资产内嵌进 App，`skills/` 直接复用 upstream，`llm-chat` 与 `claude-review` 切到 Go core。
-- `Ollama Cloud` 文案与默认地址统一，打包后的 `.app` 会随同分发 `xworkmate-go-core` helper。
+- `Ollama Cloud` 文案与默认地址统一，Go core 保持为包外开发态能力，不再内嵌进 `.app`。
 
 ### Current Delivery Scope
 - 已交付：Single Agent streaming threads、OpenClaw 本地/远程任务线程、手动归档与持续会话恢复。
