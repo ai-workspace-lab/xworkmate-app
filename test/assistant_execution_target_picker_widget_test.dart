@@ -18,7 +18,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'mode picker keeps single-agent and gateway visible while project selector stays available',
+    'mode picker keeps single-agent and gateway visible while thread-only provider controls stay available',
     (tester) async {
       final root = Directory.systemTemp.createTempSync(
         'xworkmate-picker-widget-test-',
@@ -57,10 +57,6 @@ void main() {
       );
       controller.lastObservedSettingsSnapshotInternal =
           controller.settingsController.snapshotInternal;
-      await controller.saveAssistantSelectedWorkingDirectoryForSession(
-        controller.currentSessionKey,
-        '/tmp/project-alpha',
-      );
 
       await tester.pumpWidget(
         MaterialApp(
@@ -122,19 +118,112 @@ void main() {
       ]);
       expect(
         find.byKey(const Key('assistant-working-directory-button')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('assistant-single-agent-provider-button')),
         findsOneWidget,
       );
-      expect(find.text('project-alpha'), findsOneWidget);
       expect(
         find.byKey(const Key('assistant-collaboration-toggle')),
         findsNothing,
       );
 
       await tester.pumpWidget(const SizedBox.shrink());
-      controller.dispose();
       await tester.pump();
     },
   );
+
+  testWidgets('gateway mode shows the canonical OpenClaw provider selector', (
+    tester,
+  ) async {
+    final root = Directory.systemTemp.createTempSync(
+      'xworkmate-picker-widget-gateway-test-',
+    );
+    final store = SecureConfigStore(
+      enableSecureStorage: false,
+      appDataRootPathResolver: () async => '${root.path}/settings.sqlite3',
+      secretRootPathResolver: () async => root.path,
+      supportRootPathResolver: () async => root.path,
+    );
+    final controller = AppController(
+      store: store,
+      desktopPlatformService: UnsupportedDesktopPlatformService(),
+      skillDirectoryAccessService: _FakeSkillDirectoryAccessService(root.path),
+      goTaskServiceClient: const _FakeGoTaskServiceClient(),
+      singleAgentSharedSkillScanRootOverrides: const <String>[],
+      availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+        SingleAgentProvider.codex,
+      ],
+    );
+    final inputController = TextEditingController();
+    final focusNode = FocusNode();
+    addTearDown(() async {
+      controller.dispose();
+      inputController.dispose();
+      focusNode.dispose();
+      if (root.existsSync()) {
+        await root.delete(recursive: true);
+      }
+    });
+
+    controller.appUiStateInternal = controller.appUiState.copyWith(
+      savedGatewayTargets: const <String>['gateway'],
+    );
+    controller.lastObservedSettingsSnapshotInternal =
+        controller.settingsController.snapshotInternal;
+    controller.initializeAssistantThreadContext(
+      controller.currentSessionKey,
+      executionTarget: AssistantExecutionTarget.gateway,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(platform: TargetPlatform.macOS),
+        home: Scaffold(
+          body: ComposerBarInternal(
+            controller: controller,
+            inputController: inputController,
+            focusNode: focusNode,
+            thinkingLabel: 'Normal',
+            showModelControl: false,
+            modelLabel: '',
+            modelOptions: const <String>[],
+            attachments: const <ComposerAttachmentInternal>[],
+            availableSkills: const <ComposerSkillOptionInternal>[],
+            selectedSkillKeys: const <String>[],
+            onRemoveAttachment: (_) {},
+            onToggleSkill: (_) {},
+            onThinkingChanged: (_) {},
+            onModelChanged: (_) async {},
+            onOpenGateway: () {},
+            onOpenAiGatewaySettings: () {},
+            onReconnectGateway: () async {},
+            onPickAttachments: () {},
+            onAddAttachment: (_) {},
+            onPasteImageAttachment: () async => null,
+            onContentHeightChanged: (_) {},
+            onInputHeightChanged: (_) {},
+            onSend: () async {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(
+      find.byKey(const Key('assistant-single-agent-provider-button')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('assistant-gateway-provider-button')),
+      findsOneWidget,
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
 }
 
 class _FakeSkillDirectoryAccessService implements SkillDirectoryAccessService {

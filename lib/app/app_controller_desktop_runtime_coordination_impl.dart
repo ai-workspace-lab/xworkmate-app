@@ -157,9 +157,16 @@ String? assistantWorkingDirectoryForSessionRuntimeInternal(
   AppController controller,
   String sessionKey,
 ) {
-  final candidate = controller
-      .assistantSelectedWorkingDirectoryForSession(sessionKey)
-      .trim();
+  final normalizedSessionKey = controller.normalizedAssistantSessionKeyInternal(
+    sessionKey,
+  );
+  final candidate =
+      controller
+          .assistantThreadRecordsInternal[normalizedSessionKey]
+          ?.workspaceBinding
+          .workspacePath
+          .trim() ??
+      '';
   if (candidate.isEmpty) {
     return null;
   }

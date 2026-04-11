@@ -755,7 +755,6 @@ class ThreadContextState {
     required this.latestResolvedRuntimeModel,
     this.selectedModelSource = ThreadSelectionSource.inherited,
     this.selectedSkillsSource = ThreadSelectionSource.inherited,
-    this.selectedWorkingDirectory,
     this.gatewayEntryState,
     this.lastRemoteWorkingDirectory,
     this.lastRemoteWorkspaceRefKind,
@@ -772,7 +771,6 @@ class ThreadContextState {
   final String latestResolvedRuntimeModel;
   final ThreadSelectionSource selectedModelSource;
   final ThreadSelectionSource selectedSkillsSource;
-  final String? selectedWorkingDirectory;
   final String? gatewayEntryState;
   final String? lastRemoteWorkingDirectory;
   final WorkspaceRefKind? lastRemoteWorkspaceRefKind;
@@ -789,8 +787,6 @@ class ThreadContextState {
     String? latestResolvedRuntimeModel,
     ThreadSelectionSource? selectedModelSource,
     ThreadSelectionSource? selectedSkillsSource,
-    String? selectedWorkingDirectory,
-    bool clearSelectedWorkingDirectory = false,
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
     String? lastRemoteWorkingDirectory,
@@ -809,9 +805,6 @@ class ThreadContextState {
           latestResolvedRuntimeModel ?? this.latestResolvedRuntimeModel,
       selectedModelSource: selectedModelSource ?? this.selectedModelSource,
       selectedSkillsSource: selectedSkillsSource ?? this.selectedSkillsSource,
-      selectedWorkingDirectory: clearSelectedWorkingDirectory
-          ? null
-          : (selectedWorkingDirectory ?? this.selectedWorkingDirectory),
       gatewayEntryState: clearGatewayEntryState
           ? null
           : (gatewayEntryState ?? this.gatewayEntryState),
@@ -838,7 +831,6 @@ class ThreadContextState {
       'latestResolvedRuntimeModel': latestResolvedRuntimeModel,
       'selectedModelSource': selectedModelSource.name,
       'selectedSkillsSource': selectedSkillsSource.name,
-      'selectedWorkingDirectory': selectedWorkingDirectory,
       'gatewayEntryState': gatewayEntryState,
       'lastRemoteWorkingDirectory': lastRemoteWorkingDirectory,
       'lastRemoteWorkspaceRefKind': lastRemoteWorkspaceRefKind?.name,
@@ -904,7 +896,6 @@ class ThreadContextState {
       selectedSkillsSource: ThreadSelectionSourceCopy.fromJsonValue(
         json['selectedSkillsSource']?.toString(),
       ),
-      selectedWorkingDirectory: json['selectedWorkingDirectory']?.toString(),
       gatewayEntryState: json['gatewayEntryState']?.toString(),
       lastRemoteWorkingDirectory: json['lastRemoteWorkingDirectory']
           ?.toString(),
@@ -1000,7 +991,6 @@ class TaskThread {
     String? latestResolvedRuntimeModel,
     double? lastRunAtMs,
     String? lastResultCode,
-    String? selectedWorkingDirectory,
     String? lastRemoteWorkingDirectory,
     WorkspaceRefKind? lastRemoteWorkspaceRefKind,
     double? lastArtifactSyncAtMs,
@@ -1038,10 +1028,6 @@ class TaskThread {
                  messageViewMode ?? AssistantMessageViewMode.rendered,
              latestResolvedRuntimeModel:
                  latestResolvedRuntimeModel?.trim() ?? '',
-             selectedWorkingDirectory:
-                 selectedWorkingDirectory?.trim().isNotEmpty == true
-                 ? selectedWorkingDirectory!.trim()
-                 : null,
              gatewayEntryState: gatewayEntryState?.trim(),
              lastRemoteWorkingDirectory:
                  lastRemoteWorkingDirectory?.trim().isNotEmpty == true
@@ -1084,7 +1070,6 @@ class TaskThread {
   List<String> get selectedSkillKeys => contextState.selectedSkillKeys;
   String get assistantModelId => contextState.selectedModelId;
   AssistantMessageViewMode get messageViewMode => contextState.messageViewMode;
-  String? get selectedWorkingDirectory => contextState.selectedWorkingDirectory;
   String? get gatewayEntryState => contextState.gatewayEntryState;
   String? get lastRemoteWorkingDirectory =>
       contextState.lastRemoteWorkingDirectory;
@@ -1125,8 +1110,6 @@ class TaskThread {
     String? assistantModelId,
     ThreadSelectionSource? assistantModelSource,
     ThreadSelectionSource? selectedSkillsSource,
-    String? selectedWorkingDirectory,
-    bool clearSelectedWorkingDirectory = false,
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
     String? latestResolvedRuntimeModel,
@@ -1150,8 +1133,6 @@ class TaskThread {
         selectedModelSource: assistantModelSource,
         selectedSkillsSource: selectedSkillsSource,
         latestResolvedRuntimeModel: latestResolvedRuntimeModel,
-        selectedWorkingDirectory: selectedWorkingDirectory,
-        clearSelectedWorkingDirectory: clearSelectedWorkingDirectory,
         gatewayEntryState: gatewayEntryState,
         clearGatewayEntryState: clearGatewayEntryState,
         lastRemoteWorkingDirectory: lastRemoteWorkingDirectory,
@@ -1268,7 +1249,6 @@ class TaskThread {
         'latestResolvedRuntimeModel': json['latestResolvedRuntimeModel'],
         'selectedModelSource': json['assistantModelSource'],
         'selectedSkillsSource': json['selectedSkillsSource'],
-        'selectedWorkingDirectory': json['selectedWorkingDirectory'],
         'gatewayEntryState': json['gatewayEntryState'],
         'lastRemoteWorkingDirectory': json['lastRemoteWorkingDirectory'],
         'lastRemoteWorkspaceRefKind': json['lastRemoteWorkspaceRefKind'],

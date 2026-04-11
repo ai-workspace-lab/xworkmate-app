@@ -198,17 +198,16 @@ extension AppControllerDesktopThreadBinding on AppController {
   }) {
     if (executionTarget == AssistantExecutionTarget.singleAgent) {
       if (existingBinding != null &&
-          existingBinding.workspaceKind == WorkspaceKind.localFs &&
-          !isManagedLocalThreadWorkspacePathInternal(
-            existingBinding.workspacePath,
-            sessionKey,
-          ) &&
-          ensureLocalWorkspaceDirectoryInternal(
-            existingBinding.workspacePath,
-          )) {
-        return existingBinding.copyWith(
-          displayPath: existingBinding.workspacePath,
-        );
+          existingBinding.workspaceKind == WorkspaceKind.localFs) {
+        final existingPath = existingBinding.workspacePath.trim();
+        if (existingPath.isNotEmpty &&
+            ensureLocalWorkspaceDirectoryInternal(existingPath)) {
+          // A task thread owns one stable local workingDirectory for its
+          // lifetime. Do not silently rebind it after the initial allocation.
+          return existingBinding.copyWith(
+            displayPath: existingBinding.workspacePath,
+          );
+        }
       }
       final localPath = localThreadWorkspacePathInternal(sessionKey);
       if (localPath.isEmpty) {
@@ -255,15 +254,16 @@ extension AppControllerDesktopThreadBinding on AppController {
     required SingleAgentProvider singleAgentProvider,
     ExecutionBinding? existingBinding,
   }) {
-    final sanitizedProvider =
-        executionTarget == AssistantExecutionTarget.singleAgent
-        ? settings.sanitizeSingleAgentProviderSelection(singleAgentProvider)
-        : SingleAgentProvider.unspecified;
+    final providerId = executionTarget == AssistantExecutionTarget.singleAgent
+        ? settings
+              .sanitizeSingleAgentProviderSelection(singleAgentProvider)
+              .providerId
+        : kCanonicalGatewayProviderId;
     return (existingBinding ??
             ExecutionBinding(
               executionMode: ThreadExecutionMode.localAgent,
-              executorId: sanitizedProvider.providerId,
-              providerId: sanitizedProvider.providerId,
+              executorId: providerId,
+              providerId: providerId,
               endpointId: '',
             ))
         .copyWith(
@@ -272,8 +272,8 @@ extension AppControllerDesktopThreadBinding on AppController {
               ThreadExecutionMode.localAgent,
             AssistantExecutionTarget.gateway => ThreadExecutionMode.gateway,
           },
-          executorId: sanitizedProvider.providerId,
-          providerId: sanitizedProvider.providerId,
+          executorId: providerId,
+          providerId: providerId,
           providerSource:
               executionTarget == AssistantExecutionTarget.singleAgent
               ? existingBinding?.providerSource

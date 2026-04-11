@@ -237,8 +237,6 @@ extension AppControllerDesktopSkillPermissions on AppController {
     ThreadSelectionSource? singleAgentProviderSource,
     ThreadSelectionSource? assistantModelSource,
     ThreadSelectionSource? selectedSkillsSource,
-    String? selectedWorkingDirectory,
-    bool clearSelectedWorkingDirectory = false,
     String? gatewayEntryState,
     String? latestResolvedRuntimeModel,
     String? lifecycleStatus,
@@ -350,7 +348,6 @@ extension AppControllerDesktopSkillPermissions on AppController {
                   permissionLevel: AssistantPermissionLevel.defaultAccess,
                   messageViewMode: AssistantMessageViewMode.rendered,
                   latestResolvedRuntimeModel: '',
-                  selectedWorkingDirectory: null,
                   gatewayEntryState: gatewayEntryStateForTargetInternal(
                     nextExecutionTarget,
                   ),
@@ -375,8 +372,6 @@ extension AppControllerDesktopSkillPermissions on AppController {
                   selectedSkillsSource ??
                   existing?.contextState.selectedSkillsSource,
               latestResolvedRuntimeModel: latestResolvedRuntimeModel,
-              selectedWorkingDirectory: selectedWorkingDirectory?.trim(),
-              clearSelectedWorkingDirectory: clearSelectedWorkingDirectory,
               gatewayEntryState: gatewayEntryState,
               lastRemoteWorkingDirectory: lastRemoteWorkingDirectory,
               lastRemoteWorkspaceRefKind: lastRemoteWorkspaceRefKind,
