@@ -5,9 +5,6 @@ import 'dart:io';
 import 'file_store_support.dart';
 import 'runtime_models.dart';
 
-typedef SecureConfigDatabaseOpener =
-    FutureOr<Object?> Function(String resolvedPath);
-
 enum SettingsSnapshotReloadStatus { applied, invalid }
 
 class SettingsSnapshotReloadResult {
@@ -37,40 +34,27 @@ class SkippedTaskThreadRecord {
 
 class SettingsStore {
   SettingsStore({
-    Future<String?> Function()? fallbackDirectoryPathResolver,
-    Future<String?> Function()? databasePathResolver,
-    Future<String?> Function()? defaultSupportDirectoryPathResolver,
-    SecureConfigDatabaseOpener? databaseOpener,
+    Future<String?> Function()? appDataRootPathResolver,
+    Future<String?> Function()? supportRootPathResolver,
     StoreLayoutResolver? layoutResolver,
   }) : _layoutResolver =
            layoutResolver ??
            StoreLayoutResolver(
-             localRootPathResolver: databasePathResolver,
-             supportRootPathResolver: defaultSupportDirectoryPathResolver,
-           ),
-       _enableUserSettingsMirror =
-           databasePathResolver == null &&
-           defaultSupportDirectoryPathResolver == null;
-
-  static const String settingsKey = 'xworkmate.settings.snapshot';
-  static const String auditKey = 'xworkmate.secrets.audit';
-  static const String assistantThreadsKey = 'xworkmate.assistant.threads';
-  static const String databaseFileName = 'config-store.sqlite3';
-  static const String databaseTableName = 'config_entries';
+             appDataRootPathResolver: appDataRootPathResolver,
+             supportRootPathResolver: supportRootPathResolver,
+           );
 
   final StoreLayoutResolver _layoutResolver;
-  final bool _enableUserSettingsMirror;
   bool _initialized = false;
   StoreLayout? _layout;
-  List<File> _settingsFiles = const <File>[];
-  List<Directory> _settingsWatchDirectories = const <Directory>[];
+  File? _settingsFile;
+  Directory? _settingsWatchDirectory;
   SettingsSnapshot _settingsSnapshot = SettingsSnapshot.defaults();
   List<TaskThread> _threadRecords = const <TaskThread>[];
   List<SecretAuditEntry> _auditTrail = const <SecretAuditEntry>[];
   PersistentWriteFailure? _settingsWriteFailure;
   PersistentWriteFailure? _tasksWriteFailure;
   PersistentWriteFailure? _auditWriteFailure;
-  bool _taskThreadStateResetRequired = false;
   List<SkippedTaskThreadRecord> _lastSkippedInvalidTaskThreadRecords =
       const <SkippedTaskThreadRecord>[];
 
@@ -94,44 +78,16 @@ class SettingsStore {
     _initialized = true;
     try {
       _layout = await _layoutResolver.resolve();
-      _settingsFiles = _resolveSettingsFiles(_layout!);
-      _settingsWatchDirectories = _resolveSettingsWatchDirectories(
-        _settingsFiles,
-      );
+      _settingsFile = _layout!.settingsFile;
+      _settingsWatchDirectory = _settingsFile!.parent;
     } catch (_) {
       _layout = null;
-      _settingsFiles = const <File>[];
-      _settingsWatchDirectories = const <Directory>[];
+      _settingsFile = null;
+      _settingsWatchDirectory = null;
       return;
     }
     _settingsSnapshot = await _readSettingsSnapshot();
     _threadRecords = await _readTaskThreads();
-    if (_taskThreadStateResetRequired) {
-      _settingsSnapshot = _settingsSnapshot.copyWith(
-        assistantCustomTaskTitles: const <String, String>{},
-        assistantArchivedTaskKeys: const <String>[],
-        assistantLastSessionKey: '',
-      );
-      final layout = _layout;
-      if (layout != null) {
-        try {
-          final contents = encodeYamlDocument(_settingsSnapshot.toJson());
-          for (final file
-              in _settingsFiles.isEmpty
-                  ? <File>[layout.settingsFile]
-                  : _settingsFiles) {
-            await atomicWriteString(file, contents);
-          }
-          _settingsWriteFailure = null;
-        } catch (error) {
-          _settingsWriteFailure = _buildWriteFailure(
-            PersistentStoreScope.settings,
-            'resetTaskThreadState',
-            error,
-          );
-        }
-      }
-    }
     _auditTrail = await _readAuditTrail();
   }
 
@@ -161,14 +117,14 @@ class SettingsStore {
     );
   }
 
-  Future<List<File>> resolvedSettingsFiles() async {
+  Future<File?> resolvedSettingsFile() async {
     await initialize();
-    return List<File>.from(_settingsFiles);
+    return _settingsFile;
   }
 
-  Future<List<Directory>> resolvedSettingsWatchDirectories() async {
+  Future<Directory?> resolvedSettingsWatchDirectory() async {
     await initialize();
-    return List<Directory>.from(_settingsWatchDirectories);
+    return _settingsWatchDirectory;
   }
 
   Future<void> saveSettingsSnapshot(SettingsSnapshot snapshot) async {
@@ -185,12 +141,7 @@ class SettingsStore {
     }
     try {
       final contents = encodeYamlDocument(snapshot.toJson());
-      for (final file
-          in _settingsFiles.isEmpty
-              ? <File>[layout.settingsFile]
-              : _settingsFiles) {
-        await atomicWriteString(file, contents);
-      }
+      await atomicWriteString(layout.settingsFile, contents);
       _settingsWriteFailure = null;
     } catch (error) {
       _settingsWriteFailure = _buildWriteFailure(
@@ -263,46 +214,15 @@ class SettingsStore {
 
   Future<void> clearAssistantLocalState() async {
     await initialize();
-    final nextSnapshot = _settingsSnapshot.copyWith(
-      assistantCustomTaskTitles: const <String, String>{},
-      assistantArchivedTaskKeys: const <String>[],
-      assistantLastSessionKey: '',
-    );
-    _settingsSnapshot = nextSnapshot;
     _threadRecords = const <TaskThread>[];
     final layout = _layout;
     if (layout == null) {
-      _settingsWriteFailure = _buildWriteFailure(
-        PersistentStoreScope.settings,
-        'clearAssistantLocalState',
-        StateError(
-          'Persistent settings path unavailable; reset kept in memory.',
-        ),
-      );
       _tasksWriteFailure = _buildWriteFailure(
         PersistentStoreScope.tasks,
         'clearAssistantLocalState',
         StateError('Persistent task path unavailable; reset kept in memory.'),
       );
       return;
-    }
-    try {
-      final settingsFiles = _settingsFiles.isEmpty
-          ? <File>[layout.settingsFile]
-          : _settingsFiles;
-      for (final file in settingsFiles) {
-        await atomicWriteString(
-          file,
-          encodeYamlDocument(nextSnapshot.toJson()),
-        );
-      }
-      _settingsWriteFailure = null;
-    } catch (error) {
-      _settingsWriteFailure = _buildWriteFailure(
-        PersistentStoreScope.settings,
-        'clearAssistantLocalState',
-        error,
-      );
     }
     try {
       await deleteIfExists(layout.taskIndexFile);
@@ -367,76 +287,44 @@ class SettingsStore {
   }
 
   Future<SettingsSnapshotReloadResult> _readSettingsSnapshotResult() async {
-    if (_settingsFiles.isEmpty) {
+    final settingsFile = _settingsFile;
+    if (settingsFile == null) {
       return SettingsSnapshotReloadResult(
         snapshot: SettingsSnapshot.defaults(),
         status: SettingsSnapshotReloadStatus.applied,
       );
     }
-    var sawExistingFile = false;
-    var sawInvalidFile = false;
-    for (final file in _settingsFiles) {
-      if (!await file.exists()) {
-        continue;
+    if (!await settingsFile.exists()) {
+      return SettingsSnapshotReloadResult(
+        snapshot: SettingsSnapshot.defaults(),
+        status: SettingsSnapshotReloadStatus.applied,
+      );
+    }
+    try {
+      final raw = await settingsFile.readAsString();
+      final decoded = decodeYamlDocument(raw);
+      if (decoded is Map<String, dynamic>) {
+        return SettingsSnapshotReloadResult(
+          snapshot: SettingsSnapshot.fromJson(decoded),
+          status: SettingsSnapshotReloadStatus.applied,
+        );
       }
-      sawExistingFile = true;
-      try {
-        final raw = await file.readAsString();
-        final decoded = decodeYamlDocument(raw);
-        if (decoded is Map) {
-          return SettingsSnapshotReloadResult(
-            snapshot: SettingsSnapshot.fromJson(
-              decoded.cast<String, dynamic>(),
-            ),
-            status: SettingsSnapshotReloadStatus.applied,
-          );
-        }
-        sawInvalidFile = true;
-      } catch (_) {
-        sawInvalidFile = true;
+      if (decoded is Map) {
+        return SettingsSnapshotReloadResult(
+          snapshot: SettingsSnapshot.fromJson(decoded.cast<String, dynamic>()),
+          status: SettingsSnapshotReloadStatus.applied,
+        );
       }
+    } catch (_) {
+      return SettingsSnapshotReloadResult(
+        snapshot: SettingsSnapshot.defaults(),
+        status: SettingsSnapshotReloadStatus.invalid,
+      );
     }
     return SettingsSnapshotReloadResult(
       snapshot: SettingsSnapshot.defaults(),
-      status: sawExistingFile && sawInvalidFile
-          ? SettingsSnapshotReloadStatus.invalid
-          : SettingsSnapshotReloadStatus.applied,
+      status: SettingsSnapshotReloadStatus.invalid,
     );
-  }
-
-  List<File> _resolveSettingsFiles(StoreLayout layout) {
-    final resolved = <File>[];
-    final seen = <String>{};
-
-    void addPath(String path) {
-      final normalized = path.trim();
-      if (normalized.isEmpty || !seen.add(normalized)) {
-        return;
-      }
-      resolved.add(File(normalized));
-    }
-
-    final userPath = _enableUserSettingsMirror
-        ? defaultUserSettingsFilePath()
-        : null;
-    if ((userPath ?? '').isNotEmpty) {
-      addPath(userPath!);
-    }
-    addPath(layout.settingsFile.path);
-    return List<File>.unmodifiable(resolved);
-  }
-
-  List<Directory> _resolveSettingsWatchDirectories(List<File> files) {
-    final directories = <Directory>[];
-    final seen = <String>{};
-    for (final file in files) {
-      final path = file.parent.path.trim();
-      if (path.isEmpty || !seen.add(path)) {
-        continue;
-      }
-      directories.add(Directory(path));
-    }
-    return List<Directory>.unmodifiable(directories);
   }
 
   Future<List<TaskThread>> _readTaskThreads() async {
@@ -449,10 +337,8 @@ class SettingsStore {
     final index = await _readThreadIndex(layout);
     if (index.resetRequired) {
       await _resetTaskThreadState(layout);
-      _taskThreadStateResetRequired = true;
       return const <TaskThread>[];
     }
-    _taskThreadStateResetRequired = false;
     final orderedKeys = index.sessions;
     final recordsByKey = <String, TaskThread>{};
     final skippedRecords = <SkippedTaskThreadRecord>[];
@@ -486,7 +372,6 @@ class SettingsStore {
             if (schemaVersion is! int ||
                 schemaVersion != taskThreadSchemaVersion) {
               await _resetTaskThreadState(layout);
-              _taskThreadStateResetRequired = true;
               return const <TaskThread>[];
             }
             final record = TaskThread.fromJson(decoded);

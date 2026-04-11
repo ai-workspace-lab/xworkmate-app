@@ -11,8 +11,11 @@ import 'runtime_models_runtime_payloads.dart';
 import 'runtime_models_gateway_entities.dart';
 import 'runtime_models_multi_agent.dart';
 
+const int settingsSnapshotSchemaVersion = 1;
+
 class SettingsSnapshot {
   const SettingsSnapshot({
+    required this.schemaVersion,
     required this.appLanguage,
     required this.appActive,
     required this.launchAtLogin,
@@ -25,7 +28,7 @@ class SettingsSnapshot {
     required this.defaultModel,
     required this.defaultProvider,
     required this.gatewayProfiles,
-    required this.externalAcpEndpoints,
+    required this.providerSyncDefinitions,
     required this.authorizedSkillDirectories,
     required this.ollamaLocal,
     required this.ollamaCloud,
@@ -45,13 +48,9 @@ class SettingsSnapshot {
     required this.linuxDesktop,
     required this.assistantExecutionTarget,
     required this.assistantPermissionLevel,
-    required this.assistantNavigationDestinations,
-    required this.assistantCustomTaskTitles,
-    required this.assistantArchivedTaskKeys,
-    required this.savedGatewayTargets,
-    required this.assistantLastSessionKey,
   });
 
+  final int schemaVersion;
   final AppLanguage appLanguage;
   final bool appActive;
   final bool launchAtLogin;
@@ -64,7 +63,7 @@ class SettingsSnapshot {
   final String defaultModel;
   final String defaultProvider;
   final List<GatewayConnectionProfile> gatewayProfiles;
-  final List<ExternalAcpEndpointProfile> externalAcpEndpoints;
+  final List<ExternalAcpEndpointProfile> providerSyncDefinitions;
   final List<AuthorizedSkillDirectory> authorizedSkillDirectories;
   final OllamaLocalConfig ollamaLocal;
   final OllamaCloudConfig ollamaCloud;
@@ -84,14 +83,10 @@ class SettingsSnapshot {
   final LinuxDesktopConfig linuxDesktop;
   final AssistantExecutionTarget assistantExecutionTarget;
   final AssistantPermissionLevel assistantPermissionLevel;
-  final List<AssistantFocusEntry> assistantNavigationDestinations;
-  final Map<String, String> assistantCustomTaskTitles;
-  final List<String> assistantArchivedTaskKeys;
-  final List<String> savedGatewayTargets;
-  final String assistantLastSessionKey;
 
   factory SettingsSnapshot.defaults() {
     return SettingsSnapshot(
+      schemaVersion: settingsSnapshotSchemaVersion,
       appLanguage: AppLanguage.zh,
       appActive: true,
       launchAtLogin: false,
@@ -104,7 +99,7 @@ class SettingsSnapshot {
       defaultModel: '',
       defaultProvider: 'gateway',
       gatewayProfiles: normalizeGatewayProfiles(),
-      externalAcpEndpoints: normalizeExternalAcpEndpoints(),
+      providerSyncDefinitions: normalizeExternalAcpEndpoints(),
       authorizedSkillDirectories: normalizeAuthorizedSkillDirectories(),
       ollamaLocal: OllamaLocalConfig.defaults(),
       ollamaCloud: OllamaCloudConfig.defaults(),
@@ -124,15 +119,11 @@ class SettingsSnapshot {
       linuxDesktop: LinuxDesktopConfig.defaults(),
       assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
       assistantPermissionLevel: AssistantPermissionLevel.defaultAccess,
-      assistantNavigationDestinations: kAssistantNavigationDestinationDefaults,
-      assistantCustomTaskTitles: const <String, String>{},
-      assistantArchivedTaskKeys: const <String>[],
-      savedGatewayTargets: const <String>[],
-      assistantLastSessionKey: '',
     );
   }
 
   SettingsSnapshot copyWith({
+    int? schemaVersion,
     AppLanguage? appLanguage,
     bool? appActive,
     bool? launchAtLogin,
@@ -145,7 +136,7 @@ class SettingsSnapshot {
     String? defaultModel,
     String? defaultProvider,
     List<GatewayConnectionProfile>? gatewayProfiles,
-    List<ExternalAcpEndpointProfile>? externalAcpEndpoints,
+    List<ExternalAcpEndpointProfile>? providerSyncDefinitions,
     List<AuthorizedSkillDirectory>? authorizedSkillDirectories,
     OllamaLocalConfig? ollamaLocal,
     OllamaCloudConfig? ollamaCloud,
@@ -165,18 +156,13 @@ class SettingsSnapshot {
     LinuxDesktopConfig? linuxDesktop,
     AssistantExecutionTarget? assistantExecutionTarget,
     AssistantPermissionLevel? assistantPermissionLevel,
-    List<AssistantFocusEntry>? assistantNavigationDestinations,
-    Map<String, String>? assistantCustomTaskTitles,
-    List<String>? assistantArchivedTaskKeys,
-    List<String>? savedGatewayTargets,
-    String? assistantLastSessionKey,
   }) {
     final resolvedGatewayProfiles = gatewayProfiles != null
         ? normalizeGatewayProfiles(profiles: gatewayProfiles)
         : this.gatewayProfiles;
-    final resolvedExternalAcpEndpoints = externalAcpEndpoints != null
-        ? normalizeExternalAcpEndpoints(profiles: externalAcpEndpoints)
-        : this.externalAcpEndpoints;
+    final resolvedProviderSyncDefinitions = providerSyncDefinitions != null
+        ? normalizeExternalAcpEndpoints(profiles: providerSyncDefinitions)
+        : this.providerSyncDefinitions;
     final resolvedAuthorizedSkillDirectories =
         authorizedSkillDirectories != null
         ? normalizeAuthorizedSkillDirectories(
@@ -184,6 +170,7 @@ class SettingsSnapshot {
           )
         : this.authorizedSkillDirectories;
     return SettingsSnapshot(
+      schemaVersion: schemaVersion ?? this.schemaVersion,
       appLanguage: appLanguage ?? this.appLanguage,
       appActive: appActive ?? this.appActive,
       launchAtLogin: launchAtLogin ?? this.launchAtLogin,
@@ -196,7 +183,7 @@ class SettingsSnapshot {
       defaultModel: defaultModel ?? this.defaultModel,
       defaultProvider: defaultProvider ?? this.defaultProvider,
       gatewayProfiles: resolvedGatewayProfiles,
-      externalAcpEndpoints: resolvedExternalAcpEndpoints,
+      providerSyncDefinitions: resolvedProviderSyncDefinitions,
       authorizedSkillDirectories: resolvedAuthorizedSkillDirectories,
       ollamaLocal: ollamaLocal ?? this.ollamaLocal,
       ollamaCloud: ollamaCloud ?? this.ollamaCloud,
@@ -221,23 +208,12 @@ class SettingsSnapshot {
           assistantExecutionTarget ?? this.assistantExecutionTarget,
       assistantPermissionLevel:
           assistantPermissionLevel ?? this.assistantPermissionLevel,
-      assistantNavigationDestinations:
-          assistantNavigationDestinations ??
-          this.assistantNavigationDestinations,
-      assistantCustomTaskTitles:
-          assistantCustomTaskTitles ?? this.assistantCustomTaskTitles,
-      assistantArchivedTaskKeys:
-          assistantArchivedTaskKeys ?? this.assistantArchivedTaskKeys,
-      savedGatewayTargets: normalizeSavedGatewayTargets(
-        savedGatewayTargets ?? this.savedGatewayTargets,
-      ),
-      assistantLastSessionKey:
-          assistantLastSessionKey ?? this.assistantLastSessionKey,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      'schemaVersion': schemaVersion,
       'appLanguage': appLanguage.name,
       'appActive': appActive,
       'launchAtLogin': launchAtLogin,
@@ -252,7 +228,7 @@ class SettingsSnapshot {
       'gatewayProfiles': gatewayProfiles
           .map((item) => item.toJson())
           .toList(growable: false),
-      'externalAcpEndpoints': externalAcpEndpoints
+      'providerSyncDefinitions': providerSyncDefinitions
           .map((item) => item.toJson())
           .toList(growable: false),
       'authorizedSkillDirectories': authorizedSkillDirectories
@@ -276,71 +252,16 @@ class SettingsSnapshot {
       'linuxDesktop': linuxDesktop.toJson(),
       'assistantExecutionTarget': assistantExecutionTarget.name,
       'assistantPermissionLevel': assistantPermissionLevel.name,
-      'assistantNavigationDestinations': assistantNavigationDestinations
-          .map((item) => item.name)
-          .toList(growable: false),
-      'assistantCustomTaskTitles': assistantCustomTaskTitles,
-      'assistantArchivedTaskKeys': assistantArchivedTaskKeys,
-      'savedGatewayTargets': savedGatewayTargets,
-      'assistantLastSessionKey': assistantLastSessionKey,
     };
   }
 
   factory SettingsSnapshot.fromJson(Map<String, dynamic> json) {
-    Map<String, String> normalizeTaskTitles(Object? value) {
-      if (value is! Map) {
-        return const <String, String>{};
-      }
-      final normalized = <String, String>{};
-      value.forEach((key, title) {
-        final normalizedKey = key.toString().trim();
-        final normalizedTitle = title.toString().trim();
-        if (normalizedKey.isEmpty || normalizedTitle.isEmpty) {
-          return;
-        }
-        normalized[normalizedKey] = normalizedTitle;
-      });
-      return normalized;
-    }
-
-    List<String> normalizeTaskKeys(Object? value) {
-      if (value is! List) {
-        return const <String>[];
-      }
-      final normalized = <String>[];
-      final seen = <String>{};
-      for (final item in value) {
-        final normalizedKey = item?.toString().trim() ?? '';
-        if (normalizedKey.isEmpty || !seen.add(normalizedKey)) {
-          continue;
-        }
-        normalized.add(normalizedKey);
-      }
-      return normalized;
-    }
-
-    List<String> normalizeSavedGatewayTargetsFromJson(Object? value) {
-      if (value is! List) {
-        return const <String>[];
-      }
-      return normalizeSavedGatewayTargets(
-        value.map((item) => item?.toString() ?? ''),
+    final parsedSchemaVersion = (json['schemaVersion'] as num?)?.toInt() ?? -1;
+    if (parsedSchemaVersion != settingsSnapshotSchemaVersion) {
+      throw const FormatException(
+        'Unsupported settings snapshot schema version.',
       );
     }
-
-    final rawAssistantNavigationDestinations =
-        json['assistantNavigationDestinations'];
-    final assistantNavigationDestinations =
-        rawAssistantNavigationDestinations is List
-        ? normalizeAssistantNavigationDestinations(
-            rawAssistantNavigationDestinations
-                .map(
-                  (item) =>
-                      AssistantFocusEntryCopy.fromJsonValue(item?.toString()),
-                )
-                .whereType<AssistantFocusEntry>(),
-          )
-        : kAssistantNavigationDestinationDefaults;
     final gatewayProfiles = normalizeGatewayProfiles(
       profiles: ((json['gatewayProfiles'] as List?) ?? const <Object>[])
           .whereType<Map>()
@@ -349,8 +270,8 @@ class SettingsSnapshot {
                 GatewayConnectionProfile.fromJson(item.cast<String, dynamic>()),
           ),
     );
-    final externalAcpEndpoints = normalizeExternalAcpEndpoints(
-      profiles: ((json['externalAcpEndpoints'] as List?) ?? const <Object>[])
+    final providerSyncDefinitions = normalizeExternalAcpEndpoints(
+      profiles: ((json['providerSyncDefinitions'] as List?) ?? const <Object>[])
           .whereType<Map>()
           .map(
             (item) => ExternalAcpEndpointProfile.fromJson(
@@ -369,6 +290,7 @@ class SettingsSnapshot {
               ),
     );
     return SettingsSnapshot(
+      schemaVersion: parsedSchemaVersion,
       appLanguage: AppLanguageCopy.fromJsonValue(
         json['appLanguage'] as String?,
       ),
@@ -396,7 +318,7 @@ class SettingsSnapshot {
           json['defaultProvider'] as String? ??
           SettingsSnapshot.defaults().defaultProvider,
       gatewayProfiles: gatewayProfiles,
-      externalAcpEndpoints: externalAcpEndpoints,
+      providerSyncDefinitions: providerSyncDefinitions,
       authorizedSkillDirectories: authorizedSkillDirectories,
       ollamaLocal: OllamaLocalConfig.fromJson(
         (json['ollamaLocal'] as Map?)?.cast<String, dynamic>() ?? const {},
@@ -445,17 +367,6 @@ class SettingsSnapshot {
       assistantPermissionLevel: AssistantPermissionLevelCopy.fromJsonValue(
         json['assistantPermissionLevel'] as String?,
       ),
-      assistantNavigationDestinations: assistantNavigationDestinations,
-      assistantCustomTaskTitles: normalizeTaskTitles(
-        json['assistantCustomTaskTitles'],
-      ),
-      assistantArchivedTaskKeys: normalizeTaskKeys(
-        json['assistantArchivedTaskKeys'],
-      ),
-      savedGatewayTargets: normalizeSavedGatewayTargetsFromJson(
-        json['savedGatewayTargets'],
-      ),
-      assistantLastSessionKey: json['assistantLastSessionKey'] as String? ?? '',
     );
   }
 
@@ -513,21 +424,21 @@ class SettingsSnapshot {
     return copyWithGatewayProfileAt(index, profile);
   }
 
-  ExternalAcpEndpointProfile externalAcpEndpointForProvider(
+  ExternalAcpEndpointProfile providerSyncDefinitionForProvider(
     SingleAgentProvider provider,
   ) {
-    return externalAcpEndpointForProviderId(provider.providerId) ??
+    return providerSyncDefinitionForProviderId(provider.providerId) ??
         ExternalAcpEndpointProfile.defaultsForProvider(provider);
   }
 
-  ExternalAcpEndpointProfile? externalAcpEndpointForProviderId(
+  ExternalAcpEndpointProfile? providerSyncDefinitionForProviderId(
     String providerId,
   ) {
     final normalized = normalizeSingleAgentProviderId(providerId);
     if (normalized.isEmpty) {
       return null;
     }
-    for (final item in externalAcpEndpoints) {
+    for (final item in providerSyncDefinitions) {
       if (item.providerKey == normalized) {
         return item;
       }
@@ -539,7 +450,7 @@ class SettingsSnapshot {
     if (provider.isAuto) {
       return SingleAgentProvider.auto;
     }
-    final profile = externalAcpEndpointForProviderId(provider.providerId);
+    final profile = providerSyncDefinitionForProviderId(provider.providerId);
     if (profile != null) {
       return profile.toProvider();
     }
@@ -552,7 +463,7 @@ class SettingsSnapshot {
       return SingleAgentProvider.auto;
     }
     final normalizedSelection = SingleAgentProvider.fromJsonValue(resolved);
-    final profile = externalAcpEndpointForProviderId(
+    final profile = providerSyncDefinitionForProviderId(
       normalizedSelection.providerId,
     );
     if (profile != null) {
@@ -576,57 +487,13 @@ class SettingsSnapshot {
     return resolved;
   }
 
-  bool isGatewayTargetSaved(AssistantExecutionTarget target) {
-    final targetKey = switch (target) {
-      AssistantExecutionTarget.local => 'local',
-      AssistantExecutionTarget.remote => 'remote',
-      _ => '',
-    };
-    return targetKey.isNotEmpty && savedGatewayTargets.contains(targetKey);
-  }
-
-  SettingsSnapshot markGatewayTargetSaved(AssistantExecutionTarget target) {
-    final targetKey = switch (target) {
-      AssistantExecutionTarget.local => 'local',
-      AssistantExecutionTarget.remote => 'remote',
-      _ => '',
-    };
-    if (targetKey.isEmpty || savedGatewayTargets.contains(targetKey)) {
-      return this;
-    }
-    return copyWith(
-      savedGatewayTargets: <String>[...savedGatewayTargets, targetKey],
-    );
-  }
-
-  List<AssistantExecutionTarget> visibleAssistantExecutionTargets({
-    required Iterable<AssistantExecutionTarget> supportedTargets,
-    required Iterable<SingleAgentProvider> availableSingleAgentProviders,
-  }) {
-    final supported = supportedTargets.toSet();
-    final visible = <AssistantExecutionTarget>[];
-    if (supported.contains(AssistantExecutionTarget.singleAgent) &&
-        availableSingleAgentProviders.isNotEmpty) {
-      visible.add(AssistantExecutionTarget.singleAgent);
-    }
-    if (supported.contains(AssistantExecutionTarget.local) &&
-        isGatewayTargetSaved(AssistantExecutionTarget.local)) {
-      visible.add(AssistantExecutionTarget.local);
-    }
-    if (supported.contains(AssistantExecutionTarget.remote) &&
-        isGatewayTargetSaved(AssistantExecutionTarget.remote)) {
-      visible.add(AssistantExecutionTarget.remote);
-    }
-    return List<AssistantExecutionTarget>.unmodifiable(visible);
-  }
-
-  SettingsSnapshot copyWithExternalAcpEndpointForProvider(
+  SettingsSnapshot copyWithProviderSyncDefinitionForProvider(
     SingleAgentProvider provider,
     ExternalAcpEndpointProfile profile,
   ) {
     return copyWith(
-      externalAcpEndpoints: replaceExternalAcpEndpointForProvider(
-        externalAcpEndpoints,
+      providerSyncDefinitions: replaceExternalAcpEndpointForProvider(
+        providerSyncDefinitions,
         provider,
         profile,
       ),
@@ -640,24 +507,10 @@ class SettingsSnapshot {
           gatewayProfiles: gatewayProfiles,
           vault: vault,
           aiGateway: aiGateway,
-          acpBridgeServerProfiles: externalAcpEndpoints,
+          acpBridgeServerProfiles: providerSyncDefinitions,
           authorizedSkillDirectories: authorizedSkillDirectories,
         ),
       ),
     );
   }
-}
-
-List<String> normalizeSavedGatewayTargets(Iterable<String> rawTargets) {
-  final normalized = <String>[];
-  final seen = <String>{};
-  for (final item in rawTargets) {
-    final normalizedTarget = item.trim().toLowerCase();
-    if ((normalizedTarget != 'local' && normalizedTarget != 'remote') ||
-        !seen.add(normalizedTarget)) {
-      continue;
-    }
-    normalized.add(normalizedTarget);
-  }
-  return List<String>.unmodifiable(normalized);
 }

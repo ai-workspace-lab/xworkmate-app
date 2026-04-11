@@ -356,9 +356,9 @@ class _FakeGatewayRuntimeDeps {
     );
     final store = SecureConfigStore(
       enableSecureStorage: false,
-      databasePathResolver: () async => '${root.path}/settings.sqlite3',
-      fallbackDirectoryPathResolver: () async => root.path,
-      defaultSupportDirectoryPathResolver: () async => root.path,
+      appDataRootPathResolver: () async => '${root.path}/settings.sqlite3',
+      secretRootPathResolver: () async => root.path,
+      supportRootPathResolver: () async => root.path,
     );
     return _FakeGatewayRuntimeDeps._(root, store, DeviceIdentityStore(store));
   }

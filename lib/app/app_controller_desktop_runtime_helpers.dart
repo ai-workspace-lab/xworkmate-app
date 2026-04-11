@@ -49,6 +49,17 @@ import 'app_controller_desktop_runtime_exceptions.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 extension AppControllerDesktopRuntimeHelpers on AppController {
+  Future<void> saveAppUiStateInternal(
+    AppUiState next, {
+    bool notify = false,
+  }) async {
+    appUiStateInternal = next;
+    await storeInternal.saveAppUiState(next);
+    if (notify) {
+      notifyIfActiveInternal();
+    }
+  }
+
   Future<void> persistAssistantLastSessionKeyInternal(String sessionKey) async {
     if (disposedInternal) {
       return;
@@ -57,13 +68,12 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       sessionKey,
     );
     if (normalizedSessionKey.isEmpty ||
-        settings.assistantLastSessionKey == normalizedSessionKey) {
+        appUiState.assistantLastSessionKey == normalizedSessionKey) {
       return;
     }
     try {
-      await AppControllerDesktopSettings(this).saveSettings(
-        settings.copyWith(assistantLastSessionKey: normalizedSessionKey),
-        refreshAfterSave: false,
+      await saveAppUiStateInternal(
+        appUiState.copyWith(assistantLastSessionKey: normalizedSessionKey),
       );
     } catch (_) {
       // Best effort only during teardown-sensitive transitions.
@@ -653,7 +663,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
 
   Uri? resolveSingleAgentEndpointInternal(SingleAgentProvider provider) {
     final endpoint = settings
-        .externalAcpEndpointForProvider(provider)
+        .providerSyncDefinitionForProvider(provider)
         .endpoint
         .trim();
     if (endpoint.isEmpty) {
@@ -685,7 +695,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (normalizedEndpoint == null) {
       return '';
     }
-    for (final profile in settings.externalAcpEndpoints) {
+    for (final profile in settings.providerSyncDefinitions) {
       final profileEndpoint = _normalizeExternalAcpEndpointInternal(
         profile.endpoint,
       );
@@ -716,7 +726,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   Future<List<ExternalCodeAgentAcpSyncedProvider>>
   buildExternalAcpSyncedProvidersInternal() async {
     final providers = <ExternalCodeAgentAcpSyncedProvider>[];
-    for (final profile in settings.externalAcpEndpoints) {
+    for (final profile in settings.providerSyncDefinitions) {
       final provider = settings.singleAgentProviderForId(profile.providerKey);
       if (provider == SingleAgentProvider.auto) {
         continue;
