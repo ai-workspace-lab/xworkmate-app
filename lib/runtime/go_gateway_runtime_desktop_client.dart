@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import 'gateway_runtime_errors.dart';
 import 'gateway_runtime_session_client.dart';
 import 'go_acp_stdio_bridge.dart';
@@ -19,6 +21,9 @@ class GoGatewayRuntimeDesktopClient implements GatewayRuntimeSessionClient {
   late final StreamSubscription<Map<String, dynamic>> _notificationsSubscription;
   final StreamController<GatewayRuntimeSessionUpdate> _updatesController =
       StreamController<GatewayRuntimeSessionUpdate>.broadcast();
+
+  @visibleForTesting
+  GoAcpStdioBridge get bridgeForTest => _bridge;
 
   @override
   Stream<GatewayRuntimeSessionUpdate> get updates => _updatesController.stream;
