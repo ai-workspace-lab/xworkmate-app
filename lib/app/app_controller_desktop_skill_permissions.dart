@@ -292,7 +292,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
             AssistantExecutionTarget.singleAgent,
           ThreadExecutionMode.gatewayLocal => AssistantExecutionTarget.local,
           ThreadExecutionMode.gatewayRemote => AssistantExecutionTarget.remote,
-          null => settings.assistantExecutionTarget,
+          null => AssistantExecutionTarget.singleAgent,
         };
     final nextImportedSkills =
         importedSkills ??

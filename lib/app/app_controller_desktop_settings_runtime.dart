@@ -835,28 +835,15 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     final sessionKey = normalizedAssistantSessionKeyInternal(
       sessionsControllerInternal.currentSessionKey,
     );
-    final thread = taskThreadForSessionInternal(sessionKey);
-    final target = thread?.hasExplicitExecutionTargetSelection ?? false
-        ? assistantExecutionTargetForSession(sessionKey)
-        : sanitizePersistedExecutionTargetInternal(
-            snapshot.assistantExecutionTarget,
-          );
-    if (thread?.hasExplicitExecutionTargetSelection ?? false) {
-      upsertTaskThreadInternal(
-        sessionKey,
-        gatewayEntryState: gatewayEntryStateForTargetInternal(target),
-        latestResolvedRuntimeModel: '',
-        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      );
-    } else {
-      upsertTaskThreadInternal(
-        sessionKey,
-        executionTarget: target,
-        gatewayEntryState: gatewayEntryStateForTargetInternal(target),
-        latestResolvedRuntimeModel: '',
-        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      );
-    }
+    final target = assistantExecutionTargetForSession(sessionKey);
+    upsertTaskThreadInternal(
+      sessionKey,
+      executionTarget: target,
+      executionTargetSource: ThreadSelectionSource.explicit,
+      gatewayEntryState: gatewayEntryStateForTargetInternal(target),
+      latestResolvedRuntimeModel: '',
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
     recomputeTasksInternal();
     notifyIfActiveInternal();
     await applyAssistantExecutionTargetInternal(

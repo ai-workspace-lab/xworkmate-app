@@ -358,6 +358,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       title: title.trim(),
       ownerScope: initialOwnerScope,
       executionTarget: resolvedTarget,
+      executionTargetSource: ThreadSelectionSource.explicit,
       workspaceBinding: initialWorkspaceBinding,
       messageViewMode:
           messageViewMode ??
@@ -365,6 +366,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       singleAgentProvider:
           singleAgentProvider ??
           singleAgentProviderForSession(currentSessionKey),
+      singleAgentProviderSource: ThreadSelectionSource.explicit,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     // Re-read the current thread target when the async binding sync runs so a
@@ -405,7 +407,9 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       return;
     }
     final authorizationOverride =
-        await resolveSingleAgentAuthorizationHeaderForProviderInternal(provider);
+        await resolveSingleAgentAuthorizationHeaderForProviderInternal(
+          provider,
+        );
     await replaceSingleAgentThreadSkillsInternal(
       normalizedSessionKey,
       localSkills,
