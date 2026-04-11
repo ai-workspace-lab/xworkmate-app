@@ -38,10 +38,45 @@ end
 post_install do |installer|
   append_ignored_attributes_suppression = lambda do |build_settings|
     other_cflags = build_settings['OTHER_CFLAGS'] || '$(inherited)'
-    return if other_cflags.include?('-Wno-ignored-attributes')
+    other_cxxflags = build_settings['OTHER_CPLUSPLUSFLAGS'] || '$(inherited)'
+    updated = false
 
-    build_settings['OTHER_CFLAGS'] =
-      "#{other_cflags} -Wno-ignored-attributes"
+    unless other_cflags.include?('-Wno-ignored-attributes')
+      build_settings['OTHER_CFLAGS'] =
+        "#{other_cflags} -Wno-ignored-attributes"
+      updated = true
+    end
+
+    unless other_cxxflags.include?('-Wno-ignored-attributes')
+      build_settings['OTHER_CPLUSPLUSFLAGS'] =
+        "#{other_cxxflags} -Wno-ignored-attributes"
+      updated = true
+    end
+
+    updated
+  end
+
+  append_deprecation_suppression = lambda do |build_settings|
+    other_cflags = build_settings['OTHER_CFLAGS'] || '$(inherited)'
+    other_cxxflags = build_settings['OTHER_CPLUSPLUSFLAGS'] || '$(inherited)'
+
+    unless other_cflags.include?('-Wno-deprecated-declarations')
+      build_settings['OTHER_CFLAGS'] =
+        "#{other_cflags} -Wno-deprecated-declarations"
+    end
+
+    unless other_cxxflags.include?('-Wno-deprecated-declarations')
+      build_settings['OTHER_CPLUSPLUSFLAGS'] =
+        "#{other_cxxflags} -Wno-deprecated-declarations"
+    end
+  end
+
+  append_linker_warning_suppression = lambda do |build_settings|
+    other_ldflags = build_settings['OTHER_LDFLAGS'] || '$(inherited)'
+    return if other_ldflags.include?('-Wl,-w')
+
+    build_settings['OTHER_LDFLAGS'] =
+      "#{other_ldflags} -Wl,-w"
   end
 
   normalize_system_framework_refs = lambda do |project|
@@ -56,10 +91,16 @@ post_install do |installer|
 
   installer.pods_project.targets.each do |target|
     flutter_additional_macos_build_settings(target)
-    next unless target.name == 'mobile_scanner'
-
     target.build_configurations.each do |config|
+      config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '11.5'
+
+      next unless ['mobile_scanner', 'patrol', 'CocoaAsyncSocket', 'Pods-Runner', 'Pods-RunnerTests'].include?(target.name)
+
       append_ignored_attributes_suppression.call(config.build_settings)
+      append_deprecation_suppression.call(config.build_settings)
+      append_linker_warning_suppression.call(config.build_settings)
+      config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+      config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
     end
   end
 
@@ -69,6 +110,7 @@ post_install do |installer|
 
       target.build_configurations.each do |config|
         append_ignored_attributes_suppression.call(config.build_settings)
+        append_linker_warning_suppression.call(config.build_settings)
       end
     end
     aggregate_target.user_project.save
