@@ -388,76 +388,10 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     final localSkills = await singleAgentLocalSkillsForSessionInternal(
       normalizedSessionKey,
     );
-    final provider =
-        singleAgentResolvedProviderForSession(normalizedSessionKey) ??
-        currentSingleAgentResolvedProvider;
-    if (provider == null) {
-      await replaceSingleAgentThreadSkillsInternal(
-        normalizedSessionKey,
-        localSkills,
-      );
-      return;
-    }
-    final endpointOverride = resolveSingleAgentEndpointInternal(provider);
-    if (endpointOverride == null) {
-      await replaceSingleAgentThreadSkillsInternal(
-        normalizedSessionKey,
-        localSkills,
-      );
-      return;
-    }
-    final authorizationOverride =
-        await resolveSingleAgentAuthorizationHeaderForProviderInternal(
-          provider,
-        );
     await replaceSingleAgentThreadSkillsInternal(
       normalizedSessionKey,
       localSkills,
     );
-    try {
-      await refreshAcpCapabilitiesInternal();
-      final response = await gatewayAcpClientInternal.request(
-        method: 'skills.status',
-        params: <String, dynamic>{
-          'sessionId': normalizedSessionKey,
-          'threadId': normalizedSessionKey,
-          'mode': 'single-agent',
-          'provider': provider.providerId,
-        },
-        endpointOverride: endpointOverride,
-        authorizationOverride: authorizationOverride,
-      );
-      final result = asMap(response['result']);
-      final payload = result.isNotEmpty ? result : response;
-      final skills = asList(payload['skills'])
-          .map(asMap)
-          .map((item) => singleAgentSkillEntryFromAcpInternal(item, provider))
-          .where((item) => item.key.isNotEmpty && item.label.isNotEmpty)
-          .toList(growable: false);
-      await replaceSingleAgentThreadSkillsInternal(
-        normalizedSessionKey,
-        mergeSingleAgentSkillEntriesInternal(
-          groups: <List<AssistantThreadSkillEntry>>[localSkills, skills],
-        ),
-      );
-    } on GatewayAcpException catch (error) {
-      if (unsupportedAcpSkillsStatusInternal(error)) {
-        await replaceSingleAgentThreadSkillsInternal(
-          normalizedSessionKey,
-          localSkills,
-        );
-        return;
-      }
-      await replaceSingleAgentThreadSkillsInternal(
-        normalizedSessionKey,
-        localSkills,
-      );
-    } catch (_) {
-      await replaceSingleAgentThreadSkillsInternal(
-        normalizedSessionKey,
-        localSkills,
-      );
-    }
   }
 
   Future<void> refreshSingleAgentLocalSkillsForSession(
