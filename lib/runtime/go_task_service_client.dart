@@ -219,7 +219,7 @@ class GoTaskServiceRequest {
     required this.metadata,
     this.routing,
     this.routingHint = '',
-    this.provider = SingleAgentProvider.auto,
+    this.provider = SingleAgentProvider.unspecified,
     this.remoteWorkingDirectoryHint = '',
     this.resumeSession = false,
     this.collaborationMode = GoTaskServiceCollaborationMode.standard,
@@ -322,7 +322,7 @@ class GoTaskServiceRequest {
               },
             )
             .toList(growable: false),
-      if (provider != SingleAgentProvider.auto) 'provider': provider.providerId,
+      if (!provider.isUnspecified) 'provider': provider.providerId,
       if (remoteWorkingDirectoryHint.trim().isNotEmpty)
         'remoteWorkingDirectoryHint': remoteWorkingDirectoryHint.trim(),
       if (model.trim().isNotEmpty) 'model': model.trim(),
@@ -353,7 +353,7 @@ class GoTaskServiceRequest {
       AssistantExecutionTarget.remote => 'remote',
       AssistantExecutionTarget.singleAgent => 'singleAgent',
     };
-    final explicitProviderId = provider == SingleAgentProvider.auto
+    final explicitProviderId = provider.isUnspecified
         ? ''
         : provider.providerId;
     final explicitModelValue = model.trim();

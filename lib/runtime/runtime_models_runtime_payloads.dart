@@ -1019,8 +1019,8 @@ class TaskThread {
            executionBinding ??
            ExecutionBinding(
              executionMode: ThreadExecutionMode.localAgent,
-             executorId: SingleAgentProvider.auto.providerId,
-             providerId: SingleAgentProvider.auto.providerId,
+             executorId: SingleAgentProvider.unspecified.providerId,
+             providerId: SingleAgentProvider.unspecified.providerId,
              endpointId: '',
            ),
        contextState =

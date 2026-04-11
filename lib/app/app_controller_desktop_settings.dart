@@ -311,7 +311,7 @@ extension AppControllerDesktopSettings on AppController {
         currentSettings.assistantExecutionTarget,
       ),
       messageViewMode: AssistantMessageViewMode.rendered,
-      singleAgentProvider: SingleAgentProvider.auto,
+      singleAgentProvider: SingleAgentProvider.unspecified,
     );
     await setCurrentAssistantSessionKeyInternal(
       'main',

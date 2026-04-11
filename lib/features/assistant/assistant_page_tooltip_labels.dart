@@ -43,11 +43,12 @@ String executionTargetTooltipInternal(AssistantExecutionTarget target) =>
       'Task dialog mode: ${target.compactLabel}',
     );
 
-String singleAgentProviderTooltipInternal(SingleAgentProvider provider) =>
-    appText(
-      'Bridge Provider: ${provider.label}',
-      'Bridge Provider: ${provider.label}',
-    );
+String singleAgentProviderTooltipInternal(
+  SingleAgentProvider provider,
+) => appText(
+  'Bridge Provider: ${provider.label.trim().isEmpty ? appText('未配置', 'Unconfigured') : provider.label}',
+  'Bridge Provider: ${provider.label.trim().isEmpty ? appText('未配置', 'Unconfigured') : provider.label}',
+);
 
 String modelTooltipInternal(String modelLabel) =>
     appText('模型: $modelLabel', 'Model: $modelLabel');

@@ -693,7 +693,7 @@ extension AppControllerDesktopThreadStorage on AppController {
                 record.executionBinding.providerId,
               ),
             )
-          : SingleAgentProvider.auto;
+          : SingleAgentProvider.unspecified;
       final workspaceBinding = record.workspaceBinding.copyWith(
         workspaceId: sessionKey,
         displayPath: record.workspaceKind == WorkspaceKind.localFs
