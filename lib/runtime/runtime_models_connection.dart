@@ -127,11 +127,11 @@ AssistantExecutionTarget resolveGatewayExecutionTargetFromVisibleTargets(
       visible.contains(currentTarget)) {
     return currentTarget;
   }
-  if (visible.contains(AssistantExecutionTarget.local)) {
-    return AssistantExecutionTarget.local;
-  }
   if (visible.contains(AssistantExecutionTarget.remote)) {
     return AssistantExecutionTarget.remote;
+  }
+  if (visible.contains(AssistantExecutionTarget.local)) {
+    return AssistantExecutionTarget.local;
   }
   return AssistantExecutionTarget.remote;
 }
