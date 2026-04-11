@@ -56,26 +56,17 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
     final target = controller.assistantExecutionTargetForSession(
       controller.sessionsControllerInternal.currentSessionKey,
     );
-    final resolvedProvider = target == AssistantExecutionTarget.singleAgent
-        ? (controller.singleAgentResolvedProviderForSession(
-                controller.sessionsControllerInternal.currentSessionKey,
-              ) ??
-              controller.currentSingleAgentResolvedProvider)
-        : null;
-    final endpointOverride = resolvedProvider == null
-        ? null
-        : controller.resolveSingleAgentEndpointInternal(resolvedProvider);
-    final authorizationOverride = resolvedProvider == null
-        ? ''
-        : await controller
-              .resolveSingleAgentAuthorizationHeaderForProviderInternal(
-                resolvedProvider,
-              );
-    await controller.gatewayAcpClientInternal.loadCapabilities(
-      forceRefresh: forceRefresh,
-      endpointOverride: endpointOverride,
-      authorizationOverride: authorizationOverride,
-    );
+    if (target == AssistantExecutionTarget.singleAgent) {
+      await controller.syncExternalAcpProvidersInternal();
+      await controller.goTaskServiceClientInternal.loadExternalAcpCapabilities(
+        target: AssistantExecutionTarget.singleAgent,
+        forceRefresh: forceRefresh,
+      );
+    } else {
+      await controller.gatewayAcpClientInternal.loadCapabilities(
+        forceRefresh: forceRefresh,
+      );
+    }
   } catch (_) {
     // Keep mount refresh resilient when ACP is temporarily unavailable.
   }
@@ -233,10 +224,17 @@ bool singleAgentProviderRequiresLocalPathRuntimeInternal(
   AppController controller,
   SingleAgentProvider provider,
 ) {
-  final endpoint = resolveSingleAgentEndpointRuntimeInternal(
-    controller,
-    provider,
-  );
+  final configuredEndpoint = controller.settings
+      .externalAcpEndpointForProvider(provider)
+      .endpoint
+      .trim();
+  if (configuredEndpoint.isEmpty) {
+    return true;
+  }
+  final normalizedInput = configuredEndpoint.contains('://')
+      ? configuredEndpoint
+      : 'ws://$configuredEndpoint';
+  final endpoint = Uri.tryParse(normalizedInput);
   if (endpoint == null) {
     return true;
   }
@@ -377,32 +375,4 @@ void recomputeTasksRuntimeInternal(AppController controller) {
     hasPendingRun: controller.hasAssistantPendingRun,
     activeAgentName: controller.agentsControllerInternal.activeAgentName,
   );
-}
-
-Uri? resolveSingleAgentEndpointRuntimeInternal(
-  AppController controller,
-  SingleAgentProvider provider,
-) {
-  final endpoint = controller.settings
-      .externalAcpEndpointForProvider(provider)
-      .endpoint
-      .trim();
-  if (endpoint.isEmpty) {
-    return null;
-  }
-  final normalizedInput = endpoint.contains('://')
-      ? endpoint
-      : 'ws://$endpoint';
-  final uri = Uri.tryParse(normalizedInput);
-  if (uri == null || uri.host.trim().isEmpty) {
-    return null;
-  }
-  final scheme = uri.scheme.trim().toLowerCase();
-  if (scheme != 'ws' &&
-      scheme != 'wss' &&
-      scheme != 'http' &&
-      scheme != 'https') {
-    return null;
-  }
-  return uri;
 }

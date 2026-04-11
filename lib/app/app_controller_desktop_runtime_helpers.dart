@@ -651,68 +651,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     notifyListeners();
   }
 
-  Uri? resolveSingleAgentEndpointInternal(SingleAgentProvider provider) {
-    final endpoint = settings
-        .externalAcpEndpointForProvider(provider)
-        .endpoint
-        .trim();
-    if (endpoint.isEmpty) {
-      return null;
-    }
-    final normalizedInput = endpoint.contains('://')
-        ? endpoint
-        : 'ws://$endpoint';
-    final uri = Uri.tryParse(normalizedInput);
-    if (uri == null || uri.host.trim().isEmpty) {
-      return null;
-    }
-    final scheme = uri.scheme.trim().toLowerCase();
-    if (scheme != 'ws' &&
-        scheme != 'wss' &&
-        scheme != 'http' &&
-        scheme != 'https') {
-      return null;
-    }
-    return uri;
-  }
-
-  Future<String> resolveSingleAgentAuthorizationHeaderInternal(
-    Uri endpoint,
-  ) async {
-    final normalizedEndpoint = _normalizeExternalAcpEndpointInternal(
-      endpoint.toString(),
-    );
-    if (normalizedEndpoint == null) {
-      return '';
-    }
-    for (final profile in settings.externalAcpEndpoints) {
-      final profileEndpoint = _normalizeExternalAcpEndpointInternal(
-        profile.endpoint,
-      );
-      if (profileEndpoint == null || profileEndpoint != normalizedEndpoint) {
-        continue;
-      }
-      final authRef = profile.authRef.trim();
-      if (authRef.isEmpty) {
-        return '';
-      }
-      return settingsControllerInternal.resolveSecretValueInternal(
-        refName: authRef,
-      );
-    }
-    return '';
-  }
-
-  Future<String> resolveSingleAgentAuthorizationHeaderForProviderInternal(
-    SingleAgentProvider provider,
-  ) async {
-    final endpoint = resolveSingleAgentEndpointInternal(provider);
-    if (endpoint == null) {
-      return '';
-    }
-    return resolveSingleAgentAuthorizationHeaderInternal(endpoint);
-  }
-
   Future<List<ExternalCodeAgentAcpSyncedProvider>>
   buildExternalAcpSyncedProvidersInternal() async {
     final providers = <ExternalCodeAgentAcpSyncedProvider>[];
@@ -857,32 +795,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   bool isLoopbackHostInternal(String host) {
     final trimmed = host.trim().toLowerCase();
     return trimmed == '127.0.0.1' || trimmed == 'localhost';
-  }
-
-  String? _normalizeExternalAcpEndpointInternal(String raw) {
-    final trimmed = raw.trim();
-    if (trimmed.isEmpty) {
-      return null;
-    }
-    final candidate = trimmed.contains('://') ? trimmed : 'ws://$trimmed';
-    final uri = Uri.tryParse(candidate);
-    if (uri == null || uri.host.trim().isEmpty) {
-      return null;
-    }
-    final scheme = uri.scheme.trim().toLowerCase();
-    if (scheme != 'ws' &&
-        scheme != 'wss' &&
-        scheme != 'http' &&
-        scheme != 'https') {
-      return null;
-    }
-    final defaultPort = switch (scheme) {
-      'https' || 'wss' => 443,
-      _ => 80,
-    };
-    final port = uri.hasPort ? uri.port : defaultPort;
-    final path = uri.path.trim().isEmpty ? '/' : uri.path.trim();
-    return '$scheme://${uri.host.toLowerCase()}:$port$path';
   }
 
   AssistantExecutionTarget assistantExecutionTargetForModeInternal(
