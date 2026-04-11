@@ -158,7 +158,7 @@ String? assistantWorkingDirectoryForSessionRuntimeInternal(
   String sessionKey,
 ) {
   final candidate = controller
-      .assistantWorkspacePathForSession(sessionKey)
+      .assistantSelectedWorkingDirectoryForSession(sessionKey)
       .trim();
   if (candidate.isEmpty) {
     return null;

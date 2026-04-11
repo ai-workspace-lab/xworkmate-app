@@ -51,7 +51,7 @@ extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   };
 
   String get promptValue => switch (this) {
-    AssistantExecutionTarget.singleAgent => 'agent',
+    AssistantExecutionTarget.singleAgent => 'single-agent',
     AssistantExecutionTarget.gateway => 'gateway',
   };
 
@@ -66,6 +66,7 @@ extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
     final normalized = value?.trim() ?? '';
     switch (normalized) {
       case 'singleAgent':
+      case 'single-agent':
       case 'agent':
         return AssistantExecutionTarget.singleAgent;
       case 'gateway':

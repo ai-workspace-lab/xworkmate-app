@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller_desktop_core.dart';
+import 'package:xworkmate/app/app_controller_desktop_workspace_execution.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_bar.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_models.dart';
@@ -17,7 +18,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'compact gateway picker selects remote bridge route instead of local fallback',
+    'mode picker keeps single-agent and gateway visible while project selector stays available',
     (tester) async {
       final root = Directory.systemTemp.createTempSync(
         'xworkmate-picker-widget-test-',
@@ -56,6 +57,10 @@ void main() {
       );
       controller.lastObservedSettingsSnapshotInternal =
           controller.settingsController.snapshotInternal;
+      await controller.saveAssistantSelectedWorkingDirectoryForSession(
+        controller.currentSessionKey,
+        '/tmp/project-alpha',
+      );
 
       await tester.pumpWidget(
         MaterialApp(
@@ -111,7 +116,19 @@ void main() {
           .map((item) => item.value)
           .toList(growable: false);
 
-      expect(values, contains(AssistantExecutionTarget.gateway));
+      expect(values, <AssistantExecutionTarget>[
+        AssistantExecutionTarget.singleAgent,
+        AssistantExecutionTarget.gateway,
+      ]);
+      expect(
+        find.byKey(const Key('assistant-working-directory-button')),
+        findsOneWidget,
+      );
+      expect(find.text('project-alpha'), findsOneWidget);
+      expect(
+        find.byKey(const Key('assistant-collaboration-toggle')),
+        findsNothing,
+      );
 
       await tester.pumpWidget(const SizedBox.shrink());
       controller.dispose();
@@ -203,8 +220,8 @@ class _FakeGoTaskServiceClient implements GoTaskServiceClient {
   }) async {
     return const ExternalCodeAgentAcpRoutingResolution(
       raw: <String, dynamic>{
-        'resolvedExecutionTarget': 'agent',
-        'resolvedEndpointTarget': 'agent',
+        'resolvedExecutionTarget': 'single-agent',
+        'resolvedEndpointTarget': 'singleAgent',
         'resolvedProviderId': 'codex',
         'resolvedModel': '',
         'resolvedSkills': <String>[],
@@ -218,7 +235,13 @@ class _FakeGoTaskServiceClient implements GoTaskServiceClient {
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
   }) async {
-    return const ExternalCodeAgentAcpCapabilities.empty();
+    return const ExternalCodeAgentAcpCapabilities(
+      singleAgent: true,
+      multiAgent: true,
+      providerCatalog: <SingleAgentProvider>[SingleAgentProvider.codex],
+      gatewayProviders: <Map<String, dynamic>>[],
+      raw: <String, dynamic>{},
+    );
   }
 
   @override

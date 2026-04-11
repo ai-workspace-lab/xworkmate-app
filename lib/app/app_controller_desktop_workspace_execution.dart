@@ -372,6 +372,32 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     notifyIfActiveInternal();
   }
 
+  Future<void> saveAssistantSelectedWorkingDirectoryForSession(
+    String sessionKey,
+    String workingDirectory,
+  ) async {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final normalizedWorkingDirectory = workingDirectory.trim();
+    if (normalizedWorkingDirectory.isEmpty) {
+      upsertTaskThreadInternal(
+        normalizedSessionKey,
+        clearSelectedWorkingDirectory: true,
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
+    } else {
+      upsertTaskThreadInternal(
+        normalizedSessionKey,
+        selectedWorkingDirectory: normalizedWorkingDirectory,
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
+    }
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
+    await flushAssistantThreadPersistenceInternal();
+  }
+
   Future<void> refreshSingleAgentSkillsForSession(String sessionKey) async {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
