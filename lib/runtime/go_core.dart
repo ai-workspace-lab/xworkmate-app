@@ -1,9 +1,6 @@
 import 'dart:io';
 
-enum GoCoreLaunchSource {
-  bundledHelper,
-  buildArtifact,
-}
+enum GoCoreLaunchSource { buildArtifact }
 
 class GoCoreLaunch {
   const GoCoreLaunch({
@@ -35,11 +32,6 @@ class GoCoreLocator {
   final String Function()? _resolvedExecutableResolver;
 
   Future<GoCoreLaunch?> locate() async {
-    final bundled = await _bundledHelper();
-    if (bundled != null) {
-      return bundled;
-    }
-
     for (final root in _candidateRoots()) {
       final path = '$root/build/bin/xworkmate-go-core';
       if (await _binaryExists(path)) {
@@ -53,35 +45,6 @@ class GoCoreLocator {
   }
 
   Future<bool> isAvailable() async => await locate() != null;
-
-  Future<GoCoreLaunch?> _bundledHelper() async {
-    final resolvedExecutable =
-        (_resolvedExecutableResolver?.call() ?? Platform.resolvedExecutable)
-            .trim();
-    if (resolvedExecutable.isEmpty) {
-      return null;
-    }
-    final executableFile = File(resolvedExecutable);
-    final executableDirectory = executableFile.parent;
-    final contentsDirectory = executableDirectory.parent;
-    final macOsDirectoryName = executableDirectory.path
-        .split(Platform.pathSeparator)
-        .last;
-    final contentsDirectoryName = contentsDirectory.path
-        .split(Platform.pathSeparator)
-        .last;
-    if (macOsDirectoryName != 'MacOS' || contentsDirectoryName != 'Contents') {
-      return null;
-    }
-    final bundledPath = '${contentsDirectory.path}/Helpers/xworkmate-go-core';
-    if (await _binaryExists(bundledPath)) {
-      return GoCoreLaunch(
-        executable: bundledPath,
-        source: GoCoreLaunchSource.bundledHelper,
-      );
-    }
-    return null;
-  }
 
   List<String> _candidateRoots() {
     final roots = <String>{};
@@ -106,7 +69,9 @@ class GoCoreLocator {
       roots.addAll(_ancestorPaths(executableDirectory));
     }
 
-    return roots.where((path) => path.trim().isNotEmpty).toList(growable: false);
+    return roots
+        .where((path) => path.trim().isNotEmpty)
+        .toList(growable: false);
   }
 
   List<String> _ancestorPaths(Directory start) {

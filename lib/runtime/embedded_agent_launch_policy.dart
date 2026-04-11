@@ -12,15 +12,12 @@ bool shouldBlockEmbeddedAgentLaunch({
 }
 
 bool shouldBlockGoCoreLaunch(
-  GoCoreLaunch launch, {
+  GoCoreLaunch _, {
   required bool isAppleHost,
   bool? enabled,
 }) {
-  if (!shouldApplyAppleAppStorePolicy(
+  return shouldBlockEmbeddedAgentLaunch(
     isAppleHost: isAppleHost,
     enabled: enabled,
-  )) {
-    return false;
-  }
-  return launch.source != GoCoreLaunchSource.bundledHelper;
+  );
 }

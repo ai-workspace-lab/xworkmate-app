@@ -18,7 +18,7 @@
 
 - `assets/aris/skills` 继续直接复用 upstream `skills/`
 - `llm-chat` 与 `claude-review` 统一由 `xworkmate-go-core` 提供
-- macOS `.app` 会把 helper 打进 `Contents/Helpers/xworkmate-go-core`
+- macOS App Store 交付不再在 `.app` 内嵌 `xworkmate-go-core`
 
 ## Validation
 

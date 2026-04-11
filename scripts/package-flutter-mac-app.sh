@@ -102,13 +102,12 @@ bash "$ROOT_DIR/scripts/check-apple-export-compliance.sh" "$BUILD_APP_PATH"
 rm -rf "$DIST_APP_PATH" "$DIST_DMG_PATH"
 ditto "$BUILD_APP_PATH" "$DIST_APP_PATH"
 if [[ -n "$SIGN_IDENTITY" ]]; then
-  echo "Refreshing bundled helper and re-signing with explicit identity..."
-  XWORKMATE_SIGN_IDENTITY="$SIGN_IDENTITY" bash "$ROOT_DIR/scripts/embed-go-core-helper.sh" "$DIST_APP_PATH"
+  echo "Re-signing app bundle with explicit identity..."
   codesign --force --deep --sign "$SIGN_IDENTITY" \
     --preserve-metadata=entitlements,requirements,flags,runtime \
     --timestamp=none "$DIST_APP_PATH"
 else
-  echo "Preserving Flutter build output signature and embedded helper."
+  echo "Preserving Flutter build output signature."
 fi
 
 verify_bundle_signature "$DIST_APP_PATH"
