@@ -575,16 +575,19 @@ class AppController extends ChangeNotifier {
 
   List<SingleAgentProvider> get configuredSingleAgentProviders =>
       normalizeSingleAgentProviderList(
-        (availableSingleAgentProvidersOverrideInternal ??
-                bridgeAdvertisedProvidersInternal)
-            .where((item) => item != SingleAgentProvider.auto)
-            .map(settings.resolveSingleAgentProvider),
+        bridgeAdvertisedProvidersInternal.where(
+          (item) => item != SingleAgentProvider.auto,
+        ),
       );
 
   List<SingleAgentProvider> get availableSingleAgentProviders =>
-      configuredSingleAgentProviders
-          .where(canUseSingleAgentProviderInternal)
-          .toList(growable: false);
+      availableSingleAgentProvidersOverrideInternal != null
+      ? normalizeSingleAgentProviderList(
+          availableSingleAgentProvidersOverrideInternal!,
+        )
+      : configuredSingleAgentProviders
+            .where(canUseSingleAgentProviderInternal)
+            .toList(growable: false);
 
   List<AssistantExecutionTarget> visibleAssistantExecutionTargets(
     Iterable<AssistantExecutionTarget> supportedTargets,
@@ -625,18 +628,13 @@ class AppController extends ChangeNotifier {
   SingleAgentProvider? resolvedSingleAgentProviderInternal(
     SingleAgentProvider selection,
   ) {
-    if (selection != SingleAgentProvider.auto) {
-      final resolvedSelection = settings.resolveSingleAgentProvider(selection);
-      return canUseSingleAgentProviderInternal(resolvedSelection)
-          ? resolvedSelection
-          : null;
+    if (selection == SingleAgentProvider.auto) {
+      return null;
     }
-    for (final provider in configuredSingleAgentProviders) {
-      if (canUseSingleAgentProviderInternal(provider)) {
-        return provider;
-      }
-    }
-    return null;
+    final resolvedSelection = settings.resolveSingleAgentProvider(selection);
+    return canUseSingleAgentProviderInternal(resolvedSelection)
+        ? resolvedSelection
+        : null;
   }
 
   List<String> get aiGatewayConversationModelChoices {

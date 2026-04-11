@@ -8,20 +8,66 @@ class ExternalCodeAgentAcpCapabilities {
   const ExternalCodeAgentAcpCapabilities({
     required this.singleAgent,
     required this.multiAgent,
-    required this.providers,
+    required this.providerCatalog,
     required this.raw,
   });
 
   const ExternalCodeAgentAcpCapabilities.empty()
     : singleAgent = false,
       multiAgent = false,
-      providers = const <SingleAgentProvider>{},
+      providerCatalog = const <SingleAgentProvider>[],
       raw = const <String, dynamic>{};
 
   final bool singleAgent;
   final bool multiAgent;
-  final Set<SingleAgentProvider> providers;
+  final List<SingleAgentProvider> providerCatalog;
   final Map<String, dynamic> raw;
+}
+
+class ExternalCodeAgentAcpRoutingResolution {
+  const ExternalCodeAgentAcpRoutingResolution({required this.raw});
+
+  final Map<String, dynamic> raw;
+
+  String get resolvedExecutionTarget =>
+      raw['resolvedExecutionTarget']?.toString().trim() ?? '';
+
+  String get resolvedEndpointTarget =>
+      raw['resolvedEndpointTarget']?.toString().trim() ?? '';
+
+  String get resolvedProviderId =>
+      raw['resolvedProviderId']?.toString().trim() ?? '';
+
+  String get resolvedModel => raw['resolvedModel']?.toString().trim() ?? '';
+
+  List<String> get resolvedSkills {
+    final rawList = raw['resolvedSkills'];
+    if (rawList is! List) {
+      return const <String>[];
+    }
+    return rawList
+        .map((item) => item?.toString().trim() ?? '')
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  String get skillResolutionSource =>
+      raw['skillResolutionSource']?.toString().trim() ?? '';
+
+  bool get needsSkillInstall => _boolValue(raw['needsSkillInstall']) ?? false;
+
+  String get skillInstallRequestId =>
+      raw['skillInstallRequestId']?.toString().trim() ?? '';
+
+  List<Map<String, dynamic>> get skillCandidates =>
+      _castMapList(raw['skillCandidates']);
+
+  bool get unavailable => _boolValue(raw['unavailable']) ?? false;
+
+  String get unavailableCode => raw['unavailableCode']?.toString().trim() ?? '';
+
+  String get unavailableMessage =>
+      raw['unavailableMessage']?.toString().trim() ?? '';
 }
 
 class ExternalCodeAgentAcpSyncedProvider {
@@ -493,9 +539,8 @@ class GoTaskServiceResult {
     return rawArtifacts
         .whereType<Map>()
         .map(
-          (item) => GoTaskServiceArtifact.fromJson(
-            item.cast<String, dynamic>(),
-          ),
+          (item) =>
+              GoTaskServiceArtifact.fromJson(item.cast<String, dynamic>()),
         )
         .where((item) => item.relativePath.isNotEmpty)
         .toList(growable: false);
@@ -571,6 +616,14 @@ abstract class ExternalCodeAgentAcpTransport {
     bool forceRefresh = false,
   });
 
+  Future<ExternalCodeAgentAcpRoutingResolution> resolveExternalAcpRouting({
+    required String taskPrompt,
+    required String workingDirectory,
+    required ExternalCodeAgentAcpRoutingConfig routing,
+    String aiGatewayBaseUrl = '',
+    String aiGatewayApiKey = '',
+  });
+
   Future<GoTaskServiceResult> executeTask(
     GoTaskServiceRequest request, {
     required void Function(GoTaskServiceUpdate update) onUpdate,
@@ -599,6 +652,14 @@ abstract class GoTaskServiceClient {
   Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
+  });
+
+  Future<ExternalCodeAgentAcpRoutingResolution> resolveExternalAcpRouting({
+    required String taskPrompt,
+    required String workingDirectory,
+    required ExternalCodeAgentAcpRoutingConfig routing,
+    String aiGatewayBaseUrl = '',
+    String aiGatewayApiKey = '',
   });
 
   Future<GoTaskServiceResult> executeTask(
