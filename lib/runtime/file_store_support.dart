@@ -121,14 +121,14 @@ class StoreLayout {
 
 class StoreLayoutResolver {
   StoreLayoutResolver({
-    Future<String?> Function()? localRootPathResolver,
+    Future<String?> Function()? appDataRootPathResolver,
     Future<String?> Function()? secretRootPathResolver,
     Future<String?> Function()? supportRootPathResolver,
-  }) : _localRootPathResolver = localRootPathResolver,
+  }) : _appDataRootPathResolver = appDataRootPathResolver,
        _secretRootPathResolver = secretRootPathResolver,
        _supportRootPathResolver = supportRootPathResolver;
 
-  final Future<String?> Function()? _localRootPathResolver;
+  final Future<String?> Function()? _appDataRootPathResolver;
   final Future<String?> Function()? _secretRootPathResolver;
   final Future<String?> Function()? _supportRootPathResolver;
 
@@ -145,13 +145,13 @@ class StoreLayoutResolver {
     if (supportRootPath == null) {
       throw StateError('Cannot resolve persistent storage root.');
     }
-    final localRootPath =
-        await _resolvePath(_localRootPathResolver) ?? supportRootPath;
+    final appDataRootPath =
+        await _resolvePath(_appDataRootPathResolver) ?? supportRootPath;
     final secretRootPath =
         await _resolvePath(_secretRootPathResolver) ??
         '$supportRootPath/secrets';
     final rootDirectory = await ensureDirectory(
-      normalizeStoreDirectoryPath(localRootPath),
+      normalizeStoreDirectoryPath(appDataRootPath),
     );
     final configDirectory = await ensureDirectory(
       '${rootDirectory.path}/config',

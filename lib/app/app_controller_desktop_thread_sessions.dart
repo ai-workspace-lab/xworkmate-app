@@ -499,7 +499,7 @@ extension AppControllerDesktopThreadSessions on AppController {
   List<RuntimeLogEntry> get runtimeLogs => runtimeInternal.logs;
   List<AssistantFocusEntry> get assistantNavigationDestinations =>
       normalizeAssistantNavigationDestinations(
-        settings.assistantNavigationDestinations,
+        appUiState.assistantNavigationDestinations,
       ).where(supportsAssistantFocusEntry).toList(growable: false);
 
   bool supportsAssistantFocusEntry(AssistantFocusEntry entry) {
@@ -593,16 +593,13 @@ extension AppControllerDesktopThreadSessions on AppController {
   }
 
   List<GatewaySessionSummary> assistantSessionsInternal() {
-    final archivedKeys = settings.assistantArchivedTaskKeys
-        .map(normalizedAssistantSessionKeyInternal)
-        .toSet();
     final byKey = <String, GatewaySessionSummary>{};
 
     for (final session in sessionsControllerInternal.sessions) {
       final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
         session.key,
       );
-      if (archivedKeys.contains(normalizedSessionKey)) {
+      if (isAssistantTaskArchived(normalizedSessionKey)) {
         continue;
       }
       byKey[normalizedSessionKey] = session;
@@ -613,7 +610,7 @@ extension AppControllerDesktopThreadSessions on AppController {
         record.sessionKey,
       );
       if (normalizedSessionKey.isEmpty ||
-          archivedKeys.contains(normalizedSessionKey) ||
+          isAssistantTaskArchived(normalizedSessionKey) ||
           record.archived) {
         continue;
       }
@@ -627,7 +624,8 @@ extension AppControllerDesktopThreadSessions on AppController {
     }
 
     final currentKey = normalizedAssistantSessionKeyInternal(currentSessionKey);
-    if (!archivedKeys.contains(currentKey) && !byKey.containsKey(currentKey)) {
+    if (!isAssistantTaskArchived(currentKey) &&
+        !byKey.containsKey(currentKey)) {
       byKey[currentKey] = assistantSessionSummaryForInternal(currentKey);
     }
 

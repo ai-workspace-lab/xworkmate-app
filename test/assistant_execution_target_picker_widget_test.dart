@@ -24,9 +24,9 @@ void main() {
       );
       final store = SecureConfigStore(
         enableSecureStorage: false,
-        databasePathResolver: () async => '${root.path}/settings.sqlite3',
-        fallbackDirectoryPathResolver: () async => root.path,
-        defaultSupportDirectoryPathResolver: () async => root.path,
+        appDataRootPathResolver: () async => '${root.path}/settings.sqlite3',
+        secretRootPathResolver: () async => root.path,
+        supportRootPathResolver: () async => root.path,
       );
       final controller = AppController(
         store: store,
@@ -51,8 +51,9 @@ void main() {
         }
       });
 
-      controller.settingsController.snapshotInternal = controller.settings
-          .copyWith(savedGatewayTargets: const <String>['local', 'remote']);
+      controller.appUiStateInternal = controller.appUiState.copyWith(
+        savedGatewayTargets: const <String>['local', 'remote'],
+      );
       controller.lastObservedSettingsSnapshotInternal =
           controller.settingsController.snapshotInternal;
 
