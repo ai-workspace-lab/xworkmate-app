@@ -58,6 +58,15 @@ void main() {
         expect(controller.accountSyncState?.profileScope, 'tenant-shared');
         expect(controller.accountSyncState?.tokenConfigured.apisix, isTrue);
         expect(await store.loadAccountSessionToken(), 'session-token');
+        expect(
+          controller
+              .snapshot
+              .acpBridgeServerModeConfig
+              .cloudSynced
+              .remoteServerSummary
+              .endpoint,
+          'https://xworkmate-bridge.svc.plus',
+        );
       },
     );
 

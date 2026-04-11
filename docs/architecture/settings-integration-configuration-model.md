@@ -5,8 +5,7 @@ with the provider catalog aligned to the bridge-only design.
 
 ## Current Rule
 
-- Settings only manages bridge connection parameters and upstream sync
-  definitions.
+- Settings only manages bridge connection parameters and account sync metadata.
 - The provider picker is not derived from local endpoint presets.
 - `xworkmate-bridge` is the only source of truth for the provider catalog.
 
@@ -16,15 +15,7 @@ with the provider catalog aligned to the bridge-only design.
 flowchart TD
   A["Settings UI
   仅管理 Bridge 连接参数
-  与自定义 upstream sync 定义"] --> B["SettingsSnapshot.externalAcpEndpoints
-  仅作为 sync 输入"]
-
-  B --> C["buildExternalAcpSyncedProvidersInternal()"]
-  C --> D["syncExternalAcpProvidersInternal()"]
-  D --> E["xworkmate.providers.sync"]
-  E --> F["xworkmate-bridge providerCatalog"]
-
-  F --> G["acp.capabilities"]
+  与账号同步元数据"] --> G["acp.capabilities"]
   G --> H["providerCatalog[]
   singleAgent / multiAgent"]
 
@@ -77,7 +68,7 @@ flowchart TD
 
 ## Notes
 
-- `externalAcpEndpoints` still matters, but only as bridge sync input.
+- Production cloud mode does not use app-side provider sync.
 - Provider visibility and picker contents come from
   `acp.capabilities.providerCatalog`.
 - Auto-provider resolution and unavailable messaging come from

@@ -53,15 +53,7 @@ Single-agent provider catalog and availability are owned by
 flowchart TD
   A["Settings UI
   仅管理 Bridge 连接参数
-  与自定义 upstream sync 定义"] --> B["SettingsSnapshot.externalAcpEndpoints
-  仅作为 sync 输入"]
-
-  B --> C["buildExternalAcpSyncedProvidersInternal()"]
-  C --> D["syncExternalAcpProvidersInternal()"]
-  D --> E["xworkmate.providers.sync"]
-  E --> F["xworkmate-bridge providerCatalog"]
-
-  F --> G["acp.capabilities"]
+  与账号同步元数据"] --> G["acp.capabilities"]
   G --> H["providerCatalog[]
   singleAgent / multiAgent"]
 
@@ -118,6 +110,8 @@ flowchart TD
 - Desktop App 直接桥接 Go 代码
 - Desktop 正常执行链路不以“先启动一个本地 HTTP server，再由 Desktop 自己回连”作为目标架构
 - Desktop 的 `sendMessage -> GoTaskService.executeTask -> ACP` 应理解为进程内或直接桥接语义
+- Production cloud mode does not call `xworkmate.providers.sync`
+- Production provider upstreams are bridge-owned, not app-owned
 - 对 app 来说，bridge 是 discovery / config / connect / dialogue 的统一枢纽
 
 ### Web / Mobile
