@@ -146,8 +146,8 @@ extension AppControllerDesktopThreadStorage on AppController {
     SettingsSnapshot snapshot,
   ) {
     final features = featuresFor(hostUiFeaturePlatformInternal);
-    final sanitizedExecutionTarget = features.sanitizeExecutionTarget(
-      snapshot.assistantExecutionTarget,
+    final sanitizedExecutionTarget = sanitizeExecutionTargetInternal(
+      features.sanitizeExecutionTarget(snapshot.assistantExecutionTarget),
     );
     final multiAgentConfig = features.supportsMultiAgent
         ? snapshot.multiAgent
@@ -220,9 +220,12 @@ extension AppControllerDesktopThreadStorage on AppController {
   AssistantExecutionTarget sanitizeExecutionTargetInternal(
     AssistantExecutionTarget? target,
   ) {
-    return featuresFor(
+    final sanitized = featuresFor(
       hostUiFeaturePlatformInternal,
     ).sanitizeExecutionTarget(target);
+    return sanitized == AssistantExecutionTarget.singleAgent
+        ? AssistantExecutionTarget.singleAgent
+        : AssistantExecutionTarget.gateway;
   }
 
   AssistantExecutionTarget sanitizePersistedExecutionTargetInternal(
@@ -683,8 +686,10 @@ extension AppControllerDesktopThreadStorage on AppController {
       if (!record.workspaceBinding.isComplete) {
         continue;
       }
-      final recordExecutionTarget = assistantExecutionTargetFromExecutionMode(
-        record.executionBinding.executionMode,
+      final recordExecutionTarget = sanitizeExecutionTargetInternal(
+        assistantExecutionTargetFromExecutionMode(
+          record.executionBinding.executionMode,
+        ),
       );
       final recordProvider =
           recordExecutionTarget == AssistantExecutionTarget.singleAgent
