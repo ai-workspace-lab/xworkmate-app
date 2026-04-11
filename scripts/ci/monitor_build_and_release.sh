@@ -41,6 +41,10 @@ expected_jobs = %w[prepare verify build release]
 missing_jobs = expected_jobs.reject { |job| data.fetch('jobs', {}).key?(job) }
 abort("Missing workflow jobs: #{missing_jobs.join(', ')}") unless missing_jobs.empty?
 
+prepare_job = data.fetch('jobs').fetch('prepare')
+prepare_text = prepare_job.fetch('steps', []).map { |step| step['run'] }.compact.join("\n")
+abort('prepare job must release from main.') unless prepare_text.include?('refs/heads/main')
+
 build_job = data.fetch('jobs').fetch('build')
 matrix = build_job.fetch('strategy', {}).fetch('matrix', {}).fetch('include', [])
 platforms = matrix.map { |entry| entry['platform'] }.compact.to_h { |platform| [platform, true] }.keys
@@ -50,10 +54,11 @@ abort("Missing build matrix platforms: #{missing_platforms.join(', ')}") unless 
 
 text = File.read(workflow_path)
 required_snippets = [
-  'bash ./scripts/ci/run_code_analysis.sh',
+  'bash ./scripts/ci/run_flutter_ci_suite.sh',
   'bash ./scripts/ci/build_matrix_artifacts.sh',
   'bash ./scripts/ci/setup_platform_deps.sh',
   'bash ./scripts/ci/compute_release_metadata.sh',
+  'needs.prepare.outputs.should_release == \'true\'',
   'actions/upload-artifact',
   'actions/download-artifact'
 ]
