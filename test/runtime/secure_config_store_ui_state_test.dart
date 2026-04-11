@@ -33,7 +33,7 @@ void main() {
           assistantNavigationDestinations: const <AssistantFocusEntry>[
             AssistantFocusEntry.language,
           ],
-          savedGatewayTargets: const <String>['remote'],
+          savedGatewayTargets: const <String>['gateway'],
         ),
       );
 
@@ -46,7 +46,7 @@ void main() {
         loaded.assistantNavigationDestinations,
         const <AssistantFocusEntry>[AssistantFocusEntry.language],
       );
-      expect(loaded.savedGatewayTargets, const <String>['remote']);
+      expect(loaded.savedGatewayTargets, const <String>['gateway']);
       expect(await uiStateFile?.exists(), isTrue);
       expect(await settingsFile?.exists(), isFalse);
     });

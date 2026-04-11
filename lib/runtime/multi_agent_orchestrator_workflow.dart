@@ -635,63 +635,35 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
     required String aiGatewayBaseUrl,
     required String aiGatewayApiKey,
   }) async {
-    try {
-      if (!await goCoreLocatorInternal.isAvailable()) {
-        return const CliResult(
-          output: '',
-          error: 'Go core is unavailable for llm-chat',
-          exitCode: -1,
-        );
-      }
-      final endpoint = openAiCompatibleBaseUrlInternal(
-        aiGatewayBaseUrl: aiGatewayBaseUrl,
-      );
-      final apiKey = openAiCompatibleApiKeyInternal(
-        aiGatewayApiKey: aiGatewayApiKey,
-      );
-      final output = await arisLlmChatClientInternal.chat(
-        endpoint: endpoint,
-        apiKey: apiKey,
-        model: model,
-        prompt: prompt,
-        systemPrompt:
-            'You are the ARIS reviewer. Review the provided implementation and return actionable feedback.',
-      );
-      return CliResult(output: output, error: '', exitCode: 0);
-    } catch (error) {
-      return CliResult(output: '', error: error.toString(), exitCode: -1);
-    }
+    return runOpenAiCompatiblePromptInternal(
+      role: MultiAgentRole.testerDoc,
+      model: model,
+      prompt: prompt,
+      aiGatewayBaseUrl: aiGatewayBaseUrl,
+      aiGatewayApiKey: aiGatewayApiKey,
+    );
   }
 
   Future<CliResult> runArisTesterViaClaudeReviewInternal({
     required String model,
     required String prompt,
   }) async {
-    try {
-      if (!await goCoreLocatorInternal.isAvailable()) {
-        return const CliResult(
-          output: '',
-          error: 'Go core is unavailable for claude-review',
-          exitCode: -1,
-        );
-      }
-      if (!await binaryExistsInternal(resolveCliPathInternal('claude'))) {
-        return const CliResult(
-          output: '',
-          error: 'Claude CLI is unavailable for claude-review',
-          exitCode: -1,
-        );
-      }
-      final output = await arisLlmChatClientInternal.claudeReview(
-        prompt: prompt,
+    if (await binaryExistsInternal(resolveCliPathInternal('claude'))) {
+      return runCliPromptInternal(
+        role: MultiAgentRole.testerDoc,
+        tool: 'claude',
         model: model,
-        systemPrompt:
-            'You are the ARIS reviewer. Review the provided implementation and return actionable feedback.',
+        prompt: prompt,
+        cwd: '',
+        aiGatewayBaseUrl: '',
+        aiGatewayApiKey: '',
       );
-      return CliResult(output: output, error: '', exitCode: 0);
-    } catch (error) {
-      return CliResult(output: '', error: error.toString(), exitCode: -1);
     }
+    return CliResult(
+      output: '',
+      error: 'Claude CLI is unavailable for claude-review',
+      exitCode: -1,
+    );
   }
 
   Future<CliResult> runOpenAiCompatiblePromptInternal({

@@ -53,9 +53,9 @@ flowchart TB
     end
 
     subgraph L6["Bridge / Executors / Adapters"]
-        F1["single-agent ACP request"]
-        F2["multi-agent ACP request"]
-        F3["bridge hub<br/>discovery / config / connect / dialogue"]
+        F1["agent ACP request"]
+        F2["gateway ACP request"]
+        F3["bridge hub<br/>dynamic discovery / config / connect / dialogue / auth injection"]
         F4["gateway / provider adapters"]
     end
 

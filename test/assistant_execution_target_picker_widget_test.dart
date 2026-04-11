@@ -52,7 +52,7 @@ void main() {
       });
 
       controller.appUiStateInternal = controller.appUiState.copyWith(
-        savedGatewayTargets: const <String>['local', 'remote'],
+        savedGatewayTargets: const <String>['gateway'],
       );
       controller.lastObservedSettingsSnapshotInternal =
           controller.settingsController.snapshotInternal;
@@ -111,8 +111,7 @@ void main() {
           .map((item) => item.value)
           .toList(growable: false);
 
-      expect(values, contains(AssistantExecutionTarget.remote));
-      expect(values, isNot(contains(AssistantExecutionTarget.local)));
+      expect(values, contains(AssistantExecutionTarget.gateway));
 
       await tester.pumpWidget(const SizedBox.shrink());
       controller.dispose();
@@ -204,8 +203,8 @@ class _FakeGoTaskServiceClient implements GoTaskServiceClient {
   }) async {
     return const ExternalCodeAgentAcpRoutingResolution(
       raw: <String, dynamic>{
-        'resolvedExecutionTarget': 'single-agent',
-        'resolvedEndpointTarget': 'singleAgent',
+        'resolvedExecutionTarget': 'agent',
+        'resolvedEndpointTarget': 'agent',
         'resolvedProviderId': 'codex',
         'resolvedModel': '',
         'resolvedSkills': <String>[],

@@ -6,8 +6,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'aris_bundle.dart';
 import 'embedded_agent_launch_policy.dart';
-import 'go_core.dart';
-import 'aris_llm_chat_client.dart';
 import 'multi_agent_frameworks.dart';
 import 'runtime_models.dart';
 import 'multi_agent_orchestrator_protocol.dart';
@@ -27,17 +25,12 @@ class MultiAgentOrchestrator extends ChangeNotifier {
   MultiAgentOrchestrator({
     required MultiAgentConfig config,
     ArisBundleRepository? arisBundleRepository,
-    GoCoreLocator? goCoreLocator,
     Future<bool> Function(String command)? binaryExistsResolver,
     HttpClient Function()? httpClientFactory,
-    ArisLlmChatClient? arisLlmChatClient,
     CliProcessStarter? processStarter,
   }) : configInternal = config,
        arisBundleRepositoryInternal =
            arisBundleRepository ?? ArisBundleRepository(),
-       goCoreLocatorInternal =
-           goCoreLocator ??
-           GoCoreLocator(binaryExistsResolver: binaryExistsResolver),
        binaryExistsResolverInternal = binaryExistsResolver,
        httpClientFactoryInternal = httpClientFactory ?? HttpClient.new,
        processStarterInternal =
@@ -49,24 +42,15 @@ class MultiAgentOrchestrator extends ChangeNotifier {
                environment: environment,
                workingDirectory: workingDirectory,
              );
-           }),
-       arisLlmChatClientInternal =
-           arisLlmChatClient ??
-           ArisLlmChatClient(
-             bridgeLocator:
-                 goCoreLocator ??
-                 GoCoreLocator(binaryExistsResolver: binaryExistsResolver),
-           );
+           });
 
   /// 当前配置
   MultiAgentConfig configInternal;
   MultiAgentConfig get config => configInternal;
   final ArisBundleRepository arisBundleRepositoryInternal;
-  final GoCoreLocator goCoreLocatorInternal;
   final Future<bool> Function(String command)? binaryExistsResolverInternal;
   final HttpClient Function() httpClientFactoryInternal;
   final CliProcessStarter processStarterInternal;
-  final ArisLlmChatClient arisLlmChatClientInternal;
   Process? activeCliProcessInternal;
   HttpClient? activeHttpClientInternal;
   bool abortRequestedInternal = false;

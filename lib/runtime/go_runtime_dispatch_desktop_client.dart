@@ -1,12 +1,16 @@
-import 'go_acp_stdio_bridge.dart';
+import 'gateway_acp_client.dart';
 import 'runtime_dispatch_resolver.dart';
 import 'runtime_external_code_agents.dart';
 
 class GoRuntimeDispatchDesktopClient implements RuntimeDispatchResolver {
-  GoRuntimeDispatchDesktopClient({GoAcpStdioBridge? bridge})
-    : _bridge = bridge ?? GoAcpStdioBridge();
+  GoRuntimeDispatchDesktopClient({
+    required GatewayAcpClient client,
+    required Uri? Function() endpointResolver,
+  }) : _client = client,
+       _endpointResolver = endpointResolver;
 
-  final GoAcpStdioBridge _bridge;
+  final GatewayAcpClient _client;
+  final Uri? Function() _endpointResolver;
 
   @override
   Future<String?> selectProviderId({
@@ -14,7 +18,7 @@ class GoRuntimeDispatchDesktopClient implements RuntimeDispatchResolver {
     String preferredProviderId = '',
     Iterable<String> requiredCapabilities = const <String>[],
   }) async {
-    final response = await _bridge.request(
+    final response = await _client.request(
       method: 'xworkmate.dispatch.resolve',
       params: <String, dynamic>{
         'preferredProviderId': preferredProviderId.trim(),
@@ -24,6 +28,7 @@ class GoRuntimeDispatchDesktopClient implements RuntimeDispatchResolver {
             .toList(growable: false),
         'providers': providers.map(_providerToJson).toList(growable: false),
       },
+      endpointOverride: _endpointResolver(),
     );
     final result = _castMap(response['result']);
     return result['providerId']?.toString().trim().isNotEmpty == true
@@ -39,7 +44,7 @@ class GoRuntimeDispatchDesktopClient implements RuntimeDispatchResolver {
     required Map<String, dynamic> nodeState,
     required Map<String, dynamic> nodeInfo,
   }) async {
-    final response = await _bridge.request(
+    final response = await _client.request(
       method: 'xworkmate.dispatch.resolve',
       params: <String, dynamic>{
         'preferredProviderId': preferredProviderId.trim(),
@@ -51,6 +56,7 @@ class GoRuntimeDispatchDesktopClient implements RuntimeDispatchResolver {
         'nodeState': nodeState,
         'nodeInfo': nodeInfo,
       },
+      endpointOverride: _endpointResolver(),
     );
     final result = _castMap(response['result']);
     return RuntimeDispatchResolution(
@@ -66,7 +72,7 @@ class GoRuntimeDispatchDesktopClient implements RuntimeDispatchResolver {
   }
 
   @override
-  Future<void> dispose() => _bridge.dispose();
+  Future<void> dispose() => _client.dispose();
 
   Map<String, dynamic> _providerToJson(ExternalCodeAgentProvider provider) {
     return <String, dynamic>{

@@ -34,33 +34,19 @@ class GatewayConnectionProfile {
   final String selectedAgentId;
 
   factory GatewayConnectionProfile.defaults() {
-    return GatewayConnectionProfile.defaultsRemote();
+    return GatewayConnectionProfile.defaultsGateway();
   }
 
-  factory GatewayConnectionProfile.defaultsLocal() {
+  factory GatewayConnectionProfile.defaultsGateway() {
     return const GatewayConnectionProfile(
-      mode: RuntimeConnectionMode.local,
+      mode: RuntimeConnectionMode.unconfigured,
       useSetupCode: false,
       setupCode: '',
-      host: '127.0.0.1',
-      port: 18789,
-      tls: false,
-      tokenRef: 'gateway_token_0',
-      passwordRef: 'gateway_password_0',
-      selectedAgentId: '',
-    );
-  }
-
-  factory GatewayConnectionProfile.defaultsRemote() {
-    return const GatewayConnectionProfile(
-      mode: RuntimeConnectionMode.remote,
-      useSetupCode: false,
-      setupCode: '',
-      host: 'openclaw.svc.plus',
+      host: '',
       port: 443,
       tls: true,
-      tokenRef: 'gateway_token_1',
-      passwordRef: 'gateway_password_1',
+      tokenRef: 'gateway_token_0',
+      passwordRef: 'gateway_password_0',
       selectedAgentId: '',
     );
   }
@@ -143,10 +129,9 @@ class GatewayConnectionProfile {
   }
 }
 
-const int kGatewayProfileListLength = 5;
-const int kGatewayLocalProfileIndex = 0;
-const int kGatewayRemoteProfileIndex = 1;
-const int kGatewayCustomProfileStartIndex = 2;
+const int kGatewayProfileListLength = 4;
+const int kGatewayRemoteProfileIndex = 0;
+const int kGatewayCustomProfileStartIndex = 1;
 
 List<GatewayConnectionProfile> normalizeGatewayProfiles({
   Iterable<GatewayConnectionProfile>? profiles,
@@ -154,8 +139,7 @@ List<GatewayConnectionProfile> normalizeGatewayProfiles({
   final defaults = List<GatewayConnectionProfile>.generate(
     kGatewayProfileListLength,
     (index) => switch (index) {
-      kGatewayLocalProfileIndex => GatewayConnectionProfile.defaultsLocal(),
-      kGatewayRemoteProfileIndex => GatewayConnectionProfile.defaultsRemote(),
+      kGatewayRemoteProfileIndex => GatewayConnectionProfile.defaultsGateway(),
       _ => GatewayConnectionProfile.emptySlot(index: index),
     },
     growable: false,
@@ -166,34 +150,29 @@ List<GatewayConnectionProfile> normalizeGatewayProfiles({
   for (var index = 0; index < kGatewayProfileListLength; index += 1) {
     final fallback = defaults[index];
     final current = index < incoming.length ? incoming[index] : fallback;
-    if (index == kGatewayLocalProfileIndex) {
-      normalized.add(
-        current.copyWith(
-          mode: RuntimeConnectionMode.local,
-          useSetupCode: false,
-          setupCode: '',
-          host: current.host.trim().isEmpty ? fallback.host : current.host,
-          port: current.port > 0 ? current.port : fallback.port,
-          tls: false,
-          tokenRef: current.tokenRef.trim().isEmpty
-              ? fallback.tokenRef
-              : current.tokenRef,
-          passwordRef: current.passwordRef.trim().isEmpty
-              ? fallback.passwordRef
-              : current.passwordRef,
-        ),
-      );
-      continue;
-    }
     if (index == kGatewayRemoteProfileIndex) {
-      final useDefaultRemoteEndpoint =
-          current.host.trim().isEmpty || current.port <= 0;
+      final hasEndpoint = current.host.trim().isNotEmpty && current.port > 0;
+      final slotMode = switch (current.mode) {
+        RuntimeConnectionMode.local => RuntimeConnectionMode.local,
+        RuntimeConnectionMode.remote => RuntimeConnectionMode.remote,
+        RuntimeConnectionMode.unconfigured => hasEndpoint
+            ? RuntimeConnectionMode.remote
+            : RuntimeConnectionMode.unconfigured,
+      };
       normalized.add(
         current.copyWith(
-          mode: RuntimeConnectionMode.remote,
-          host: useDefaultRemoteEndpoint ? fallback.host : current.host,
-          port: useDefaultRemoteEndpoint ? fallback.port : current.port,
-          tls: useDefaultRemoteEndpoint ? fallback.tls : current.tls,
+          mode: slotMode,
+          useSetupCode: slotMode == RuntimeConnectionMode.local
+              ? false
+              : current.useSetupCode,
+          setupCode: slotMode == RuntimeConnectionMode.local
+              ? ''
+              : current.setupCode,
+          host: hasEndpoint ? current.host : fallback.host,
+          port: current.port > 0 ? current.port : fallback.port,
+          tls: slotMode == RuntimeConnectionMode.local
+              ? false
+              : (hasEndpoint ? current.tls : fallback.tls),
           tokenRef: current.tokenRef.trim().isEmpty
               ? fallback.tokenRef
               : current.tokenRef,

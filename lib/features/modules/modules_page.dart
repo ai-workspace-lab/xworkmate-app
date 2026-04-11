@@ -495,8 +495,8 @@ class _SkillsPanel extends StatelessWidget {
         SectionHeader(
           title: appText('技能模式', 'Skill modes'),
           subtitle: appText(
-            '用相同界面简洁区分单机智能体、本地 Gateway、远程 Gateway 三种模式，以及各自可用的技能包。',
-            'Keep the same page structure while separating single-agent, local gateway, and remote gateway skill packs.',
+            '用相同界面简洁区分 Agent 与 Gateway 两种路径，以及各自可用的技能包。',
+            'Keep the same page structure while separating the agent and gateway paths and their available skill packs.',
           ),
         ),
         const SizedBox(height: 16),
@@ -668,52 +668,30 @@ class _SkillsPanel extends StatelessWidget {
         ],
         skills: singleAgentSkills.map((item) => item.name).toList(),
         emptyLabel: appText(
-          '切换到单机智能体模式后，将显示本地技能包。',
-          'Switch to single-agent mode to inspect local skill packs.',
+          '切换到 Agent 模式后，将显示当前可用的本地技能包。',
+          'Switch to agent mode to inspect the currently available local skill packs.',
         ),
       ),
       _SkillModeCardData(
-        title: appText('本地 Gateway', 'Local gateway'),
+        title: appText('Gateway', 'Gateway'),
         subtitle: appText(
-          '通过本地 OpenClaw Gateway 暴露运行时技能，适合本机节点与代理协作。',
-          'Expose runtime skill packs through the local OpenClaw Gateway for local nodes and agents.',
+          '通过 xworkmate-bridge 暴露运行时技能，统一承接当前 gateway 路径。',
+          'Expose runtime skill packs through xworkmate-bridge as the single gateway path.',
         ),
         icon: Icons.lan_rounded,
-        status: currentMode == AssistantExecutionTarget.local
+        status: currentMode == AssistantExecutionTarget.gateway
             ? StatusInfo(appText('当前模式', 'Current mode'), StatusTone.accent)
             : StatusInfo(appText('可切换', 'Available'), StatusTone.success),
         chips: <String>[
-          appText('节点协作', 'Node orchestration'),
-          appText('本机运行时', 'Local runtime'),
+          appText('统一路由', 'Unified routing'),
+          appText('xworkmate-bridge', 'xworkmate-bridge'),
         ],
-        skills: currentMode == AssistantExecutionTarget.local
+        skills: currentMode == AssistantExecutionTarget.gateway
             ? gatewaySkills.map((item) => item.name).toList()
             : const <String>[],
         emptyLabel: appText(
-          '切换到本地 Gateway 模式后，将显示当前本地网关返回的技能包。',
-          'Switch to local gateway mode to inspect the active local runtime skill packs.',
-        ),
-      ),
-      _SkillModeCardData(
-        title: appText('远程 Gateway', 'Remote gateway'),
-        subtitle: appText(
-          '通过远程 Gateway 暴露团队或服务端技能，适合共享节点、代理与平台能力。',
-          'Expose team or hosted skill packs through the remote gateway for shared nodes, agents, and services.',
-        ),
-        icon: Icons.cloud_done_rounded,
-        status: currentMode == AssistantExecutionTarget.remote
-            ? StatusInfo(appText('当前模式', 'Current mode'), StatusTone.accent)
-            : StatusInfo(appText('可切换', 'Available'), StatusTone.success),
-        chips: <String>[
-          appText('团队共享', 'Team shared'),
-          appText('平台服务', 'Platform services'),
-        ],
-        skills: currentMode == AssistantExecutionTarget.remote
-            ? gatewaySkills.map((item) => item.name).toList()
-            : const <String>[],
-        emptyLabel: appText(
-          '切换到远程 Gateway 模式后，将显示当前远程网关返回的技能包。',
-          'Switch to remote gateway mode to inspect the active remote runtime skill packs.',
+          '切换到 Gateway 模式后，将显示当前 bridge 返回的技能包。',
+          'Switch to gateway mode to inspect the active skill packs returned by the bridge.',
         ),
       ),
     ];

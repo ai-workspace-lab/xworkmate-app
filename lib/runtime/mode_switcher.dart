@@ -1,8 +1,8 @@
-// OpenClaw Gateway mode switching logic.
+// Gateway mode switching logic.
 //
 // Handles transitions between:
 // - Local mode (127.0.0.1:18789): Full functionality, no cloud memory
-// - Remote mode (wss://openclaw.svc.plus): Full functionality with cloud memory
+// - Remote mode (configured bridge endpoint): Full functionality with cloud memory
 // - Offline mode: Local Codex only, limited functionality
 
 import 'dart:async';
@@ -17,7 +17,7 @@ enum GatewayMode {
   /// Local mode: Gateway running locally at 127.0.0.1:18789
   local,
 
-  /// Remote mode: Gateway connected to cloud at wss://openclaw.svc.plus
+  /// Remote mode: Gateway connected through the configured bridge endpoint
   remote,
 
   /// Offline mode: No gateway connection, local Codex only
@@ -145,7 +145,8 @@ class ModeSwitcher extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final profile = GatewayConnectionProfile.defaultsLocal().copyWith(
+      final profile = GatewayConnectionProfile.defaults().copyWith(
+        mode: RuntimeConnectionMode.local,
         host: host,
         port: port,
         tls: false,
@@ -187,7 +188,7 @@ class ModeSwitcher extends ChangeNotifier {
 
   /// Switch to remote mode.
   Future<ModeSwitchResult> switchToRemote({
-    String host = 'openclaw.svc.plus',
+    String host = '',
     int port = 443,
     bool tls = true,
     String? token,
@@ -201,7 +202,8 @@ class ModeSwitcher extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final profile = GatewayConnectionProfile.defaultsRemote().copyWith(
+      final profile = GatewayConnectionProfile.defaults().copyWith(
+        mode: RuntimeConnectionMode.remote,
         host: host,
         port: port,
         tls: tls,
@@ -325,7 +327,7 @@ class ModeSwitcher extends ChangeNotifier {
       case GatewayMode.local:
         return 'Local Mode (127.0.0.1:18789)';
       case GatewayMode.remote:
-        return 'Remote Mode (wss://openclaw.svc.plus)';
+        return 'Remote Mode (Configured bridge endpoint)';
       case GatewayMode.offline:
         return 'Offline Mode (Local Codex Only)';
     }

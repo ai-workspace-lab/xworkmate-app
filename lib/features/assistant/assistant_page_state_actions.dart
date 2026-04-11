@@ -443,8 +443,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       visibleTargets: widget.controller
           .visibleAssistantExecutionTargets(const <AssistantExecutionTarget>[
             AssistantExecutionTarget.singleAgent,
-            AssistantExecutionTarget.local,
-            AssistantExecutionTarget.remote,
+            AssistantExecutionTarget.gateway,
           ]),
       localWorkspaceAvailable: widget.controller.settings.workspacePath
           .trim()
@@ -554,8 +553,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
         widget.controller,
         supportedTargets: const <AssistantExecutionTarget>[
           AssistantExecutionTarget.singleAgent,
-          AssistantExecutionTarget.local,
-          AssistantExecutionTarget.remote,
+          AssistantExecutionTarget.gateway,
         ],
       ),
       isCurrent: true,

@@ -252,6 +252,9 @@ class GoTaskServiceRequest {
       multiAgent ||
       collaborationMode == GoTaskServiceCollaborationMode.multiAgent;
 
+  AssistantExecutionTarget get normalizedTarget =>
+      target.isGateway ? AssistantExecutionTarget.gateway : target;
+
   GoTaskServiceRoute get route {
     if (isMultiAgentRequest) {
       return GoTaskServiceRoute.externalAcpMulti;
@@ -260,24 +263,16 @@ class GoTaskServiceRequest {
   }
 
   String get acpMode {
-    if (route == GoTaskServiceRoute.externalAcpMulti) {
-      return 'multi-agent';
-    }
     return switch (target) {
-      AssistantExecutionTarget.singleAgent => 'single-agent',
-      AssistantExecutionTarget.local => _gatewaySessionMode,
-      AssistantExecutionTarget.remote => _gatewaySessionMode,
+      AssistantExecutionTarget.singleAgent => 'agent',
+      AssistantExecutionTarget.gateway => _gatewaySessionMode,
     };
   }
 
   String get routingExecutionTarget {
-    if (route == GoTaskServiceRoute.externalAcpMulti) {
-      return 'multi-agent';
-    }
     return switch (target) {
-      AssistantExecutionTarget.singleAgent => 'single-agent',
-      AssistantExecutionTarget.local => 'gateway',
-      AssistantExecutionTarget.remote => 'gateway',
+      AssistantExecutionTarget.singleAgent => 'agent',
+      AssistantExecutionTarget.gateway => 'gateway',
     };
   }
 
@@ -333,9 +328,9 @@ class GoTaskServiceRequest {
         'aiGatewayApiKey': aiGatewayApiKey.trim(),
       'routing': resolvedRouting.toJson(),
       if (routingHint.trim().isNotEmpty) 'routingHint': routingHint.trim(),
-      'requestedExecutionTarget': target.promptValue,
+      'requestedExecutionTarget': normalizedTarget.promptValue,
       if (_usesGatewaySessionMode(acpMode)) ...<String, dynamic>{
-        'executionTarget': target.promptValue,
+        'executionTarget': normalizedTarget.promptValue,
         if (agentId.trim().isNotEmpty) 'agentId': agentId.trim(),
         if (metadata.isNotEmpty) 'metadata': metadata,
       },
@@ -344,14 +339,14 @@ class GoTaskServiceRequest {
   }
 
   ExternalCodeAgentAcpRoutingConfig _synthesizedRouting() {
-    final preferredGatewayTarget = switch (target) {
-      AssistantExecutionTarget.remote => 'remote',
-      _ => 'local',
+    final gatewayTarget = normalizedTarget;
+    final preferredGatewayTarget = switch (gatewayTarget) {
+      AssistantExecutionTarget.gateway => 'gateway',
+      _ => 'gateway',
     };
-    final explicitExecutionTarget = switch (target) {
-      AssistantExecutionTarget.local => 'local',
-      AssistantExecutionTarget.remote => 'remote',
-      AssistantExecutionTarget.singleAgent => 'singleAgent',
+    final explicitExecutionTarget = switch (gatewayTarget) {
+      AssistantExecutionTarget.singleAgent => 'agent',
+      AssistantExecutionTarget.gateway => 'gateway',
     };
     final explicitProviderId = provider.isUnspecified
         ? ''
@@ -586,23 +581,26 @@ String? goTaskServiceGatewayEntryState({
       final resolvedEndpointTarget = result.resolvedEndpointTarget
           .trim()
           .toLowerCase();
-      if (resolvedEndpointTarget ==
-          AssistantExecutionTarget.remote.promptValue.toLowerCase()) {
-        return AssistantExecutionTarget.remote.promptValue;
+      if (resolvedEndpointTarget.isEmpty ||
+          resolvedEndpointTarget == 'gateway') {
+        return AssistantExecutionTarget.gateway.promptValue;
       }
-      if (resolvedEndpointTarget ==
-          AssistantExecutionTarget.local.promptValue.toLowerCase()) {
-        return AssistantExecutionTarget.local.promptValue;
-      }
-      return requestedTarget == AssistantExecutionTarget.remote
-          ? AssistantExecutionTarget.remote.promptValue
-          : AssistantExecutionTarget.local.promptValue;
+      throw StateError(
+        'Bridge protocol mismatch: unsupported resolvedEndpointTarget "$resolvedEndpointTarget".',
+      );
+    case 'agent':
+      return AssistantExecutionTarget.singleAgent.promptValue;
     case 'single-agent':
-      return AssistantExecutionTarget.singleAgent.promptValue;
     case 'multi-agent':
-      return AssistantExecutionTarget.singleAgent.promptValue;
+    case 'local':
+    case 'remote':
+      throw StateError(
+        'Bridge protocol mismatch: unsupported resolvedExecutionTarget "$resolvedExecutionTarget".',
+      );
     default:
-      return requestedTarget.promptValue;
+      return requestedTarget.isGateway
+          ? AssistantExecutionTarget.gateway.promptValue
+          : requestedTarget.promptValue;
   }
 }
 
