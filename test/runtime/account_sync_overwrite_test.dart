@@ -73,20 +73,20 @@ void main() {
         expect(first.state, 'ready');
         expect(
           controller.snapshot.gatewayProfiles[kGatewayRemoteProfileIndex].host,
-          'remote.gateway.svc.plus',
+          'local.example.com',
         );
         expect(
           controller
               .snapshot
               .gatewayProfiles[kGatewayRemoteProfileIndex]
               .tokenRef,
-          kAccountManagedSecretTargetOpenclawGatewayToken,
+          'local_ref',
         );
         expect(controller.snapshot.vault.address, 'https://vault.svc.plus');
         expect(controller.snapshot.vault.namespace, 'prod');
         expect(
           controller.snapshot.aiGateway.baseUrl,
-          'https://apisix.svc.plus',
+          'https://local-apisix.example.com',
         );
         expect(
           controller.snapshot.aiGateway.apiKeyRef,
@@ -116,7 +116,16 @@ void main() {
         expect(controller.snapshot.vault.address, 'https://vault.svc.plus');
         expect(
           controller.snapshot.aiGateway.baseUrl,
-          'https://apisix.svc.plus',
+          'https://edited-apisix.example.com',
+        );
+        expect(
+          controller
+              .snapshot
+              .acpBridgeServerModeConfig
+              .cloudSynced
+              .remoteServerSummary
+              .endpoint,
+          'https://xworkmate-bridge.svc.plus',
         );
 
         final rawSyncState = await store.loadSupportJson(

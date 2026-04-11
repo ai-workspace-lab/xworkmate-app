@@ -300,7 +300,8 @@ class AppController extends ChangeNotifier {
   late final MultiAgentOrchestrator multiAgentOrchestratorInternal;
   late final MultiAgentMountManager multiAgentMountManagerInternal;
 
-  GoTaskServiceClient get goTaskServiceClientForTest => goTaskServiceClientInternal;
+  GoTaskServiceClient get goTaskServiceClientForTest =>
+      goTaskServiceClientInternal;
 
   Map<SingleAgentProvider, SingleAgentCapabilities>
   singleAgentCapabilitiesByProviderInternal =
@@ -654,10 +655,7 @@ class AppController extends ChangeNotifier {
     if (selection == SingleAgentProvider.auto) {
       return null;
     }
-    final resolvedSelection = settings.resolveSingleAgentProvider(selection);
-    return canUseSingleAgentProviderInternal(resolvedSelection)
-        ? resolvedSelection
-        : null;
+    return canUseSingleAgentProviderInternal(selection) ? selection : null;
   }
 
   List<String> get aiGatewayConversationModelChoices {

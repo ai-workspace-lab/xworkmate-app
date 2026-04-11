@@ -79,7 +79,7 @@ void main() {
                         lastSyncAt: 123456789,
                         remoteServerSummary:
                             const AcpBridgeServerRemoteServerSummary(
-                              endpoint: 'wss://gateway.svc.plus',
+                              endpoint: 'https://xworkmate-bridge.svc.plus',
                               hasAdvancedOverrides: false,
                             ),
                       ),

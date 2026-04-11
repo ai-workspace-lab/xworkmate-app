@@ -160,7 +160,6 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
     );
     controller.recomputeTasksInternal();
     try {
-      await controller.syncExternalAcpProvidersInternal();
       final result = await controller.goTaskServiceClientInternal.executeTask(
         GoTaskServiceRequest(
           sessionId: sessionKey,
