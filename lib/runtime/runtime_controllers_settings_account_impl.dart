@@ -491,24 +491,33 @@ Future<void> logoutAccountSettingsInternal(
   await controller.storeInternal.clearAccountSessionUserId();
   await controller.storeInternal.clearAccountSessionIdentifier();
   await controller.storeInternal.clearAccountSessionSummary();
+  await controller.storeInternal.clearAccountSyncState();
+  await controller.storeInternal.clearAccountManagedSecrets();
+  final currentSnapshot = controller.snapshotInternal;
+  final clearedCloudSync = currentSnapshot.acpBridgeServerModeConfig.cloudSynced
+      .copyWith(
+        accountIdentifier: '',
+        lastSyncAt: 0,
+        remoteServerSummary: currentSnapshot
+            .acpBridgeServerModeConfig
+            .cloudSynced
+            .remoteServerSummary
+            .copyWith(endpoint: '', hasAdvancedOverrides: false),
+      );
   if (!controller.snapshotInternal.accountLocalMode) {
     await controller.saveSnapshot(
-      controller.snapshotInternal.copyWith(
+      currentSnapshot.copyWith(
         accountLocalMode: true,
-        acpBridgeServerModeConfig: controller
-            .snapshotInternal
-            .acpBridgeServerModeConfig
-            .copyWith(
-              cloudSynced: controller
-                  .snapshotInternal
-                  .acpBridgeServerModeConfig
-                  .cloudSynced
-                  .copyWith(accountIdentifier: ''),
-            ),
+        acpBridgeServerModeConfig: currentSnapshot.acpBridgeServerModeConfig
+            .copyWith(cloudSynced: clearedCloudSync),
       ),
       recordAccountOverrides: false,
     );
   } else {
+    controller.snapshotInternal = currentSnapshot.copyWith(
+      acpBridgeServerModeConfig: currentSnapshot.acpBridgeServerModeConfig
+          .copyWith(cloudSynced: clearedCloudSync),
+    );
     await controller.reloadDerivedStateInternal();
   }
   controller.accountStatusInternal = statusMessage;
