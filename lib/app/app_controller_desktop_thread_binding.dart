@@ -258,7 +258,7 @@ extension AppControllerDesktopThreadBinding on AppController {
     final sanitizedProvider =
         executionTarget == AssistantExecutionTarget.singleAgent
         ? settings.sanitizeSingleAgentProviderSelection(singleAgentProvider)
-        : SingleAgentProvider.auto;
+        : SingleAgentProvider.unspecified;
     return (existingBinding ??
             ExecutionBinding(
               executionMode: ThreadExecutionMode.localAgent,

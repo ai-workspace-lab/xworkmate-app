@@ -361,7 +361,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       singleAgentProvider:
           singleAgentProvider ??
           singleAgentProviderForSession(currentSessionKey),
-      singleAgentProviderSource: ThreadSelectionSource.explicit,
+      singleAgentProviderSource: ThreadSelectionSource.inherited,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     // Re-read the current thread target when the async binding sync runs so a
