@@ -588,11 +588,7 @@ class AppController extends ChangeNotifier {
       );
 
   List<SingleAgentProvider> get configuredSingleAgentProviders =>
-      normalizeSingleAgentProviderList(
-        bridgeAdvertisedProvidersInternal.where(
-          (item) => item != SingleAgentProvider.auto,
-        ),
-      );
+      normalizeSingleAgentProviderList(bridgeAdvertisedProvidersInternal);
 
   List<SingleAgentProvider> get availableSingleAgentProviders =>
       availableSingleAgentProvidersOverrideInternal != null
@@ -638,11 +634,10 @@ class AppController extends ChangeNotifier {
   bool canUseSingleAgentProviderInternal(SingleAgentProvider provider) {
     final override = availableSingleAgentProvidersOverrideInternal;
     if (override != null) {
-      return provider != SingleAgentProvider.auto &&
-          override.contains(provider);
+      return !provider.isUnspecified && override.contains(provider);
     }
-    if (provider == SingleAgentProvider.auto) {
-      return hasAnyAvailableSingleAgentProvider;
+    if (provider.isUnspecified) {
+      return false;
     }
     final capabilities = singleAgentCapabilitiesByProviderInternal[provider];
     return capabilities?.available == true &&
@@ -652,7 +647,7 @@ class AppController extends ChangeNotifier {
   SingleAgentProvider? resolvedSingleAgentProviderInternal(
     SingleAgentProvider selection,
   ) {
-    if (selection == SingleAgentProvider.auto) {
+    if (selection.isUnspecified) {
       return null;
     }
     return canUseSingleAgentProviderInternal(selection) ? selection : null;

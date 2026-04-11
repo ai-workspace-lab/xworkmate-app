@@ -447,8 +447,8 @@ class SettingsSnapshot {
   }
 
   SingleAgentProvider resolveSingleAgentProvider(SingleAgentProvider provider) {
-    if (provider.isAuto) {
-      return SingleAgentProvider.auto;
+    if (provider.isUnspecified) {
+      return SingleAgentProvider.unspecified;
     }
     final profile = providerSyncDefinitionForProviderId(provider.providerId);
     if (profile != null) {
@@ -459,8 +459,8 @@ class SettingsSnapshot {
 
   SingleAgentProvider singleAgentProviderForId(String providerId) {
     final resolved = normalizeSingleAgentProviderId(providerId);
-    if (resolved.isEmpty || resolved == SingleAgentProvider.auto.providerId) {
-      return SingleAgentProvider.auto;
+    if (resolved.isEmpty || resolved == 'auto') {
+      return SingleAgentProvider.unspecified;
     }
     final normalizedSelection = SingleAgentProvider.fromJsonValue(resolved);
     final profile = providerSyncDefinitionForProviderId(
@@ -476,8 +476,8 @@ class SettingsSnapshot {
     SingleAgentProvider provider,
   ) {
     final resolved = resolveSingleAgentProvider(provider);
-    if (resolved.isAuto) {
-      return SingleAgentProvider.auto;
+    if (resolved.isUnspecified) {
+      return SingleAgentProvider.unspecified;
     }
     if (kKnownSingleAgentProviders.any(
       (item) => item.providerId == resolved.providerId,
