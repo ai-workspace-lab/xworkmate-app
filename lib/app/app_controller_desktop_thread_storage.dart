@@ -444,7 +444,7 @@ extension AppControllerDesktopThreadStorage on AppController {
                   path: resolvedRootPath,
                   bookmark: rootSpec.bookmark,
                 ),
-                );
+              );
           if (accessHandle == null) {
             continue;
           }
@@ -690,11 +690,14 @@ extension AppControllerDesktopThreadStorage on AppController {
       final recordExecutionTarget = assistantExecutionTargetFromExecutionMode(
         record.executionBinding.executionMode,
       );
-      final recordProvider = settings.sanitizeSingleAgentProviderSelection(
-        SingleAgentProviderCopy.fromJsonValue(
-          record.executionBinding.providerId,
-        ),
-      );
+      final recordProvider =
+          recordExecutionTarget == AssistantExecutionTarget.singleAgent
+          ? settings.sanitizeSingleAgentProviderSelection(
+              SingleAgentProviderCopy.fromJsonValue(
+                record.executionBinding.providerId,
+              ),
+            )
+          : SingleAgentProvider.auto;
       final workspaceBinding = record.workspaceBinding.copyWith(
         workspaceId: sessionKey,
         displayPath: record.workspaceKind == WorkspaceKind.localFs
@@ -728,6 +731,10 @@ extension AppControllerDesktopThreadStorage on AppController {
           ),
           executorId: recordProvider.providerId,
           providerId: recordProvider.providerId,
+          providerSource:
+              recordExecutionTarget == AssistantExecutionTarget.singleAgent
+              ? record.executionBinding.providerSource
+              : ThreadSelectionSource.inherited,
         ),
         lifecycleState: record.lifecycleState.copyWith(status: 'ready'),
       );
