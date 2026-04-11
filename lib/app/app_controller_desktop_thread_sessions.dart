@@ -47,6 +47,45 @@ import 'app_controller_desktop_runtime_helpers.dart';
 import 'app_controller_desktop_thread_sessions_collaboration_impl.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
+
+AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
+  required AssistantExecutionTarget target,
+  required GatewayConnectionSnapshot connection,
+  required GatewayConnectionProfile targetProfile,
+}) {
+  final expectedMode = target == AssistantExecutionTarget.local
+      ? RuntimeConnectionMode.local
+      : RuntimeConnectionMode.remote;
+  final matchesTarget = connection.mode == expectedMode;
+  final targetAddress =
+      targetProfile.host.trim().isNotEmpty && targetProfile.port > 0
+      ? '${targetProfile.host.trim()}:${targetProfile.port}'
+      : appText('未连接目标', 'No target');
+  final rawStatus = matchesTarget
+      ? connection.status
+      : RuntimeConnectionStatus.offline;
+  final pairingRequired = matchesTarget && connection.pairingRequired;
+  final gatewayTokenMissing = matchesTarget && connection.gatewayTokenMissing;
+  final status = pairingRequired || gatewayTokenMissing
+      ? RuntimeConnectionStatus.error
+      : rawStatus;
+  final primaryLabel = pairingRequired
+      ? appText('需配对', 'Pairing Required')
+      : gatewayTokenMissing
+      ? appText('缺少令牌', 'Missing Token')
+      : status.label;
+  return AssistantThreadConnectionState(
+    executionTarget: target,
+    status: status,
+    primaryLabel: primaryLabel,
+    detailLabel: targetAddress,
+    ready: status == RuntimeConnectionStatus.connected,
+    pairingRequired: pairingRequired,
+    gatewayTokenMissing: gatewayTokenMissing,
+    lastError: matchesTarget ? connection.lastError?.trim() : null,
+  );
+}
+
 extension AppControllerDesktopThreadSessions on AppController {
   TaskThread? taskThreadForSessionInternal(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
@@ -394,41 +433,10 @@ extension AppControllerDesktopThreadSessions on AppController {
       );
     }
 
-    final expectedMode = target == AssistantExecutionTarget.local
-        ? RuntimeConnectionMode.local
-        : RuntimeConnectionMode.remote;
-    final matchesTarget = connection.mode == expectedMode;
-    final fallbackProfile = gatewayProfileForAssistantExecutionTargetInternal(
-      target,
-    );
-    final fallbackAddress = gatewayAddressLabelInternal(fallbackProfile);
-    final detail = matchesTarget
-        ? (connection.remoteAddress?.trim().isNotEmpty == true
-              ? connection.remoteAddress!.trim()
-              : fallbackAddress)
-        : fallbackAddress;
-    final rawStatus = matchesTarget
-        ? connection.status
-        : RuntimeConnectionStatus.offline;
-    final pairingRequired = matchesTarget && connection.pairingRequired;
-    final gatewayTokenMissing = matchesTarget && connection.gatewayTokenMissing;
-    final status = pairingRequired || gatewayTokenMissing
-        ? RuntimeConnectionStatus.error
-        : rawStatus;
-    final primaryLabel = pairingRequired
-        ? appText('需配对', 'Pairing Required')
-        : gatewayTokenMissing
-        ? appText('缺少令牌', 'Missing Token')
-        : status.label;
-    return AssistantThreadConnectionState(
-      executionTarget: target,
-      status: status,
-      primaryLabel: primaryLabel,
-      detailLabel: detail,
-      ready: status == RuntimeConnectionStatus.connected,
-      pairingRequired: pairingRequired,
-      gatewayTokenMissing: gatewayTokenMissing,
-      lastError: matchesTarget ? connection.lastError?.trim() : null,
+    return resolveGatewayThreadConnectionStateInternal(
+      target: target,
+      connection: connection,
+      targetProfile: gatewayProfileForAssistantExecutionTargetInternal(target),
     );
   }
 

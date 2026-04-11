@@ -45,6 +45,41 @@ import 'app_controller_desktop_thread_storage.dart';
 import 'app_controller_desktop_skill_permissions.dart';
 import 'app_controller_desktop_runtime_helpers.dart';
 
+class DesktopThreadBindingSnapshotInternal {
+  const DesktopThreadBindingSnapshotInternal({
+    required this.executionTarget,
+    required this.singleAgentProvider,
+    required this.record,
+  });
+
+  final AssistantExecutionTarget executionTarget;
+  final SingleAgentProvider singleAgentProvider;
+  final TaskThread? record;
+}
+
+DesktopThreadBindingSnapshotInternal
+resolveDesktopThreadBindingSnapshotInternal({
+  required AssistantExecutionTarget defaultExecutionTarget,
+  AssistantExecutionTarget? executionTargetOverride,
+  TaskThread? latestRecord,
+}) {
+  final resolvedExecutionTarget =
+      executionTargetOverride ??
+      (latestRecord == null
+          ? defaultExecutionTarget
+          : assistantExecutionTargetFromExecutionMode(
+              latestRecord.executionBinding.executionMode,
+            ));
+  final resolvedProvider = SingleAgentProviderCopy.fromJsonValue(
+    latestRecord?.executionBinding.providerId ?? '',
+  );
+  return DesktopThreadBindingSnapshotInternal(
+    executionTarget: resolvedExecutionTarget,
+    singleAgentProvider: resolvedProvider,
+    record: latestRecord,
+  );
+}
+
 extension AppControllerDesktopThreadBinding on AppController {
   String managedLocalThreadWorkspaceSuffixInternal(String sessionKey) =>
       '/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(sessionKey)}';
@@ -161,20 +196,6 @@ extension AppControllerDesktopThreadBinding on AppController {
     required ThreadOwnerScope ownerScope,
     WorkspaceBinding? existingBinding,
   }) {
-    final preservesRemoteSingleAgentBinding =
-        existingBinding != null &&
-        existingBinding.workspaceKind == WorkspaceKind.remoteFs &&
-        existingBinding.workspacePath.trim().isNotEmpty &&
-        !isOwnerScopedRemoteWorkspacePathInternal(
-          existingBinding.workspacePath,
-        );
-    if (preservesRemoteSingleAgentBinding) {
-      return existingBinding.copyWith(
-        displayPath: existingBinding.displayPath.trim().isEmpty
-            ? existingBinding.workspacePath
-            : null,
-      );
-    }
     if (executionTarget == AssistantExecutionTarget.singleAgent) {
       if (existingBinding != null &&
           existingBinding.workspaceKind == WorkspaceKind.localFs &&
@@ -264,39 +285,34 @@ extension AppControllerDesktopThreadBinding on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final existing = assistantThreadRecordsInternal[normalizedSessionKey];
-    final resolvedExecutionTarget =
-        executionTarget ??
-        (existing == null
-            ? null
-            : assistantExecutionTargetFromExecutionMode(
-                existing.executionBinding.executionMode,
-              )) ??
-        assistantExecutionTargetForSession(normalizedSessionKey);
     final ownerScope = await ensureDesktopThreadOwnerScopeInternal(
       normalizedSessionKey,
     );
+    final latestRecord = assistantThreadRecordsInternal[normalizedSessionKey];
+    final snapshot = resolveDesktopThreadBindingSnapshotInternal(
+      defaultExecutionTarget: settings.assistantExecutionTarget,
+      executionTargetOverride: executionTarget,
+      latestRecord: latestRecord,
+    );
     final workspaceBinding = buildDesktopWorkspaceBindingInternal(
       normalizedSessionKey,
-      executionTarget: resolvedExecutionTarget,
+      executionTarget: snapshot.executionTarget,
       ownerScope: ownerScope,
-      existingBinding: existing?.workspaceBinding,
+      existingBinding: snapshot.record?.workspaceBinding,
     );
     upsertTaskThreadInternal(
       normalizedSessionKey,
       ownerScope: ownerScope,
       workspaceBinding: workspaceBinding,
       executionBinding: buildDesktopExecutionBindingInternal(
-        executionTarget: resolvedExecutionTarget,
+        executionTarget: snapshot.executionTarget,
         singleAgentProvider: settings.sanitizeSingleAgentProviderSelection(
-          SingleAgentProviderCopy.fromJsonValue(
-            existing?.executionBinding.providerId ?? '',
-          ),
+          snapshot.singleAgentProvider,
         ),
-        existingBinding: existing?.executionBinding,
+        existingBinding: snapshot.record?.executionBinding,
       ),
       lifecycleState:
-          (existing?.lifecycleState ??
+          (snapshot.record?.lifecycleState ??
                   const ThreadLifecycleState(
                     archived: false,
                     status: 'ready',
