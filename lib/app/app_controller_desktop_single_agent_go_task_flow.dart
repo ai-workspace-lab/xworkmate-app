@@ -94,7 +94,7 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
             );
       final unavailableReason =
           routingResolution.unavailable ||
-              (routingResolution.resolvedExecutionTarget == 'agent' &&
+              (routingResolution.resolvedExecutionTarget == 'single-agent' &&
                   effectiveProvider == null)
           ? (routingResolution.unavailableMessage.isNotEmpty
                 ? routingResolution.unavailableMessage
@@ -176,7 +176,7 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
             routing,
             routingResolution,
           ),
-          routingHint: 'agent',
+          routingHint: 'single-agent',
           provider: effectiveProvider ?? SingleAgentProvider.unspecified,
           remoteWorkingDirectoryHint:
               controller
@@ -238,7 +238,8 @@ ExternalCodeAgentAcpRoutingConfig _resolvedRoutingConfigDesktopInternal(
   final explicitExecutionTarget = switch (resolution.resolvedExecutionTarget
       .trim()
       .toLowerCase()) {
-    'agent' => 'agent',
+    'single-agent' => 'single-agent',
+    'multi-agent' => 'multi-agent',
     'gateway' => 'gateway',
     _ => original.explicitExecutionTarget,
   };

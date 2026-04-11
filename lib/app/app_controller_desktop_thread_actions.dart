@@ -247,14 +247,14 @@ extension AppControllerDesktopThreadActions on AppController {
       currentSessionKey,
       executionTarget: currentTarget,
     );
-    var workspacePath = assistantWorkspacePathForSession(
+    final workingDirectory = assistantSelectedWorkingDirectoryForSession(
       currentSessionKey,
     ).trim();
-    if (workspacePath.isEmpty) {
+    if (workingDirectory.isEmpty) {
       final error = StateError(
         appText(
-          '当前线程缺少工作路径，无法运行。请先配置工作区根目录后再试。',
-          'This thread has no workspace path, so it cannot run. Configure a workspace root and try again.',
+          '当前线程尚未选择项目目录，无法运行。请先选择项目。',
+          'This thread has no project directory yet. Select a project before running.',
         ),
       );
       appendAssistantThreadMessageInternal(
@@ -312,9 +312,7 @@ extension AppControllerDesktopThreadActions on AppController {
               threadId: sessionKey,
               target: currentTarget,
               prompt: message,
-              workingDirectory: assistantWorkspacePathForSession(
-                sessionKey,
-              ).trim(),
+              workingDirectory: workingDirectory,
               model: assistantModelForSession(sessionKey),
               thinking: thinking,
               selectedSkills: selectedSkillLabels,

@@ -9,6 +9,7 @@ class ExternalCodeAgentAcpCapabilities {
     required this.singleAgent,
     required this.multiAgent,
     required this.providerCatalog,
+    required this.gatewayProviders,
     required this.raw,
   });
 
@@ -16,11 +17,13 @@ class ExternalCodeAgentAcpCapabilities {
     : singleAgent = false,
       multiAgent = false,
       providerCatalog = const <SingleAgentProvider>[],
+      gatewayProviders = const <Map<String, dynamic>>[],
       raw = const <String, dynamic>{};
 
   final bool singleAgent;
   final bool multiAgent;
   final List<SingleAgentProvider> providerCatalog;
+  final List<Map<String, dynamic>> gatewayProviders;
   final Map<String, dynamic> raw;
 }
 
@@ -37,6 +40,9 @@ class ExternalCodeAgentAcpRoutingResolution {
 
   String get resolvedProviderId =>
       raw['resolvedProviderId']?.toString().trim() ?? '';
+
+  String get resolvedGatewayProviderId =>
+      raw['resolvedGatewayProviderId']?.toString().trim() ?? '';
 
   String get resolvedModel => raw['resolvedModel']?.toString().trim() ?? '';
 
@@ -264,14 +270,14 @@ class GoTaskServiceRequest {
 
   String get acpMode {
     return switch (target) {
-      AssistantExecutionTarget.singleAgent => 'agent',
+      AssistantExecutionTarget.singleAgent => 'single-agent',
       AssistantExecutionTarget.gateway => _gatewaySessionMode,
     };
   }
 
   String get routingExecutionTarget {
     return switch (target) {
-      AssistantExecutionTarget.singleAgent => 'agent',
+      AssistantExecutionTarget.singleAgent => 'single-agent',
       AssistantExecutionTarget.gateway => 'gateway',
     };
   }
@@ -345,7 +351,7 @@ class GoTaskServiceRequest {
       _ => 'gateway',
     };
     final explicitExecutionTarget = switch (gatewayTarget) {
-      AssistantExecutionTarget.singleAgent => 'agent',
+      AssistantExecutionTarget.singleAgent => 'single-agent',
       AssistantExecutionTarget.gateway => 'gateway',
     };
     final explicitProviderId = provider.isUnspecified
@@ -582,16 +588,17 @@ String? goTaskServiceGatewayEntryState({
           .trim()
           .toLowerCase();
       if (resolvedEndpointTarget.isEmpty ||
-          resolvedEndpointTarget == 'gateway') {
+          resolvedEndpointTarget == 'gateway' ||
+          resolvedEndpointTarget == 'local' ||
+          resolvedEndpointTarget == 'remote') {
         return AssistantExecutionTarget.gateway.promptValue;
       }
       throw StateError(
         'Bridge protocol mismatch: unsupported resolvedEndpointTarget "$resolvedEndpointTarget".',
       );
-    case 'agent':
-      return AssistantExecutionTarget.singleAgent.promptValue;
     case 'single-agent':
     case 'multi-agent':
+      return AssistantExecutionTarget.singleAgent.promptValue;
     case 'local':
     case 'remote':
       throw StateError(

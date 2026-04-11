@@ -121,16 +121,17 @@ void main() {
       expect(target, AssistantExecutionTarget.gateway);
     });
 
-    test('falls back to remote when legacy local gateway selection is active', () {
-      final target = resolveGatewayExecutionTargetFromVisibleTargets(
-        const <AssistantExecutionTarget>[
-          AssistantExecutionTarget.gateway,
-        ],
-        currentTarget: AssistantExecutionTarget.gateway,
-      );
+    test(
+      'falls back to remote when legacy local gateway selection is active',
+      () {
+        final target = resolveGatewayExecutionTargetFromVisibleTargets(
+          const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway],
+          currentTarget: AssistantExecutionTarget.gateway,
+        );
 
-      expect(target, AssistantExecutionTarget.gateway);
-    });
+        expect(target, AssistantExecutionTarget.gateway);
+      },
+    );
   });
 
   group('resolveGatewayThreadConnectionStateInternal', () {
@@ -325,6 +326,45 @@ void main() {
         );
         expect(record.lastArtifactSyncStatus, 'synced');
         expect(record.lastArtifactSyncAtMs, isNotNull);
+      },
+    );
+  });
+
+  group('selected working directory', () {
+    test(
+      'persists thread project directory without changing local workspace binding',
+      () async {
+        final controller = AppController();
+        addTearDown(controller.dispose);
+
+        const sessionKey = 'draft:project-dir';
+        controller.initializeAssistantThreadContext(
+          sessionKey,
+          executionTarget: AssistantExecutionTarget.singleAgent,
+        );
+        final originalWorkspacePath = controller
+            .assistantWorkspacePathForSession(sessionKey);
+
+        await controller.saveAssistantSelectedWorkingDirectoryForSession(
+          sessionKey,
+          '/tmp/project-alpha',
+        );
+
+        final record = controller.requireTaskThreadForSessionInternal(
+          sessionKey,
+        );
+        expect(record.selectedWorkingDirectory, '/tmp/project-alpha');
+        expect(
+          controller.assistantSelectedWorkingDirectoryForSession(sessionKey),
+          '/tmp/project-alpha',
+        );
+        expect(
+          controller.assistantSelectedWorkingDirectoryDisplayLabelForSession(
+            sessionKey,
+          ),
+          'project-alpha',
+        );
+        expect(record.workspaceBinding.workspacePath, originalWorkspacePath);
       },
     );
   });

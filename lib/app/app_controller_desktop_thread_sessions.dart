@@ -216,6 +216,35 @@ extension AppControllerDesktopThreadSessions on AppController {
         '';
   }
 
+  String assistantSelectedWorkingDirectoryForSession(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    return taskThreadForSessionInternal(
+          normalizedSessionKey,
+        )?.selectedWorkingDirectory?.trim() ??
+        '';
+  }
+
+  String assistantSelectedWorkingDirectoryDisplayLabelForSession(
+    String sessionKey,
+  ) {
+    final workingDirectory = assistantSelectedWorkingDirectoryForSession(
+      sessionKey,
+    );
+    if (workingDirectory.isEmpty) {
+      return appText('选择项目', 'Select Project');
+    }
+    final segments = workingDirectory
+        .split(RegExp(r'[\\/]'))
+        .where((item) => item.trim().isNotEmpty)
+        .toList(growable: false);
+    if (segments.isEmpty) {
+      return workingDirectory;
+    }
+    return segments.last;
+  }
+
   Future<AssistantArtifactSnapshot> loadAssistantArtifactSnapshot({
     String? sessionKey,
   }) {
