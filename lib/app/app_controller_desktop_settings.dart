@@ -46,24 +46,24 @@ import 'app_controller_desktop_runtime_helpers.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 extension AppControllerDesktopSettings on AppController {
-  SettingsSnapshot _markSavedGatewayTargetsForChangedProfiles(
+  AppUiState _markSavedGatewayTargetsForChangedProfiles(
     SettingsSnapshot previous,
     SettingsSnapshot snapshot,
   ) {
-    var nextSnapshot = snapshot;
+    var nextState = appUiState;
     if (jsonEncode(previous.primaryLocalGatewayProfile.toJson()) !=
         jsonEncode(snapshot.primaryLocalGatewayProfile.toJson())) {
-      nextSnapshot = nextSnapshot.markGatewayTargetSaved(
+      nextState = nextState.markGatewayTargetSaved(
         AssistantExecutionTarget.local,
       );
     }
     if (jsonEncode(previous.primaryRemoteGatewayProfile.toJson()) !=
         jsonEncode(snapshot.primaryRemoteGatewayProfile.toJson())) {
-      nextSnapshot = nextSnapshot.markGatewayTargetSaved(
+      nextState = nextState.markGatewayTargetSaved(
         AssistantExecutionTarget.remote,
       );
     }
-    return nextSnapshot;
+    return nextState;
   }
 
   Future<void> saveSettingsDraft(SettingsSnapshot snapshot) async {
@@ -195,10 +195,13 @@ extension AppControllerDesktopSettings on AppController {
       settings,
       settingsDraft,
     );
-    markPendingApplyDomainsInternal(settings, nextSettings);
+    markPendingApplyDomainsInternal(settings, settingsDraft);
     await persistDraftSecretsInternal();
-    if (nextSettings.toJsonString() != settings.toJsonString()) {
-      await persistSettingsSnapshotInternal(nextSettings);
+    if (nextSettings.toJsonString() != appUiState.toJsonString()) {
+      await saveAppUiStateInternal(nextSettings);
+    }
+    if (settingsDraft.toJsonString() != settings.toJsonString()) {
+      await persistSettingsSnapshotInternal(settingsDraft);
     }
     settingsDraftInternal = settings;
     settingsDraftInitializedInternal = true;
@@ -262,7 +265,10 @@ extension AppControllerDesktopSettings on AppController {
       previous,
       snapshot,
     );
-    await persistSettingsSnapshotInternal(nextSnapshot);
+    if (nextSnapshot.toJsonString() != appUiState.toJsonString()) {
+      await saveAppUiStateInternal(nextSnapshot);
+    }
+    await persistSettingsSnapshotInternal(snapshot);
     if (disposedInternal) {
       return;
     }
@@ -284,8 +290,10 @@ extension AppControllerDesktopSettings on AppController {
   Future<void> clearAssistantLocalState() async {
     await flushAssistantThreadPersistenceInternal();
     await storeInternal.clearAssistantLocalState();
+    await storeInternal.clearAppUiState();
     await storeInternal.saveTaskThreads(const <TaskThread>[]);
-    final defaults = SettingsSnapshot.defaults();
+    final currentSettings = settings;
+    appUiStateInternal = AppUiState.defaults();
     taskThreadRepositoryInternal.clear();
     assistantThreadMessagesInternal.clear();
     localSessionMessagesInternal.clear();
@@ -297,17 +305,10 @@ extension AppControllerDesktopSettings on AppController {
     singleAgentExternalCliPendingSessionKeysInternal.clear();
     assistantThreadTurnQueuesInternal.clear();
     multiAgentRunPendingInternal = false;
-    setActiveAppLanguage(defaults.appLanguage);
-    await settingsControllerInternal.saveSnapshot(defaults);
-    multiAgentOrchestratorInternal.updateConfig(defaults.multiAgent);
-    agentsControllerInternal.restoreSelection(
-      defaults.primaryRemoteGatewayProfile.selectedAgentId,
-    );
-    modelsControllerInternal.restoreFromSettings(defaults.aiGateway);
     initializeAssistantThreadContext(
       'main',
       executionTarget: sanitizePersistedExecutionTargetInternal(
-        defaults.assistantExecutionTarget,
+        currentSettings.assistantExecutionTarget,
       ),
       messageViewMode: AssistantMessageViewMode.rendered,
       singleAgentProvider: SingleAgentProvider.auto,

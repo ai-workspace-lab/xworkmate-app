@@ -90,21 +90,10 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> saveSnapshot(
-    SettingsSnapshot snapshot, {
-    bool recordAccountOverrides = true,
-  }) async {
-    final previousSnapshot = snapshotInternal;
+  Future<void> saveSnapshot(SettingsSnapshot snapshot) async {
     snapshotInternal = snapshot;
     lastSnapshotJsonInternal = snapshotInternal.toJsonString();
     await storeInternal.saveSettingsSnapshot(snapshot);
-    if (recordAccountOverrides) {
-      await recordAccountOverridesForSnapshotChangeSettingsInternal(
-        this,
-        previous: previousSnapshot,
-        current: snapshotInternal,
-      );
-    }
     await refreshSettingsFileStampInternal();
     await reloadDerivedStateInternal();
     notifyListeners();
@@ -528,8 +517,8 @@ class SettingsController extends ChangeNotifier {
       await subscription.cancel();
     }
     settingsWatchSubscriptionsInternal.clear();
-    final files = await storeInternal.resolvedSettingsFiles();
-    final directories = await storeInternal.resolvedSettingsWatchDirectories();
+    final file = await storeInternal.resolvedSettingsFile();
+    final directory = await storeInternal.resolvedSettingsWatchDirectory();
     void scheduleReload() {
       settingsReloadDebounceInternal?.cancel();
       settingsReloadDebounceInternal = Timer(
@@ -538,7 +527,7 @@ class SettingsController extends ChangeNotifier {
       );
     }
 
-    for (final file in files) {
+    if (file != null) {
       try {
         if (await file.exists()) {
           settingsWatchSubscriptionsInternal.add(
@@ -551,7 +540,7 @@ class SettingsController extends ChangeNotifier {
         // Best effort only. Directory watch below remains as a fallback.
       }
     }
-    for (final directory in directories) {
+    if (directory != null) {
       try {
         if (!await directory.exists()) {
           await directory.create(recursive: true);
@@ -628,9 +617,9 @@ class SettingsController extends ChangeNotifier {
   }
 
   Future<String> computeSettingsFileStampInternal() async {
-    final files = await storeInternal.resolvedSettingsFiles();
     final buffer = StringBuffer();
-    for (final file in files) {
+    final file = await storeInternal.resolvedSettingsFile();
+    if (file != null) {
       buffer.write(file.path);
       if (await file.exists()) {
         final stat = await file.stat();

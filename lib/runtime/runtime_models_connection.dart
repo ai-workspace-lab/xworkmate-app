@@ -347,7 +347,11 @@ List<SingleAgentProvider> normalizeSingleAgentProviderList(
 }
 
 const List<SingleAgentProvider> kPresetExternalAcpProviders =
-    <SingleAgentProvider>[SingleAgentProvider.opencode];
+    <SingleAgentProvider>[
+      SingleAgentProvider.codex,
+      SingleAgentProvider.opencode,
+      SingleAgentProvider.gemini,
+    ];
 
 const List<SingleAgentProvider> kKnownSingleAgentProviders =
     <SingleAgentProvider>[
@@ -357,4 +361,4 @@ const List<SingleAgentProvider> kKnownSingleAgentProviders =
       SingleAgentProvider.gemini,
     ];
 
-const Set<String> kLegacyExternalAcpProviderIds = <String>{'claude', 'gemini'};
+const Set<String> kLegacyExternalAcpProviderIds = <String>{'claude'};
