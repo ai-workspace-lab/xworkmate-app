@@ -14,6 +14,10 @@ elif [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" ]]; then
   release_tag="manual-${GITHUB_RUN_NUMBER:-0}"
   release_title="Manual Build ${GITHUB_RUN_NUMBER:-0}"
   release_notes="Automated manual build from ${GITHUB_SHA:-unknown}"
+elif [[ "${GITHUB_REF:-}" == "refs/heads/main" ]]; then
+  release_tag="latest"
+  release_title="Latest"
+  release_notes="Automated latest main build from ${GITHUB_SHA:-unknown}"
 else
   release_tag="main-${GITHUB_RUN_NUMBER:-0}"
   release_title="Main Build ${GITHUB_RUN_NUMBER:-0}"
