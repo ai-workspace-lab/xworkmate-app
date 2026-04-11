@@ -316,11 +316,6 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final settingsTitle =
-        settings.assistantCustomTaskTitles[normalizedSessionKey]?.trim() ?? '';
-    if (settingsTitle.isNotEmpty) {
-      return settingsTitle;
-    }
     return assistantThreadRecordsInternal[normalizedSessionKey]?.title.trim() ??
         '';
   }
@@ -510,23 +505,12 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       return;
     }
     final normalizedTitle = title.trim();
-    final next = Map<String, String>.from(settings.assistantCustomTaskTitles);
-    final current = next[normalizedSessionKey]?.trim() ?? '';
-    if (normalizedTitle.isEmpty) {
-      if (current.isEmpty) {
-        return;
-      }
-      next.remove(normalizedSessionKey);
-    } else {
-      if (current == normalizedTitle) {
-        return;
-      }
-      next[normalizedSessionKey] = normalizedTitle;
+    final current =
+        assistantThreadRecordsInternal[normalizedSessionKey]?.title.trim() ??
+        '';
+    if (current == normalizedTitle) {
+      return;
     }
-    await AppControllerDesktopSettings(this).saveSettings(
-      settings.copyWith(assistantCustomTaskTitles: next),
-      refreshAfterSave: false,
-    );
     upsertTaskThreadInternal(
       normalizedSessionKey,
       title: normalizedTitle,
@@ -540,10 +524,8 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    return settings.assistantArchivedTaskKeys.any(
-      (item) =>
-          normalizedAssistantSessionKeyInternal(item) == normalizedSessionKey,
-    );
+    return assistantThreadRecordsInternal[normalizedSessionKey]?.archived ??
+        false;
   }
 
   Future<void> saveAssistantTaskArchived(
@@ -556,19 +538,6 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     if (normalizedSessionKey.isEmpty) {
       return;
     }
-    final next = <String>[
-      ...settings.assistantArchivedTaskKeys.where(
-        (item) =>
-            normalizedAssistantSessionKeyInternal(item) != normalizedSessionKey,
-      ),
-    ];
-    if (archived) {
-      next.add(normalizedSessionKey);
-    }
-    await AppControllerDesktopSettings(this).saveSettings(
-      settings.copyWith(assistantArchivedTaskKeys: next),
-      refreshAfterSave: false,
-    );
     if (archived) {
       unawaited(
         enqueueThreadTurnInternal<void>(normalizedSessionKey, () async {

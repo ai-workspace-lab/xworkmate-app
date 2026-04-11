@@ -485,7 +485,11 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
   ) {
     archivedTaskKeysInternal
       ..clear()
-      ..addAll(controller.settings.assistantArchivedTaskKeys);
+      ..addAll(
+        controller.assistantThreadRecordsInternal.values
+            .where((item) => item.archived)
+            .map((item) => item.sessionKey),
+      );
     synchronizeTaskSeedsInternal(controller);
     final entries =
         taskSeedsInternal.values

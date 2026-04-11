@@ -3,6 +3,7 @@ export 'runtime_models_profiles.dart';
 export 'runtime_models_configs.dart';
 export 'runtime_models_account.dart';
 export 'runtime_models_settings_snapshot.dart';
+export 'runtime_models_ui_state.dart';
 export 'runtime_models_runtime_payloads.dart';
 export 'runtime_models_gateway_entities.dart';
 export 'runtime_models_multi_agent.dart';
