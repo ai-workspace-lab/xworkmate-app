@@ -100,6 +100,7 @@ class _SettingsPageState extends State<SettingsPage> {
         identifier: identifier,
         password: _accountPasswordController.text,
       );
+      await _refreshBridgeCapabilities();
     } finally {
       _accountPasswordController.clear();
     }
@@ -110,6 +111,7 @@ class _SettingsPageState extends State<SettingsPage> {
     await widget.controller.settingsController.syncAccountSettings(
       baseUrl: _accountBaseUrlController.text.trim(),
     );
+    await _refreshBridgeCapabilities();
   }
 
   Future<void> _verifyAccountMfa(SettingsSnapshot settings) async {
@@ -119,8 +121,26 @@ class _SettingsPageState extends State<SettingsPage> {
         baseUrl: _accountBaseUrlController.text.trim(),
         code: _accountMfaCodeController.text.trim(),
       );
+      await _refreshBridgeCapabilities();
     } finally {
       _accountMfaCodeController.clear();
+    }
+  }
+
+  Future<void> _refreshBridgeCapabilities() async {
+    final dynamic controller = widget.controller;
+    try {
+      await controller.refreshSingleAgentCapabilitiesInternal(
+        forceRefresh: true,
+      );
+    } catch (_) {
+      // Best effort only. Account sync should still succeed if runtime refresh
+      // is temporarily unavailable.
+    }
+    try {
+      await controller.refreshAcpCapabilitiesInternal(forceRefresh: true);
+    } catch (_) {
+      // Best effort only. Runtime capabilities can be retried later.
     }
   }
 
