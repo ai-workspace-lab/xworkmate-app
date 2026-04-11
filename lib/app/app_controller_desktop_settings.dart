@@ -51,16 +51,10 @@ extension AppControllerDesktopSettings on AppController {
     SettingsSnapshot snapshot,
   ) {
     var nextState = appUiState;
-    if (jsonEncode(previous.primaryLocalGatewayProfile.toJson()) !=
-        jsonEncode(snapshot.primaryLocalGatewayProfile.toJson())) {
+    if (jsonEncode(previous.primaryGatewayProfile.toJson()) !=
+        jsonEncode(snapshot.primaryGatewayProfile.toJson())) {
       nextState = nextState.markGatewayTargetSaved(
-        AssistantExecutionTarget.local,
-      );
-    }
-    if (jsonEncode(previous.primaryRemoteGatewayProfile.toJson()) !=
-        jsonEncode(snapshot.primaryRemoteGatewayProfile.toJson())) {
-      nextState = nextState.markGatewayTargetSaved(
-        AssistantExecutionTarget.remote,
+        AssistantExecutionTarget.gateway,
       );
     }
     return nextState;

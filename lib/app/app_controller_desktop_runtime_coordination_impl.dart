@@ -252,8 +252,7 @@ GatewayMode bridgeGatewayModeRuntimeInternal(AppController controller) {
   }
   return switch (controller.currentAssistantExecutionTarget) {
     AssistantExecutionTarget.singleAgent => GatewayMode.offline,
-    AssistantExecutionTarget.local => GatewayMode.local,
-    AssistantExecutionTarget.remote => GatewayMode.remote,
+    AssistantExecutionTarget.gateway => GatewayMode.remote,
   };
 }
 

@@ -110,7 +110,7 @@ extension AppControllerDesktopGateway on AppController {
     final resolvedProfileIndex = gatewayProfileIndexForExecutionTargetInternal(
       assistantExecutionTargetForModeInternal(
         modeFromHostInternal(
-          decoded?.host ?? settings.primaryRemoteGatewayProfile.host,
+          decoded?.host ?? settings.primaryGatewayProfile.host,
         ),
       ),
     );
@@ -121,7 +121,7 @@ extension AppControllerDesktopGateway on AppController {
     );
     final resolvedTarget = assistantExecutionTargetForModeInternal(
       modeFromHostInternal(
-        decoded?.host ?? settings.primaryRemoteGatewayProfile.host,
+        decoded?.host ?? settings.primaryGatewayProfile.host,
       ),
     );
     final currentProfile = gatewayProfileForAssistantExecutionTargetInternal(
@@ -133,9 +133,7 @@ extension AppControllerDesktopGateway on AppController {
       host: decoded?.host ?? currentProfile.host,
       port: decoded?.port ?? currentProfile.port,
       tls: decoded?.tls ?? currentProfile.tls,
-      mode: resolvedTarget == AssistantExecutionTarget.local
-          ? RuntimeConnectionMode.local
-          : RuntimeConnectionMode.remote,
+      mode: RuntimeConnectionMode.remote,
     );
     await AppControllerDesktopSettings(this).saveSettings(
       settings
@@ -179,7 +177,10 @@ extension AppControllerDesktopGateway on AppController {
     String token = '',
     String password = '',
   }) async {
-    final nextTarget = assistantExecutionTargetForModeInternal(mode);
+    final normalizedMode = mode == RuntimeConnectionMode.local
+        ? RuntimeConnectionMode.remote
+        : mode;
+    final nextTarget = assistantExecutionTargetForModeInternal(normalizedMode);
     final nextProfileIndex = gatewayProfileIndexForExecutionTargetInternal(
       nextTarget,
     );
@@ -188,21 +189,16 @@ extension AppControllerDesktopGateway on AppController {
       token: token.trim(),
       password: password.trim(),
     );
-    final resolvedHost =
-        host.trim().isEmpty && mode == RuntimeConnectionMode.local
-        ? '127.0.0.1'
-        : host.trim();
-    final resolvedPort = mode == RuntimeConnectionMode.local && port <= 0
-        ? 18789
-        : port;
+    final resolvedHost = host.trim();
+    final resolvedPort = port;
     final nextProfile =
         gatewayProfileForAssistantExecutionTargetInternal(nextTarget).copyWith(
-          mode: mode,
+          mode: normalizedMode,
           useSetupCode: false,
           setupCode: '',
           host: resolvedHost,
           port: resolvedPort <= 0 ? 443 : resolvedPort,
-          tls: mode == RuntimeConnectionMode.local ? false : tls,
+          tls: normalizedMode == RuntimeConnectionMode.local ? false : tls,
         );
     await AppControllerDesktopSettings(this).saveSettings(
       settings

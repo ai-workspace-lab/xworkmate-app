@@ -1,6 +1,6 @@
 # 任务执行链路统一收敛
 
-Last Updated: 2026-04-08
+Last Updated: 2026-04-11
 
 ## 背景
 
@@ -11,7 +11,7 @@ Last Updated: 2026-04-08
 
 - Desktop / Web / Mobile 的现状与目标混在一起
 - controller 层的历史分流被误认为长期规范
-- `gateway` 与显式 `multi-agent` 被描述成 UI 规范入口
+- `local / remote / multi-agent` 被描述成 app 侧一级执行路径
 
 本文件把官方口径统一为：
 
@@ -19,29 +19,57 @@ Last Updated: 2026-04-08
 - `GoTaskService.executeTask` 是唯一公开入口
 - ACP 是统一控制面
 - `bridge` 是 app 客户端的发现 / 配置 / 连接 / 对话枢纽
+- app 当前只保留 `agent / gateway` 两条路径
+- ACP Server list / gateway upstream 由 `xworkmate-bridge` 动态发现与维护
+- `$INTERNAL_SERVICE_TOKEN` 仅属于 bridge / internal service 注入责任
 - 账户同步只同步 bridge 相关配置属性与安全引用，不做自动连接
 
 
 ## 目标态
 ```mermaid
 flowchart TD
-    A["Desktop / Web / Mobile UI"] --> B["sendMessage<br/>统一 Task Envelope"]
-    B --> C["GoTaskService.executeTask<br/>唯一公开入口"]
-    C --> D["ACP.session.start / session.message"]
-    D --> E["Router.Resolve"]
-    E --> F["Skills.Resolve"]
-    F --> G["Memory.Inject"]
-    G --> H["buildResolvedExecutionParams"]
-    H --> I{"resolvedExecutionTarget"}
-    I -->|"single-agent"| J["single-agent ACP request"]
-    I -->|"multi-agent"| K["multi-agent ACP request"]
-    J --> M["bridge hub"]
-    K --> M
-    M --> N["Gateway / Provider adapters"]
-    N --> O["stream events / result"]
-    O --> P["Memory.Record"]
-    P --> Q["Update Thread State"]
-    Q --> R["UI stream render"]
+    subgraph APP["App surfaces"]
+        A["Desktop / Web / Mobile UI"]
+        B["sendMessage<br/>Task Envelope"]
+        C["GoTaskService.executeTask<br/>唯一公开入口"]
+        A --> B --> C
+    end
+
+    subgraph ACP["ACP control plane"]
+        D["ACP.session.start / session.message"]
+        E["Router.Resolve"]
+        F["Skills.Resolve"]
+        G["Memory.Inject"]
+        H["buildResolvedExecutionParams"]
+        I{"resolvedExecutionPath"}
+        D --> E --> F --> G --> H --> I
+    end
+
+    subgraph BRIDGE["xworkmate-bridge"]
+        J["agent route"]
+        K["gateway route"]
+        L["bridge routing hub<br/>dynamic discovery / policy / auth injection"]
+        M["Provider adapters<br/>codex / opencode / claude / gemini"]
+        N["Gateway adapters<br/>openclaw / aris / hosted gateway capability"]
+        J --> L
+        K --> L
+        L --> M
+        L --> N
+    end
+
+    subgraph RETURN["Return path"]
+        O["stream events / result"]
+        P["Memory.Record"]
+        Q["Update Thread State"]
+        R["UI stream render"]
+        O --> P --> Q --> R
+    end
+
+    C --> D
+    I -->|"agent"| J
+    I -->|"gateway"| K
+    M --> O
+    N --> O
 ```
 
 ## Provider 真源
@@ -49,58 +77,54 @@ flowchart TD
 Single-agent provider catalog and availability are owned by
 `xworkmate-bridge`, not by local endpoint presets inside the app.
 
+ACP server addresses and gateway upstreams are also bridge-owned dynamic
+discovery data. The app must not treat concrete endpoints such as
+`https://acp-server.svc.plus/*` or `wss://openclaw.svc.plus` as app-side
+hardcoded truth sources.
+
 ```mermaid
 flowchart TD
-  A["Settings UI
-  仅管理 Bridge 连接参数
-  与账号同步元数据"] --> G["acp.capabilities"]
-  G --> H["providerCatalog[]
-  singleAgent / multiAgent"]
+  subgraph INPUT["Config / discovery input"]
+    A["Settings UI<br/>仅管理 bridge 连接参数<br/>与账号同步元数据"]
+    B["acp.capabilities"]
+    C["bridge capability snapshot<br/>providerCatalog / agent / gateway<br/>dynamic upstream discovery"]
+    A --> B --> C
+  end
 
-  H --> I["refreshSingleAgentCapabilitiesRuntimeInternal()"]
-  I --> J["bridgeAdvertisedProvidersInternal
-  App 内唯一 provider 名单源"]
-  I --> K["singleAgentCapabilitiesByProviderInternal
-  App 内唯一 provider 可用性源"]
+  subgraph APPSTATE["App-side truth sources"]
+    D["refreshSingleAgentCapabilitiesRuntimeInternal()"]
+    E["bridgeAdvertisedProvidersInternal<br/>App 内唯一 provider 名单源"]
+    F["singleAgentCapabilitiesByProviderInternal<br/>App 内唯一 provider 可用性源"]
+    G["refreshAcpCapabilitiesRuntimeInternal()"]
+    H["GatewayAcpCapabilities"]
+    I["mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal()"]
+    J["ManagedMountTargetState<br/>gateway capability / discovery state"]
+    C --> D --> E
+    D --> F
+    C --> G --> H --> I --> J
+  end
 
-  G --> L["refreshAcpCapabilitiesRuntimeInternal()"]
-  L --> M["GatewayAcpCapabilities
-  providerCatalog / singleAgent / multiAgent"]
-  M --> N["mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal()"]
-  N --> O["ManagedMountTargetState
-  codex / opencode / claude / gemini / aris / openclaw
-  available / discoveryState"]
+  subgraph UISTATE["UI affordances"]
+    K["configuredSingleAgentProviders<br/>Composer / Thread Picker provider source"]
+    L["availableSingleAgentProviders<br/>agent path visibility"]
+    M["visible gateway affordances<br/>只看 bridge capabilities / discovery"]
+    E --> K
+    F --> L
+    J --> M
+  end
 
-  J --> P["configuredSingleAgentProviders
-  = bridgeAdvertisedProvidersInternal"]
-  P --> Q["singleAgentProviderOptions
-  Composer / Thread Picker 唯一数据源"]
-
-  K --> R["availableSingleAgentProviders
-  = bridge 当前可用 provider"]
-  R --> S["visibleAssistantExecutionTargets(...)
-  single-agent 是否显示
-  只看 runtime available providers"]
-
-  O --> T["visible gateway / multi-agent execution affordances
-  openclaw / aris discovery 只看 bridge capabilities"]
-
-  Q --> U["setSingleAgentProvider(providerId)
-  仅写入 thread executionBinding.providerId"]
-
-  U --> V["singleAgentProviderForSession()
-  恢复线程已选 providerId"]
-
-  V --> W["sendSingleAgentMessageDesktopGoTaskFlowInternal()"]
-  W --> X["xworkmate.routing.resolve"]
-  X --> Y["resolvedProviderId /
-  unavailableCode /
-  unavailableMessage"]
-
-  Y --> Z{"unavailable?"}
-  Z -->|"no"| AA["executeTask(... resolved routing ...)"]
-  Z -->|"yes"| AB["provider unavailable UX
-  直接使用 bridge unavailable message"]
+  subgraph EXEC["Execution resolution"]
+    N["setSingleAgentProvider(providerId)<br/>仅写入 thread executionBinding.providerId"]
+    O["singleAgentProviderForSession()"]
+    P["buildExternalAcpRoutingForSessionInternal()"]
+    Q["xworkmate.routing.resolve"]
+    R["resolvedProviderId / unavailableMessage"]
+    S{"unavailable?"}
+    T["executeTask(... resolved routing ...)"]
+    U["provider unavailable UX<br/>直接使用 bridge unavailable message"]
+    K --> N --> O --> P --> Q --> R --> S
+    S -->|"no"| T
+    S -->|"yes"| U
 ```
 
 ## 端侧桥接规则
@@ -112,6 +136,8 @@ flowchart TD
 - Desktop 的 `sendMessage -> GoTaskService.executeTask -> ACP` 应理解为进程内或直接桥接语义
 - Production cloud mode does not call `xworkmate.providers.sync`
 - Production provider upstreams are bridge-owned, not app-owned
+- Production ACP server list / gateway upstreams are bridge-owned, not app-owned
+- `$INTERNAL_SERVICE_TOKEN` 只允许在 bridge / internal service 层使用，app 不持有
 - 对 app 来说，bridge 是 discovery / config / connect / dialogue 的统一枢纽
 
 ### Web / Mobile
@@ -124,9 +150,12 @@ flowchart TD
 
 ### 传输协议
 
-- local / loopback 允许 `ws://` 或 `http://`
-- remote 必须使用 `wss://` 或 `https://`
-- remote 模式禁止静默降级到非 TLS
+- app 侧当前不再把 `local / remote` 作为执行路径语义
+- Desktop 只区分 `agent / gateway` 两条路径，二者都经由 `xworkmate-bridge` 路由
+- 如果 bridge endpoint 是网络地址，则必须遵守 TLS 要求
+- loopback / non-TLS 只允许作为底层 adapter / 开发态传输细节，不能重新上升为产品执行路径语义
+- app 不直接持有 ACP server upstream 或 gateway upstream 的授权头
+- `Authorization: Bearer $INTERNAL_SERVICE_TOKEN` 属于 bridge / internal service 注入责任
 
 ### ACP contract
 
@@ -149,6 +178,10 @@ flowchart TD
 - 所有任务都先进入 ACP 控制面，再解析到 executor
 - Desktop 采用直接桥接 Go 代码的控制面接入方式
 - Web / Mobile 采用连接 Go server 的控制面接入方式
+- app 侧一级执行路径只保留 `agent / gateway`
+- `multi-agent` 是 bridge / gateway 内部能力，不再作为 app 侧一级路径
+- app 不直接调用 `acp-server.svc.plus/*` 或 `openclaw.svc.plus`
+- 如果需要补全或变更 ACP / gateway upstream，优先在 `xworkmate-bridge` 仓库实现动态发现能力
 
 ### Compatibility route (removed from target)
 
@@ -161,4 +194,4 @@ flowchart TD
 2. Dart 请求模型统一
 3. route 决策内收到 `GoTaskService` / ACP
 4. app 侧 bridge 枢纽与 provider / gateway 适配关系收敛
-5. `multi-agent` 成为统一请求语义
+5. `multi-agent` 下沉为 bridge 内部能力，而不是 app 一级路径

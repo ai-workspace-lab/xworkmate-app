@@ -464,7 +464,7 @@ class AssistantThreadSkillEntry {
   }
 }
 
-const int taskThreadSchemaVersion = 20260403;
+const int taskThreadSchemaVersion = 20260411;
 
 enum ThreadRealm { local, remote }
 
@@ -513,26 +513,18 @@ bool isLegacyAutoThreadExecutionModeValue(String? value) {
   return value?.trim().toLowerCase() == 'auto';
 }
 
-enum ThreadExecutionMode { localAgent, gatewayLocal, gatewayRemote }
+enum ThreadExecutionMode { localAgent, gateway }
 
 extension ThreadExecutionModeCopy on ThreadExecutionMode {
   static ThreadExecutionMode fromJsonValue(String? value) {
     final normalized = value?.trim();
     switch (normalized) {
-      case 'auto':
-        return ThreadExecutionMode.localAgent;
       case 'singleAgent':
-      case 'local_agent':
       case 'localAgent':
+      case 'agent':
         return ThreadExecutionMode.localAgent;
-      case 'local':
-      case 'gateway_local':
-      case 'gatewayLocal':
-        return ThreadExecutionMode.gatewayLocal;
-      case 'remote':
-      case 'gateway_remote':
-      case 'gatewayRemote':
-        return ThreadExecutionMode.gatewayRemote;
+      case 'gateway':
+        return ThreadExecutionMode.gateway;
       default:
         return ThreadExecutionMode.localAgent;
     }
@@ -731,8 +723,7 @@ ThreadExecutionMode threadExecutionModeFromAssistantExecutionTarget(
 ) {
   return switch (target) {
     AssistantExecutionTarget.singleAgent => ThreadExecutionMode.localAgent,
-    AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
-    AssistantExecutionTarget.remote => ThreadExecutionMode.gatewayRemote,
+    AssistantExecutionTarget.gateway => ThreadExecutionMode.gateway,
   };
 }
 
@@ -741,8 +732,7 @@ AssistantExecutionTarget assistantExecutionTargetFromExecutionMode(
 ) {
   return switch (mode) {
     ThreadExecutionMode.localAgent => AssistantExecutionTarget.singleAgent,
-    ThreadExecutionMode.gatewayLocal => AssistantExecutionTarget.local,
-    ThreadExecutionMode.gatewayRemote => AssistantExecutionTarget.remote,
+    ThreadExecutionMode.gateway => AssistantExecutionTarget.gateway,
   };
 }
 
