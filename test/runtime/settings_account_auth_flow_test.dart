@@ -133,6 +133,74 @@ void main() {
       expect(controller.accountSession?.email, 'review@svc.plus');
       expect(controller.accountSyncState?.syncState, 'ready');
     });
+
+    test(
+      'login stays blocked when bridge server is not included in sync data',
+      () async {
+        final root = await Directory.systemTemp.createTemp(
+          'xworkmate-account-auth-missing-bridge-server-',
+        );
+        final store = SecureConfigStore(
+          enableSecureStorage: false,
+          appDataRootPathResolver: () async => root.path,
+          secretRootPathResolver: () async => root.path,
+          supportRootPathResolver: () async => root.path,
+        );
+        final controller = SettingsController(
+          store,
+          accountClientFactory: (_) =>
+              _MissingBridgeServerAccountRuntimeClient(),
+        );
+        addTearDown(() async {
+          controller.dispose();
+          store.dispose();
+          if (await root.exists()) {
+            await root.delete(recursive: true);
+          }
+        });
+
+        await store.initialize();
+        await controller.initialize();
+        await controller.saveSnapshot(
+          controller.snapshot.copyWith(
+            accountBaseUrl: 'https://accounts.customer.example',
+            accountUsername: 'review@customer.example',
+          ),
+        );
+
+        await controller.loginAccount(
+          baseUrl: 'https://accounts.customer.example',
+          identifier: 'review@customer.example',
+          password: '***REMOVED-CREDENTIAL***',
+        );
+
+        expect(controller.accountSignedIn, isTrue);
+        expect(
+          controller.accountStatus,
+          'Signed in as review@customer.example',
+        );
+        expect(controller.accountSyncState?.syncState, 'blocked');
+        expect(
+          controller.accountSyncState?.syncMessage,
+          'Bridge server is unavailable',
+        );
+        expect(
+          controller
+              .snapshot
+              .acpBridgeServerModeConfig
+              .cloudSynced
+              .remoteServerSummary
+              .endpoint,
+          isEmpty,
+        );
+        expect(
+          await store.loadAccountManagedSecret(
+            target: kAccountManagedSecretTargetBridgeAuthToken,
+          ),
+          'bridge-token',
+        );
+      },
+    );
   });
 }
 
@@ -227,6 +295,40 @@ class _MfaAccountRuntimeClient extends AccountRuntimeClient {
       mfaEnabled: true,
       totpEnabled: true,
       totpPending: false,
+    );
+  }
+}
+
+class _MissingBridgeServerAccountRuntimeClient extends AccountRuntimeClient {
+  _MissingBridgeServerAccountRuntimeClient()
+    : super(baseUrl: 'https://accounts.customer.example');
+
+  @override
+  Future<Map<String, dynamic>> login({
+    required String identifier,
+    required String password,
+  }) async {
+    return <String, dynamic>{
+      'token': 'session-token',
+      'BRIDGE_AUTH_TOKEN': 'bridge-token',
+      'expiresAt': '2026-04-12T00:00:00Z',
+      'user': <String, dynamic>{
+        'id': 'u-2',
+        'email': 'review@customer.example',
+        'name': 'Customer Review',
+        'role': 'readonly',
+      },
+    };
+  }
+
+  @override
+  Future<AccountSessionSummary> loadSession({required String token}) async {
+    return const AccountSessionSummary(
+      userId: 'u-2',
+      email: 'review@customer.example',
+      name: 'Customer Review',
+      role: 'readonly',
+      mfaEnabled: false,
     );
   }
 }

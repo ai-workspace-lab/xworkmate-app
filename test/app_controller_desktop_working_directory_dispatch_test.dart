@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller_desktop_core.dart';
 import 'package:xworkmate/app/app_controller_desktop_runtime_helpers.dart';
@@ -6,6 +8,7 @@ import 'package:xworkmate/app/app_controller_desktop_thread_sessions.dart';
 import 'package:xworkmate/app/app_controller_desktop_workspace_execution.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -14,14 +17,49 @@ void main() {
     test(
       'single-agent requests reuse the unique thread workspace workingDirectory',
       () async {
+        final root = await Directory.systemTemp.createTemp(
+          'xworkmate-thread-working-directory-',
+        );
+        final store = SecureConfigStore(
+          enableSecureStorage: false,
+          appDataRootPathResolver: () async => '${root.path}/settings.sqlite3',
+          secretRootPathResolver: () async => root.path,
+          supportRootPathResolver: () async => root.path,
+        );
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(
+            acpBridgeServerModeConfig: SettingsSnapshot.defaults()
+                .acpBridgeServerModeConfig
+                .copyWith(
+                  cloudSynced: SettingsSnapshot.defaults()
+                      .acpBridgeServerModeConfig
+                      .cloudSynced
+                      .copyWith(
+                        remoteServerSummary:
+                            const AcpBridgeServerRemoteServerSummary(
+                              endpoint: 'https://bridge.customer.example',
+                              hasAdvancedOverrides: false,
+                            ),
+                      ),
+                ),
+          ),
+        );
         final client = _CapturingGoTaskServiceClient();
         final controller = AppController(
+          store: store,
           goTaskServiceClient: client,
           availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
           ],
         );
-        addTearDown(controller.dispose);
+        addTearDown(() async {
+          controller.dispose();
+          store.dispose();
+          if (await root.exists()) {
+            await root.delete(recursive: true);
+          }
+        });
 
         const sessionKey = 'draft:single-agent-working-directory';
         controller.initializeAssistantThreadContext(
@@ -53,6 +91,42 @@ void main() {
             expectedThreadWorkingDirectory,
           ],
         );
+        expect(
+          client.resolveExternalAcpRoutingCallCount,
+          0,
+          reason:
+              'single-agent turns should go straight to session.start/session.message without app-side routing preflight',
+        );
+      },
+    );
+
+    test(
+      'single-agent turns stay blocked until bridge server has been synced',
+      () async {
+        final client = _CapturingGoTaskServiceClient();
+        final controller = AppController(
+          goTaskServiceClient: client,
+          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+          ],
+        );
+        addTearDown(controller.dispose);
+
+        const sessionKey = 'draft:single-agent-missing-bridge-server';
+        controller.initializeAssistantThreadContext(
+          sessionKey,
+          executionTarget: AssistantExecutionTarget.singleAgent,
+        );
+        await controller.switchSession(sessionKey);
+
+        await controller.sendChatMessage('first turn');
+
+        expect(client.requests, isEmpty);
+        final messages = controller
+            .requireTaskThreadForSessionInternal(sessionKey)
+            .messages;
+        expect(messages, isNotEmpty);
+        expect(messages.last.text, contains('Bridge Server'));
       },
     );
 
@@ -98,6 +172,7 @@ void main() {
 
 class _CapturingGoTaskServiceClient implements GoTaskServiceClient {
   final List<GoTaskServiceRequest> requests = <GoTaskServiceRequest>[];
+  int resolveExternalAcpRoutingCallCount = 0;
 
   @override
   Future<void> cancelTask({
@@ -168,6 +243,7 @@ class _CapturingGoTaskServiceClient implements GoTaskServiceClient {
     String aiGatewayBaseUrl = '',
     String aiGatewayApiKey = '',
   }) async {
+    resolveExternalAcpRoutingCallCount += 1;
     return const ExternalCodeAgentAcpRoutingResolution(
       raw: <String, dynamic>{
         'resolvedExecutionTarget': 'single-agent',
