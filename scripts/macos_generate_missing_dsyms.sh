@@ -38,5 +38,12 @@ for framework in "${frameworks_dir}"/*.framework; do
 
   echo "Generating missing dSYM for ${framework_name}"
   rm -rf "${dsym_path}"
-  xcrun dsymutil "${binary_path}" -o "${dsym_path}"
+  uuid_output="$(xcrun dwarfdump --uuid "${binary_path}" 2>/dev/null || true)"
+  if [[ -z "${uuid_output}" ]]; then
+    continue
+  fi
+
+  if ! xcrun dsymutil "${binary_path}" -o "${dsym_path}" >/dev/null 2>&1; then
+    rm -rf "${dsym_path}"
+  fi
 done

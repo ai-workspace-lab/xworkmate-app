@@ -376,6 +376,7 @@
 		};
 		33CC111E2044C6BF0003C045 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -435,6 +436,7 @@
 		};
 		A1B2C3074F0A000100000001 /* Generate Missing Framework dSYMs */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -536,6 +538,14 @@
 					"$(inherited)",
 					"-Wno-ignored-attributes",
 				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(inherited)",
+					"-Wno-ignored-attributes",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-Wl,-w",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = plus.svc.xworkmate.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -556,6 +566,14 @@
 					"$(inherited)",
 					"-Wno-ignored-attributes",
 				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(inherited)",
+					"-Wno-ignored-attributes",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-Wl,-w",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = plus.svc.xworkmate.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -575,6 +593,14 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-Wno-ignored-attributes",
+				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(inherited)",
+					"-Wno-ignored-attributes",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-Wl,-w",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = plus.svc.xworkmate.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -664,6 +690,14 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-Wno-ignored-attributes",
+				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(inherited)",
+					"-Wno-ignored-attributes",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-Wl,-w",
 				);
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				RUNTIME_EXCEPTION_ALLOW_JIT = YES;
@@ -819,6 +853,14 @@
 					"$(inherited)",
 					"-Wno-ignored-attributes",
 				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(inherited)",
+					"-Wno-ignored-attributes",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-Wl,-w",
+				);
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				RUNTIME_EXCEPTION_ALLOW_JIT = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -850,6 +892,14 @@
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-Wno-ignored-attributes",
+				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(inherited)",
+					"-Wno-ignored-attributes",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-Wl,-w",
 				);
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				RUNTIME_EXCEPTION_ALLOW_JIT = YES;
