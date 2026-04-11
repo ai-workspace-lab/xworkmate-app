@@ -258,6 +258,184 @@
   - 标题、来源、摘要等字段完整
   - 结果留在当前线程内
 - 建议记录项
+  - 当前 provider / endpoint
+  - 输入提示词
+  - 结果中的标题 / 来源 / 摘要
+  - 是否回到当前线程
+
+## 5. XWorkmate App -> XWorkmate Bridge 远端单 Agent / Gateway 验收
+
+这些 case 用于验证 `xworkmate-app` 通过本地 `GoAcpStdioBridge` 调用
+`xworkmate-bridge`，再转发到远端 `codex / opencode / gemini / openclaw`
+时的真实线程行为，重点关注：
+
+- provider 选择是否正确
+- follow-up 是否保持同一 thread
+- artifact 是否写回当前线程本地 workspace
+- `lastRemoteWorkingDirectory` / `remoteWorkspaceRefKind` 是否只作为 metadata
+
+统一新增记录项：
+
+- 当前模式
+- 当前 provider / endpoint
+- 输入提示词
+- 线程 ID
+- 本地线程 workspace 路径
+- 产物路径列表
+- `lastRemoteWorkingDirectory`
+- `remoteWorkspaceRefKind`
+- 是否需要外部服务人工确认
+
+### `MANUAL-REMOTE-001` Codex 对话 + `pptx`
+
+- 前置条件
+  - 已选择任务对话模式 `codex`
+  - bridge/provider 连通
+- 操作步骤
+  1. 输入“生成一个两页产品介绍演示稿，输出为 `deck.pptx`”
+  2. 等待任务完成并确认 artifact 区出现 `.pptx`
+  3. 在同一线程继续追问“把第二页改成总结页”
+- 期望结果
+  - 对话可用
+  - `.pptx` 写回当前线程本地 workspace
+  - follow-up 复用同一线程，不漂移到其他 provider
+  - `lastRemoteWorkingDirectory` 更新，但 `workspaceBinding` 仍是本地目录
+
+### `MANUAL-REMOTE-002` Codex `docx/xlsx/pdf`
+
+- 前置条件
+  - 已选择任务对话模式 `codex`
+- 操作步骤
+  1. 执行 `docx`：生成一份周报文档
+  2. 执行 `xlsx`：生成一个带汇总公式的销售表
+  3. 执行 `pdf`：生成或转换出一个 PDF 摘要文件
+- 期望结果
+  - 三类任务均可执行
+  - 产物分别出现在 artifact 区
+  - 文件落回当前线程本地 workspace
+
+### `MANUAL-REMOTE-003` Codex `image-resizer`
+
+- 前置条件
+  - 已选择任务对话模式 `codex`
+  - 线程目录内有一张待处理图片
+- 操作步骤
+  1. 输入“将 `input.png` 缩放到 1200x800 并输出 `resized.png`”
+  2. 等待结果完成
+- 期望结果
+  - 图片处理成功
+  - 输出图片写回当前线程本地 workspace
+  - 结果摘要含尺寸或压缩信息
+
+### `MANUAL-REMOTE-004` OpenCode 对话 + `pptx`
+
+- 前置条件
+  - 已选择任务对话模式 `opencode`
+- 操作步骤
+  1. 输入“生成一个两页演示稿 `deck.pptx`”
+  2. 等待完成
+  3. 同线程继续追问修改第二页内容
+- 期望结果
+  - 对话可用
+  - `.pptx` 落回当前线程本地 workspace
+  - follow-up 继续复用同一线程上下文
+
+### `MANUAL-REMOTE-005` OpenCode `docx/xlsx/pdf`
+
+- 前置条件
+  - 已选择任务对话模式 `opencode`
+- 操作步骤
+  1. 执行 `docx`
+  2. 执行 `xlsx`
+  3. 执行 `pdf`
+- 期望结果
+  - 三类任务可用
+  - 产物可见且落回当前线程本地 workspace
+
+### `MANUAL-REMOTE-006` OpenCode `image-resizer`
+
+- 前置条件
+  - 已选择任务对话模式 `opencode`
+  - 已准备本地输入图片
+- 操作步骤
+  1. 输入图片缩放任务
+  2. 等待结果
+- 期望结果
+  - 输出图片可见
+  - 线程 artifact 和本地 workspace 均可确认结果
+
+### `MANUAL-REMOTE-007` Gemini 基础对话
+
+- 前置条件
+  - 已选择任务对话模式 `gemini`
+- 操作步骤
+  1. 输入“回复 exactly pong”
+  2. 在同一线程继续追问“回复 exactly round2”
+- 期望结果
+  - 基础对话可用
+  - 两轮消息都停留在同一线程
+  - provider 显示仍为 `gemini`
+
+### `MANUAL-REMOTE-008` Gemini 文档 / 图片任务能力边界确认
+
+- 前置条件
+  - 已选择任务对话模式 `gemini`
+- 操作步骤
+  1. 分别尝试 `docx / pptx / xlsx / pdf / image-resizer`
+  2. 记录每项成功或失败
+- 期望结果
+  - 若成功：artifact 落回当前线程本地 workspace
+  - 若失败：错误摘要明确，可区分是 provider 能力限制还是 bridge/app 落盘问题
+
+### `MANUAL-GATEWAY-001` OpenClaw Gateway 基础对话
+
+- 前置条件
+  - 任务线程使用 remote gateway / `openclaw gateway`
+  - `openclaw.svc.plus` 可连通
+- 操作步骤
+  1. 输入普通对话任务
+  2. 等待 gateway 返回结果
+- 期望结果
+  - 可建立对话
+  - 线程消息返回成功或明确失败摘要
+  - provider / mode 显示为 gateway 路径
+
+### `MANUAL-GATEWAY-002` OpenClaw Gateway 文档类任务
+
+- 前置条件
+  - Gateway 路径可用
+- 操作步骤
+  1. 执行 `docx` 或 `pptx`
+  2. 执行 `xlsx` 或 `pdf`
+- 期望结果
+  - 至少 1-2 类文档任务成功
+  - 若返回 artifact，应回写当前线程本地 workspace
+  - 若只返回文本摘要，应记录为“对话成功但无 artifact”
+
+### `MANUAL-GATEWAY-003` OpenClaw Gateway 浏览器自动化
+
+- 前置条件
+  - Gateway 浏览器能力可用
+  - 有可访问网页
+- 操作步骤
+  1. 输入“打开示例页面并提取标题”
+  2. 如支持截图，再追问“截图并保存结果”
+- 期望结果
+  - 可执行浏览器任务
+  - 返回网页摘要
+  - 若有截图 / 日志产物，应进入当前线程 artifact
+
+### `MANUAL-GATEWAY-004` OpenClaw Gateway 在线资讯汇总
+
+- 前置条件
+  - Gateway 联网能力可用
+- 操作步骤
+  1. 输入“汇总今天关于 AI Agent 的 5 条资讯”
+  2. 查看结构化结果
+- 期望结果
+  - 能返回标题、来源、摘要
+  - 结果留在当前线程
+  - 若生成文档或截图，写回当前线程本地 workspace
   - 查询词
   - 结果条数
   - 结果摘要截图
