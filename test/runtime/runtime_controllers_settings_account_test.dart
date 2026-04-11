@@ -48,15 +48,21 @@ void main() {
           target: kAccountManagedSecretTargetAIGatewayAccessToken,
           value: 'managed-secret',
         );
+        await store.saveAccountManagedSecret(
+          target: kAccountManagedSecretTargetOpenclawGatewayToken,
+          value: 'bridge-token',
+        );
         await store.saveAccountSyncState(
           AccountSyncState.defaults().copyWith(
             syncState: 'ready',
-            syncMessage: 'Remote defaults synced',
+            syncMessage: 'Bridge access synced',
             lastSyncAtMs: 123456789,
-            lastSyncSource: 'https://accounts.svc.plus',
-            syncedDefaults: AccountRemoteProfile.defaults().copyWith(
-              openclawUrl: 'wss://gateway.svc.plus',
-              apisixUrl: 'https://apisix.svc.plus',
+            lastSyncSource: 'https://xworkmate-bridge.svc.plus',
+            profileScope: 'bridge',
+            tokenConfigured: const AccountTokenConfigured(
+              openclaw: true,
+              vault: false,
+              apisix: false,
             ),
           ),
         );
@@ -98,12 +104,26 @@ void main() {
           ),
           isNull,
         );
+        expect(
+          await store.loadAccountManagedSecret(
+            target: kAccountManagedSecretTargetOpenclawGatewayToken,
+          ),
+          isNull,
+        );
         expect(await store.loadAccountSyncState(), isNull);
 
         expect(controller.accountSignedIn, isFalse);
         expect(controller.accountStatus, 'Signed out');
         expect(controller.accountSyncState, isNull);
         expect(controller.snapshot.accountLocalMode, isTrue);
+        expect(
+          controller
+              .snapshot
+              .acpBridgeServerModeConfig
+              .cloudSynced
+              .accountBaseUrl,
+          isEmpty,
+        );
         expect(
           controller
               .snapshot

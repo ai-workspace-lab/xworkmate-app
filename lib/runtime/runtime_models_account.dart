@@ -593,18 +593,6 @@ class AcpBridgeServerModeConfig {
   }
 }
 
-class AccountProfileResponse {
-  const AccountProfileResponse({
-    required this.profile,
-    required this.profileScope,
-    required this.tokenConfigured,
-  });
-
-  final AccountRemoteProfile profile;
-  final String profileScope;
-  final AccountTokenConfigured tokenConfigured;
-}
-
 class AccountSyncState {
   const AccountSyncState({
     required this.syncedDefaults,
