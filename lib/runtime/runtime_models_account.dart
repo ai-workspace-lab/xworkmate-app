@@ -67,38 +67,38 @@ class AccountSessionSummary {
 
 class AccountTokenConfigured {
   const AccountTokenConfigured({
-    required this.openclaw,
+    required this.bridge,
     required this.vault,
     required this.apisix,
   });
 
-  final bool openclaw;
+  final bool bridge;
   final bool vault;
   final bool apisix;
 
   factory AccountTokenConfigured.defaults() {
     return const AccountTokenConfigured(
-      openclaw: false,
+      bridge: false,
       vault: false,
       apisix: false,
     );
   }
 
-  AccountTokenConfigured copyWith({bool? openclaw, bool? vault, bool? apisix}) {
+  AccountTokenConfigured copyWith({bool? bridge, bool? vault, bool? apisix}) {
     return AccountTokenConfigured(
-      openclaw: openclaw ?? this.openclaw,
+      bridge: bridge ?? this.bridge,
       vault: vault ?? this.vault,
       apisix: apisix ?? this.apisix,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'openclaw': openclaw, 'vault': vault, 'apisix': apisix};
+    return {'bridge': bridge, 'vault': vault, 'apisix': apisix};
   }
 
   factory AccountTokenConfigured.fromJson(Map<String, dynamic> json) {
     return AccountTokenConfigured(
-      openclaw: json['openclaw'] as bool? ?? false,
+      bridge: json['bridge'] as bool? ?? false,
       vault: json['vault'] as bool? ?? false,
       apisix: json['apisix'] as bool? ?? false,
     );
@@ -165,16 +165,16 @@ class AccountSecretLocator {
 
 class AccountRemoteProfile {
   const AccountRemoteProfile({
-    required this.openclawUrl,
-    required this.openclawOrigin,
+    required this.bridgeServerUrl,
+    required this.bridgeServerOrigin,
     required this.vaultUrl,
     required this.vaultNamespace,
     required this.apisixUrl,
     required this.secretLocators,
   });
 
-  final String openclawUrl;
-  final String openclawOrigin;
+  final String bridgeServerUrl;
+  final String bridgeServerOrigin;
   final String vaultUrl;
   final String vaultNamespace;
   final String apisixUrl;
@@ -182,8 +182,8 @@ class AccountRemoteProfile {
 
   factory AccountRemoteProfile.defaults() {
     return const AccountRemoteProfile(
-      openclawUrl: '',
-      openclawOrigin: '',
+      bridgeServerUrl: '',
+      bridgeServerOrigin: '',
       vaultUrl: '',
       vaultNamespace: '',
       apisixUrl: '',
@@ -192,16 +192,16 @@ class AccountRemoteProfile {
   }
 
   AccountRemoteProfile copyWith({
-    String? openclawUrl,
-    String? openclawOrigin,
+    String? bridgeServerUrl,
+    String? bridgeServerOrigin,
     String? vaultUrl,
     String? vaultNamespace,
     String? apisixUrl,
     List<AccountSecretLocator>? secretLocators,
   }) {
     return AccountRemoteProfile(
-      openclawUrl: openclawUrl ?? this.openclawUrl,
-      openclawOrigin: openclawOrigin ?? this.openclawOrigin,
+      bridgeServerUrl: bridgeServerUrl ?? this.bridgeServerUrl,
+      bridgeServerOrigin: bridgeServerOrigin ?? this.bridgeServerOrigin,
       vaultUrl: vaultUrl ?? this.vaultUrl,
       vaultNamespace: vaultNamespace ?? this.vaultNamespace,
       apisixUrl: apisixUrl ?? this.apisixUrl,
@@ -211,8 +211,8 @@ class AccountRemoteProfile {
 
   Map<String, dynamic> toJson() {
     return {
-      'openclawUrl': openclawUrl,
-      'openclawOrigin': openclawOrigin,
+      'BRIDGE_SERVER_URL': bridgeServerUrl,
+      'bridgeServerOrigin': bridgeServerOrigin,
       'vaultUrl': vaultUrl,
       'vaultNamespace': vaultNamespace,
       'apisixUrl': apisixUrl,
@@ -238,9 +238,10 @@ class AccountRemoteProfile {
 
     final defaults = AccountRemoteProfile.defaults();
     return AccountRemoteProfile(
-      openclawUrl: json['openclawUrl'] as String? ?? defaults.openclawUrl,
-      openclawOrigin:
-          json['openclawOrigin'] as String? ?? defaults.openclawOrigin,
+      bridgeServerUrl:
+          json['BRIDGE_SERVER_URL'] as String? ?? defaults.bridgeServerUrl,
+      bridgeServerOrigin:
+          json['bridgeServerOrigin'] as String? ?? defaults.bridgeServerOrigin,
       vaultUrl: json['vaultUrl'] as String? ?? defaults.vaultUrl,
       vaultNamespace:
           json['vaultNamespace'] as String? ?? defaults.vaultNamespace,
@@ -690,14 +691,13 @@ class AccountSyncResult {
   final String message;
 }
 
-const String kAccountManagedSecretTargetOpenclawGatewayToken =
-    'openclaw.gateway_token';
+const String kAccountManagedSecretTargetBridgeAuthToken = 'bridge.auth_token';
 const String kAccountManagedSecretTargetAIGatewayAccessToken =
     'ai_gateway.access_token';
 const String kAccountManagedSecretTargetOllamaCloudApiKey =
     'ollama_cloud.api_key';
 const List<String> kAccountManagedSecretTargets = <String>[
-  kAccountManagedSecretTargetOpenclawGatewayToken,
+  kAccountManagedSecretTargetBridgeAuthToken,
   kAccountManagedSecretTargetAIGatewayAccessToken,
   kAccountManagedSecretTargetOllamaCloudApiKey,
 ];
