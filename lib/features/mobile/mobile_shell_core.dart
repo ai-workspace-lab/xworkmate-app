@@ -250,7 +250,6 @@ class MobileShellStateInternal extends State<MobileShell> {
   }
 
   Future<void> promptBridgeVerificationCodeInternal() async {
-    final messenger = ScaffoldMessenger.maybeOf(context);
     final accountSignedIn =
         (await widget.controller.storeInternal.loadAccountSessionToken())
             ?.trim()
@@ -261,6 +260,10 @@ class MobileShellStateInternal extends State<MobileShell> {
     }
     if (!accountSignedIn) {
       await openGatewaySetupCodeEntryInternal();
+      if (!mounted) {
+        return;
+      }
+      final messenger = ScaffoldMessenger.maybeOf(context);
       messenger?.showSnackBar(
         SnackBar(
           content: Text(
