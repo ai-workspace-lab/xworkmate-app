@@ -334,10 +334,18 @@ extension AppControllerDesktopSkillPermissions on AppController {
       );
     }
     final nextProvider =
-        singleAgentProvider ??
-        SingleAgentProviderCopy.fromJsonValue(
-          executionBinding?.providerId ?? existing?.executionBinding.providerId,
-        );
+        nextExecutionTarget == AssistantExecutionTarget.singleAgent
+        ? (singleAgentProvider ??
+              SingleAgentProviderCopy.fromJsonValue(
+                executionBinding?.providerId ??
+                    existing?.executionBinding.providerId,
+              ))
+        : SingleAgentProvider.auto;
+    final nextProviderSource =
+        nextExecutionTarget == AssistantExecutionTarget.singleAgent
+        ? (singleAgentProviderSource ??
+              existing?.executionBinding.providerSource)
+        : ThreadSelectionSource.inherited;
     final nextExecutionBinding =
         (executionBinding ??
                 existing?.executionBinding ??
@@ -361,9 +369,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
               executionModeSource:
                   executionTargetSource ??
                   existing?.executionBinding.executionModeSource,
-              providerSource:
-                  singleAgentProviderSource ??
-                  existing?.executionBinding.providerSource,
+              providerSource: nextProviderSource,
             );
     final nextContextState =
         (contextState ??

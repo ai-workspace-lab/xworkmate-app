@@ -276,6 +276,9 @@ class MobileShellStateInternal extends State<MobileShell> {
       );
       return;
     }
+    if (!mounted) {
+      return;
+    }
     final codeController = TextEditingController();
     final enteredCode = await showDialog<String>(
       context: context,

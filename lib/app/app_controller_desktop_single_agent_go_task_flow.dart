@@ -1,8 +1,6 @@
 // ignore_for_file: unused_import, unnecessary_import
 
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
@@ -154,6 +152,7 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
           .map((item) => item.label.trim().isNotEmpty ? item.label : item.key)
           .where((item) => item.trim().isNotEmpty)
           .toList(growable: false);
+      await controller.syncExternalAcpProvidersInternal();
       final result = await controller.goTaskServiceClientInternal.executeTask(
         GoTaskServiceRequest(
           sessionId: sessionKey,
@@ -341,41 +340,4 @@ Future<void> _persistSingleAgentArtifactsDesktopInternal(
   AppController controller,
   String sessionKey,
   GoTaskServiceResult result,
-) async {
-  final artifacts = result.artifacts;
-  if (artifacts.isEmpty) {
-    controller.upsertTaskThreadInternal(
-      sessionKey,
-      lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      lastArtifactSyncStatus: 'no-artifacts',
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
-    return;
-  }
-  final existingThread = controller.requireTaskThreadForSessionInternal(
-    sessionKey,
-  );
-  if (existingThread.workspaceBinding.workspaceKind != WorkspaceKind.localFs) {
-    controller.upsertTaskThreadInternal(
-      sessionKey,
-      lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      lastArtifactSyncStatus: 'skipped-non-local-workspace',
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
-    return;
-  }
-  final root = Directory(existingThread.workspaceBinding.workspacePath);
-  final syncResult = await syncInlineArtifactsToLocalWorkspace(
-    root: root,
-    artifacts: artifacts,
-  );
-
-  controller.upsertTaskThreadInternal(
-    sessionKey,
-    lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    lastArtifactSyncStatus: syncResult.wroteArtifact
-        ? 'synced'
-        : 'no-inline-content',
-    updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-  );
-}
+) => controller.persistGoTaskArtifactsForSessionInternal(sessionKey, result);
