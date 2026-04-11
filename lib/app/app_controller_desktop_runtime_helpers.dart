@@ -661,42 +661,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     notifyListeners();
   }
 
-  Future<List<ExternalCodeAgentAcpSyncedProvider>>
-  buildExternalAcpSyncedProvidersInternal() async {
-    final providers = <ExternalCodeAgentAcpSyncedProvider>[];
-    for (final profile in settings.providerSyncDefinitions) {
-      final provider = settings.singleAgentProviderForId(profile.providerKey);
-      if (provider == SingleAgentProvider.auto) {
-        continue;
-      }
-      final endpoint = profile.endpoint.trim();
-      if (!profile.enabled || endpoint.isEmpty) {
-        continue;
-      }
-      final authorizationHeader = profile.authRef.trim().isEmpty
-          ? ''
-          : await settingsControllerInternal.resolveSecretValueInternal(
-              refName: profile.authRef.trim(),
-            );
-      providers.add(
-        ExternalCodeAgentAcpSyncedProvider(
-          providerId: provider.providerId,
-          label: provider.label,
-          endpoint: endpoint,
-          authorizationHeader: authorizationHeader,
-          enabled: true,
-        ),
-      );
-    }
-    return providers;
-  }
-
-  Future<void> syncExternalAcpProvidersInternal() async {
-    await goTaskServiceClientInternal.syncExternalProviders(
-      await buildExternalAcpSyncedProvidersInternal(),
-    );
-  }
-
   Future<void> persistGoTaskArtifactsForSessionInternal(
     String sessionKey,
     GoTaskServiceResult result,

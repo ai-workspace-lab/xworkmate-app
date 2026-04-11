@@ -306,7 +306,6 @@ extension AppControllerDesktopThreadActions on AppController {
         try {
           final dispatch = await codeAgentNodeOrchestratorInternal
               .buildGatewayDispatch(buildCodeAgentNodeStateInternal());
-          await syncExternalAcpProvidersInternal();
           final result = await goTaskServiceClientInternal.executeTask(
             GoTaskServiceRequest(
               sessionId: sessionKey,
