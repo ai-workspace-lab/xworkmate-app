@@ -6,96 +6,108 @@ Date: 2026-04-11
 
 Scope:
 - `xworkmate-app`
-- Settings / account sync / local UI state / task thread persistence
+- settings / account sync / cloud runtime state
 
 ## V1 Decision
 
-This worktree implements the first app-side simplification:
+Production cloud mode is bridge-only:
 
-- keep a single persisted config file: `config/settings.yaml`
-- move local recoverable UI state to `ui/state.json`
-- keep task title/archive in `tasks/*.json`
-- make account sync one-way overwrite for sync-owned fields
-- keep bridge provider catalog / runtime capabilities runtime-only
+- app-facing cloud endpoint is fixed to `https://xworkmate-bridge.svc.plus`
+- production provider catalog is bridge-owned
+- production gateway upstream is bridge-owned
+- account sync is metadata-only for session state, status, and managed secret references
+- account sync does not own executable ACP or gateway upstream endpoints
 
-## Overview Workflow
+## Production Routing Truth
+
+The app does not define or sync production upstreams.
+
+Bridge-owned production routing is:
+
+- `codex` -> `https://acp-server.svc.plus/codex/acp/rpc`
+- `opencode` -> `https://acp-server.svc.plus/opencode/acp/rpc`
+- `gemini` -> `https://acp-server.svc.plus/gemini/acp/rpc`
+- gateway -> `wss://openclaw.svc.plus`
+
+The app only talks to:
+
+- `https://xworkmate-bridge.svc.plus`
+
+## App Responsibilities
+
+- sign in to `accounts.svc.plus`
+- persist account session and sync metadata
+- call bridge runtime methods:
+  - `acp.capabilities`
+  - `xworkmate.routing.resolve`
+  - `session.start`
+  - `session.message`
+  - `session.cancel`
+  - `session.close`
+  - bridge-owned gateway methods
+- render bridge/provider/gateway status from bridge runtime results
+
+## Removed Responsibilities
+
+- no app-side direct-connect cloud path
+- no production `xworkmate.providers.sync`
+- no production provider catalog from `providerSyncDefinitions`
+- no execution-time use of account-synced `openclawUrl`
+- no execution-time use of account-synced `apisixUrl`
+- no direct app calls to `acp-server.svc.plus/*`
+- no direct app calls to `openclaw.svc.plus`
+
+## State Rules
+
+`settings.yaml`
+
+- stores current user settings and local editing state
+- does not own production ACP upstream definitions
+- does not get executable provider endpoints from account sync
+
+`account/sync_state.json`
+
+- stores synced account metadata only
+- may retain `openclawUrl` / `apisixUrl` as account profile metadata
+- does not overwrite executable cloud routing targets
+
+`acpBridgeServerModeConfig.cloudSynced.remoteServerSummary.endpoint`
+
+- represents bridge cloud entry only
+- fixed to `https://xworkmate-bridge.svc.plus` while signed in and synced
+- is not an upstream provider URL
+- is not a gateway upstream URL
+
+## Workflow
 
 ```mermaid
 flowchart TD
   UI["Settings UI / App Startup"] --> INIT["SettingsController.initialize()"]
-
-  subgraph LocalStores["APP Local Stores"]
-    YAML["config/settings.yaml"]
-    UISTATE["ui/state.json"]
-    SYNCJSON["account/sync_state.json"]
-    SECRET["secrets/*.secret\naccount session token / managed secrets"]
-    TASKS["tasks/*.json\nthread title / archived / thread-owned state"]
-  end
-
-  INIT --> LOAD["SecureConfigStore.loadSettingsSnapshot()"]
-  LOAD --> YAML
-
-  INIT --> LOADUI["SecureConfigStore.loadAppUiState()"]
-  LOADUI --> UISTATE
-
-  INIT --> LOADTHREADS["loadTaskThreads()"]
-  LOADTHREADS --> TASKS
-
+  INIT --> LOAD["load settings + UI state + task state"]
   INIT --> RESTORE["restoreAccountSession()"]
-  RESTORE --> TOKEN["loadAccountSessionToken()"]
-  TOKEN --> SECRET
-
-  TOKEN --> CHECK{"baseUrl + session token ready?"}
-  CHECK -->|no| BLOCK["blocked\nAccount session is unavailable"]
+  RESTORE --> CHECK{"account session ready?"}
+  CHECK -->|no| BLOCK["blocked"]
   CHECK -->|yes| SYNC["syncAccountSettingsInternal(baseUrl)"]
 
   SYNC --> API["AccountRuntimeClient.loadProfile(token)"]
-  API --> SAVE_SYNC["saveAccountSyncState(nextState)"]
-  SAVE_SYNC --> SYNCJSON
-
-  API --> MODECFG["saveSnapshot(\naccountLocalMode=false,\nacpBridgeServerModeConfig.cloudSynced=remote summary\n)"]
-  MODECFG --> YAML
-
+  API --> SAVE_SYNC["save account sync metadata"]
+  API --> SAVE_SUMMARY["set cloud summary endpoint = bridge base URL"]
   API --> APPLY["applyAccountSyncedDefaultsSettingsInternal(state)"]
 
-  APPLY --> O1["overwrite remote gateway endpoint"]
-  APPLY --> O2["overwrite gateway tokenRef"]
-  APPLY --> O3["overwrite vault address / namespace"]
-  APPLY --> O4["overwrite aiGateway baseUrl / apiKeyRef"]
-  APPLY --> O5["overwrite ollamaCloud apiKeyRef"]
-  APPLY --> O6["update cloudSynced metadata"]
+  APPLY --> KEEP1["keep vault metadata"]
+  APPLY --> KEEP2["keep managed secret refs"]
+  APPLY --> SKIP1["do not overwrite gateway executable endpoint"]
+  APPLY --> SKIP2["do not overwrite ACP executable endpoint"]
 
-  O1 --> SAVE["saveSnapshot(next settings)"]
-  O2 --> SAVE
-  O3 --> SAVE
-  O4 --> SAVE
-  O5 --> SAVE
-  O6 --> SAVE
-
-  SAVE --> YAML
-  SAVE --> DERIVED["reloadDerivedStateInternal()"]
-  DERIVED --> VIEW["Settings / Runtime ViewModel"]
-
-  VIEW --> NOTE1["does not auto-connect gateway"]
-  APPLY -. not touched .-> NOTE2["providerSyncDefinitions\n(sync payload definitions)\nnot overwritten here"]
-
-  UI --> LOCAL_EDIT["local settings edit"]
-  LOCAL_EDIT --> SAVE_LOCAL["saveSnapshot()"]
-  SAVE_LOCAL --> YAML
-
-  UI --> UI_EDIT["local ui restore edit"]
-  UI_EDIT --> SAVE_UI["saveAppUiState()"]
-  SAVE_UI --> UISTATE
-
-  UI --> THREAD_EDIT["rename / archive / restore thread"]
-  THREAD_EDIT --> SAVE_THREAD["saveTaskThreads()"]
-  SAVE_THREAD --> TASKS
+  UI --> BRIDGE_CAPS["acp.capabilities via bridge"]
+  UI --> BRIDGE_ROUTE["xworkmate.routing.resolve via bridge"]
+  UI --> BRIDGE_RUN["session.* via bridge"]
+  UI --> BRIDGE_GATEWAY["xworkmate.gateway.* via bridge"]
 ```
 
-## V1 Boundaries
+## Invariants
 
-- `settings.yaml` only stores current schema V1 config intent and sync-owned local snapshots.
-- `ui/state.json` stores `assistantLastSessionKey`, `assistantNavigationDestinations`, and `savedGatewayTargets`.
-- `tasks/*.json` stores thread-owned display facts such as `title` and `archived`.
-- `account/sync_state.json` stores sync metadata only, not local override policy.
-- bridge-advertised providers and ACP capability state stay runtime-only.
+- `providerSyncDefinitions` is not a production truth source.
+- account sync may update metadata, but not production execution targets.
+- gateway runtime status shown in the app must come from bridge runtime results.
+- bridge capability/provider availability shown in the app must come from `acp.capabilities`.

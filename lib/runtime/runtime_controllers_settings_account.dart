@@ -25,10 +25,7 @@ extension SettingsControllerAccountExtension on SettingsController {
     if (local.isNotEmpty) {
       return local;
     }
-    if (!snapshotInternal.acpBridgeServerModeConfig.usesCloudSyncBase) {
-      return '';
-    }
-    return accountSyncStateInternal?.syncedDefaults.apisixUrl.trim() ?? '';
+    return '';
   }
 
   List<String> get effectiveAiGatewayAvailableModels {

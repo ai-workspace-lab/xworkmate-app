@@ -46,47 +46,21 @@ class _FakeGoAcpStdioBridgeWithSyncOrder extends GoAcpStdioBridge {
 }
 
 void main() {
-  group('External ACP bridge sync order', () {
-    test('syncs providers before capabilities requests', () async {
+  group('External ACP bridge routing order', () {
+    test('loads capabilities without app-side provider sync', () async {
       final bridge = _FakeGoAcpStdioBridgeWithSyncOrder();
       final transport = ExternalCodeAgentAcpDesktopTransport(bridge: bridge);
-
-      await transport
-          .syncExternalProviders(const <ExternalCodeAgentAcpSyncedProvider>[
-            ExternalCodeAgentAcpSyncedProvider(
-              providerId: 'codex',
-              label: 'Codex',
-              endpoint: 'https://acp-server.svc.plus/codex/acp/rpc',
-              authorizationHeader: '',
-              enabled: true,
-            ),
-          ]);
 
       await transport.loadExternalAcpCapabilities(
         target: AssistantExecutionTarget.singleAgent,
       );
 
-      expect(bridge.methods, <String>[
-        'xworkmate.providers.sync',
-        'xworkmate.providers.sync',
-        'acp.capabilities',
-      ]);
+      expect(bridge.methods, <String>['acp.capabilities']);
     });
 
-    test('syncs providers before session start requests', () async {
+    test('starts sessions without app-side provider sync', () async {
       final bridge = _FakeGoAcpStdioBridgeWithSyncOrder();
       final transport = ExternalCodeAgentAcpDesktopTransport(bridge: bridge);
-
-      await transport
-          .syncExternalProviders(const <ExternalCodeAgentAcpSyncedProvider>[
-            ExternalCodeAgentAcpSyncedProvider(
-              providerId: 'codex',
-              label: 'Codex',
-              endpoint: 'https://acp-server.svc.plus/codex/acp/rpc',
-              authorizationHeader: '',
-              enabled: true,
-            ),
-          ]);
 
       await transport.executeTask(
         const GoTaskServiceRequest(
@@ -108,11 +82,7 @@ void main() {
         onUpdate: (_) {},
       );
 
-      expect(bridge.methods, <String>[
-        'xworkmate.providers.sync',
-        'xworkmate.providers.sync',
-        'session.start',
-      ]);
+      expect(bridge.methods, <String>['session.start']);
     });
   });
 }
