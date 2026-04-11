@@ -235,7 +235,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         );
         final provider =
             resolvedSingleAgentProviderInternal(selection) ?? selection;
-        final providerLabel = provider == SingleAgentProvider.auto
+        final providerLabel = provider.isUnspecified
             ? appText('Bridge Provider', 'Bridge Provider')
             : provider.label;
         final address = _extractGatewayAddressFromErrorInternal(raw);

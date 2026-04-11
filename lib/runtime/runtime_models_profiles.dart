@@ -100,7 +100,7 @@ class ExternalAcpEndpointProfile {
       json['providerKey']?.toString() ?? '',
     );
     final builtin = SingleAgentProviderCopy.fromJsonValue(providerKey);
-    final fallbackLabel = builtin.isAuto ? providerKey : builtin.label;
+    final fallbackLabel = builtin.isUnspecified ? providerKey : builtin.label;
     final label = json['label']?.toString().trim().isNotEmpty == true
         ? json['label'].toString().trim()
         : fallbackLabel;
@@ -132,9 +132,6 @@ List<ExternalAcpEndpointProfile> normalizeExternalAcpEndpoints({
   ) {
     final key = profile.providerKey.trim().toLowerCase();
     for (final provider in kKnownSingleAgentProviders) {
-      if (provider.isAuto) {
-        continue;
-      }
       if (provider.providerId == key) {
         return provider;
       }
@@ -142,9 +139,6 @@ List<ExternalAcpEndpointProfile> normalizeExternalAcpEndpoints({
     final label = profile.label.trim();
     final badge = profile.badge.trim();
     for (final provider in kKnownSingleAgentProviders) {
-      if (provider.isAuto) {
-        continue;
-      }
       if (provider.label == label && provider.badge == badge) {
         return provider;
       }

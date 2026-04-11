@@ -219,24 +219,19 @@ class SingleAgentProviderBadgeInternal extends StatelessWidget {
     final candidate = provider.badge.trim().isEmpty
         ? provider.label
         : provider.badge;
-    final display = candidate.length <= 2
+    final display = candidate.trim().isEmpty
+        ? '?'
+        : candidate.length <= 2
         ? candidate
         : candidate.substring(0, 2);
-    final isAuto = provider == SingleAgentProvider.auto;
     return Container(
       width: 18,
       height: 18,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: isAuto
-            ? palette.accent.withValues(alpha: 0.16)
-            : palette.surfaceSecondary,
+        color: palette.surfaceSecondary,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: isAuto
-              ? palette.accent.withValues(alpha: 0.4)
-              : palette.strokeSoft,
-        ),
+        border: Border.all(color: palette.strokeSoft),
       ),
       child: Text(
         display,

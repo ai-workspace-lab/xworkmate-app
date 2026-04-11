@@ -175,6 +175,63 @@ void main() {
       );
     },
   );
+
+  test(
+    'single-agent threads default to bridge catalog providers without reviving auto mode',
+    () async {
+      final root = Directory.systemTemp.createTempSync(
+        'xworkmate-provider-selection-test-',
+      );
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        appDataRootPathResolver: () async => root.path,
+        secretRootPathResolver: () async => root.path,
+        supportRootPathResolver: () async => root.path,
+      );
+      final controller = AppController(
+        store: store,
+        desktopPlatformService: UnsupportedDesktopPlatformService(),
+        skillDirectoryAccessService: _FakeSkillDirectoryAccessService(
+          root.path,
+        ),
+        goTaskServiceClient: const _FakeGoTaskServiceClient(),
+        singleAgentSharedSkillScanRootOverrides: const <String>[],
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+      );
+      addTearDown(() async {
+        controller.dispose();
+        if (root.existsSync()) {
+          await root.delete(recursive: true);
+        }
+      });
+
+      expect(
+        controller.singleAgentProviderForSession('draft:bridge-default'),
+        SingleAgentProvider.codex,
+      );
+
+      controller.initializeAssistantThreadContext(
+        'draft:bridge-default',
+        executionTarget: AssistantExecutionTarget.singleAgent,
+      );
+
+      final thread = controller.taskThreadForSessionInternal(
+        'draft:bridge-default',
+      );
+      expect(thread, isNotNull);
+      expect(
+        thread!.executionBinding.providerId,
+        SingleAgentProvider.codex.providerId,
+      );
+      expect(
+        thread.executionBinding.providerSource,
+        ThreadSelectionSource.inherited,
+      );
+      expect(thread.hasExplicitProviderSelection, isFalse);
+    },
+  );
 }
 
 class _FakeSkillDirectoryAccessService implements SkillDirectoryAccessService {

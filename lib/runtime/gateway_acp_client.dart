@@ -158,7 +158,7 @@ class GatewayAcpClient {
         providerId,
         label: label?.isNotEmpty == true ? label : null,
       );
-      if (provider != SingleAgentProvider.auto) {
+      if (!provider.isUnspecified) {
         providers.add(provider);
       }
     }

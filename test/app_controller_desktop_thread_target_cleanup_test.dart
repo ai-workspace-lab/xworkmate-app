@@ -14,7 +14,7 @@ void main() {
     TaskThread buildThread({
       required String threadId,
       required ThreadExecutionMode mode,
-      String providerId = 'auto',
+      String providerId = '',
     }) {
       return TaskThread(
         threadId: threadId,
