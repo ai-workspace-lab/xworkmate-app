@@ -103,6 +103,7 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
   AppController controller, {
   bool forceRefresh = false,
 }) async {
+  await controller.syncExternalAcpProvidersInternal();
   final capabilities = await controller.goTaskServiceClientInternal
       .loadExternalAcpCapabilities(
         target: AssistantExecutionTarget.singleAgent,

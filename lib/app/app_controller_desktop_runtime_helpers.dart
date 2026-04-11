@@ -27,6 +27,7 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
+import '../runtime/go_task_service_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
@@ -712,6 +713,104 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     return resolveSingleAgentAuthorizationHeaderInternal(endpoint);
   }
 
+  Future<List<ExternalCodeAgentAcpSyncedProvider>>
+  buildExternalAcpSyncedProvidersInternal() async {
+    final providers = <ExternalCodeAgentAcpSyncedProvider>[];
+    for (final profile in settings.externalAcpEndpoints) {
+      final provider = settings.singleAgentProviderForId(profile.providerKey);
+      if (provider == SingleAgentProvider.auto) {
+        continue;
+      }
+      final endpoint = profile.endpoint.trim();
+      if (!profile.enabled || endpoint.isEmpty) {
+        continue;
+      }
+      final authorizationHeader = profile.authRef.trim().isEmpty
+          ? ''
+          : await settingsControllerInternal.resolveSecretValueInternal(
+              refName: profile.authRef.trim(),
+            );
+      providers.add(
+        ExternalCodeAgentAcpSyncedProvider(
+          providerId: provider.providerId,
+          label: provider.label,
+          endpoint: endpoint,
+          authorizationHeader: authorizationHeader,
+          enabled: true,
+        ),
+      );
+    }
+    return providers;
+  }
+
+  Future<void> syncExternalAcpProvidersInternal() async {
+    await goTaskServiceClientInternal.syncExternalProviders(
+      await buildExternalAcpSyncedProvidersInternal(),
+    );
+  }
+
+  Future<void> persistGoTaskArtifactsForSessionInternal(
+    String sessionKey,
+    GoTaskServiceResult result,
+  ) async {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final artifacts = result.artifacts;
+    final syncedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+    if (artifacts.isEmpty) {
+      upsertTaskThreadInternal(
+        normalizedSessionKey,
+        lastArtifactSyncAtMs: syncedAtMs,
+        lastArtifactSyncStatus: 'no-artifacts',
+        updatedAtMs: syncedAtMs,
+      );
+      return;
+    }
+    final existingThread = requireTaskThreadForSessionInternal(
+      normalizedSessionKey,
+    );
+    if (existingThread.workspaceBinding.workspaceKind !=
+        WorkspaceKind.localFs) {
+      upsertTaskThreadInternal(
+        normalizedSessionKey,
+        lastArtifactSyncAtMs: syncedAtMs,
+        lastArtifactSyncStatus: 'skipped-non-local-workspace',
+        updatedAtMs: syncedAtMs,
+      );
+      return;
+    }
+    final root = Directory(existingThread.workspaceBinding.workspacePath);
+    await root.create(recursive: true);
+
+    var wroteArtifact = false;
+    for (final artifact in artifacts) {
+      if (!artifact.hasInlineContent) {
+        continue;
+      }
+      final relativePath = _sanitizeArtifactRelativePathInternal(
+        artifact.relativePath,
+      );
+      if (relativePath.isEmpty) {
+        continue;
+      }
+      final target = await _nextArtifactTargetFileInternal(root, relativePath);
+      await target.parent.create(recursive: true);
+      await target.writeAsBytes(
+        _decodeArtifactContentInternal(artifact),
+        flush: true,
+      );
+      wroteArtifact = true;
+    }
+
+    upsertTaskThreadInternal(
+      normalizedSessionKey,
+      lastArtifactSyncAtMs: syncedAtMs,
+      lastArtifactSyncStatus: wroteArtifact ? 'synced' : 'no-inline-content',
+      updatedAtMs: syncedAtMs,
+    );
+  }
+
   Uri? resolveGatewayAcpEndpointInternal() {
     final target = assistantExecutionTargetForSession(
       sessionsControllerInternal.currentSessionKey,
@@ -820,4 +919,52 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       ),
     };
   }
+}
+
+String _sanitizeArtifactRelativePathInternal(String raw) {
+  final trimmed = raw.trim().replaceAll('\\', '/');
+  if (trimmed.isEmpty) {
+    return '';
+  }
+  return trimmed
+      .split('/')
+      .where(
+        (segment) => segment.isNotEmpty && segment != '.' && segment != '..',
+      )
+      .join('/');
+}
+
+List<int> _decodeArtifactContentInternal(GoTaskServiceArtifact artifact) {
+  final encoding = artifact.encoding.trim().toLowerCase();
+  if (encoding == 'base64') {
+    return base64Decode(artifact.content);
+  }
+  return utf8.encode(artifact.content);
+}
+
+Future<File> _nextArtifactTargetFileInternal(
+  Directory root,
+  String relativePath,
+) async {
+  final segments = relativePath.split('/');
+  final fileName = segments.removeLast();
+  final parent = segments.isEmpty
+      ? root
+      : Directory('${root.path}/${segments.join('/')}');
+  final dotIndex = fileName.lastIndexOf('.');
+  final baseName = dotIndex <= 0 ? fileName : fileName.substring(0, dotIndex);
+  final extension = dotIndex <= 0 ? '' : fileName.substring(dotIndex);
+  var candidate = File('${parent.path}/$fileName');
+  if (!await candidate.exists()) {
+    return candidate;
+  }
+  for (var version = 2; version < 1000; version += 1) {
+    candidate = File('${parent.path}/$baseName.v$version$extension');
+    if (!await candidate.exists()) {
+      return candidate;
+    }
+  }
+  return File(
+    '${parent.path}/$baseName.${DateTime.now().millisecondsSinceEpoch}$extension',
+  );
 }
