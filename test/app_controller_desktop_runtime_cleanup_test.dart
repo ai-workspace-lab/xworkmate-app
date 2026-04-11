@@ -330,8 +330,8 @@ class _FakeGoTaskServiceClient implements GoTaskServiceClient {
   }) async {
     return const ExternalCodeAgentAcpRoutingResolution(
       raw: <String, dynamic>{
-        'resolvedExecutionTarget': 'single-agent',
-        'resolvedEndpointTarget': 'singleAgent',
+        'resolvedExecutionTarget': 'agent',
+        'resolvedEndpointTarget': 'agent',
         'resolvedProviderId': 'codex',
         'resolvedModel': '',
         'resolvedSkills': <String>[],

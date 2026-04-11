@@ -533,8 +533,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
           'code-edit',
           'gateway-bridge',
           'memory-sync',
-          'single-agent',
-          'multi-agent',
+          'agent',
+          'gateway',
         ],
       ),
     );
@@ -724,26 +724,42 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   Uri? resolveGatewayAcpEndpointInternal() {
-    final target = assistantExecutionTargetForSession(
-      sessionsControllerInternal.currentSessionKey,
-    );
-    if (target == AssistantExecutionTarget.singleAgent) {
+    return resolveBridgeAcpEndpointInternal() ??
+        _nonLoopbackGatewayProfileBaseUriInternal(
+          settings.primaryGatewayProfile,
+        );
+  }
+
+  Uri? resolveBridgeAcpEndpointInternal() {
+    final rawEndpoint =
+        settings.acpBridgeServerModeConfig.cloudSynced.remoteServerSummary
+            .endpoint
+            .trim();
+    if (rawEndpoint.isEmpty) {
       return null;
     }
-    return gatewayProfileBaseUriInternal(
-      gatewayProfileForAssistantExecutionTargetInternal(target),
-    );
+    final uri = Uri.tryParse(rawEndpoint);
+    final scheme = uri?.scheme.trim().toLowerCase() ?? '';
+    if (uri == null ||
+        !kSupportedExternalAcpEndpointSchemes.contains(scheme)) {
+      return null;
+    }
+    return uri.replace(query: null, fragment: null);
   }
 
   Uri? resolveExternalAcpEndpointForTargetInternal(
     AssistantExecutionTarget target,
   ) {
-    if (target == AssistantExecutionTarget.singleAgent) {
-      return null;
+    final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
+    if (bridgeEndpoint != null) {
+      return bridgeEndpoint;
     }
-    return gatewayProfileBaseUriInternal(
-      gatewayProfileForAssistantExecutionTargetInternal(target),
-    );
+    if (target == AssistantExecutionTarget.gateway) {
+      return _nonLoopbackGatewayProfileBaseUriInternal(
+        settings.primaryGatewayProfile,
+      );
+    }
+    return null;
   }
 
   Uri? gatewayProfileBaseUriInternal(GatewayConnectionProfile profile) {
@@ -756,6 +772,66 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       host: host,
       port: profile.port,
     );
+  }
+
+  Uri? _nonLoopbackGatewayProfileBaseUriInternal(
+    GatewayConnectionProfile profile,
+  ) {
+    if (isLoopbackHostInternal(profile.host)) {
+      return null;
+    }
+    return gatewayProfileBaseUriInternal(profile);
+  }
+
+  Future<String?> resolveGatewayAcpAuthorizationHeaderInternal(
+    Uri endpoint,
+  ) async {
+    final normalizedHost = endpoint.host.trim().toLowerCase();
+    final bridgeHost =
+        Uri.tryParse(
+          settings.acpBridgeServerModeConfig.cloudSynced.remoteServerSummary
+              .endpoint
+              .trim(),
+        )?.host
+            .trim()
+            .toLowerCase() ??
+        '';
+    if (bridgeHost.isNotEmpty && normalizedHost == bridgeHost) {
+      final accountToken =
+          (await storeInternal.loadAccountSessionToken())?.trim() ?? '';
+      if (accountToken.isNotEmpty) {
+        return 'Bearer $accountToken';
+      }
+    }
+    final profileIndex =
+        gatewayProfileIndexMatchingEndpointInternal(endpoint) ??
+        kGatewayRemoteProfileIndex;
+    final gatewayToken = await settingsControllerInternal.loadEffectiveGatewayToken(
+      profileIndex: profileIndex,
+    );
+    if (gatewayToken.isNotEmpty) {
+      return 'Bearer $gatewayToken';
+    }
+    final gatewayPassword =
+        await settingsControllerInternal.loadEffectiveGatewayPassword(
+          profileIndex: profileIndex,
+        );
+    if (gatewayPassword.isNotEmpty) {
+      final encoded = base64Encode(utf8.encode('operator:$gatewayPassword'));
+      return 'Basic $encoded';
+    }
+    return null;
+  }
+
+  int? gatewayProfileIndexMatchingEndpointInternal(Uri endpoint) {
+    final normalizedHost = endpoint.host.trim().toLowerCase();
+    final gateway = gatewayProfileBaseUriInternal(settings.primaryGatewayProfile);
+    if (gateway != null &&
+        gateway.host.trim().toLowerCase() == normalizedHost &&
+        gateway.port == endpoint.port) {
+      return kGatewayRemoteProfileIndex;
+    }
+    return null;
   }
 
   RuntimeConnectionMode modeFromHostInternal(String host) {
@@ -777,8 +853,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     return switch (mode) {
       RuntimeConnectionMode.unconfigured =>
         AssistantExecutionTarget.singleAgent,
-      RuntimeConnectionMode.local => AssistantExecutionTarget.local,
-      RuntimeConnectionMode.remote => AssistantExecutionTarget.remote,
+      RuntimeConnectionMode.local => AssistantExecutionTarget.gateway,
+      RuntimeConnectionMode.remote => AssistantExecutionTarget.gateway,
     };
   }
 
@@ -786,10 +862,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     AssistantExecutionTarget target,
   ) {
     return switch (target) {
-      AssistantExecutionTarget.local => settings.primaryLocalGatewayProfile,
-      AssistantExecutionTarget.remote => settings.primaryRemoteGatewayProfile,
+      AssistantExecutionTarget.gateway => settings.primaryGatewayProfile,
       AssistantExecutionTarget.singleAgent => throw StateError(
-        'Single Agent target has no OpenClaw gateway profile.',
+        'Single Agent target has no gateway profile.',
       ),
     };
   }
@@ -798,10 +873,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     AssistantExecutionTarget target,
   ) {
     return switch (target) {
-      AssistantExecutionTarget.local => kGatewayLocalProfileIndex,
-      AssistantExecutionTarget.remote => kGatewayRemoteProfileIndex,
+      AssistantExecutionTarget.gateway => kGatewayRemoteProfileIndex,
       AssistantExecutionTarget.singleAgent => throw StateError(
-        'Single Agent target has no OpenClaw gateway profile index.',
+        'Single Agent target has no gateway profile index.',
       ),
     };
   }

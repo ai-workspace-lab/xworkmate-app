@@ -53,9 +53,7 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
   required GatewayConnectionSnapshot connection,
   required GatewayConnectionProfile targetProfile,
 }) {
-  final expectedMode = target == AssistantExecutionTarget.local
-      ? RuntimeConnectionMode.local
-      : RuntimeConnectionMode.remote;
+  const expectedMode = RuntimeConnectionMode.remote;
   final matchesTarget = connection.mode == expectedMode;
   final targetAddress =
       targetProfile.host.trim().isNotEmpty && targetProfile.port > 0
@@ -592,8 +590,7 @@ extension AppControllerDesktopThreadSessions on AppController {
   ) {
     return switch (target) {
       AssistantExecutionTarget.singleAgent => WorkspaceRefKind.localPath,
-      AssistantExecutionTarget.local ||
-      AssistantExecutionTarget.remote => WorkspaceRefKind.remotePath,
+      AssistantExecutionTarget.gateway => WorkspaceRefKind.remotePath,
     };
   }
 

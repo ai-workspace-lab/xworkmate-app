@@ -42,51 +42,34 @@ bool isLegacyAutoAssistantExecutionTargetValue(String? value) {
   return value?.trim().toLowerCase() == 'auto';
 }
 
-enum AssistantExecutionTarget { singleAgent, local, remote }
+enum AssistantExecutionTarget { singleAgent, gateway }
 
 extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   String get label => switch (this) {
-    AssistantExecutionTarget.singleAgent => appText('单机智能体', 'Single Agent'),
-    AssistantExecutionTarget.local => appText(
-      '本地 OpenClaw Gateway',
-      'Local OpenClaw Gateway',
-    ),
-    AssistantExecutionTarget.remote => appText(
-      '远程 OpenClaw Gateway',
-      'Remote OpenClaw Gateway',
-    ),
+    AssistantExecutionTarget.singleAgent => appText('Agent', 'Agent'),
+    AssistantExecutionTarget.gateway => appText('Gateway', 'Gateway'),
   };
 
   String get promptValue => switch (this) {
-    AssistantExecutionTarget.singleAgent => 'single-agent',
-    AssistantExecutionTarget.local => 'local',
-    AssistantExecutionTarget.remote => 'remote',
+    AssistantExecutionTarget.singleAgent => 'agent',
+    AssistantExecutionTarget.gateway => 'gateway',
   };
 
-  bool get isGateway =>
-      this == AssistantExecutionTarget.local ||
-      this == AssistantExecutionTarget.remote;
+  bool get isGateway => this == AssistantExecutionTarget.gateway;
 
   String get compactLabel => switch (this) {
     AssistantExecutionTarget.singleAgent => appText('智能体', 'Agent'),
-    AssistantExecutionTarget.local || AssistantExecutionTarget.remote =>
-      appText('OpenClaw Gateway', 'OpenClaw Gateway'),
+    AssistantExecutionTarget.gateway => appText('Gateway', 'Gateway'),
   };
 
   static AssistantExecutionTarget fromJsonValue(String? value) {
     final normalized = value?.trim() ?? '';
     switch (normalized) {
-      case 'auto':
-        return AssistantExecutionTarget.singleAgent;
       case 'singleAgent':
-      case 'aiGatewayOnly':
-      case 'single-agent':
-      case 'ai-gateway-only':
+      case 'agent':
         return AssistantExecutionTarget.singleAgent;
-      case 'local':
-        return AssistantExecutionTarget.local;
-      case 'remote':
-        return AssistantExecutionTarget.remote;
+      case 'gateway':
+        return AssistantExecutionTarget.gateway;
       default:
         return AssistantExecutionTarget.singleAgent;
     }
@@ -106,7 +89,7 @@ List<AssistantExecutionTarget> compactAssistantExecutionTargets(
       continue;
     }
     if (!addedGateway) {
-      ordered.add(AssistantExecutionTarget.remote);
+      ordered.add(AssistantExecutionTarget.gateway);
       addedGateway = true;
     }
   }
@@ -115,25 +98,22 @@ List<AssistantExecutionTarget> compactAssistantExecutionTargets(
 
 AssistantExecutionTarget collapseAssistantExecutionTargetForDisplay(
   AssistantExecutionTarget target,
-) => target.isGateway ? AssistantExecutionTarget.remote : target;
+) => target;
 
 AssistantExecutionTarget resolveGatewayExecutionTargetFromVisibleTargets(
   Iterable<AssistantExecutionTarget> visibleTargets, {
   AssistantExecutionTarget? currentTarget,
 }) {
   final visible = visibleTargets.toList(growable: false);
-  if (currentTarget != null &&
-      currentTarget.isGateway &&
-      visible.contains(currentTarget)) {
-    return currentTarget;
+  if (currentTarget != null && currentTarget.isGateway) {
+    if (visible.contains(AssistantExecutionTarget.gateway)) {
+      return AssistantExecutionTarget.gateway;
+    }
   }
-  if (visible.contains(AssistantExecutionTarget.remote)) {
-    return AssistantExecutionTarget.remote;
+  if (visible.contains(AssistantExecutionTarget.gateway)) {
+    return AssistantExecutionTarget.gateway;
   }
-  if (visible.contains(AssistantExecutionTarget.local)) {
-    return AssistantExecutionTarget.local;
-  }
-  return AssistantExecutionTarget.remote;
+  return AssistantExecutionTarget.gateway;
 }
 
 String normalizeSingleAgentProviderId(String value) {

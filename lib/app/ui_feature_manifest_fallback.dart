@@ -106,7 +106,7 @@ mobile:
       enabled: false
       release_tier: experimental
       build_modes: []
-      description: Mobile does not expose local gateway assistant mode
+      description: Mobile does not expose a separate gateway assistant mode
       ui_surface: assistant_page
     relay_gateway:
       enabled: true
@@ -124,7 +124,7 @@ mobile:
       enabled: true
       release_tier: stable
       build_modes: [debug, profile, release]
-      description: Mobile multi-agent toggle in assistant composer
+      description: Mobile gateway toggle in assistant composer
       ui_surface: assistant_page
     local_runtime:
       enabled: false
@@ -185,7 +185,7 @@ mobile:
       enabled: false
       release_tier: experimental
       build_modes: [debug, profile, release]
-      description: Mobile settings multi-agent tab
+      description: Mobile settings gateway tab
       ui_surface: settings_page
     appearance:
       enabled: true
@@ -322,7 +322,7 @@ desktop:
       enabled: true
       release_tier: stable
       build_modes: [debug, profile, release]
-      description: Desktop local gateway assistant mode
+      description: Desktop gateway assistant mode
       ui_surface: assistant_page
     relay_gateway:
       enabled: true
@@ -340,7 +340,7 @@ desktop:
       enabled: true
       release_tier: stable
       build_modes: [debug, profile, release]
-      description: Desktop multi-agent toggle in assistant composer
+      description: Desktop gateway toggle in assistant composer
       ui_surface: assistant_page
     local_runtime:
       enabled: true
@@ -401,7 +401,7 @@ desktop:
       enabled: false
       release_tier: experimental
       build_modes: [debug, profile, release]
-      description: Desktop settings multi-agent tab
+      description: Desktop settings gateway tab
       ui_surface: settings_page
     appearance:
       enabled: true
@@ -513,13 +513,13 @@ web:
       enabled: true
       release_tier: stable
       build_modes: [debug, profile, release]
-      description: Web multi-agent toggle in assistant composer
+      description: Web gateway toggle in assistant composer
       ui_surface: web_assistant_page
     local_gateway:
       enabled: true
       release_tier: stable
       build_modes: [debug, profile, release]
-      description: Web local gateway assistant mode
+      description: Web gateway assistant mode
       ui_surface: web_assistant_page
     local_runtime:
       enabled: false

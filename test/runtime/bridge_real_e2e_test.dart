@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/desktop_thread_artifact_sync.dart';
 import 'package:xworkmate/runtime/external_code_agent_acp_desktop_transport.dart';
+import 'package:xworkmate/runtime/gateway_acp_client.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
@@ -22,6 +23,8 @@ void main() {
       Platform.environment['RUN_REAL_BRIDGE_E2E'] == 'true';
   final bridgeAuthToken =
       Platform.environment['BRIDGE_AUTH_TOKEN']?.trim() ?? '';
+  final bridgeAcpEndpoint =
+      Platform.environment['BRIDGE_ACP_ENDPOINT']?.trim() ?? '';
   final openclawGatewayToken =
       Platform.environment['OPENCLAW_GATEWAY_TOKEN']?.trim() ?? '';
 
@@ -29,10 +32,19 @@ void main() {
     late ExternalCodeAgentAcpDesktopTransport transport;
 
     setUpAll(() async {
-      if (!runRealE2E || bridgeAuthToken.isEmpty) {
+      if (!runRealE2E ||
+          bridgeAuthToken.isEmpty ||
+          bridgeAcpEndpoint.isEmpty) {
         return;
       }
-      transport = ExternalCodeAgentAcpDesktopTransport();
+      final client = GatewayAcpClient(
+        endpointResolver: () => Uri.parse(bridgeAcpEndpoint),
+        authorizationResolver: (_) async => 'Bearer $bridgeAuthToken',
+      );
+      transport = ExternalCodeAgentAcpDesktopTransport(
+        client: client,
+        endpointResolver: (_) => Uri.parse(bridgeAcpEndpoint),
+      );
       await transport.syncExternalProviders(
         _providerEndpoints.entries
             .map(
@@ -49,13 +61,17 @@ void main() {
     });
 
     tearDownAll(() async {
-      if (runRealE2E && bridgeAuthToken.isNotEmpty) {
+      if (runRealE2E &&
+          bridgeAuthToken.isNotEmpty &&
+          bridgeAcpEndpoint.isNotEmpty) {
         await transport.dispose();
       }
     });
 
     test('loads external ACP capabilities and provider catalog', () async {
-      if (!runRealE2E || bridgeAuthToken.isEmpty) {
+      if (!runRealE2E ||
+          bridgeAuthToken.isEmpty ||
+          bridgeAcpEndpoint.isEmpty) {
         return;
       }
       final capabilities = await transport.loadExternalAcpCapabilities(
@@ -70,7 +86,9 @@ void main() {
 
     for (final providerId in _providerEndpoints.keys) {
       test('$providerId supports a two-turn conversation', () async {
-        if (!runRealE2E || bridgeAuthToken.isEmpty) {
+        if (!runRealE2E ||
+            bridgeAuthToken.isEmpty ||
+            bridgeAcpEndpoint.isEmpty) {
           return;
         }
         final workdir = await Directory.systemTemp.createTemp(
@@ -221,12 +239,13 @@ void main() {
     }
   });
 
-  group('openclaw gateway smoke', () {
-    test('defaultsRemote still targets openclaw.svc.plus:443', () {
-      final profile = GatewayConnectionProfile.defaultsRemote();
-      expect(profile.host, 'openclaw.svc.plus');
+  group('bridge-owned deployment examples', () {
+    test('default gateway profile starts unconfigured', () {
+      final profile = GatewayConnectionProfile.defaults();
+      expect(profile.host, isEmpty);
       expect(profile.port, 443);
       expect(profile.tls, isTrue);
+      expect(profile.mode, RuntimeConnectionMode.unconfigured);
     });
 
     test('wss endpoint is reachable', () async {
@@ -337,7 +356,7 @@ GoTaskServiceRequest _buildRequest({
     metadata: const <String, dynamic>{},
     routing: ExternalCodeAgentAcpRoutingConfig(
       mode: ExternalCodeAgentAcpRoutingMode.explicit,
-      preferredGatewayTarget: 'local',
+      preferredGatewayTarget: 'gateway',
       explicitExecutionTarget: 'singleAgent',
       explicitProviderId: providerId,
       explicitModel: '',

@@ -3,19 +3,22 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'gateway_acp_client.dart';
-import 'go_acp_stdio_bridge.dart';
 import 'go_task_service_client.dart';
 import 'runtime_models.dart';
 
 class ExternalCodeAgentAcpDesktopTransport
     implements ExternalCodeAgentAcpTransport {
-  ExternalCodeAgentAcpDesktopTransport({GoAcpStdioBridge? bridge})
-    : _bridge = bridge ?? GoAcpStdioBridge();
+  ExternalCodeAgentAcpDesktopTransport({
+    required GatewayAcpClient client,
+    required Uri? Function(AssistantExecutionTarget target) endpointResolver,
+  }) : _client = client,
+       _endpointResolver = endpointResolver;
 
-  final GoAcpStdioBridge _bridge;
+  final GatewayAcpClient _client;
+  final Uri? Function(AssistantExecutionTarget target) _endpointResolver;
 
   @visibleForTesting
-  GoAcpStdioBridge get bridgeForTest => _bridge;
+  GatewayAcpClient get clientForTest => _client;
 
   @override
   Future<void> syncExternalProviders(
@@ -27,9 +30,10 @@ class ExternalCodeAgentAcpDesktopTransport
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
   }) async {
-    final response = await _bridge.request(
+    final response = await _client.request(
       method: 'acp.capabilities',
       params: const <String, dynamic>{},
+      endpointOverride: _endpointResolver(target),
     );
     final result = _castMap(response['result']);
     final caps = _castMap(result['capabilities']);
@@ -58,7 +62,7 @@ class ExternalCodeAgentAcpDesktopTransport
     String aiGatewayBaseUrl = '',
     String aiGatewayApiKey = '',
   }) async {
-    final response = await _bridge.request(
+    final response = await _client.request(
       method: 'xworkmate.routing.resolve',
       params: <String, dynamic>{
         'taskPrompt': taskPrompt,
@@ -69,6 +73,7 @@ class ExternalCodeAgentAcpDesktopTransport
           'aiGatewayApiKey': aiGatewayApiKey.trim(),
         'routing': routing.toJson(),
       },
+      endpointOverride: _endpointResolver(AssistantExecutionTarget.singleAgent),
     );
     return ExternalCodeAgentAcpRoutingResolution(
       raw: _castMap(response['result']),
@@ -80,30 +85,30 @@ class ExternalCodeAgentAcpDesktopTransport
     GoTaskServiceRequest request, {
     required void Function(GoTaskServiceUpdate update) onUpdate,
   }) async {
-    late final StreamSubscription<Map<String, dynamic>> subscription;
     var streamedText = '';
     String? completedMessage;
-    subscription = _bridge.notifications.listen((notification) {
-      final update = goTaskServiceUpdateFromAcpNotification(notification);
-      if (update == null) {
-        return;
-      }
-      if (update.sessionId != request.sessionId ||
-          update.threadId != request.threadId) {
-        return;
-      }
-      if (update.isDelta) {
-        streamedText += update.text;
-      }
-      if (update.isDone && update.message.trim().isNotEmpty) {
-        completedMessage = update.message.trim();
-      }
-      onUpdate(update);
-    });
     try {
-      final response = await _bridge.request(
+      final response = await _client.request(
         method: request.resumeSession ? 'session.message' : 'session.start',
         params: request.toExternalAcpParams(),
+        endpointOverride: _endpointResolver(request.target),
+        onNotification: (notification) {
+          final update = goTaskServiceUpdateFromAcpNotification(notification);
+          if (update == null) {
+            return;
+          }
+          if (update.sessionId != request.sessionId ||
+              update.threadId != request.threadId) {
+            return;
+          }
+          if (update.isDelta) {
+            streamedText += update.text;
+          }
+          if (update.isDone && update.message.trim().isNotEmpty) {
+            completedMessage = update.message.trim();
+          }
+          onUpdate(update);
+        },
       );
       return goTaskServiceResultFromAcpResponse(
         response,
@@ -114,10 +119,8 @@ class ExternalCodeAgentAcpDesktopTransport
     } catch (error) {
       throw GatewayAcpException(
         error.toString(),
-        code: 'EXTERNAL_ACP_STDIO_ERROR',
+        code: 'EXTERNAL_ACP_GATEWAY_ERROR',
       );
-    } finally {
-      await subscription.cancel();
     }
   }
 
@@ -127,9 +130,10 @@ class ExternalCodeAgentAcpDesktopTransport
     required String sessionId,
     required String threadId,
   }) async {
-    await _bridge.request(
-      method: 'session.cancel',
-      params: <String, dynamic>{'sessionId': sessionId, 'threadId': threadId},
+    await _client.cancelSession(
+      sessionId: sessionId,
+      threadId: threadId,
+      endpointOverride: _endpointResolver(target),
     );
   }
 
@@ -139,14 +143,15 @@ class ExternalCodeAgentAcpDesktopTransport
     required String sessionId,
     required String threadId,
   }) async {
-    await _bridge.request(
-      method: 'session.close',
-      params: <String, dynamic>{'sessionId': sessionId, 'threadId': threadId},
+    await _client.closeSession(
+      sessionId: sessionId,
+      threadId: threadId,
+      endpointOverride: _endpointResolver(target),
     );
   }
 
   @override
-  Future<void> dispose() => _bridge.dispose();
+  Future<void> dispose() => _client.dispose();
 
   Map<String, dynamic> _castMap(Object? value) {
     if (value is Map<String, dynamic>) {
