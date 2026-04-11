@@ -306,6 +306,7 @@ extension AppControllerDesktopThreadActions on AppController {
         try {
           final dispatch = await codeAgentNodeOrchestratorInternal
               .buildGatewayDispatch(buildCodeAgentNodeStateInternal());
+          await syncExternalAcpProvidersInternal();
           final result = await goTaskServiceClientInternal.executeTask(
             GoTaskServiceRequest(
               sessionId: sessionKey,
@@ -347,6 +348,7 @@ extension AppControllerDesktopThreadActions on AppController {
             lastResultCode: result.success ? 'success' : 'error',
             updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
           );
+          await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
           if (!result.success) {
             appendLocalSessionMessageInternal(
               sessionKey,

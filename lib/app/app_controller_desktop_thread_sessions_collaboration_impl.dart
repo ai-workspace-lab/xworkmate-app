@@ -160,6 +160,7 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
     );
     controller.recomputeTasksInternal();
     try {
+      await controller.syncExternalAcpProvidersInternal();
       final result = await controller.goTaskServiceClientInternal.executeTask(
         GoTaskServiceRequest(
           sessionId: sessionKey,
@@ -202,6 +203,10 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
             ),
           );
         },
+      );
+      await controller.persistGoTaskArtifactsForSessionInternal(
+        sessionKey,
+        result,
       );
       controller.appendLocalSessionMessageInternal(
         sessionKey,

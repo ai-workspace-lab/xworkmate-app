@@ -72,7 +72,8 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
             .toList(growable: false);
 
     final resolvedExplicitProviderId =
-        thread?.hasExplicitProviderSelection ?? false
+        sessionTarget == AssistantExecutionTarget.singleAgent &&
+            (thread?.hasExplicitProviderSelection ?? false)
         ? singleAgentProviderForSession(normalizedSessionKey).providerId
         : '';
     final resolvedExplicitModel = thread?.hasExplicitModelSelection ?? false
