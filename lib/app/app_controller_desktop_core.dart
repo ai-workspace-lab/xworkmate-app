@@ -27,6 +27,7 @@ import '../runtime/codex_runtime.dart';
 import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/go_gateway_runtime_desktop_client.dart';
+import '../runtime/go_acp_stdio_bridge.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/external_code_agent_acp_desktop_transport.dart';
@@ -136,6 +137,7 @@ class AppController extends ChangeNotifier {
     hostUiFeaturePlatformInternal = Platform.isIOS || Platform.isAndroid
         ? UiFeaturePlatform.mobile
         : UiFeaturePlatform.desktop;
+    final sharedExternalAcpBridge = GoAcpStdioBridge();
 
     final resolvedRuntimeCoordinator =
         runtimeCoordinator ??
@@ -143,7 +145,9 @@ class AppController extends ChangeNotifier {
           gateway: GatewayRuntime(
             store: storeInternal,
             identityStore: DeviceIdentityStore(storeInternal),
-            sessionClient: GoGatewayRuntimeDesktopClient(),
+            sessionClient: GoGatewayRuntimeDesktopClient(
+              bridge: sharedExternalAcpBridge,
+            ),
             allowDirectSocketFallbackOnSessionClientFailure:
                 shouldBlockEmbeddedAgentLaunch(
                   isAppleHost: Platform.isIOS || Platform.isMacOS,
@@ -214,7 +218,9 @@ class AppController extends ChangeNotifier {
         goTaskServiceClient ??
         DesktopGoTaskService(
           gateway: runtimeCoordinatorInternal.gateway,
-          acpTransport: ExternalCodeAgentAcpDesktopTransport(),
+          acpTransport: ExternalCodeAgentAcpDesktopTransport(
+            bridge: sharedExternalAcpBridge,
+          ),
         );
     multiAgentOrchestratorInternal = MultiAgentOrchestrator(
       config: resolveMultiAgentConfigInternal(
@@ -293,6 +299,9 @@ class AppController extends ChangeNotifier {
   late final GoTaskServiceClient goTaskServiceClientInternal;
   late final MultiAgentOrchestrator multiAgentOrchestratorInternal;
   late final MultiAgentMountManager multiAgentMountManagerInternal;
+
+  GoTaskServiceClient get goTaskServiceClientForTest => goTaskServiceClientInternal;
+
   Map<SingleAgentProvider, SingleAgentCapabilities>
   singleAgentCapabilitiesByProviderInternal =
       const <SingleAgentProvider, SingleAgentCapabilities>{};
