@@ -28,7 +28,23 @@ class _FakeGoAcpStdioBridge extends GoAcpStdioBridge {
         'result': <String, dynamic>{
           'singleAgent': true,
           'multiAgent': true,
-          'providers': <String>['codex', 'opencode', 'gemini'],
+          'providerCatalog': <Map<String, dynamic>>[
+            <String, dynamic>{'providerId': 'codex', 'label': 'Codex'},
+            <String, dynamic>{'providerId': 'opencode', 'label': 'OpenCode'},
+            <String, dynamic>{'providerId': 'gemini', 'label': 'Gemini'},
+          ],
+        },
+      };
+    }
+    if (method == 'xworkmate.routing.resolve') {
+      return <String, dynamic>{
+        'result': <String, dynamic>{
+          'resolvedExecutionTarget': 'single-agent',
+          'resolvedEndpointTarget': 'singleAgent',
+          'resolvedProviderId': 'gemini',
+          'resolvedModel': 'gemini-2.5-pro',
+          'resolvedSkills': <String>['pptx'],
+          'unavailable': false,
         },
       };
     }
@@ -43,38 +59,64 @@ class _FakeGoAcpStdioBridge extends GoAcpStdioBridge {
 
 void main() {
   group('ExternalCodeAgentAcpDesktopTransport', () {
-    test('reads bridge capabilities without pushing an empty provider sync', () async {
-      final bridge = _FakeGoAcpStdioBridge();
-      final transport = ExternalCodeAgentAcpDesktopTransport(bridge: bridge);
+    test(
+      'reads bridge capabilities without pushing an empty provider sync',
+      () async {
+        final bridge = _FakeGoAcpStdioBridge();
+        final transport = ExternalCodeAgentAcpDesktopTransport(bridge: bridge);
 
-      final capabilities = await transport.loadExternalAcpCapabilities(
-        target: AssistantExecutionTarget.singleAgent,
-      );
+        final capabilities = await transport.loadExternalAcpCapabilities(
+          target: AssistantExecutionTarget.singleAgent,
+        );
 
-      expect(bridge.methods, <String>['acp.capabilities']);
-      expect(
-        capabilities.providers.map((item) => item.providerId).toList()..sort(),
-        <String>['codex', 'gemini', 'opencode'],
-      );
-    });
+        expect(bridge.methods, <String>['acp.capabilities']);
+        expect(
+          capabilities.providerCatalog.map((item) => item.providerId).toList(),
+          <String>['codex', 'opencode', 'gemini'],
+        );
+      },
+    );
 
-    test('only syncs when app has explicit provider overrides to send', () async {
-      final bridge = _FakeGoAcpStdioBridge();
-      final transport = ExternalCodeAgentAcpDesktopTransport(bridge: bridge);
+    test(
+      'only syncs when app has explicit provider overrides to send',
+      () async {
+        final bridge = _FakeGoAcpStdioBridge();
+        final transport = ExternalCodeAgentAcpDesktopTransport(bridge: bridge);
 
-      await transport.syncExternalProviders(
-        const <ExternalCodeAgentAcpSyncedProvider>[
-          ExternalCodeAgentAcpSyncedProvider(
-            providerId: 'codex',
-            label: 'Codex',
-            endpoint: 'https://acp-server.svc.plus/codex/acp/rpc',
-            authorizationHeader: '',
-            enabled: true,
+        await transport
+            .syncExternalProviders(const <ExternalCodeAgentAcpSyncedProvider>[
+              ExternalCodeAgentAcpSyncedProvider(
+                providerId: 'codex',
+                label: 'Codex',
+                endpoint: 'https://acp-server.svc.plus/codex/acp/rpc',
+                authorizationHeader: '',
+                enabled: true,
+              ),
+            ]);
+
+        expect(bridge.methods, <String>['xworkmate.providers.sync']);
+      },
+    );
+
+    test(
+      'uses bridge routing resolve for preflight provider selection',
+      () async {
+        final bridge = _FakeGoAcpStdioBridge();
+        final transport = ExternalCodeAgentAcpDesktopTransport(bridge: bridge);
+
+        final resolution = await transport.resolveExternalAcpRouting(
+          taskPrompt: 'make slides',
+          workingDirectory: '/tmp/workspace',
+          routing: const ExternalCodeAgentAcpRoutingConfig.auto(
+            preferredGatewayTarget: 'local',
           ),
-        ],
-      );
+        );
 
-      expect(bridge.methods, <String>['xworkmate.providers.sync']);
-    });
+        expect(bridge.methods, <String>['xworkmate.routing.resolve']);
+        expect(resolution.resolvedProviderId, 'gemini');
+        expect(resolution.resolvedModel, 'gemini-2.5-pro');
+        expect(resolution.resolvedSkills, <String>['pptx']);
+      },
+    );
   });
 }
