@@ -77,26 +77,23 @@ void main() {
       },
     );
 
-    test(
-      'only syncs when app has explicit provider overrides to send',
-      () async {
-        final bridge = _FakeGoAcpStdioBridge();
-        final transport = ExternalCodeAgentAcpDesktopTransport(bridge: bridge);
+    test('ignores app-side provider sync in bridge-only mode', () async {
+      final bridge = _FakeGoAcpStdioBridge();
+      final transport = ExternalCodeAgentAcpDesktopTransport(bridge: bridge);
 
-        await transport
-            .syncExternalProviders(const <ExternalCodeAgentAcpSyncedProvider>[
-              ExternalCodeAgentAcpSyncedProvider(
-                providerId: 'codex',
-                label: 'Codex',
-                endpoint: 'https://acp-server.svc.plus/codex/acp/rpc',
-                authorizationHeader: '',
-                enabled: true,
-              ),
-            ]);
+      await transport
+          .syncExternalProviders(const <ExternalCodeAgentAcpSyncedProvider>[
+            ExternalCodeAgentAcpSyncedProvider(
+              providerId: 'codex',
+              label: 'Codex',
+              endpoint: 'https://acp-server.svc.plus/codex/acp/rpc',
+              authorizationHeader: '',
+              enabled: true,
+            ),
+          ]);
 
-        expect(bridge.methods, <String>['xworkmate.providers.sync']);
-      },
-    );
+      expect(bridge.methods, isEmpty);
+    });
 
     test(
       'uses bridge routing resolve for preflight provider selection',
