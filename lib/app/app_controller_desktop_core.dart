@@ -201,7 +201,6 @@ class AppController extends ChangeNotifier {
         singleAgentSharedSkillScanRootOverrides?.toList(growable: false);
     gatewayAcpClientInternal = GatewayAcpClient(
       endpointResolver: resolveGatewayAcpEndpointInternal,
-      authorizationResolver: resolveSingleAgentAuthorizationHeaderInternal,
     );
     availableSingleAgentProvidersOverrideInternal =
         availableSingleAgentProvidersOverride;
