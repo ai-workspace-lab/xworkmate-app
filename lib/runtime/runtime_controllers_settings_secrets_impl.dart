@@ -174,7 +174,7 @@ bool hasStoredGatewayTokenForProfileSettingsInternal(
     (!controller.snapshotInternal.accountLocalMode &&
         profileIndex == kGatewayRemoteProfileIndex &&
         controller.secureRefsInternal.containsKey(
-          kAccountManagedSecretTargetOpenclawGatewayToken,
+          kAccountManagedSecretTargetBridgeAuthToken,
         ));
 
 bool hasStoredGatewayPasswordForProfileSettingsInternal(
@@ -195,7 +195,7 @@ String? storedGatewayTokenMaskForProfileSettingsInternal(
     (!controller.snapshotInternal.accountLocalMode &&
             profileIndex == kGatewayRemoteProfileIndex
         ? controller
-              .secureRefsInternal[kAccountManagedSecretTargetOpenclawGatewayToken]
+              .secureRefsInternal[kAccountManagedSecretTargetBridgeAuthToken]
         : null);
 
 String? storedGatewayPasswordMaskForProfileSettingsInternal(

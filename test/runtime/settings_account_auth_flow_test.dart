@@ -55,16 +55,20 @@ void main() {
       expect(controller.accountSession?.totpPending, isFalse);
       expect(controller.accountSyncState?.syncState, 'ready');
       expect(controller.accountSyncState?.profileScope, 'bridge');
-      expect(controller.accountSyncState?.tokenConfigured.openclaw, isTrue);
+      expect(controller.accountSyncState?.tokenConfigured.bridge, isTrue);
       expect(controller.accountSyncState?.tokenConfigured.apisix, isFalse);
       expect(await store.loadAccountSessionToken(), 'session-token');
       expect(
         await store.loadAccountManagedSecret(
-          target: kAccountManagedSecretTargetOpenclawGatewayToken,
+          target: kAccountManagedSecretTargetBridgeAuthToken,
         ),
         'bridge-token',
       );
       expect(client.loadSessionCalls, 0);
+      expect(
+        controller.accountSyncState?.syncedDefaults.bridgeServerUrl,
+        'https://xworkmate-bridge.svc.plus',
+      );
       expect(
         controller
             .snapshot
@@ -147,7 +151,8 @@ class _SuccessfulAccountRuntimeClient extends AccountRuntimeClient {
     expect(password, '***REMOVED-CREDENTIAL***');
     return <String, dynamic>{
       'token': 'session-token',
-      'internalServiceToken': 'bridge-token',
+      'BRIDGE_AUTH_TOKEN': 'bridge-token',
+      'BRIDGE_SERVER_URL': 'https://xworkmate-bridge.svc.plus',
       'expiresAt': '2026-04-12T00:00:00Z',
       'user': <String, dynamic>{
         'id': 'u-1',
@@ -198,7 +203,8 @@ class _MfaAccountRuntimeClient extends AccountRuntimeClient {
     lastVerifiedCode = code;
     return <String, dynamic>{
       'token': 'session-token',
-      'internalServiceToken': 'bridge-token',
+      'BRIDGE_AUTH_TOKEN': 'bridge-token',
+      'BRIDGE_SERVER_URL': 'https://xworkmate-bridge.svc.plus',
       'expiresAt': '2026-04-12T00:00:00Z',
       'user': <String, dynamic>{
         'id': 'u-1',

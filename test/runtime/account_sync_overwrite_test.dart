@@ -75,7 +75,7 @@ void main() {
           value: 'stale-ollama-token',
         );
         await store.saveAccountManagedSecret(
-          target: kAccountManagedSecretTargetOpenclawGatewayToken,
+          target: kAccountManagedSecretTargetBridgeAuthToken,
           value: 'bridge-token',
         );
 
@@ -113,11 +113,11 @@ void main() {
         );
         expect(controller.snapshot.accountLocalMode, isFalse);
         expect(controller.accountSyncState?.profileScope, 'bridge');
-        expect(controller.accountSyncState?.tokenConfigured.openclaw, isTrue);
+        expect(controller.accountSyncState?.tokenConfigured.bridge, isTrue);
         expect(controller.accountSyncState?.tokenConfigured.apisix, isFalse);
         expect(
           await store.loadAccountManagedSecret(
-            target: kAccountManagedSecretTargetOpenclawGatewayToken,
+            target: kAccountManagedSecretTargetBridgeAuthToken,
           ),
           'bridge-token',
         );

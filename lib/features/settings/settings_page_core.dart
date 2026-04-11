@@ -171,8 +171,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildTokenConfiguredSummary(AccountSyncState? accountState) {
     final configured = <String>[
-      if (accountState?.tokenConfigured.openclaw == true)
-        appText('Gateway Token', 'Gateway Token'),
+      if (accountState?.tokenConfigured.bridge == true)
+        appText('Bridge Token', 'Bridge Token'),
       if (accountState?.tokenConfigured.apisix == true)
         appText('AI Gateway Token', 'AI Gateway Token'),
       if (accountState?.tokenConfigured.vault == true) 'Vault Token',
