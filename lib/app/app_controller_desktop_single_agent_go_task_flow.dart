@@ -57,6 +57,9 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
         sessionKey,
       );
       final selection = controller.singleAgentProviderForSession(sessionKey);
+      final effectiveProvider =
+          controller.resolvedSingleAgentProviderInternal(selection) ??
+          selection;
       final preflightWorkingDirectory = controller
           .resolveSingleAgentWorkingDirectoryForSessionInternal(sessionKey);
       if (preflightWorkingDirectory == null ||
@@ -76,37 +79,32 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
         );
         throw error;
       }
-
-      final aiGatewayApiKey = await controller.loadAiGatewayApiKey();
-      final routingResolution = await controller.goTaskServiceClientInternal
-          .resolveExternalAcpRouting(
-            taskPrompt: message,
-            workingDirectory: preflightWorkingDirectory,
-            routing: routing,
-            aiGatewayBaseUrl: controller.aiGatewayUrl,
-            aiGatewayApiKey: aiGatewayApiKey,
-          );
-      final effectiveProvider =
-          routingResolution.resolvedProviderId.trim().isEmpty
-          ? null
-          : SingleAgentProviderCopy.fromJsonValue(
-              routingResolution.resolvedProviderId,
-            );
       final unavailableReason =
-          routingResolution.unavailable ||
-              (routingResolution.resolvedExecutionTarget == 'single-agent' &&
-                  effectiveProvider == null)
-          ? (routingResolution.unavailableMessage.isNotEmpty
-                ? routingResolution.unavailableMessage
-                : selection.isUnspecified
-                ? appText(
-                    '当前没有可用的 GoTaskService Provider。',
-                    'No GoTaskService provider is currently available.',
-                  )
-                : appText(
-                    '当前 GoTaskService 不支持 ${selection.label}。',
-                    'GoTaskService does not currently support ${selection.label}.',
-                  ))
+          controller.singleAgentShouldSuggestAcpSwitchForSession(sessionKey)
+          ? singleAgentUnavailableLabelDesktopInternal(
+              controller,
+              sessionKey,
+              null,
+            )
+          : controller.singleAgentNeedsAiGatewayConfigurationForSession(
+              sessionKey,
+            )
+          ? singleAgentUnavailableLabelDesktopInternal(
+              controller,
+              sessionKey,
+              appText(
+                'Bridge 当前没有同步到可用 Provider。',
+                'The bridge does not currently have any synced providers.',
+              ),
+            )
+          : controller.resolveExternalAcpEndpointForTargetInternal(
+                  AssistantExecutionTarget.singleAgent,
+                ) ==
+                null
+          ? appText(
+              '当前线程还没有同步到 Bridge Server。请先登录账号并在设置里完成同步后再重试。',
+              'This thread does not have a synced bridge server yet. Sign in and complete Settings sync before trying again.',
+            )
           : null;
       if (unavailableReason != null) {
         controller.upsertTaskThreadInternal(
@@ -120,17 +118,14 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
           sessionKey,
           assistantErrorMessageSingleAgentDesktopInternal(
             controller,
-            singleAgentUnavailableLabelDesktopInternal(
-              controller,
-              sessionKey,
-              unavailableReason,
-            ),
+            unavailableReason,
           ),
         );
         return;
       }
 
-      if (effectiveProvider != null) {
+      final aiGatewayApiKey = await controller.loadAiGatewayApiKey();
+      if (!effectiveProvider.isUnspecified) {
         appendSingleAgentRuntimeStatusDesktopInternal(
           controller,
           sessionKey,
@@ -140,7 +135,9 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
       final workingDirectory = controller
           .resolveSingleAgentWorkingDirectoryForSessionInternal(
             sessionKey,
-            provider: effectiveProvider,
+            provider: effectiveProvider.isUnspecified
+                ? null
+                : effectiveProvider,
           );
       final resolvedWorkingDirectory =
           workingDirectory == null || workingDirectory.trim().isEmpty
@@ -159,25 +156,18 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
           target: AssistantExecutionTarget.singleAgent,
           prompt: message,
           workingDirectory: resolvedWorkingDirectory,
-          model: routingResolution.resolvedModel.trim().isNotEmpty
-              ? routingResolution.resolvedModel
-              : controller.assistantModelForSession(sessionKey),
+          model: controller.assistantModelForSession(sessionKey),
           thinking: thinking,
-          selectedSkills: routingResolution.resolvedSkills.isNotEmpty
-              ? routingResolution.resolvedSkills
-              : selectedSkills,
+          selectedSkills: selectedSkills,
           inlineAttachments: attachments,
           localAttachments: localAttachments,
           aiGatewayBaseUrl: controller.aiGatewayUrl,
           aiGatewayApiKey: aiGatewayApiKey,
           agentId: '',
           metadata: const <String, dynamic>{},
-          routing: _resolvedRoutingConfigDesktopInternal(
-            routing,
-            routingResolution,
-          ),
+          routing: routing,
           routingHint: 'single-agent',
-          provider: effectiveProvider ?? SingleAgentProvider.unspecified,
+          provider: effectiveProvider,
           remoteWorkingDirectoryHint:
               controller
                   .requireTaskThreadForSessionInternal(sessionKey)
@@ -229,31 +219,6 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
       controller.notifyIfActiveInternal();
     }
   });
-}
-
-ExternalCodeAgentAcpRoutingConfig _resolvedRoutingConfigDesktopInternal(
-  ExternalCodeAgentAcpRoutingConfig original,
-  ExternalCodeAgentAcpRoutingResolution resolution,
-) {
-  final explicitExecutionTarget = switch (resolution.resolvedExecutionTarget
-      .trim()
-      .toLowerCase()) {
-    'single-agent' => 'single-agent',
-    'multi-agent' => 'multi-agent',
-    'gateway' => 'gateway',
-    _ => original.explicitExecutionTarget,
-  };
-  return ExternalCodeAgentAcpRoutingConfig(
-    mode: ExternalCodeAgentAcpRoutingMode.explicit,
-    preferredGatewayTarget: original.preferredGatewayTarget,
-    explicitExecutionTarget: explicitExecutionTarget,
-    explicitProviderId: resolution.resolvedProviderId,
-    explicitModel: resolution.resolvedModel,
-    explicitSkills: resolution.resolvedSkills,
-    allowSkillInstall: original.allowSkillInstall,
-    availableSkills: original.availableSkills,
-    installApproval: original.installApproval,
-  );
 }
 
 Future<void> _applySingleAgentGoTaskResultDesktopInternal(

@@ -60,7 +60,7 @@ void main() {
             lastSyncSource: 'https://xworkmate-bridge.svc.plus',
             profileScope: 'bridge',
             tokenConfigured: const AccountTokenConfigured(
-              openclaw: true,
+              bridge: true,
               vault: false,
               apisix: false,
             ),
