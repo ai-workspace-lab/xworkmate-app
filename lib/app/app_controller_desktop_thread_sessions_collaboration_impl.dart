@@ -121,8 +121,8 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
     if (workingDirectory == null || workingDirectory.trim().isEmpty) {
       final error = StateError(
         appText(
-          '当前线程缺少工作路径，无法启动多 Agent 协作。',
-          'This thread has no workspace path, so multi-agent collaboration cannot start.',
+          '当前线程缺少工作路径，无法启动 Gateway 协作。',
+          'This thread has no workspace path, so gateway collaboration cannot start.',
         ),
       );
       controller.appendLocalSessionMessageInternal(
@@ -176,8 +176,8 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
           aiGatewayApiKey: aiGatewayApiKey,
           agentId: '',
           metadata: const <String, dynamic>{},
-          routingHint: 'multi-agent',
-          collaborationMode: GoTaskServiceCollaborationMode.multiAgent,
+          routingHint: 'gateway',
+          collaborationMode: GoTaskServiceCollaborationMode.standard,
           resumeSession: true,
         ),
         onUpdate: (update) {
@@ -406,9 +406,7 @@ bool canQuickConnectGatewayThreadSessionInternal(AppController controller) {
     AssistantExecutionTarget.singleAgent => GatewayConnectionProfile.emptySlot(
       index: kGatewayRemoteProfileIndex,
     ),
-    AssistantExecutionTarget.local => GatewayConnectionProfile.defaultsLocal(),
-    AssistantExecutionTarget.remote =>
-      GatewayConnectionProfile.defaultsRemote(),
+    AssistantExecutionTarget.gateway => GatewayConnectionProfile.defaults(),
   };
   return controller.hasStoredGatewayCredential ||
       host != defaults.host ||

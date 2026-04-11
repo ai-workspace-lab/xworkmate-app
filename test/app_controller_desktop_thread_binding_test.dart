@@ -60,7 +60,7 @@ void main() {
       );
 
       final snapshot = resolveDesktopThreadBindingSnapshotInternal(
-        defaultExecutionTarget: AssistantExecutionTarget.local,
+        defaultExecutionTarget: AssistantExecutionTarget.gateway,
         latestRecord: latestRecord,
       );
 
@@ -79,12 +79,12 @@ void main() {
         );
 
         final snapshot = resolveDesktopThreadBindingSnapshotInternal(
-          defaultExecutionTarget: AssistantExecutionTarget.local,
-          executionTargetOverride: AssistantExecutionTarget.remote,
+          defaultExecutionTarget: AssistantExecutionTarget.gateway,
+          executionTargetOverride: AssistantExecutionTarget.gateway,
           latestRecord: latestRecord,
         );
 
-        expect(snapshot.executionTarget, AssistantExecutionTarget.remote);
+        expect(snapshot.executionTarget, AssistantExecutionTarget.gateway);
         expect(snapshot.singleAgentProvider, SingleAgentProvider.opencode);
       },
     );
@@ -92,16 +92,16 @@ void main() {
     test('does not recover provider from stale fallback-only records', () {
       final staleRecord = buildThread(
         threadId: 'thread-3',
-        mode: ThreadExecutionMode.gatewayRemote,
+        mode: ThreadExecutionMode.gateway,
         providerId: SingleAgentProvider.codex.providerId,
       );
 
       final snapshot = resolveDesktopThreadBindingSnapshotInternal(
-        defaultExecutionTarget: AssistantExecutionTarget.remote,
+        defaultExecutionTarget: AssistantExecutionTarget.gateway,
         latestRecord: null,
       );
 
-      expect(snapshot.executionTarget, AssistantExecutionTarget.remote);
+      expect(snapshot.executionTarget, AssistantExecutionTarget.gateway);
       expect(snapshot.singleAgentProvider.isUnspecified, isTrue);
       expect(snapshot.record, isNull);
       expect(staleRecord.executionBinding.providerId, isNotEmpty);
@@ -113,62 +113,72 @@ void main() {
       final target = resolveGatewayExecutionTargetFromVisibleTargets(
         const <AssistantExecutionTarget>[
           AssistantExecutionTarget.singleAgent,
-          AssistantExecutionTarget.local,
-          AssistantExecutionTarget.remote,
+          AssistantExecutionTarget.gateway,
         ],
         currentTarget: AssistantExecutionTarget.singleAgent,
       );
 
-      expect(target, AssistantExecutionTarget.remote);
+      expect(target, AssistantExecutionTarget.gateway);
     });
 
-    test('preserves explicit local gateway selection when already active', () {
+    test('falls back to remote when legacy local gateway selection is active', () {
       final target = resolveGatewayExecutionTargetFromVisibleTargets(
         const <AssistantExecutionTarget>[
-          AssistantExecutionTarget.local,
-          AssistantExecutionTarget.remote,
+          AssistantExecutionTarget.gateway,
         ],
-        currentTarget: AssistantExecutionTarget.local,
+        currentTarget: AssistantExecutionTarget.gateway,
       );
 
-      expect(target, AssistantExecutionTarget.local);
+      expect(target, AssistantExecutionTarget.gateway);
     });
   });
 
   group('resolveGatewayThreadConnectionStateInternal', () {
     test('uses the thread target profile as the only address source', () {
+      final targetProfile = GatewayConnectionProfile.defaults().copyWith(
+        mode: RuntimeConnectionMode.remote,
+        host: 'bridge.example.internal',
+        port: 443,
+        tls: true,
+      );
       final state = resolveGatewayThreadConnectionStateInternal(
-        target: AssistantExecutionTarget.remote,
+        target: AssistantExecutionTarget.gateway,
         connection:
             GatewayConnectionSnapshot.initial(
               mode: RuntimeConnectionMode.remote,
             ).copyWith(
               status: RuntimeConnectionStatus.connected,
-              remoteAddress: '127.0.0.1:18789',
+              remoteAddress: 'legacy-loopback:18789',
             ),
-        targetProfile: GatewayConnectionProfile.defaultsRemote(),
+        targetProfile: targetProfile,
       );
 
       expect(state.status, RuntimeConnectionStatus.connected);
-      expect(state.detailLabel, 'openclaw.svc.plus:443');
+      expect(state.detailLabel, 'bridge.example.internal:443');
       expect(state.ready, isTrue);
     });
 
     test('marks mismatched local snapshot as offline for remote threads', () {
+      final targetProfile = GatewayConnectionProfile.defaults().copyWith(
+        mode: RuntimeConnectionMode.remote,
+        host: 'bridge.example.internal',
+        port: 443,
+        tls: true,
+      );
       final state = resolveGatewayThreadConnectionStateInternal(
-        target: AssistantExecutionTarget.remote,
+        target: AssistantExecutionTarget.gateway,
         connection:
             GatewayConnectionSnapshot.initial(
               mode: RuntimeConnectionMode.local,
             ).copyWith(
               status: RuntimeConnectionStatus.connected,
-              remoteAddress: '127.0.0.1:18789',
+              remoteAddress: 'legacy-loopback:18789',
             ),
-        targetProfile: GatewayConnectionProfile.defaultsRemote(),
+        targetProfile: targetProfile,
       );
 
       expect(state.status, RuntimeConnectionStatus.offline);
-      expect(state.detailLabel, 'openclaw.svc.plus:443');
+      expect(state.detailLabel, 'bridge.example.internal:443');
       expect(state.ready, isFalse);
       expect(state.lastError, isNull);
     });
@@ -183,7 +193,7 @@ void main() {
             mode: RuntimeConnectionMode.remote,
           ).copyWith(
             status: RuntimeConnectionStatus.connected,
-            remoteAddress: '127.0.0.1:18789',
+            remoteAddress: 'legacy-loopback:18789',
           ),
         );
         final controller = AppController(
@@ -197,22 +207,21 @@ void main() {
           controller.dispose();
           await gateway.disposeTestResources();
         });
-
         const sessionKey = 'draft:remote-status';
         controller.initializeAssistantThreadContext(
           sessionKey,
-          executionTarget: AssistantExecutionTarget.remote,
+          executionTarget: AssistantExecutionTarget.gateway,
         );
         controller.upsertTaskThreadInternal(
           sessionKey,
-          executionTarget: AssistantExecutionTarget.remote,
+          executionTarget: AssistantExecutionTarget.gateway,
           executionTargetSource: ThreadSelectionSource.explicit,
         );
 
         final state = controller.assistantConnectionStateForSession(sessionKey);
 
         expect(state.status, RuntimeConnectionStatus.connected);
-        expect(state.detailLabel, 'openclaw.svc.plus:443');
+        expect(state.detailLabel, '未连接目标');
         expect(state.ready, isTrue);
       },
     );
@@ -226,12 +235,12 @@ void main() {
       const sessionKey = 'draft:routing';
       controller.initializeAssistantThreadContext(
         sessionKey,
-        executionTarget: AssistantExecutionTarget.remote,
+        executionTarget: AssistantExecutionTarget.gateway,
         singleAgentProvider: SingleAgentProvider.opencode,
       );
       controller.upsertTaskThreadInternal(
         sessionKey,
-        executionTarget: AssistantExecutionTarget.remote,
+        executionTarget: AssistantExecutionTarget.gateway,
         executionTargetSource: ThreadSelectionSource.explicit,
         singleAgentProvider: SingleAgentProvider.opencode,
         singleAgentProviderSource: ThreadSelectionSource.explicit,
@@ -242,7 +251,7 @@ void main() {
       );
 
       expect(routing.mode, ExternalCodeAgentAcpRoutingMode.explicit);
-      expect(routing.explicitExecutionTarget, 'remote');
+      expect(routing.explicitExecutionTarget, 'gateway');
       expect(routing.explicitProviderId, isEmpty);
     });
   });
@@ -265,7 +274,7 @@ void main() {
         const sessionKey = 'draft:remote-artifacts';
         controller.upsertTaskThreadInternal(
           sessionKey,
-          executionTarget: AssistantExecutionTarget.remote,
+          executionTarget: AssistantExecutionTarget.gateway,
           executionTargetSource: ThreadSelectionSource.explicit,
           workspaceBinding: WorkspaceBinding(
             workspaceId: 'workspace-1',

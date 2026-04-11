@@ -84,8 +84,7 @@ class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {
       widget.controller
           .visibleAssistantExecutionTargets(const <AssistantExecutionTarget>[
             AssistantExecutionTarget.singleAgent,
-            AssistantExecutionTarget.local,
-            AssistantExecutionTarget.remote,
+            AssistantExecutionTarget.gateway,
           ]),
     );
     final runningCount = tasks

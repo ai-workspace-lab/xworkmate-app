@@ -11,7 +11,7 @@ import 'runtime_models_runtime_payloads.dart';
 import 'runtime_models_gateway_entities.dart';
 import 'runtime_models_multi_agent.dart';
 
-const int settingsSnapshotSchemaVersion = 1;
+const int settingsSnapshotSchemaVersion = 2;
 
 class SettingsSnapshot {
   const SettingsSnapshot({
@@ -384,10 +384,7 @@ class SettingsSnapshot {
 
   String toJsonString() => jsonEncode(toJson());
 
-  GatewayConnectionProfile get primaryLocalGatewayProfile =>
-      gatewayProfiles[kGatewayLocalProfileIndex];
-
-  GatewayConnectionProfile get primaryRemoteGatewayProfile =>
+  GatewayConnectionProfile get primaryGatewayProfile =>
       gatewayProfiles[kGatewayRemoteProfileIndex];
 
   GatewayConnectionProfile? gatewayProfileForExecutionTarget(
@@ -395,8 +392,7 @@ class SettingsSnapshot {
   ) {
     return switch (target) {
       AssistantExecutionTarget.singleAgent => null,
-      AssistantExecutionTarget.local => primaryLocalGatewayProfile,
-      AssistantExecutionTarget.remote => primaryRemoteGatewayProfile,
+      AssistantExecutionTarget.gateway => primaryGatewayProfile,
     };
   }
 
@@ -414,8 +410,7 @@ class SettingsSnapshot {
     GatewayConnectionProfile profile,
   ) {
     final index = switch (target) {
-      AssistantExecutionTarget.local => kGatewayLocalProfileIndex,
-      AssistantExecutionTarget.remote => kGatewayRemoteProfileIndex,
+      AssistantExecutionTarget.gateway => kGatewayRemoteProfileIndex,
       AssistantExecutionTarget.singleAgent => null,
     };
     if (index == null) {

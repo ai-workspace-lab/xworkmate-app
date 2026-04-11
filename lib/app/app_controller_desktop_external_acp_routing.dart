@@ -49,9 +49,8 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
       normalizedSessionKey,
     );
     final preferredGatewayTarget = switch (sessionTarget) {
-      AssistantExecutionTarget.local => 'local',
-      AssistantExecutionTarget.remote => 'remote',
-      AssistantExecutionTarget.singleAgent => 'local',
+      AssistantExecutionTarget.gateway => 'gateway',
+      AssistantExecutionTarget.singleAgent => 'gateway',
     };
     final availableSkills =
         assistantImportedSkillsForSession(normalizedSessionKey)
@@ -122,9 +121,8 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
 
   String _routingExecutionTargetValueInternal(AssistantExecutionTarget target) {
     return switch (target) {
-      AssistantExecutionTarget.singleAgent => 'singleAgent',
-      AssistantExecutionTarget.local => 'local',
-      AssistantExecutionTarget.remote => 'remote',
+      AssistantExecutionTarget.singleAgent => 'agent',
+      AssistantExecutionTarget.gateway => 'gateway',
     };
   }
 }

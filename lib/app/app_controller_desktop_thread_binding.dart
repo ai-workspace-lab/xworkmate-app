@@ -270,9 +270,7 @@ extension AppControllerDesktopThreadBinding on AppController {
           executionMode: switch (executionTarget) {
             AssistantExecutionTarget.singleAgent =>
               ThreadExecutionMode.localAgent,
-            AssistantExecutionTarget.local => ThreadExecutionMode.gatewayLocal,
-            AssistantExecutionTarget.remote =>
-              ThreadExecutionMode.gatewayRemote,
+            AssistantExecutionTarget.gateway => ThreadExecutionMode.gateway,
           },
           executorId: sanitizedProvider.providerId,
           providerId: sanitizedProvider.providerId,

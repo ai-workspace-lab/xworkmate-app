@@ -26,8 +26,6 @@ import '../runtime/gateway_acp_client.dart';
 import '../runtime/codex_runtime.dart';
 import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
-import '../runtime/go_gateway_runtime_desktop_client.dart';
-import '../runtime/go_acp_stdio_bridge.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/external_code_agent_acp_desktop_transport.dart';
@@ -137,7 +135,6 @@ class AppController extends ChangeNotifier {
     hostUiFeaturePlatformInternal = Platform.isIOS || Platform.isAndroid
         ? UiFeaturePlatform.mobile
         : UiFeaturePlatform.desktop;
-    final sharedExternalAcpBridge = GoAcpStdioBridge();
 
     final resolvedRuntimeCoordinator =
         runtimeCoordinator ??
@@ -145,13 +142,6 @@ class AppController extends ChangeNotifier {
           gateway: GatewayRuntime(
             store: storeInternal,
             identityStore: DeviceIdentityStore(storeInternal),
-            sessionClient: GoGatewayRuntimeDesktopClient(
-              bridge: sharedExternalAcpBridge,
-            ),
-            allowDirectSocketFallbackOnSessionClientFailure:
-                shouldBlockEmbeddedAgentLaunch(
-                  isAppleHost: Platform.isIOS || Platform.isMacOS,
-                ),
           ),
           codex: CodexRuntime(),
           configBridge: CodexConfigBridge(),
@@ -205,21 +195,25 @@ class AppController extends ChangeNotifier {
         singleAgentSharedSkillScanRootOverrides?.toList(growable: false);
     gatewayAcpClientInternal = GatewayAcpClient(
       endpointResolver: resolveGatewayAcpEndpointInternal,
+      authorizationResolver: resolveGatewayAcpAuthorizationHeaderInternal,
     );
     availableSingleAgentProvidersOverrideInternal =
         availableSingleAgentProvidersOverride;
     arisBundleRepositoryInternal =
         arisBundleRepository ?? ArisBundleRepository();
-    goCoreLocatorInternal = GoCoreLocator();
     runtimeCoordinatorInternal.attachDispatchResolver(
-      GoRuntimeDispatchDesktopClient(),
+      GoRuntimeDispatchDesktopClient(
+        client: gatewayAcpClientInternal,
+        endpointResolver: resolveGatewayAcpEndpointInternal,
+      ),
     );
     goTaskServiceClientInternal =
         goTaskServiceClient ??
         DesktopGoTaskService(
           gateway: runtimeCoordinatorInternal.gateway,
           acpTransport: ExternalCodeAgentAcpDesktopTransport(
-            bridge: sharedExternalAcpBridge,
+            client: gatewayAcpClientInternal,
+            endpointResolver: resolveExternalAcpEndpointForTargetInternal,
           ),
         );
     multiAgentOrchestratorInternal = MultiAgentOrchestrator(
@@ -227,14 +221,15 @@ class AppController extends ChangeNotifier {
         settingsControllerInternal.snapshot,
       ),
       arisBundleRepository: arisBundleRepositoryInternal,
-      goCoreLocator: goCoreLocatorInternal,
     );
     multiAgentMountManagerInternal =
         multiAgentMountManager ??
         MultiAgentMountManager(
           arisBundleRepository: arisBundleRepositoryInternal,
-          goCoreLocator: goCoreLocatorInternal,
-          resolver: GoMultiAgentMountDesktopClient(),
+          resolver: GoMultiAgentMountDesktopClient(
+            client: gatewayAcpClientInternal,
+            endpointResolver: resolveGatewayAcpEndpointInternal,
+          ),
         );
 
     attachChildListenersInternal();
@@ -295,13 +290,14 @@ class AppController extends ChangeNotifier {
   late final List<SingleAgentProvider>?
   availableSingleAgentProvidersOverrideInternal;
   late final ArisBundleRepository arisBundleRepositoryInternal;
-  late final GoCoreLocator goCoreLocatorInternal;
   late final GoTaskServiceClient goTaskServiceClientInternal;
   late final MultiAgentOrchestrator multiAgentOrchestratorInternal;
   late final MultiAgentMountManager multiAgentMountManagerInternal;
 
   GoTaskServiceClient get goTaskServiceClientForTest =>
       goTaskServiceClientInternal;
+
+  GatewayAcpClient get gatewayAcpClientForTest => gatewayAcpClientInternal;
 
   Map<SingleAgentProvider, SingleAgentCapabilities>
   singleAgentCapabilitiesByProviderInternal =
@@ -608,13 +604,9 @@ class AppController extends ChangeNotifier {
         availableSingleAgentProviders.isNotEmpty) {
       visible.add(AssistantExecutionTarget.singleAgent);
     }
-    if (supported.contains(AssistantExecutionTarget.local) &&
-        appUiState.isGatewayTargetSaved(AssistantExecutionTarget.local)) {
-      visible.add(AssistantExecutionTarget.local);
-    }
-    if (supported.contains(AssistantExecutionTarget.remote) &&
-        appUiState.isGatewayTargetSaved(AssistantExecutionTarget.remote)) {
-      visible.add(AssistantExecutionTarget.remote);
+    if (supported.contains(AssistantExecutionTarget.gateway) &&
+        appUiState.isGatewayTargetSaved(AssistantExecutionTarget.gateway)) {
+      visible.add(AssistantExecutionTarget.gateway);
     }
     if (!supportedTargets.contains(AssistantExecutionTarget.singleAgent) ||
         visible.contains(AssistantExecutionTarget.singleAgent)) {
