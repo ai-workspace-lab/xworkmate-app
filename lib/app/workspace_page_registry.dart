@@ -120,14 +120,12 @@ workspacePageSpecsInternal = <WorkspaceDestination, WorkspacePageSpec>{
       initialTab: controller.settingsTab,
       initialDetail: controller.settingsDetail,
       navigationContext: controller.settingsNavigationContext,
-      showSectionTabs: true,
     ),
     mobileBuilder: (controller, onOpenDetail) => SettingsPage(
       controller: controller,
       initialTab: controller.settingsTab,
       initialDetail: controller.settingsDetail,
       navigationContext: controller.settingsNavigationContext,
-      showSectionTabs: true,
     ),
   ),
   WorkspaceDestination.account: WorkspacePageSpec(
