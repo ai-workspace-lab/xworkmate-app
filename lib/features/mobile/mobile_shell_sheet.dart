@@ -55,7 +55,7 @@ class MobileSafeSheetInternal extends StatelessWidget {
                   controller.hasAssistantPendingRun ||
                   controller.activeRunId != null;
               final securePathLabel = mobileSecurePathLabelInternal(
-                profile: controller.settings.primaryRemoteGatewayProfile,
+                profile: controller.settings.primaryGatewayProfile,
                 connection: connection,
               );
               final localDeviceLabel =
@@ -660,7 +660,7 @@ String mobileTargetLabelInternal(AppController controller) {
   if ((connection.remoteAddress ?? '').isNotEmpty) {
     return connection.remoteAddress!;
   }
-  final profile = controller.settings.primaryRemoteGatewayProfile;
+  final profile = controller.settings.primaryGatewayProfile;
   final host = profile.host.trim();
   if (host.isNotEmpty && profile.port > 0) {
     return '$host:${profile.port}';

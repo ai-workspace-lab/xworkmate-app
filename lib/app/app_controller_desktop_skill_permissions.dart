@@ -256,8 +256,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
         switch (existing?.executionBinding.executionMode) {
           ThreadExecutionMode.localAgent =>
             AssistantExecutionTarget.singleAgent,
-          ThreadExecutionMode.gatewayLocal => AssistantExecutionTarget.local,
-          ThreadExecutionMode.gatewayRemote => AssistantExecutionTarget.remote,
+          ThreadExecutionMode.gateway => AssistantExecutionTarget.gateway,
           null => AssistantExecutionTarget.singleAgent,
         };
     final nextImportedSkills =
@@ -325,10 +324,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
               executionMode: switch (nextExecutionTarget) {
                 AssistantExecutionTarget.singleAgent =>
                   ThreadExecutionMode.localAgent,
-                AssistantExecutionTarget.local =>
-                  ThreadExecutionMode.gatewayLocal,
-                AssistantExecutionTarget.remote =>
-                  ThreadExecutionMode.gatewayRemote,
+                AssistantExecutionTarget.gateway => ThreadExecutionMode.gateway,
               },
               executorId: nextProvider.providerId,
               providerId: nextProvider.providerId,

@@ -46,11 +46,11 @@ void main() {
     test('prefers the current thread record over the main thread fallback', () {
       final primary = buildThread(
         threadId: 'draft:1',
-        mode: ThreadExecutionMode.gatewayRemote,
+        mode: ThreadExecutionMode.gateway,
       );
       final fallback = buildThread(
         threadId: 'main',
-        mode: ThreadExecutionMode.gatewayLocal,
+        mode: ThreadExecutionMode.gateway,
       );
 
       final resolved = _ThreadSessionTargetResolverHarness().resolveTarget(
@@ -58,7 +58,20 @@ void main() {
         fallback: fallback,
       );
 
-      expect(resolved, AssistantExecutionTarget.remote);
+      expect(resolved, AssistantExecutionTarget.gateway);
+    });
+
+    test('keeps gateway records on the canonical gateway target', () {
+      final primary = buildThread(
+        threadId: 'draft:legacy-local',
+        mode: ThreadExecutionMode.gateway,
+      );
+
+      final resolved = _ThreadSessionTargetResolverHarness().resolveTarget(
+        primary: primary,
+      );
+
+      expect(resolved, AssistantExecutionTarget.gateway);
     });
 
     test(

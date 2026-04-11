@@ -265,7 +265,7 @@
 
 ## 5. XWorkmate App -> XWorkmate Bridge 远端单 Agent / Gateway 验收
 
-这些 case 用于验证 `xworkmate-app` 通过本地 `GoAcpStdioBridge` 调用
+这些 case 用于验证 `xworkmate-app` 通过当前 bridge / gateway ACP 链路调用
 `xworkmate-bridge`，再转发到远端 `codex / opencode / gemini / openclaw`
 时的真实线程行为，重点关注：
 

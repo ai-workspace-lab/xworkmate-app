@@ -41,11 +41,11 @@ flowchart TD
   K --> R["availableSingleAgentProviders
   = bridge 当前可用 provider"]
   R --> S["visibleAssistantExecutionTargets(...)
-  single-agent 是否显示
-  只看 runtime available providers"]
+  agent / gateway 是否显示
+  只看 bridge runtime capabilities"]
 
-  O --> T["visible gateway / multi-agent execution affordances
-  openclaw / aris discovery 只看 bridge capabilities"]
+  O --> T["visible gateway affordances
+  gateway discovery 只看 bridge capabilities"]
 
   Q --> U["setSingleAgentProvider(providerId)
   仅写入 thread executionBinding.providerId"]

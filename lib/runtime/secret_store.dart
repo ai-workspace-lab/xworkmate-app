@@ -449,10 +449,9 @@ class SecretStore {
 
   static const List<int> _gatewayProfileFallbackOrder = <int>[
     kGatewayRemoteProfileIndex,
-    kGatewayLocalProfileIndex,
+    1,
     2,
     3,
-    4,
   ];
 
   static String _accountManagedSecretKey(String target) =>

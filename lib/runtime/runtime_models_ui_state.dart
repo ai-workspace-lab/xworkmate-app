@@ -3,7 +3,7 @@ import 'dart:convert';
 import '../models/app_models.dart';
 import 'runtime_models_connection.dart';
 
-const int appUiStateSchemaVersion = 1;
+const int appUiStateSchemaVersion = 2;
 
 class AppUiState {
   const AppUiState({
@@ -106,8 +106,7 @@ class AppUiState {
 
   bool isGatewayTargetSaved(AssistantExecutionTarget target) {
     final targetKey = switch (target) {
-      AssistantExecutionTarget.local => 'local',
-      AssistantExecutionTarget.remote => 'remote',
+      AssistantExecutionTarget.gateway => 'gateway',
       _ => '',
     };
     return targetKey.isNotEmpty && savedGatewayTargets.contains(targetKey);
@@ -115,8 +114,7 @@ class AppUiState {
 
   AppUiState markGatewayTargetSaved(AssistantExecutionTarget target) {
     final targetKey = switch (target) {
-      AssistantExecutionTarget.local => 'local',
-      AssistantExecutionTarget.remote => 'remote',
+      AssistantExecutionTarget.gateway => 'gateway',
       _ => '',
     };
     if (targetKey.isEmpty || savedGatewayTargets.contains(targetKey)) {
@@ -133,7 +131,7 @@ List<String> normalizeSavedGatewayTargets(Iterable<String> rawTargets) {
   final seen = <String>{};
   for (final item in rawTargets) {
     final normalizedTarget = item.trim().toLowerCase();
-    if ((normalizedTarget != 'local' && normalizedTarget != 'remote') ||
+    if (normalizedTarget != 'gateway' ||
         !seen.add(normalizedTarget)) {
       continue;
     }

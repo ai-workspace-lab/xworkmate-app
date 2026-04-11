@@ -1,12 +1,16 @@
-import 'go_acp_stdio_bridge.dart';
+import 'gateway_acp_client.dart';
 import 'multi_agent_mount_resolver.dart';
 import 'runtime_models.dart';
 
 class GoMultiAgentMountDesktopClient implements MultiAgentMountResolver {
-  GoMultiAgentMountDesktopClient({GoAcpStdioBridge? bridge})
-    : _bridge = bridge ?? GoAcpStdioBridge();
+  GoMultiAgentMountDesktopClient({
+    required GatewayAcpClient client,
+    required Uri? Function() endpointResolver,
+  }) : _client = client,
+       _endpointResolver = endpointResolver;
 
-  final GoAcpStdioBridge _bridge;
+  final GatewayAcpClient _client;
+  final Uri? Function() _endpointResolver;
 
   @override
   Future<MultiAgentConfig?> reconcile({
@@ -17,7 +21,7 @@ class GoMultiAgentMountDesktopClient implements MultiAgentMountResolver {
     required String opencodeHome,
     required ArisMountProbe arisProbe,
   }) async {
-    final response = await _bridge.request(
+    final response = await _client.request(
       method: 'xworkmate.mounts.reconcile',
       params: <String, dynamic>{
         'config': <String, dynamic>{
@@ -33,6 +37,7 @@ class GoMultiAgentMountDesktopClient implements MultiAgentMountResolver {
         'opencodeHome': opencodeHome.trim(),
         'aris': arisProbe.toJson(),
       },
+      endpointOverride: _endpointResolver(),
     );
     final result = _castMap(response['result']);
     final rawTargets = result['mountTargets'];
@@ -60,7 +65,7 @@ class GoMultiAgentMountDesktopClient implements MultiAgentMountResolver {
   }
 
   @override
-  Future<void> dispose() => _bridge.dispose();
+  Future<void> dispose() => _client.dispose();
 
   Map<String, dynamic> _castMap(Object? value) {
     if (value is Map<String, dynamic>) {
