@@ -46,6 +46,8 @@ class GoAcpStdioBridge {
   Stream<Map<String, dynamic>> get notifications =>
       _notificationsController.stream;
 
+  bool get isStarted => _process != null || _startupFuture != null;
+
   Future<Map<String, dynamic>> request({
     required String method,
     required Map<String, dynamic> params,
