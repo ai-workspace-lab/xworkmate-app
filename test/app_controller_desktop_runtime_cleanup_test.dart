@@ -102,9 +102,9 @@ void main() {
 
       final store = SecureConfigStore(
         enableSecureStorage: false,
-        databasePathResolver: () async => '${root.path}/settings.sqlite3',
-        fallbackDirectoryPathResolver: () async => root.path,
-        defaultSupportDirectoryPathResolver: () async => root.path,
+        appDataRootPathResolver: () async => root.path,
+        secretRootPathResolver: () async => root.path,
+        supportRootPathResolver: () async => root.path,
       );
       final controller = AppController(
         store: store,
@@ -128,7 +128,7 @@ void main() {
 
       final endpoint = 'http://${server.address.address}:${server.port}';
       final nextSettings = controller.settings.copyWith(
-        externalAcpEndpoints: <ExternalAcpEndpointProfile>[
+        providerSyncDefinitions: <ExternalAcpEndpointProfile>[
           ExternalAcpEndpointProfile.defaultsForProvider(
             SingleAgentProvider.codex,
           ).copyWith(endpoint: endpoint),

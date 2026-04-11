@@ -225,7 +225,7 @@ bool singleAgentProviderRequiresLocalPathRuntimeInternal(
   SingleAgentProvider provider,
 ) {
   final configuredEndpoint = controller.settings
-      .externalAcpEndpointForProvider(provider)
+      .providerSyncDefinitionForProvider(provider)
       .endpoint
       .trim();
   if (configuredEndpoint.isEmpty) {
