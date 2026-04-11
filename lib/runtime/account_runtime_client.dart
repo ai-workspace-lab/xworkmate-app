@@ -250,6 +250,9 @@ class AccountRuntimeClient {
   AccountSessionSummary _accountSessionSummaryFromUserJson(
     Map<String, dynamic> user,
   ) {
+    final mfa = _asMap(user['mfa']);
+    final totpEnabled = mfa['totpEnabled'] as bool? ?? false;
+    final totpPending = mfa['totpPending'] as bool? ?? false;
     return AccountSessionSummary(
       userId: _stringValue(user['id']),
       email: _stringValue(user['email']),
@@ -257,7 +260,9 @@ class AccountRuntimeClient {
           ? _stringValue(user['name'])
           : _stringValue(user['username']),
       role: _stringValue(user['role']),
-      mfaEnabled: user['mfaEnabled'] as bool? ?? false,
+      mfaEnabled: user['mfaEnabled'] as bool? ?? totpEnabled,
+      totpEnabled: totpEnabled,
+      totpPending: totpPending,
     );
   }
 
