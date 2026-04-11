@@ -384,7 +384,7 @@ Uri? resolveSingleAgentEndpointRuntimeInternal(
   SingleAgentProvider provider,
 ) {
   final endpoint = controller.settings
-      .externalAcpEndpointForProvider(provider)
+      .providerSyncDefinitionForProvider(provider)
       .endpoint
       .trim();
   if (endpoint.isEmpty) {

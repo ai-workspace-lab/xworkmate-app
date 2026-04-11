@@ -12,32 +12,29 @@ import 'settings_store.dart';
 
 class SecureConfigStore {
   SecureConfigStore({
-    Future<String?> Function()? fallbackDirectoryPathResolver,
-    Future<String?> Function()? databasePathResolver,
-    Future<String?> Function()? defaultSupportDirectoryPathResolver,
-    SecureConfigDatabaseOpener? databaseOpener,
+    Future<String?> Function()? secretRootPathResolver,
+    Future<String?> Function()? appDataRootPathResolver,
+    Future<String?> Function()? supportRootPathResolver,
     SecureStorageClient? secureStorage,
     bool enableSecureStorage = true,
   }) {
     final layoutResolver = StoreLayoutResolver(
-      localRootPathResolver: databasePathResolver,
-      secretRootPathResolver: fallbackDirectoryPathResolver,
-      supportRootPathResolver: defaultSupportDirectoryPathResolver,
+      appDataRootPathResolver: appDataRootPathResolver,
+      secretRootPathResolver: secretRootPathResolver,
+      supportRootPathResolver: supportRootPathResolver,
     );
     _layoutResolver = layoutResolver;
     _secretStore = SecretStore(
-      fallbackDirectoryPathResolver: fallbackDirectoryPathResolver,
-      databasePathResolver: databasePathResolver,
-      defaultSupportDirectoryPathResolver: defaultSupportDirectoryPathResolver,
+      secretRootPathResolver: secretRootPathResolver,
+      appDataRootPathResolver: appDataRootPathResolver,
+      supportRootPathResolver: supportRootPathResolver,
       secureStorage: secureStorage,
       enableSecureStorage: enableSecureStorage,
       layoutResolver: layoutResolver,
     );
     _settingsStore = SettingsStore(
-      fallbackDirectoryPathResolver: fallbackDirectoryPathResolver,
-      databasePathResolver: databasePathResolver,
-      defaultSupportDirectoryPathResolver: defaultSupportDirectoryPathResolver,
-      databaseOpener: databaseOpener,
+      appDataRootPathResolver: appDataRootPathResolver,
+      supportRootPathResolver: supportRootPathResolver,
       layoutResolver: layoutResolver,
     );
   }
@@ -67,12 +64,12 @@ class SecureConfigStore {
     return _settingsStore.saveSettingsSnapshot(snapshot);
   }
 
-  Future<List<File>> resolvedSettingsFiles() {
-    return _settingsStore.resolvedSettingsFiles();
+  Future<File?> resolvedSettingsFile() {
+    return _settingsStore.resolvedSettingsFile();
   }
 
-  Future<List<Directory>> resolvedSettingsWatchDirectories() {
-    return _settingsStore.resolvedSettingsWatchDirectories();
+  Future<Directory?> resolvedSettingsWatchDirectory() {
+    return _settingsStore.resolvedSettingsWatchDirectory();
   }
 
   Future<List<TaskThread>> loadTaskThreads() {
@@ -241,6 +238,29 @@ class SecureConfigStore {
     if (file != null && await file.exists()) {
       await file.delete();
     }
+  }
+
+  Future<AppUiState> loadAppUiState() async {
+    final payload = await loadSupportJson('ui/state.json');
+    if (payload == null) {
+      return AppUiState.defaults();
+    }
+    try {
+      return AppUiState.fromJson(payload);
+    } catch (_) {
+      return AppUiState.defaults();
+    }
+  }
+
+  Future<void> saveAppUiState(AppUiState value) =>
+      saveSupportJson('ui/state.json', value.toJson());
+
+  Future<void> clearAppUiState() async {
+    final file = await supportFile('ui/state.json');
+    if (file == null) {
+      return;
+    }
+    await deleteIfExists(file);
   }
 
   Future<String?> loadAccountManagedSecret({required String target}) =>

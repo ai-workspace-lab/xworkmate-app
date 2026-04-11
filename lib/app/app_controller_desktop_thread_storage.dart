@@ -98,7 +98,7 @@ extension AppControllerDesktopThreadStorage on AppController {
 
   Future<void> restoreInitialAssistantSessionSelectionInternal() async {
     final normalized = normalizedAssistantSessionKeyInternal(
-      settings.assistantLastSessionKey,
+      appUiState.assistantLastSessionKey,
     );
     final known =
         normalized == 'main' ||
@@ -146,20 +146,6 @@ extension AppControllerDesktopThreadStorage on AppController {
     SettingsSnapshot snapshot,
   ) {
     final features = featuresFor(hostUiFeaturePlatformInternal);
-    final allowedNavigation =
-        normalizeAssistantNavigationDestinations(
-              snapshot.assistantNavigationDestinations,
-            )
-            .where((entry) {
-              final destination = entry.destination;
-              if (destination != null) {
-                return features.allowedDestinations.contains(destination);
-              }
-              return features.allowedDestinations.contains(
-                WorkspaceDestination.settings,
-              );
-            })
-            .toList(growable: false);
     final sanitizedExecutionTarget = features.sanitizeExecutionTarget(
       snapshot.assistantExecutionTarget,
     );
@@ -186,12 +172,30 @@ extension AppControllerDesktopThreadStorage on AppController {
         : false;
     return snapshot.copyWith(
       assistantExecutionTarget: sanitizedExecutionTarget,
-      assistantNavigationDestinations: allowedNavigation,
       multiAgent: multiAgentConfig,
       experimentalCanvas: experimentalCanvas,
       experimentalBridge: experimentalBridge,
       experimentalDebug: experimentalDebug,
     );
+  }
+
+  AppUiState sanitizeAppUiStateInternal(AppUiState state) {
+    final features = featuresFor(hostUiFeaturePlatformInternal);
+    final allowedNavigation =
+        normalizeAssistantNavigationDestinations(
+              state.assistantNavigationDestinations,
+            )
+            .where((entry) {
+              final destination = entry.destination;
+              if (destination != null) {
+                return features.allowedDestinations.contains(destination);
+              }
+              return features.allowedDestinations.contains(
+                WorkspaceDestination.settings,
+              );
+            })
+            .toList(growable: false);
+    return state.copyWith(assistantNavigationDestinations: allowedNavigation);
   }
 
   SettingsSnapshot sanitizeOllamaCloudSettingsInternal(
@@ -267,7 +271,6 @@ extension AppControllerDesktopThreadStorage on AppController {
     final key = normalizedAssistantSessionKeyInternal(sessionKey);
     final existingTitle =
         assistantThreadRecordsInternal[key]?.title.trim() ?? '';
-    final customTitle = settings.assistantCustomTaskTitles[key]?.trim() ?? '';
     final next = List<GatewayChatMessage>.from(
       assistantThreadMessagesInternal[key] ?? const <GatewayChatMessage>[],
     )..add(message);
@@ -278,7 +281,7 @@ extension AppControllerDesktopThreadStorage on AppController {
         existingTitle,
         next,
         fallback: key,
-        hasCustomTitle: customTitle.isNotEmpty,
+        hasCustomTitle: existingTitle.isNotEmpty,
       ),
       messages: next,
       updatedAtMs:
@@ -329,16 +332,13 @@ extension AppControllerDesktopThreadStorage on AppController {
   }
 
   List<GatewaySessionSummary> assistantSessionSummariesInternal() {
-    final archivedKeys = settings.assistantArchivedTaskKeys
-        .map(normalizedAssistantSessionKeyInternal)
-        .toSet();
     final items = <GatewaySessionSummary>[];
 
     for (final record in assistantThreadRecordsInternal.values) {
       final sessionKey = normalizedAssistantSessionKeyInternal(
         record.sessionKey,
       );
-      if (archivedKeys.contains(sessionKey) || record.archived) {
+      if (record.archived) {
         continue;
       }
       items.add(assistantSessionSummaryForInternal(sessionKey, record: record));
@@ -350,7 +350,7 @@ extension AppControllerDesktopThreadStorage on AppController {
     final hasCurrent = items.any(
       (item) => matchesSessionKey(item.key, currentSessionKey),
     );
-    if (!hasCurrent && !archivedKeys.contains(currentSessionKey)) {
+    if (!hasCurrent && !isAssistantTaskArchived(currentSessionKey)) {
       items.add(assistantSessionSummaryForInternal(currentSessionKey));
     }
 
@@ -673,9 +673,6 @@ extension AppControllerDesktopThreadStorage on AppController {
     singleAgentSharedImportedSkillsInternal =
         const <AssistantThreadSkillEntry>[];
     singleAgentLocalSkillsHydratedInternal = false;
-    final archivedKeys = settings.assistantArchivedTaskKeys
-        .map(normalizedAssistantSessionKeyInternal)
-        .toSet();
     for (final record in records) {
       final sessionKey = normalizedAssistantSessionKeyInternal(
         record.sessionKey,
@@ -686,7 +683,6 @@ extension AppControllerDesktopThreadStorage on AppController {
       if (!record.workspaceBinding.isComplete) {
         continue;
       }
-      final titleFromSettings = assistantCustomTaskTitle(sessionKey);
       final recordExecutionTarget = assistantExecutionTargetFromExecutionMode(
         record.executionBinding.executionMode,
       );
@@ -708,10 +704,8 @@ extension AppControllerDesktopThreadStorage on AppController {
       );
       final normalizedRecord = record.copyWith(
         threadId: sessionKey,
-        title: titleFromSettings.isEmpty
-            ? record.title.trim()
-            : titleFromSettings,
-        archived: record.archived || archivedKeys.contains(sessionKey),
+        title: record.title.trim(),
+        archived: record.archived,
         messageViewMode: record.messageViewMode,
         selectedSkillKeys: record.selectedSkillKeys
             .where(

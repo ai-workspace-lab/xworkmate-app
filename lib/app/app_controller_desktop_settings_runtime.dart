@@ -231,9 +231,9 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     final next = current.contains(destination)
         ? current.where((item) => item != destination).toList(growable: false)
         : <AssistantFocusEntry>[...current, destination];
-    await AppControllerDesktopSettings(this).saveSettings(
-      settings.copyWith(assistantNavigationDestinations: next),
-      refreshAfterSave: false,
+    await saveAppUiStateInternal(
+      appUiState.copyWith(assistantNavigationDestinations: next),
+      notify: true,
     );
   }
 
@@ -301,9 +301,9 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     );
     final temporaryStore = SecureConfigStore(
       enableSecureStorage: false,
-      databasePathResolver: () async =>
+      appDataRootPathResolver: () async =>
           '${temporaryRoot.path}/settings.sqlite3',
-      fallbackDirectoryPathResolver: () async => temporaryRoot.path,
+      secretRootPathResolver: () async => temporaryRoot.path,
     );
     final runtime = GatewayRuntime(
       store: temporaryStore,
@@ -463,6 +463,13 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       resolvedUserHomeDirectoryInternal =
           await skillDirectoryAccessServiceInternal.resolveUserHomeDirectory();
       await settingsControllerInternal.initialize();
+      final loadedAppUiState = await storeInternal.loadAppUiState();
+      final sanitizedAppUiState = sanitizeAppUiStateInternal(loadedAppUiState);
+      appUiStateInternal = sanitizedAppUiState;
+      if (sanitizedAppUiState.toJsonString() !=
+          loadedAppUiState.toJsonString()) {
+        await storeInternal.saveAppUiState(sanitizedAppUiState);
+      }
       final storedAssistantThreads = await storeInternal.loadTaskThreads();
       final skippedInvalidThreadRecords =
           storeInternal.lastSkippedInvalidTaskThreadRecords;

@@ -103,12 +103,6 @@ extension SettingsControllerAccountExtension on SettingsController {
   Future<void> cancelAccountMfaChallenge() =>
       cancelAccountMfaChallengeSettingsInternal(this);
 
-  Future<void> markAccountOverride(String fieldKey) =>
-      markAccountOverrideSettingsInternal(this, fieldKey: fieldKey);
-
-  Future<void> clearAccountOverride(String fieldKey) =>
-      clearAccountOverrideSettingsInternal(this, fieldKey: fieldKey);
-
   List<SecretReferenceEntry> buildSecretReferences() {
     final entries = <SecretReferenceEntry>[
       ...secureRefsInternal.entries.map(

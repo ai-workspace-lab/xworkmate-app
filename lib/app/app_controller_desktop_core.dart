@@ -336,6 +336,7 @@ class AppController extends ChangeNotifier {
   SettingsDetailPage? settingsDetailInternal;
   SettingsNavigationContext? settingsNavigationContextInternal;
   DetailPanelData? detailPanelInternal;
+  AppUiState appUiStateInternal = AppUiState.defaults();
   SettingsSnapshot settingsDraftInternal = SettingsSnapshot.defaults();
   SettingsSnapshot lastAppliedSettingsInternal = SettingsSnapshot.defaults();
   final Map<String, String> draftSecretValuesInternal = <String, String>{};
@@ -389,6 +390,8 @@ class AppController extends ChangeNotifier {
     }
     return resolvedRoots;
   }
+
+  AppUiState get appUiState => appUiStateInternal;
 
   WorkspaceDestination get destination => destinationInternal;
   UiFeatureManifest get uiFeatureManifest => uiFeatureManifestInternal;
@@ -594,10 +597,20 @@ class AppController extends ChangeNotifier {
   List<AssistantExecutionTarget> visibleAssistantExecutionTargets(
     Iterable<AssistantExecutionTarget> supportedTargets,
   ) {
-    final visible = settings.visibleAssistantExecutionTargets(
-      supportedTargets: supportedTargets,
-      availableSingleAgentProviders: availableSingleAgentProviders,
-    );
+    final supported = supportedTargets.toSet();
+    final visible = <AssistantExecutionTarget>[];
+    if (supported.contains(AssistantExecutionTarget.singleAgent) &&
+        availableSingleAgentProviders.isNotEmpty) {
+      visible.add(AssistantExecutionTarget.singleAgent);
+    }
+    if (supported.contains(AssistantExecutionTarget.local) &&
+        appUiState.isGatewayTargetSaved(AssistantExecutionTarget.local)) {
+      visible.add(AssistantExecutionTarget.local);
+    }
+    if (supported.contains(AssistantExecutionTarget.remote) &&
+        appUiState.isGatewayTargetSaved(AssistantExecutionTarget.remote)) {
+      visible.add(AssistantExecutionTarget.remote);
+    }
     if (!supportedTargets.contains(AssistantExecutionTarget.singleAgent) ||
         visible.contains(AssistantExecutionTarget.singleAgent)) {
       return visible;

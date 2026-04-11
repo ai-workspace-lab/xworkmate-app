@@ -596,7 +596,6 @@ class AccountProfileResponse {
 class AccountSyncState {
   const AccountSyncState({
     required this.syncedDefaults,
-    required this.overrideFlags,
     required this.syncState,
     required this.syncMessage,
     required this.lastSyncAtMs,
@@ -607,7 +606,6 @@ class AccountSyncState {
   });
 
   final AccountRemoteProfile syncedDefaults;
-  final Map<String, bool> overrideFlags;
   final String syncState;
   final String syncMessage;
   final int lastSyncAtMs;
@@ -619,7 +617,6 @@ class AccountSyncState {
   factory AccountSyncState.defaults() {
     return AccountSyncState(
       syncedDefaults: AccountRemoteProfile.defaults(),
-      overrideFlags: const <String, bool>{},
       syncState: 'idle',
       syncMessage: 'Remote config not synced yet',
       lastSyncAtMs: 0,
@@ -632,7 +629,6 @@ class AccountSyncState {
 
   AccountSyncState copyWith({
     AccountRemoteProfile? syncedDefaults,
-    Map<String, bool>? overrideFlags,
     String? syncState,
     String? syncMessage,
     int? lastSyncAtMs,
@@ -643,7 +639,6 @@ class AccountSyncState {
   }) {
     return AccountSyncState(
       syncedDefaults: syncedDefaults ?? this.syncedDefaults,
-      overrideFlags: overrideFlags ?? this.overrideFlags,
       syncState: syncState ?? this.syncState,
       syncMessage: syncMessage ?? this.syncMessage,
       lastSyncAtMs: lastSyncAtMs ?? this.lastSyncAtMs,
@@ -657,7 +652,6 @@ class AccountSyncState {
   Map<String, dynamic> toJson() {
     return {
       'syncedDefaults': syncedDefaults.toJson(),
-      'overrideFlags': overrideFlags,
       'syncState': syncState,
       'syncMessage': syncMessage,
       'lastSyncAtMs': lastSyncAtMs,
@@ -669,21 +663,11 @@ class AccountSyncState {
   }
 
   factory AccountSyncState.fromJson(Map<String, dynamic> json) {
-    Map<String, bool> decodeOverrideFlags(Object? value) {
-      if (value is! Map) {
-        return const <String, bool>{};
-      }
-      return value.map<String, bool>((key, entry) {
-        return MapEntry(key.toString(), entry == true);
-      });
-    }
-
     return AccountSyncState(
       syncedDefaults: AccountRemoteProfile.fromJson(
         (json['syncedDefaults'] as Map?)?.cast<String, dynamic>() ??
             const <String, dynamic>{},
       ),
-      overrideFlags: decodeOverrideFlags(json['overrideFlags']),
       syncState: json['syncState'] as String? ?? 'idle',
       syncMessage:
           json['syncMessage'] as String? ?? 'Remote config not synced yet',
@@ -721,19 +705,3 @@ const List<String> kAccountManagedSecretTargets = <String>[
 bool isSupportedAccountManagedSecretTarget(String target) {
   return kAccountManagedSecretTargets.contains(target.trim());
 }
-
-const String kAccountOverrideGatewayRemoteEndpoint = 'gateway.remote.endpoint';
-const String kAccountOverrideVaultAddress = 'vault.address';
-const String kAccountOverrideVaultNamespace = 'vault.namespace';
-const String kAccountOverrideAiGatewayBaseUrl = 'aiGateway.baseUrl';
-const String kAccountOverrideAiGatewayApiKeyRef = 'aiGateway.apiKeyRef';
-const String kAccountOverrideOllamaCloudApiKeyRef = 'ollamaCloud.apiKeyRef';
-
-const List<String> kAccountOverrideFieldKeys = <String>[
-  kAccountOverrideGatewayRemoteEndpoint,
-  kAccountOverrideVaultAddress,
-  kAccountOverrideVaultNamespace,
-  kAccountOverrideAiGatewayBaseUrl,
-  kAccountOverrideAiGatewayApiKeyRef,
-  kAccountOverrideOllamaCloudApiKeyRef,
-];
