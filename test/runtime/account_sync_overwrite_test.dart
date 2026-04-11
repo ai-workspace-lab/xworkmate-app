@@ -11,7 +11,7 @@ void main() {
 
   group('syncAccountSettings overwrite policy', () {
     test(
-      'always overwrites sync-owned fields and stores metadata only',
+      'rewrites only bridge-owned auth metadata and removes old synced secret refs',
       () async {
         final root = await Directory.systemTemp.createTemp(
           'xworkmate-account-sync-overwrite-',
@@ -59,12 +59,24 @@ void main() {
             ),
             aiGateway: controller.snapshot.aiGateway.copyWith(
               baseUrl: 'https://local-apisix.example.com',
-              apiKeyRef: 'local_ai_ref',
+              apiKeyRef: kAccountManagedSecretTargetAIGatewayAccessToken,
             ),
             ollamaCloud: controller.snapshot.ollamaCloud.copyWith(
-              apiKeyRef: 'local_ollama_ref',
+              apiKeyRef: kAccountManagedSecretTargetOllamaCloudApiKey,
             ),
           ),
+        );
+        await store.saveAccountManagedSecret(
+          target: kAccountManagedSecretTargetAIGatewayAccessToken,
+          value: 'stale-ai-token',
+        );
+        await store.saveAccountManagedSecret(
+          target: kAccountManagedSecretTargetOllamaCloudApiKey,
+          value: 'stale-ollama-token',
+        );
+        await store.saveAccountManagedSecret(
+          target: kAccountManagedSecretTargetOpenclawGatewayToken,
+          value: 'bridge-token',
         );
 
         final first = await controller.syncAccountSettings(
@@ -82,21 +94,61 @@ void main() {
               .tokenRef,
           'local_ref',
         );
-        expect(controller.snapshot.vault.address, 'https://vault.svc.plus');
-        expect(controller.snapshot.vault.namespace, 'prod');
+        expect(
+          controller.snapshot.vault.address,
+          'https://local-vault.example.com',
+        );
+        expect(controller.snapshot.vault.namespace, 'local');
         expect(
           controller.snapshot.aiGateway.baseUrl,
           'https://local-apisix.example.com',
         );
         expect(
           controller.snapshot.aiGateway.apiKeyRef,
-          kAccountManagedSecretTargetAIGatewayAccessToken,
+          AiGatewayProfile.defaults().apiKeyRef,
         );
         expect(
           controller.snapshot.ollamaCloud.apiKeyRef,
-          kAccountManagedSecretTargetOllamaCloudApiKey,
+          OllamaCloudConfig.defaults().apiKeyRef,
         );
         expect(controller.snapshot.accountLocalMode, isFalse);
+        expect(controller.accountSyncState?.profileScope, 'bridge');
+        expect(controller.accountSyncState?.tokenConfigured.openclaw, isTrue);
+        expect(controller.accountSyncState?.tokenConfigured.apisix, isFalse);
+        expect(
+          await store.loadAccountManagedSecret(
+            target: kAccountManagedSecretTargetOpenclawGatewayToken,
+          ),
+          'bridge-token',
+        );
+        expect(
+          await store.loadAccountManagedSecret(
+            target: kAccountManagedSecretTargetAIGatewayAccessToken,
+          ),
+          isNull,
+        );
+        expect(
+          await store.loadAccountManagedSecret(
+            target: kAccountManagedSecretTargetOllamaCloudApiKey,
+          ),
+          isNull,
+        );
+        expect(
+          controller
+              .snapshot
+              .acpBridgeServerModeConfig
+              .cloudSynced
+              .accountBaseUrl,
+          isEmpty,
+        );
+        expect(
+          controller
+              .snapshot
+              .acpBridgeServerModeConfig
+              .cloudSynced
+              .accountIdentifier,
+          isEmpty,
+        );
 
         await controller.saveSnapshot(
           controller.snapshot.copyWith(
@@ -113,7 +165,7 @@ void main() {
           baseUrl: 'https://accounts.svc.plus',
         );
         expect(second.state, 'ready');
-        expect(controller.snapshot.vault.address, 'https://vault.svc.plus');
+        expect(controller.snapshot.vault.address, 'https://edited.example.com');
         expect(
           controller.snapshot.aiGateway.baseUrl,
           'https://edited-apisix.example.com',
@@ -142,49 +194,4 @@ void main() {
 
 class _FakeAccountRuntimeClient extends AccountRuntimeClient {
   _FakeAccountRuntimeClient() : super(baseUrl: 'https://accounts.svc.plus');
-
-  @override
-  Future<AccountProfileResponse> loadProfile({required String token}) async {
-    expect(token, 'session-token');
-    return AccountProfileResponse(
-      profile: AccountRemoteProfile.defaults().copyWith(
-        openclawUrl: 'wss://remote.gateway.svc.plus',
-        vaultUrl: 'https://vault.svc.plus',
-        vaultNamespace: 'prod',
-        apisixUrl: 'https://apisix.svc.plus',
-        secretLocators: const <AccountSecretLocator>[
-          AccountSecretLocator(
-            id: 'gateway',
-            provider: 'vault',
-            secretPath: 'kv/xworkmate',
-            secretKey: 'gateway_token',
-            target: kAccountManagedSecretTargetOpenclawGatewayToken,
-            required: true,
-          ),
-          AccountSecretLocator(
-            id: 'ai',
-            provider: 'vault',
-            secretPath: 'kv/xworkmate',
-            secretKey: 'ai_gateway_token',
-            target: kAccountManagedSecretTargetAIGatewayAccessToken,
-            required: true,
-          ),
-          AccountSecretLocator(
-            id: 'ollama',
-            provider: 'vault',
-            secretPath: 'kv/xworkmate',
-            secretKey: 'ollama_key',
-            target: kAccountManagedSecretTargetOllamaCloudApiKey,
-            required: true,
-          ),
-        ],
-      ),
-      profileScope: 'workspace',
-      tokenConfigured: const AccountTokenConfigured(
-        openclaw: true,
-        vault: true,
-        apisix: true,
-      ),
-    );
-  }
 }

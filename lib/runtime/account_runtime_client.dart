@@ -162,30 +162,6 @@ class AccountRuntimeClient {
     return _accountSessionSummaryFromUserJson(user);
   }
 
-  Future<AccountProfileResponse> loadProfile({required String token}) async {
-    final payload = await _requestJson(
-      method: 'GET',
-      path: '/api/auth/xworkmate/profile',
-      bearerToken: token,
-    );
-    final profile = _asMap(payload['profile']);
-    final remoteProfile = AccountRemoteProfile.defaults().copyWith(
-      openclawUrl: _stringValue(profile['openclawUrl']),
-      openclawOrigin: _stringValue(profile['openclawOrigin']),
-      vaultUrl: _stringValue(profile['vaultUrl']),
-      vaultNamespace: _stringValue(profile['vaultNamespace']),
-      apisixUrl: _stringValue(profile['apisixUrl']),
-      secretLocators: _decodeLocators(profile),
-    );
-    return AccountProfileResponse(
-      profile: remoteProfile,
-      profileScope: _stringValue(payload['profileScope']),
-      tokenConfigured: AccountTokenConfigured.fromJson(
-        _asMap(payload['tokenConfigured']),
-      ),
-    );
-  }
-
   Future<BridgeBootstrapIssue> createBridgeBootstrapTicket({
     required String token,
   }) async {
@@ -264,26 +240,6 @@ class AccountRuntimeClient {
       totpEnabled: totpEnabled,
       totpPending: totpPending,
     );
-  }
-
-  List<AccountSecretLocator> _decodeLocators(Map<String, dynamic> profile) {
-    final raw = profile['secretLocators'];
-    if (raw is! List) {
-      return const <AccountSecretLocator>[];
-    }
-    return raw
-        .whereType<Map>()
-        .map(
-          (item) => AccountSecretLocator.fromJson(item.cast<String, dynamic>()),
-        )
-        .where(
-          (item) =>
-              item.provider.trim().isNotEmpty &&
-              item.secretPath.trim().isNotEmpty &&
-              item.secretKey.trim().isNotEmpty &&
-              item.target.trim().isNotEmpty,
-        )
-        .toList(growable: false);
   }
 
   Uri _vaultReadUri(String rawBaseUrl, String secretPath) {

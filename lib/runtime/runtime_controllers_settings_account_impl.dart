@@ -144,12 +144,17 @@ Future<void> completeAccountSignInSettingsInternal(
   );
   await controller.storeInternal.saveAccountSessionIdentifier(identifier);
   await controller.storeInternal.saveAccountSessionSummary(sessionSummary);
-  controller.accountStatusInternal = 'Signed in';
-  await restoreAccountSessionSettingsInternal(
+  await syncAccountSettingsInternal(
     controller,
     baseUrl: baseUrl,
+    bridgeTokenOverride: _resolveBridgeAuthorizationToken(payload),
     quiet: true,
   );
+  await controller.reloadDerivedStateInternal();
+  final email = controller.accountSessionInternal?.email.trim() ?? '';
+  controller.accountStatusInternal = email.isEmpty
+      ? 'Signed in'
+      : 'Signed in as $email';
 }
 
 Future<void> restoreAccountSessionSettingsInternal(
@@ -219,20 +224,18 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
   SettingsController controller, {
   String baseUrl = '',
   bool quiet = false,
+  String bridgeTokenOverride = '',
 }) async {
-  final normalizedBaseUrl = normalizeAccountBaseUrlSettingsInternal(
-    baseUrl,
-    fallback: controller.snapshotInternal.accountBaseUrl,
-  );
-  final token =
+  final sessionToken =
       (await controller.storeInternal.loadAccountSessionToken())?.trim() ?? '';
-  if (normalizedBaseUrl.isEmpty || token.isEmpty) {
+  if (sessionToken.isEmpty) {
     const result = AccountSyncResult(
       state: 'blocked',
       message: 'Account session is unavailable',
     );
     controller.accountStatusInternal = result.message;
     if (!quiet) {
+      controller.accountBusyInternal = false;
       controller.notifyListeners();
     }
     return result;
@@ -240,172 +243,90 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
 
   if (!quiet) {
     controller.accountBusyInternal = true;
-    controller.accountStatusInternal = 'Syncing remote defaults...';
+    controller.accountStatusInternal = 'Syncing bridge access...';
     controller.notifyListeners();
   }
 
-  try {
-    final client = controller.buildAccountClient(normalizedBaseUrl);
-    final response = await client.loadProfile(token: token);
-    final previousState =
-        await controller.storeInternal.loadAccountSyncState() ??
-        AccountSyncState.defaults();
-    final nextState = previousState.copyWith(
-      syncedDefaults: response.profile,
-      syncState: 'ready',
-      syncMessage: 'Remote defaults synced',
-      lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
-      lastSyncSource: normalizedBaseUrl,
-      lastSyncError: '',
-      profileScope: response.profileScope,
-      tokenConfigured: response.tokenConfigured,
+  final bridgeToken = bridgeTokenOverride.trim().isNotEmpty
+      ? bridgeTokenOverride.trim()
+      : ((await controller.storeInternal.loadAccountManagedSecret(
+              target: kAccountManagedSecretTargetOpenclawGatewayToken,
+            ))?.trim() ??
+            '');
+  if (bridgeToken.isEmpty) {
+    const result = AccountSyncResult(
+      state: 'blocked',
+      message: 'Bridge authorization is unavailable',
     );
-    await controller.storeInternal.saveAccountSyncState(nextState);
-    final currentSettings = controller.snapshotInternal;
-    final currentModeConfig = currentSettings.acpBridgeServerModeConfig;
-    final nextModeConfig = currentModeConfig.copyWith(
-      cloudSynced: currentModeConfig.cloudSynced.copyWith(
-        accountBaseUrl: normalizedBaseUrl,
-        accountIdentifier: currentSettings.accountUsername.trim().isNotEmpty
-            ? currentSettings.accountUsername.trim()
-            : controller.accountSessionInternal?.email.trim() ?? '',
-        lastSyncAt: nextState.lastSyncAtMs,
-        remoteServerSummary: currentModeConfig.cloudSynced.remoteServerSummary
-            .copyWith(
-              endpoint: _kProductionBridgeEndpoint,
-              hasAdvancedOverrides: false,
-            ),
-      ),
-    );
-    if (nextModeConfig.toJson().toString() !=
-        currentModeConfig.toJson().toString()) {
-      await controller.saveSnapshot(
-        currentSettings.copyWith(
-          accountLocalMode: false,
-          acpBridgeServerModeConfig: nextModeConfig,
-        ),
-      );
-    }
-    await applyAccountSyncedDefaultsSettingsInternal(
-      controller,
-      state: nextState,
-    );
-    await controller.reloadDerivedStateInternal();
-    final email = controller.accountSessionInternal?.email.trim() ?? '';
-    controller.accountStatusInternal = email.isEmpty
-        ? 'Signed in'
-        : 'Signed in as $email';
-    return const AccountSyncResult(
-      state: 'ready',
-      message: 'Remote defaults synced',
-    );
-  } on AccountRuntimeException catch (error) {
-    final previousState =
-        await controller.storeInternal.loadAccountSyncState() ??
-        AccountSyncState.defaults();
-    if (_isNonBlockingAccountProfileSyncError(error)) {
-      final fallbackState = previousState.copyWith(
-        syncState: 'ready',
-        syncMessage: 'Remote defaults unavailable; using existing settings',
-        lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
-        lastSyncSource: normalizedBaseUrl,
-        lastSyncError: error.message,
-      );
-      await controller.storeInternal.saveAccountSyncState(fallbackState);
-      await controller.reloadDerivedStateInternal();
-      final email = controller.accountSessionInternal?.email.trim() ?? '';
-      controller.accountStatusInternal = email.isEmpty
-          ? 'Signed in'
-          : 'Signed in as $email';
-      return const AccountSyncResult(
-        state: 'ready',
-        message: 'Remote defaults unavailable; using existing settings',
-      );
-    }
-    final errorState = previousState.copyWith(
-      syncState: 'error',
-      syncMessage: error.message,
-      lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
-      lastSyncSource: normalizedBaseUrl,
-      lastSyncError: error.message,
-    );
-    await controller.storeInternal.saveAccountSyncState(errorState);
-    await controller.reloadDerivedStateInternal();
-    controller.accountStatusInternal = error.message;
-    return AccountSyncResult(state: 'error', message: error.message);
-  } finally {
+    controller.accountStatusInternal = result.message;
     if (!quiet) {
       controller.accountBusyInternal = false;
       controller.notifyListeners();
     }
-  }
-}
-
-bool _isNonBlockingAccountProfileSyncError(AccountRuntimeException error) {
-  return error.errorCode == 'xworkmate_secret_read_failed';
-}
-
-Future<void> applyAccountSyncedDefaultsSettingsInternal(
-  SettingsController controller, {
-  required AccountSyncState state,
-}) async {
-  final previous = controller.snapshotInternal;
-  var next = previous;
-  final defaults = state.syncedDefaults;
-  if (defaults.vaultUrl.trim().isNotEmpty) {
-    next = next.copyWith(
-      vault: next.vault.copyWith(address: defaults.vaultUrl.trim()),
-    );
+    return result;
   }
 
-  if (defaults.vaultNamespace.trim().isNotEmpty) {
-    next = next.copyWith(
-      vault: next.vault.copyWith(namespace: defaults.vaultNamespace.trim()),
-    );
-  }
-
-  final aiGatewayLocator = defaults.locatorForTarget(
-    kAccountManagedSecretTargetAIGatewayAccessToken,
+  await controller.storeInternal.saveAccountManagedSecret(
+    target: kAccountManagedSecretTargetOpenclawGatewayToken,
+    value: bridgeToken,
   );
-  if (aiGatewayLocator != null) {
-    next = next.copyWith(
-      aiGateway: next.aiGateway.copyWith(apiKeyRef: aiGatewayLocator.target),
-    );
-  }
-
-  final ollamaLocator = defaults.locatorForTarget(
-    kAccountManagedSecretTargetOllamaCloudApiKey,
+  await controller.storeInternal.clearAccountManagedSecret(
+    target: kAccountManagedSecretTargetAIGatewayAccessToken,
   );
-  if (ollamaLocator != null) {
-    next = next.copyWith(
-      ollamaCloud: next.ollamaCloud.copyWith(apiKeyRef: ollamaLocator.target),
-    );
-  }
+  await controller.storeInternal.clearAccountManagedSecret(
+    target: kAccountManagedSecretTargetOllamaCloudApiKey,
+  );
 
-  if (next.accountLocalMode) {
-    next = next.copyWith(accountLocalMode: false);
-  }
-  next = next.copyWith(
-    acpBridgeServerModeConfig: next.acpBridgeServerModeConfig.copyWith(
-      cloudSynced: next.acpBridgeServerModeConfig.cloudSynced.copyWith(
-        accountBaseUrl: next.accountBaseUrl,
-        accountIdentifier: next.accountUsername,
-        lastSyncAt: state.lastSyncAtMs,
-        remoteServerSummary: next
-            .acpBridgeServerModeConfig
-            .cloudSynced
-            .remoteServerSummary
-            .copyWith(
-              endpoint: _kProductionBridgeEndpoint,
-              hasAdvancedOverrides: false,
-            ),
-      ),
+  final nextState = AccountSyncState.defaults().copyWith(
+    syncState: 'ready',
+    syncMessage: 'Bridge access synced',
+    lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
+    lastSyncSource: _kProductionBridgeEndpoint,
+    lastSyncError: '',
+    profileScope: 'bridge',
+    tokenConfigured: const AccountTokenConfigured(
+      openclaw: true,
+      vault: false,
+      apisix: false,
     ),
   );
-
-  if (next.toJsonString() != previous.toJsonString()) {
-    await controller.saveSnapshot(next);
+  await controller.storeInternal.saveAccountSyncState(nextState);
+  final currentSettings = controller.snapshotInternal;
+  final currentModeConfig = currentSettings.acpBridgeServerModeConfig;
+  final nextModeConfig = currentModeConfig.copyWith(
+    cloudSynced: currentModeConfig.cloudSynced.copyWith(
+      accountBaseUrl: '',
+      accountIdentifier: '',
+      lastSyncAt: nextState.lastSyncAtMs,
+      remoteServerSummary: currentModeConfig.cloudSynced.remoteServerSummary
+          .copyWith(
+            endpoint: _kProductionBridgeEndpoint,
+            hasAdvancedOverrides: false,
+          ),
+    ),
+  );
+  final sanitizedSettings = _sanitizeBridgeOnlyAccountSyncSettings(
+    currentSettings.copyWith(
+      accountLocalMode: false,
+      acpBridgeServerModeConfig: nextModeConfig,
+    ),
+  );
+  if (sanitizedSettings.toJsonString() != currentSettings.toJsonString()) {
+    await controller.saveSnapshot(sanitizedSettings);
   }
+  await controller.reloadDerivedStateInternal();
+  final email = controller.accountSessionInternal?.email.trim() ?? '';
+  controller.accountStatusInternal = email.isEmpty
+      ? 'Signed in'
+      : 'Signed in as $email';
+  if (!quiet) {
+    controller.accountBusyInternal = false;
+    controller.notifyListeners();
+  }
+  return const AccountSyncResult(
+    state: 'ready',
+    message: 'Bridge access synced',
+  );
 }
 
 Future<void> logoutAccountSettingsInternal(
@@ -429,6 +350,7 @@ Future<void> logoutAccountSettingsInternal(
   final currentSnapshot = controller.snapshotInternal;
   final clearedCloudSync = currentSnapshot.acpBridgeServerModeConfig.cloudSynced
       .copyWith(
+        accountBaseUrl: '',
         accountIdentifier: '',
         lastSyncAt: 0,
         remoteServerSummary: currentSnapshot
@@ -500,6 +422,39 @@ String normalizeAccountBaseUrlSettingsInternal(
   return candidate.endsWith('/')
       ? candidate.substring(0, candidate.length - 1)
       : candidate;
+}
+
+SettingsSnapshot _sanitizeBridgeOnlyAccountSyncSettings(
+  SettingsSnapshot settings,
+) {
+  final normalizedAiGatewayRef =
+      settings.aiGateway.apiKeyRef.trim() ==
+          kAccountManagedSecretTargetAIGatewayAccessToken
+      ? AiGatewayProfile.defaults().apiKeyRef
+      : settings.aiGateway.apiKeyRef;
+  final normalizedOllamaRef =
+      settings.ollamaCloud.apiKeyRef.trim() ==
+          kAccountManagedSecretTargetOllamaCloudApiKey
+      ? OllamaCloudConfig.defaults().apiKeyRef
+      : settings.ollamaCloud.apiKeyRef;
+  return settings.copyWith(
+    aiGateway: settings.aiGateway.copyWith(apiKeyRef: normalizedAiGatewayRef),
+    ollamaCloud: settings.ollamaCloud.copyWith(apiKeyRef: normalizedOllamaRef),
+  );
+}
+
+String _resolveBridgeAuthorizationToken(Map<String, dynamic> payload) {
+  final explicit = _stringValue(payload['internalServiceToken']).isNotEmpty
+      ? _stringValue(payload['internalServiceToken'])
+      : _stringValue(payload['internal_service_token']).isNotEmpty
+      ? _stringValue(payload['internal_service_token'])
+      : _stringValue(payload['bridgeAuthToken']).isNotEmpty
+      ? _stringValue(payload['bridgeAuthToken'])
+      : _stringValue(payload['bridge_auth_token']);
+  if (explicit.isNotEmpty) {
+    return explicit;
+  }
+  return '';
 }
 
 int _parseExpiresAtMs(Object? value) {

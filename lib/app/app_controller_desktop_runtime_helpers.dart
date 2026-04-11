@@ -731,17 +731,18 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   Uri? resolveBridgeAcpEndpointInternal() {
-    final rawEndpoint =
-        settings.acpBridgeServerModeConfig.cloudSynced.remoteServerSummary
-            .endpoint
-            .trim();
+    final rawEndpoint = settings
+        .acpBridgeServerModeConfig
+        .cloudSynced
+        .remoteServerSummary
+        .endpoint
+        .trim();
     if (rawEndpoint.isEmpty) {
       return null;
     }
     final uri = Uri.tryParse(rawEndpoint);
     final scheme = uri?.scheme.trim().toLowerCase() ?? '';
-    if (uri == null ||
-        !kSupportedExternalAcpEndpointSchemes.contains(scheme)) {
+    if (uri == null || !kSupportedExternalAcpEndpointSchemes.contains(scheme)) {
       return null;
     }
     return uri.replace(query: null, fragment: null);
@@ -789,33 +790,34 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final normalizedHost = endpoint.host.trim().toLowerCase();
     final bridgeHost =
         Uri.tryParse(
-          settings.acpBridgeServerModeConfig.cloudSynced.remoteServerSummary
+          settings
+              .acpBridgeServerModeConfig
+              .cloudSynced
+              .remoteServerSummary
               .endpoint
               .trim(),
-        )?.host
-            .trim()
-            .toLowerCase() ??
+        )?.host.trim().toLowerCase() ??
         '';
     if (bridgeHost.isNotEmpty && normalizedHost == bridgeHost) {
-      final accountToken =
-          (await storeInternal.loadAccountSessionToken())?.trim() ?? '';
-      if (accountToken.isNotEmpty) {
-        return 'Bearer $accountToken';
+      final bridgeToken =
+          (await storeInternal.loadAccountManagedSecret(
+            target: kAccountManagedSecretTargetOpenclawGatewayToken,
+          ))?.trim() ??
+          '';
+      if (bridgeToken.isNotEmpty) {
+        return 'Bearer $bridgeToken';
       }
     }
     final profileIndex =
         gatewayProfileIndexMatchingEndpointInternal(endpoint) ??
         kGatewayRemoteProfileIndex;
-    final gatewayToken = await settingsControllerInternal.loadEffectiveGatewayToken(
-      profileIndex: profileIndex,
-    );
+    final gatewayToken = await settingsControllerInternal
+        .loadEffectiveGatewayToken(profileIndex: profileIndex);
     if (gatewayToken.isNotEmpty) {
       return 'Bearer $gatewayToken';
     }
-    final gatewayPassword =
-        await settingsControllerInternal.loadEffectiveGatewayPassword(
-          profileIndex: profileIndex,
-        );
+    final gatewayPassword = await settingsControllerInternal
+        .loadEffectiveGatewayPassword(profileIndex: profileIndex);
     if (gatewayPassword.isNotEmpty) {
       final encoded = base64Encode(utf8.encode('operator:$gatewayPassword'));
       return 'Basic $encoded';
@@ -825,7 +827,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
 
   int? gatewayProfileIndexMatchingEndpointInternal(Uri endpoint) {
     final normalizedHost = endpoint.host.trim().toLowerCase();
-    final gateway = gatewayProfileBaseUriInternal(settings.primaryGatewayProfile);
+    final gateway = gatewayProfileBaseUriInternal(
+      settings.primaryGatewayProfile,
+    );
     if (gateway != null &&
         gateway.host.trim().toLowerCase() == normalizedHost &&
         gateway.port == endpoint.port) {
