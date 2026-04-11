@@ -138,6 +138,10 @@ void main() {
         await controller.settingsController.syncAccountSettings(
           baseUrl: controller.settings.accountBaseUrl,
         );
+        await controller.refreshSingleAgentCapabilitiesInternal(
+          forceRefresh: true,
+        );
+        await controller.refreshAcpCapabilitiesInternal(forceRefresh: true);
         await tester.pump();
 
         expect(
@@ -148,6 +152,8 @@ void main() {
           controller.settingsController.syncedBaseUrls,
           isNot(contains('https://draft-accounts.svc.plus')),
         );
+        expect(controller.singleAgentRefreshCount, 1);
+        expect(controller.acpRefreshCount, 1);
 
         await controller.settingsController.logoutAccount();
         await tester.pump();
@@ -268,6 +274,8 @@ class _FakeSettingsPageController extends ChangeNotifier
   final _FakeSettingsController settingsController;
 
   SettingsSnapshot _settingsDraft;
+  int singleAgentRefreshCount = 0;
+  int acpRefreshCount = 0;
 
   @override
   SettingsSnapshot get settings => settingsController.snapshot;
@@ -280,6 +288,18 @@ class _FakeSettingsPageController extends ChangeNotifier
     notifyListeners();
   }
 
+  Future<void> refreshSingleAgentCapabilitiesInternal({
+    bool forceRefresh = false,
+  }) async {
+    singleAgentRefreshCount += 1;
+  }
+
+  Future<void> refreshAcpCapabilitiesInternal({
+    bool forceRefresh = false,
+  }) async {
+    acpRefreshCount += 1;
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -289,6 +309,13 @@ class _FakeSettingsController extends SettingsController {
     : super(SecureConfigStore(enableSecureStorage: false));
 
   final List<String> syncedBaseUrls = <String>[];
+
+  @override
+  Future<void> saveSnapshot(SettingsSnapshot snapshot) async {
+    snapshotInternal = snapshot;
+    lastSnapshotJsonInternal = snapshot.toJsonString();
+    notifyListeners();
+  }
 
   void seedSignedOutState(SettingsSnapshot settings) {
     snapshotInternal = settings.copyWith(accountLocalMode: true);
