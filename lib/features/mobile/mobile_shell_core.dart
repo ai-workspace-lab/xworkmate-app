@@ -256,6 +256,9 @@ class MobileShellStateInternal extends State<MobileShell> {
             ?.trim()
             .isNotEmpty ??
         false;
+    if (!mounted) {
+      return;
+    }
     if (!accountSignedIn) {
       await openGatewaySetupCodeEntryInternal();
       messenger?.showSnackBar(
