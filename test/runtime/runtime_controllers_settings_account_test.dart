@@ -49,7 +49,7 @@ void main() {
           value: 'managed-secret',
         );
         await store.saveAccountManagedSecret(
-          target: kAccountManagedSecretTargetOpenclawGatewayToken,
+          target: kAccountManagedSecretTargetBridgeAuthToken,
           value: 'bridge-token',
         );
         await store.saveAccountSyncState(
@@ -106,7 +106,7 @@ void main() {
         );
         expect(
           await store.loadAccountManagedSecret(
-            target: kAccountManagedSecretTargetOpenclawGatewayToken,
+            target: kAccountManagedSecretTargetBridgeAuthToken,
           ),
           isNull,
         );

@@ -801,7 +801,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (bridgeHost.isNotEmpty && normalizedHost == bridgeHost) {
       final bridgeToken =
           (await storeInternal.loadAccountManagedSecret(
-            target: kAccountManagedSecretTargetOpenclawGatewayToken,
+            target: kAccountManagedSecretTargetBridgeAuthToken,
           ))?.trim() ??
           '';
       if (bridgeToken.isNotEmpty) {

@@ -359,12 +359,12 @@ class _FakeSettingsController extends SettingsController {
       lastSyncSource: 'https://accounts.svc.plus',
       profileScope: 'tenant-shared',
       tokenConfigured: const AccountTokenConfigured(
-        openclaw: true,
+        bridge: true,
         vault: false,
         apisix: true,
       ),
       syncedDefaults: AccountRemoteProfile.defaults().copyWith(
-        openclawUrl: 'wss://gateway.svc.plus',
+        bridgeServerUrl: 'https://xworkmate-bridge.svc.plus',
         apisixUrl: 'https://apisix.svc.plus',
       ),
     );
@@ -385,12 +385,12 @@ class _FakeSettingsController extends SettingsController {
       lastSyncSource: baseUrl,
       profileScope: 'tenant-shared',
       tokenConfigured: const AccountTokenConfigured(
-        openclaw: true,
+        bridge: true,
         vault: false,
         apisix: true,
       ),
       syncedDefaults: AccountRemoteProfile.defaults().copyWith(
-        openclawUrl: 'wss://gateway.svc.plus',
+        bridgeServerUrl: 'https://xworkmate-bridge.svc.plus',
         apisixUrl: 'https://apisix.svc.plus',
       ),
     );

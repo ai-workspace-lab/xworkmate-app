@@ -55,7 +55,7 @@ extension SettingsControllerAccountExtension on SettingsController {
       refName: gatewayTokenRefForProfileInternal(resolvedProfileIndex),
       fallbackRefName: SecretStore.gatewayTokenRefKey(resolvedProfileIndex),
       accountTarget: resolvedProfileIndex == kGatewayRemoteProfileIndex
-          ? kAccountManagedSecretTargetOpenclawGatewayToken
+          ? kAccountManagedSecretTargetBridgeAuthToken
           : '',
     );
   }

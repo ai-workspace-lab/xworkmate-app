@@ -148,6 +148,7 @@ Future<void> completeAccountSignInSettingsInternal(
     controller,
     baseUrl: baseUrl,
     bridgeTokenOverride: _resolveBridgeAuthorizationToken(payload),
+    bridgeServerUrlOverride: _resolveBridgeServerUrl(payload),
     quiet: true,
   );
   await controller.reloadDerivedStateInternal();
@@ -225,6 +226,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
   String baseUrl = '',
   bool quiet = false,
   String bridgeTokenOverride = '',
+  String bridgeServerUrlOverride = '',
 }) async {
   final sessionToken =
       (await controller.storeInternal.loadAccountSessionToken())?.trim() ?? '';
@@ -250,7 +252,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
   final bridgeToken = bridgeTokenOverride.trim().isNotEmpty
       ? bridgeTokenOverride.trim()
       : ((await controller.storeInternal.loadAccountManagedSecret(
-              target: kAccountManagedSecretTargetOpenclawGatewayToken,
+              target: kAccountManagedSecretTargetBridgeAuthToken,
             ))?.trim() ??
             '');
   if (bridgeToken.isEmpty) {
@@ -266,8 +268,33 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     return result;
   }
 
+  final bridgeServerUrl = bridgeServerUrlOverride.trim().isNotEmpty
+      ? bridgeServerUrlOverride.trim()
+      : controller.accountSyncStateInternal?.syncedDefaults.bridgeServerUrl
+                .trim()
+                .isNotEmpty ==
+            true
+      ? controller.accountSyncStateInternal!.syncedDefaults.bridgeServerUrl
+            .trim()
+      : controller
+            .snapshotInternal
+            .acpBridgeServerModeConfig
+            .cloudSynced
+            .remoteServerSummary
+            .endpoint
+            .trim()
+            .isNotEmpty
+      ? controller
+            .snapshotInternal
+            .acpBridgeServerModeConfig
+            .cloudSynced
+            .remoteServerSummary
+            .endpoint
+            .trim()
+      : _kProductionBridgeEndpoint;
+
   await controller.storeInternal.saveAccountManagedSecret(
-    target: kAccountManagedSecretTargetOpenclawGatewayToken,
+    target: kAccountManagedSecretTargetBridgeAuthToken,
     value: bridgeToken,
   );
   await controller.storeInternal.clearAccountManagedSecret(
@@ -278,14 +305,17 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
   );
 
   final nextState = AccountSyncState.defaults().copyWith(
+    syncedDefaults: AccountRemoteProfile.defaults().copyWith(
+      bridgeServerUrl: bridgeServerUrl,
+    ),
     syncState: 'ready',
     syncMessage: 'Bridge access synced',
     lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
-    lastSyncSource: _kProductionBridgeEndpoint,
+    lastSyncSource: bridgeServerUrl,
     lastSyncError: '',
     profileScope: 'bridge',
     tokenConfigured: const AccountTokenConfigured(
-      openclaw: true,
+      bridge: true,
       vault: false,
       apisix: false,
     ),
@@ -299,10 +329,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
       accountIdentifier: '',
       lastSyncAt: nextState.lastSyncAtMs,
       remoteServerSummary: currentModeConfig.cloudSynced.remoteServerSummary
-          .copyWith(
-            endpoint: _kProductionBridgeEndpoint,
-            hasAdvancedOverrides: false,
-          ),
+          .copyWith(endpoint: bridgeServerUrl, hasAdvancedOverrides: false),
     ),
   );
   final sanitizedSettings = _sanitizeBridgeOnlyAccountSyncSettings(
@@ -444,13 +471,15 @@ SettingsSnapshot _sanitizeBridgeOnlyAccountSyncSettings(
 }
 
 String _resolveBridgeAuthorizationToken(Map<String, dynamic> payload) {
-  final explicit = _stringValue(payload['internalServiceToken']).isNotEmpty
-      ? _stringValue(payload['internalServiceToken'])
-      : _stringValue(payload['internal_service_token']).isNotEmpty
-      ? _stringValue(payload['internal_service_token'])
-      : _stringValue(payload['bridgeAuthToken']).isNotEmpty
-      ? _stringValue(payload['bridgeAuthToken'])
-      : _stringValue(payload['bridge_auth_token']);
+  final explicit = _stringValue(payload['BRIDGE_AUTH_TOKEN']);
+  if (explicit.isNotEmpty) {
+    return explicit;
+  }
+  return '';
+}
+
+String _resolveBridgeServerUrl(Map<String, dynamic> payload) {
+  final explicit = _stringValue(payload['BRIDGE_SERVER_URL']);
   if (explicit.isNotEmpty) {
     return explicit;
   }
