@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
+import '../runtime/desktop_thread_artifact_sync.dart';
 import '../runtime/go_task_service_client.dart';
 import '../runtime/runtime_models.dart';
 import 'app_controller_desktop_core.dart';
@@ -364,81 +365,17 @@ Future<void> _persistSingleAgentArtifactsDesktopInternal(
     return;
   }
   final root = Directory(existingThread.workspaceBinding.workspacePath);
-  await root.create(recursive: true);
-
-  var wroteArtifact = false;
-  for (final artifact in artifacts) {
-    if (!artifact.hasInlineContent) {
-      continue;
-    }
-    final relativePath = _sanitizeArtifactRelativePathInternal(
-      artifact.relativePath,
-    );
-    if (relativePath.isEmpty) {
-      continue;
-    }
-    final target = await _nextArtifactTargetFileInternal(root, relativePath);
-    await target.parent.create(recursive: true);
-    await target.writeAsBytes(
-      _decodeArtifactContentInternal(artifact),
-      flush: true,
-    );
-    wroteArtifact = true;
-  }
+  final syncResult = await syncInlineArtifactsToLocalWorkspace(
+    root: root,
+    artifacts: artifacts,
+  );
 
   controller.upsertTaskThreadInternal(
     sessionKey,
     lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    lastArtifactSyncStatus: wroteArtifact ? 'synced' : 'no-inline-content',
+    lastArtifactSyncStatus: syncResult.wroteArtifact
+        ? 'synced'
+        : 'no-inline-content',
     updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-  );
-}
-
-String _sanitizeArtifactRelativePathInternal(String raw) {
-  final trimmed = raw.trim().replaceAll('\\', '/');
-  if (trimmed.isEmpty) {
-    return '';
-  }
-  final cleaned = trimmed
-      .split('/')
-      .where(
-        (segment) => segment.isNotEmpty && segment != '.' && segment != '..',
-      )
-      .join('/');
-  return cleaned;
-}
-
-List<int> _decodeArtifactContentInternal(GoTaskServiceArtifact artifact) {
-  final encoding = artifact.encoding.trim().toLowerCase();
-  if (encoding == 'base64') {
-    return base64Decode(artifact.content);
-  }
-  return utf8.encode(artifact.content);
-}
-
-Future<File> _nextArtifactTargetFileInternal(
-  Directory root,
-  String relativePath,
-) async {
-  final segments = relativePath.split('/');
-  final fileName = segments.removeLast();
-  final parent = segments.isEmpty
-      ? root
-      : Directory('${root.path}/${segments.join('/')}');
-  final dotIndex = fileName.lastIndexOf('.');
-  final baseName = dotIndex <= 0 ? fileName : fileName.substring(0, dotIndex);
-  final extension = dotIndex <= 0 ? '' : fileName.substring(dotIndex);
-  var candidate = File('${parent.path}/$fileName');
-  if (!await candidate.exists()) {
-    return candidate;
-  }
-  for (var version = 2; version < 1000; version += 1) {
-    candidate = File('${parent.path}/$baseName.v$version$extension');
-    if (!await candidate.exists()) {
-      return candidate;
-    }
-  }
-  return File(
-    '${parent.path}/$baseName.${DateTime.now().millisecondsSinceEpoch}$extension',
   );
 }
