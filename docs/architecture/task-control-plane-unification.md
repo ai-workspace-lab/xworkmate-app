@@ -62,7 +62,7 @@ flowchart TD
   E --> F["xworkmate-bridge providerCatalog"]
 
   F --> G["acp.capabilities"]
-  G --> H["providers[]
+  G --> H["providerCatalog[]
   singleAgent / multiAgent"]
 
   H --> I["refreshSingleAgentCapabilitiesRuntimeInternal()"]
@@ -73,7 +73,7 @@ flowchart TD
 
   G --> L["refreshAcpCapabilitiesRuntimeInternal()"]
   L --> M["GatewayAcpCapabilities
-  providers / singleAgent / multiAgent"]
+  providerCatalog / singleAgent / multiAgent"]
   M --> N["mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal()"]
   N --> O["ManagedMountTargetState
   codex / opencode / claude / gemini / aris / openclaw
@@ -100,14 +100,15 @@ flowchart TD
   恢复线程已选 providerId"]
 
   V --> W["sendSingleAgentMessageDesktopGoTaskFlowInternal()"]
-  W --> X["再次拉取 acp.capabilities"]
-  X --> Y["按本次 bridge providers 解析
-  auto -> 当前 bridge 顺序第一个可用 provider
-  explicit -> 当前 bridge 已广告的 provider"]
+  W --> X["xworkmate.routing.resolve"]
+  X --> Y["resolvedProviderId /
+  unavailableCode /
+  unavailableMessage"]
 
-  Y --> Z{"provider resolved?"}
-  Z -->|"yes"| AA["executeTask(... provider ...)"]
-  Z -->|"no"| AB["provider unavailable UX"]
+  Y --> Z{"unavailable?"}
+  Z -->|"no"| AA["executeTask(... resolved routing ...)"]
+  Z -->|"yes"| AB["provider unavailable UX
+  直接使用 bridge unavailable message"]
 ```
 
 ## 端侧桥接规则

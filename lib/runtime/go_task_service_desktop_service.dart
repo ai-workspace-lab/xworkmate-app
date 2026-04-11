@@ -25,6 +25,21 @@ class DesktopGoTaskService implements GoTaskServiceClient {
   );
 
   @override
+  Future<ExternalCodeAgentAcpRoutingResolution> resolveExternalAcpRouting({
+    required String taskPrompt,
+    required String workingDirectory,
+    required ExternalCodeAgentAcpRoutingConfig routing,
+    String aiGatewayBaseUrl = '',
+    String aiGatewayApiKey = '',
+  }) => _acpTransport.resolveExternalAcpRouting(
+    taskPrompt: taskPrompt,
+    workingDirectory: workingDirectory,
+    routing: routing,
+    aiGatewayBaseUrl: aiGatewayBaseUrl,
+    aiGatewayApiKey: aiGatewayApiKey,
+  );
+
+  @override
   Future<GoTaskServiceResult> executeTask(
     GoTaskServiceRequest request, {
     required void Function(GoTaskServiceUpdate update) onUpdate,
