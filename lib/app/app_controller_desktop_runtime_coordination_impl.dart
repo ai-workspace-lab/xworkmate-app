@@ -57,7 +57,6 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
       controller.sessionsControllerInternal.currentSessionKey,
     );
     if (target == AssistantExecutionTarget.singleAgent) {
-      await controller.syncExternalAcpProvidersInternal();
       await controller.goTaskServiceClientInternal.loadExternalAcpCapabilities(
         target: AssistantExecutionTarget.singleAgent,
         forceRefresh: forceRefresh,
@@ -94,7 +93,6 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
   AppController controller, {
   bool forceRefresh = false,
 }) async {
-  await controller.syncExternalAcpProvidersInternal();
   final capabilities = await controller.goTaskServiceClientInternal
       .loadExternalAcpCapabilities(
         target: AssistantExecutionTarget.singleAgent,
@@ -221,40 +219,15 @@ String? resolveSingleAgentWorkingDirectoryForSessionRuntimeInternal(
 }
 
 bool singleAgentProviderRequiresLocalPathRuntimeInternal(
-  AppController controller,
+  AppController _,
   SingleAgentProvider provider,
 ) {
-  final configuredEndpoint = controller.settings
-      .providerSyncDefinitionForProvider(provider)
-      .endpoint
-      .trim();
-  if (configuredEndpoint.isEmpty) {
-    return true;
-  }
-  final normalizedInput = configuredEndpoint.contains('://')
-      ? configuredEndpoint
-      : 'ws://$configuredEndpoint';
-  final endpoint = Uri.tryParse(normalizedInput);
-  if (endpoint == null) {
-    return true;
-  }
-  final scheme = endpoint.scheme.trim().toLowerCase();
-  if (scheme == 'wss' || scheme == 'https') {
+  if (provider == SingleAgentProvider.codex ||
+      provider == SingleAgentProvider.opencode ||
+      provider == SingleAgentProvider.gemini) {
     return false;
   }
-  final host = endpoint.host.trim();
-  if (host.isEmpty) {
-    return true;
-  }
-  final address = InternetAddress.tryParse(host);
-  if (address != null) {
-    return !(address.isLoopback || address.type == InternetAddressType.unix);
-  }
-  final normalizedHost = host.toLowerCase();
-  if (normalizedHost == 'localhost') {
-    return true;
-  }
-  return false;
+  return true;
 }
 
 CodeAgentNodeState buildCodeAgentNodeStateRuntimeInternal(

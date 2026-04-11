@@ -13,8 +13,6 @@ class ExternalCodeAgentAcpDesktopTransport
     : _bridge = bridge ?? GoAcpStdioBridge();
 
   final GoAcpStdioBridge _bridge;
-  List<ExternalCodeAgentAcpSyncedProvider> _syncedProviders =
-      const <ExternalCodeAgentAcpSyncedProvider>[];
 
   @visibleForTesting
   GoAcpStdioBridge get bridgeForTest => _bridge;
@@ -22,19 +20,13 @@ class ExternalCodeAgentAcpDesktopTransport
   @override
   Future<void> syncExternalProviders(
     List<ExternalCodeAgentAcpSyncedProvider> providers,
-  ) async {
-    _syncedProviders = List<ExternalCodeAgentAcpSyncedProvider>.unmodifiable(
-      providers,
-    );
-    await _syncProviders();
-  }
+  ) async {}
 
   @override
   Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
   }) async {
-    await _syncProviders();
     final response = await _bridge.request(
       method: 'acp.capabilities',
       params: const <String, dynamic>{},
@@ -66,7 +58,6 @@ class ExternalCodeAgentAcpDesktopTransport
     String aiGatewayBaseUrl = '',
     String aiGatewayApiKey = '',
   }) async {
-    await _syncProviders();
     final response = await _bridge.request(
       method: 'xworkmate.routing.resolve',
       params: <String, dynamic>{
@@ -89,7 +80,6 @@ class ExternalCodeAgentAcpDesktopTransport
     GoTaskServiceRequest request, {
     required void Function(GoTaskServiceUpdate update) onUpdate,
   }) async {
-    await _syncProviders();
     late final StreamSubscription<Map<String, dynamic>> subscription;
     var streamedText = '';
     String? completedMessage;
@@ -157,28 +147,6 @@ class ExternalCodeAgentAcpDesktopTransport
 
   @override
   Future<void> dispose() => _bridge.dispose();
-
-  Future<void> _syncProviders() async {
-    if (_syncedProviders.isEmpty) {
-      return;
-    }
-    await _bridge.request(
-      method: 'xworkmate.providers.sync',
-      params: <String, dynamic>{
-        'providers': _syncedProviders
-            .map(
-              (item) => <String, dynamic>{
-                'providerId': item.providerId,
-                'endpoint': item.endpoint,
-                'label': item.label,
-                'authorizationHeader': item.authorizationHeader,
-                'enabled': item.enabled,
-              },
-            )
-            .toList(growable: false),
-      },
-    );
-  }
 
   Map<String, dynamic> _castMap(Object? value) {
     if (value is Map<String, dynamic>) {

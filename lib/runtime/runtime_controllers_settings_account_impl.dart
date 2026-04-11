@@ -2,6 +2,8 @@ import 'account_runtime_client.dart';
 import 'runtime_controllers_settings.dart';
 import 'runtime_models.dart';
 
+const _kProductionBridgeEndpoint = 'https://xworkmate-bridge.svc.plus';
+
 Future<void> loginAccountSettingsInternal(
   SettingsController controller, {
   required String baseUrl,
@@ -270,9 +272,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
         lastSyncAt: nextState.lastSyncAtMs,
         remoteServerSummary: currentModeConfig.cloudSynced.remoteServerSummary
             .copyWith(
-              endpoint: response.profile.openclawUrl.trim().isNotEmpty
-                  ? response.profile.openclawUrl.trim()
-                  : response.profile.apisixUrl.trim(),
+              endpoint: _kProductionBridgeEndpoint,
               hasAdvancedOverrides: false,
             ),
       ),
@@ -352,37 +352,6 @@ Future<void> applyAccountSyncedDefaultsSettingsInternal(
   final previous = controller.snapshotInternal;
   var next = previous;
   final defaults = state.syncedDefaults;
-  if (defaults.openclawUrl.trim().isNotEmpty) {
-    final remoteProfile = previous.gatewayProfiles[kGatewayRemoteProfileIndex];
-    final normalized = normalizeGatewayManualEndpointInternal(
-      host: defaults.openclawUrl,
-      port: remoteProfile.port,
-      tls: remoteProfile.tls,
-    );
-    next = next.copyWithGatewayProfileAt(
-      kGatewayRemoteProfileIndex,
-      remoteProfile.copyWith(
-        mode: RuntimeConnectionMode.remote,
-        useSetupCode: false,
-        setupCode: '',
-        host: normalized.host,
-        port: normalized.port,
-        tls: normalized.tls,
-      ),
-    );
-  }
-
-  final gatewayTokenLocator = defaults.locatorForTarget(
-    kAccountManagedSecretTargetOpenclawGatewayToken,
-  );
-  if (gatewayTokenLocator != null) {
-    final remoteProfile = next.gatewayProfiles[kGatewayRemoteProfileIndex];
-    next = next.copyWithGatewayProfileAt(
-      kGatewayRemoteProfileIndex,
-      remoteProfile.copyWith(tokenRef: gatewayTokenLocator.target),
-    );
-  }
-
   if (defaults.vaultUrl.trim().isNotEmpty) {
     next = next.copyWith(
       vault: next.vault.copyWith(address: defaults.vaultUrl.trim()),
@@ -392,12 +361,6 @@ Future<void> applyAccountSyncedDefaultsSettingsInternal(
   if (defaults.vaultNamespace.trim().isNotEmpty) {
     next = next.copyWith(
       vault: next.vault.copyWith(namespace: defaults.vaultNamespace.trim()),
-    );
-  }
-
-  if (defaults.apisixUrl.trim().isNotEmpty) {
-    next = next.copyWith(
-      aiGateway: next.aiGateway.copyWith(baseUrl: defaults.apisixUrl.trim()),
     );
   }
 
@@ -433,9 +396,7 @@ Future<void> applyAccountSyncedDefaultsSettingsInternal(
             .cloudSynced
             .remoteServerSummary
             .copyWith(
-              endpoint: defaults.openclawUrl.trim().isNotEmpty
-                  ? defaults.openclawUrl.trim()
-                  : defaults.apisixUrl.trim(),
+              endpoint: _kProductionBridgeEndpoint,
               hasAdvancedOverrides: false,
             ),
       ),

@@ -152,7 +152,6 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
           .map((item) => item.label.trim().isNotEmpty ? item.label : item.key)
           .where((item) => item.trim().isNotEmpty)
           .toList(growable: false);
-      await controller.syncExternalAcpProvidersInternal();
       final result = await controller.goTaskServiceClientInternal.executeTask(
         GoTaskServiceRequest(
           sessionId: sessionKey,
