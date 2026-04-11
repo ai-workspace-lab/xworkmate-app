@@ -2,8 +2,6 @@ import 'account_runtime_client.dart';
 import 'runtime_controllers_settings.dart';
 import 'runtime_models.dart';
 
-const _kProductionBridgeEndpoint = 'https://xworkmate-bridge.svc.plus';
-
 Future<void> loginAccountSettingsInternal(
   SettingsController controller, {
   required String baseUrl,
@@ -260,6 +258,15 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
       state: 'blocked',
       message: 'Bridge authorization is unavailable',
     );
+    await controller.storeInternal.saveAccountSyncState(
+      AccountSyncState.defaults().copyWith(
+        syncState: result.state,
+        syncMessage: result.message,
+        lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
+        lastSyncError: result.message,
+        profileScope: 'bridge',
+      ),
+    );
     controller.accountStatusInternal = result.message;
     if (!quiet) {
       controller.accountBusyInternal = false;
@@ -267,6 +274,11 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     }
     return result;
   }
+
+  await controller.storeInternal.saveAccountManagedSecret(
+    target: kAccountManagedSecretTargetBridgeAuthToken,
+    value: bridgeToken,
+  );
 
   final bridgeServerUrl = bridgeServerUrlOverride.trim().isNotEmpty
       ? bridgeServerUrlOverride.trim()
@@ -291,12 +303,36 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
             .remoteServerSummary
             .endpoint
             .trim()
-      : _kProductionBridgeEndpoint;
-
-  await controller.storeInternal.saveAccountManagedSecret(
-    target: kAccountManagedSecretTargetBridgeAuthToken,
-    value: bridgeToken,
-  );
+      : '';
+  if (bridgeServerUrl.isEmpty ||
+      !isSupportedExternalAcpEndpoint(bridgeServerUrl)) {
+    const result = AccountSyncResult(
+      state: 'blocked',
+      message: 'Bridge server is unavailable',
+    );
+    await controller.storeInternal.saveAccountSyncState(
+      AccountSyncState.defaults().copyWith(
+        syncedDefaults: AccountRemoteProfile.defaults(),
+        syncState: result.state,
+        syncMessage: result.message,
+        lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
+        lastSyncError: result.message,
+        profileScope: 'bridge',
+        tokenConfigured: const AccountTokenConfigured(
+          bridge: true,
+          vault: false,
+          apisix: false,
+        ),
+      ),
+    );
+    await controller.reloadDerivedStateInternal();
+    controller.accountStatusInternal = result.message;
+    if (!quiet) {
+      controller.accountBusyInternal = false;
+      controller.notifyListeners();
+    }
+    return result;
+  }
   await controller.storeInternal.clearAccountManagedSecret(
     target: kAccountManagedSecretTargetAIGatewayAccessToken,
   );
@@ -474,6 +510,10 @@ String _resolveBridgeAuthorizationToken(Map<String, dynamic> payload) {
   final explicit = _stringValue(payload['BRIDGE_AUTH_TOKEN']);
   if (explicit.isNotEmpty) {
     return explicit;
+  }
+  final internalServiceToken = _stringValue(payload['internalServiceToken']);
+  if (internalServiceToken.isNotEmpty) {
+    return internalServiceToken;
   }
   return '';
 }

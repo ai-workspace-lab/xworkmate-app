@@ -333,6 +333,56 @@ void main() {
   });
 
   group('resolveGatewayAcpAuthorizationHeaderInternal', () {
+    test('requires synced bridge endpoint before ACP endpoint can resolve', () {
+      final controller = AppController();
+      addTearDown(controller.dispose);
+
+      expect(controller.resolveBridgeAcpEndpointInternal(), isNull);
+      expect(
+        controller.resolveExternalAcpEndpointForTargetInternal(
+          AssistantExecutionTarget.singleAgent,
+        ),
+        isNull,
+      );
+
+      controller.settingsController.snapshotInternal = controller.settings
+          .copyWith(
+            acpBridgeServerModeConfig: controller
+                .settings
+                .acpBridgeServerModeConfig
+                .copyWith(
+                  cloudSynced: controller
+                      .settings
+                      .acpBridgeServerModeConfig
+                      .cloudSynced
+                      .copyWith(
+                        remoteServerSummary:
+                            const AcpBridgeServerRemoteServerSummary(
+                              endpoint: 'https://bridge.customer.example/acp',
+                              hasAdvancedOverrides: false,
+                            ),
+                      ),
+                ),
+          );
+
+      expect(
+        controller.resolveBridgeAcpEndpointInternal(),
+        Uri.parse('https://bridge.customer.example/acp'),
+      );
+      expect(
+        controller.resolveExternalAcpEndpointForTargetInternal(
+          AssistantExecutionTarget.singleAgent,
+        ),
+        Uri.parse('https://bridge.customer.example/acp'),
+      );
+      expect(
+        controller.resolveExternalAcpEndpointForTargetInternal(
+          AssistantExecutionTarget.gateway,
+        ),
+        Uri.parse('https://bridge.customer.example/acp'),
+      );
+    });
+
     test(
       'prefers the synced bridge bearer token over the account session token',
       () async {
@@ -480,6 +530,7 @@ class _BridgeSyncAccountRuntimeClient extends AccountRuntimeClient {
     return <String, dynamic>{
       'token': 'session-token',
       'internalServiceToken': 'bridge-token',
+      'BRIDGE_SERVER_URL': 'https://xworkmate-bridge.svc.plus',
       'expiresAt': '2026-04-12T00:00:00Z',
       'user': <String, dynamic>{
         'id': 'u-1',

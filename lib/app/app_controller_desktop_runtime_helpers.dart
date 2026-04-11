@@ -226,6 +226,14 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }) {
     final raw = error.toString().trim();
     final lowered = raw.toLowerCase();
+    if ((lowered.contains('acp_endpoint_missing') ||
+            lowered.contains('missing acp endpoint')) &&
+        target == AssistantExecutionTarget.singleAgent) {
+      return appText(
+        '当前线程还没有同步到 Bridge Server。请先登录账号并在设置里完成同步后再重试。',
+        'This thread does not have a synced bridge server yet. Sign in and complete Settings sync before trying again.',
+      );
+    }
     if (lowered.contains('gateway not connected') ||
         lowered.contains('code: offline') ||
         lowered.contains('offlin') && lowered.contains('gateway')) {
@@ -724,10 +732,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   Uri? resolveGatewayAcpEndpointInternal() {
-    return resolveBridgeAcpEndpointInternal() ??
-        _nonLoopbackGatewayProfileBaseUriInternal(
-          settings.primaryGatewayProfile,
-        );
+    return resolveBridgeAcpEndpointInternal();
   }
 
   Uri? resolveBridgeAcpEndpointInternal() {
@@ -748,19 +753,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     return uri.replace(query: null, fragment: null);
   }
 
-  Uri? resolveExternalAcpEndpointForTargetInternal(
-    AssistantExecutionTarget target,
-  ) {
-    final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
-    if (bridgeEndpoint != null) {
-      return bridgeEndpoint;
-    }
-    if (target == AssistantExecutionTarget.gateway) {
-      return _nonLoopbackGatewayProfileBaseUriInternal(
-        settings.primaryGatewayProfile,
-      );
-    }
-    return null;
+  Uri? resolveExternalAcpEndpointForTargetInternal(AssistantExecutionTarget _) {
+    return resolveBridgeAcpEndpointInternal();
   }
 
   Uri? gatewayProfileBaseUriInternal(GatewayConnectionProfile profile) {
@@ -775,30 +769,18 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     );
   }
 
-  Uri? _nonLoopbackGatewayProfileBaseUriInternal(
-    GatewayConnectionProfile profile,
-  ) {
-    if (isLoopbackHostInternal(profile.host)) {
-      return null;
-    }
-    return gatewayProfileBaseUriInternal(profile);
-  }
-
   Future<String?> resolveGatewayAcpAuthorizationHeaderInternal(
     Uri endpoint,
   ) async {
     final normalizedHost = endpoint.host.trim().toLowerCase();
-    final bridgeHost =
-        Uri.tryParse(
-          settings
-              .acpBridgeServerModeConfig
-              .cloudSynced
-              .remoteServerSummary
-              .endpoint
-              .trim(),
-        )?.host.trim().toLowerCase() ??
-        '';
-    if (bridgeHost.isNotEmpty && normalizedHost == bridgeHost) {
+    final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
+    final bridgeHost = bridgeEndpoint?.host.trim().toLowerCase() ?? '';
+    final bridgePort = bridgeEndpoint?.port ?? 0;
+    final matchesBridgeEndpoint =
+        bridgeHost.isNotEmpty &&
+        normalizedHost == bridgeHost &&
+        (bridgePort <= 0 || endpoint.port == bridgePort);
+    if (matchesBridgeEndpoint) {
       final bridgeToken =
           (await storeInternal.loadAccountManagedSecret(
             target: kAccountManagedSecretTargetBridgeAuthToken,
