@@ -87,6 +87,16 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
 }
 
 extension AppControllerDesktopThreadSessions on AppController {
+  AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordsInternal(
+    TaskThread? primaryRecord, {
+    TaskThread? fallbackRecord,
+  }) {
+    return resolveAssistantExecutionTargetFromRecordsForTest(
+      primaryRecord,
+      fallbackRecord: fallbackRecord,
+    );
+  }
+
   TaskThread? taskThreadForSessionInternal(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -552,12 +562,12 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final record = taskThreadForSessionInternal(normalizedSessionKey);
-    return sanitizePersistedExecutionTargetInternal(
-      record == null
-          ? settings.assistantExecutionTarget
-          : assistantExecutionTargetFromExecutionMode(
-              record.executionBinding.executionMode,
-            ),
+    final mainRecord = matchesSessionKey(normalizedSessionKey, 'main')
+        ? null
+        : taskThreadForSessionInternal('main');
+    return resolveAssistantExecutionTargetFromRecordsInternal(
+      record,
+      fallbackRecord: mainRecord,
     );
   }
 
@@ -628,4 +638,16 @@ extension AppControllerDesktopThreadSessions on AppController {
       );
     return items;
   }
+}
+
+AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordsForTest(
+  TaskThread? primaryRecord, {
+  TaskThread? fallbackRecord,
+}) {
+  final record = primaryRecord ?? fallbackRecord;
+  return record == null
+      ? AssistantExecutionTarget.singleAgent
+      : assistantExecutionTargetFromExecutionMode(
+          record.executionBinding.executionMode,
+        );
 }
