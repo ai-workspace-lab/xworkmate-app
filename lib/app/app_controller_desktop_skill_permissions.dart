@@ -216,40 +216,6 @@ extension AppControllerDesktopSkillPermissions on AppController {
     notifyIfActiveInternal();
   }
 
-  AssistantThreadSkillEntry singleAgentSkillEntryFromAcpInternal(
-    Map<String, dynamic> item,
-    SingleAgentProvider provider,
-  ) {
-    return AssistantThreadSkillEntry(
-      key: item['skillKey']?.toString().trim().isNotEmpty == true
-          ? item['skillKey'].toString().trim()
-          : (item['name']?.toString().trim() ?? ''),
-      label: item['name']?.toString().trim() ?? '',
-      description: item['description']?.toString().trim() ?? '',
-      source: item['source']?.toString().trim() ?? provider.providerId,
-      sourcePath: item['path']?.toString().trim() ?? '',
-      scope: item['scope']?.toString().trim().isNotEmpty == true
-          ? item['scope'].toString().trim()
-          : 'session',
-      sourceLabel: item['sourceLabel']?.toString().trim().isNotEmpty == true
-          ? item['sourceLabel'].toString().trim()
-          : (item['source']?.toString().trim().isNotEmpty == true
-                ? item['source'].toString().trim()
-                : provider.label),
-    );
-  }
-
-  bool unsupportedAcpSkillsStatusInternal(GatewayAcpException error) {
-    final code = (error.code ?? '').trim();
-    if (code == '-32601' || code == 'METHOD_NOT_FOUND') {
-      return true;
-    }
-    final message = error.toString().toLowerCase();
-    return message.contains('unknown method') ||
-        message.contains('method not found') ||
-        message.contains('skills.status');
-  }
-
   void upsertTaskThreadInternal(
     String sessionKey, {
     ThreadOwnerScope? ownerScope,
