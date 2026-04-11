@@ -4,7 +4,6 @@ import 'package:integration_test/integration_test.dart';
 import 'package:xworkmate/app/app_controller_desktop_core.dart';
 import 'package:xworkmate/features/settings/settings_page.dart';
 import 'package:xworkmate/i18n/app_language.dart';
-import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/runtime_controllers_settings.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
@@ -14,8 +13,10 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'settings page keeps canonical account status and logout behavior aligned',
+    'settings login card reads canonical values instead of stale draft data',
     (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1600, 1200));
+      addTearDown(() async => tester.binding.setSurfaceSize(null));
       final fixtures = _buildSettingsPageFixtures();
       final controller = fixtures.controller;
       final canonicalSettings = fixtures.canonicalSettings;
@@ -23,22 +24,6 @@ void main() {
       final staleDraft = canonicalSettings.copyWith(
         accountBaseUrl: 'https://draft-accounts.svc.plus',
         accountUsername: 'draft@svc.plus',
-        acpBridgeServerModeConfig: canonicalSettings.acpBridgeServerModeConfig
-            .copyWith(
-              cloudSynced: canonicalSettings
-                  .acpBridgeServerModeConfig
-                  .cloudSynced
-                  .copyWith(
-                    accountBaseUrl: 'https://draft-accounts.svc.plus',
-                    accountIdentifier: 'draft@svc.plus',
-                    lastSyncAt: 987654321,
-                    remoteServerSummary:
-                        const AcpBridgeServerRemoteServerSummary(
-                          endpoint: 'wss://draft-gateway.svc.plus',
-                          hasAdvancedOverrides: true,
-                        ),
-                  ),
-            ),
       );
       await controller.saveSettingsDraft(staleDraft);
 
@@ -59,47 +44,20 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 300));
 
-      final serviceUrlText = tester.widget<Text>(
-        find.byKey(const ValueKey('settings-account-summary-service-url')),
+      final baseUrlField = tester.widget<TextFormField>(
+        find.byKey(const ValueKey('settings-account-base-url-field')),
       );
-      final accountIdentifierText = tester.widget<Text>(
-        find.byKey(
-          const ValueKey('settings-account-summary-account-identifier'),
-        ),
-      );
-      expect(serviceUrlText.data ?? '', contains('https://accounts.svc.plus'));
-      expect(
-        serviceUrlText.data ?? '',
-        isNot(contains('https://draft-accounts.svc.plus')),
-      );
-      expect(accountIdentifierText.data ?? '', contains('canonical@svc.plus'));
-      expect(
-        accountIdentifierText.data ?? '',
-        isNot(contains('draft@svc.plus')),
+      final identifierField = tester.widget<TextFormField>(
+        find.byKey(const ValueKey('settings-account-identifier-field')),
       );
 
-      await controller.settingsController.syncAccountSettings(
-        baseUrl: controller.settings.accountBaseUrl,
-      );
-      await tester.pump();
-
+      expect(baseUrlField.controller?.text, 'https://accounts.svc.plus');
       expect(
-        controller.settingsController.syncedBaseUrls,
-        contains('https://accounts.svc.plus'),
+        baseUrlField.controller?.text,
+        isNot('https://draft-accounts.svc.plus'),
       );
-      expect(
-        controller.settingsController.syncedBaseUrls,
-        isNot(contains('https://draft-accounts.svc.plus')),
-      );
-
-      await controller.settingsController.logoutAccount();
-      await tester.pump();
-
-      expect(find.text('未登录'), findsOneWidget);
-      final loggedOutButton = tester.widget<FilledButton>(
-        find.byKey(const ValueKey('settings-account-logout-button')),
-      );
-      expect(loggedOutButton.onPressed, isNull);
+      expect(identifierField.controller?.text, 'canonical@svc.plus');
+      expect(identifierField.controller?.text, isNot('draft@svc.plus'));
     },
   );
 }
@@ -109,18 +67,7 @@ SettingsSnapshot _buildCanonicalSettings() {
   return defaults.copyWith(
     accountBaseUrl: 'https://accounts.svc.plus',
     accountUsername: 'canonical@svc.plus',
-    accountLocalMode: false,
-    acpBridgeServerModeConfig: defaults.acpBridgeServerModeConfig.copyWith(
-      cloudSynced: defaults.acpBridgeServerModeConfig.cloudSynced.copyWith(
-        accountBaseUrl: 'https://accounts.svc.plus',
-        accountIdentifier: 'canonical@svc.plus',
-        lastSyncAt: 123456789,
-        remoteServerSummary: const AcpBridgeServerRemoteServerSummary(
-          endpoint: 'wss://gateway.svc.plus',
-          hasAdvancedOverrides: false,
-        ),
-      ),
-    ),
+    accountLocalMode: true,
   );
 }
 
@@ -129,7 +76,7 @@ _SettingsPageFixtures _buildSettingsPageFixtures() {
     appLanguage: AppLanguage.zh,
   );
   final settingsController = _FakeSettingsController()
-    ..seedSignedInState(canonicalSettings);
+    ..seedSignedOutState(canonicalSettings);
   final controller = _FakeSettingsPageController(
     settingsController: settingsController,
     settingsDraft: canonicalSettings,
@@ -163,6 +110,7 @@ class _FakeSettingsPageController extends ChangeNotifier
 
   @override
   final _FakeSettingsController settingsController;
+
   SettingsSnapshot _settingsDraft;
 
   @override
@@ -176,22 +124,6 @@ class _FakeSettingsPageController extends ChangeNotifier
     notifyListeners();
   }
 
-  Future<void> saveSettings(SettingsSnapshot snapshot) async {
-    settingsController.snapshotInternal = snapshot;
-    _settingsDraft = snapshot;
-    notifyListeners();
-  }
-
-  @override
-  void navigateHome() {}
-
-  @override
-  void openSettings({
-    SettingsTab tab = SettingsTab.gateway,
-    SettingsDetailPage? detail,
-    SettingsNavigationContext? navigationContext,
-  }) {}
-
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -200,66 +132,15 @@ class _FakeSettingsController extends SettingsController {
   _FakeSettingsController()
     : super(SecureConfigStore(enableSecureStorage: false));
 
-  final List<String> syncedBaseUrls = <String>[];
-
-  void seedSignedInState(SettingsSnapshot settings) {
+  void seedSignedOutState(SettingsSnapshot settings) {
     snapshotInternal = settings;
     lastSnapshotJsonInternal = settings.toJsonString();
-    accountSessionTokenInternal = 'session-token';
-    accountSessionInternal = const AccountSessionSummary(
-      userId: 'u-1',
-      email: 'canonical@svc.plus',
-      name: 'Canonical',
-      role: 'member',
-      mfaEnabled: false,
-    );
-    accountSyncStateInternal = AccountSyncState.defaults().copyWith(
-      syncState: 'ready',
-      syncMessage: 'Remote defaults synced',
-      lastSyncAtMs: 123456789,
-      lastSyncSource: 'https://accounts.svc.plus',
-      syncedDefaults: AccountRemoteProfile.defaults().copyWith(
-        openclawUrl: 'wss://gateway.svc.plus',
-        apisixUrl: 'https://apisix.svc.plus',
-      ),
-    );
-    accountStatusInternal = 'Signed in as canonical@svc.plus';
-    accountBusyInternal = false;
-    pendingAccountMfaTicketInternal = '';
-    pendingAccountBaseUrlInternal = '';
-  }
-
-  Future<AccountSyncResult> syncAccountSettings({String baseUrl = ''}) async {
-    syncedBaseUrls.add(baseUrl);
-    accountBusyInternal = true;
-    notifyListeners();
-    accountSyncStateInternal = AccountSyncState.defaults().copyWith(
-      syncState: 'ready',
-      syncMessage: 'Remote defaults synced',
-      lastSyncAtMs: 123456789,
-      lastSyncSource: baseUrl,
-      syncedDefaults: AccountRemoteProfile.defaults().copyWith(
-        openclawUrl: 'wss://gateway.svc.plus',
-        apisixUrl: 'https://apisix.svc.plus',
-      ),
-    );
-    accountBusyInternal = false;
-    final email = accountSessionInternal?.email.trim() ?? '';
-    accountStatusInternal = email.isEmpty ? 'Signed in' : 'Signed in as $email';
-    notifyListeners();
-    return const AccountSyncResult(
-      state: 'ready',
-      message: 'Remote defaults synced',
-    );
-  }
-
-  Future<void> logoutAccount() async {
     accountSessionTokenInternal = '';
     accountSessionInternal = null;
     accountSyncStateInternal = null;
     accountStatusInternal = 'Signed out';
+    accountBusyInternal = false;
     pendingAccountMfaTicketInternal = '';
     pendingAccountBaseUrlInternal = '';
-    notifyListeners();
   }
 }

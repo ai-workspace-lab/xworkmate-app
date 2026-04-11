@@ -132,15 +132,7 @@ Future<void> completeAccountSignInSettingsInternal(
     return;
   }
   final user = _asMap(payload['user']);
-  final sessionSummary = AccountSessionSummary(
-    userId: _stringValue(user['id']),
-    email: _stringValue(user['email']),
-    name: _stringValue(user['name']).isNotEmpty
-        ? _stringValue(user['name'])
-        : _stringValue(user['username']),
-    role: _stringValue(user['role']),
-    mfaEnabled: user['mfaEnabled'] == true,
-  );
+  final sessionSummary = _accountSessionSummaryFromUserPayload(user);
   await controller.storeInternal.saveAccountSessionToken(token);
   await controller.storeInternal.saveAccountSessionExpiresAtMs(
     _parseExpiresAtMs(payload['expiresAt']),
@@ -515,6 +507,25 @@ Future<void> cancelAccountMfaChallengeSettingsInternal(
     controller.accountStatusInternal = 'Signed out';
   }
   controller.notifyListeners();
+}
+
+AccountSessionSummary _accountSessionSummaryFromUserPayload(
+  Map<String, dynamic> user,
+) {
+  final mfa = _asMap(user['mfa']);
+  final totpEnabled = mfa['totpEnabled'] as bool? ?? false;
+  final totpPending = mfa['totpPending'] as bool? ?? false;
+  return AccountSessionSummary(
+    userId: _stringValue(user['id']),
+    email: _stringValue(user['email']),
+    name: _stringValue(user['name']).isNotEmpty
+        ? _stringValue(user['name'])
+        : _stringValue(user['username']),
+    role: _stringValue(user['role']),
+    mfaEnabled: user['mfaEnabled'] as bool? ?? totpEnabled,
+    totpEnabled: totpEnabled,
+    totpPending: totpPending,
+  );
 }
 
 String normalizeAccountBaseUrlSettingsInternal(
