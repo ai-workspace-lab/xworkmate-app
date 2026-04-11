@@ -1,6 +1,7 @@
 import 'gateway_runtime.dart';
 import 'go_task_service_client.dart';
 import 'runtime_models.dart';
+import 'package:flutter/foundation.dart';
 
 class DesktopGoTaskService implements GoTaskServiceClient {
   DesktopGoTaskService({
@@ -68,6 +69,9 @@ class DesktopGoTaskService implements GoTaskServiceClient {
     sessionId: sessionId,
     threadId: threadId,
   );
+
+  @visibleForTesting
+  ExternalCodeAgentAcpTransport get acpTransportForTest => _acpTransport;
 
   @override
   Future<void> dispose() async {
