@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import 'gateway_acp_client.dart';
 import 'go_acp_stdio_bridge.dart';
 import 'go_task_service_client.dart';
@@ -13,6 +15,9 @@ class ExternalCodeAgentAcpDesktopTransport
   final GoAcpStdioBridge _bridge;
   List<ExternalCodeAgentAcpSyncedProvider> _syncedProviders =
       const <ExternalCodeAgentAcpSyncedProvider>[];
+
+  @visibleForTesting
+  GoAcpStdioBridge get bridgeForTest => _bridge;
 
   @override
   Future<void> syncExternalProviders(

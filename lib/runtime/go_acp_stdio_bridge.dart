@@ -41,6 +41,7 @@ class GoAcpStdioBridge {
   StreamSubscription<String>? _stdoutSubscription;
   StreamSubscription<String>? _stderrSubscription;
   Future<void>? _startupFuture;
+  Future<void>? _disposeFuture;
   int _requestCounter = 0;
 
   Stream<Map<String, dynamic>> get notifications =>
@@ -84,6 +85,16 @@ class GoAcpStdioBridge {
   }
 
   Future<void> dispose() async {
+    final inFlight = _disposeFuture;
+    if (inFlight != null) {
+      return inFlight;
+    }
+    final next = _disposeInternal();
+    _disposeFuture = next;
+    return next;
+  }
+
+  Future<void> _disposeInternal() async {
     final process = _process;
     _process = null;
     _startupFuture = null;
@@ -111,7 +122,9 @@ class GoAcpStdioBridge {
         // Best effort only.
       }
     }
-    await _notificationsController.close();
+    if (!_notificationsController.isClosed) {
+      await _notificationsController.close();
+    }
   }
 
   Future<void> _ensureStarted() async {
