@@ -19,15 +19,12 @@ class SettingsPage extends StatefulWidget {
     this.initialTab = SettingsTab.gateway,
     this.initialDetail,
     this.navigationContext,
-    this.showSectionTabs = true,
   });
 
   final AppController controller;
   final SettingsTab initialTab;
   final SettingsDetailPage? initialDetail;
   final SettingsNavigationContext? navigationContext;
-  final bool showSectionTabs;
-
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
@@ -75,20 +72,21 @@ class _SettingsPageState extends State<SettingsPage> {
         controller.settingsController,
       ]),
       builder: (context, _) {
-        final settings = controller.settingsDraft;
+        final currentSettings = controller.settings;
+        final settingsDraft = controller.settingsDraft;
         final accountState = controller.settingsController.accountSyncState;
         final accountBusy = controller.settingsController.accountBusy;
         final accountSignedIn = controller.settingsController.accountSignedIn;
         final accountSession = controller.settingsController.accountSession;
-        final cloudSync = settings.acpBridgeServerModeConfig.cloudSynced;
+        final cloudSync = currentSettings.acpBridgeServerModeConfig.cloudSynced;
         final remoteSummary = cloudSync.remoteServerSummary.endpoint.trim();
         final serviceUrl = cloudSync.accountBaseUrl.trim().isNotEmpty
             ? cloudSync.accountBaseUrl.trim()
-            : settings.accountBaseUrl.trim();
+            : currentSettings.accountBaseUrl.trim();
         final accountIdentifier = cloudSync.accountIdentifier.trim().isNotEmpty
             ? cloudSync.accountIdentifier.trim()
-            : settings.accountUsername.trim().isNotEmpty
-            ? settings.accountUsername.trim()
+            : currentSettings.accountUsername.trim().isNotEmpty
+            ? currentSettings.accountUsername.trim()
             : (accountSession?.email.trim() ?? '');
         final sessionLabel = accountSignedIn
             ? appText(
@@ -191,14 +189,23 @@ class _SettingsPageState extends State<SettingsPage> {
                           const SizedBox(height: 8),
                           Text(
                             '${appText('服务地址', 'Service URL')}: ${serviceUrl.isEmpty ? appText('待配置', 'Pending') : serviceUrl}',
+                            key: const ValueKey(
+                              'settings-account-summary-service-url',
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Text(
                             '${appText('账户标识', 'Account Identifier')}: ${accountIdentifier.isEmpty ? appText('待登录', 'Not signed in') : accountIdentifier}',
+                            key: const ValueKey(
+                              'settings-account-summary-account-identifier',
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Text(
                             '${appText('最近同步', 'Last Sync')}: ${_formatSyncTime(cloudSync.lastSyncAt)}',
+                            key: const ValueKey(
+                              'settings-account-summary-last-sync',
+                            ),
                           ),
                         ],
                       ),
@@ -212,7 +219,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           key: const ValueKey('settings-account-sync-button'),
                           onPressed: accountBusy
                               ? null
-                              : () => _syncAccount(settings),
+                              : () => _syncAccount(currentSettings),
                           child: Text(appText('重新同步', 'Sync Again')),
                         ),
                         FilledButton.tonal(
@@ -295,7 +302,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           key: const ValueKey('settings-base-sync-button'),
                           onPressed: accountBusy
                               ? null
-                              : () => _syncAccount(settings),
+                              : () => _syncAccount(settingsDraft),
                           child: Text(appText('重新同步', 'Sync Again')),
                         ),
                         FilledButton.tonal(
@@ -304,7 +311,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           ),
                           onPressed: accountBusy
                               ? null
-                              : () => _disconnectManagedBase(settings),
+                              : () => _disconnectManagedBase(settingsDraft),
                           child: Text(appText('断开', 'Disconnect')),
                         ),
                       ],
