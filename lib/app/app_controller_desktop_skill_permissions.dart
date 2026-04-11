@@ -306,7 +306,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
                 executionBinding?.providerId ??
                     existing?.executionBinding.providerId,
               ))
-        : SingleAgentProvider.auto;
+        : SingleAgentProvider.unspecified;
     final nextProviderSource =
         nextExecutionTarget == AssistantExecutionTarget.singleAgent
         ? (singleAgentProviderSource ??
