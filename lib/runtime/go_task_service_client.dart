@@ -762,6 +762,8 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
               ? result['output'].toString().trim()
               : result['summary']?.toString().trim().isNotEmpty == true
               ? result['summary'].toString().trim()
+              : result['resultSummary']?.toString().trim().isNotEmpty == true
+              ? result['resultSummary'].toString().trim()
               : result['message']?.toString().trim() ?? '')
           .trim();
   final primaryText =
