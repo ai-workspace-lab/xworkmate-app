@@ -100,6 +100,9 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
     appendLogInternal(this, level, category, message);
   }
 
+  @visibleForTesting
+  bool get usesSessionClient => sessionClientInternal != null;
+
   Future<void> initialize() async {
     sessionUpdatesInternal ??= sessionClientInternal?.updates.listen(
       _handleSessionUpdateInternal,

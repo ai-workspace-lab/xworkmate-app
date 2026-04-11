@@ -67,6 +67,9 @@ class GoGatewayRuntimeDesktopClient implements GatewayRuntimeSessionClient {
 
   @override
   Future<void> disconnect({required String runtimeId}) async {
+    if (!_bridge.isStarted) {
+      return;
+    }
     await _request(
       method: 'xworkmate.gateway.disconnect',
       params: <String, dynamic>{'runtimeId': runtimeId},
