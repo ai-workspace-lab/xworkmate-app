@@ -437,16 +437,6 @@ class SettingsNavigationContext {
   final bool? prefersGatewaySetupCode;
 }
 
-enum AccountTab { profile, workspace, sessions }
-
-extension AccountTabCopy on AccountTab {
-  String get label => switch (this) {
-    AccountTab.profile => appText('资料', 'Profile'),
-    AccountTab.workspace => appText('工作区', 'Workspace'),
-    AccountTab.sessions => appText('会话', 'Sessions'),
-  };
-}
-
 class QuickAction {
   const QuickAction({
     required this.title,
