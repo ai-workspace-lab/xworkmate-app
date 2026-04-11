@@ -8,12 +8,14 @@ import 'package:xworkmate/app/app_controller_desktop_skill_permissions.dart';
 import 'package:xworkmate/app/app_controller_desktop_thread_binding.dart';
 import 'package:xworkmate/app/app_controller_desktop_thread_sessions.dart';
 import 'package:xworkmate/app/app_controller_desktop_workspace_execution.dart';
+import 'package:xworkmate/runtime/account_runtime_client.dart';
 import 'package:xworkmate/runtime/codex_config_bridge.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
+import 'package:xworkmate/runtime/runtime_controllers.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
@@ -330,6 +332,68 @@ void main() {
     );
   });
 
+  group('resolveGatewayAcpAuthorizationHeaderInternal', () {
+    test(
+      'prefers the synced bridge bearer token over the account session token',
+      () async {
+        final root = await Directory.systemTemp.createTemp(
+          'xworkmate-bridge-auth-header-',
+        );
+        final store = SecureConfigStore(
+          enableSecureStorage: false,
+          appDataRootPathResolver: () async => '${root.path}/settings.sqlite3',
+          secretRootPathResolver: () async => root.path,
+          supportRootPathResolver: () async => root.path,
+        );
+        final controller = AppController(
+          store: store,
+          accountClientFactory: (_) => _BridgeSyncAccountRuntimeClient(),
+        );
+        addTearDown(() async {
+          controller.dispose();
+          if (await root.exists()) {
+            try {
+              await root.delete(recursive: true);
+            } on FileSystemException {
+              // Temp cleanup is best-effort on macOS when sqlite/watch handles lag.
+            }
+          }
+        });
+
+        await store.initialize();
+        await controller.settingsController.initialize();
+        await controller.settingsController.saveSnapshot(
+          controller.settings.copyWith(
+            accountBaseUrl: 'https://accounts.svc.plus',
+            accountUsername: 'review@svc.plus',
+          ),
+        );
+        await controller.settingsController.loginAccount(
+          baseUrl: 'https://accounts.svc.plus',
+          identifier: 'review@svc.plus',
+          password: '***REMOVED-CREDENTIAL***',
+        );
+        await controller.settingsController.saveGatewaySecrets(
+          profileIndex: kGatewayRemoteProfileIndex,
+          token: 'local-token',
+          password: '',
+        );
+
+        final bridgeAuthorization = await controller
+            .resolveGatewayAcpAuthorizationHeaderInternal(
+              Uri.parse('https://xworkmate-bridge.svc.plus/acp'),
+            );
+        final nonBridgeAuthorization = await controller
+            .resolveGatewayAcpAuthorizationHeaderInternal(
+              Uri.parse('https://remote.example.com/acp'),
+            );
+
+        expect(bridgeAuthorization, 'Bearer bridge-token');
+        expect(nonBridgeAuthorization, 'Bearer local-token');
+      },
+    );
+  });
+
   group('selected working directory', () {
     test(
       'persists thread project directory without changing local workspace binding',
@@ -417,4 +481,28 @@ class _FakeGatewayRuntimeDeps {
   final Directory root;
   final SecureConfigStore store;
   final DeviceIdentityStore identityStore;
+}
+
+class _BridgeSyncAccountRuntimeClient extends AccountRuntimeClient {
+  _BridgeSyncAccountRuntimeClient()
+    : super(baseUrl: 'https://accounts.svc.plus');
+
+  @override
+  Future<Map<String, dynamic>> login({
+    required String identifier,
+    required String password,
+  }) async {
+    return <String, dynamic>{
+      'token': 'session-token',
+      'internalServiceToken': 'bridge-token',
+      'expiresAt': '2026-04-12T00:00:00Z',
+      'user': <String, dynamic>{
+        'id': 'u-1',
+        'email': identifier,
+        'name': 'Review',
+        'role': 'member',
+        'mfaEnabled': false,
+      },
+    };
+  }
 }

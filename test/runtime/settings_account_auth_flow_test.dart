@@ -10,65 +10,71 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsController account auth flow', () {
-    test(
-      'login persists session summary and synced profile metadata',
-      () async {
-        final root = await Directory.systemTemp.createTemp(
-          'xworkmate-account-auth-login-',
-        );
-        final store = SecureConfigStore(
-          enableSecureStorage: false,
-          appDataRootPathResolver: () async => root.path,
-          secretRootPathResolver: () async => root.path,
-          supportRootPathResolver: () async => root.path,
-        );
-        final controller = SettingsController(
-          store,
-          accountClientFactory: (_) => _SuccessfulAccountRuntimeClient(),
-        );
-        addTearDown(() async {
-          controller.dispose();
-          store.dispose();
-          if (await root.exists()) {
-            await root.delete(recursive: true);
-          }
-        });
+    test('login persists session summary and bridge sync metadata', () async {
+      final root = await Directory.systemTemp.createTemp(
+        'xworkmate-account-auth-login-',
+      );
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        appDataRootPathResolver: () async => root.path,
+        secretRootPathResolver: () async => root.path,
+        supportRootPathResolver: () async => root.path,
+      );
+      final client = _SuccessfulAccountRuntimeClient();
+      final controller = SettingsController(
+        store,
+        accountClientFactory: (_) => client,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        store.dispose();
+        if (await root.exists()) {
+          await root.delete(recursive: true);
+        }
+      });
 
-        await store.initialize();
-        await controller.initialize();
-        await controller.saveSnapshot(
-          controller.snapshot.copyWith(
-            accountBaseUrl: 'https://accounts.svc.plus',
-            accountUsername: 'review@svc.plus',
-          ),
-        );
+      await store.initialize();
+      await controller.initialize();
+      await controller.saveSnapshot(
+        controller.snapshot.copyWith(
+          accountBaseUrl: 'https://accounts.svc.plus',
+          accountUsername: 'review@svc.plus',
+        ),
+      );
 
-        await controller.loginAccount(
-          baseUrl: 'https://accounts.svc.plus',
-          identifier: 'review@svc.plus',
-          password: '***REMOVED-CREDENTIAL***',
-        );
+      await controller.loginAccount(
+        baseUrl: 'https://accounts.svc.plus',
+        identifier: 'review@svc.plus',
+        password: '***REMOVED-CREDENTIAL***',
+      );
 
-        expect(controller.accountSignedIn, isTrue);
-        expect(controller.accountStatus, 'Signed in as review@svc.plus');
-        expect(controller.accountSession?.email, 'review@svc.plus');
-        expect(controller.accountSession?.totpEnabled, isTrue);
-        expect(controller.accountSession?.totpPending, isFalse);
-        expect(controller.accountSyncState?.syncState, 'ready');
-        expect(controller.accountSyncState?.profileScope, 'tenant-shared');
-        expect(controller.accountSyncState?.tokenConfigured.apisix, isTrue);
-        expect(await store.loadAccountSessionToken(), 'session-token');
-        expect(
-          controller
-              .snapshot
-              .acpBridgeServerModeConfig
-              .cloudSynced
-              .remoteServerSummary
-              .endpoint,
-          'https://xworkmate-bridge.svc.plus',
-        );
-      },
-    );
+      expect(controller.accountSignedIn, isTrue);
+      expect(controller.accountStatus, 'Signed in as review@svc.plus');
+      expect(controller.accountSession?.email, 'review@svc.plus');
+      expect(controller.accountSession?.totpEnabled, isTrue);
+      expect(controller.accountSession?.totpPending, isFalse);
+      expect(controller.accountSyncState?.syncState, 'ready');
+      expect(controller.accountSyncState?.profileScope, 'bridge');
+      expect(controller.accountSyncState?.tokenConfigured.openclaw, isTrue);
+      expect(controller.accountSyncState?.tokenConfigured.apisix, isFalse);
+      expect(await store.loadAccountSessionToken(), 'session-token');
+      expect(
+        await store.loadAccountManagedSecret(
+          target: kAccountManagedSecretTargetOpenclawGatewayToken,
+        ),
+        'bridge-token',
+      );
+      expect(client.loadSessionCalls, 0);
+      expect(
+        controller
+            .snapshot
+            .acpBridgeServerModeConfig
+            .cloudSynced
+            .remoteServerSummary
+            .endpoint,
+        'https://xworkmate-bridge.svc.plus',
+      );
+    });
 
     test('mfa challenge transitions to verified signed-in session', () async {
       final root = await Directory.systemTemp.createTemp(
@@ -130,6 +136,8 @@ class _SuccessfulAccountRuntimeClient extends AccountRuntimeClient {
   _SuccessfulAccountRuntimeClient()
     : super(baseUrl: 'https://accounts.svc.plus');
 
+  int loadSessionCalls = 0;
+
   @override
   Future<Map<String, dynamic>> login({
     required String identifier,
@@ -139,6 +147,7 @@ class _SuccessfulAccountRuntimeClient extends AccountRuntimeClient {
     expect(password, '***REMOVED-CREDENTIAL***');
     return <String, dynamic>{
       'token': 'session-token',
+      'internalServiceToken': 'bridge-token',
       'expiresAt': '2026-04-12T00:00:00Z',
       'user': <String, dynamic>{
         'id': 'u-1',
@@ -153,6 +162,7 @@ class _SuccessfulAccountRuntimeClient extends AccountRuntimeClient {
 
   @override
   Future<AccountSessionSummary> loadSession({required String token}) async {
+    loadSessionCalls += 1;
     expect(token, 'session-token');
     return const AccountSessionSummary(
       userId: 'u-1',
@@ -162,22 +172,6 @@ class _SuccessfulAccountRuntimeClient extends AccountRuntimeClient {
       mfaEnabled: true,
       totpEnabled: true,
       totpPending: false,
-    );
-  }
-
-  @override
-  Future<AccountProfileResponse> loadProfile({required String token}) async {
-    expect(token, 'session-token');
-    return AccountProfileResponse(
-      profile: AccountRemoteProfile.defaults().copyWith(
-        apisixUrl: 'https://apisix.svc.plus',
-      ),
-      profileScope: 'tenant-shared',
-      tokenConfigured: const AccountTokenConfigured(
-        openclaw: true,
-        vault: false,
-        apisix: true,
-      ),
     );
   }
 }
@@ -204,6 +198,7 @@ class _MfaAccountRuntimeClient extends AccountRuntimeClient {
     lastVerifiedCode = code;
     return <String, dynamic>{
       'token': 'session-token',
+      'internalServiceToken': 'bridge-token',
       'expiresAt': '2026-04-12T00:00:00Z',
       'user': <String, dynamic>{
         'id': 'u-1',
@@ -226,19 +221,6 @@ class _MfaAccountRuntimeClient extends AccountRuntimeClient {
       mfaEnabled: true,
       totpEnabled: true,
       totpPending: false,
-    );
-  }
-
-  @override
-  Future<AccountProfileResponse> loadProfile({required String token}) async {
-    return AccountProfileResponse(
-      profile: AccountRemoteProfile.defaults(),
-      profileScope: 'tenant-shared',
-      tokenConfigured: const AccountTokenConfigured(
-        openclaw: true,
-        vault: false,
-        apisix: true,
-      ),
     );
   }
 }
