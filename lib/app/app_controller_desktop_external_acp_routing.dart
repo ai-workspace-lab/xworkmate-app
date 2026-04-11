@@ -49,8 +49,8 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
       normalizedSessionKey,
     );
     final preferredGatewayTarget = switch (sessionTarget) {
-      AssistantExecutionTarget.gateway => 'gateway',
-      AssistantExecutionTarget.singleAgent => 'gateway',
+      AssistantExecutionTarget.gateway => kCanonicalGatewayProviderId,
+      AssistantExecutionTarget.singleAgent => kCanonicalGatewayProviderId,
     };
     final availableSkills =
         assistantImportedSkillsForSession(normalizedSessionKey)

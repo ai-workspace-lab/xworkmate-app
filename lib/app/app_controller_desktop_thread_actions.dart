@@ -247,14 +247,16 @@ extension AppControllerDesktopThreadActions on AppController {
       currentSessionKey,
       executionTarget: currentTarget,
     );
-    final workingDirectory = assistantSelectedWorkingDirectoryForSession(
-      currentSessionKey,
-    ).trim();
+    final workingDirectory =
+        assistantWorkingDirectoryForSessionInternal(
+          currentSessionKey,
+        )?.trim() ??
+        '';
     if (workingDirectory.isEmpty) {
       final error = StateError(
         appText(
-          '当前线程尚未选择项目目录，无法运行。请先选择项目。',
-          'This thread has no project directory yet. Select a project before running.',
+          '当前任务线程缺少可运行的 workingDirectory，无法执行。',
+          'This task thread has no runnable workingDirectory yet.',
         ),
       );
       appendAssistantThreadMessageInternal(

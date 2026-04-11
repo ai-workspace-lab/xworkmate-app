@@ -4,7 +4,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -343,31 +342,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     });
   }
 
-  Future<void> pickWorkingDirectoryInternal() async {
-    final controller = widget.controller;
-    final sessionKey = controller.currentSessionKey;
-    final selectedWorkingDirectory = controller
-        .assistantSelectedWorkingDirectoryForSession(sessionKey)
-        .trim();
-    final fallbackWorkspacePath = controller
-        .assistantWorkspacePathForSession(sessionKey)
-        .trim();
-    final initialDirectory = selectedWorkingDirectory.isNotEmpty
-        ? selectedWorkingDirectory
-        : fallbackWorkspacePath;
-    final pickedDirectory = await getDirectoryPath(
-      confirmButtonText: appText('选择项目', 'Select Project'),
-      initialDirectory: initialDirectory.isNotEmpty ? initialDirectory : null,
-    );
-    if (!mounted || pickedDirectory == null || pickedDirectory.trim().isEmpty) {
-      return;
-    }
-    await controller.saveAssistantSelectedWorkingDirectoryForSession(
-      sessionKey,
-      pickedDirectory,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
@@ -400,15 +374,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     final selectedSkills = widget.availableSkills
         .where((skill) => widget.selectedSkillKeys.contains(skill.key))
         .toList(growable: false);
-    final selectedWorkingDirectory = controller
-        .assistantSelectedWorkingDirectoryForSession(
-          controller.currentSessionKey,
-        )
-        .trim();
-    final selectedWorkingDirectoryLabel = controller
-        .assistantSelectedWorkingDirectoryDisplayLabelForSession(
-          controller.currentSessionKey,
-        );
     final submitLabel = connected
         ? appText('提交', 'Submit')
         : singleAgent
@@ -505,57 +470,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                 ),
                 const SizedBox(width: 4),
               ],
-              Tooltip(
-                message: selectedWorkingDirectory.isEmpty
-                    ? appText(
-                        '选择 bridge 执行使用的项目目录（workingDirectory）',
-                        'Choose the bridge project directory (workingDirectory).',
-                      )
-                    : selectedWorkingDirectory,
-                child: InkWell(
-                  key: const Key('assistant-working-directory-button'),
-                  onTap: () => unawaited(pickWorkingDirectoryInternal()),
-                  borderRadius: BorderRadius.circular(AppRadius.chip),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: palette.surfacePrimary,
-                      borderRadius: BorderRadius.circular(AppRadius.chip),
-                      border: Border.all(color: palette.strokeSoft),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.folder_open_rounded,
-                          size: 16,
-                          color: selectedWorkingDirectory.isEmpty
-                              ? palette.textMuted
-                              : palette.textPrimary,
-                        ),
-                        const SizedBox(width: 6),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 160),
-                          child: Text(
-                            selectedWorkingDirectoryLabel,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelMedium
-                                ?.copyWith(
-                                  color: selectedWorkingDirectory.isEmpty
-                                      ? palette.textMuted
-                                      : palette.textPrimary,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
               if (singleAgent) ...[
                 PopupMenuButton<SingleAgentProvider>(
                   key: const Key('assistant-single-agent-provider-button'),
@@ -591,6 +505,36 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                     tooltip: singleAgentProviderTooltipInternal(
                       controller.currentSingleAgentProvider,
                     ),
+                    showChevron: true,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ] else ...[
+                PopupMenuButton<String>(
+                  key: const Key('assistant-gateway-provider-button'),
+                  tooltip: appText('Gateway Provider', 'Gateway Provider'),
+                  onSelected: (_) {},
+                  itemBuilder: (context) => const <PopupMenuEntry<String>>[
+                    PopupMenuItem<String>(
+                      value: kCanonicalGatewayProviderId,
+                      key: Key('assistant-gateway-provider-menu-item-openclaw'),
+                      child: Row(
+                        children: [
+                          Icon(Icons.cloud_outlined, size: 18),
+                          SizedBox(width: 10),
+                          Expanded(child: Text(kCanonicalGatewayProviderLabel)),
+                          Icon(Icons.check_rounded, size: 18),
+                        ],
+                      ),
+                    ),
+                  ],
+                  child: ComposerToolbarChipInternal(
+                    icon: Icons.cloud_outlined,
+                    tooltip: gatewayProviderTooltipInternal(),
                     showChevron: true,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,

@@ -347,8 +347,8 @@ class GoTaskServiceRequest {
   ExternalCodeAgentAcpRoutingConfig _synthesizedRouting() {
     final gatewayTarget = normalizedTarget;
     final preferredGatewayTarget = switch (gatewayTarget) {
-      AssistantExecutionTarget.gateway => 'gateway',
-      _ => 'gateway',
+      AssistantExecutionTarget.gateway => kCanonicalGatewayProviderId,
+      _ => kCanonicalGatewayProviderId,
     };
     final explicitExecutionTarget = switch (gatewayTarget) {
       AssistantExecutionTarget.singleAgent => 'single-agent',

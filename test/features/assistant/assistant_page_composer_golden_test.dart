@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller_desktop_core.dart';
-import 'package:xworkmate/app/app_controller_desktop_workspace_execution.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_bar.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_models.dart';
@@ -17,7 +16,7 @@ import 'package:xworkmate/theme/app_theme.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('renders composer with project workingDirectory chip', (
+  testWidgets('renders composer with thread provider controls only', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1400, 320));
@@ -61,10 +60,6 @@ void main() {
     );
     controller.lastObservedSettingsSnapshotInternal =
         controller.settingsController.snapshotInternal;
-    await controller.saveAssistantSelectedWorkingDirectoryForSession(
-      controller.currentSessionKey,
-      '${root.path}/project-alpha',
-    );
 
     await tester.pumpWidget(
       MaterialApp(

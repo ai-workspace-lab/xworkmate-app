@@ -394,41 +394,26 @@ void main() {
     );
   });
 
-  group('selected working directory', () {
+  group('thread working directory', () {
     test(
-      'persists thread project directory without changing local workspace binding',
+      'uses the unique thread workspace as the only workingDirectory source',
       () async {
         final controller = AppController();
         addTearDown(controller.dispose);
 
-        const sessionKey = 'draft:project-dir';
+        const sessionKey = 'draft:thread-working-directory';
         controller.initializeAssistantThreadContext(
           sessionKey,
           executionTarget: AssistantExecutionTarget.singleAgent,
         );
-        final originalWorkspacePath = controller
-            .assistantWorkspacePathForSession(sessionKey);
-
-        await controller.saveAssistantSelectedWorkingDirectoryForSession(
-          sessionKey,
-          '/tmp/project-alpha',
-        );
-
         final record = controller.requireTaskThreadForSessionInternal(
           sessionKey,
         );
-        expect(record.selectedWorkingDirectory, '/tmp/project-alpha');
+
         expect(
-          controller.assistantSelectedWorkingDirectoryForSession(sessionKey),
-          '/tmp/project-alpha',
+          controller.assistantWorkingDirectoryForSessionInternal(sessionKey),
+          record.workspaceBinding.workspacePath,
         );
-        expect(
-          controller.assistantSelectedWorkingDirectoryDisplayLabelForSession(
-            sessionKey,
-          ),
-          'project-alpha',
-        );
-        expect(record.workspaceBinding.workspacePath, originalWorkspacePath);
       },
     );
   });
