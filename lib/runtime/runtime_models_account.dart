@@ -8,6 +8,8 @@ class AccountSessionSummary {
     required this.name,
     required this.role,
     required this.mfaEnabled,
+    this.totpEnabled = false,
+    this.totpPending = false,
   });
 
   final String userId;
@@ -15,6 +17,8 @@ class AccountSessionSummary {
   final String name;
   final String role;
   final bool mfaEnabled;
+  final bool totpEnabled;
+  final bool totpPending;
 
   AccountSessionSummary copyWith({
     String? userId,
@@ -22,6 +26,8 @@ class AccountSessionSummary {
     String? name,
     String? role,
     bool? mfaEnabled,
+    bool? totpEnabled,
+    bool? totpPending,
   }) {
     return AccountSessionSummary(
       userId: userId ?? this.userId,
@@ -29,6 +35,8 @@ class AccountSessionSummary {
       name: name ?? this.name,
       role: role ?? this.role,
       mfaEnabled: mfaEnabled ?? this.mfaEnabled,
+      totpEnabled: totpEnabled ?? this.totpEnabled,
+      totpPending: totpPending ?? this.totpPending,
     );
   }
 
@@ -39,6 +47,8 @@ class AccountSessionSummary {
       'name': name,
       'role': role,
       'mfaEnabled': mfaEnabled,
+      'totpEnabled': totpEnabled,
+      'totpPending': totpPending,
     };
   }
 
@@ -49,6 +59,8 @@ class AccountSessionSummary {
       name: json['name'] as String? ?? '',
       role: json['role'] as String? ?? '',
       mfaEnabled: json['mfaEnabled'] as bool? ?? false,
+      totpEnabled: json['totpEnabled'] as bool? ?? false,
+      totpPending: json['totpPending'] as bool? ?? false,
     );
   }
 }
