@@ -137,8 +137,8 @@ void main() {
             final result = await transport.executeTask(
               _buildRequest(
                 providerId: providerId,
-                sessionId: '${providerId}-${scenario.skill}',
-                threadId: '${providerId}-${scenario.skill}',
+                sessionId: '$providerId-${scenario.skill}',
+                threadId: '$providerId-${scenario.skill}',
                 workingDirectory: workdir.path,
                 prompt: scenario.prompt,
                 selectedSkills: <String>[scenario.skill],
