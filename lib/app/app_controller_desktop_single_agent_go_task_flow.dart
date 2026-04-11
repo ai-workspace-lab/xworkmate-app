@@ -58,7 +58,6 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
         sessionKey,
       );
       final selection = controller.singleAgentProviderForSession(sessionKey);
-      await controller.syncExternalAcpProvidersInternal();
       final capabilities = await controller.goTaskServiceClientInternal
           .loadExternalAcpCapabilities(
             target: AssistantExecutionTarget.singleAgent,
