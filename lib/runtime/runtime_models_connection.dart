@@ -167,7 +167,7 @@ String normalizeSingleAgentProviderId(String value) {
 String singleAgentProviderFallbackLabelInternal(String providerId) {
   final normalized = normalizeSingleAgentProviderId(providerId);
   if (normalized.isEmpty) {
-    return 'Custom Agent';
+    return appText('Bridge Provider', 'Bridge Provider');
   }
   return normalized
       .split(RegExp(r'[-_.]+'))
@@ -182,7 +182,6 @@ String singleAgentProviderFallbackBadgeInternal({
 }) {
   final normalized = normalizeSingleAgentProviderId(providerId);
   final known = <String, String>{
-    'auto': 'A',
     'codex': 'C',
     'opencode': 'O',
     'claude': 'Cl',
@@ -225,10 +224,10 @@ class SingleAgentProvider {
     this.source = SingleAgentProviderSource.externalExtension,
   });
 
-  static const SingleAgentProvider auto = SingleAgentProvider(
-    providerId: 'auto',
-    label: 'Auto',
-    badge: 'A',
+  static const SingleAgentProvider unspecified = SingleAgentProvider(
+    providerId: '',
+    label: '',
+    badge: '',
   );
 
   static const SingleAgentProvider codex = SingleAgentProvider(
@@ -260,7 +259,7 @@ class SingleAgentProvider {
   final String badge;
   final SingleAgentProviderSource source;
 
-  bool get isAuto => providerId == auto.providerId;
+  bool get isUnspecified => providerId.trim().isEmpty;
   bool get isExternalExtension =>
       source == SingleAgentProviderSource.externalExtension;
 
@@ -301,7 +300,7 @@ class SingleAgentProvider {
       'opencode' => opencode,
       'claude' => claude,
       'gemini' => gemini,
-      'auto' || '' => auto,
+      'auto' || '' => unspecified,
       _ => SingleAgentProvider(
         providerId: normalized,
         label: singleAgentProviderFallbackLabelInternal(normalized),

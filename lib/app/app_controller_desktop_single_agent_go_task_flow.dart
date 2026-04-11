@@ -98,7 +98,7 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
                   effectiveProvider == null)
           ? (routingResolution.unavailableMessage.isNotEmpty
                 ? routingResolution.unavailableMessage
-                : selection == SingleAgentProvider.auto
+                : selection.isUnspecified
                 ? appText(
                     '当前没有可用的 GoTaskService Provider。',
                     'No GoTaskService provider is currently available.',
@@ -177,7 +177,7 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
             routingResolution,
           ),
           routingHint: 'single-agent',
-          provider: effectiveProvider ?? SingleAgentProvider.auto,
+          provider: effectiveProvider ?? SingleAgentProvider.unspecified,
           remoteWorkingDirectoryHint:
               controller
                   .requireTaskThreadForSessionInternal(sessionKey)

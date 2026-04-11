@@ -254,7 +254,12 @@ extension AppControllerDesktopThreadSessions on AppController {
           )?.executionBinding.providerId ??
           '',
     );
-    return settings.sanitizeSingleAgentProviderSelection(stored);
+    final sanitized = settings.sanitizeSingleAgentProviderSelection(stored);
+    if (!sanitized.isUnspecified) {
+      return sanitized;
+    }
+    final options = singleAgentProviderOptions;
+    return options.isEmpty ? SingleAgentProvider.unspecified : options.first;
   }
 
   SingleAgentProvider get currentSingleAgentProvider =>
@@ -304,7 +309,7 @@ extension AppControllerDesktopThreadSessions on AppController {
       return false;
     }
     final selection = singleAgentProviderForSession(normalizedSessionKey);
-    if (selection == SingleAgentProvider.auto) {
+    if (selection.isUnspecified) {
       return false;
     }
     return !canUseSingleAgentProviderInternal(selection) &&
@@ -385,7 +390,7 @@ extension AppControllerDesktopThreadSessions on AppController {
       return resolvedProvider.label;
     }
     final provider = currentSingleAgentProvider;
-    if (provider != SingleAgentProvider.auto) {
+    if (!provider.isUnspecified) {
       return provider.label;
     }
     return appText('单机智能体', 'Single Agent');

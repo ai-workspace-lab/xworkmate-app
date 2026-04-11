@@ -102,7 +102,7 @@ void main() {
       );
 
       expect(snapshot.executionTarget, AssistantExecutionTarget.remote);
-      expect(snapshot.singleAgentProvider, SingleAgentProvider.auto);
+      expect(snapshot.singleAgentProvider.isUnspecified, isTrue);
       expect(snapshot.record, isNull);
       expect(staleRecord.executionBinding.providerId, isNotEmpty);
     });
