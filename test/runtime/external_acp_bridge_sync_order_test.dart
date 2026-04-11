@@ -1,24 +1,21 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/external_code_agent_acp_desktop_transport.dart';
-import 'package:xworkmate/runtime/go_acp_stdio_bridge.dart';
+import 'package:xworkmate/runtime/gateway_acp_client.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
-class _FakeGoAcpStdioBridgeWithSyncOrder extends GoAcpStdioBridge {
-  final List<String> methods = <String>[];
-  final StreamController<Map<String, dynamic>> _notifications =
-      StreamController<Map<String, dynamic>>.broadcast();
+class _FakeGatewayAcpClientWithSyncOrder extends GatewayAcpClient {
+  _FakeGatewayAcpClientWithSyncOrder() : super(endpointResolver: () => null);
 
-  @override
-  Stream<Map<String, dynamic>> get notifications => _notifications.stream;
+  final List<String> methods = <String>[];
 
   @override
   Future<Map<String, dynamic>> request({
     required String method,
     required Map<String, dynamic> params,
-    Duration timeout = const Duration(seconds: 120),
+    void Function(Map<String, dynamic>)? onNotification,
+    Uri? endpointOverride,
+    String authorizationOverride = '',
   }) async {
     methods.add(method);
     return switch (method) {
@@ -33,34 +30,35 @@ class _FakeGoAcpStdioBridgeWithSyncOrder extends GoAcpStdioBridge {
         'result': <String, dynamic>{
           'success': true,
           'output': 'ok',
-          'resolvedExecutionTarget': 'single-agent',
+          'resolvedExecutionTarget': 'agent',
         },
       },
     };
-  }
-
-  @override
-  Future<void> dispose() async {
-    await _notifications.close();
   }
 }
 
 void main() {
   group('External ACP bridge routing order', () {
     test('loads capabilities without app-side provider sync', () async {
-      final bridge = _FakeGoAcpStdioBridgeWithSyncOrder();
-      final transport = ExternalCodeAgentAcpDesktopTransport(bridge: bridge);
+      final client = _FakeGatewayAcpClientWithSyncOrder();
+      final transport = ExternalCodeAgentAcpDesktopTransport(
+        client: client,
+        endpointResolver: (_) => null,
+      );
 
       await transport.loadExternalAcpCapabilities(
         target: AssistantExecutionTarget.singleAgent,
       );
 
-      expect(bridge.methods, <String>['acp.capabilities']);
+      expect(client.methods, <String>['acp.capabilities']);
     });
 
     test('starts sessions without app-side provider sync', () async {
-      final bridge = _FakeGoAcpStdioBridgeWithSyncOrder();
-      final transport = ExternalCodeAgentAcpDesktopTransport(bridge: bridge);
+      final client = _FakeGatewayAcpClientWithSyncOrder();
+      final transport = ExternalCodeAgentAcpDesktopTransport(
+        client: client,
+        endpointResolver: (_) => null,
+      );
 
       await transport.executeTask(
         const GoTaskServiceRequest(
@@ -82,7 +80,7 @@ void main() {
         onUpdate: (_) {},
       );
 
-      expect(bridge.methods, <String>['session.start']);
+      expect(client.methods, <String>['session.start']);
     });
   });
 }

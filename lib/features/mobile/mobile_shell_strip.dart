@@ -38,7 +38,7 @@ class MobileSafeStripInternal extends StatelessWidget {
     final hasPendingRun =
         controller.hasAssistantPendingRun || controller.activeRunId != null;
     final securePathLabel = mobileSecurePathLabelInternal(
-      profile: controller.settings.primaryRemoteGatewayProfile,
+      profile: controller.settings.primaryGatewayProfile,
       connection: connection,
     );
 
