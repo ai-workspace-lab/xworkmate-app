@@ -698,7 +698,11 @@ extension AppControllerDesktopThreadStorage on AppController {
                 record.executionBinding.providerId,
               ),
             )
-          : SingleAgentProvider.unspecified;
+          : const SingleAgentProvider(
+              providerId: kCanonicalGatewayProviderId,
+              label: kCanonicalGatewayProviderLabel,
+              badge: 'OC',
+            );
       final workspaceBinding = record.workspaceBinding.copyWith(
         workspaceId: sessionKey,
         displayPath: record.workspaceKind == WorkspaceKind.localFs

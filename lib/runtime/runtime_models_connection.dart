@@ -333,6 +333,9 @@ const List<SingleAgentProvider> kPresetExternalAcpProviders =
       SingleAgentProvider.gemini,
     ];
 
+const String kCanonicalGatewayProviderId = 'openclaw';
+const String kCanonicalGatewayProviderLabel = 'OpenClaw';
+
 const List<SingleAgentProvider> kKnownSingleAgentProviders =
     <SingleAgentProvider>[
       SingleAgentProvider.codex,

@@ -1,7 +1,6 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller_desktop_core.dart';
+import 'package:xworkmate/app/app_controller_desktop_runtime_helpers.dart';
 import 'package:xworkmate/app/app_controller_desktop_thread_actions.dart';
 import 'package:xworkmate/app/app_controller_desktop_thread_sessions.dart';
 import 'package:xworkmate/app/app_controller_desktop_workspace_execution.dart';
@@ -13,24 +12,16 @@ void main() {
 
   group('thread workingDirectory dispatch', () {
     test(
-      'single-agent requests reuse the thread selected workingDirectory',
+      'single-agent requests reuse the unique thread workspace workingDirectory',
       () async {
         final client = _CapturingGoTaskServiceClient();
-        final projectDir = Directory.systemTemp.createTempSync(
-          'xworkmate-project-alpha-',
-        );
         final controller = AppController(
           goTaskServiceClient: client,
           availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
           ],
         );
-        addTearDown(() async {
-          controller.dispose();
-          if (projectDir.existsSync()) {
-            await projectDir.delete(recursive: true);
-          }
-        });
+        addTearDown(controller.dispose);
 
         const sessionKey = 'draft:single-agent-working-directory';
         controller.initializeAssistantThreadContext(
@@ -38,10 +29,10 @@ void main() {
           executionTarget: AssistantExecutionTarget.singleAgent,
         );
         await controller.switchSession(sessionKey);
-        await controller.saveAssistantSelectedWorkingDirectoryForSession(
-          sessionKey,
-          projectDir.path,
-        );
+        final expectedThreadWorkingDirectory = controller
+            .requireTaskThreadForSessionInternal(sessionKey)
+            .workspaceBinding
+            .workspacePath;
 
         await controller.sendChatMessage('first turn');
         await controller.sendChatMessage('second turn');
@@ -57,60 +48,51 @@ void main() {
         ]);
         expect(
           client.requests.map((item) => item.workingDirectory).toList(),
-          <String>[projectDir.path, projectDir.path],
-        );
-      },
-    );
-
-    test(
-      'gateway threads persist their selected workingDirectory separately from workspace binding',
-      () async {
-        final projectDir = Directory.systemTemp.createTempSync(
-          'xworkmate-project-beta-',
-        );
-        final controller = AppController(
-          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-            SingleAgentProvider.codex,
+          <String>[
+            expectedThreadWorkingDirectory,
+            expectedThreadWorkingDirectory,
           ],
         );
-        addTearDown(() async {
-          controller.dispose();
-          if (projectDir.existsSync()) {
-            await projectDir.delete(recursive: true);
-          }
-        });
-
-        controller.appUiStateInternal = controller.appUiState.copyWith(
-          savedGatewayTargets: const <String>['gateway'],
-        );
-        controller.lastObservedSettingsSnapshotInternal =
-            controller.settingsController.snapshotInternal;
-
-        const sessionKey = 'draft:gateway-working-directory';
-        controller.initializeAssistantThreadContext(
-          sessionKey,
-          executionTarget: AssistantExecutionTarget.gateway,
-        );
-        await controller.switchSession(sessionKey);
-        await controller.setAssistantExecutionTarget(
-          AssistantExecutionTarget.gateway,
-        );
-        await controller.saveAssistantSelectedWorkingDirectoryForSession(
-          sessionKey,
-          projectDir.path,
-        );
-
-        final record = controller.requireTaskThreadForSessionInternal(
-          sessionKey,
-        );
-        expect(
-          controller.assistantExecutionTargetForSession(sessionKey),
-          AssistantExecutionTarget.gateway,
-        );
-        expect(record.selectedWorkingDirectory, projectDir.path);
-        expect(record.workspaceBinding.workspacePath, isNot(projectDir.path));
       },
     );
+
+    test('each task thread keeps an independent workingDirectory', () async {
+      final controller = AppController(
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+      );
+      addTearDown(controller.dispose);
+
+      const sessionKey = 'draft:thread-working-directory-a';
+      const otherSessionKey = 'draft:thread-working-directory-b';
+      controller.initializeAssistantThreadContext(
+        sessionKey,
+        executionTarget: AssistantExecutionTarget.singleAgent,
+      );
+      controller.initializeAssistantThreadContext(
+        otherSessionKey,
+        executionTarget: AssistantExecutionTarget.singleAgent,
+      );
+      final recordA = controller.requireTaskThreadForSessionInternal(
+        sessionKey,
+      );
+      final recordB = controller.requireTaskThreadForSessionInternal(
+        otherSessionKey,
+      );
+      expect(
+        controller.assistantWorkingDirectoryForSessionInternal(sessionKey),
+        recordA.workspaceBinding.workspacePath,
+      );
+      expect(
+        controller.assistantWorkingDirectoryForSessionInternal(otherSessionKey),
+        recordB.workspaceBinding.workspacePath,
+      );
+      expect(
+        recordA.workspaceBinding.workspacePath,
+        isNot(recordB.workspaceBinding.workspacePath),
+      );
+    });
   });
 }
 
