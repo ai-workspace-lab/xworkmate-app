@@ -343,6 +343,31 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     });
   }
 
+  Future<void> pickWorkingDirectoryInternal() async {
+    final controller = widget.controller;
+    final sessionKey = controller.currentSessionKey;
+    final selectedWorkingDirectory = controller
+        .assistantSelectedWorkingDirectoryForSession(sessionKey)
+        .trim();
+    final fallbackWorkspacePath = controller
+        .assistantWorkspacePathForSession(sessionKey)
+        .trim();
+    final initialDirectory = selectedWorkingDirectory.isNotEmpty
+        ? selectedWorkingDirectory
+        : fallbackWorkspacePath;
+    final pickedDirectory = await getDirectoryPath(
+      confirmButtonText: appText('选择项目', 'Select Project'),
+      initialDirectory: initialDirectory.isNotEmpty ? initialDirectory : null,
+    );
+    if (!mounted || pickedDirectory == null || pickedDirectory.trim().isEmpty) {
+      return;
+    }
+    await controller.saveAssistantSelectedWorkingDirectoryForSession(
+      sessionKey,
+      pickedDirectory,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
@@ -375,6 +400,15 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     final selectedSkills = widget.availableSkills
         .where((skill) => widget.selectedSkillKeys.contains(skill.key))
         .toList(growable: false);
+    final selectedWorkingDirectory = controller
+        .assistantSelectedWorkingDirectoryForSession(
+          controller.currentSessionKey,
+        )
+        .trim();
+    final selectedWorkingDirectoryLabel = controller
+        .assistantSelectedWorkingDirectoryDisplayLabelForSession(
+          controller.currentSessionKey,
+        );
     final submitLabel = connected
         ? appText('提交', 'Submit')
         : singleAgent
@@ -471,6 +505,57 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                 ),
                 const SizedBox(width: 4),
               ],
+              Tooltip(
+                message: selectedWorkingDirectory.isEmpty
+                    ? appText(
+                        '选择 bridge 执行使用的项目目录（workingDirectory）',
+                        'Choose the bridge project directory (workingDirectory).',
+                      )
+                    : selectedWorkingDirectory,
+                child: InkWell(
+                  key: const Key('assistant-working-directory-button'),
+                  onTap: () => unawaited(pickWorkingDirectoryInternal()),
+                  borderRadius: BorderRadius.circular(AppRadius.chip),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: palette.surfacePrimary,
+                      borderRadius: BorderRadius.circular(AppRadius.chip),
+                      border: Border.all(color: palette.strokeSoft),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.folder_open_rounded,
+                          size: 16,
+                          color: selectedWorkingDirectory.isEmpty
+                              ? palette.textMuted
+                              : palette.textPrimary,
+                        ),
+                        const SizedBox(width: 6),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 160),
+                          child: Text(
+                            selectedWorkingDirectoryLabel,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(
+                                  color: selectedWorkingDirectory.isEmpty
+                                      ? palette.textMuted
+                                      : palette.textPrimary,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
               if (singleAgent) ...[
                 PopupMenuButton<SingleAgentProvider>(
                   key: const Key('assistant-single-agent-provider-button'),
@@ -556,64 +641,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                         ),
                       ),
                 const SizedBox(width: 4),
-              ],
-              if (uiFeatures.supportsMultiAgent) ...[
-                Tooltip(
-                  message: appText(
-                    '多 Agent 协作模式（Architect 调度/文档 → Lead Engineer 主程 → Worker/Review）',
-                    'Multi-Agent Collaboration Mode (Architect docs/scheduler -> Lead Engineer -> Worker/Review)',
-                  ),
-                  child: AnimatedBuilder(
-                    animation: controller.multiAgentOrchestrator,
-                    builder: (context, _) {
-                      final collab = controller.multiAgentOrchestrator;
-                      final enabled = collab.config.enabled;
-                      return IconButton(
-                        key: const Key('assistant-collaboration-toggle'),
-                        icon: Icon(
-                          enabled
-                              ? Icons.auto_awesome
-                              : Icons.auto_awesome_outlined,
-                          size: 20,
-                          color: enabled ? Colors.orange : null,
-                        ),
-                        onPressed:
-                            collab.isRunning ||
-                                controller.isMultiAgentRunPending
-                            ? null
-                            : () => unawaited(
-                                controller.saveMultiAgentConfig(
-                                  collab.config.copyWith(enabled: !enabled),
-                                ),
-                              ),
-                        splashRadius: 18,
-                      );
-                    },
-                  ),
-                ),
-                AnimatedBuilder(
-                  animation: controller.multiAgentOrchestrator,
-                  builder: (context, _) {
-                    final collab = controller.multiAgentOrchestrator;
-                    if (!collab.config.enabled) {
-                      return const SizedBox.shrink();
-                    }
-                    return Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: ComposerToolbarChipInternal(
-                        icon: Icons.hub_rounded,
-                        tooltip: collab.config.usesAris
-                            ? appText('多智能体模式: ARIS', 'Multi-agent mode: ARIS')
-                            : appText('多智能体模式: 原生', 'Multi-agent mode: Native'),
-                        showChevron: false,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                      ),
-                    );
-                  },
-                ),
               ],
             ],
           ),

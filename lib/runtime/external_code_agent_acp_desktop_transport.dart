@@ -40,6 +40,9 @@ class ExternalCodeAgentAcpDesktopTransport
     final providerCatalog = _parseProviderCatalog(
       result['providerCatalog'] ?? caps['providerCatalog'],
     );
+    final gatewayProviders = _castMapList(
+      result['gatewayProviders'] ?? caps['gatewayProviders'],
+    );
     return ExternalCodeAgentAcpCapabilities(
       singleAgent:
           _boolValue(result['singleAgent']) ??
@@ -50,6 +53,7 @@ class ExternalCodeAgentAcpDesktopTransport
           _boolValue(caps['multi_agent']) ??
           true,
       providerCatalog: providerCatalog,
+      gatewayProviders: gatewayProviders,
       raw: result,
     );
   }
@@ -171,6 +175,10 @@ class ExternalCodeAgentAcpDesktopTransport
       return raw.cast<Object?>();
     }
     return const <Object?>[];
+  }
+
+  List<Map<String, dynamic>> _castMapList(Object? raw) {
+    return _asList(raw).map(_castMap).toList(growable: false);
   }
 
   bool? _boolValue(Object? raw) {

@@ -140,9 +140,14 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     inputControllerInternal.clear();
 
     try {
-      if (uiFeatures.supportsMultiAgent &&
-          controller.settings.multiAgent.enabled) {
-        final collaborationAttachments = submittedAttachments
+      final attachmentPayloads = await buildAttachmentPayloadsInternal(
+        submittedAttachments,
+      );
+      await controller.sendChatMessage(
+        prompt,
+        thinking: thinkingLabelInternal,
+        attachments: attachmentPayloads,
+        localAttachments: submittedAttachments
             .map(
               (item) => CollaborationAttachment(
                 name: item.name,
@@ -150,33 +155,9 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
                 path: item.path,
               ),
             )
-            .toList(growable: false);
-        await controller.runMultiAgentCollaboration(
-          rawPrompt: rawPrompt,
-          composedPrompt: prompt,
-          attachments: collaborationAttachments,
-          selectedSkillLabels: selectedSkillLabels,
-        );
-      } else {
-        final attachmentPayloads = await buildAttachmentPayloadsInternal(
-          submittedAttachments,
-        );
-        await controller.sendChatMessage(
-          prompt,
-          thinking: thinkingLabelInternal,
-          attachments: attachmentPayloads,
-          localAttachments: submittedAttachments
-              .map(
-                (item) => CollaborationAttachment(
-                  name: item.name,
-                  description: item.mimeType,
-                  path: item.path,
-                ),
-              )
-              .toList(growable: false),
-          selectedSkillLabels: selectedSkillLabels,
-        );
-      }
+            .toList(growable: false),
+        selectedSkillLabels: selectedSkillLabels,
+      );
     } catch (_) {
       if (!mounted) {
         rethrow;
@@ -440,11 +421,12 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     final sessionKey = buildDraftSessionKeyInternal(widget.controller);
     final inheritedTarget = pickDraftThreadExecutionTargetInternal(
       currentTarget: widget.controller.currentAssistantExecutionTarget,
-      visibleTargets: widget.controller
-          .visibleAssistantExecutionTargets(const <AssistantExecutionTarget>[
-            AssistantExecutionTarget.singleAgent,
-            AssistantExecutionTarget.gateway,
-          ]),
+      visibleTargets: widget.controller.visibleAssistantExecutionTargets(
+        const <AssistantExecutionTarget>[
+          AssistantExecutionTarget.singleAgent,
+          AssistantExecutionTarget.gateway,
+        ],
+      ),
       localWorkspaceAvailable: widget.controller.settings.workspacePath
           .trim()
           .isNotEmpty,

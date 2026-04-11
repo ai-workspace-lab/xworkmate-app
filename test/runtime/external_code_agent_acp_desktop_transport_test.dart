@@ -28,15 +28,23 @@ class _FakeGatewayAcpClient extends GatewayAcpClient {
             <String, dynamic>{'providerId': 'opencode', 'label': 'OpenCode'},
             <String, dynamic>{'providerId': 'gemini', 'label': 'Gemini'},
           ],
+          'gatewayProviders': <Map<String, dynamic>>[
+            <String, dynamic>{'providerId': 'local', 'label': 'Local Gateway'},
+            <String, dynamic>{
+              'providerId': 'openclaw',
+              'label': 'OpenClaw Gateway',
+            },
+          ],
         },
       };
     }
     if (method == 'xworkmate.routing.resolve') {
       return <String, dynamic>{
         'result': <String, dynamic>{
-          'resolvedExecutionTarget': 'agent',
-          'resolvedEndpointTarget': 'agent',
+          'resolvedExecutionTarget': 'single-agent',
+          'resolvedEndpointTarget': 'singleAgent',
           'resolvedProviderId': 'gemini',
+          'resolvedGatewayProviderId': 'local',
           'resolvedModel': 'gemini-2.5-pro',
           'resolvedSkills': <String>['pptx'],
           'unavailable': false,
@@ -66,6 +74,12 @@ void main() {
         expect(
           capabilities.providerCatalog.map((item) => item.providerId).toList(),
           <String>['codex', 'opencode', 'gemini'],
+        );
+        expect(
+          capabilities.gatewayProviders
+              .map((item) => item['providerId']?.toString())
+              .toList(),
+          <String>['local', 'openclaw'],
         );
       },
     );
@@ -109,7 +123,10 @@ void main() {
         );
 
         expect(client.methods, <String>['xworkmate.routing.resolve']);
+        expect(resolution.resolvedExecutionTarget, 'single-agent');
+        expect(resolution.resolvedEndpointTarget, 'singleAgent');
         expect(resolution.resolvedProviderId, 'gemini');
+        expect(resolution.resolvedGatewayProviderId, 'local');
         expect(resolution.resolvedModel, 'gemini-2.5-pro');
         expect(resolution.resolvedSkills, <String>['pptx']);
       },

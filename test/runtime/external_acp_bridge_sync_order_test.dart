@@ -30,7 +30,7 @@ class _FakeGatewayAcpClientWithSyncOrder extends GatewayAcpClient {
         'result': <String, dynamic>{
           'success': true,
           'output': 'ok',
-          'resolvedExecutionTarget': 'agent',
+          'resolvedExecutionTarget': 'single-agent',
         },
       },
     };

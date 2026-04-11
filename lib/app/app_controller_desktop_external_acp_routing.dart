@@ -121,7 +121,7 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
 
   String _routingExecutionTargetValueInternal(AssistantExecutionTarget target) {
     return switch (target) {
-      AssistantExecutionTarget.singleAgent => 'agent',
+      AssistantExecutionTarget.singleAgent => 'single-agent',
       AssistantExecutionTarget.gateway => 'gateway',
     };
   }
