@@ -59,18 +59,18 @@ class FileSecureStorageClient implements SecureStorageClient {
 
 class SecretStore {
   SecretStore({
-    Future<String?> Function()? fallbackDirectoryPathResolver,
-    Future<String?> Function()? databasePathResolver,
-    Future<String?> Function()? defaultSupportDirectoryPathResolver,
+    Future<String?> Function()? secretRootPathResolver,
+    Future<String?> Function()? appDataRootPathResolver,
+    Future<String?> Function()? supportRootPathResolver,
     SecureStorageClient? secureStorage,
     bool enableSecureStorage = true,
     StoreLayoutResolver? layoutResolver,
   }) : _layoutResolver =
            layoutResolver ??
            StoreLayoutResolver(
-             localRootPathResolver: databasePathResolver,
-             secretRootPathResolver: fallbackDirectoryPathResolver,
-             supportRootPathResolver: defaultSupportDirectoryPathResolver,
+             appDataRootPathResolver: appDataRootPathResolver,
+             secretRootPathResolver: secretRootPathResolver,
+             supportRootPathResolver: supportRootPathResolver,
            ),
        _secureStorageOverride = secureStorage;
 
