@@ -41,7 +41,6 @@ class SettingsSnapshot {
     required this.accountUsername,
     required this.accountWorkspace,
     required this.accountWorkspaceFollowed,
-    required this.accountLocalMode,
     required this.acpBridgeServerModeConfig,
     required this.linuxDesktop,
     required this.assistantExecutionTarget,
@@ -74,7 +73,6 @@ class SettingsSnapshot {
   final String accountUsername;
   final String accountWorkspace;
   final bool accountWorkspaceFollowed;
-  final bool accountLocalMode;
   final AcpBridgeServerModeConfig acpBridgeServerModeConfig;
   final LinuxDesktopConfig linuxDesktop;
   final AssistantExecutionTarget assistantExecutionTarget;
@@ -108,7 +106,6 @@ class SettingsSnapshot {
       accountUsername: '',
       accountWorkspace: 'Default Workspace',
       accountWorkspaceFollowed: false,
-      accountLocalMode: true,
       acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults(),
       linuxDesktop: LinuxDesktopConfig.defaults(),
       assistantExecutionTarget: AssistantExecutionTarget.agent,
@@ -143,7 +140,6 @@ class SettingsSnapshot {
     String? accountUsername,
     String? accountWorkspace,
     bool? accountWorkspaceFollowed,
-    bool? accountLocalMode,
     AcpBridgeServerModeConfig? acpBridgeServerModeConfig,
     LinuxDesktopConfig? linuxDesktop,
     AssistantExecutionTarget? assistantExecutionTarget,
@@ -187,7 +183,6 @@ class SettingsSnapshot {
       accountWorkspace: accountWorkspace ?? this.accountWorkspace,
       accountWorkspaceFollowed:
           accountWorkspaceFollowed ?? this.accountWorkspaceFollowed,
-      accountLocalMode: accountLocalMode ?? this.accountLocalMode,
       acpBridgeServerModeConfig:
           acpBridgeServerModeConfig ?? this.acpBridgeServerModeConfig,
       linuxDesktop: linuxDesktop ?? this.linuxDesktop,
@@ -230,7 +225,6 @@ class SettingsSnapshot {
       'accountUsername': accountUsername,
       'accountWorkspace': accountWorkspace,
       'accountWorkspaceFollowed': accountWorkspaceFollowed,
-      'accountLocalMode': accountLocalMode,
       'acpBridgeServerModeConfig': acpBridgeServerModeConfig.toJson(),
       'linuxDesktop': linuxDesktop.toJson(),
       'assistantExecutionTarget': assistantExecutionTarget.name,
@@ -323,7 +317,6 @@ class SettingsSnapshot {
           SettingsSnapshot.defaults().accountWorkspace,
       accountWorkspaceFollowed:
           json['accountWorkspaceFollowed'] as bool? ?? false,
-      accountLocalMode: json['accountLocalMode'] as bool? ?? true,
       acpBridgeServerModeConfig: AcpBridgeServerModeConfig.fromJson(
         (json['acpBridgeServerModeConfig'] as Map?)?.cast<String, dynamic>() ??
             const {},

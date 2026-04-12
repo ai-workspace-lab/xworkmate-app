@@ -177,9 +177,7 @@ extension AppControllerDesktopGateway on AppController {
     String token = '',
     String password = '',
   }) async {
-    final normalizedMode = mode == RuntimeConnectionMode.local
-        ? RuntimeConnectionMode.remote
-        : mode;
+    final normalizedMode = RuntimeConnectionMode.remote;
     final nextTarget = assistantExecutionTargetForModeInternal(normalizedMode);
     final nextProfileIndex = gatewayProfileIndexForExecutionTargetInternal(
       nextTarget,
@@ -198,7 +196,7 @@ extension AppControllerDesktopGateway on AppController {
           setupCode: '',
           host: resolvedHost,
           port: resolvedPort <= 0 ? 443 : resolvedPort,
-          tls: normalizedMode == RuntimeConnectionMode.local ? false : tls,
+          tls: tls,
         );
     await AppControllerDesktopSettings(this).saveSettings(
       settings

@@ -31,7 +31,6 @@ void main() {
             onVerifyMfa: () async {},
             onCancelMfa: () async {},
             onSync: () async {},
-            onDisconnect: () async {},
             onLogout: () async {},
           ),
         ),
@@ -49,7 +48,6 @@ void main() {
       addTearDown(controllers.dispose);
 
       final settings = SettingsSnapshot.defaults().copyWith(
-        accountLocalMode: false,
         accountBaseUrl: 'https://accounts.svc.plus',
         accountUsername: 'review@svc.plus',
         acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
@@ -105,7 +103,6 @@ void main() {
             onVerifyMfa: () async {},
             onCancelMfa: () async {},
             onSync: () async {},
-            onDisconnect: () async {},
             onLogout: () async {},
           ),
         ),
