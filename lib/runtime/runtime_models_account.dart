@@ -671,6 +671,7 @@ class AccountSyncResult {
   final String message;
 }
 
+const String kManagedBridgeServerUrl = 'https://xworkmate-bridge.svc.plus';
 const String kAccountManagedSecretTargetBridgeAuthToken = 'bridge.auth_token';
 const String kAccountManagedSecretTargetAIGatewayAccessToken =
     'ai_gateway.access_token';

@@ -14,8 +14,10 @@ This project ships a Flutter desktop/mobile client that connects to an OpenClaw 
 ## 2. Gateway And Network Trust Boundary
 
 - Keep the gateway endpoint, auth token, password, and TLS choice explicit.
-- Only loopback/local mode may use plain `ws` or equivalent non-TLS transport intentionally.
+- The managed bridge / gateway runtime path is remote-only and pinned to the managed bridge origin.
+- `BRIDGE_SERVER_URL` must not become the runtime source of truth for bridge startup or task dialog sends.
 - Remote connections must not silently downgrade from TLS to non-TLS.
+- Explicit loopback / non-TLS behavior is only allowed in isolated external ACP self-host test flows, not in the managed bridge / gateway main path.
 - A user-initiated connect action may use the current form values directly for the active handshake. Persistence is a separate concern and must not be required for the immediate request.
 - When changing auth behavior, verify both success and rejection paths.
 

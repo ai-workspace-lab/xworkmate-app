@@ -95,9 +95,6 @@ extension SettingsControllerAccountExtension on SettingsController {
   Future<AccountSyncResult> syncAccountManagedSecrets({String baseUrl = ''}) =>
       syncAccountSettings(baseUrl: baseUrl);
 
-  Future<void> disconnectManagedAccountBase() =>
-      disconnectManagedAccountBaseSettingsInternal(this);
-
   Future<void> logoutAccount() => logoutAccountSettingsInternal(this);
 
   Future<void> cancelAccountMfaChallenge() =>

@@ -7,14 +7,12 @@ class RuntimeBootstrapConfig {
     required this.workspacePath,
     required this.remoteProjectRoot,
     required this.cliPath,
-    required this.localGateway,
     required this.remoteGateway,
   });
 
   final String? workspacePath;
   final String? remoteProjectRoot;
   final String? cliPath;
-  final GatewayBootstrapTarget? localGateway;
   final GatewayBootstrapTarget? remoteGateway;
 
   static Future<RuntimeBootstrapConfig> load({
@@ -36,10 +34,6 @@ class RuntimeBootstrapConfig {
       workspacePath: workspaceRoot?.path,
       remoteProjectRoot: workspaceRoot?.path,
       cliPath: _resolveCliPath(openClawRoot),
-      localGateway: GatewayBootstrapTarget.tryParse(
-        env['local'],
-        token: env['local-token'],
-      ),
       remoteGateway: GatewayBootstrapTarget.tryParse(
         env['remote'],
         token: env['remote-token'],
@@ -86,9 +80,8 @@ class RuntimeBootstrapConfig {
 
   GatewayBootstrapTarget? preferredGatewayFor(RuntimeConnectionMode mode) {
     return switch (mode) {
-      RuntimeConnectionMode.local => localGateway ?? remoteGateway,
-      RuntimeConnectionMode.remote => remoteGateway ?? localGateway,
-      RuntimeConnectionMode.unconfigured => remoteGateway ?? localGateway,
+      RuntimeConnectionMode.remote => remoteGateway,
+      RuntimeConnectionMode.unconfigured => remoteGateway,
     };
   }
 
@@ -162,11 +155,8 @@ class GatewayBootstrapTarget {
     final tls = scheme == 'wss' || scheme == 'https';
     final port = uri.hasPort ? uri.port : (tls ? 443 : 18789);
     final host = uri.host.trim();
-    final isLocal = host == '127.0.0.1' || host == 'localhost';
     return GatewayBootstrapTarget(
-      mode: isLocal
-          ? RuntimeConnectionMode.local
-          : RuntimeConnectionMode.remote,
+      mode: RuntimeConnectionMode.remote,
       url: trimmed,
       host: host,
       port: port,

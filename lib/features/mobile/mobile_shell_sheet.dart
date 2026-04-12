@@ -643,7 +643,6 @@ String mobileSecurePathLabelInternal({
       ? profile.mode
       : connection.mode;
   return switch (mode) {
-    RuntimeConnectionMode.local => appText('Loopback WS', 'Loopback WS'),
     RuntimeConnectionMode.remote =>
       profile.tls
           ? appText('Secure Direct TLS', 'Secure Direct TLS')
