@@ -180,10 +180,9 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                   focusNode: composerFocusNodeInternal,
                   thinkingLabel: thinkingLabelInternal,
                   showModelControl: true,
-                  modelLabel:
-                      controller.resolvedAssistantModel.isEmpty
-                      ? appText('未选择模型', 'No model selected')
-                      : controller.resolvedAssistantModel,
+                  modelLabel: controller.assistantDisplayModelForSession(
+                    controller.currentSessionKey,
+                  ),
                   modelOptions: controller.assistantModelChoices,
                   attachments: attachmentsInternal,
                   availableSkills: AssistantPageStateActionsInternal(

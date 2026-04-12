@@ -158,38 +158,40 @@ class ComposerToolbarChipStateInternal
   Widget build(BuildContext context) {
     final palette = context.palette;
 
-    return Tooltip(
-      message: widget.tooltip,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => hoveredInternal = true),
-        onExit: (_) => setState(() => hoveredInternal = false),
-        child: Container(
-          padding: widget.padding,
-          decoration: BoxDecoration(
-            color: hoveredInternal
-                ? palette.surfaceSecondary
-                : palette.surfacePrimary,
-            borderRadius: BorderRadius.circular(AppRadius.chip),
-            border: Border.all(color: palette.strokeSoft),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              widget.leading ??
-                  Icon(widget.icon, size: 16, color: palette.textMuted),
-              if (widget.showChevron) ...[
-                const SizedBox(width: 1),
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 14,
-                  color: palette.textMuted,
-                ),
-              ],
+    final chip = MouseRegion(
+      onEnter: (_) => setState(() => hoveredInternal = true),
+      onExit: (_) => setState(() => hoveredInternal = false),
+      child: Container(
+        padding: widget.padding,
+        decoration: BoxDecoration(
+          color: hoveredInternal
+              ? palette.surfaceSecondary
+              : palette.surfacePrimary,
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+          border: Border.all(color: palette.strokeSoft),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            widget.leading ??
+                Icon(widget.icon, size: 16, color: palette.textMuted),
+            if (widget.showChevron) ...[
+              const SizedBox(width: 1),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 14,
+                color: palette.textMuted,
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );
+    final tooltip = widget.tooltip.trim();
+    if (tooltip.isEmpty) {
+      return chip;
+    }
+    return Tooltip(message: tooltip, child: chip);
   }
 }
 
