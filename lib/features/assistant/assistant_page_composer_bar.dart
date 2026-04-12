@@ -198,7 +198,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
   }
 
   void handleControllerChangedInternal() {
-    if (!mounted || !skillPickerPortalControllerInternal.isShowing) {
+    if (!mounted) {
       return;
     }
     setState(() {});
@@ -379,13 +379,18 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                 PopupMenuButton<AssistantExecutionTarget>(
                   key: const Key('assistant-execution-target-button'),
                   tooltip: appText('任务对话模式', 'Task Dialog Mode'),
-                  onSelected: (value) {
+                  onSelected: (value) async {
                     final resolvedTarget =
-                        resolveGatewayExecutionTargetFromVisibleTargets(
+                        resolveAssistantExecutionTargetFromVisibleTargets(
                           visibleExecutionTargets,
-                          currentTarget: executionTarget,
+                          currentTarget: value,
                         );
-                    controller.setAssistantExecutionTarget(resolvedTarget);
+                    await controller.setAssistantExecutionTarget(
+                      resolvedTarget,
+                    );
+                    if (mounted) {
+                      setState(() {});
+                    }
                   },
                   itemBuilder: (context) => compactExecutionTargets
                       .map(
@@ -420,7 +425,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                 ),
                 const SizedBox(width: 4),
               ],
-              if (availableProviders.isNotEmpty) ...[
+              if (executionTarget.isAgent && availableProviders.isNotEmpty) ...[
                 PopupMenuButton<String>(
                   key: const Key('assistant-provider-button'),
                   tooltip: appText('智能体 Provider', 'Agent Provider'),

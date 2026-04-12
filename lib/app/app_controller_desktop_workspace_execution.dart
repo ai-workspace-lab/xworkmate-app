@@ -122,16 +122,26 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     if (!assistantThreadRecordsInternal.containsKey(sessionKey)) {
       initializeAssistantThreadContext(
         sessionKey,
-        executionTarget: assistantExecutionTargetForSession(sessionKey),
+        executionTarget: AssistantExecutionTarget.agent,
         messageViewMode: assistantMessageViewModeForSession(sessionKey),
       );
     }
     upsertTaskThreadInternal(
       sessionKey,
+      executionTarget: AssistantExecutionTarget.agent,
+      executionTargetSource: ThreadSelectionSource.explicit,
       singleAgentProvider: resolvedProvider,
       singleAgentProviderSource: ThreadSelectionSource.explicit,
+      gatewayEntryState: gatewayEntryStateForTargetInternal(
+        AssistantExecutionTarget.agent,
+      ),
       latestResolvedProviderId: '',
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    await applyAssistantExecutionTargetInternal(
+      AssistantExecutionTarget.agent,
+      sessionKey: sessionKey,
+      persistDefaultSelection: true,
     );
     await flushAssistantThreadPersistenceInternal();
     recomputeTasksInternal();

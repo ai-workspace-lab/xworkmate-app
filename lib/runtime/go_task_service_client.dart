@@ -228,8 +228,7 @@ class GoTaskServiceRequest {
       multiAgent ||
       collaborationMode == GoTaskServiceCollaborationMode.multiAgent;
 
-  AssistantExecutionTarget get normalizedTarget =>
-      target.isGateway ? AssistantExecutionTarget.gateway : target;
+  AssistantExecutionTarget get normalizedTarget => target;
 
   GoTaskServiceRoute get route {
     if (isMultiAgentRequest) {
@@ -243,7 +242,7 @@ class GoTaskServiceRequest {
   }
 
   String get routingExecutionTarget {
-    return 'gateway';
+    return normalizedTarget.promptValue;
   }
 
   bool get hasInlineAttachments => inlineAttachments.isNotEmpty;
@@ -307,9 +306,11 @@ class GoTaskServiceRequest {
   ExternalCodeAgentAcpRoutingConfig _synthesizedRouting() {
     final gatewayTarget = normalizedTarget;
     final preferredGatewayTarget = switch (gatewayTarget) {
+      AssistantExecutionTarget.agent => kCanonicalGatewayProviderId,
       AssistantExecutionTarget.gateway => kCanonicalGatewayProviderId,
     };
     final explicitExecutionTarget = switch (gatewayTarget) {
+      AssistantExecutionTarget.agent => 'agent',
       AssistantExecutionTarget.gateway => 'gateway',
     };
     final explicitProviderId = provider.isUnspecified

@@ -64,10 +64,14 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
             .where((item) => item.trim().isNotEmpty)
             .toList(growable: false);
 
+    final currentTarget = assistantExecutionTargetForSession(
+      normalizedSessionKey,
+    );
     final resolvedProvider = assistantProviderForSession(normalizedSessionKey);
-    final resolvedExplicitProviderId =
-        thread?.hasExplicitProviderSelection == true &&
-            !resolvedProvider.isUnspecified
+    final resolvedExplicitProviderId = currentTarget.isGateway
+        ? kCanonicalGatewayProviderId
+        : thread?.hasExplicitProviderSelection == true &&
+              !resolvedProvider.isUnspecified
         ? resolvedProvider.providerId
         : '';
     final resolvedExplicitModel = thread?.hasExplicitModelSelection ?? false
@@ -85,9 +89,7 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
         explicitExecutionTarget?.trim().isNotEmpty == true
         ? explicitExecutionTarget!.trim()
         : hasAnyExplicitSelection
-        ? _routingExecutionTargetValueInternal(
-            assistantExecutionTargetForSession(normalizedSessionKey),
-          )
+        ? _routingExecutionTargetValueInternal(currentTarget)
         : '';
     final hasExplicitSelection =
         resolvedExplicitExecutionTarget.isNotEmpty ||
@@ -115,8 +117,6 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
   }
 
   String _routingExecutionTargetValueInternal(AssistantExecutionTarget target) {
-    return switch (target) {
-      AssistantExecutionTarget.gateway => 'gateway',
-    };
+    return target.promptValue;
   }
 }

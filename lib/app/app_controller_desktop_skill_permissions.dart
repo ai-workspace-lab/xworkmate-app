@@ -250,8 +250,9 @@ extension AppControllerDesktopSkillPermissions on AppController {
     final nextExecutionTarget =
         executionTarget ??
         switch (existing?.executionBinding.executionMode) {
+          ThreadExecutionMode.agent => AssistantExecutionTarget.agent,
           ThreadExecutionMode.gateway => AssistantExecutionTarget.gateway,
-          null => AssistantExecutionTarget.gateway,
+          null => AssistantExecutionTarget.agent,
         };
     final nextImportedSkills =
         importedSkills ??
@@ -293,11 +294,15 @@ extension AppControllerDesktopSkillPermissions on AppController {
     final requestedProvider = singleAgentProvider?.isUnspecified == false
         ? singleAgentProvider
         : null;
-    final nextProvider = resolveAssistantProvider(
+    final nextProviderId = normalizeSingleAgentProviderId(
       requestedProvider?.providerId ??
           existing?.executionBinding.providerId ??
-          existing?.contextState.latestResolvedProviderId,
+          existing?.contextState.latestResolvedProviderId ??
+          '',
     );
+    final nextProvider = nextProviderId.isEmpty
+        ? SingleAgentProvider.unspecified
+        : resolveAssistantProvider(nextProviderId);
     final nextProviderSource =
         singleAgentProviderSource ??
         existing?.executionBinding.providerSource ??
@@ -306,13 +311,18 @@ extension AppControllerDesktopSkillPermissions on AppController {
         (executionBinding ??
                 existing?.executionBinding ??
                 ExecutionBinding(
-                  executionMode: ThreadExecutionMode.gateway,
+                  executionMode:
+                      threadExecutionModeFromAssistantExecutionTarget(
+                        nextExecutionTarget,
+                      ),
                   executorId: nextProvider.providerId,
                   providerId: nextProvider.providerId,
                   endpointId: '',
                 ))
             .copyWith(
-              executionMode: ThreadExecutionMode.gateway,
+              executionMode: threadExecutionModeFromAssistantExecutionTarget(
+                nextExecutionTarget,
+              ),
               executorId: nextProvider.providerId,
               providerId: nextProvider.providerId,
               executionModeSource:

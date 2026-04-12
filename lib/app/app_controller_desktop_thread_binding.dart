@@ -219,22 +219,30 @@ extension AppControllerDesktopThreadBinding on AppController {
     required AssistantExecutionTarget executionTarget,
     ExecutionBinding? existingBinding,
   }) {
-    final selectedProvider = resolveAssistantProvider(
-      existingBinding?.providerId,
+    final persistedProviderId = normalizeSingleAgentProviderId(
+      existingBinding?.providerId ?? '',
     );
+    final selectedProvider = persistedProviderId.isEmpty
+        ? SingleAgentProvider.unspecified
+        : resolveAssistantProvider(persistedProviderId);
     return (existingBinding ??
             ExecutionBinding(
-              executionMode: ThreadExecutionMode.gateway,
+              executionMode: threadExecutionModeFromAssistantExecutionTarget(
+                executionTarget,
+              ),
               executorId: selectedProvider.providerId,
               providerId: selectedProvider.providerId,
               endpointId: '',
             ))
         .copyWith(
-          executionMode: ThreadExecutionMode.gateway,
+          executionMode: threadExecutionModeFromAssistantExecutionTarget(
+            executionTarget,
+          ),
           executorId: selectedProvider.providerId,
           providerId: selectedProvider.providerId,
           providerSource:
-              existingBinding?.providerSource ?? ThreadSelectionSource.inherited,
+              existingBinding?.providerSource ??
+              ThreadSelectionSource.inherited,
         );
   }
 

@@ -42,55 +42,63 @@ bool isLegacyAutoAssistantExecutionTargetValue(String? value) {
   return value?.trim().toLowerCase() == 'auto';
 }
 
-enum AssistantExecutionTarget { gateway }
+enum AssistantExecutionTarget { agent, gateway }
 
 extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   String get label => switch (this) {
+    AssistantExecutionTarget.agent => appText('智能体', 'Agent'),
     AssistantExecutionTarget.gateway => appText('Gateway', 'Gateway'),
   };
 
   String get promptValue => switch (this) {
+    AssistantExecutionTarget.agent => 'agent',
     AssistantExecutionTarget.gateway => 'gateway',
   };
 
+  bool get isAgent => this == AssistantExecutionTarget.agent;
   bool get isGateway => this == AssistantExecutionTarget.gateway;
 
   String get compactLabel => switch (this) {
+    AssistantExecutionTarget.agent => appText('智能体', 'Agent'),
     AssistantExecutionTarget.gateway => appText('Gateway', 'Gateway'),
   };
 
   static AssistantExecutionTarget fromJsonValue(String? value) {
-    return AssistantExecutionTarget.gateway;
+    return AssistantExecutionTarget.values.firstWhere(
+      (item) => item.name == value?.trim() || item.promptValue == value?.trim(),
+      orElse: () => AssistantExecutionTarget.agent,
+    );
   }
 }
 
 List<AssistantExecutionTarget> compactAssistantExecutionTargets(
   Iterable<AssistantExecutionTarget> targets,
 ) {
-  if (targets.contains(AssistantExecutionTarget.gateway)) {
-    return const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway];
+  final ordered = <AssistantExecutionTarget>[];
+  for (final candidate in AssistantExecutionTarget.values) {
+    if (targets.contains(candidate)) {
+      ordered.add(candidate);
+    }
   }
-  return const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway];
+  return ordered.isEmpty ? AssistantExecutionTarget.values : ordered;
 }
 
 AssistantExecutionTarget collapseAssistantExecutionTargetForDisplay(
   AssistantExecutionTarget target,
 ) => target;
 
-AssistantExecutionTarget resolveGatewayExecutionTargetFromVisibleTargets(
+AssistantExecutionTarget resolveAssistantExecutionTargetFromVisibleTargets(
   Iterable<AssistantExecutionTarget> visibleTargets, {
   AssistantExecutionTarget? currentTarget,
 }) {
   final visible = visibleTargets.toList(growable: false);
-  if (currentTarget != null && currentTarget.isGateway) {
-    if (visible.contains(AssistantExecutionTarget.gateway)) {
-      return AssistantExecutionTarget.gateway;
-    }
+  if (currentTarget != null && visible.contains(currentTarget)) {
+    return currentTarget;
   }
-  if (visible.contains(AssistantExecutionTarget.gateway)) {
-    return AssistantExecutionTarget.gateway;
+  if (visible.isNotEmpty) {
+    return visible.first;
   }
-  return AssistantExecutionTarget.gateway;
+  return AssistantExecutionTarget.agent;
 }
 
 String normalizeSingleAgentProviderId(String value) {
@@ -211,6 +219,12 @@ class SingleAgentProvider {
     badge: 'G',
   );
 
+  static const SingleAgentProvider openclaw = SingleAgentProvider(
+    providerId: kCanonicalGatewayProviderId,
+    label: kCanonicalGatewayProviderLabel,
+    badge: 'OC',
+  );
+
   final String providerId;
   final String label;
   final String badge;
@@ -257,6 +271,7 @@ class SingleAgentProvider {
       'opencode' => opencode,
       'claude' => claude,
       'gemini' => gemini,
+      kCanonicalGatewayProviderId => openclaw,
       'auto' || '' => unspecified,
       _ => SingleAgentProvider(
         providerId: normalized,

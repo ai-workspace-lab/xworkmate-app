@@ -111,7 +111,7 @@ class SettingsSnapshot {
       accountLocalMode: true,
       acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults(),
       linuxDesktop: LinuxDesktopConfig.defaults(),
-      assistantExecutionTarget: AssistantExecutionTarget.gateway,
+      assistantExecutionTarget: AssistantExecutionTarget.agent,
       assistantPermissionLevel: AssistantPermissionLevel.defaultAccess,
     );
   }
