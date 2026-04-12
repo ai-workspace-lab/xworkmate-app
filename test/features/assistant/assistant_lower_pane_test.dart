@@ -9,6 +9,60 @@ import 'package:xworkmate/widgets/surface_card.dart';
 
 void main() {
   group('AssistantLowerPaneInternal', () {
+    testWidgets('shows agent and gateway task dialog modes', (tester) async {
+      final controller = AppController();
+      addTearDown(controller.dispose);
+
+      await controller.sessionsController.switchSession('session-1');
+
+      await tester.pumpWidget(
+        _buildTestApp(child: _buildLowerPane(controller: controller)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('assistant-provider-button')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('assistant-execution-target-button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('assistant-execution-target-menu-item-agent')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('assistant-execution-target-menu-item-gateway')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('assistant-execution-target-menu-item-gateway')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.assistantExecutionTarget.name, 'gateway');
+      expect(find.byKey(const Key('assistant-provider-button')), findsNothing);
+
+      await tester.tap(
+        find.byKey(const Key('assistant-execution-target-button')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('assistant-execution-target-menu-item-agent')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.assistantExecutionTarget.name, 'agent');
+      expect(
+        find.byKey(const Key('assistant-provider-button')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('shows assistant providers and allows switching provider', (
       tester,
     ) async {
@@ -18,9 +72,7 @@ void main() {
       await controller.sessionsController.switchSession('session-1');
 
       await tester.pumpWidget(
-        _buildTestApp(
-          child: _buildLowerPane(controller: controller),
-        ),
+        _buildTestApp(child: _buildLowerPane(controller: controller)),
       );
       await tester.pumpAndSettle();
 
@@ -46,7 +98,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        controller.assistantProviderForSession(controller.currentSessionKey)
+        controller
+            .assistantProviderForSession(controller.currentSessionKey)
             .providerId,
         'opencode',
       );
@@ -88,9 +141,7 @@ Widget _buildTestApp({required Widget child}) {
   return MaterialApp(
     theme: AppTheme.light(),
     home: Material(
-      child: Center(
-        child: SizedBox(width: 1400, height: 360, child: child),
-      ),
+      child: Center(child: SizedBox(width: 1400, height: 360, child: child)),
     ),
   );
 }

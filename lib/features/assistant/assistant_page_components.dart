@@ -82,7 +82,7 @@ class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {
     final groupedTasks = groupTasksForRailInternal(
       tasks,
       widget.controller.visibleAssistantExecutionTargets(
-        const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway],
+        AssistantExecutionTarget.values,
       ),
     );
     final runningCount = tasks
@@ -578,10 +578,7 @@ class AssistantEmptyStateInternal extends StatelessWidget {
                             ? appText('开始输入', 'Start typing')
                             : reconnectAvailable
                             ? appText('重新连接 Bridge', 'Reconnect bridge')
-                            : appText(
-                                '连接 Bridge',
-                                'Connect xworkmate-bridge',
-                              ),
+                            : appText('连接 Bridge', 'Connect xworkmate-bridge'),
                       ),
                       style: FilledButton.styleFrom(
                         minimumSize: const Size(0, 28),

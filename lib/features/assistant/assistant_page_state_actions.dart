@@ -120,9 +120,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
             taskSeedsInternal[controller.currentSessionKey]?.title ??
             fallbackSessionTitleInternal(controller.currentSessionKey),
         preview: rawPrompt,
-        status:
-            controller.hasAssistantPendingRun ||
-                connectionState.connected
+        status: controller.hasAssistantPendingRun || connectionState.connected
             ? 'running'
             : 'queued',
         owner: autoAgent?.name ?? conversationOwnerLabelInternal(controller),
@@ -408,7 +406,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     final inheritedTarget = pickDraftThreadExecutionTargetInternal(
       currentTarget: widget.controller.currentAssistantExecutionTarget,
       visibleTargets: widget.controller.visibleAssistantExecutionTargets(
-        const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway],
+        AssistantExecutionTarget.values,
       ),
       localWorkspaceAvailable: widget.controller.settings.workspacePath
           .trim()
@@ -515,9 +513,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       surface: 'Assistant',
       executionTarget: resolvedVisibleExecutionTargetInternal(
         widget.controller,
-        supportedTargets: const <AssistantExecutionTarget>[
-          AssistantExecutionTarget.gateway,
-        ],
+        supportedTargets: AssistantExecutionTarget.values,
       ),
       isCurrent: true,
       draft: true,
