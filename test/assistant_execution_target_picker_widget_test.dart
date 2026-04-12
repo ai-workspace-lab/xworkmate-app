@@ -220,6 +220,11 @@ void main() {
       find.byKey(const Key('assistant-gateway-provider-button')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const Key('assistant-gateway-provider-badge')),
+      findsOneWidget,
+    );
+    expect(find.text('🦞'), findsOneWidget);
     final gatewayButton = tester.widget<PopupMenuButton<String>>(
       find.byKey(const Key('assistant-gateway-provider-button')),
     );
@@ -232,6 +237,12 @@ void main() {
     expect(
       items.whereType<PopupMenuItem<String>>().single.value,
       kCanonicalGatewayProviderId,
+    );
+    final menuRow =
+        items.whereType<PopupMenuItem<String>>().single.child as Row;
+    expect(
+      menuRow.children.first.key,
+      const Key('assistant-gateway-provider-menu-badge'),
     );
 
     await tester.pumpWidget(const SizedBox.shrink());
