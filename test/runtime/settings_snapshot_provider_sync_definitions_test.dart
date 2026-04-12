@@ -3,38 +3,6 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   group('SettingsSnapshot schema v1', () {
-    test('defaults include provider sync presets', () {
-      final providerKeys = SettingsSnapshot.defaults().providerSyncDefinitions
-          .map((item) => item.providerKey)
-          .toList(growable: false);
-
-      expect(providerKeys, <String>['codex', 'opencode', 'gemini']);
-    });
-
-    test('round trips providerSyncDefinitions and schemaVersion', () {
-      final snapshot = SettingsSnapshot.defaults().copyWith(
-        providerSyncDefinitions: <ExternalAcpEndpointProfile>[
-          ExternalAcpEndpointProfile.defaultsForProvider(
-            SingleAgentProvider.codex,
-          ).copyWith(endpoint: 'https://codex.example.com'),
-          ExternalAcpEndpointProfile.defaultsForProvider(
-            SingleAgentProvider.opencode,
-          ),
-          ExternalAcpEndpointProfile.defaultsForProvider(
-            SingleAgentProvider.gemini,
-          ),
-        ],
-      );
-
-      final decoded = SettingsSnapshot.fromJson(snapshot.toJson());
-
-      expect(decoded.schemaVersion, settingsSnapshotSchemaVersion);
-      expect(
-        decoded.providerSyncDefinitions.first.endpoint,
-        'https://codex.example.com',
-      );
-    });
-
     test('missing schemaVersion is rejected', () {
       expect(
         () => SettingsSnapshot.fromJson(<String, dynamic>{
@@ -45,7 +13,34 @@ void main() {
       );
     });
 
-    test('removed ui restore fields are not serialized', () {
+    test('legacy provider sync and CLI fields are ignored on read', () {
+      final decoded = SettingsSnapshot.fromJson(<String, dynamic>{
+        'schemaVersion': settingsSnapshotSchemaVersion,
+        'appLanguage': 'zh',
+        'gatewayProfiles': <Map<String, dynamic>>[],
+        'providerSyncDefinitions': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'providerKey': 'codex',
+            'label': 'Codex',
+            'badge': 'C',
+            'endpoint': 'https://codex.example.com',
+            'authRef': 'secret://codex',
+            'enabled': true,
+          },
+        ],
+        'codexCliPath': '/tmp/codex',
+      });
+
+      expect(decoded.schemaVersion, settingsSnapshotSchemaVersion);
+      expect(
+        decoded.sanitizeSingleAgentProviderSelection(SingleAgentProvider.codex),
+        SingleAgentProvider.codex,
+      );
+      expect(decoded.toJson().containsKey('providerSyncDefinitions'), isFalse);
+      expect(decoded.toJson().containsKey('codexCliPath'), isFalse);
+    });
+
+    test('removed ui restore and local provider fields are not serialized', () {
       final json = SettingsSnapshot.defaults().toJson();
 
       expect(json.containsKey('assistantLastSessionKey'), isFalse);
@@ -54,12 +49,13 @@ void main() {
       expect(json.containsKey('assistantArchivedTaskKeys'), isFalse);
       expect(json.containsKey('savedGatewayTargets'), isFalse);
       expect(json.containsKey('externalAcpEndpoints'), isFalse);
-      expect(json.containsKey('providerSyncDefinitions'), isTrue);
+      expect(json.containsKey('providerSyncDefinitions'), isFalse);
+      expect(json.containsKey('codexCliPath'), isFalse);
     });
   });
 
   group('AcpBridgeServerModeConfig advanced overrides', () {
-    test('advanced override ACP profiles are normalized to full presets', () {
+    test('legacy ACP bridge server profiles are ignored and not reserialized', () {
       final config = AcpBridgeServerModeConfig.fromJson(<String, dynamic>{
         'advancedOverrides': <String, dynamic>{
           'acpBridgeServerProfiles': <Map<String, dynamic>>[
@@ -67,19 +63,19 @@ void main() {
               'providerKey': 'opencode',
               'label': 'OpenCode',
               'badge': 'O',
-              'endpoint': '',
-              'authRef': '',
+              'endpoint': 'https://opencode.example.com',
+              'authRef': 'secret://opencode',
               'enabled': true,
             },
           ],
         },
       });
 
-      final providerKeys = config.advancedOverrides.acpBridgeServerProfiles
-          .map((item) => item.providerKey)
-          .toList(growable: false);
+      final json = config.toJson();
+      final advancedOverrides = (json['advancedOverrides'] as Map?)?.cast<String, dynamic>();
 
-      expect(providerKeys, <String>['codex', 'opencode', 'gemini']);
+      expect(advancedOverrides, isNotNull);
+      expect(advancedOverrides!.containsKey('acpBridgeServerProfiles'), isFalse);
     });
   });
 }

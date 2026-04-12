@@ -38,7 +38,6 @@ import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_mounts.dart';
 import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
-import '../runtime/single_agent_capabilities.dart';
 import '../runtime/skill_directory_access.dart';
 import 'task_thread_repositories.dart';
 import 'app_controller_desktop_navigation.dart';
@@ -294,9 +293,6 @@ class AppController extends ChangeNotifier {
 
   GatewayAcpClient get gatewayAcpClientForTest => gatewayAcpClientInternal;
 
-  Map<SingleAgentProvider, SingleAgentCapabilities>
-  singleAgentCapabilitiesByProviderInternal =
-      const <SingleAgentProvider, SingleAgentCapabilities>{};
   List<SingleAgentProvider> bridgeAdvertisedProvidersInternal =
       const <SingleAgentProvider>[];
   final Map<String, List<GatewayChatMessage>> assistantThreadMessagesInternal =
@@ -439,7 +435,6 @@ class AppController extends ChangeNotifier {
   bool isCodexBridgeBusyInternal = false;
   String? codexBridgeErrorInternal;
   String? codexRuntimeWarningInternal;
-  String? resolvedCodexCliPathInternal;
   CodexCooperationState codexCooperationStateInternal =
       CodexCooperationState.notStarted;
   SettingsController get settingsController => settingsControllerInternal;
@@ -528,9 +523,6 @@ class AppController extends ChangeNotifier {
   bool get isCodexBridgeBusy => isCodexBridgeBusyInternal;
   String? get codexBridgeError => codexBridgeErrorInternal;
   String? get codexRuntimeWarning => codexRuntimeWarningInternal;
-  String? get resolvedCodexCliPath => resolvedCodexCliPathInternal;
-  bool get hasDetectedCodexCli => resolvedCodexCliPathInternal != null;
-  String get configuredCodexCliPath => settings.codexCliPath.trim();
   CodeAgentRuntimeMode get configuredCodeAgentRuntimeMode =>
       settings.codeAgentRuntimeMode;
   CodeAgentRuntimeMode get effectiveCodeAgentRuntimeMode =>
@@ -583,18 +575,13 @@ class AppController extends ChangeNotifier {
         bridgeAdvertisedProvidersInternal,
       );
 
-  List<SingleAgentProvider> get availableSingleAgentProviders =>
-      configuredSingleAgentProviders
-          .where(canUseSingleAgentProviderInternal)
-          .toList(growable: false);
-
   List<AssistantExecutionTarget> visibleAssistantExecutionTargets(
     Iterable<AssistantExecutionTarget> supportedTargets,
   ) {
     final supported = supportedTargets.toSet();
     final visible = <AssistantExecutionTarget>[];
     if (supported.contains(AssistantExecutionTarget.singleAgent) &&
-        availableSingleAgentProviders.isNotEmpty) {
+        configuredSingleAgentProviders.isNotEmpty) {
       visible.add(AssistantExecutionTarget.singleAgent);
     }
     if (supported.contains(AssistantExecutionTarget.gateway)) {
@@ -612,25 +599,29 @@ class AppController extends ChangeNotifier {
     ];
   }
 
-  bool get hasAnyAvailableSingleAgentProvider =>
-      availableSingleAgentProviders.isNotEmpty;
-
-  bool canUseSingleAgentProviderInternal(SingleAgentProvider provider) {
+  bool isBridgeAdvertisedSingleAgentProviderInternal(
+    SingleAgentProvider provider,
+  ) {
     if (provider.isUnspecified) {
       return false;
     }
-    final capabilities = singleAgentCapabilitiesByProviderInternal[provider];
-    return capabilities?.available == true &&
-        capabilities!.supportsProvider(provider);
+    return configuredSingleAgentProviders.any(
+      (item) => item.providerId == provider.providerId,
+    );
   }
 
-  SingleAgentProvider? resolvedSingleAgentProviderInternal(
+  SingleAgentProvider? advertisedSingleAgentProviderInternal(
     SingleAgentProvider selection,
   ) {
     if (selection.isUnspecified) {
       return null;
     }
-    return canUseSingleAgentProviderInternal(selection) ? selection : null;
+    for (final provider in configuredSingleAgentProviders) {
+      if (provider.providerId == selection.providerId) {
+        return provider;
+      }
+    }
+    return null;
   }
 
   List<String> get aiGatewayConversationModelChoices {

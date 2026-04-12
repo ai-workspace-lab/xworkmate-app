@@ -12,8 +12,6 @@ class CodeAgentNodeState {
     required this.bridgeEnabled,
     required this.bridgeState,
     required this.preferredProviderId,
-    this.resolvedCodexCliPath,
-    this.configuredCodexCliPath = '',
   });
 
   final String selectedAgentId;
@@ -23,8 +21,6 @@ class CodeAgentNodeState {
   final bool bridgeEnabled;
   final String bridgeState;
   final String preferredProviderId;
-  final String? resolvedCodexCliPath;
-  final String configuredCodexCliPath;
 }
 
 /// Resolved gateway dispatch envelope for the app-mediated node.
@@ -58,8 +54,6 @@ class CodeAgentNodeOrchestrator {
           'runtimeMode': state.runtimeMode.name,
           'bridgeEnabled': state.bridgeEnabled,
           'bridgeState': state.bridgeState,
-          'resolvedCodexCliPath': state.resolvedCodexCliPath?.trim() ?? '',
-          'configuredCodexCliPath': state.configuredCodexCliPath.trim(),
         },
         nodeInfo: const <String, dynamic>{
           'id': 'xworkmate-app',
@@ -82,9 +76,6 @@ class CodeAgentNodeOrchestrator {
           )
         : null;
     final normalizedAgentId = state.selectedAgentId.trim();
-    final configuredPath = state.resolvedCodexCliPath?.trim().isNotEmpty == true
-        ? state.resolvedCodexCliPath!.trim()
-        : state.configuredCodexCliPath.trim();
 
     final metadata = <String, dynamic>{
       'node': <String, dynamic>{
@@ -107,7 +98,6 @@ class CodeAgentNodeOrchestrator {
           CodeAgentRuntimeMode.externalCli => 'stdio-jsonrpc',
           CodeAgentRuntimeMode.builtIn => 'ffi-runtime',
         },
-        if (configuredPath.isNotEmpty) 'binaryConfigured': true,
       },
       if (provider != null)
         'provider': <String, dynamic>{

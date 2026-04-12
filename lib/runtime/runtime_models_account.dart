@@ -425,14 +425,12 @@ class AcpBridgeServerAdvancedOverrides {
     required this.gatewayProfiles,
     required this.vault,
     required this.aiGateway,
-    required this.acpBridgeServerProfiles,
     required this.authorizedSkillDirectories,
   });
 
   final List<GatewayConnectionProfile> gatewayProfiles;
   final VaultConfig vault;
   final AiGatewayProfile aiGateway;
-  final List<ExternalAcpEndpointProfile> acpBridgeServerProfiles;
   final List<AuthorizedSkillDirectory> authorizedSkillDirectories;
 
   factory AcpBridgeServerAdvancedOverrides.defaults() {
@@ -440,7 +438,6 @@ class AcpBridgeServerAdvancedOverrides {
       gatewayProfiles: normalizeGatewayProfiles(),
       vault: VaultConfig.defaults(),
       aiGateway: AiGatewayProfile.defaults(),
-      acpBridgeServerProfiles: normalizeExternalAcpEndpoints(),
       authorizedSkillDirectories: normalizeAuthorizedSkillDirectories(),
     );
   }
@@ -449,7 +446,6 @@ class AcpBridgeServerAdvancedOverrides {
     List<GatewayConnectionProfile>? gatewayProfiles,
     VaultConfig? vault,
     AiGatewayProfile? aiGateway,
-    List<ExternalAcpEndpointProfile>? acpBridgeServerProfiles,
     List<AuthorizedSkillDirectory>? authorizedSkillDirectories,
   }) {
     return AcpBridgeServerAdvancedOverrides(
@@ -458,9 +454,6 @@ class AcpBridgeServerAdvancedOverrides {
           : this.gatewayProfiles,
       vault: vault ?? this.vault,
       aiGateway: aiGateway ?? this.aiGateway,
-      acpBridgeServerProfiles: acpBridgeServerProfiles != null
-          ? normalizeExternalAcpEndpoints(profiles: acpBridgeServerProfiles)
-          : this.acpBridgeServerProfiles,
       authorizedSkillDirectories: authorizedSkillDirectories != null
           ? normalizeAuthorizedSkillDirectories(
               directories: authorizedSkillDirectories,
@@ -476,9 +469,6 @@ class AcpBridgeServerAdvancedOverrides {
           .toList(growable: false),
       'vault': vault.toJson(),
       'aiGateway': aiGateway.toJson(),
-      'acpBridgeServerProfiles': acpBridgeServerProfiles
-          .map((item) => item.toJson())
-          .toList(growable: false),
       'authorizedSkillDirectories': authorizedSkillDirectories
           .map((item) => item.toJson())
           .toList(growable: false),
@@ -501,16 +491,6 @@ class AcpBridgeServerAdvancedOverrides {
       ),
       aiGateway: AiGatewayProfile.fromJson(
         (json['aiGateway'] as Map?)?.cast<String, dynamic>() ?? const {},
-      ),
-      acpBridgeServerProfiles: normalizeExternalAcpEndpoints(
-        profiles:
-            ((json['acpBridgeServerProfiles'] as List?) ?? const <Object>[])
-                .whereType<Map>()
-                .map(
-                  (item) => ExternalAcpEndpointProfile.fromJson(
-                    item.cast<String, dynamic>(),
-                  ),
-                ),
       ),
       authorizedSkillDirectories: normalizeAuthorizedSkillDirectories(
         directories:

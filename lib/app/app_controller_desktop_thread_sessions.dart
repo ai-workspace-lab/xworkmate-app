@@ -269,7 +269,7 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    return resolvedSingleAgentProviderInternal(
+    return advertisedSingleAgentProviderInternal(
       singleAgentProviderForSession(normalizedSessionKey),
     );
   }
@@ -285,7 +285,7 @@ extension AppControllerDesktopThreadSessions on AppController {
         AssistantExecutionTarget.singleAgent) {
       return false;
     }
-    return !hasAnyAvailableSingleAgentProvider;
+    return configuredSingleAgentProviders.isEmpty;
   }
 
   bool get currentSingleAgentNeedsBridgeProvider =>
@@ -310,8 +310,8 @@ extension AppControllerDesktopThreadSessions on AppController {
     if (selection.isUnspecified) {
       return false;
     }
-    return !canUseSingleAgentProviderInternal(selection) &&
-        hasAnyAvailableSingleAgentProvider;
+    return !isBridgeAdvertisedSingleAgentProviderInternal(selection) &&
+        configuredSingleAgentProviders.isNotEmpty;
   }
 
   bool get currentSingleAgentShouldSuggestAcpSwitch =>
@@ -371,9 +371,7 @@ extension AppControllerDesktopThreadSessions on AppController {
       singleAgentShouldShowModelControlForSession(currentSessionKey);
 
   List<SingleAgentProvider> get singleAgentProviderOptions =>
-      availableSingleAgentProviders.isNotEmpty
-      ? availableSingleAgentProviders
-      : configuredSingleAgentProviders;
+      configuredSingleAgentProviders;
 
   String singleAgentProviderLabelForSession(String sessionKey) {
     return singleAgentProviderForSession(sessionKey).label;

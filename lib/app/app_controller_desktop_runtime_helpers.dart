@@ -242,7 +242,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
           sessionsControllerInternal.currentSessionKey,
         );
         final provider =
-            resolvedSingleAgentProviderInternal(selection) ?? selection;
+            advertisedSingleAgentProviderInternal(selection) ?? selection;
         final providerLabel = provider.isUnspecified
             ? appText('Bridge Provider', 'Bridge Provider')
             : provider.label;
@@ -436,14 +436,11 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
             'Built-in Codex runtime is reserved for a future release; XWorkmate switched back to External Codex CLI automatically.',
           )
         : null;
-    final normalizedPath = snapshot.codexCliPath.trim();
-    if (normalizedPath == snapshot.codexCliPath &&
-        normalizedRuntimeMode == snapshot.codeAgentRuntimeMode) {
+    if (normalizedRuntimeMode == snapshot.codeAgentRuntimeMode) {
       return snapshot;
     }
     return snapshot.copyWith(
       codeAgentRuntimeMode: normalizedRuntimeMode,
-      codexCliPath: normalizedPath,
     );
   }
 
@@ -462,36 +459,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     this,
     forceRefresh: forceRefresh,
   );
-
-  Future<void> refreshResolvedCodexCliPathInternal() async {
-    if (effectiveCodeAgentRuntimeMode != CodeAgentRuntimeMode.externalCli) {
-      resolvedCodexCliPathInternal = null;
-      return;
-    }
-    if (shouldBlockEmbeddedAgentLaunch(
-      isAppleHost: Platform.isIOS || Platform.isMacOS,
-    )) {
-      resolvedCodexCliPathInternal = null;
-      return;
-    }
-
-    final configuredPath = configuredCodexCliPath;
-    String? detectedPath;
-    if (configuredPath.isNotEmpty) {
-      try {
-        if (await File(configuredPath).exists()) {
-          detectedPath = configuredPath;
-        }
-      } catch (_) {
-        detectedPath = null;
-      }
-    }
-    detectedPath ??= await runtimeCoordinatorInternal.codex.findCodexBinary();
-    if (disposedInternal) {
-      return;
-    }
-    resolvedCodexCliPathInternal = detectedPath;
-  }
 
   List<ManagedMountTargetState> mergeAcpCapabilitiesIntoMountTargetsInternal(
     List<ManagedMountTargetState> current,
@@ -637,9 +604,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     }
     setActiveAppLanguage(current.appLanguage);
     multiAgentOrchestratorInternal.updateConfig(current.multiAgent);
-    if (previous.codexCliPath != current.codexCliPath ||
-        previous.codeAgentRuntimeMode != current.codeAgentRuntimeMode) {
-      await refreshResolvedCodexCliPathInternal();
+    if (previous.codeAgentRuntimeMode != current.codeAgentRuntimeMode) {
       registerCodexExternalProviderInternal();
       if (disposedInternal) {
         return;

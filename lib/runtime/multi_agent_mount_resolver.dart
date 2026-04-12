@@ -40,7 +40,6 @@ abstract class MultiAgentMountResolver {
   Future<MultiAgentConfig?> reconcile({
     required MultiAgentConfig config,
     required String aiGatewayUrl,
-    String configuredCodexCliPath = '',
     required String codexHome,
     required String opencodeHome,
     required ArisMountProbe arisProbe,

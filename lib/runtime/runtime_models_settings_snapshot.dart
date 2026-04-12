@@ -24,11 +24,9 @@ class SettingsSnapshot {
     required this.remoteProjectRoot,
     required this.cliPath,
     required this.codeAgentRuntimeMode,
-    required this.codexCliPath,
     required this.defaultModel,
     required this.defaultProvider,
     required this.gatewayProfiles,
-    required this.providerSyncDefinitions,
     required this.authorizedSkillDirectories,
     required this.ollamaLocal,
     required this.ollamaCloud,
@@ -59,11 +57,9 @@ class SettingsSnapshot {
   final String remoteProjectRoot;
   final String cliPath;
   final CodeAgentRuntimeMode codeAgentRuntimeMode;
-  final String codexCliPath;
   final String defaultModel;
   final String defaultProvider;
   final List<GatewayConnectionProfile> gatewayProfiles;
-  final List<ExternalAcpEndpointProfile> providerSyncDefinitions;
   final List<AuthorizedSkillDirectory> authorizedSkillDirectories;
   final OllamaLocalConfig ollamaLocal;
   final OllamaCloudConfig ollamaCloud;
@@ -95,11 +91,9 @@ class SettingsSnapshot {
       remoteProjectRoot: '',
       cliPath: 'openclaw',
       codeAgentRuntimeMode: CodeAgentRuntimeMode.externalCli,
-      codexCliPath: '',
       defaultModel: '',
       defaultProvider: 'gateway',
       gatewayProfiles: normalizeGatewayProfiles(),
-      providerSyncDefinitions: normalizeExternalAcpEndpoints(),
       authorizedSkillDirectories: normalizeAuthorizedSkillDirectories(),
       ollamaLocal: OllamaLocalConfig.defaults(),
       ollamaCloud: OllamaCloudConfig.defaults(),
@@ -132,11 +126,9 @@ class SettingsSnapshot {
     String? remoteProjectRoot,
     String? cliPath,
     CodeAgentRuntimeMode? codeAgentRuntimeMode,
-    String? codexCliPath,
     String? defaultModel,
     String? defaultProvider,
     List<GatewayConnectionProfile>? gatewayProfiles,
-    List<ExternalAcpEndpointProfile>? providerSyncDefinitions,
     List<AuthorizedSkillDirectory>? authorizedSkillDirectories,
     OllamaLocalConfig? ollamaLocal,
     OllamaCloudConfig? ollamaCloud,
@@ -160,9 +152,6 @@ class SettingsSnapshot {
     final resolvedGatewayProfiles = gatewayProfiles != null
         ? normalizeGatewayProfiles(profiles: gatewayProfiles)
         : this.gatewayProfiles;
-    final resolvedProviderSyncDefinitions = providerSyncDefinitions != null
-        ? normalizeExternalAcpEndpoints(profiles: providerSyncDefinitions)
-        : this.providerSyncDefinitions;
     final resolvedAuthorizedSkillDirectories =
         authorizedSkillDirectories != null
         ? normalizeAuthorizedSkillDirectories(
@@ -179,11 +168,9 @@ class SettingsSnapshot {
       remoteProjectRoot: remoteProjectRoot ?? this.remoteProjectRoot,
       cliPath: cliPath ?? this.cliPath,
       codeAgentRuntimeMode: codeAgentRuntimeMode ?? this.codeAgentRuntimeMode,
-      codexCliPath: codexCliPath ?? this.codexCliPath,
       defaultModel: defaultModel ?? this.defaultModel,
       defaultProvider: defaultProvider ?? this.defaultProvider,
       gatewayProfiles: resolvedGatewayProfiles,
-      providerSyncDefinitions: resolvedProviderSyncDefinitions,
       authorizedSkillDirectories: resolvedAuthorizedSkillDirectories,
       ollamaLocal: ollamaLocal ?? this.ollamaLocal,
       ollamaCloud: ollamaCloud ?? this.ollamaCloud,
@@ -222,13 +209,9 @@ class SettingsSnapshot {
       'remoteProjectRoot': remoteProjectRoot,
       'cliPath': cliPath,
       'codeAgentRuntimeMode': codeAgentRuntimeMode.name,
-      'codexCliPath': codexCliPath,
       'defaultModel': defaultModel,
       'defaultProvider': defaultProvider,
       'gatewayProfiles': gatewayProfiles
-          .map((item) => item.toJson())
-          .toList(growable: false),
-      'providerSyncDefinitions': providerSyncDefinitions
           .map((item) => item.toJson())
           .toList(growable: false),
       'authorizedSkillDirectories': authorizedSkillDirectories
@@ -270,15 +253,6 @@ class SettingsSnapshot {
                 GatewayConnectionProfile.fromJson(item.cast<String, dynamic>()),
           ),
     );
-    final providerSyncDefinitions = normalizeExternalAcpEndpoints(
-      profiles: ((json['providerSyncDefinitions'] as List?) ?? const <Object>[])
-          .whereType<Map>()
-          .map(
-            (item) => ExternalAcpEndpointProfile.fromJson(
-              item.cast<String, dynamic>(),
-            ),
-          ),
-    );
     final authorizedSkillDirectories = normalizeAuthorizedSkillDirectories(
       directories:
           ((json['authorizedSkillDirectories'] as List?) ?? const <Object>[])
@@ -308,9 +282,6 @@ class SettingsSnapshot {
       codeAgentRuntimeMode: CodeAgentRuntimeModeCopy.fromJsonValue(
         json['codeAgentRuntimeMode'] as String?,
       ),
-      codexCliPath:
-          json['codexCliPath'] as String? ??
-          SettingsSnapshot.defaults().codexCliPath,
       defaultModel:
           json['defaultModel'] as String? ??
           SettingsSnapshot.defaults().defaultModel,
@@ -318,7 +289,6 @@ class SettingsSnapshot {
           json['defaultProvider'] as String? ??
           SettingsSnapshot.defaults().defaultProvider,
       gatewayProfiles: gatewayProfiles,
-      providerSyncDefinitions: providerSyncDefinitions,
       authorizedSkillDirectories: authorizedSkillDirectories,
       ollamaLocal: OllamaLocalConfig.fromJson(
         (json['ollamaLocal'] as Map?)?.cast<String, dynamic>() ?? const {},
@@ -419,91 +389,15 @@ class SettingsSnapshot {
     return copyWithGatewayProfileAt(index, profile);
   }
 
-  ExternalAcpEndpointProfile providerSyncDefinitionForProvider(
-    SingleAgentProvider provider,
-  ) {
-    return providerSyncDefinitionForProviderId(provider.providerId) ??
-        ExternalAcpEndpointProfile.defaultsForProvider(provider);
-  }
-
-  ExternalAcpEndpointProfile? providerSyncDefinitionForProviderId(
-    String providerId,
-  ) {
-    final normalized = normalizeSingleAgentProviderId(providerId);
-    if (normalized.isEmpty) {
-      return null;
-    }
-    for (final item in providerSyncDefinitions) {
-      if (item.providerKey == normalized) {
-        return item;
-      }
-    }
-    return null;
-  }
-
-  SingleAgentProvider resolveSingleAgentProvider(SingleAgentProvider provider) {
-    if (provider.isUnspecified) {
-      return SingleAgentProvider.unspecified;
-    }
-    final profile = providerSyncDefinitionForProviderId(provider.providerId);
-    if (profile != null) {
-      return profile.toProvider();
-    }
-    return provider;
-  }
-
-  SingleAgentProvider singleAgentProviderForId(String providerId) {
-    final resolved = normalizeSingleAgentProviderId(providerId);
-    if (resolved.isEmpty || resolved == 'auto') {
-      return SingleAgentProvider.unspecified;
-    }
-    final normalizedSelection = SingleAgentProvider.fromJsonValue(resolved);
-    final profile = providerSyncDefinitionForProviderId(
-      normalizedSelection.providerId,
-    );
-    if (profile != null) {
-      return profile.toProvider();
-    }
-    return normalizedSelection;
-  }
-
   SingleAgentProvider sanitizeSingleAgentProviderSelection(
     SingleAgentProvider provider,
   ) {
-    final resolved = resolveSingleAgentProvider(provider);
-    if (resolved.isUnspecified) {
+    if (provider.isUnspecified) {
       return SingleAgentProvider.unspecified;
     }
-    if (isBridgeOwnedSingleAgentProviderId(resolved.providerId)) {
-      return resolved;
+    if (isBridgeOwnedSingleAgentProviderId(provider.providerId)) {
+      return provider;
     }
     return SingleAgentProvider.unspecified;
-  }
-
-  SettingsSnapshot copyWithProviderSyncDefinitionForProvider(
-    SingleAgentProvider provider,
-    ExternalAcpEndpointProfile profile,
-  ) {
-    return copyWith(
-      providerSyncDefinitions: replaceExternalAcpEndpointForProvider(
-        providerSyncDefinitions,
-        provider,
-        profile,
-      ),
-    );
-  }
-
-  SettingsSnapshot captureAcpBridgeServerAdvancedOverrides() {
-    return copyWith(
-      acpBridgeServerModeConfig: acpBridgeServerModeConfig.copyWith(
-        advancedOverrides: AcpBridgeServerAdvancedOverrides(
-          gatewayProfiles: gatewayProfiles,
-          vault: vault,
-          aiGateway: aiGateway,
-          acpBridgeServerProfiles: providerSyncDefinitions,
-          authorizedSkillDirectories: authorizedSkillDirectories,
-        ),
-      ),
-    );
   }
 }
