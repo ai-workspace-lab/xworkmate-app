@@ -374,6 +374,9 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     final selectedSkills = widget.availableSkills
         .where((skill) => widget.selectedSkillKeys.contains(skill.key))
         .toList(growable: false);
+    final displayedSingleAgentProvider =
+        controller.currentSingleAgentResolvedProvider ??
+        controller.currentSingleAgentProvider;
     final submitLabel = connected
         ? appText('提交', 'Submit')
         : singleAgent
@@ -500,10 +503,10 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                       .toList(),
                   child: ComposerToolbarChipInternal(
                     leading: SingleAgentProviderBadgeInternal(
-                      provider: controller.currentSingleAgentProvider,
+                      provider: displayedSingleAgentProvider,
                     ),
                     tooltip: singleAgentProviderTooltipInternal(
-                      controller.currentSingleAgentProvider,
+                      displayedSingleAgentProvider,
                     ),
                     showChevron: true,
                     padding: const EdgeInsets.symmetric(

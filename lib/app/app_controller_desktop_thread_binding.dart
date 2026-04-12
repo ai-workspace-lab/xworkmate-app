@@ -48,12 +48,12 @@ import 'app_controller_desktop_runtime_helpers.dart';
 class DesktopThreadBindingSnapshotInternal {
   const DesktopThreadBindingSnapshotInternal({
     required this.executionTarget,
-    required this.singleAgentProvider,
+    required this.selectedSingleAgentProvider,
     required this.record,
   });
 
   final AssistantExecutionTarget executionTarget;
-  final SingleAgentProvider singleAgentProvider;
+  final SingleAgentProvider selectedSingleAgentProvider;
   final TaskThread? record;
 }
 
@@ -70,12 +70,12 @@ resolveDesktopThreadBindingSnapshotInternal({
           : assistantExecutionTargetFromExecutionMode(
               latestRecord.executionBinding.executionMode,
             ));
-  final resolvedProvider = SingleAgentProviderCopy.fromJsonValue(
+  final selectedProvider = SingleAgentProviderCopy.fromJsonValue(
     latestRecord?.executionBinding.providerId ?? '',
   );
   return DesktopThreadBindingSnapshotInternal(
     executionTarget: resolvedExecutionTarget,
-    singleAgentProvider: resolvedProvider,
+    selectedSingleAgentProvider: selectedProvider,
     record: latestRecord,
   );
 }
@@ -254,7 +254,8 @@ extension AppControllerDesktopThreadBinding on AppController {
     required SingleAgentProvider singleAgentProvider,
     ExecutionBinding? existingBinding,
   }) {
-    final providerId = executionTarget == AssistantExecutionTarget.singleAgent
+    final selectedProviderId =
+        executionTarget == AssistantExecutionTarget.singleAgent
         ? settings
               .sanitizeSingleAgentProviderSelection(singleAgentProvider)
               .providerId
@@ -262,8 +263,8 @@ extension AppControllerDesktopThreadBinding on AppController {
     return (existingBinding ??
             ExecutionBinding(
               executionMode: ThreadExecutionMode.localAgent,
-              executorId: providerId,
-              providerId: providerId,
+              executorId: selectedProviderId,
+              providerId: selectedProviderId,
               endpointId: '',
             ))
         .copyWith(
@@ -272,8 +273,8 @@ extension AppControllerDesktopThreadBinding on AppController {
               ThreadExecutionMode.localAgent,
             AssistantExecutionTarget.gateway => ThreadExecutionMode.gateway,
           },
-          executorId: providerId,
-          providerId: providerId,
+          executorId: selectedProviderId,
+          providerId: selectedProviderId,
           providerSource:
               executionTarget == AssistantExecutionTarget.singleAgent
               ? existingBinding?.providerSource
@@ -309,9 +310,7 @@ extension AppControllerDesktopThreadBinding on AppController {
       workspaceBinding: workspaceBinding,
       executionBinding: buildDesktopExecutionBindingInternal(
         executionTarget: snapshot.executionTarget,
-        singleAgentProvider: settings.sanitizeSingleAgentProviderSelection(
-          snapshot.singleAgentProvider,
-        ),
+        singleAgentProvider: snapshot.selectedSingleAgentProvider,
         existingBinding: snapshot.record?.executionBinding,
       ),
       lifecycleState:
