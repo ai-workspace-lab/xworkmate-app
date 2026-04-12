@@ -151,28 +151,25 @@ List<GatewayConnectionProfile> normalizeGatewayProfiles({
     final fallback = defaults[index];
     final current = index < incoming.length ? incoming[index] : fallback;
     if (index == kGatewayRemoteProfileIndex) {
-      final hasEndpoint = current.host.trim().isNotEmpty && current.port > 0;
+      final hasEndpoint =
+          current.host.trim().isNotEmpty &&
+          current.port > 0 &&
+          !_isGatewayLoopbackHost(current.host);
       final slotMode = switch (current.mode) {
-        RuntimeConnectionMode.local => RuntimeConnectionMode.local,
         RuntimeConnectionMode.remote => RuntimeConnectionMode.remote,
-        RuntimeConnectionMode.unconfigured => hasEndpoint
-            ? RuntimeConnectionMode.remote
-            : RuntimeConnectionMode.unconfigured,
+        RuntimeConnectionMode.unconfigured =>
+          hasEndpoint
+              ? RuntimeConnectionMode.remote
+              : RuntimeConnectionMode.unconfigured,
       };
       normalized.add(
         current.copyWith(
           mode: slotMode,
-          useSetupCode: slotMode == RuntimeConnectionMode.local
-              ? false
-              : current.useSetupCode,
-          setupCode: slotMode == RuntimeConnectionMode.local
-              ? ''
-              : current.setupCode,
+          useSetupCode: current.useSetupCode,
+          setupCode: current.setupCode,
           host: hasEndpoint ? current.host : fallback.host,
           port: current.port > 0 ? current.port : fallback.port,
-          tls: slotMode == RuntimeConnectionMode.local
-              ? false
-              : (hasEndpoint ? current.tls : fallback.tls),
+          tls: hasEndpoint ? current.tls : fallback.tls,
           tokenRef: current.tokenRef.trim().isEmpty
               ? fallback.tokenRef
               : current.tokenRef,
@@ -184,28 +181,19 @@ List<GatewayConnectionProfile> normalizeGatewayProfiles({
       continue;
     }
     final slotMode = switch (current.mode) {
-      RuntimeConnectionMode.local => RuntimeConnectionMode.local,
       RuntimeConnectionMode.remote => RuntimeConnectionMode.remote,
       RuntimeConnectionMode.unconfigured =>
-        current.host.trim().isNotEmpty
+        current.host.trim().isNotEmpty && !_isGatewayLoopbackHost(current.host)
             ? RuntimeConnectionMode.remote
             : RuntimeConnectionMode.unconfigured,
     };
     normalized.add(
       current.copyWith(
         mode: slotMode,
-        useSetupCode: slotMode == RuntimeConnectionMode.local
-            ? false
-            : current.useSetupCode,
-        setupCode: slotMode == RuntimeConnectionMode.local
-            ? ''
-            : current.setupCode,
-        port: current.port > 0
-            ? current.port
-            : slotMode == RuntimeConnectionMode.local
-            ? 18789
-            : 443,
-        tls: slotMode == RuntimeConnectionMode.local ? false : current.tls,
+        useSetupCode: current.useSetupCode,
+        setupCode: current.setupCode,
+        port: current.port > 0 ? current.port : 443,
+        tls: current.tls,
         tokenRef: current.tokenRef.trim().isEmpty
             ? fallback.tokenRef
             : current.tokenRef,
@@ -216,6 +204,11 @@ List<GatewayConnectionProfile> normalizeGatewayProfiles({
     );
   }
   return List<GatewayConnectionProfile>.unmodifiable(normalized);
+}
+
+bool _isGatewayLoopbackHost(String host) {
+  final normalized = host.trim().toLowerCase();
+  return normalized == '127.0.0.1' || normalized == 'localhost';
 }
 
 List<GatewayConnectionProfile> replaceGatewayProfileAt(

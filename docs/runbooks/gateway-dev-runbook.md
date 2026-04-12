@@ -1,6 +1,8 @@
 # Gateway Dev Runbook
 
-This runbook covers the `XWorkmate.svc.plus` client when it connects directly to an OpenClaw gateway for local and remote development, pairing approval, and release verification.
+This runbook covers the `XWorkmate.svc.plus` client when it connects to the managed bridge / remote gateway path for pairing approval and release verification.
+
+Local gateway / loopback is no longer an app-facing runtime mode for account sync, bridge startup, or task dialog send flow.
 
 ## Scope
 
@@ -16,21 +18,17 @@ This runbook covers the `XWorkmate.svc.plus` client when it connects directly to
 - `.env` is development prefill only. It must not become the persisted source of truth and must not auto-connect the gateway.
 - Shared tokens and passwords are user-entered auth inputs. Never hardcode them in Dart, native code, tests, or scripts.
 - Long-lived secrets belong in secure storage. XWorkmate also keeps a file-backed fallback for device identity and operator device token so release builds keep a stable paired identity.
-- Local mode may use plain `ws://127.0.0.1:18789`.
-- Remote mode must use TLS, for example `wss://openclaw.svc.plus:443`.
+- The app-facing bridge / gateway path is remote-only and must use TLS, for example `wss://openclaw.svc.plus:443`.
+- Loopback endpoints must not be revived as runtime truth sources for account sync or task dialog startup.
 
 ## Endpoint Matrix
 
-- XWorkmate direct local gateway auth:
-  - `ws://127.0.0.1:18789`
 - XWorkmate direct remote gateway auth:
   - `wss://openclaw.svc.plus:443`
 - OpenClaw operator control page for pairing approval:
   - [https://openclaw.svc.plus/nodes](https://openclaw.svc.plus/nodes)
-- Local web console style endpoint:
-  - `http://127.0.0.1:18789`
 
-Do not enter `http://` or `https://` into the XWorkmate gateway dialog unless the code explicitly expects a browser console URL. The app-level gateway connection is `ws://` or `wss://`.
+Do not enter loopback / local console URLs into the XWorkmate gateway dialog. The current app-level gateway connection is remote-only `wss://`.
 
 ## Config Sources
 
@@ -61,7 +59,6 @@ Do not enter `http://` or `https://` into the XWorkmate gateway dialog unless th
 
 ### Symptom
 
-- XWorkmate could connect locally and chat normally.
 - Remote shared-token auth reached the gateway, but remote connect repeatedly ended with `NOT_PAIRED: pairing required`.
 - The operator page showed one `Pending` `XWorkmate Mac` entry and one older `Paired` `XWorkmate Mac` entry at the same time.
 
@@ -218,9 +215,8 @@ If a device-run test hangs instead of failing with an assertion, record it as ma
 
 ## Manual Acceptance
 
-1. Verify local mode can connect and chat through `ws://127.0.0.1:18789`.
-2. Verify remote mode can connect through `wss://openclaw.svc.plus:443`.
-3. Verify first remote connect creates one pending pairing request.
-4. Approve that request from [https://openclaw.svc.plus/nodes](https://openclaw.svc.plus/nodes).
-5. Reconnect and verify the same `deviceId` is now listed under `Paired`.
-6. Restart the app and verify remote reconnect does not create a fresh pending request.
+1. Verify remote mode can connect through `wss://openclaw.svc.plus:443`.
+2. Verify first remote connect creates one pending pairing request.
+3. Approve that request from [https://openclaw.svc.plus/nodes](https://openclaw.svc.plus/nodes).
+4. Reconnect and verify the same `deviceId` is now listed under `Paired`.
+5. Restart the app and verify remote reconnect does not create a fresh pending request.

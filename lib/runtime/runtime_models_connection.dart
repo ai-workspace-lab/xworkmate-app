@@ -10,12 +10,11 @@ import 'runtime_models_runtime_payloads.dart';
 import 'runtime_models_gateway_entities.dart';
 import 'runtime_models_multi_agent.dart';
 
-enum RuntimeConnectionMode { unconfigured, local, remote }
+enum RuntimeConnectionMode { unconfigured, remote }
 
 extension RuntimeConnectionModeCopy on RuntimeConnectionMode {
   String get label => switch (this) {
     RuntimeConnectionMode.unconfigured => appText('未配置', 'Unconfigured'),
-    RuntimeConnectionMode.local => appText('本地', 'Local'),
     RuntimeConnectionMode.remote => appText('远程', 'Remote'),
   };
 

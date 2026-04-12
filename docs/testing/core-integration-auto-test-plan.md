@@ -12,8 +12,8 @@
 本文默认当前真实拓扑如下：
 
 - 在线用户同步会向本地设置注入远程默认值
-- ACP 支持 selfhost 远程服务端
-- ACP 支持 local / loopback 模式
+- bridge / gateway 主链路固定走 managed remote bridge
+- 外部 ACP selfhost 仍可覆盖远程服务端
 - 线程执行同时覆盖本地执行型任务与在线执行任务
 
 ## 2. 现有可复用测试基础
@@ -74,7 +74,7 @@
 - endpoint 规范化
 - 账户同步与 settings snapshot
 - 线程身份、技能绑定、artifact 写回、线程隔离
-- local / remote 模式切换与 provider 选择
+- remote / offline 模式切换与 provider 选择
 
 ### 3.2 feature
 
@@ -101,7 +101,7 @@
 - 结果写入当前线程 workspace 或 artifact snapshot
 - 本地执行型与在线执行型都通过同一结果表面暴露产物
 - secret 不进入普通 settings snapshot
-- local 模式允许明确的非 TLS 边界，remote 模式不允许静默降级
+- managed remote 主链路不允许 non-TLS / loopback fallback
 - 错误信息按配置错误、连接失败、鉴权失败、任务失败分层呈现
 
 ## 5. 设置页面配置功能
@@ -154,32 +154,26 @@
   - 兼并到 `test/runtime/external_acp_endpoint_settings_suite.dart`
   - 设置页提示补充到 `test/features/settings_page_gateway_acp_messages_suite.dart`
 
-### `ACP-CONFIG-003` local ACP loopback 模式允许非 TLS，remote 模式不允许静默降级
+### `ACP-CONFIG-003` managed bridge 入口固定，且主链路不允许 loopback / non-TLS fallback
 
 - 测试目标
-  - 明确 local / loopback 与 remote transport trust boundary。
+  - 明确 bridge runtime 不依赖 `BRIDGE_SERVER_URL`，并固定走 managed remote bridge。
 - 推荐测试层级
   - `runtime`
-  - `feature`
 - 前置依赖与假服务
-  - endpoint normalization fixtures
-  - loopback host 样例：
-    - `http://127.0.0.1:9001/opencode`
-    - `ws://127.0.0.1:9001/codex`
-  - remote host 样例：
-    - `http://example.com/opencode`
+  - bridge runtime fixtures
+  - stale env / sync metadata 样例：
+    - `BRIDGE_SERVER_URL=https://stale.example.invalid`
 - 关键断言
-  - loopback/local 模式可接受非 TLS
-  - remote 模式遇到非 TLS 时给出明确错误或阻止提交
-  - remote 模式不会 silently rewrite 成 insecure transport
+  - `resolveBridgeAcpEndpointInternal()` 固定返回 `https://xworkmate-bridge.svc.plus`
+  - thread send / collaboration send 不再因缺少 `BRIDGE_SERVER_URL` 被阻断
+  - 不存在 local 模式枚举与 fallback
 - 失败分类
-  - loopback 被误拦截
-  - remote 静默降级
-  - 错误分类不清晰
+  - 旧 truth source 仍影响运行态入口
+  - 缺少 `BRIDGE_SERVER_URL` 仍被当作主错误
+  - local fallback 未清干净
 - 后续实现建议文件落点
-  - 首选扩展 `test/runtime/gateway_endpoint_normalization_suite.dart`
-  - 连接策略落到 `test/runtime/external_acp_endpoint_settings_suite.dart`
-  - 表单提示补充到 `test/features/settings_page_gateway_acp_messages_suite.dart`
+  - `test/runtime/bridge_runtime_cleanup_test.dart`
 
 ### `ACP-CONFIG-004` 设置页测试连接对 hosted base URL、自定义 auth、失败提示语分类正确
 
@@ -190,7 +184,7 @@
   - `integration`
 - 前置依赖与假服务
   - fake gateway client
-  - hosted / selfhost / local 三类 endpoint fixture
+  - managed bridge / selfhost 两类 endpoint fixture
   - fake failure 分类：
     - 鉴权失败
     - 空响应
