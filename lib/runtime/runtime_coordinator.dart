@@ -21,7 +21,7 @@ enum CoordinatorState { disconnected, connecting, connected, ready, error }
 /// This class coordinates:
 /// - GatewayRuntime: Connection to OpenClaw Gateway
 /// - CodexRuntime: Code agent runtime (external CLI or built-in runtime mode)
-/// - ModeSwitcher: Local/Remote/Offline mode switching
+/// - ModeSwitcher: Remote/Offline mode switching
 /// - Extensible external code-agent provider descriptors for future CLIs
 class RuntimeCoordinator extends ChangeNotifier {
   final GatewayRuntime gateway;
@@ -242,8 +242,9 @@ class RuntimeCoordinator extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Auto-select best available mode
-      final result = await modeSwitcher.autoSelect(preferRemote: preferRemote);
+      final result = preferRemote
+          ? await modeSwitcher.switchToRemote()
+          : await modeSwitcher.switchToOffline();
 
       if (!result.success) {
         throw StateError('No available connection mode: ${result.error}');
@@ -337,9 +338,6 @@ class RuntimeCoordinator extends ChangeNotifier {
   List<GatewayMode> getAvailableModes() {
     final modes = <GatewayMode>[];
 
-    // Always can try local mode
-    modes.add(GatewayMode.local);
-
     // Remote mode requires network
     modes.add(GatewayMode.remote);
 
@@ -370,8 +368,6 @@ class RuntimeCoordinator extends ChangeNotifier {
 
   Future<ModeSwitchResult> _switchMode(GatewayMode mode) {
     switch (mode) {
-      case GatewayMode.local:
-        return modeSwitcher.switchToLocal();
       case GatewayMode.remote:
         return modeSwitcher.switchToRemote();
       case GatewayMode.offline:

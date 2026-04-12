@@ -171,8 +171,7 @@ bool hasStoredGatewayTokenForProfileSettingsInternal(
     controller.secureRefsInternal.containsKey(
       gatewayTokenRefForProfileSettingsInternal(controller, profileIndex),
     ) ||
-    (!controller.snapshotInternal.accountLocalMode &&
-        profileIndex == kGatewayRemoteProfileIndex &&
+    (profileIndex == kGatewayRemoteProfileIndex &&
         controller.secureRefsInternal.containsKey(
           kAccountManagedSecretTargetBridgeAuthToken,
         ));
@@ -192,8 +191,7 @@ String? storedGatewayTokenMaskForProfileSettingsInternal(
       controller,
       profileIndex,
     )] ??
-    (!controller.snapshotInternal.accountLocalMode &&
-            profileIndex == kGatewayRemoteProfileIndex
+    (profileIndex == kGatewayRemoteProfileIndex
         ? controller
               .secureRefsInternal[kAccountManagedSecretTargetBridgeAuthToken]
         : null);
