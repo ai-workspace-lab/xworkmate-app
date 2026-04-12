@@ -360,7 +360,14 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
           assistantMessageViewModeForSession(currentSessionKey),
       singleAgentProvider:
           singleAgentProvider ??
-          singleAgentProviderForSession(currentSessionKey),
+          settings.sanitizeSingleAgentProviderSelection(
+            SingleAgentProviderCopy.fromJsonValue(
+              assistantThreadRecordsInternal[normalizedSessionKey]
+                      ?.executionBinding
+                      .providerId ??
+                  '',
+            ),
+          ),
       singleAgentProviderSource: ThreadSelectionSource.inherited,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );

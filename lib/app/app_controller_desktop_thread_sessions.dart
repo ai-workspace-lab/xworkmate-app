@@ -423,8 +423,8 @@ extension AppControllerDesktopThreadSessions on AppController {
               normalizedSessionKey,
             )
           ? appText(
-              '当前没有可用的 Bridge Provider。请先在设置里配置并同步可用连接。',
-              'No bridge provider is currently available. Configure and sync an available upstream connection in Settings first.',
+              'Bridge 当前没有可用 Provider。',
+              'The bridge does not currently advertise any available providers.',
             )
           : appText(
               '当前线程的 Bridge Provider 尚未就绪。',

@@ -304,35 +304,10 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
             .endpoint
             .trim()
       : '';
-  if (bridgeServerUrl.isEmpty ||
-      !isSupportedExternalAcpEndpoint(bridgeServerUrl)) {
-    const result = AccountSyncResult(
-      state: 'blocked',
-      message: 'Bridge server is unavailable',
-    );
-    await controller.storeInternal.saveAccountSyncState(
-      AccountSyncState.defaults().copyWith(
-        syncedDefaults: AccountRemoteProfile.defaults(),
-        syncState: result.state,
-        syncMessage: result.message,
-        lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
-        lastSyncError: result.message,
-        profileScope: 'bridge',
-        tokenConfigured: const AccountTokenConfigured(
-          bridge: true,
-          vault: false,
-          apisix: false,
-        ),
-      ),
-    );
-    await controller.reloadDerivedStateInternal();
-    controller.accountStatusInternal = result.message;
-    if (!quiet) {
-      controller.accountBusyInternal = false;
-      controller.notifyListeners();
-    }
-    return result;
-  }
+  final resolvedBridgeServerUrl =
+      isSupportedExternalAcpEndpoint(bridgeServerUrl)
+      ? bridgeServerUrl
+      : kCanonicalBridgeAcpEndpoint;
   await controller.storeInternal.clearAccountManagedSecret(
     target: kAccountManagedSecretTargetAIGatewayAccessToken,
   );
@@ -342,12 +317,12 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
 
   final nextState = AccountSyncState.defaults().copyWith(
     syncedDefaults: AccountRemoteProfile.defaults().copyWith(
-      bridgeServerUrl: bridgeServerUrl,
+      bridgeServerUrl: resolvedBridgeServerUrl,
     ),
     syncState: 'ready',
     syncMessage: 'Bridge access synced',
     lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
-    lastSyncSource: bridgeServerUrl,
+    lastSyncSource: resolvedBridgeServerUrl,
     lastSyncError: '',
     profileScope: 'bridge',
     tokenConfigured: const AccountTokenConfigured(
@@ -365,7 +340,10 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
       accountIdentifier: '',
       lastSyncAt: nextState.lastSyncAtMs,
       remoteServerSummary: currentModeConfig.cloudSynced.remoteServerSummary
-          .copyWith(endpoint: bridgeServerUrl, hasAdvancedOverrides: false),
+          .copyWith(
+            endpoint: resolvedBridgeServerUrl,
+            hasAdvancedOverrides: false,
+          ),
     ),
   );
   final sanitizedSettings = _sanitizeBridgeOnlyAccountSyncSettings(

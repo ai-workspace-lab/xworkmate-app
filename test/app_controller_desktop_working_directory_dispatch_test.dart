@@ -101,7 +101,7 @@ void main() {
     );
 
     test(
-      'single-agent turns stay blocked until bridge server has been synced',
+      'single-agent turns go through the canonical bridge entry without synced endpoint state',
       () async {
         final client = _CapturingGoTaskServiceClient();
         final controller = AppController(
@@ -121,12 +121,9 @@ void main() {
 
         await controller.sendChatMessage('first turn');
 
-        expect(client.requests, isEmpty);
-        final messages = controller
-            .requireTaskThreadForSessionInternal(sessionKey)
-            .messages;
-        expect(messages, isNotEmpty);
-        expect(messages.last.text, contains('Bridge Server'));
+        expect(client.requests, hasLength(1));
+        expect(client.requests.single.sessionId, sessionKey);
+        expect(client.requests.single.threadId, sessionKey);
       },
     );
 
@@ -165,6 +162,38 @@ void main() {
       expect(
         recordA.workspaceBinding.workspacePath,
         isNot(recordB.workspaceBinding.workspacePath),
+      );
+    });
+
+    test('new task threads do not inherit another thread provider choice', () {
+      final controller = AppController(
+        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+          SingleAgentProvider.gemini,
+        ],
+      );
+      addTearDown(controller.dispose);
+
+      const firstSessionKey = 'draft:thread-provider-a';
+      const secondSessionKey = 'draft:thread-provider-b';
+
+      controller.initializeAssistantThreadContext(
+        firstSessionKey,
+        executionTarget: AssistantExecutionTarget.singleAgent,
+        singleAgentProvider: SingleAgentProvider.gemini,
+      );
+      controller.initializeAssistantThreadContext(
+        secondSessionKey,
+        executionTarget: AssistantExecutionTarget.singleAgent,
+      );
+
+      expect(
+        controller.singleAgentProviderForSession(firstSessionKey),
+        SingleAgentProvider.gemini,
+      );
+      expect(
+        controller.singleAgentProviderForSession(secondSessionKey),
+        SingleAgentProvider.codex,
       );
     });
   });

@@ -335,6 +335,7 @@ const List<SingleAgentProvider> kPresetExternalAcpProviders =
 
 const String kCanonicalGatewayProviderId = 'openclaw';
 const String kCanonicalGatewayProviderLabel = 'OpenClaw';
+const String kCanonicalBridgeAcpEndpoint = 'https://xworkmate-bridge.svc.plus';
 
 const List<SingleAgentProvider> kKnownSingleAgentProviders =
     <SingleAgentProvider>[

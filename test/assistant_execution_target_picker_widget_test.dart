@@ -220,6 +220,19 @@ void main() {
       find.byKey(const Key('assistant-gateway-provider-button')),
       findsOneWidget,
     );
+    final gatewayButton = tester.widget<PopupMenuButton<String>>(
+      find.byKey(const Key('assistant-gateway-provider-button')),
+    );
+    final items = gatewayButton.itemBuilder(
+      tester.element(
+        find.byKey(const Key('assistant-gateway-provider-button')),
+      ),
+    );
+    expect(items, hasLength(1));
+    expect(
+      items.whereType<PopupMenuItem<String>>().single.value,
+      kCanonicalGatewayProviderId,
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
