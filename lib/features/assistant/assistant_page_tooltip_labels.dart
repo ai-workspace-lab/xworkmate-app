@@ -43,9 +43,9 @@ String executionTargetTooltipInternal(AssistantExecutionTarget target) =>
       'Task dialog mode: ${target.compactLabel}',
     );
 
-String gatewayProviderTooltipInternal() => appText(
-  'Gateway Provider: 🦞 $kCanonicalGatewayProviderLabel',
-  'Gateway Provider: 🦞 $kCanonicalGatewayProviderLabel',
+String providerTooltipInternal(SingleAgentProvider provider) => appText(
+  '智能体 Provider: ${provider.label}',
+  'Agent provider: ${provider.label}',
 );
 
 String modelTooltipInternal(String modelLabel) =>

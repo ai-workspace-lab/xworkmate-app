@@ -101,6 +101,43 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     notifyIfActiveInternal();
   }
 
+  Future<void> setAssistantSingleAgentProvider(
+    SingleAgentProvider provider,
+  ) async {
+    final resolvedProvider = resolveAssistantProvider(provider.providerId);
+    final sessionKey = normalizedAssistantSessionKeyInternal(
+      sessionsControllerInternal.currentSessionKey,
+    );
+    if (sessionKey.isEmpty) {
+      return;
+    }
+    final existing = taskThreadForSessionInternal(sessionKey);
+    if (existing != null &&
+        normalizeSingleAgentProviderId(existing.executionBinding.providerId) ==
+            resolvedProvider.providerId &&
+        existing.executionBinding.providerSource ==
+            ThreadSelectionSource.explicit) {
+      return;
+    }
+    if (!assistantThreadRecordsInternal.containsKey(sessionKey)) {
+      initializeAssistantThreadContext(
+        sessionKey,
+        executionTarget: assistantExecutionTargetForSession(sessionKey),
+        messageViewMode: assistantMessageViewModeForSession(sessionKey),
+      );
+    }
+    upsertTaskThreadInternal(
+      sessionKey,
+      singleAgentProvider: resolvedProvider,
+      singleAgentProviderSource: ThreadSelectionSource.explicit,
+      latestResolvedProviderId: '',
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    await flushAssistantThreadPersistenceInternal();
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
+  }
+
   Future<void> setAssistantMessageViewMode(
     AssistantMessageViewMode mode,
   ) async {

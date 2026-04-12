@@ -567,6 +567,14 @@ class AppController extends ChangeNotifier {
   List<SingleAgentProvider> get bridgeProviderCatalog =>
       normalizeSingleAgentProviderList(bridgeProviderCatalogInternal);
 
+  List<SingleAgentProvider> get assistantProviderCatalog {
+    final catalog = bridgeProviderCatalog;
+    if (catalog.isNotEmpty) {
+      return catalog;
+    }
+    return kPresetExternalAcpProviders;
+  }
+
   SingleAgentProvider? bridgeProviderForId(String providerId) {
     final normalizedProviderId = normalizeSingleAgentProviderId(providerId);
     if (normalizedProviderId.isEmpty) {
@@ -578,6 +586,30 @@ class AppController extends ChangeNotifier {
       }
     }
     return null;
+  }
+
+  SingleAgentProvider resolveAssistantProvider(String? providerId) {
+    final normalizedProviderId = normalizeSingleAgentProviderId(providerId ?? '');
+    final catalog = assistantProviderCatalog;
+    if (normalizedProviderId.isNotEmpty) {
+      for (final provider in catalog) {
+        if (provider.providerId == normalizedProviderId) {
+          return provider;
+        }
+      }
+    }
+    if (catalog.isNotEmpty) {
+      return catalog.first;
+    }
+    return SingleAgentProvider.unspecified;
+  }
+
+  SingleAgentProvider assistantProviderForSession(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final thread = taskThreadForSessionInternal(normalizedSessionKey);
+    return resolveAssistantProvider(thread?.executionBinding.providerId);
   }
 
   List<AssistantExecutionTarget> visibleAssistantExecutionTargets(

@@ -290,8 +290,18 @@ extension AppControllerDesktopSkillPermissions on AppController {
         'TaskThread $normalizedSessionKey is missing a complete workspaceBinding.',
       );
     }
-    final nextProvider = SingleAgentProvider.unspecified;
-    const nextProviderSource = ThreadSelectionSource.inherited;
+    final requestedProvider = singleAgentProvider?.isUnspecified == false
+        ? singleAgentProvider
+        : null;
+    final nextProvider = resolveAssistantProvider(
+      requestedProvider?.providerId ??
+          existing?.executionBinding.providerId ??
+          existing?.contextState.latestResolvedProviderId,
+    );
+    final nextProviderSource =
+        singleAgentProviderSource ??
+        existing?.executionBinding.providerSource ??
+        ThreadSelectionSource.inherited;
     final nextExecutionBinding =
         (executionBinding ??
                 existing?.executionBinding ??

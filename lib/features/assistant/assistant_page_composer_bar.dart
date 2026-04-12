@@ -53,9 +53,6 @@ class ComposerBarInternal extends StatefulWidget {
     required this.onToggleSkill,
     required this.onThinkingChanged,
     required this.onModelChanged,
-    required this.onOpenGateway,
-    required this.onOpenAiGatewaySettings,
-    required this.onReconnectGateway,
     required this.onPickAttachments,
     required this.onAddAttachment,
     required this.onPasteImageAttachment,
@@ -78,9 +75,6 @@ class ComposerBarInternal extends StatefulWidget {
   final ValueChanged<String> onToggleSkill;
   final ValueChanged<String> onThinkingChanged;
   final Future<void> Function(String modelId) onModelChanged;
-  final VoidCallback onOpenGateway;
-  final VoidCallback onOpenAiGatewaySettings;
-  final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
   final ValueChanged<ComposerAttachmentInternal> onAddAttachment;
   final AssistantClipboardImageReader onPasteImageAttachment;
@@ -316,10 +310,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     final uiFeatures = controller.featuresFor(
       resolveUiFeaturePlatformFromContext(context),
     );
-    final connectionState = controller.currentAssistantConnectionState;
-    final connected = connectionState.connected;
-    final reconnectAvailable = controller.canQuickConnectGateway;
-    final connecting = connectionState.connecting;
     final visibleExecutionTargets = controller.visibleAssistantExecutionTargets(
       uiFeatures.availableExecutionTargets,
     );
@@ -337,16 +327,14 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
       executionTarget,
     );
     final permissionLevel = controller.assistantPermissionLevel;
+    final availableProviders = controller.assistantProviderCatalog;
+    final selectedProvider = controller.assistantProviderForSession(
+      controller.currentSessionKey,
+    );
     final selectedSkills = widget.availableSkills
         .where((skill) => widget.selectedSkillKeys.contains(skill.key))
         .toList(growable: false);
-    final submitLabel = connected
-        ? appText('提交', 'Submit')
-        : connecting
-        ? appText('连接中…', 'Connecting…')
-        : reconnectAvailable
-        ? appText('重连', 'Reconnect')
-        : appText('连接', 'Connect');
+    final submitLabel = appText('提交', 'Submit');
 
     reportContentHeightInternal();
 
@@ -432,32 +420,48 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                 ),
                 const SizedBox(width: 4),
               ],
-              if (!connecting) ...[
+              if (availableProviders.isNotEmpty) ...[
                 PopupMenuButton<String>(
-                  key: const Key('assistant-gateway-provider-button'),
-                  tooltip: appText('Gateway Provider', 'Gateway Provider'),
-                  onSelected: (_) {},
-                  itemBuilder: (context) => const <PopupMenuEntry<String>>[
-                    PopupMenuItem<String>(
-                      value: kCanonicalGatewayProviderId,
-                      key: Key('assistant-gateway-provider-menu-item-openclaw'),
-                      child: Row(
-                        children: [
-                          GatewayProviderBadgeInternal(
-                            key: Key('assistant-gateway-provider-menu-badge'),
+                  key: const Key('assistant-provider-button'),
+                  tooltip: appText('智能体 Provider', 'Agent Provider'),
+                  onSelected: (providerId) async {
+                    await controller.setAssistantSingleAgentProvider(
+                      controller.resolveAssistantProvider(providerId),
+                    );
+                    if (mounted) {
+                      setState(() {});
+                    }
+                  },
+                  itemBuilder: (context) => availableProviders
+                      .map(
+                        (provider) => PopupMenuItem<String>(
+                          value: provider.providerId,
+                          key: Key(
+                            'assistant-provider-menu-item-${provider.providerId}',
                           ),
-                          SizedBox(width: 10),
-                          Expanded(child: Text(kCanonicalGatewayProviderLabel)),
-                          Icon(Icons.check_rounded, size: 18),
-                        ],
-                      ),
-                    ),
-                  ],
+                          child: Row(
+                            children: [
+                              SingleAgentProviderBadgeInternal(
+                                key: Key(
+                                  'assistant-provider-menu-badge-${provider.providerId}',
+                                ),
+                                provider: provider,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(child: Text(provider.label)),
+                              if (provider == selectedProvider)
+                                const Icon(Icons.check_rounded, size: 18),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(growable: false),
                   child: ComposerToolbarChipInternal(
-                    leading: const GatewayProviderBadgeInternal(
-                      key: Key('assistant-gateway-provider-badge'),
+                    leading: SingleAgentProviderBadgeInternal(
+                      key: const Key('assistant-provider-badge'),
+                      provider: selectedProvider,
                     ),
-                    tooltip: gatewayProviderTooltipInternal(),
+                    tooltip: providerTooltipInternal(selectedProvider),
                     showChevron: true,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -707,15 +711,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                 message: submitLabel,
                 child: FilledButton(
                   key: const Key('assistant-send-button'),
-                  onPressed: connecting
-                      ? null
-                      : connected
-                      ? widget.onSend
-                      : reconnectAvailable
-                      ? () async {
-                          await widget.onReconnectGateway();
-                        }
-                      : widget.onOpenGateway,
+                  onPressed: widget.onSend,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -729,14 +725,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        connected
-                            ? Icons.arrow_upward_rounded
-                            : reconnectAvailable
-                            ? Icons.refresh_rounded
-                            : Icons.link_rounded,
-                        size: 18,
-                      ),
+                      const Icon(Icons.arrow_upward_rounded, size: 18),
                       const SizedBox(width: 4),
                       Text(submitLabel),
                     ],

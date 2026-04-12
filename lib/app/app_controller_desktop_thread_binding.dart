@@ -219,19 +219,22 @@ extension AppControllerDesktopThreadBinding on AppController {
     required AssistantExecutionTarget executionTarget,
     ExecutionBinding? existingBinding,
   }) {
-    const selectedProviderId = kCanonicalGatewayProviderId;
+    final selectedProvider = resolveAssistantProvider(
+      existingBinding?.providerId,
+    );
     return (existingBinding ??
             ExecutionBinding(
               executionMode: ThreadExecutionMode.gateway,
-              executorId: selectedProviderId,
-              providerId: selectedProviderId,
+              executorId: selectedProvider.providerId,
+              providerId: selectedProvider.providerId,
               endpointId: '',
             ))
         .copyWith(
           executionMode: ThreadExecutionMode.gateway,
-          executorId: selectedProviderId,
-          providerId: selectedProviderId,
-          providerSource: ThreadSelectionSource.inherited,
+          executorId: selectedProvider.providerId,
+          providerId: selectedProvider.providerId,
+          providerSource:
+              existingBinding?.providerSource ?? ThreadSelectionSource.inherited,
         );
   }
 
