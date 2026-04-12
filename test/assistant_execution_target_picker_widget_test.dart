@@ -14,6 +14,7 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/runtime/skill_directory_access.dart';
 import 'package:xworkmate/theme/app_theme.dart';
+import 'package:xworkmate/widgets/assistant_focus_panel_previews.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -302,10 +303,119 @@ void main() {
       await tester.pump();
 
       expect(find.textContaining('设置 -> 集成'), findsNothing);
-      expect(find.textContaining('本地集成配置'), findsOneWidget);
+      expect(find.textContaining('等待 Bridge 就绪'), findsOneWidget);
+      expect(find.textContaining('Bridge Provider 尚未就绪'), findsOneWidget);
+      expect(find.textContaining('本地集成配置'), findsNothing);
       expect(find.text('打开配置中心'), findsNothing);
       expect(find.text('打开设置中心'), findsNothing);
       expect(find.text('查看线程工具栏'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'single-agent skills focus preview describes bridge recovery instead of settings sync when endpoint is missing',
+    (tester) async {
+      final root = Directory.systemTemp.createTempSync(
+        'xworkmate-focus-preview-widget-test-',
+      );
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        appDataRootPathResolver: () async => '${root.path}/settings.sqlite3',
+        secretRootPathResolver: () async => root.path,
+        supportRootPathResolver: () async => root.path,
+      );
+      final controller = AppController(
+        store: store,
+        desktopPlatformService: UnsupportedDesktopPlatformService(),
+        skillDirectoryAccessService: _FakeSkillDirectoryAccessService(
+          root.path,
+        ),
+        goTaskServiceClient: const _FakeGoTaskServiceClient(),
+        singleAgentSharedSkillScanRootOverrides: const <String>[],
+      );
+      addTearDown(() async {
+        controller.dispose();
+        if (root.existsSync()) {
+          await root.delete(recursive: true);
+        }
+      });
+
+      controller.initializeAssistantThreadContext(
+        controller.currentSessionKey,
+        executionTarget: AssistantExecutionTarget.singleAgent,
+        singleAgentProvider: SingleAgentProvider.codex,
+      );
+      controller.bridgeProviderCatalogInternal = const <SingleAgentProvider>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(platform: TargetPlatform.macOS),
+          home: Scaffold(
+            body: SkillsFocusPreviewInternal(controller: controller),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('Bridge Server 当前不可用'), findsOneWidget);
+      expect(find.textContaining('设置里配置并同步连接'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'gateway empty state only asks for bridge connectivity and removes edit-connection affordance',
+    (tester) async {
+      final root = Directory.systemTemp.createTempSync(
+        'xworkmate-gateway-empty-state-widget-test-',
+      );
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        appDataRootPathResolver: () async => '${root.path}/settings.sqlite3',
+        secretRootPathResolver: () async => root.path,
+        supportRootPathResolver: () async => root.path,
+      );
+      final controller = AppController(
+        store: store,
+        desktopPlatformService: UnsupportedDesktopPlatformService(),
+        skillDirectoryAccessService: _FakeSkillDirectoryAccessService(
+          root.path,
+        ),
+        goTaskServiceClient: const _FakeGoTaskServiceClient(),
+        singleAgentSharedSkillScanRootOverrides: const <String>[],
+      );
+      addTearDown(() async {
+        controller.dispose();
+        if (root.existsSync()) {
+          await root.delete(recursive: true);
+        }
+      });
+
+      controller.initializeAssistantThreadContext(
+        controller.currentSessionKey,
+        executionTarget: AssistantExecutionTarget.gateway,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(platform: TargetPlatform.macOS),
+          home: Scaffold(
+            body: AssistantEmptyStateInternal(
+              controller: controller,
+              onFocusComposer: () {},
+              onOpenGateway: () {},
+              onOpenAiGatewaySettings: () {},
+              onReconnectGateway: () async {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('先连接 Bridge'), findsOneWidget);
+      expect(find.textContaining('xworkmate-bridge 尚未连接'), findsOneWidget);
+      expect(find.text('连接 Bridge'), findsOneWidget);
+      expect(find.text('编辑连接'), findsNothing);
+      expect(find.text('连接 Gateway'), findsNothing);
     },
   );
 }
@@ -422,8 +532,4 @@ class _FakeGoTaskServiceClient implements GoTaskServiceClient {
     );
   }
 
-  @override
-  Future<void> syncExternalProviders(
-    List<ExternalCodeAgentAcpSyncedProvider> providers,
-  ) async {}
 }

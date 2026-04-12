@@ -21,11 +21,6 @@ class ExternalCodeAgentAcpDesktopTransport
   GatewayAcpClient get clientForTest => _client;
 
   @override
-  Future<void> syncExternalProviders(
-    List<ExternalCodeAgentAcpSyncedProvider> providers,
-  ) async {}
-
-  @override
   Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
     required AssistantExecutionTarget target,
     bool forceRefresh = false,

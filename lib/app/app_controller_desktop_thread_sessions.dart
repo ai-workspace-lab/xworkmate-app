@@ -52,19 +52,11 @@ import 'app_controller_desktop_thread_sessions_collaboration_impl.dart';
 AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
   required AssistantExecutionTarget target,
   required GatewayConnectionSnapshot connection,
-  required GatewayConnectionProfile targetProfile,
 }) {
-  const expectedMode = RuntimeConnectionMode.remote;
-  final matchesTarget = connection.mode == expectedMode;
-  final targetAddress =
-      targetProfile.host.trim().isNotEmpty && targetProfile.port > 0
-      ? '${targetProfile.host.trim()}:${targetProfile.port}'
-      : appText('未连接目标', 'No target');
-  final rawStatus = matchesTarget
-      ? connection.status
-      : RuntimeConnectionStatus.offline;
-  final pairingRequired = matchesTarget && connection.pairingRequired;
-  final gatewayTokenMissing = matchesTarget && connection.gatewayTokenMissing;
+  final bridgeAddress = connection.remoteAddress?.trim() ?? '';
+  final rawStatus = connection.status;
+  final pairingRequired = connection.pairingRequired;
+  final gatewayTokenMissing = connection.gatewayTokenMissing;
   final status = pairingRequired || gatewayTokenMissing
       ? RuntimeConnectionStatus.error
       : rawStatus;
@@ -77,11 +69,13 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
     executionTarget: target,
     status: status,
     primaryLabel: primaryLabel,
-    detailLabel: targetAddress,
+    detailLabel: bridgeAddress.isEmpty
+        ? appText('xworkmate-bridge 未连接', 'xworkmate-bridge is not connected')
+        : bridgeAddress,
     ready: status == RuntimeConnectionStatus.connected,
     pairingRequired: pairingRequired,
     gatewayTokenMissing: gatewayTokenMissing,
-    lastError: matchesTarget ? connection.lastError?.trim() : null,
+    lastError: connection.lastError?.trim(),
   );
 }
 
@@ -303,6 +297,12 @@ extension AppControllerDesktopThreadSessions on AppController {
         AssistantExecutionTarget.singleAgent) {
       return false;
     }
+    if (resolveExternalAcpEndpointForTargetInternal(
+          AssistantExecutionTarget.singleAgent,
+        ) ==
+        null) {
+      return false;
+    }
     return bridgeProviderCatalog.isEmpty;
   }
 
@@ -315,6 +315,12 @@ extension AppControllerDesktopThreadSessions on AppController {
     );
     if (assistantExecutionTargetForSession(normalizedSessionKey) !=
         AssistantExecutionTarget.singleAgent) {
+      return false;
+    }
+    if (resolveExternalAcpEndpointForTargetInternal(
+          AssistantExecutionTarget.singleAgent,
+        ) ==
+        null) {
       return false;
     }
     final selection = singleAgentProviderForSession(normalizedSessionKey);
@@ -461,7 +467,6 @@ extension AppControllerDesktopThreadSessions on AppController {
     return resolveGatewayThreadConnectionStateInternal(
       target: target,
       connection: connection,
-      targetProfile: gatewayProfileForAssistantExecutionTargetInternal(target),
     );
   }
 

@@ -12,11 +12,6 @@ class DesktopGoTaskService implements GoTaskServiceClient {
   final ExternalCodeAgentAcpTransport _acpTransport;
 
   @override
-  Future<void> syncExternalProviders(
-    List<ExternalCodeAgentAcpSyncedProvider> providers,
-  ) => _acpTransport.syncExternalProviders(providers);
-
-  @override
   Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
     required AssistantExecutionTarget target,
     bool forceRefresh = false,

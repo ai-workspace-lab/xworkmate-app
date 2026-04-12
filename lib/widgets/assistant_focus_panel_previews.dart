@@ -61,8 +61,8 @@ class TasksFocusPreviewInternal extends StatelessWidget {
                     RuntimeConnectionStatus.connected
                 ? appText('当前没有任务摘要。', 'No task summary yet.')
                 : appText(
-                    '连接 Gateway 后这里会显示任务摘要。',
-                    'Connect a gateway to load task summaries.',
+                    '恢复 xworkmate-bridge 连接后这里会显示任务摘要。',
+                    'Task summaries appear here after xworkmate-bridge reconnects.',
                   ),
           )
         else
@@ -112,12 +112,23 @@ class SkillsFocusPreviewInternal extends StatelessWidget {
               .toList(growable: false)
         : typedController.skills.take(4).toList(growable: false);
     if (items.isEmpty) {
+      final bridgeEndpointMissing =
+          typedController.isSingleAgentMode &&
+          typedController.resolveExternalAcpEndpointForTargetInternal(
+                AssistantExecutionTarget.singleAgent,
+              ) ==
+              null;
       return PreviewEmptyStateInternal(
         message: typedController.isSingleAgentMode
             ? (typedController.currentSingleAgentNeedsBridgeProvider
                   ? appText(
-                      '当前没有可用的 Bridge Provider，请先在设置里配置并同步连接。',
-                      'No bridge provider is available. Configure and sync a connection in Settings first.',
+                      'Bridge 当前没有广告可用 Provider。恢复后这里会显示线程自己的技能摘要。',
+                      'The bridge is not advertising any available providers right now. Thread-owned skill summaries will appear here after it recovers.',
+                    )
+                  : bridgeEndpointMissing
+                  ? appText(
+                      'Bridge Server 当前不可用。恢复后这里会显示线程自己的技能摘要。',
+                      'The bridge server is currently unavailable. Thread-owned skill summaries will appear here after it recovers.',
                     )
                   : appText(
                       '当前线程还没有已加载技能。切换 provider 后会读取该线程自己的 skills 列表。',
@@ -130,8 +141,8 @@ class SkillsFocusPreviewInternal extends StatelessWidget {
                 'No skills are loaded for the active agent.',
               )
             : appText(
-                '连接 Gateway 后可查看技能摘要。',
-                'Connect a gateway to inspect skills here.',
+                '恢复 xworkmate-bridge 连接后可查看技能摘要。',
+                'Skill summaries are available again after xworkmate-bridge reconnects.',
               ),
       );
     }
@@ -236,8 +247,8 @@ class McpFocusPreviewInternal extends StatelessWidget {
     if (items.isEmpty) {
       return PreviewEmptyStateInternal(
         message: appText(
-          '当前没有 MCP 连接器。连接 Gateway 后这里会显示工具摘要。',
-          'No MCP connectors yet. Connect a gateway to load tool summaries here.',
+          '当前没有 MCP 连接器。恢复 xworkmate-bridge 连接后这里会显示工具摘要。',
+          'No MCP connectors yet. Tool summaries appear here after xworkmate-bridge reconnects.',
         ),
       );
     }

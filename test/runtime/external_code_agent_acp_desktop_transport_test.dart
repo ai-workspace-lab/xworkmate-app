@@ -84,27 +84,6 @@ void main() {
       },
     );
 
-    test('ignores app-side provider sync in bridge-only mode', () async {
-      final client = _FakeGatewayAcpClient();
-      final transport = ExternalCodeAgentAcpDesktopTransport(
-        client: client,
-        endpointResolver: (_) => null,
-      );
-
-      await transport
-          .syncExternalProviders(const <ExternalCodeAgentAcpSyncedProvider>[
-            ExternalCodeAgentAcpSyncedProvider(
-              providerId: 'codex',
-              label: 'Codex',
-              endpoint: 'https://acp-server.svc.plus/codex/acp/rpc',
-              authorizationHeader: '',
-              enabled: true,
-            ),
-          ]);
-
-      expect(client.methods, isEmpty);
-    });
-
     test(
       'uses bridge routing resolve for preflight provider selection',
       () async {

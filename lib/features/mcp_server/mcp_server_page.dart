@@ -76,8 +76,8 @@ class McpServerPage extends StatelessWidget {
                             'No MCP servers connected.',
                           )
                         : appText(
-                            '连接 Gateway 后可查看 MCP 服务器。',
-                            'Connect a gateway to view MCP servers.',
+                            '恢复 xworkmate-bridge 连接后可查看 MCP 服务器。',
+                            'MCP servers are visible again after xworkmate-bridge reconnects.',
                           ),
                   ),
                 )
