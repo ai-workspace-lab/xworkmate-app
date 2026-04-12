@@ -37,6 +37,7 @@ import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
 import 'app_controller_desktop_single_agent.dart';
+import 'app_controller_desktop_single_agent_status_messages.dart';
 import 'app_controller_desktop_thread_binding.dart';
 import 'app_controller_desktop_thread_actions.dart';
 import 'app_controller_desktop_workspace_execution.dart';
@@ -404,7 +405,6 @@ extension AppControllerDesktopThreadSessions on AppController {
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
     if (target == AssistantExecutionTarget.singleAgent) {
       final primaryLabel = appText('Bridge', 'Bridge');
-      final provider = singleAgentProviderForSession(normalizedSessionKey);
       final resolvedProvider = singleAgentResolvedProviderForSession(
         normalizedSessionKey,
       );
@@ -412,21 +412,10 @@ extension AppControllerDesktopThreadSessions on AppController {
       final providerReady = resolvedProvider != null;
       final detail = providerReady
           ? joinConnectionPartsInternal(<String>[resolvedProvider.label, model])
-          : singleAgentShouldSuggestAcpSwitchForSession(normalizedSessionKey)
-          ? appText(
-              '${provider.label} 当前不可用，请改成 Bridge 当前可用的 Provider。',
-              '${provider.label} is unavailable. Switch to a provider currently advertised by the bridge.',
-            )
-          : singleAgentNeedsBridgeProviderForSession(
+          : singleAgentUnavailableLabelDesktopInternal(
+              this,
               normalizedSessionKey,
-            )
-          ? appText(
-              'Bridge 当前没有可用 Provider。',
-              'The bridge does not currently advertise any available providers.',
-            )
-          : appText(
-              '当前线程的 Bridge Provider 尚未就绪。',
-              'The bridge provider for this thread is not ready yet.',
+              null,
             );
       return AssistantThreadConnectionState(
         executionTarget: target,

@@ -76,6 +76,32 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
         );
         throw error;
       }
+      final preflightUnavailableReason =
+          controller.singleAgentShouldSuggestAcpSwitchForSession(sessionKey) ||
+              controller.singleAgentNeedsBridgeProviderForSession(sessionKey)
+          ? singleAgentUnavailableLabelDesktopInternal(
+              controller,
+              sessionKey,
+              null,
+            )
+          : null;
+      if (preflightUnavailableReason != null) {
+        controller.upsertTaskThreadInternal(
+          sessionKey,
+          lifecycleStatus: 'ready',
+          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          lastResultCode: 'error',
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        );
+        controller.appendAssistantThreadMessageInternal(
+          sessionKey,
+          assistantErrorMessageSingleAgentDesktopInternal(
+            controller,
+            preflightUnavailableReason,
+          ),
+        );
+        return;
+      }
       if (controller.resolveExternalAcpEndpointForTargetInternal(
             AssistantExecutionTarget.singleAgent,
           ) ==
@@ -112,27 +138,11 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
           ? resolvedProvider
           : controller.advertisedSingleAgentProviderInternal(selection) ??
                 selection;
-      final unavailableReason =
-          routingResolution.unavailable
+      final unavailableReason = routingResolution.unavailable
           ? singleAgentUnavailableLabelDesktopInternal(
               controller,
               sessionKey,
               routingResolution.unavailableMessage,
-            )
-          : controller.singleAgentShouldSuggestAcpSwitchForSession(sessionKey)
-          ? singleAgentUnavailableLabelDesktopInternal(
-              controller,
-              sessionKey,
-              null,
-            )
-          : controller.singleAgentNeedsBridgeProviderForSession(sessionKey)
-          ? singleAgentUnavailableLabelDesktopInternal(
-              controller,
-              sessionKey,
-              appText(
-                'Bridge 当前没有同步到可用 Provider。',
-                'The bridge does not currently have any synced providers.',
-              ),
             )
           : null;
       if (unavailableReason != null) {
