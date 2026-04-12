@@ -520,16 +520,19 @@ class UiFeatureAccess {
   }
 
   List<AssistantExecutionTarget> get availableExecutionTargets {
-    if (supportsRelayGateway) {
-      return const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway];
-    }
-    return const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway];
+    return const <AssistantExecutionTarget>[
+      AssistantExecutionTarget.agent,
+      AssistantExecutionTarget.gateway,
+    ];
   }
 
   AssistantExecutionTarget sanitizeExecutionTarget(
     AssistantExecutionTarget? target,
   ) {
-    return AssistantExecutionTarget.gateway;
+    final resolved = target ?? AssistantExecutionTarget.agent;
+    return availableExecutionTargets.contains(resolved)
+        ? resolved
+        : AssistantExecutionTarget.agent;
   }
 }
 

@@ -646,6 +646,7 @@ String _sidebarTaskUpdatedAtLabel(double? updatedAtMs) {
 
 IconData _sidebarTaskTargetIcon(AssistantExecutionTarget target) {
   return switch (target) {
+    AssistantExecutionTarget.agent => Icons.hub_rounded,
     AssistantExecutionTarget.gateway => Icons.cloud_outlined,
   };
 }

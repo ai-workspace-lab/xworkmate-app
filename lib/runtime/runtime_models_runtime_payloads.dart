@@ -513,11 +513,14 @@ bool isLegacyAutoThreadExecutionModeValue(String? value) {
   return value?.trim().toLowerCase() == 'auto';
 }
 
-enum ThreadExecutionMode { gateway }
+enum ThreadExecutionMode { agent, gateway }
 
 extension ThreadExecutionModeCopy on ThreadExecutionMode {
   static ThreadExecutionMode fromJsonValue(String? value) {
-    return ThreadExecutionMode.gateway;
+    return ThreadExecutionMode.values.firstWhere(
+      (item) => item.name == value?.trim(),
+      orElse: () => ThreadExecutionMode.gateway,
+    );
   }
 }
 
@@ -711,13 +714,19 @@ class ExecutionBinding {
 ThreadExecutionMode threadExecutionModeFromAssistantExecutionTarget(
   AssistantExecutionTarget target,
 ) {
-  return ThreadExecutionMode.gateway;
+  return switch (target) {
+    AssistantExecutionTarget.agent => ThreadExecutionMode.agent,
+    AssistantExecutionTarget.gateway => ThreadExecutionMode.gateway,
+  };
 }
 
 AssistantExecutionTarget assistantExecutionTargetFromExecutionMode(
   ThreadExecutionMode mode,
 ) {
-  return AssistantExecutionTarget.gateway;
+  return switch (mode) {
+    ThreadExecutionMode.agent => AssistantExecutionTarget.agent,
+    ThreadExecutionMode.gateway => AssistantExecutionTarget.gateway,
+  };
 }
 
 WorkspaceRefKind workspaceRefKindFromWorkspaceKind(WorkspaceKind kind) {

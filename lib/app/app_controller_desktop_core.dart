@@ -480,7 +480,8 @@ class AppController extends ChangeNotifier {
   bool get hasPendingSettingsApply => pendingSettingsApplyInternal;
   String get settingsDraftStatusMessage => settingsDraftStatusMessageInternal;
   List<GatewayAgentSummary> get agents => agentsControllerInternal.agents;
-  List<GatewaySessionSummary> get sessions => sessionsControllerInternal.sessions;
+  List<GatewaySessionSummary> get sessions =>
+      sessionsControllerInternal.sessions;
   List<GatewaySessionSummary> get assistantSessions =>
       assistantSessionsInternal();
   List<GatewayInstanceSummary> get instances =>
@@ -568,7 +569,9 @@ class AppController extends ChangeNotifier {
       normalizeSingleAgentProviderList(bridgeProviderCatalogInternal);
 
   List<SingleAgentProvider> get assistantProviderCatalog {
-    final catalog = bridgeProviderCatalog;
+    final catalog = normalizeBridgeOwnedSingleAgentProviderList(
+      bridgeProviderCatalogInternal,
+    );
     if (catalog.isNotEmpty) {
       return catalog;
     }
@@ -589,7 +592,9 @@ class AppController extends ChangeNotifier {
   }
 
   SingleAgentProvider resolveAssistantProvider(String? providerId) {
-    final normalizedProviderId = normalizeSingleAgentProviderId(providerId ?? '');
+    final normalizedProviderId = normalizeSingleAgentProviderId(
+      providerId ?? '',
+    );
     final catalog = assistantProviderCatalog;
     if (normalizedProviderId.isNotEmpty) {
       for (final provider in catalog) {
@@ -609,12 +614,18 @@ class AppController extends ChangeNotifier {
       sessionKey,
     );
     final thread = taskThreadForSessionInternal(normalizedSessionKey);
+    final executionTarget = assistantExecutionTargetForSession(
+      normalizedSessionKey,
+    );
+    if (executionTarget.isGateway) {
+      return SingleAgentProvider.openclaw;
+    }
     return resolveAssistantProvider(thread?.executionBinding.providerId);
   }
 
   List<AssistantExecutionTarget> visibleAssistantExecutionTargets(
     Iterable<AssistantExecutionTarget> supportedTargets,
-  ) => const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway];
+  ) => compactAssistantExecutionTargets(supportedTargets);
 
   List<String> get aiGatewayConversationModelChoices {
     final availableModels =

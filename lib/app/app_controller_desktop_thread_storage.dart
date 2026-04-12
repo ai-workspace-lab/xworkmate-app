@@ -62,7 +62,9 @@ extension AppControllerDesktopThreadStorage on AppController {
   }
 
   Future<void> ensureActiveAssistantThreadInternal() async {
-    if (!isAssistantTaskArchived(sessionsControllerInternal.currentSessionKey)) {
+    if (!isAssistantTaskArchived(
+      sessionsControllerInternal.currentSessionKey,
+    )) {
       return;
     }
     final fallback = assistantSessionSummariesInternal().firstWhere(
@@ -683,11 +685,18 @@ extension AppControllerDesktopThreadStorage on AppController {
           record.executionBinding.executionMode,
         ),
       );
-      const recordProvider = SingleAgentProvider(
-        providerId: kCanonicalGatewayProviderId,
-        label: kCanonicalGatewayProviderLabel,
-        badge: 'OC',
+      final recordProviderId = normalizeSingleAgentProviderId(
+        record.executionBinding.providerId,
       );
+      final recordProvider = recordProviderId.isEmpty
+          ? SingleAgentProvider.unspecified
+          : resolveAssistantProvider(recordProviderId);
+      final normalizedExecutionTarget =
+          recordExecutionTarget.isGateway &&
+              recordProviderId.isNotEmpty &&
+              isBridgeOwnedSingleAgentProviderId(recordProviderId)
+          ? AssistantExecutionTarget.agent
+          : recordExecutionTarget;
       final workspaceBinding = record.workspaceBinding.copyWith(
         workspaceId: sessionKey,
         displayPath: record.workspaceKind == WorkspaceKind.localFs
@@ -707,19 +716,19 @@ extension AppControllerDesktopThreadStorage on AppController {
             )
             .toList(growable: false),
         assistantModelId: record.assistantModelId.trim().isEmpty
-            ? resolvedAssistantModelForTargetInternal(recordExecutionTarget)
+            ? resolvedAssistantModelForTargetInternal(normalizedExecutionTarget)
             : record.assistantModelId.trim(),
         gatewayEntryState: (record.gatewayEntryState ?? '').trim().isEmpty
-            ? gatewayEntryStateForTargetInternal(recordExecutionTarget)
+            ? gatewayEntryStateForTargetInternal(normalizedExecutionTarget)
             : record.gatewayEntryState,
         workspaceBinding: workspaceBinding,
         executionBinding: record.executionBinding.copyWith(
           executionMode: threadExecutionModeFromAssistantExecutionTarget(
-            recordExecutionTarget,
+            normalizedExecutionTarget,
           ),
           executorId: recordProvider.providerId,
           providerId: recordProvider.providerId,
-          providerSource: ThreadSelectionSource.inherited,
+          providerSource: record.executionBinding.providerSource,
         ),
         lifecycleState: record.lifecycleState.copyWith(status: 'ready'),
       );
