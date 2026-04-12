@@ -42,6 +42,7 @@ validate_app_bundle() {
     return 1
   }
 
+  bash "$ROOT_DIR/scripts/validate-macos-app-bundle.sh" "$app_path"
   codesign --verify --deep --verbose=2 "$app_path"
 }
 
@@ -71,6 +72,8 @@ if [[ ! -d "$SOURCE_APP" ]]; then
   echo "Expected app bundle missing from DMG: $SOURCE_APP" >&2
   exit 1
 fi
+
+validate_app_bundle "$SOURCE_APP"
 
 if [[ -d "$TARGET_APP" ]]; then
   echo "Replacing existing app at $TARGET_APP"

@@ -96,8 +96,14 @@ verify_bundle_signature() {
   codesign --verify --deep --verbose=2 "$app_path"
 }
 
+validate_bundle_dependencies() {
+  local app_path="$1"
+  bash "$ROOT_DIR/scripts/validate-macos-app-bundle.sh" "$app_path"
+}
+
 echo "Validating export compliance metadata..."
 bash "$ROOT_DIR/scripts/check-apple-export-compliance.sh" "$BUILD_APP_PATH"
+validate_bundle_dependencies "$BUILD_APP_PATH"
 
 rm -rf "$DIST_APP_PATH" "$DIST_DMG_PATH"
 ditto "$BUILD_APP_PATH" "$DIST_APP_PATH"
@@ -111,6 +117,7 @@ else
 fi
 
 verify_bundle_signature "$DIST_APP_PATH"
+validate_bundle_dependencies "$DIST_APP_PATH"
 
 echo "Packaging DMG..."
 DMG_VOLUME_NAME="$APP_NAME" "$ROOT_DIR/scripts/create-dmg.sh" "$DIST_APP_PATH" "$DIST_DMG_PATH"
