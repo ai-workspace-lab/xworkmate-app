@@ -37,7 +37,6 @@ import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
 import 'app_controller_desktop_single_agent.dart';
-import 'app_controller_desktop_single_agent_status_messages.dart';
 import 'app_controller_desktop_thread_binding.dart';
 import 'app_controller_desktop_thread_actions.dart';
 import 'app_controller_desktop_workspace_execution.dart';
@@ -109,13 +108,6 @@ extension AppControllerDesktopThreadSessions on AppController {
   }
 
   int assistantSkillCountForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final target = assistantExecutionTargetForSession(normalizedSessionKey);
-    if (target == AssistantExecutionTarget.singleAgent) {
-      return assistantImportedSkillsForSession(normalizedSessionKey).length;
-    }
     return skills.length;
   }
 
@@ -153,18 +145,6 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final target = assistantExecutionTargetForSession(normalizedSessionKey);
-    final latestResolvedModel =
-        taskThreadForSessionInternal(
-          normalizedSessionKey,
-        )?.latestResolvedRuntimeModel.trim() ??
-        '';
-    if (target == AssistantExecutionTarget.singleAgent) {
-      if (latestResolvedModel.isNotEmpty) {
-        return latestResolvedModel;
-      }
-      return singleAgentRuntimeModelForSession(normalizedSessionKey);
-    }
     final recordModel =
         assistantThreadRecordsInternal[normalizedSessionKey]?.assistantModelId
             .trim() ??
@@ -176,7 +156,9 @@ extension AppControllerDesktopThreadSessions on AppController {
         (availableChoices.isEmpty || availableChoices.contains(recordModel))) {
       return recordModel;
     }
-    return resolvedAssistantModelForTargetInternal(target);
+    return resolvedAssistantModelForTargetInternal(
+      AssistantExecutionTarget.gateway,
+    );
   }
 
   String assistantWorkspacePathForSession(String sessionKey) {
@@ -194,7 +176,7 @@ extension AppControllerDesktopThreadSessions on AppController {
       normalizedAssistantSessionKeyInternal(sessionKey),
     );
     if (record == null) {
-      return WorkspaceRefKind.localPath;
+      return WorkspaceRefKind.remotePath;
     }
     return record.workspaceBinding.workspaceKind == WorkspaceKind.localFs
         ? WorkspaceRefKind.localPath
@@ -237,177 +219,8 @@ extension AppControllerDesktopThreadSessions on AppController {
     );
   }
 
-  SingleAgentProvider singleAgentProviderForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final selectedProvider = SingleAgentProviderCopy.fromJsonValue(
-      taskThreadForSessionInternal(
-            normalizedSessionKey,
-          )?.executionBinding.providerId ??
-          '',
-    );
-    if (!selectedProvider.isUnspecified) {
-      return selectedProvider;
-    }
-    final options = singleAgentProviderOptions;
-    return options.isEmpty ? SingleAgentProvider.unspecified : options.first;
-  }
-
-  SingleAgentProvider get currentSingleAgentProvider =>
-      singleAgentProviderForSession(currentSessionKey);
-
-  SingleAgentProvider? singleAgentResolvedProviderForSession(
-    String sessionKey,
-  ) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final record = taskThreadForSessionInternal(normalizedSessionKey);
-    final resolvedProviderId = record?.latestResolvedProviderId.trim() ?? '';
-    if (resolvedProviderId.isNotEmpty) {
-      return bridgeProviderForId(resolvedProviderId) ??
-          SingleAgentProviderCopy.fromJsonValue(resolvedProviderId);
-    }
-    return null;
-  }
-
-  SingleAgentProvider? get currentSingleAgentResolvedProvider =>
-      singleAgentResolvedProviderForSession(currentSessionKey);
-
-  SingleAgentProvider? singleAgentCatalogProviderForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final selection = singleAgentProviderForSession(normalizedSessionKey);
-    if (selection.isUnspecified) {
-      return null;
-    }
-    return bridgeProviderForId(selection.providerId);
-  }
-
-  SingleAgentProvider? get currentSingleAgentCatalogProvider =>
-      singleAgentCatalogProviderForSession(currentSessionKey);
-
-  bool singleAgentNeedsBridgeProviderForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    if (assistantExecutionTargetForSession(normalizedSessionKey) !=
-        AssistantExecutionTarget.singleAgent) {
-      return false;
-    }
-    if (resolveExternalAcpEndpointForTargetInternal(
-          AssistantExecutionTarget.singleAgent,
-        ) ==
-        null) {
-      return false;
-    }
-    return bridgeProviderCatalog.isEmpty;
-  }
-
-  bool get currentSingleAgentNeedsBridgeProvider =>
-      singleAgentNeedsBridgeProviderForSession(currentSessionKey);
-
-  bool singleAgentShouldSuggestAcpSwitchForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    if (assistantExecutionTargetForSession(normalizedSessionKey) !=
-        AssistantExecutionTarget.singleAgent) {
-      return false;
-    }
-    if (resolveExternalAcpEndpointForTargetInternal(
-          AssistantExecutionTarget.singleAgent,
-        ) ==
-        null) {
-      return false;
-    }
-    final selection = singleAgentProviderForSession(normalizedSessionKey);
-    if (selection.isUnspecified) {
-      return false;
-    }
-    final selectedProvider = bridgeProviderForId(selection.providerId);
-    return selectedProvider == null && bridgeProviderCatalog.isNotEmpty;
-  }
-
-  bool get currentSingleAgentShouldSuggestAcpSwitch =>
-      singleAgentShouldSuggestAcpSwitchForSession(currentSessionKey);
-
-  String singleAgentRuntimeModelForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    return taskThreadForSessionInternal(
-          normalizedSessionKey,
-        )?.latestResolvedRuntimeModel.trim() ??
-        '';
-  }
-
-  String get currentSingleAgentRuntimeModel =>
-      singleAgentRuntimeModelForSession(currentSessionKey);
-
-  String singleAgentModelDisplayLabelForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final runtimeModel = singleAgentRuntimeModelForSession(
-      normalizedSessionKey,
-    );
-    if (runtimeModel.isNotEmpty) {
-      return runtimeModel;
-    }
-    final model = assistantModelForSession(normalizedSessionKey);
-    if (model.isNotEmpty) {
-      return model;
-    }
-    final provider =
-        singleAgentResolvedProviderForSession(normalizedSessionKey) ??
-        singleAgentCatalogProviderForSession(normalizedSessionKey) ??
-        singleAgentProviderForSession(normalizedSessionKey);
-    return appText(
-      '请先配置 ${provider.label} 模型',
-      'Configure ${provider.label} model',
-    );
-  }
-
-  String get currentSingleAgentModelDisplayLabel =>
-      singleAgentModelDisplayLabelForSession(currentSessionKey);
-
-  bool singleAgentShouldShowModelControlForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    if (assistantExecutionTargetForSession(normalizedSessionKey) !=
-        AssistantExecutionTarget.singleAgent) {
-      return true;
-    }
-    return singleAgentRuntimeModelForSession(normalizedSessionKey).isNotEmpty;
-  }
-
-  bool get currentSingleAgentShouldShowModelControl =>
-      singleAgentShouldShowModelControlForSession(currentSessionKey);
-
-  List<SingleAgentProvider> get singleAgentProviderOptions =>
-      bridgeProviderCatalog;
-
   String get assistantConversationOwnerLabel {
-    if (!isSingleAgentMode) {
-      return activeAgentName;
-    }
-    final resolvedProvider = currentSingleAgentResolvedProvider;
-    if (resolvedProvider != null) {
-      return resolvedProvider.label;
-    }
-    final catalogProvider = currentSingleAgentCatalogProvider;
-    if (catalogProvider != null) {
-      return catalogProvider.label;
-    }
-    final provider = currentSingleAgentProvider;
-    if (!provider.isUnspecified) {
-      return provider.label;
-    }
-    return appText('单机智能体', 'Single Agent');
+    return activeAgentName;
   }
 
   AssistantThreadConnectionState get currentAssistantConnectionState =>
@@ -420,50 +233,6 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
-    if (target == AssistantExecutionTarget.singleAgent) {
-      final primaryLabel = appText('Bridge', 'Bridge');
-      final provider = singleAgentProviderForSession(normalizedSessionKey);
-      final resolvedProvider = singleAgentResolvedProviderForSession(
-        normalizedSessionKey,
-      );
-      final catalogProvider = singleAgentCatalogProviderForSession(
-        normalizedSessionKey,
-      );
-      final model = assistantModelForSession(normalizedSessionKey);
-      final providerReady = catalogProvider != null;
-      final displayProvider = resolvedProvider ?? catalogProvider ?? provider;
-      final detail = providerReady
-          ? joinConnectionPartsInternal(<String>[displayProvider.label, model])
-          : singleAgentShouldSuggestAcpSwitchForSession(normalizedSessionKey)
-          ? appText(
-              '${provider.label} 当前不可用，请改成 Bridge 当前可用的 Provider。',
-              '${provider.label} is unavailable. Switch to a provider currently advertised by the bridge.',
-            )
-          : singleAgentNeedsBridgeProviderForSession(normalizedSessionKey)
-          ? appText(
-              'Bridge 当前没有可用 Provider。',
-              'The bridge does not currently advertise any available providers.',
-            )
-          : appText(
-              '当前线程的 Bridge Provider 尚未就绪。',
-              'The bridge provider for this thread is not ready yet.',
-            );
-      return AssistantThreadConnectionState(
-        executionTarget: target,
-        status: providerReady
-            ? RuntimeConnectionStatus.connected
-            : RuntimeConnectionStatus.offline,
-        primaryLabel: primaryLabel,
-        detailLabel: detail.isEmpty
-            ? appText('未配置单机智能体', 'Single Agent is not configured')
-            : detail,
-        ready: providerReady,
-        pairingRequired: false,
-        gatewayTokenMissing: false,
-        lastError: null,
-      );
-    }
-
     return resolveGatewayThreadConnectionStateInternal(
       target: target,
       connection: connection,
@@ -534,14 +303,8 @@ extension AppControllerDesktopThreadSessions on AppController {
     final sessionKey = normalizedAssistantSessionKeyInternal(
       sessionsControllerInternal.currentSessionKey,
     );
-    final items = List<GatewayChatMessage>.from(
-      isSingleAgentMode
-          ? const <GatewayChatMessage>[]
-          : chatControllerInternal.messages,
-    );
-    final threadItems = isSingleAgentMode
-        ? assistantThreadMessagesInternal[sessionKey]
-        : null;
+    final items = List<GatewayChatMessage>.from(chatControllerInternal.messages);
+    final threadItems = assistantThreadMessagesInternal[sessionKey];
     if (threadItems != null && threadItems.isNotEmpty) {
       items.addAll(threadItems);
     }
@@ -549,9 +312,7 @@ extension AppControllerDesktopThreadSessions on AppController {
     if (localItems != null && localItems.isNotEmpty) {
       items.addAll(localItems);
     }
-    final streaming = isSingleAgentMode
-        ? (aiGatewayStreamingTextBySessionInternal[sessionKey]?.trim() ?? '')
-        : (chatControllerInternal.streamingAssistantText?.trim() ?? '');
+    final streaming = chatControllerInternal.streamingAssistantText?.trim() ?? '';
     if (streaming.isNotEmpty) {
       items.add(
         GatewayChatMessage(
@@ -604,12 +365,7 @@ extension AppControllerDesktopThreadSessions on AppController {
 
   WorkspaceRefKind defaultWorkspaceRefKindForTargetInternal(
     AssistantExecutionTarget target,
-  ) {
-    return switch (target) {
-      AssistantExecutionTarget.singleAgent => WorkspaceRefKind.localPath,
-      AssistantExecutionTarget.gateway => WorkspaceRefKind.remotePath,
-    };
-  }
+  ) => WorkspaceRefKind.remotePath;
 
   List<GatewaySessionSummary> assistantSessionsInternal() {
     final byKey = <String, GatewaySessionSummary>{};
@@ -663,7 +419,7 @@ AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordsForTest(
 }) {
   final record = primaryRecord ?? fallbackRecord;
   return record == null
-      ? AssistantExecutionTarget.singleAgent
+      ? AssistantExecutionTarget.gateway
       : assistantExecutionTargetFromExecutionMode(
           record.executionBinding.executionMode,
         );

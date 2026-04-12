@@ -118,7 +118,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
   late final TextEditingController skillPickerSearchControllerInternal;
   late final FocusNode skillPickerSearchFocusNodeInternal;
   bool handlingPasteShortcutInternal = false;
-  bool refreshingSingleAgentSkillsInternal = false;
   String skillPickerQueryInternal = '';
 
   @override
@@ -147,37 +146,8 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     reportContentHeightInternal();
   }
 
-  Future<void> refreshSingleAgentSkillsInternal() async {
-    if (refreshingSingleAgentSkillsInternal) {
-      return;
-    }
-    setState(() {
-      refreshingSingleAgentSkillsInternal = true;
-    });
-    try {
-      await widget.controller.refreshSingleAgentLocalSkillsForSession(
-        widget.controller.currentSessionKey,
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          refreshingSingleAgentSkillsInternal = false;
-        });
-      }
-    }
-  }
-
-  List<ComposerSkillOptionInternal> activeSkillOptionsInternal() {
-    if (widget.controller.isSingleAgentMode) {
-      return widget.controller
-          .assistantImportedSkillsForSession(
-            widget.controller.currentSessionKey,
-          )
-          .map(skillOptionFromThreadSkillInternal)
-          .toList(growable: false);
-    }
-    return widget.availableSkills;
-  }
+  List<ComposerSkillOptionInternal> activeSkillOptionsInternal() =>
+      widget.availableSkills;
 
   List<ComposerSkillOptionInternal> filteredSkillOptionsInternal() {
     final normalizedQuery = skillPickerQueryInternal.trim().toLowerCase();
@@ -220,9 +190,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
       }
       skillPickerSearchFocusNodeInternal.requestFocus();
     });
-    if (widget.controller.isSingleAgentMode) {
-      unawaited(refreshSingleAgentSkillsInternal());
-    }
   }
 
   @override
@@ -350,7 +317,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
       resolveUiFeaturePlatformFromContext(context),
     );
     final connectionState = controller.currentAssistantConnectionState;
-    final singleAgent = connectionState.isSingleAgent;
     final connected = connectionState.connected;
     final reconnectAvailable = controller.canQuickConnectGateway;
     final connecting = connectionState.connecting;
@@ -374,12 +340,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     final selectedSkills = widget.availableSkills
         .where((skill) => widget.selectedSkillKeys.contains(skill.key))
         .toList(growable: false);
-    final displayedSingleAgentProvider =
-        controller.currentSingleAgentResolvedProvider ??
-        controller.currentSingleAgentProvider;
     final submitLabel = connected
-        ? appText('提交', 'Submit')
-        : singleAgent
         ? appText('提交', 'Submit')
         : connecting
         ? appText('连接中…', 'Connecting…')
@@ -432,12 +393,10 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                   tooltip: appText('任务对话模式', 'Task Dialog Mode'),
                   onSelected: (value) {
                     final resolvedTarget =
-                        value == AssistantExecutionTarget.singleAgent
-                        ? AssistantExecutionTarget.singleAgent
-                        : resolveGatewayExecutionTargetFromVisibleTargets(
-                            visibleExecutionTargets,
-                            currentTarget: executionTarget,
-                          );
+                        resolveGatewayExecutionTargetFromVisibleTargets(
+                          visibleExecutionTargets,
+                          currentTarget: executionTarget,
+                        );
                     controller.setAssistantExecutionTarget(resolvedTarget);
                   },
                   itemBuilder: (context) => compactExecutionTargets
@@ -473,50 +432,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                 ),
                 const SizedBox(width: 4),
               ],
-              if (singleAgent) ...[
-                PopupMenuButton<SingleAgentProvider>(
-                  key: const Key('assistant-single-agent-provider-button'),
-                  tooltip: appText('Bridge Provider', 'Bridge Provider'),
-                  onSelected: (value) {
-                    unawaited(controller.setSingleAgentProvider(value));
-                  },
-                  itemBuilder: (context) => controller
-                      .singleAgentProviderOptions
-                      .map(
-                        (value) => PopupMenuItem<SingleAgentProvider>(
-                          value: value,
-                          key: Key(
-                            'assistant-single-agent-provider-menu-item-${value.providerId}',
-                          ),
-                          child: Row(
-                            children: [
-                              SingleAgentProviderBadgeInternal(provider: value),
-                              const SizedBox(width: 10),
-                              Expanded(child: Text(value.label)),
-                              if (value ==
-                                  controller.currentSingleAgentProvider)
-                                const Icon(Icons.check_rounded, size: 18),
-                            ],
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  child: ComposerToolbarChipInternal(
-                    leading: SingleAgentProviderBadgeInternal(
-                      provider: displayedSingleAgentProvider,
-                    ),
-                    tooltip: singleAgentProviderTooltipInternal(
-                      displayedSingleAgentProvider,
-                    ),
-                    showChevron: true,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-              ] else ...[
+              if (!connecting) ...[
                 PopupMenuButton<String>(
                   key: const Key('assistant-gateway-provider-button'),
                   tooltip: appText('Gateway Provider', 'Gateway Provider'),
@@ -795,8 +711,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                       ? null
                       : connected
                       ? widget.onSend
-                      : singleAgent
-                      ? widget.onSend
                       : reconnectAvailable
                       ? () async {
                           await widget.onReconnectGateway();
@@ -817,8 +731,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                     children: [
                       Icon(
                         connected
-                            ? Icons.arrow_upward_rounded
-                            : singleAgent
                             ? Icons.arrow_upward_rounded
                             : reconnectAvailable
                             ? Icons.refresh_rounded

@@ -94,7 +94,6 @@ class _AppShellState extends State<AppShell> {
       title: appText('新对话', 'New conversation'),
       executionTarget: target,
       messageViewMode: controller.currentAssistantMessageViewMode,
-      singleAgentProvider: SingleAgentProvider.unspecified,
     );
     controller.navigateTo(WorkspaceDestination.assistant);
     await controller.switchSession(sessionKey);

@@ -89,53 +89,20 @@ class SkillsFocusPreviewInternal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final typedController = castAssistantFocusControllerInternal(controller);
-    final items = typedController.isSingleAgentMode
-        ? typedController
-              .assistantImportedSkillsForSession(
-                typedController.currentSessionKey,
-              )
-              .take(4)
-              .map(
-                (skill) => GatewaySkillSummary(
-                  name: skill.label,
-                  description: skill.description,
-                  source: skill.sourcePath,
-                  skillKey: skill.key,
-                  primaryEnv: null,
-                  eligible: true,
-                  disabled: false,
-                  missingBins: const <String>[],
-                  missingEnv: const <String>[],
-                  missingConfig: const <String>[],
-                ),
-              )
-              .toList(growable: false)
-        : typedController.skills.take(4).toList(growable: false);
+    final items = typedController.skills.take(4).toList(growable: false);
     if (items.isEmpty) {
       final bridgeEndpointMissing =
-          typedController.isSingleAgentMode &&
           typedController.resolveExternalAcpEndpointForTargetInternal(
-                AssistantExecutionTarget.singleAgent,
+                AssistantExecutionTarget.gateway,
               ) ==
               null;
       return PreviewEmptyStateInternal(
-        message: typedController.isSingleAgentMode
-            ? (typedController.currentSingleAgentNeedsBridgeProvider
-                  ? appText(
-                      'Bridge 当前没有广告可用 Provider。恢复后这里会显示线程自己的技能摘要。',
-                      'The bridge is not advertising any available providers right now. Thread-owned skill summaries will appear here after it recovers.',
-                    )
-                  : bridgeEndpointMissing
-                  ? appText(
-                      'Bridge Server 当前不可用。恢复后这里会显示线程自己的技能摘要。',
-                      'The bridge server is currently unavailable. Thread-owned skill summaries will appear here after it recovers.',
-                    )
-                  : appText(
-                      '当前线程还没有已加载技能。切换 provider 后会读取该线程自己的 skills 列表。',
-                      'No skills are loaded for this thread yet. Switching the provider reloads the thread-owned skills list.',
-                    ))
-            : typedController.connection.status ==
-                  RuntimeConnectionStatus.connected
+        message: bridgeEndpointMissing
+            ? appText(
+                'Bridge Server 当前不可用。恢复后这里会显示线程技能摘要。',
+                'The bridge server is currently unavailable. Thread skill summaries will appear here after it recovers.',
+              )
+            : typedController.connection.status == RuntimeConnectionStatus.connected
             ? appText(
                 '当前代理没有已加载技能。',
                 'No skills are loaded for the active agent.',
@@ -277,9 +244,7 @@ class ClawHubFocusPreviewInternal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final typedController = castAssistantFocusControllerInternal(controller);
-    final skillCount = typedController.isSingleAgentMode
-        ? typedController.currentAssistantSkillCount
-        : typedController.skills.length;
+    final skillCount = typedController.skills.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
