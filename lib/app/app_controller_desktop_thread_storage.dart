@@ -62,10 +62,7 @@ extension AppControllerDesktopThreadStorage on AppController {
   }
 
   Future<void> ensureActiveAssistantThreadInternal() async {
-    if (!isSingleAgentMode ||
-        !isAssistantTaskArchived(
-          sessionsControllerInternal.currentSessionKey,
-        )) {
+    if (!isAssistantTaskArchived(sessionsControllerInternal.currentSessionKey)) {
       return;
     }
     final fallback = assistantSessionSummariesInternal().firstWhere(
@@ -219,14 +216,9 @@ extension AppControllerDesktopThreadStorage on AppController {
 
   AssistantExecutionTarget sanitizeExecutionTargetInternal(
     AssistantExecutionTarget? target,
-  ) {
-    final sanitized = featuresFor(
-      hostUiFeaturePlatformInternal,
-    ).sanitizeExecutionTarget(target);
-    return sanitized == AssistantExecutionTarget.singleAgent
-        ? AssistantExecutionTarget.singleAgent
-        : AssistantExecutionTarget.gateway;
-  }
+  ) => featuresFor(
+    hostUiFeaturePlatformInternal,
+  ).sanitizeExecutionTarget(target);
 
   AssistantExecutionTarget sanitizePersistedExecutionTargetInternal(
     AssistantExecutionTarget? target,
@@ -691,16 +683,11 @@ extension AppControllerDesktopThreadStorage on AppController {
           record.executionBinding.executionMode,
         ),
       );
-      final recordProvider =
-          recordExecutionTarget == AssistantExecutionTarget.singleAgent
-          ? SingleAgentProviderCopy.fromJsonValue(
-              record.executionBinding.providerId,
-            )
-          : const SingleAgentProvider(
-              providerId: kCanonicalGatewayProviderId,
-              label: kCanonicalGatewayProviderLabel,
-              badge: 'OC',
-            );
+      const recordProvider = SingleAgentProvider(
+        providerId: kCanonicalGatewayProviderId,
+        label: kCanonicalGatewayProviderLabel,
+        badge: 'OC',
+      );
       final workspaceBinding = record.workspaceBinding.copyWith(
         workspaceId: sessionKey,
         displayPath: record.workspaceKind == WorkspaceKind.localFs
@@ -732,10 +719,7 @@ extension AppControllerDesktopThreadStorage on AppController {
           ),
           executorId: recordProvider.providerId,
           providerId: recordProvider.providerId,
-          providerSource:
-              recordExecutionTarget == AssistantExecutionTarget.singleAgent
-              ? record.executionBinding.providerSource
-              : ThreadSelectionSource.inherited,
+          providerSource: ThreadSelectionSource.inherited,
         ),
         lifecycleState: record.lifecycleState.copyWith(status: 'ready'),
       );

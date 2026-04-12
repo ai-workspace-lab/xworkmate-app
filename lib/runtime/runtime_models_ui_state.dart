@@ -105,18 +105,12 @@ class AppUiState {
   String toJsonString() => jsonEncode(toJson());
 
   bool isGatewayTargetSaved(AssistantExecutionTarget target) {
-    final targetKey = switch (target) {
-      AssistantExecutionTarget.gateway => 'gateway',
-      _ => '',
-    };
+    const targetKey = 'gateway';
     return targetKey.isNotEmpty && savedGatewayTargets.contains(targetKey);
   }
 
   AppUiState markGatewayTargetSaved(AssistantExecutionTarget target) {
-    final targetKey = switch (target) {
-      AssistantExecutionTarget.gateway => 'gateway',
-      _ => '',
-    };
+    const targetKey = 'gateway';
     if (targetKey.isEmpty || savedGatewayTargets.contains(targetKey)) {
       return this;
     }

@@ -296,7 +296,6 @@ extension AppControllerDesktopSettings on AppController {
     aiGatewayStreamingClientsInternal.clear();
     aiGatewayPendingSessionKeysInternal.clear();
     aiGatewayAbortedSessionKeysInternal.clear();
-    singleAgentExternalCliPendingSessionKeysInternal.clear();
     assistantThreadTurnQueuesInternal.clear();
     multiAgentRunPendingInternal = false;
     initializeAssistantThreadContext(
@@ -305,7 +304,6 @@ extension AppControllerDesktopSettings on AppController {
         currentSettings.assistantExecutionTarget,
       ),
       messageViewMode: AssistantMessageViewMode.rendered,
-      singleAgentProvider: SingleAgentProvider.unspecified,
     );
     await setCurrentAssistantSessionKeyInternal(
       'main',

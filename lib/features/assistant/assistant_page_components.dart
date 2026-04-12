@@ -82,10 +82,7 @@ class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {
     final groupedTasks = groupTasksForRailInternal(
       tasks,
       widget.controller.visibleAssistantExecutionTargets(
-        const <AssistantExecutionTarget>[
-          AssistantExecutionTarget.singleAgent,
-          AssistantExecutionTarget.gateway,
-        ],
+        const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway],
       ),
     );
     final runningCount = tasks
@@ -501,55 +498,14 @@ class AssistantEmptyStateInternal extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final connectionState = controller.currentAssistantConnectionState;
-    final singleAgent = connectionState.isSingleAgent;
     final connected = connectionState.connected;
-    final singleAgentNeedsBridgeProvider =
-        controller.currentSingleAgentNeedsBridgeProvider;
-    final singleAgentSuggestsAcpSwitch =
-        controller.currentSingleAgentShouldSuggestAcpSwitch;
-    final providerLabel =
-        (controller.currentSingleAgentResolvedProvider ??
-                controller.currentSingleAgentProvider)
-            .label;
     final reconnectAvailable = controller.canQuickConnectGateway;
-    final title = singleAgent
-        ? connected
-              ? appText('开始智能体任务', 'Start an agent task')
-              : singleAgentNeedsBridgeProvider
-              ? appText(
-                  '等待 Bridge Provider',
-                  'Waiting for a bridge provider',
-                )
-              : appText(
-                  '等待 Bridge 就绪',
-                  'Waiting for bridge readiness',
-                )
-        : connected
+    final title = connected
         ? appText('开始对话或运行任务', 'Start a chat or run a task')
         : connectionState.status == RuntimeConnectionStatus.error
         ? appText('Bridge 连接失败', 'Bridge connection failed')
         : appText('先连接 Bridge', 'Connect xworkmate-bridge first');
-    final description = singleAgent
-        ? connected
-              ? appText(
-                  '当前线程会通过 Bridge 当前广告的 Provider 处理任务，不会建立 OpenClaw Gateway 会话。',
-                  'This thread runs through the provider currently advertised by the bridge and does not open an OpenClaw Gateway session.',
-                )
-              : singleAgentSuggestsAcpSwitch
-              ? appText(
-                  '当前线程固定为 $providerLabel，但它在这台设备上不可用。请改成 Bridge 当前可用的 Provider。',
-                  'This thread is pinned to $providerLabel, but it is unavailable on this device. Switch to a provider currently advertised by the bridge.',
-                )
-              : singleAgentNeedsBridgeProvider
-              ? appText(
-                  'Bridge 当前没有广告可用 Provider。恢复后可直接开始任务；当前流程不依赖本地集成配置。',
-                  'The bridge is not advertising any available providers right now. Once it recovers, this thread can start directly without extra local integration setup.',
-                )
-              : appText(
-                  '当前线程的 Bridge Provider 尚未就绪。请等待 Bridge 恢复，或切换到当前可用 Provider。',
-                  'The bridge provider for this thread is not ready yet. Wait for the bridge to recover, or switch to a currently available provider.',
-                )
-        : connected
+    final description = connected
         ? appText(
             '输入需求后即可开始执行，结果会回到当前会话并同步到任务页。',
             'Type a request to start execution. Results return to this session and the Tasks page.',
@@ -605,8 +561,6 @@ class AssistantEmptyStateInternal extends StatelessWidget {
                     FilledButton.icon(
                       onPressed: connected
                           ? onFocusComposer
-                          : singleAgent
-                          ? onFocusComposer
                           : reconnectAvailable
                           ? () async {
                               await onReconnectGateway();
@@ -615,8 +569,6 @@ class AssistantEmptyStateInternal extends StatelessWidget {
                       icon: Icon(
                         connected
                             ? Icons.edit_rounded
-                            : singleAgent
-                            ? Icons.smart_toy_outlined
                             : reconnectAvailable
                             ? Icons.refresh_rounded
                             : Icons.link_rounded,
@@ -624,8 +576,6 @@ class AssistantEmptyStateInternal extends StatelessWidget {
                       label: Text(
                         connected
                             ? appText('开始输入', 'Start typing')
-                            : singleAgent
-                            ? appText('查看线程工具栏', 'Open toolbar')
                             : reconnectAvailable
                             ? appText('重新连接 Bridge', 'Reconnect bridge')
                             : appText(

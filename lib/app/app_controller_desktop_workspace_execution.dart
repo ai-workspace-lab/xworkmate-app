@@ -36,7 +36,6 @@ import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
-import 'app_controller_desktop_single_agent.dart';
 import 'app_controller_desktop_thread_binding.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_actions.dart';
@@ -65,7 +64,6 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         sessionsControllerInternal.currentSessionKey,
         executionTarget: resolvedTarget,
         messageViewMode: currentAssistantMessageViewMode,
-        singleAgentProvider: currentSingleAgentProvider,
       );
     }
     StateError? bindingError;
@@ -96,53 +94,11 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       sessionKey: sessionsControllerInternal.currentSessionKey,
       persistDefaultSelection: true,
     );
-    if (resolvedTarget == AssistantExecutionTarget.singleAgent) {
-      await refreshSingleAgentSkillsForSession(
-        sessionsControllerInternal.currentSessionKey,
-      );
-    }
     if (bindingError != null) {
       debugPrint('setAssistantExecutionTarget binding fallback: $bindingError');
     }
     recomputeTasksInternal();
     notifyIfActiveInternal();
-  }
-
-  Future<void> setSingleAgentProvider(SingleAgentProvider provider) async {
-    final sessionKey = normalizedAssistantSessionKeyInternal(currentSessionKey);
-    final sanitizedProvider = settings.sanitizeSingleAgentProviderSelection(
-      provider,
-    );
-    if (singleAgentProviderForSession(sessionKey) == sanitizedProvider) {
-      return;
-    }
-    if (!assistantThreadRecordsInternal.containsKey(sessionKey)) {
-      initializeAssistantThreadContext(
-        sessionKey,
-        executionTarget: assistantExecutionTargetForSession(sessionKey),
-        messageViewMode: assistantMessageViewModeForSession(sessionKey),
-        singleAgentProvider: currentSingleAgentProvider,
-      );
-    }
-    upsertTaskThreadInternal(
-      sessionKey,
-      singleAgentProvider: sanitizedProvider,
-      singleAgentProviderSource: ThreadSelectionSource.explicit,
-      latestResolvedRuntimeModel: '',
-      latestResolvedProviderId: '',
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
-    recomputeTasksInternal();
-    notifyIfActiveInternal();
-    if (assistantExecutionTargetForSession(sessionKey) ==
-        AssistantExecutionTarget.singleAgent) {
-      await refreshSingleAgentSkillsForSession(sessionKey);
-    }
-    unawaited(
-      refreshMultiAgentMounts(
-        sync: settings.multiAgent.autoSync,
-      ).catchError((_) {}),
-    );
   }
 
   Future<void> setAssistantMessageViewMode(
@@ -159,7 +115,6 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         sessionKey,
         executionTarget: assistantExecutionTargetForSession(sessionKey),
         messageViewMode: assistantMessageViewModeForSession(sessionKey),
-        singleAgentProvider: singleAgentProviderForSession(sessionKey),
       );
     }
     upsertTaskThreadInternal(
@@ -194,14 +149,12 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    if (resolvedTarget != AssistantExecutionTarget.singleAgent) {
-      upsertTaskThreadInternal(
-        normalizedSessionKey,
-        latestResolvedRuntimeModel: '',
-        latestResolvedProviderId: '',
-        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      );
-    }
+    upsertTaskThreadInternal(
+      normalizedSessionKey,
+      latestResolvedRuntimeModel: '',
+      latestResolvedProviderId: '',
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
     if (!matchesSessionKey(
       normalizedSessionKey,
       sessionsControllerInternal.currentSessionKey,
@@ -214,26 +167,6 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         settings.copyWith(assistantExecutionTarget: resolvedTarget),
         refreshAfterSave: false,
       );
-    }
-
-    if (resolvedTarget == AssistantExecutionTarget.singleAgent) {
-      if (preserveGatewayHistoryForSelectedThread &&
-          runtimeInternal.isConnected) {
-        preserveGatewayHistoryForSessionInternal(normalizedSessionKey);
-      }
-      await ensureActiveAssistantThreadInternal();
-      if (runtimeInternal.isConnected) {
-        try {
-          await AppControllerDesktopGateway(this).disconnectGateway();
-        } catch (_) {
-          // Preserve the selected thread-bound target even when the active
-          // gateway session does not close cleanly on the first attempt.
-        }
-      } else {
-        chatControllerInternal.clear();
-      }
-      await setCurrentAssistantSessionKeyInternal(normalizedSessionKey);
-      return;
     }
 
     final targetProfile = gatewayProfileForAssistantExecutionTargetInternal(
@@ -300,9 +233,6 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         messageViewMode: assistantMessageViewModeForSession(
           normalizedSessionKey,
         ),
-        singleAgentProvider: singleAgentProviderForSession(
-          normalizedSessionKey,
-        ),
       );
     }
     upsertTaskThreadInternal(
@@ -328,7 +258,6 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     String title = '',
     AssistantExecutionTarget? executionTarget,
     AssistantMessageViewMode? messageViewMode,
-    SingleAgentProvider? singleAgentProvider,
   }) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -361,17 +290,6 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       messageViewMode:
           messageViewMode ??
           assistantMessageViewModeForSession(currentSessionKey),
-      singleAgentProvider:
-          singleAgentProvider ??
-          settings.sanitizeSingleAgentProviderSelection(
-            SingleAgentProviderCopy.fromJsonValue(
-              assistantThreadRecordsInternal[normalizedSessionKey]
-                      ?.executionBinding
-                      .providerId ??
-                  '',
-            ),
-          ),
-      singleAgentProviderSource: ThreadSelectionSource.inherited,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     // Re-read the current thread target when the async binding sync runs so a
@@ -380,30 +298,6 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     unawaited(ensureDesktopTaskThreadBindingInternal(normalizedSessionKey));
     unawaited(persistAssistantLastSessionKeyInternal(normalizedSessionKey));
     notifyIfActiveInternal();
-  }
-
-  Future<void> refreshSingleAgentSkillsForSession(String sessionKey) async {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    if (assistantExecutionTargetForSession(normalizedSessionKey) !=
-        AssistantExecutionTarget.singleAgent) {
-      return;
-    }
-    final localSkills = await singleAgentLocalSkillsForSessionInternal(
-      normalizedSessionKey,
-    );
-    await replaceSingleAgentThreadSkillsInternal(
-      normalizedSessionKey,
-      localSkills,
-    );
-  }
-
-  Future<void> refreshSingleAgentLocalSkillsForSession(
-    String sessionKey,
-  ) async {
-    await refreshSharedSingleAgentLocalSkillsCacheInternal(forceRescan: true);
-    await refreshSingleAgentSkillsForSession(sessionKey);
   }
 
   Future<void> toggleAssistantSkillForSession(

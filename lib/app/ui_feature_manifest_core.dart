@@ -520,38 +520,16 @@ class UiFeatureAccess {
   }
 
   List<AssistantExecutionTarget> get availableExecutionTargets {
-    final targets = <AssistantExecutionTarget>[];
-    if (supportsDirectAi) {
-      targets.add(AssistantExecutionTarget.singleAgent);
-    }
     if (supportsRelayGateway) {
-      targets.add(AssistantExecutionTarget.gateway);
+      return const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway];
     }
-    return targets;
+    return const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway];
   }
 
   AssistantExecutionTarget sanitizeExecutionTarget(
     AssistantExecutionTarget? target,
   ) {
-    final available = availableExecutionTargets;
-    if (target != null && available.contains(target)) {
-      return target;
-    }
-    final preferredOrder = platform == UiFeaturePlatform.web
-        ? const <AssistantExecutionTarget>[
-            AssistantExecutionTarget.singleAgent,
-            AssistantExecutionTarget.gateway,
-          ]
-        : const <AssistantExecutionTarget>[
-            AssistantExecutionTarget.singleAgent,
-            AssistantExecutionTarget.gateway,
-          ];
-    for (final candidate in preferredOrder) {
-      if (available.contains(candidate)) {
-        return candidate;
-      }
-    }
-    return AssistantExecutionTarget.singleAgent;
+    return AssistantExecutionTarget.gateway;
   }
 }
 

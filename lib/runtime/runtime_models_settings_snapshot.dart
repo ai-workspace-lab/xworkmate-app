@@ -111,7 +111,7 @@ class SettingsSnapshot {
       accountLocalMode: true,
       acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults(),
       linuxDesktop: LinuxDesktopConfig.defaults(),
-      assistantExecutionTarget: AssistantExecutionTarget.singleAgent,
+      assistantExecutionTarget: AssistantExecutionTarget.gateway,
       assistantPermissionLevel: AssistantPermissionLevel.defaultAccess,
     );
   }
@@ -359,12 +359,7 @@ class SettingsSnapshot {
 
   GatewayConnectionProfile? gatewayProfileForExecutionTarget(
     AssistantExecutionTarget target,
-  ) {
-    return switch (target) {
-      AssistantExecutionTarget.singleAgent => null,
-      AssistantExecutionTarget.gateway => primaryGatewayProfile,
-    };
-  }
+  ) => primaryGatewayProfile;
 
   SettingsSnapshot copyWithGatewayProfileAt(
     int index,
@@ -379,14 +374,7 @@ class SettingsSnapshot {
     AssistantExecutionTarget target,
     GatewayConnectionProfile profile,
   ) {
-    final index = switch (target) {
-      AssistantExecutionTarget.gateway => kGatewayRemoteProfileIndex,
-      AssistantExecutionTarget.singleAgent => null,
-    };
-    if (index == null) {
-      return this;
-    }
-    return copyWithGatewayProfileAt(index, profile);
+    return copyWithGatewayProfileAt(kGatewayRemoteProfileIndex, profile);
   }
 
   SingleAgentProvider sanitizeSingleAgentProviderSelection(
