@@ -102,8 +102,8 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
                 ) ==
                 null
           ? appText(
-              '当前线程还没有同步到 Bridge Server。请先登录账号并在设置里完成同步后再重试。',
-              'This thread does not have a synced bridge server yet. Sign in and complete Settings sync before trying again.',
+              'Bridge ACP 入口当前不可用。',
+              'The bridge ACP entrypoint is currently unavailable.',
             )
           : null;
       if (unavailableReason != null) {

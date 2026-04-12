@@ -333,16 +333,19 @@ void main() {
   });
 
   group('resolveGatewayAcpAuthorizationHeaderInternal', () {
-    test('requires synced bridge endpoint before ACP endpoint can resolve', () {
+    test('resolves ACP endpoint through the canonical bridge entry', () {
       final controller = AppController();
       addTearDown(controller.dispose);
 
-      expect(controller.resolveBridgeAcpEndpointInternal(), isNull);
+      expect(
+        controller.resolveBridgeAcpEndpointInternal(),
+        Uri.parse(kCanonicalBridgeAcpEndpoint),
+      );
       expect(
         controller.resolveExternalAcpEndpointForTargetInternal(
           AssistantExecutionTarget.singleAgent,
         ),
-        isNull,
+        Uri.parse(kCanonicalBridgeAcpEndpoint),
       );
 
       controller.settingsController.snapshotInternal = controller.settings
@@ -367,19 +370,19 @@ void main() {
 
       expect(
         controller.resolveBridgeAcpEndpointInternal(),
-        Uri.parse('https://bridge.customer.example/acp'),
+        Uri.parse(kCanonicalBridgeAcpEndpoint),
       );
       expect(
         controller.resolveExternalAcpEndpointForTargetInternal(
           AssistantExecutionTarget.singleAgent,
         ),
-        Uri.parse('https://bridge.customer.example/acp'),
+        Uri.parse(kCanonicalBridgeAcpEndpoint),
       );
       expect(
         controller.resolveExternalAcpEndpointForTargetInternal(
           AssistantExecutionTarget.gateway,
         ),
-        Uri.parse('https://bridge.customer.example/acp'),
+        Uri.parse(kCanonicalBridgeAcpEndpoint),
       );
     });
 

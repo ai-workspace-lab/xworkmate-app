@@ -736,16 +736,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   Uri? resolveBridgeAcpEndpointInternal() {
-    final rawEndpoint = settings
-        .acpBridgeServerModeConfig
-        .cloudSynced
-        .remoteServerSummary
-        .endpoint
-        .trim();
-    if (rawEndpoint.isEmpty) {
-      return null;
-    }
-    final uri = Uri.tryParse(rawEndpoint);
+    final uri = Uri.tryParse(kCanonicalBridgeAcpEndpoint);
     final scheme = uri?.scheme.trim().toLowerCase() ?? '';
     if (uri == null || !kSupportedExternalAcpEndpointSchemes.contains(scheme)) {
       return null;

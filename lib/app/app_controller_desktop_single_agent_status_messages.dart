@@ -96,12 +96,12 @@ String singleAgentUnavailableLabelDesktopInternal(
   )) {
     return detail.isEmpty
         ? appText(
-            '当前没有可用的 Bridge Provider。请先在设置里配置并同步外部 Agent 连接。',
-            'No bridge provider is available. Configure and sync an external agent connection in Settings first.',
+            'Bridge 当前没有可用 Provider。',
+            'The bridge does not currently advertise any available providers.',
           )
         : appText(
-            '$detail 当前没有可用的 Bridge Provider。请先在设置里配置并同步外部 Agent 连接。',
-            '$detail No bridge provider is available. Configure and sync an external agent connection in Settings first.',
+            '$detail Bridge 当前没有可用 Provider。',
+            '$detail The bridge does not currently advertise any available providers.',
           );
   }
   return detail.isEmpty
