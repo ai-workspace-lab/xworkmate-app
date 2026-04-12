@@ -229,6 +229,14 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
   final sessionToken =
       (await controller.storeInternal.loadAccountSessionToken())?.trim() ?? '';
   if (sessionToken.isEmpty) {
+    final nextState = AccountSyncState.defaults().copyWith(
+      syncState: 'blocked',
+      syncMessage: 'Account session is unavailable',
+      lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
+      lastSyncError: 'Account session is unavailable',
+      profileScope: 'bridge',
+    );
+    await _persistAccountSyncStateInternal(controller, nextState);
     const result = AccountSyncResult(
       state: 'blocked',
       message: 'Account session is unavailable',
@@ -258,7 +266,8 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
       state: 'blocked',
       message: 'Bridge authorization is unavailable',
     );
-    await controller.storeInternal.saveAccountSyncState(
+    await _persistAccountSyncStateInternal(
+      controller,
       AccountSyncState.defaults().copyWith(
         syncState: result.state,
         syncMessage: result.message,
@@ -300,7 +309,8 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
       state: 'blocked',
       message: 'BRIDGE_SERVER_URL is unavailable',
     );
-    await controller.storeInternal.saveAccountSyncState(
+    await _persistAccountSyncStateInternal(
+      controller,
       AccountSyncState.defaults().copyWith(
         syncState: result.state,
         syncMessage: result.message,
@@ -435,6 +445,38 @@ Future<void> logoutAccountSettingsInternal(
   }
 }
 
+Future<void> disconnectManagedAccountBaseSettingsInternal(
+  SettingsController controller,
+) async {
+  final currentSnapshot = controller.snapshotInternal;
+  final cloudSynced = currentSnapshot.acpBridgeServerModeConfig.cloudSynced;
+  final nextState =
+      controller.accountSyncStateInternal ?? AccountSyncState.defaults();
+  await _persistAccountSyncStateInternal(
+    controller,
+    nextState.copyWith(
+      syncState: 'disconnected',
+      syncMessage: 'Using local connection settings',
+      lastSyncError: '',
+      profileScope: nextState.profileScope.trim().isEmpty
+          ? 'bridge'
+          : nextState.profileScope,
+    ),
+  );
+  await controller.saveSnapshot(
+    currentSnapshot.copyWith(
+      accountLocalMode: true,
+      acpBridgeServerModeConfig: currentSnapshot.acpBridgeServerModeConfig
+          .copyWith(
+            cloudSynced: cloudSynced.copyWith(
+              accountBaseUrl: '',
+              accountIdentifier: '',
+            ),
+          ),
+    ),
+  );
+}
+
 Future<void> cancelAccountMfaChallengeSettingsInternal(
   SettingsController controller,
 ) async {
@@ -547,4 +589,12 @@ Map<String, dynamic> _asMap(Object? value) {
 
 String _stringValue(Object? value) {
   return value?.toString().trim() ?? '';
+}
+
+Future<void> _persistAccountSyncStateInternal(
+  SettingsController controller,
+  AccountSyncState value,
+) async {
+  await controller.storeInternal.saveAccountSyncState(value);
+  controller.accountSyncStateInternal = value;
 }
