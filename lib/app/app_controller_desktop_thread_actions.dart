@@ -38,7 +38,6 @@ import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
 import 'app_controller_desktop_external_acp_routing.dart';
-import 'app_controller_desktop_single_agent.dart';
 import 'app_controller_desktop_thread_binding.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_workspace_execution.dart';
@@ -49,6 +48,20 @@ import 'app_controller_desktop_runtime_helpers.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 extension AppControllerDesktopThreadActions on AppController {
+  GatewayChatMessage assistantErrorMessageInternal(String text) {
+    return GatewayChatMessage(
+      id: nextLocalMessageIdInternal(),
+      role: 'assistant',
+      text: text,
+      timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      toolCallId: null,
+      toolName: null,
+      stopReason: null,
+      pending: false,
+      error: true,
+    );
+  }
+
   bool assistantSessionHasPendingRun(String sessionKey) {
     final normalized = normalizedAssistantSessionKeyInternal(sessionKey);
     return aiGatewayPendingSessionKeysInternal.contains(normalized) ||
@@ -59,23 +72,8 @@ extension AppControllerDesktopThreadActions on AppController {
             ));
   }
 
-  Future<void> sendSingleAgentMessageInternal(
-    String message, {
-    required String thinking,
-    required List<GatewayChatAttachmentPayload> attachments,
-    required List<CollaborationAttachment> localAttachments,
-  }) => AppControllerDesktopSingleAgent(this).sendSingleAgentMessageInternal(
-    message,
-    thinking: thinking,
-    attachments: attachments,
-    localAttachments: localAttachments,
-  );
-
   Future<void> connectSavedGateway() async {
     final target = currentAssistantExecutionTarget;
-    if (target == AssistantExecutionTarget.singleAgent) {
-      return;
-    }
     await AppControllerDesktopGateway(this).connectProfileInternal(
       gatewayProfileForAssistantExecutionTargetInternal(target),
       profileIndex: gatewayProfileIndexForExecutionTargetInternal(target),
@@ -154,20 +152,17 @@ extension AppControllerDesktopThreadActions on AppController {
 
   Future<void> selectAgent(String? agentId) async {
     agentsControllerInternal.selectAgent(agentId);
-    if (currentAssistantExecutionTarget !=
-        AssistantExecutionTarget.singleAgent) {
-      final target = currentAssistantExecutionTarget;
-      final nextProfile = gatewayProfileForAssistantExecutionTargetInternal(
-        target,
-      ).copyWith(selectedAgentId: agentsControllerInternal.selectedAgentId);
-      await AppControllerDesktopSettings(this).saveSettings(
-        settings.copyWithGatewayProfileAt(
-          gatewayProfileIndexForExecutionTargetInternal(target),
-          nextProfile,
-        ),
-        refreshAfterSave: false,
-      );
-    }
+    final target = currentAssistantExecutionTarget;
+    final nextProfile = gatewayProfileForAssistantExecutionTargetInternal(
+      target,
+    ).copyWith(selectedAgentId: agentsControllerInternal.selectedAgentId);
+    await AppControllerDesktopSettings(this).saveSettings(
+      settings.copyWithGatewayProfileAt(
+        gatewayProfileIndexForExecutionTargetInternal(target),
+        nextProfile,
+      ),
+      refreshAfterSave: false,
+    );
     sessionsControllerInternal.configure(
       mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? 'main',
       selectedAgentId: agentsControllerInternal.selectedAgentId,
@@ -205,9 +200,7 @@ extension AppControllerDesktopThreadActions on AppController {
     final nextTarget = assistantExecutionTargetForSession(nextSessionKey);
     final nextViewMode = assistantMessageViewModeForSession(nextSessionKey);
 
-    if (!isSingleAgentMode) {
-      preserveGatewayHistoryForSessionInternal(previousSessionKey);
-    }
+    preserveGatewayHistoryForSessionInternal(previousSessionKey);
 
     await setCurrentAssistantSessionKeyInternal(nextSessionKey);
     upsertTaskThreadInternal(
@@ -226,9 +219,6 @@ extension AppControllerDesktopThreadActions on AppController {
       persistDefaultSelection: false,
       preserveGatewayHistoryForSelectedThread: false,
     );
-    if (nextTarget == AssistantExecutionTarget.singleAgent) {
-      await refreshSingleAgentSkillsForSession(nextSessionKey);
-    }
     recomputeTasksInternal();
   }
 
@@ -266,17 +256,6 @@ extension AppControllerDesktopThreadActions on AppController {
       await flushAssistantThreadPersistenceInternal();
       recomputeTasksInternal();
       throw error;
-    }
-    if (currentTarget == AssistantExecutionTarget.singleAgent) {
-      await sendSingleAgentMessageInternal(
-        message,
-        thinking: thinking,
-        attachments: attachments,
-        localAttachments: localAttachments,
-      );
-      await flushAssistantThreadPersistenceInternal();
-      recomputeTasksInternal();
-      return;
     }
     await enqueueThreadTurnInternal<void>(
       normalizedAssistantSessionKeyInternal(currentSessionKey),
@@ -454,32 +433,6 @@ extension AppControllerDesktopThreadActions on AppController {
       );
       recomputeTasksInternal();
       notifyIfActiveInternal();
-      return;
-    }
-    if (isSingleAgentMode) {
-      final sessionKey = normalizedAssistantSessionKeyInternal(
-        sessionsControllerInternal.currentSessionKey,
-      );
-      if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
-        await goTaskServiceClientInternal.cancelTask(
-          route: GoTaskServiceRoute.externalAcpSingle,
-          target: AssistantExecutionTarget.singleAgent,
-          sessionId: sessionKey,
-          threadId: sessionKey,
-        );
-        aiGatewayPendingSessionKeysInternal.remove(sessionKey);
-        clearAiGatewayStreamingTextInternal(sessionKey);
-        upsertTaskThreadInternal(
-          sessionKey,
-          lifecycleStatus: 'ready',
-          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          lastResultCode: 'aborted',
-          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        );
-        recomputeTasksInternal();
-        notifyIfActiveInternal();
-        return;
-      }
       return;
     }
     final sessionKey = normalizedAssistantSessionKeyInternal(

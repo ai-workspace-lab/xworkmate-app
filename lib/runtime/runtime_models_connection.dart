@@ -42,59 +42,35 @@ bool isLegacyAutoAssistantExecutionTargetValue(String? value) {
   return value?.trim().toLowerCase() == 'auto';
 }
 
-enum AssistantExecutionTarget { singleAgent, gateway }
+enum AssistantExecutionTarget { gateway }
 
 extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   String get label => switch (this) {
-    AssistantExecutionTarget.singleAgent => appText('Agent', 'Agent'),
     AssistantExecutionTarget.gateway => appText('Gateway', 'Gateway'),
   };
 
   String get promptValue => switch (this) {
-    AssistantExecutionTarget.singleAgent => 'single-agent',
     AssistantExecutionTarget.gateway => 'gateway',
   };
 
   bool get isGateway => this == AssistantExecutionTarget.gateway;
 
   String get compactLabel => switch (this) {
-    AssistantExecutionTarget.singleAgent => appText('智能体', 'Agent'),
     AssistantExecutionTarget.gateway => appText('Gateway', 'Gateway'),
   };
 
   static AssistantExecutionTarget fromJsonValue(String? value) {
-    final normalized = value?.trim() ?? '';
-    switch (normalized) {
-      case 'singleAgent':
-      case 'single-agent':
-      case 'agent':
-        return AssistantExecutionTarget.singleAgent;
-      case 'gateway':
-        return AssistantExecutionTarget.gateway;
-      default:
-        return AssistantExecutionTarget.singleAgent;
-    }
+    return AssistantExecutionTarget.gateway;
   }
 }
 
 List<AssistantExecutionTarget> compactAssistantExecutionTargets(
   Iterable<AssistantExecutionTarget> targets,
 ) {
-  final ordered = <AssistantExecutionTarget>[];
-  var addedGateway = false;
-  for (final target in targets) {
-    if (target == AssistantExecutionTarget.singleAgent) {
-      if (!ordered.contains(AssistantExecutionTarget.singleAgent)) {
-        ordered.add(AssistantExecutionTarget.singleAgent);
-      }
-      continue;
-    }
-    if (!addedGateway) {
-      ordered.add(AssistantExecutionTarget.gateway);
-      addedGateway = true;
-    }
+  if (targets.contains(AssistantExecutionTarget.gateway)) {
+    return const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway];
   }
-  return List<AssistantExecutionTarget>.unmodifiable(ordered);
+  return const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway];
 }
 
 AssistantExecutionTarget collapseAssistantExecutionTargetForDisplay(

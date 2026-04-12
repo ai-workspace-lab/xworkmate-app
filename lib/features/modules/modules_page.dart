@@ -645,33 +645,8 @@ class _SkillsPanel extends StatelessWidget {
     List<GatewaySkillSummary> items,
     AssistantExecutionTarget currentMode,
   ) {
-    final singleAgentSkills = items
-        .where((item) => _isSingleAgentSkill(item))
-        .toList(growable: false);
-    final gatewaySkills = items
-        .where((item) => !_isSingleAgentSkill(item))
-        .toList(growable: false);
+    final gatewaySkills = items.toList(growable: false);
     return <_SkillModeCardData>[
-      _SkillModeCardData(
-        title: appText('单机智能体', 'Single agent'),
-        subtitle: appText(
-          '直接挂载本地 / 已授权目录中的技能包，适合个人工作区快速调用。',
-          'Mount local or authorized skill packs directly for fast personal workspace use.',
-        ),
-        icon: Icons.auto_awesome_rounded,
-        status: currentMode == AssistantExecutionTarget.singleAgent
-            ? StatusInfo(appText('当前模式', 'Current mode'), StatusTone.accent)
-            : StatusInfo(appText('可切换', 'Available'), StatusTone.success),
-        chips: [
-          for (final provider in controller.bridgeProviderCatalog)
-            provider.label,
-        ],
-        skills: singleAgentSkills.map((item) => item.name).toList(),
-        emptyLabel: appText(
-          '切换到 Agent 模式后，将显示当前可用的本地技能包。',
-          'Switch to agent mode to inspect the currently available local skill packs.',
-        ),
-      ),
       _SkillModeCardData(
         title: appText('Gateway', 'Gateway'),
         subtitle: appText(
@@ -695,11 +670,6 @@ class _SkillsPanel extends StatelessWidget {
         ),
       ),
     ];
-  }
-
-  bool _isSingleAgentSkill(GatewaySkillSummary item) {
-    const gatewaySources = <String>{'gateway', 'workspace', 'acp'};
-    return !gatewaySources.contains(item.source.trim().toLowerCase());
   }
 }
 

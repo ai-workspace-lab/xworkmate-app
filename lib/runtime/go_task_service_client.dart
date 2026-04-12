@@ -239,17 +239,11 @@ class GoTaskServiceRequest {
   }
 
   String get acpMode {
-    return switch (target) {
-      AssistantExecutionTarget.singleAgent => 'single-agent',
-      AssistantExecutionTarget.gateway => _gatewaySessionMode,
-    };
+    return _gatewaySessionMode;
   }
 
   String get routingExecutionTarget {
-    return switch (target) {
-      AssistantExecutionTarget.singleAgent => 'single-agent',
-      AssistantExecutionTarget.gateway => 'gateway',
-    };
+    return 'gateway';
   }
 
   bool get hasInlineAttachments => inlineAttachments.isNotEmpty;
@@ -314,10 +308,8 @@ class GoTaskServiceRequest {
     final gatewayTarget = normalizedTarget;
     final preferredGatewayTarget = switch (gatewayTarget) {
       AssistantExecutionTarget.gateway => kCanonicalGatewayProviderId,
-      _ => kCanonicalGatewayProviderId,
     };
     final explicitExecutionTarget = switch (gatewayTarget) {
-      AssistantExecutionTarget.singleAgent => 'single-agent',
       AssistantExecutionTarget.gateway => 'gateway',
     };
     final explicitProviderId = provider.isUnspecified
@@ -562,9 +554,8 @@ String? goTaskServiceGatewayEntryState({
       throw StateError(
         'Bridge protocol mismatch: unsupported resolvedEndpointTarget "$resolvedEndpointTarget".',
       );
-    case 'single-agent':
     case 'multi-agent':
-      return AssistantExecutionTarget.singleAgent.promptValue;
+      return AssistantExecutionTarget.gateway.promptValue;
     case 'local':
     case 'remote':
       throw StateError(
