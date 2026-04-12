@@ -1,7 +1,7 @@
 ## Skills
 
 - Use `xworkmate-acceptance` before claiming build, packaging, installation, or release readiness for this repo.
-- For any change that touches gateway auth, `.env`, secure storage, tokens, passwords, TLS, file upload, native entitlements, packaging, or release-sensitive settings, follow the security rules in this file and [docs/security/secure-development-rules.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/security/secure-development-rules.md).
+- For any change that touches gateway auth, `.env`, secure storage, tokens, passwords, TLS, file upload, native entitlements, packaging, or release-sensitive settings, follow the security rules in this file and [docs/security/secure-development-rules.md](docs/security/secure-development-rules.md).
 - For non-trivial implementation work, default to the worktree-first execution flow in this file without asking the user to restate that preference each time.
 
 ## Default Task Mode
@@ -94,10 +94,10 @@ Soft triggers (recommended execution):
 
 Baseline commands:
 - `flutter analyze`
-- `flutter test test/runtime/app_controller_assistant_flow_test.dart`
-- `flutter test test/runtime/code_agent_node_orchestrator_test.dart`
-- `flutter test test/runtime/app_controller_thread_skills_test.dart`
-- `flutter test test/quality/wave1_file_size_guard_test.dart`
+- `flutter test test/app_controller_desktop_runtime_cleanup_test.dart`
+- `flutter test test/app_controller_desktop_working_directory_dispatch_test.dart`
+- `flutter test test/runtime/external_code_agent_acp_desktop_transport_test.dart`
+- `flutter test test/app_controller_desktop_thread_target_cleanup_test.dart`
 
 Cleanup baseline requirements:
 - Every "stale code cleanup" task must include an explicit list of removed compatibility layers; wrapper-only/refactor-only changes are insufficient.
@@ -149,19 +149,19 @@ A refactor task is complete only when:
 - Keep network trust boundaries explicit. Loopback/local mode may use non-TLS intentionally; remote mode must not silently downgrade transport security.
 - File and attachment access must be user-driven. Never read or send workspace files implicitly.
 - Any new macOS or iOS entitlement must be least-privilege, justified by the feature, and covered by tests or manual verification notes.
-- Auth, secret, network, or entitlement changes require `flutter analyze`, relevant unit/widget tests, and serial device-run integration tests when integration coverage is needed.
+- Auth, secret, network, or entitlement changes require `flutter analyze` and relevant Flutter unit/widget tests.
 
 ## Testing Rules
 
 - Modify any Flutter UI page, and you must add or update widget tests and golden tests.
-- Modify any core business flow, and you must add or update `integration_test`.
-- Modify permission, camera, file picker, notification, WebView, or native page interaction behavior, and you must add or update Patrol coverage.
-- Modify any Go handler, service, or repository, and you must add or update matching `*_test.go` unit tests.
+- Modify any core business flow, and you must add or update focused Flutter tests under `test/`.
+- Modify permission, camera, file picker, notification, WebView, or native page interaction behavior, and you must add or update the nearest existing Flutter regression coverage under `test/`.
 - All UI tests must use `Key`-based locators first. Avoid fragile text-only or hierarchy-only selectors unless no Key exists yet.
-- Release/* branches must run the full chain: `flutter test`, `flutter test test/golden`, `flutter test integration_test`, `patrol test`, and `go test ./...`.
+- Release/* branches must run the current repo-native validation chain from `docs/README_TESTING.md`.
+  At minimum for this repo that means `flutter analyze` and `flutter test`.
 - New features must follow test first, then implementation, then full regression.
 - Keep tests split by module. Do not pile every scenario into one file.
-- Golden baseline refreshes require UI review confirmation before updating reference images.
+- Golden baseline refreshes require UI review confirmation before updating reference images. Run the actual golden test files that exist in `test/features/**`.
 - CI failures must be fixed in tests or implementation. Do not skip the failing check in merge workflows.
 
-See [docs/security/secure-development-rules.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/security/secure-development-rules.md) for the full checklist.
+See [docs/security/secure-development-rules.md](docs/security/secure-development-rules.md) for the full checklist.
