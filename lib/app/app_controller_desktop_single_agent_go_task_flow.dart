@@ -105,15 +105,18 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
             workingDirectory: preflightWorkingDirectory,
             routing: routing,
           );
-      final resolvedProvider = SingleAgentProviderCopy.fromJsonValue(
-        routingResolution.resolvedProviderId,
+      final resolvedProviderId = routingResolution.resolvedProviderId.trim();
+      final resolvedProvider = resolvedProviderId.isEmpty
+          ? null
+          : controller.bridgeProviderForId(resolvedProviderId) ??
+                SingleAgentProviderCopy.fromJsonValue(resolvedProviderId);
+      final effectiveProvider = resolvedProvider ?? selection;
+      controller.upsertTaskThreadInternal(
+        sessionKey,
+        latestResolvedProviderId: resolvedProviderId,
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       );
-      final effectiveProvider = !resolvedProvider.isUnspecified
-          ? resolvedProvider
-          : controller.advertisedSingleAgentProviderInternal(selection) ??
-                selection;
-      final unavailableReason =
-          routingResolution.unavailable
+      final unavailableReason = routingResolution.unavailable
           ? singleAgentUnavailableLabelDesktopInternal(
               controller,
               sessionKey,
@@ -265,6 +268,7 @@ Future<void> _applySingleAgentGoTaskResultDesktopInternal(
     sessionKey,
     gatewayEntryState: resolvedGatewayEntryState,
     latestResolvedRuntimeModel: resolvedRuntimeModel,
+    latestResolvedProviderId: result.resolvedProviderId,
     lifecycleStatus: 'ready',
     lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     lastResultCode: result.success ? 'success' : 'error',

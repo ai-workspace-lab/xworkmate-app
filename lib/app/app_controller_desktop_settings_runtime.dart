@@ -845,6 +845,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       executionTargetSource: ThreadSelectionSource.explicit,
       gatewayEntryState: gatewayEntryStateForTargetInternal(target),
       latestResolvedRuntimeModel: '',
+      latestResolvedProviderId: '',
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     recomputeTasksInternal();

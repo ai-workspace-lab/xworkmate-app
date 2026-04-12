@@ -81,11 +81,12 @@ class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {
     final tasks = widget.tasks;
     final groupedTasks = groupTasksForRailInternal(
       tasks,
-      widget.controller
-          .visibleAssistantExecutionTargets(const <AssistantExecutionTarget>[
-            AssistantExecutionTarget.singleAgent,
-            AssistantExecutionTarget.gateway,
-          ]),
+      widget.controller.visibleAssistantExecutionTargets(
+        const <AssistantExecutionTarget>[
+          AssistantExecutionTarget.singleAgent,
+          AssistantExecutionTarget.gateway,
+        ],
+      ),
     );
     final runningCount = tasks
         .where((task) => normalizedTaskStatusInternal(task.status) == 'running')
@@ -506,19 +507,22 @@ class AssistantEmptyStateInternal extends StatelessWidget {
         controller.currentSingleAgentNeedsBridgeProvider;
     final singleAgentSuggestsAcpSwitch =
         controller.currentSingleAgentShouldSuggestAcpSwitch;
-    final providerLabel = controller.currentSingleAgentProvider.label;
+    final providerLabel =
+        (controller.currentSingleAgentResolvedProvider ??
+                controller.currentSingleAgentProvider)
+            .label;
     final reconnectAvailable = controller.canQuickConnectGateway;
     final title = singleAgent
         ? connected
               ? appText('开始智能体任务', 'Start an agent task')
               : singleAgentNeedsBridgeProvider
               ? appText(
-                  '先配置 Bridge Provider',
-                  'Configure a bridge provider first',
+                  '等待 Bridge Provider',
+                  'Waiting for a bridge provider',
                 )
               : appText(
-                  '先准备 Bridge Provider',
-                  'Prepare the bridge provider first',
+                  '等待 Bridge 就绪',
+                  'Waiting for bridge readiness',
                 )
         : connected
         ? appText('开始对话或运行任务', 'Start a chat or run a task')
@@ -538,12 +542,12 @@ class AssistantEmptyStateInternal extends StatelessWidget {
                 )
               : singleAgentNeedsBridgeProvider
               ? appText(
-                  '请先在 设置 -> 集成 中配置并同步可用的外部 Agent 连接，然后再继续当前任务。',
-                  'Configure and sync an available external agent connection in Settings -> Integrations before continuing this task.',
+                  'Bridge 当前没有广告可用 Provider。恢复后可直接开始任务；当前流程不依赖本地集成配置。',
+                  'The bridge is not advertising any available providers right now. Once it recovers, this thread can start directly without extra local integration setup.',
                 )
               : appText(
-                  '当前线程的 Bridge Provider 尚未就绪。请先检查 $providerLabel 对应连接。',
-                  'The bridge provider for this thread is not ready yet. Check the connection mapped to $providerLabel first.',
+                  '当前线程的 Bridge Provider 尚未就绪。请等待 Bridge 恢复，或切换到当前可用 Provider。',
+                  'The bridge provider for this thread is not ready yet. Wait for the bridge to recover, or switch to a currently available provider.',
                 )
         : connected
         ? appText(
@@ -602,9 +606,7 @@ class AssistantEmptyStateInternal extends StatelessWidget {
                       onPressed: connected
                           ? onFocusComposer
                           : singleAgent
-                          ? singleAgentNeedsBridgeProvider
-                                ? onOpenAiGatewaySettings
-                                : onFocusComposer
+                          ? onFocusComposer
                           : reconnectAvailable
                           ? () async {
                               await onReconnectGateway();
@@ -614,9 +616,7 @@ class AssistantEmptyStateInternal extends StatelessWidget {
                         connected
                             ? Icons.edit_rounded
                             : singleAgent
-                            ? singleAgentNeedsBridgeProvider
-                                  ? Icons.tune_rounded
-                                  : Icons.smart_toy_outlined
+                            ? Icons.smart_toy_outlined
                             : reconnectAvailable
                             ? Icons.refresh_rounded
                             : Icons.link_rounded,
@@ -625,9 +625,7 @@ class AssistantEmptyStateInternal extends StatelessWidget {
                         connected
                             ? appText('开始输入', 'Start typing')
                             : singleAgent
-                            ? singleAgentNeedsBridgeProvider
-                                  ? appText('打开配置中心', 'Open settings')
-                                  : appText('查看线程工具栏', 'Open toolbar')
+                            ? appText('查看线程工具栏', 'Open toolbar')
                             : reconnectAvailable
                             ? appText('重新连接', 'Reconnect')
                             : appText('连接 Gateway', 'Connect gateway'),
@@ -643,8 +641,7 @@ class AssistantEmptyStateInternal extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (!connected &&
-                        (!singleAgent || singleAgentNeedsBridgeProvider))
+                    if (!connected && !singleAgent)
                       OutlinedButton.icon(
                         onPressed: singleAgent
                             ? onOpenAiGatewaySettings

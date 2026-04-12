@@ -8,14 +8,12 @@ import 'package:xworkmate/app/app_controller_desktop_skill_permissions.dart';
 import 'package:xworkmate/app/app_controller_desktop_thread_binding.dart';
 import 'package:xworkmate/app/app_controller_desktop_thread_sessions.dart';
 import 'package:xworkmate/app/app_controller_desktop_workspace_execution.dart';
-import 'package:xworkmate/runtime/account_runtime_client.dart';
 import 'package:xworkmate/runtime/codex_config_bridge.dart';
 import 'package:xworkmate/runtime/codex_runtime.dart';
 import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
-import 'package:xworkmate/runtime/runtime_controllers.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
@@ -34,6 +32,7 @@ void main() {
       required String threadId,
       required ThreadExecutionMode mode,
       required String providerId,
+      String latestResolvedProviderId = '',
     }) {
       return TaskThread(
         threadId: threadId,
@@ -51,6 +50,7 @@ void main() {
           providerId: providerId,
           endpointId: '',
         ),
+        latestResolvedProviderId: latestResolvedProviderId,
       );
     }
 
@@ -67,7 +67,10 @@ void main() {
       );
 
       expect(snapshot.executionTarget, AssistantExecutionTarget.singleAgent);
-      expect(snapshot.singleAgentProvider, SingleAgentProvider.opencode);
+      expect(
+        snapshot.selectedSingleAgentProvider,
+        SingleAgentProvider.opencode,
+      );
       expect(snapshot.record, same(latestRecord));
     });
 
@@ -87,7 +90,37 @@ void main() {
         );
 
         expect(snapshot.executionTarget, AssistantExecutionTarget.gateway);
-        expect(snapshot.singleAgentProvider, SingleAgentProvider.opencode);
+        expect(
+          snapshot.selectedSingleAgentProvider,
+          SingleAgentProvider.opencode,
+        );
+      },
+    );
+
+    test(
+      'keeps the stored provider selection separate from resolved provider',
+      () {
+        final latestRecord = buildThread(
+          threadId: 'thread-2b',
+          mode: ThreadExecutionMode.localAgent,
+          providerId: SingleAgentProvider.opencode.providerId,
+          latestResolvedProviderId: SingleAgentProvider.codex.providerId,
+        );
+
+        final snapshot = resolveDesktopThreadBindingSnapshotInternal(
+          defaultExecutionTarget: AssistantExecutionTarget.gateway,
+          latestRecord: latestRecord,
+        );
+
+        expect(snapshot.executionTarget, AssistantExecutionTarget.singleAgent);
+        expect(
+          snapshot.selectedSingleAgentProvider,
+          SingleAgentProvider.opencode,
+        );
+        expect(
+          latestRecord.latestResolvedProviderId,
+          SingleAgentProvider.codex.providerId,
+        );
       },
     );
 
@@ -104,7 +137,7 @@ void main() {
       );
 
       expect(snapshot.executionTarget, AssistantExecutionTarget.gateway);
-      expect(snapshot.singleAgentProvider.isUnspecified, isTrue);
+      expect(snapshot.selectedSingleAgentProvider.isUnspecified, isTrue);
       expect(snapshot.record, isNull);
       expect(staleRecord.executionBinding.providerId, isNotEmpty);
     });
@@ -228,6 +261,45 @@ void main() {
         expect(state.ready, isTrue);
       },
     );
+
+    test(
+      'treats an advertised bridge catalog provider as ready before the first resolved turn',
+      () {
+        final controller = AppController();
+        addTearDown(controller.dispose);
+
+        const sessionKey = 'draft:single-agent-ready-from-catalog';
+        controller.initializeAssistantThreadContext(
+          sessionKey,
+          executionTarget: AssistantExecutionTarget.singleAgent,
+          singleAgentProvider: SingleAgentProvider.codex,
+        );
+        controller.bridgeProviderCatalogInternal = const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ];
+        controller.upsertTaskThreadInternal(
+          sessionKey,
+          executionTarget: AssistantExecutionTarget.singleAgent,
+          executionTargetSource: ThreadSelectionSource.explicit,
+          singleAgentProvider: SingleAgentProvider.codex,
+          singleAgentProviderSource: ThreadSelectionSource.explicit,
+        );
+
+        expect(
+          controller.singleAgentResolvedProviderForSession(sessionKey),
+          isNull,
+        );
+        expect(
+          controller.singleAgentCatalogProviderForSession(sessionKey),
+          SingleAgentProvider.codex,
+        );
+
+        final state = controller.assistantConnectionStateForSession(sessionKey);
+        expect(state.status, RuntimeConnectionStatus.connected);
+        expect(state.ready, isTrue);
+        expect(state.detailLabel, contains('Codex'));
+      },
+    );
   });
 
   group('buildExternalAcpRoutingForSessionInternal', () {
@@ -333,17 +405,13 @@ void main() {
   });
 
   group('resolveGatewayAcpAuthorizationHeaderInternal', () {
-    test('uses only synced or persisted BRIDGE_SERVER_URL values', () {
-      final controller = AppController();
-      addTearDown(controller.dispose);
-
-      expect(controller.resolveBridgeAcpEndpointInternal(), isNull);
-      expect(
-        controller.resolveExternalAcpEndpointForTargetInternal(
-          AssistantExecutionTarget.singleAgent,
-        ),
-        isNull,
+    test('prefers BRIDGE_SERVER_URL from environment over local settings', () {
+      final controller = AppController(
+        environmentOverride: const <String, String>{
+          'BRIDGE_SERVER_URL': 'https://bridge.env.example/acp',
+        },
       );
+      addTearDown(controller.dispose);
 
       controller.settingsController.snapshotInternal = controller.settings
           .copyWith(
@@ -367,24 +435,51 @@ void main() {
 
       expect(
         controller.resolveBridgeAcpEndpointInternal(),
-        Uri.parse('https://bridge.customer.example/acp'),
+        Uri.parse('https://bridge.env.example/acp'),
       );
       expect(
         controller.resolveExternalAcpEndpointForTargetInternal(
           AssistantExecutionTarget.singleAgent,
         ),
-        Uri.parse('https://bridge.customer.example/acp'),
+        Uri.parse('https://bridge.env.example/acp'),
       );
       expect(
         controller.resolveExternalAcpEndpointForTargetInternal(
           AssistantExecutionTarget.gateway,
         ),
-        Uri.parse('https://bridge.customer.example/acp'),
+        Uri.parse('https://bridge.env.example/acp'),
       );
     });
 
+    test('does not recover bridge endpoint from local settings snapshot alone', () {
+      final controller = AppController();
+      addTearDown(controller.dispose);
+
+      controller.settingsController.snapshotInternal = controller.settings
+          .copyWith(
+            acpBridgeServerModeConfig: controller
+                .settings
+                .acpBridgeServerModeConfig
+                .copyWith(
+                  cloudSynced: controller
+                      .settings
+                      .acpBridgeServerModeConfig
+                      .cloudSynced
+                      .copyWith(
+                        remoteServerSummary:
+                            const AcpBridgeServerRemoteServerSummary(
+                              endpoint: 'https://bridge.customer.example/acp',
+                              hasAdvancedOverrides: false,
+                            ),
+                      ),
+                ),
+          );
+
+      expect(controller.resolveBridgeAcpEndpointInternal(), isNull);
+    });
+
     test(
-      'prefers the synced bridge bearer token over the account session token',
+      'prefers environment bridge bearer tokens over persisted bridge secrets',
       () async {
         final root = await Directory.systemTemp.createTemp(
           'xworkmate-bridge-auth-header-',
@@ -397,7 +492,11 @@ void main() {
         );
         final controller = AppController(
           store: store,
-          accountClientFactory: (_) => _BridgeSyncAccountRuntimeClient(),
+          environmentOverride: const <String, String>{
+            'BRIDGE_SERVER_URL': 'https://xworkmate-bridge.svc.plus/acp',
+            'BRIDGE_AUTH_TOKEN': 'env-bridge-token',
+            'INTERNAL_SERVICE_TOKEN': 'env-internal-token',
+          },
         );
         addTearDown(() async {
           controller.dispose();
@@ -411,22 +510,9 @@ void main() {
         });
 
         await store.initialize();
-        await controller.settingsController.initialize();
-        await controller.settingsController.saveSnapshot(
-          controller.settings.copyWith(
-            accountBaseUrl: 'https://accounts.svc.plus',
-            accountUsername: 'review@svc.plus',
-          ),
-        );
-        await controller.settingsController.loginAccount(
-          baseUrl: 'https://accounts.svc.plus',
-          identifier: 'review@svc.plus',
-          password: '***REMOVED-CREDENTIAL***',
-        );
-        await controller.settingsController.saveGatewaySecrets(
-          profileIndex: kGatewayRemoteProfileIndex,
-          token: 'local-token',
-          password: '',
+        await store.saveAccountManagedSecret(
+          target: kAccountManagedSecretTargetBridgeAuthToken,
+          value: 'persisted-bridge-token',
         );
 
         final bridgeAuthorization = await controller
@@ -438,7 +524,7 @@ void main() {
               Uri.parse('https://remote.example.com/acp'),
             );
 
-        expect(bridgeAuthorization, 'Bearer bridge-token');
+        expect(bridgeAuthorization, 'Bearer env-bridge-token');
         expect(nonBridgeAuthorization, isNull);
       },
     );
@@ -516,29 +602,4 @@ class _FakeGatewayRuntimeDeps {
   final Directory root;
   final SecureConfigStore store;
   final DeviceIdentityStore identityStore;
-}
-
-class _BridgeSyncAccountRuntimeClient extends AccountRuntimeClient {
-  _BridgeSyncAccountRuntimeClient()
-    : super(baseUrl: 'https://accounts.svc.plus');
-
-  @override
-  Future<Map<String, dynamic>> login({
-    required String identifier,
-    required String password,
-  }) async {
-    return <String, dynamic>{
-      'token': 'session-token',
-      'internalServiceToken': 'bridge-token',
-      'BRIDGE_SERVER_URL': 'https://xworkmate-bridge.svc.plus',
-      'expiresAt': '2026-04-12T00:00:00Z',
-      'user': <String, dynamic>{
-        'id': 'u-1',
-        'email': identifier,
-        'name': 'Review',
-        'role': 'member',
-        'mfaEnabled': false,
-      },
-    };
-  }
 }

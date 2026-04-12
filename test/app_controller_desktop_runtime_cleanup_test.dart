@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller_desktop_core.dart';
 import 'package:xworkmate/app/app_controller_desktop_skill_permissions.dart';
 import 'package:xworkmate/app/app_controller_desktop_thread_sessions.dart';
+import 'package:xworkmate/app/app_controller_desktop_thread_storage.dart';
 import 'package:xworkmate/app/app_controller_desktop_workspace_execution.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
@@ -62,8 +63,9 @@ void main() {
       );
     }
 
-    final settingsSnapshot = File('lib/runtime/runtime_models_settings_snapshot.dart')
-        .readAsStringSync();
+    final settingsSnapshot = File(
+      'lib/runtime/runtime_models_settings_snapshot.dart',
+    ).readAsStringSync();
     expect(
       settingsSnapshot.contains('providerSyncDefinitions'),
       isFalse,
@@ -76,8 +78,9 @@ void main() {
       reason: 'settings snapshots should not persist app-side Codex CLI paths',
     );
 
-    final accountModels = File('lib/runtime/runtime_models_account.dart')
-        .readAsStringSync();
+    final accountModels = File(
+      'lib/runtime/runtime_models_account.dart',
+    ).readAsStringSync();
     expect(
       accountModels.contains('acpBridgeServerProfiles'),
       isFalse,
@@ -85,8 +88,9 @@ void main() {
           'account advanced overrides should not mirror bridge provider catalogs',
     );
 
-    final orchestrator = File('lib/runtime/code_agent_node_orchestrator.dart')
-        .readAsStringSync();
+    final orchestrator = File(
+      'lib/runtime/code_agent_node_orchestrator.dart',
+    ).readAsStringSync();
     expect(
       orchestrator.contains('configuredCodexCliPath'),
       isFalse,
@@ -287,13 +291,131 @@ void main() {
       expect(thread!.hasExplicitProviderSelection, isFalse);
     },
   );
+
+  group('thread restore provider semantics', () {
+    const owner = ThreadOwnerScope(
+      realm: ThreadRealm.local,
+      subjectType: ThreadSubjectType.user,
+      subjectId: 'u1',
+      displayName: 'User',
+    );
+
+    TaskThread buildThread({
+      required String threadId,
+      required ThreadExecutionMode mode,
+      required String providerId,
+      String latestResolvedProviderId = '',
+    }) {
+      return TaskThread(
+        threadId: threadId,
+        ownerScope: owner,
+        workspaceBinding: const WorkspaceBinding(
+          workspaceId: 'ws-1',
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: '/tmp/ws',
+          displayPath: '/tmp/ws',
+          writable: true,
+        ),
+        executionBinding: ExecutionBinding(
+          executionMode: mode,
+          executorId: providerId,
+          providerId: providerId,
+          endpointId: '',
+        ),
+        latestResolvedProviderId: latestResolvedProviderId,
+      );
+    }
+
+    test(
+      'restore preserves the stored single-agent provider selection without inventing a resolved provider',
+      () {
+        final controller = AppController();
+        _seedBridgeProviders(controller, const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ]);
+        addTearDown(controller.dispose);
+
+        const sessionKey = 'draft:restore-selection';
+        controller.restoreAssistantThreadsInternal(<TaskThread>[
+          buildThread(
+            threadId: sessionKey,
+            mode: ThreadExecutionMode.localAgent,
+            providerId: 'legacy-provider',
+          ),
+        ]);
+
+        final restored = controller.requireTaskThreadForSessionInternal(
+          sessionKey,
+        );
+        expect(restored.executionBinding.providerId, 'legacy-provider');
+        expect(
+          controller.singleAgentProviderForSession(sessionKey).providerId,
+          'legacy-provider',
+        );
+        expect(
+          controller.singleAgentResolvedProviderForSession(sessionKey),
+          isNull,
+        );
+      },
+    );
+
+    test(
+      'restore continues to treat latestResolvedProviderId as the only resolved provider source',
+      () {
+        final controller = AppController();
+        _seedBridgeProviders(controller, const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ]);
+        addTearDown(controller.dispose);
+
+        const sessionKey = 'draft:restore-resolved-provider';
+        controller.restoreAssistantThreadsInternal(<TaskThread>[
+          buildThread(
+            threadId: sessionKey,
+            mode: ThreadExecutionMode.localAgent,
+            providerId: 'legacy-provider',
+            latestResolvedProviderId: SingleAgentProvider.codex.providerId,
+          ),
+        ]);
+
+        expect(
+          controller.singleAgentProviderForSession(sessionKey).providerId,
+          'legacy-provider',
+        );
+        expect(
+          controller.singleAgentResolvedProviderForSession(sessionKey),
+          SingleAgentProvider.codex,
+        );
+      },
+    );
+
+    test('restore still canonicalizes gateway provider bindings', () {
+      final controller = AppController();
+      addTearDown(controller.dispose);
+
+      const sessionKey = 'draft:restore-gateway';
+      controller.restoreAssistantThreadsInternal(<TaskThread>[
+        buildThread(
+          threadId: sessionKey,
+          mode: ThreadExecutionMode.gateway,
+          providerId: 'legacy-provider',
+        ),
+      ]);
+
+      final restored = controller.requireTaskThreadForSessionInternal(
+        sessionKey,
+      );
+      expect(restored.executionBinding.providerId, kCanonicalGatewayProviderId);
+      expect(restored.executionBinding.executorId, kCanonicalGatewayProviderId);
+    });
+  });
 }
 
 void _seedBridgeProviders(
   AppController controller,
   List<SingleAgentProvider> providers,
 ) {
-  controller.bridgeAdvertisedProvidersInternal = providers;
+  controller.bridgeProviderCatalogInternal = providers;
 }
 
 class _FakeSkillDirectoryAccessService implements SkillDirectoryAccessService {

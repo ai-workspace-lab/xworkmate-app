@@ -246,15 +246,14 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final stored = SingleAgentProviderCopy.fromJsonValue(
+    final selectedProvider = SingleAgentProviderCopy.fromJsonValue(
       taskThreadForSessionInternal(
             normalizedSessionKey,
           )?.executionBinding.providerId ??
           '',
     );
-    final sanitized = settings.sanitizeSingleAgentProviderSelection(stored);
-    if (!sanitized.isUnspecified) {
-      return sanitized;
+    if (!selectedProvider.isUnspecified) {
+      return selectedProvider;
     }
     final options = singleAgentProviderOptions;
     return options.isEmpty ? SingleAgentProvider.unspecified : options.first;
@@ -269,13 +268,31 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    return advertisedSingleAgentProviderInternal(
-      singleAgentProviderForSession(normalizedSessionKey),
-    );
+    final record = taskThreadForSessionInternal(normalizedSessionKey);
+    final resolvedProviderId = record?.latestResolvedProviderId.trim() ?? '';
+    if (resolvedProviderId.isNotEmpty) {
+      return bridgeProviderForId(resolvedProviderId) ??
+          SingleAgentProviderCopy.fromJsonValue(resolvedProviderId);
+    }
+    return null;
   }
 
   SingleAgentProvider? get currentSingleAgentResolvedProvider =>
       singleAgentResolvedProviderForSession(currentSessionKey);
+
+  SingleAgentProvider? singleAgentCatalogProviderForSession(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final selection = singleAgentProviderForSession(normalizedSessionKey);
+    if (selection.isUnspecified) {
+      return null;
+    }
+    return bridgeProviderForId(selection.providerId);
+  }
+
+  SingleAgentProvider? get currentSingleAgentCatalogProvider =>
+      singleAgentCatalogProviderForSession(currentSessionKey);
 
   bool singleAgentNeedsBridgeProviderForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
@@ -285,18 +302,11 @@ extension AppControllerDesktopThreadSessions on AppController {
         AssistantExecutionTarget.singleAgent) {
       return false;
     }
-    return configuredSingleAgentProviders.isEmpty;
+    return bridgeProviderCatalog.isEmpty;
   }
 
   bool get currentSingleAgentNeedsBridgeProvider =>
       singleAgentNeedsBridgeProviderForSession(currentSessionKey);
-
-  bool singleAgentHasResolvedProviderForSession(String sessionKey) {
-    return singleAgentResolvedProviderForSession(sessionKey) != null;
-  }
-
-  bool get currentSingleAgentHasResolvedProvider =>
-      singleAgentHasResolvedProviderForSession(currentSessionKey);
 
   bool singleAgentShouldSuggestAcpSwitchForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
@@ -310,8 +320,8 @@ extension AppControllerDesktopThreadSessions on AppController {
     if (selection.isUnspecified) {
       return false;
     }
-    return !isBridgeAdvertisedSingleAgentProviderInternal(selection) &&
-        configuredSingleAgentProviders.isNotEmpty;
+    final selectedProvider = bridgeProviderForId(selection.providerId);
+    return selectedProvider == null && bridgeProviderCatalog.isNotEmpty;
   }
 
   bool get currentSingleAgentShouldSuggestAcpSwitch =>
@@ -346,6 +356,7 @@ extension AppControllerDesktopThreadSessions on AppController {
     }
     final provider =
         singleAgentResolvedProviderForSession(normalizedSessionKey) ??
+        singleAgentCatalogProviderForSession(normalizedSessionKey) ??
         singleAgentProviderForSession(normalizedSessionKey);
     return appText(
       '请先配置 ${provider.label} 模型',
@@ -371,11 +382,7 @@ extension AppControllerDesktopThreadSessions on AppController {
       singleAgentShouldShowModelControlForSession(currentSessionKey);
 
   List<SingleAgentProvider> get singleAgentProviderOptions =>
-      configuredSingleAgentProviders;
-
-  String singleAgentProviderLabelForSession(String sessionKey) {
-    return singleAgentProviderForSession(sessionKey).label;
-  }
+      bridgeProviderCatalog;
 
   String get assistantConversationOwnerLabel {
     if (!isSingleAgentMode) {
@@ -384,6 +391,10 @@ extension AppControllerDesktopThreadSessions on AppController {
     final resolvedProvider = currentSingleAgentResolvedProvider;
     if (resolvedProvider != null) {
       return resolvedProvider.label;
+    }
+    final catalogProvider = currentSingleAgentCatalogProvider;
+    if (catalogProvider != null) {
+      return catalogProvider.label;
     }
     final provider = currentSingleAgentProvider;
     if (!provider.isUnspecified) {
@@ -408,18 +419,20 @@ extension AppControllerDesktopThreadSessions on AppController {
       final resolvedProvider = singleAgentResolvedProviderForSession(
         normalizedSessionKey,
       );
+      final catalogProvider = singleAgentCatalogProviderForSession(
+        normalizedSessionKey,
+      );
       final model = assistantModelForSession(normalizedSessionKey);
-      final providerReady = resolvedProvider != null;
+      final providerReady = catalogProvider != null;
+      final displayProvider = resolvedProvider ?? catalogProvider ?? provider;
       final detail = providerReady
-          ? joinConnectionPartsInternal(<String>[resolvedProvider.label, model])
+          ? joinConnectionPartsInternal(<String>[displayProvider.label, model])
           : singleAgentShouldSuggestAcpSwitchForSession(normalizedSessionKey)
           ? appText(
               '${provider.label} 当前不可用，请改成 Bridge 当前可用的 Provider。',
               '${provider.label} is unavailable. Switch to a provider currently advertised by the bridge.',
             )
-          : singleAgentNeedsBridgeProviderForSession(
-              normalizedSessionKey,
-            )
+          : singleAgentNeedsBridgeProviderForSession(normalizedSessionKey)
           ? appText(
               'Bridge 当前没有可用 Provider。',
               'The bridge does not currently advertise any available providers.',
