@@ -36,7 +36,6 @@ import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
-import 'app_controller_desktop_single_agent.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_actions.dart';
 import 'app_controller_desktop_workspace_execution.dart';
@@ -48,12 +47,10 @@ import 'app_controller_desktop_runtime_helpers.dart';
 class DesktopThreadBindingSnapshotInternal {
   const DesktopThreadBindingSnapshotInternal({
     required this.executionTarget,
-    required this.selectedSingleAgentProvider,
     required this.record,
   });
 
   final AssistantExecutionTarget executionTarget;
-  final SingleAgentProvider selectedSingleAgentProvider;
   final TaskThread? record;
 }
 
@@ -70,12 +67,8 @@ resolveDesktopThreadBindingSnapshotInternal({
           : assistantExecutionTargetFromExecutionMode(
               latestRecord.executionBinding.executionMode,
             ));
-  final selectedProvider = SingleAgentProviderCopy.fromJsonValue(
-    latestRecord?.executionBinding.providerId ?? '',
-  );
   return DesktopThreadBindingSnapshotInternal(
     executionTarget: resolvedExecutionTarget,
-    selectedSingleAgentProvider: selectedProvider,
     record: latestRecord,
   );
 }
@@ -196,33 +189,6 @@ extension AppControllerDesktopThreadBinding on AppController {
     required ThreadOwnerScope ownerScope,
     WorkspaceBinding? existingBinding,
   }) {
-    if (executionTarget == AssistantExecutionTarget.singleAgent) {
-      if (existingBinding != null &&
-          existingBinding.workspaceKind == WorkspaceKind.localFs) {
-        final existingPath = existingBinding.workspacePath.trim();
-        if (existingPath.isNotEmpty &&
-            ensureLocalWorkspaceDirectoryInternal(existingPath)) {
-          // A task thread owns one stable local workingDirectory for its
-          // lifetime. Do not silently rebind it after the initial allocation.
-          return existingBinding.copyWith(
-            displayPath: existingBinding.workspacePath,
-          );
-        }
-      }
-      final localPath = localThreadWorkspacePathInternal(sessionKey);
-      if (localPath.isEmpty) {
-        throw StateError(
-          'Local executable thread $sessionKey requires a writable local workspace.',
-        );
-      }
-      return WorkspaceBinding(
-        workspaceId: normalizedAssistantSessionKeyInternal(sessionKey),
-        workspaceKind: WorkspaceKind.localFs,
-        workspacePath: localPath,
-        displayPath: localPath,
-        writable: true,
-      );
-    }
     final remotePath = remoteThreadWorkspacePathInternal(
       sessionKey,
       ownerScope,
@@ -251,34 +217,21 @@ extension AppControllerDesktopThreadBinding on AppController {
 
   ExecutionBinding buildDesktopExecutionBindingInternal({
     required AssistantExecutionTarget executionTarget,
-    required SingleAgentProvider singleAgentProvider,
     ExecutionBinding? existingBinding,
   }) {
-    final selectedProviderId =
-        executionTarget == AssistantExecutionTarget.singleAgent
-        ? settings
-              .sanitizeSingleAgentProviderSelection(singleAgentProvider)
-              .providerId
-        : kCanonicalGatewayProviderId;
+    const selectedProviderId = kCanonicalGatewayProviderId;
     return (existingBinding ??
             ExecutionBinding(
-              executionMode: ThreadExecutionMode.localAgent,
+              executionMode: ThreadExecutionMode.gateway,
               executorId: selectedProviderId,
               providerId: selectedProviderId,
               endpointId: '',
             ))
         .copyWith(
-          executionMode: switch (executionTarget) {
-            AssistantExecutionTarget.singleAgent =>
-              ThreadExecutionMode.localAgent,
-            AssistantExecutionTarget.gateway => ThreadExecutionMode.gateway,
-          },
+          executionMode: ThreadExecutionMode.gateway,
           executorId: selectedProviderId,
           providerId: selectedProviderId,
-          providerSource:
-              executionTarget == AssistantExecutionTarget.singleAgent
-              ? existingBinding?.providerSource
-              : ThreadSelectionSource.inherited,
+          providerSource: ThreadSelectionSource.inherited,
         );
   }
 
@@ -310,7 +263,6 @@ extension AppControllerDesktopThreadBinding on AppController {
       workspaceBinding: workspaceBinding,
       executionBinding: buildDesktopExecutionBindingInternal(
         executionTarget: snapshot.executionTarget,
-        singleAgentProvider: snapshot.selectedSingleAgentProvider,
         existingBinding: snapshot.record?.executionBinding,
       ),
       lifecycleState:

@@ -31,13 +31,11 @@ import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
-import '../runtime/single_agent_capabilities.dart';
 import '../runtime/skill_directory_access.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
-import 'app_controller_desktop_single_agent.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_actions.dart';
 import 'app_controller_desktop_workspace_execution.dart';
@@ -53,19 +51,9 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
   bool persistMountTargets = false,
 }) async {
   try {
-    final target = controller.assistantExecutionTargetForSession(
-      controller.sessionsControllerInternal.currentSessionKey,
+    await controller.gatewayAcpClientInternal.loadCapabilities(
+      forceRefresh: forceRefresh,
     );
-    if (target == AssistantExecutionTarget.singleAgent) {
-      await controller.goTaskServiceClientInternal.loadExternalAcpCapabilities(
-        target: AssistantExecutionTarget.singleAgent,
-        forceRefresh: forceRefresh,
-      );
-    } else {
-      await controller.gatewayAcpClientInternal.loadCapabilities(
-        forceRefresh: forceRefresh,
-      );
-    }
   } catch (_) {
     // Keep mount refresh resilient when ACP is temporarily unavailable.
   }
@@ -91,19 +79,7 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
 Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
   AppController controller, {
   bool forceRefresh = false,
-}) async {
-  final capabilities = await controller.goTaskServiceClientInternal
-      .loadExternalAcpCapabilities(
-        target: AssistantExecutionTarget.singleAgent,
-        forceRefresh: forceRefresh,
-      );
-  controller.bridgeProviderCatalogInternal = normalizeSingleAgentProviderList(
-    capabilities.providerCatalog,
-  );
-  if (!controller.disposedInternal) {
-    controller.notifyListeners();
-  }
-}
+}) async {}
 
 List<ManagedMountTargetState>
 mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal(
@@ -192,42 +168,6 @@ String? resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal(
   return candidate;
 }
 
-String? resolveSingleAgentWorkingDirectoryForSessionRuntimeInternal(
-  AppController controller,
-  String sessionKey, {
-  SingleAgentProvider? provider,
-}) {
-  final requiresLocalPath =
-      provider == null ||
-      singleAgentProviderRequiresLocalPathRuntimeInternal(controller, provider);
-  final record =
-      controller.assistantThreadRecordsInternal[controller
-          .normalizedAssistantSessionKeyInternal(sessionKey)];
-  if (!requiresLocalPath && record?.workspaceKind == WorkspaceKind.remoteFs) {
-    return assistantWorkingDirectoryForSessionRuntimeInternal(
-      controller,
-      sessionKey,
-    );
-  }
-  return resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal(
-    controller,
-    sessionKey,
-    requireLocalExistence: requiresLocalPath,
-  );
-}
-
-bool singleAgentProviderRequiresLocalPathRuntimeInternal(
-  AppController _,
-  SingleAgentProvider provider,
-) {
-  if (provider == SingleAgentProvider.codex ||
-      provider == SingleAgentProvider.opencode ||
-      provider == SingleAgentProvider.gemini) {
-    return false;
-  }
-  return true;
-}
-
 CodeAgentNodeState buildCodeAgentNodeStateRuntimeInternal(
   AppController controller,
 ) {
@@ -247,7 +187,6 @@ GatewayMode bridgeGatewayModeRuntimeInternal(AppController controller) {
     return GatewayMode.offline;
   }
   return switch (controller.currentAssistantExecutionTarget) {
-    AssistantExecutionTarget.singleAgent => GatewayMode.offline,
     AssistantExecutionTarget.gateway => GatewayMode.remote,
   };
 }

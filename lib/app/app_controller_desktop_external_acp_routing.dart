@@ -45,13 +45,7 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
       sessionKey,
     );
     final thread = assistantThreadRecordsInternal[normalizedSessionKey];
-    final sessionTarget = assistantExecutionTargetForSession(
-      normalizedSessionKey,
-    );
-    final preferredGatewayTarget = switch (sessionTarget) {
-      AssistantExecutionTarget.gateway => kCanonicalGatewayProviderId,
-      AssistantExecutionTarget.singleAgent => kCanonicalGatewayProviderId,
-    };
+    const preferredGatewayTarget = kCanonicalGatewayProviderId;
     final availableSkills =
         assistantImportedSkillsForSession(normalizedSessionKey)
             .map((item) {
@@ -70,11 +64,7 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
             .where((item) => item.trim().isNotEmpty)
             .toList(growable: false);
 
-    final resolvedExplicitProviderId =
-        sessionTarget == AssistantExecutionTarget.singleAgent &&
-            (thread?.hasExplicitProviderSelection ?? false)
-        ? singleAgentProviderForSession(normalizedSessionKey).providerId
-        : '';
+    const resolvedExplicitProviderId = '';
     final resolvedExplicitModel = thread?.hasExplicitModelSelection ?? false
         ? assistantModelForSession(normalizedSessionKey)
         : '';
@@ -121,7 +111,6 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
 
   String _routingExecutionTargetValueInternal(AssistantExecutionTarget target) {
     return switch (target) {
-      AssistantExecutionTarget.singleAgent => 'single-agent',
       AssistantExecutionTarget.gateway => 'gateway',
     };
   }

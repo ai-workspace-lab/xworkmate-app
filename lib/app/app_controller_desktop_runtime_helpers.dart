@@ -226,36 +226,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }) {
     final raw = error.toString().trim();
     final lowered = raw.toLowerCase();
-    if ((lowered.contains('acp_endpoint_missing') ||
-            lowered.contains('missing acp endpoint')) &&
-        target == AssistantExecutionTarget.singleAgent) {
-      return appText(
-        '当前线程缺少可用的 Bridge Server，暂时无法继续。',
-        'This thread does not have an available bridge server yet.',
-      );
-    }
     if (lowered.contains('gateway not connected') ||
         lowered.contains('code: offline') ||
         lowered.contains('offlin') && lowered.contains('gateway')) {
-      if (target == AssistantExecutionTarget.singleAgent) {
-        final selection = singleAgentProviderForSession(
-          sessionsControllerInternal.currentSessionKey,
-        );
-        final provider = currentSingleAgentResolvedProvider ?? selection;
-        final providerLabel = provider.isUnspecified
-            ? appText('Bridge Provider', 'Bridge Provider')
-            : provider.label;
-        final address = _extractGatewayAddressFromErrorInternal(raw);
-        return address.isEmpty
-            ? appText(
-                '当前线程的 Bridge Provider（$providerLabel）未连接。请先恢复该 Provider 对应连接后再重试。',
-                'The Bridge Provider for this thread ($providerLabel) is offline. Restore that provider connection, then try again.',
-              )
-            : appText(
-                '当前线程的 Bridge Provider（$providerLabel）未连接：$address。请先恢复该 Provider 对应连接后再重试。',
-                'The Bridge Provider for this thread ($providerLabel) is offline: $address. Restore that provider connection, then try again.',
-              );
-      }
       final profile = gatewayProfileForAssistantExecutionTargetInternal(target);
       final address = gatewayAddressLabelInternal(profile);
       return address == appText('未连接目标', 'No target')
@@ -269,13 +242,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
             );
     }
     return raw;
-  }
-
-  String _extractGatewayAddressFromErrorInternal(String raw) {
-    final match = RegExp(
-      r'((?:\d{1,3}\.){3}\d{1,3}:\d+|localhost:\d+|[a-zA-Z0-9.-]+:\d+)',
-    ).firstMatch(raw);
-    return match?.group(1)?.trim() ?? '';
   }
 
   String formatAiGatewayHttpErrorInternal(int statusCode, String detail) {
@@ -477,19 +443,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     requireLocalExistence: requireLocalExistence,
   );
 
-  String? resolveSingleAgentWorkingDirectoryForSessionInternal(
-    String sessionKey, {
-    SingleAgentProvider? provider,
-  }) => resolveSingleAgentWorkingDirectoryForSessionRuntimeInternal(
-    this,
-    sessionKey,
-    provider: provider,
-  );
-
-  bool singleAgentProviderRequiresLocalPathInternal(
-    SingleAgentProvider provider,
-  ) => singleAgentProviderRequiresLocalPathRuntimeInternal(this, provider);
-
   void registerCodexExternalProviderInternal() {
     runtimeCoordinatorInternal.registerExternalCodeAgent(
       ExternalCodeAgentProvider(
@@ -610,10 +563,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       await refreshSharedSingleAgentLocalSkillsCacheInternal(forceRescan: true);
       if (disposedInternal) {
         return;
-      }
-      if (assistantExecutionTargetForSession(currentSessionKey) ==
-          AssistantExecutionTarget.singleAgent) {
-        await refreshSingleAgentSkillsForSession(currentSessionKey);
       }
     }
     notifyIfActiveInternal();
@@ -800,35 +749,16 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   AssistantExecutionTarget assistantExecutionTargetForModeInternal(
     RuntimeConnectionMode mode,
   ) {
-    return switch (mode) {
-      RuntimeConnectionMode.unconfigured =>
-        AssistantExecutionTarget.singleAgent,
-      RuntimeConnectionMode.local => AssistantExecutionTarget.gateway,
-      RuntimeConnectionMode.remote => AssistantExecutionTarget.gateway,
-    };
+    return AssistantExecutionTarget.gateway;
   }
 
   GatewayConnectionProfile gatewayProfileForAssistantExecutionTargetInternal(
     AssistantExecutionTarget target,
-  ) {
-    return switch (target) {
-      AssistantExecutionTarget.gateway => settings.primaryGatewayProfile,
-      AssistantExecutionTarget.singleAgent => throw StateError(
-        'Single Agent target has no gateway profile.',
-      ),
-    };
-  }
+  ) => settings.primaryGatewayProfile;
 
   int gatewayProfileIndexForExecutionTargetInternal(
     AssistantExecutionTarget target,
-  ) {
-    return switch (target) {
-      AssistantExecutionTarget.gateway => kGatewayRemoteProfileIndex,
-      AssistantExecutionTarget.singleAgent => throw StateError(
-        'Single Agent target has no gateway profile index.',
-      ),
-    };
-  }
+  ) => kGatewayRemoteProfileIndex;
 }
 
 String _sanitizeArtifactRelativePathInternal(String raw) {

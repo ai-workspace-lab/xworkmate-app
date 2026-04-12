@@ -39,7 +39,6 @@ class SidebarNavigation extends StatelessWidget {
     this.onSettingsTabChanged,
     this.taskItems = const <SidebarTaskItem>[],
     this.visibleExecutionTargets = const <AssistantExecutionTarget>[
-      AssistantExecutionTarget.singleAgent,
       AssistantExecutionTarget.gateway,
     ],
     this.assistantSkillCount = 0,
