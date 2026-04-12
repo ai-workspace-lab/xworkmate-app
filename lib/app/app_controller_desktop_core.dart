@@ -122,6 +122,7 @@ class AppController extends ChangeNotifier {
     UiFeatureManifest? uiFeatureManifest,
     SkillDirectoryAccessService? skillDirectoryAccessService,
     AccountRuntimeClient Function(String baseUrl)? accountClientFactory,
+    Map<String, String>? environmentOverride,
     List<String>? singleAgentSharedSkillScanRootOverrides,
     ArisBundleRepository? arisBundleRepository,
     GoTaskServiceClient? goTaskServiceClient,
@@ -191,6 +192,9 @@ class AppController extends ChangeNotifier {
         skillDirectoryAccessService ?? createSkillDirectoryAccessService();
     singleAgentSharedSkillScanRootOverridesInternal =
         singleAgentSharedSkillScanRootOverrides?.toList(growable: false);
+    environmentOverrideInternal = environmentOverride == null
+        ? null
+        : Map<String, String>.unmodifiable(environmentOverride);
     gatewayAcpClientInternal = GatewayAcpClient(
       endpointResolver: resolveGatewayAcpEndpointInternal,
       authorizationResolver: resolveGatewayAcpAuthorizationHeaderInternal,
@@ -293,7 +297,7 @@ class AppController extends ChangeNotifier {
 
   GatewayAcpClient get gatewayAcpClientForTest => gatewayAcpClientInternal;
 
-  List<SingleAgentProvider> bridgeAdvertisedProvidersInternal =
+  List<SingleAgentProvider> bridgeProviderCatalogInternal =
       const <SingleAgentProvider>[];
   final Map<String, List<GatewayChatMessage>> assistantThreadMessagesInternal =
       <String, List<GatewayChatMessage>>{};
@@ -350,6 +354,7 @@ class AppController extends ChangeNotifier {
   StreamSubscription<GatewayPushEvent>? runtimeEventsSubscriptionInternal;
   bool disposedInternal = false;
   String resolvedUserHomeDirectoryInternal = resolveUserHomeDirectory();
+  Map<String, String>? environmentOverrideInternal;
   SettingsSnapshot lastObservedSettingsSnapshotInternal =
       SettingsSnapshot.defaults();
   Future<void> assistantThreadPersistQueueInternal = Future<void>.value();
@@ -570,10 +575,21 @@ class AppController extends ChangeNotifier {
         profileIndex,
       );
 
-  List<SingleAgentProvider> get configuredSingleAgentProviders =>
-      normalizeBridgeOwnedSingleAgentProviderList(
-        bridgeAdvertisedProvidersInternal,
-      );
+  List<SingleAgentProvider> get bridgeProviderCatalog =>
+      normalizeSingleAgentProviderList(bridgeProviderCatalogInternal);
+
+  SingleAgentProvider? bridgeProviderForId(String providerId) {
+    final normalizedProviderId = normalizeSingleAgentProviderId(providerId);
+    if (normalizedProviderId.isEmpty) {
+      return null;
+    }
+    for (final provider in bridgeProviderCatalog) {
+      if (provider.providerId == normalizedProviderId) {
+        return provider;
+      }
+    }
+    return null;
+  }
 
   List<AssistantExecutionTarget> visibleAssistantExecutionTargets(
     Iterable<AssistantExecutionTarget> supportedTargets,
@@ -581,7 +597,7 @@ class AppController extends ChangeNotifier {
     final supported = supportedTargets.toSet();
     final visible = <AssistantExecutionTarget>[];
     if (supported.contains(AssistantExecutionTarget.singleAgent) &&
-        configuredSingleAgentProviders.isNotEmpty) {
+        bridgeProviderCatalog.isNotEmpty) {
       visible.add(AssistantExecutionTarget.singleAgent);
     }
     if (supported.contains(AssistantExecutionTarget.gateway)) {
@@ -597,31 +613,6 @@ class AppController extends ChangeNotifier {
         (target) => target != AssistantExecutionTarget.singleAgent,
       ),
     ];
-  }
-
-  bool isBridgeAdvertisedSingleAgentProviderInternal(
-    SingleAgentProvider provider,
-  ) {
-    if (provider.isUnspecified) {
-      return false;
-    }
-    return configuredSingleAgentProviders.any(
-      (item) => item.providerId == provider.providerId,
-    );
-  }
-
-  SingleAgentProvider? advertisedSingleAgentProviderInternal(
-    SingleAgentProvider selection,
-  ) {
-    if (selection.isUnspecified) {
-      return null;
-    }
-    for (final provider in configuredSingleAgentProviders) {
-      if (provider.providerId == selection.providerId) {
-        return provider;
-      }
-    }
-    return null;
   }
 
   List<String> get aiGatewayConversationModelChoices {

@@ -131,18 +131,37 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
             workingDirectory: preflightWorkingDirectory,
             routing: routing,
           );
-      final resolvedProvider = SingleAgentProviderCopy.fromJsonValue(
-        routingResolution.resolvedProviderId,
+      final resolvedProviderId = routingResolution.resolvedProviderId.trim();
+      final resolvedProvider = resolvedProviderId.isEmpty
+          ? null
+          : controller.bridgeProviderForId(resolvedProviderId) ??
+                SingleAgentProviderCopy.fromJsonValue(resolvedProviderId);
+      final effectiveProvider = resolvedProvider ?? selection;
+      controller.upsertTaskThreadInternal(
+        sessionKey,
+        latestResolvedProviderId: resolvedProviderId,
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       );
-      final effectiveProvider = !resolvedProvider.isUnspecified
-          ? resolvedProvider
-          : controller.advertisedSingleAgentProviderInternal(selection) ??
-                selection;
       final unavailableReason = routingResolution.unavailable
           ? singleAgentUnavailableLabelDesktopInternal(
               controller,
               sessionKey,
               routingResolution.unavailableMessage,
+            )
+          : controller.singleAgentShouldSuggestAcpSwitchForSession(sessionKey)
+          ? singleAgentUnavailableLabelDesktopInternal(
+              controller,
+              sessionKey,
+              null,
+            )
+          : controller.singleAgentNeedsBridgeProviderForSession(sessionKey)
+          ? singleAgentUnavailableLabelDesktopInternal(
+              controller,
+              sessionKey,
+              appText(
+                'Bridge 当前没有同步到可用 Provider。',
+                'The bridge does not currently have any synced providers.',
+              ),
             )
           : null;
       if (unavailableReason != null) {
@@ -275,6 +294,7 @@ Future<void> _applySingleAgentGoTaskResultDesktopInternal(
     sessionKey,
     gatewayEntryState: resolvedGatewayEntryState,
     latestResolvedRuntimeModel: resolvedRuntimeModel,
+    latestResolvedProviderId: result.resolvedProviderId,
     lifecycleStatus: 'ready',
     lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     lastResultCode: result.success ? 'success' : 'error',

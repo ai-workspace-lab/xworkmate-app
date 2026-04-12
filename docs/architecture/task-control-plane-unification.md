@@ -93,7 +93,7 @@ flowchart TD
 
   subgraph APPSTATE["App-side truth sources"]
     D["refreshSingleAgentCapabilitiesRuntimeInternal()"]
-    E["bridgeAdvertisedProvidersInternal<br/>App 内唯一 provider 名单源"]
+    E["bridgeProviderCatalogInternal<br/>App 内唯一 provider 名单源"]
     F["singleAgentCapabilitiesByProviderInternal<br/>App 内唯一 provider 可用性源"]
     G["refreshAcpCapabilitiesRuntimeInternal()"]
     H["GatewayAcpCapabilities"]
@@ -105,7 +105,7 @@ flowchart TD
   end
 
   subgraph UISTATE["UI affordances"]
-    K["configuredSingleAgentProviders<br/>Composer / Thread Picker provider source"]
+    K["bridgeProviderCatalog<br/>Composer / Thread Picker provider source"]
     L["availableSingleAgentProviders<br/>agent path visibility"]
     M["visible gateway affordances<br/>只看 bridge capabilities / discovery"]
     E --> K

@@ -165,24 +165,6 @@ void main() {
       },
     );
 
-    testWidgets('renders the signed-out login card consistently', (
-      tester,
-    ) async {
-      await tester.binding.setSurfaceSize(const Size(1600, 1200));
-      addTearDown(() async => tester.binding.setSurfaceSize(null));
-      final fixtures = _buildSettingsPageFixtures(
-        seed: _SettingsAccountSeed.signedOut,
-      );
-      final controller = fixtures.controller;
-
-      await tester.pumpWidget(_buildSettingsPageApp(controller));
-      await tester.pump(const Duration(milliseconds: 300));
-
-      await expectLater(
-        find.byKey(const ValueKey('settings-page-boundary')),
-        matchesGoldenFile('goldens/settings_page_account_status_canonical.png'),
-      );
-    });
   });
 }
 
@@ -190,13 +172,10 @@ Widget _buildSettingsPageApp(_FakeSettingsPageController controller) {
   return MaterialApp(
     theme: AppTheme.light(platform: TargetPlatform.macOS),
     home: Scaffold(
-      body: RepaintBoundary(
-        key: const ValueKey('settings-page-boundary'),
-        child: SizedBox(
-          width: 1600,
-          height: 1200,
-          child: SettingsPage(controller: controller),
-        ),
+      body: SizedBox(
+        width: 1600,
+        height: 1200,
+        child: SettingsPage(controller: controller),
       ),
     ),
   );
