@@ -333,19 +333,16 @@ void main() {
   });
 
   group('resolveGatewayAcpAuthorizationHeaderInternal', () {
-    test('resolves ACP endpoint through the canonical bridge entry', () {
+    test('uses only synced or persisted BRIDGE_SERVER_URL values', () {
       final controller = AppController();
       addTearDown(controller.dispose);
 
-      expect(
-        controller.resolveBridgeAcpEndpointInternal(),
-        Uri.parse(kCanonicalBridgeAcpEndpoint),
-      );
+      expect(controller.resolveBridgeAcpEndpointInternal(), isNull);
       expect(
         controller.resolveExternalAcpEndpointForTargetInternal(
           AssistantExecutionTarget.singleAgent,
         ),
-        Uri.parse(kCanonicalBridgeAcpEndpoint),
+        isNull,
       );
 
       controller.settingsController.snapshotInternal = controller.settings
@@ -370,19 +367,19 @@ void main() {
 
       expect(
         controller.resolveBridgeAcpEndpointInternal(),
-        Uri.parse(kCanonicalBridgeAcpEndpoint),
+        Uri.parse('https://bridge.customer.example/acp'),
       );
       expect(
         controller.resolveExternalAcpEndpointForTargetInternal(
           AssistantExecutionTarget.singleAgent,
         ),
-        Uri.parse(kCanonicalBridgeAcpEndpoint),
+        Uri.parse('https://bridge.customer.example/acp'),
       );
       expect(
         controller.resolveExternalAcpEndpointForTargetInternal(
           AssistantExecutionTarget.gateway,
         ),
-        Uri.parse(kCanonicalBridgeAcpEndpoint),
+        Uri.parse('https://bridge.customer.example/acp'),
       );
     });
 
@@ -442,7 +439,7 @@ void main() {
             );
 
         expect(bridgeAuthorization, 'Bearer bridge-token');
-        expect(nonBridgeAuthorization, 'Bearer local-token');
+        expect(nonBridgeAuthorization, isNull);
       },
     );
   });

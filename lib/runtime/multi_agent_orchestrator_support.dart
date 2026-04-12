@@ -15,23 +15,12 @@ import 'multi_agent_orchestrator_workflow.dart';
 import 'multi_agent_orchestrator_core.dart';
 
 extension MultiAgentOrchestratorSupportInternal on MultiAgentOrchestrator {
-  String openAiCompatibleBaseUrlInternal({required String aiGatewayBaseUrl}) {
-    if (configInternal.aiGatewayInjectionPolicy !=
-            AiGatewayInjectionPolicy.disabled &&
-        aiGatewayBaseUrl.trim().isNotEmpty) {
-      final normalized = aiGatewayBaseUrl.trim();
-      return normalized.endsWith('/v1') ? normalized : '$normalized/v1';
-    }
+  String openAiCompatibleBaseUrlInternal() {
     final normalized = configInternal.ollamaEndpoint.trim();
     return normalized.endsWith('/v1') ? normalized : '$normalized/v1';
   }
 
-  String openAiCompatibleApiKeyInternal({required String aiGatewayApiKey}) {
-    if (configInternal.aiGatewayInjectionPolicy !=
-            AiGatewayInjectionPolicy.disabled &&
-        aiGatewayApiKey.trim().isNotEmpty) {
-      return aiGatewayApiKey.trim();
-    }
+  String openAiCompatibleApiKeyInternal() {
     return 'ollama';
   }
 
@@ -236,27 +225,8 @@ extension MultiAgentOrchestratorSupportInternal on MultiAgentOrchestrator {
   }
 
   /// 构建 Ollama 环境变量
-  Map<String, String> buildCliEnvVarsInternal({
-    required String tool,
-    required String aiGatewayBaseUrl,
-    required String aiGatewayApiKey,
-  }) {
+  Map<String, String> buildCliEnvVarsInternal({required String tool}) {
     final baseEnv = <String, String>{...Platform.environment};
-    if (configInternal.aiGatewayInjectionPolicy !=
-            AiGatewayInjectionPolicy.disabled &&
-        aiGatewayBaseUrl.trim().isNotEmpty &&
-        aiGatewayApiKey.trim().isNotEmpty) {
-      baseEnv['OPENAI_BASE_URL'] = aiGatewayBaseUrl.trim();
-      baseEnv['OPENAI_API_KEY'] = aiGatewayApiKey.trim();
-      baseEnv['OLLAMA_BASE_URL'] = aiGatewayBaseUrl.trim();
-      baseEnv['OLLAMA_HOST'] = aiGatewayBaseUrl.trim();
-      if (tool == 'claude') {
-        baseEnv['ANTHROPIC_BASE_URL'] = aiGatewayBaseUrl.trim();
-        baseEnv['ANTHROPIC_AUTH_TOKEN'] = aiGatewayApiKey.trim();
-        baseEnv['ANTHROPIC_API_KEY'] = aiGatewayApiKey.trim();
-      }
-      return baseEnv;
-    }
     final ollamaEndpoint = configInternal.ollamaEndpoint.trim();
     if (ollamaEndpoint.isNotEmpty) {
       baseEnv['OLLAMA_BASE_URL'] = ollamaEndpoint;

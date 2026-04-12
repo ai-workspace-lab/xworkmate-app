@@ -277,7 +277,7 @@ extension AppControllerDesktopThreadSessions on AppController {
   SingleAgentProvider? get currentSingleAgentResolvedProvider =>
       singleAgentResolvedProviderForSession(currentSessionKey);
 
-  bool singleAgentNeedsAiGatewayConfigurationForSession(String sessionKey) {
+  bool singleAgentNeedsBridgeProviderForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
@@ -288,8 +288,8 @@ extension AppControllerDesktopThreadSessions on AppController {
     return !hasAnyAvailableSingleAgentProvider;
   }
 
-  bool get currentSingleAgentNeedsAiGatewayConfiguration =>
-      singleAgentNeedsAiGatewayConfigurationForSession(currentSessionKey);
+  bool get currentSingleAgentNeedsBridgeProvider =>
+      singleAgentNeedsBridgeProviderForSession(currentSessionKey);
 
   bool singleAgentHasResolvedProviderForSession(String sessionKey) {
     return singleAgentResolvedProviderForSession(sessionKey) != null;
@@ -419,7 +419,7 @@ extension AppControllerDesktopThreadSessions on AppController {
               '${provider.label} 当前不可用，请改成 Bridge 当前可用的 Provider。',
               '${provider.label} is unavailable. Switch to a provider currently advertised by the bridge.',
             )
-          : singleAgentNeedsAiGatewayConfigurationForSession(
+          : singleAgentNeedsBridgeProviderForSession(
               normalizedSessionKey,
             )
           ? appText(

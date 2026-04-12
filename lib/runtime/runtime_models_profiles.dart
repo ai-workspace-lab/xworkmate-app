@@ -62,7 +62,7 @@ class ExternalAcpEndpointProfile {
 
   SingleAgentProvider? get builtinProvider {
     final normalized = providerKey.trim().toLowerCase();
-    for (final provider in kKnownSingleAgentProviders) {
+    for (final provider in kPresetExternalAcpProviders) {
       if (provider.providerId == normalized) {
         return provider;
       }
@@ -131,14 +131,14 @@ List<ExternalAcpEndpointProfile> normalizeExternalAcpEndpoints({
     ExternalAcpEndpointProfile profile,
   ) {
     final key = profile.providerKey.trim().toLowerCase();
-    for (final provider in kKnownSingleAgentProviders) {
+    for (final provider in kPresetExternalAcpProviders) {
       if (provider.providerId == key) {
         return provider;
       }
     }
     final label = profile.label.trim();
     final badge = profile.badge.trim();
-    for (final provider in kKnownSingleAgentProviders) {
+    for (final provider in kPresetExternalAcpProviders) {
       if (provider.label == label && provider.badge == badge) {
         return provider;
       }
@@ -153,12 +153,7 @@ List<ExternalAcpEndpointProfile> normalizeExternalAcpEndpoints({
     if (key.isEmpty) {
       continue;
     }
-    if (kLegacyExternalAcpProviderIds.contains(originalKey) &&
-        item.endpoint.trim().isEmpty) {
-      continue;
-    }
-    if (originalKey.startsWith('custom-agent-') &&
-        canonicalProvider != null &&
+    if (!isBridgeOwnedSingleAgentProviderId(originalKey) &&
         item.endpoint.trim().isEmpty) {
       continue;
     }

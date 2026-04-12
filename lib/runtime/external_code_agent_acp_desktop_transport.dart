@@ -63,18 +63,12 @@ class ExternalCodeAgentAcpDesktopTransport
     required String taskPrompt,
     required String workingDirectory,
     required ExternalCodeAgentAcpRoutingConfig routing,
-    String aiGatewayBaseUrl = '',
-    String aiGatewayApiKey = '',
   }) async {
     final response = await _client.request(
       method: 'xworkmate.routing.resolve',
       params: <String, dynamic>{
         'taskPrompt': taskPrompt,
         'workingDirectory': workingDirectory.trim(),
-        if (aiGatewayBaseUrl.trim().isNotEmpty)
-          'aiGatewayBaseUrl': aiGatewayBaseUrl.trim(),
-        if (aiGatewayApiKey.trim().isNotEmpty)
-          'aiGatewayApiKey': aiGatewayApiKey.trim(),
         'routing': routing.toJson(),
       },
       endpointOverride: _endpointResolver(AssistantExecutionTarget.singleAgent),
@@ -218,6 +212,6 @@ class ExternalCodeAgentAcpDesktopTransport
         providers.add(provider);
       }
     }
-    return normalizeSingleAgentProviderList(providers);
+    return normalizeBridgeOwnedSingleAgentProviderList(providers);
   }
 }

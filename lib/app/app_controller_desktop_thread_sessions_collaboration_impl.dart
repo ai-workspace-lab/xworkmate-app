@@ -107,9 +107,34 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
       ? 'main'
       : controller.currentSessionKey;
   await controller.enqueueThreadTurnInternal<void>(sessionKey, () async {
-    final aiGatewayApiKey = await loadAiGatewayApiKeyThreadSessionInternal(
-      controller,
-    );
+    if (controller.resolveExternalAcpEndpointForTargetInternal(
+          controller.assistantExecutionTargetForSession(sessionKey),
+        ) ==
+        null) {
+      final error = StateError(
+        appText(
+          'BRIDGE_SERVER_URL 未配置，无法启动任务对话。',
+          'BRIDGE_SERVER_URL is unavailable, so task chat cannot start.',
+        ),
+      );
+      controller.appendLocalSessionMessageInternal(
+        sessionKey,
+        GatewayChatMessage(
+          id: controller.nextLocalMessageIdInternal(),
+          role: 'assistant',
+          text: error.message.toString(),
+          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          toolCallId: null,
+          toolName: 'Multi-Agent',
+          stopReason: null,
+          pending: false,
+          error: true,
+        ),
+      );
+      controller.recomputeTasksInternal();
+      controller.notifyIfActiveInternal();
+      throw error;
+    }
     await controller.ensureDesktopTaskThreadBindingInternal(
       sessionKey,
       executionTarget: controller.assistantExecutionTargetForSession(
@@ -172,8 +197,6 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
           selectedSkills: selectedSkillLabels,
           inlineAttachments: const <GatewayChatAttachmentPayload>[],
           localAttachments: attachments,
-          aiGatewayBaseUrl: controller.aiGatewayUrl,
-          aiGatewayApiKey: aiGatewayApiKey,
           agentId: '',
           metadata: const <String, dynamic>{},
           routingHint: 'gateway',
