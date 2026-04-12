@@ -392,12 +392,6 @@ class SettingsSnapshot {
   SingleAgentProvider sanitizeSingleAgentProviderSelection(
     SingleAgentProvider provider,
   ) {
-    if (provider.isUnspecified) {
-      return SingleAgentProvider.unspecified;
-    }
-    if (isBridgeOwnedSingleAgentProviderId(provider.providerId)) {
-      return provider;
-    }
-    return SingleAgentProvider.unspecified;
+    return provider.isUnspecified ? SingleAgentProvider.unspecified : provider;
   }
 }

@@ -97,8 +97,9 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
         target: AssistantExecutionTarget.singleAgent,
         forceRefresh: forceRefresh,
       );
-  controller.bridgeAdvertisedProvidersInternal =
-      normalizeSingleAgentProviderList(capabilities.providerCatalog);
+  controller.bridgeProviderCatalogInternal = normalizeSingleAgentProviderList(
+    capabilities.providerCatalog,
+  );
   if (!controller.disposedInternal) {
     controller.notifyListeners();
   }

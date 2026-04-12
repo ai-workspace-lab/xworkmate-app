@@ -20,7 +20,7 @@ flowchart TD
   singleAgent / multiAgent"]
 
   H --> I["refreshSingleAgentCapabilitiesRuntimeInternal()"]
-  I --> J["bridgeAdvertisedProvidersInternal
+  I --> J["bridgeProviderCatalogInternal
   App 内唯一 provider 名单源"]
   I --> K["singleAgentCapabilitiesByProviderInternal
   App 内唯一 provider 可用性源"]
@@ -33,8 +33,8 @@ flowchart TD
   codex / opencode / claude / gemini / aris / openclaw
   available / discoveryState"]
 
-  J --> P["configuredSingleAgentProviders
-  = bridgeAdvertisedProvidersInternal"]
+  J --> P["bridgeProviderCatalog
+  = bridgeProviderCatalogInternal"]
   P --> Q["singleAgentProviderOptions
   Composer / Thread Picker 唯一数据源"]
 
