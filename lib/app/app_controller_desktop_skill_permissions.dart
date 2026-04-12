@@ -96,11 +96,6 @@ extension AppControllerDesktopSkillPermissions on AppController {
     if (disposedInternal) {
       return;
     }
-    if (assistantExecutionTargetForSession(currentSessionKey) ==
-        AssistantExecutionTarget.singleAgent) {
-      await refreshSingleAgentSkillsForSession(currentSessionKey);
-      return;
-    }
     notifyIfActiveInternal();
   }
 
@@ -255,10 +250,8 @@ extension AppControllerDesktopSkillPermissions on AppController {
     final nextExecutionTarget =
         executionTarget ??
         switch (existing?.executionBinding.executionMode) {
-          ThreadExecutionMode.localAgent =>
-            AssistantExecutionTarget.singleAgent,
           ThreadExecutionMode.gateway => AssistantExecutionTarget.gateway,
-          null => AssistantExecutionTarget.singleAgent,
+          null => AssistantExecutionTarget.gateway,
         };
     final nextImportedSkills =
         importedSkills ??
@@ -286,47 +279,30 @@ extension AppControllerDesktopSkillPermissions on AppController {
     final nextWorkspaceBinding =
         workspaceBinding ??
         existing?.workspaceBinding ??
-        (nextExecutionTarget == AssistantExecutionTarget.singleAgent
-            ? buildDesktopWorkspaceBindingInternal(
-                normalizedSessionKey,
-                executionTarget: nextExecutionTarget,
-                ownerScope: nextOwnerScope,
-                existingBinding: null,
-              )
-            : null);
-    if (nextWorkspaceBinding == null || !nextWorkspaceBinding.isComplete) {
+        buildDesktopWorkspaceBindingInternal(
+          normalizedSessionKey,
+          executionTarget: nextExecutionTarget,
+          ownerScope: nextOwnerScope,
+          existingBinding: null,
+        );
+    if (!nextWorkspaceBinding.isComplete) {
       throw StateError(
         'TaskThread $normalizedSessionKey is missing a complete workspaceBinding.',
       );
     }
-    final nextProvider =
-        nextExecutionTarget == AssistantExecutionTarget.singleAgent
-        ? (singleAgentProvider ??
-              SingleAgentProviderCopy.fromJsonValue(
-                executionBinding?.providerId ??
-                    existing?.executionBinding.providerId,
-              ))
-        : SingleAgentProvider.unspecified;
-    final nextProviderSource =
-        nextExecutionTarget == AssistantExecutionTarget.singleAgent
-        ? (singleAgentProviderSource ??
-              existing?.executionBinding.providerSource)
-        : ThreadSelectionSource.inherited;
+    final nextProvider = SingleAgentProvider.unspecified;
+    const nextProviderSource = ThreadSelectionSource.inherited;
     final nextExecutionBinding =
         (executionBinding ??
                 existing?.executionBinding ??
                 ExecutionBinding(
-                  executionMode: ThreadExecutionMode.localAgent,
+                  executionMode: ThreadExecutionMode.gateway,
                   executorId: nextProvider.providerId,
                   providerId: nextProvider.providerId,
                   endpointId: '',
                 ))
             .copyWith(
-              executionMode: switch (nextExecutionTarget) {
-                AssistantExecutionTarget.singleAgent =>
-                  ThreadExecutionMode.localAgent,
-                AssistantExecutionTarget.gateway => ThreadExecutionMode.gateway,
-              },
+              executionMode: ThreadExecutionMode.gateway,
               executorId: nextProvider.providerId,
               providerId: nextProvider.providerId,
               executionModeSource:

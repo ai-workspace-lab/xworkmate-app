@@ -87,11 +87,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       return;
     }
 
-    final shouldUseGatewayAgent =
-        executionTarget != AssistantExecutionTarget.singleAgent;
-    final autoAgent = shouldUseGatewayAgent
-        ? pickAutoAgentInternal(controller, rawPrompt)
-        : null;
+    final autoAgent = pickAutoAgentInternal(controller, rawPrompt);
     if (autoAgent != null) {
       await controller.selectAgent(autoAgent.id);
     }
@@ -111,7 +107,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       attachmentNames: attachmentNames,
       selectedSkillLabels: selectedSkillLabels,
       executionTarget: executionTarget,
-      singleAgentProvider: controller.currentSingleAgentProvider,
       permissionLevel: settings.assistantPermissionLevel,
     );
 
@@ -127,7 +122,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
         preview: rawPrompt,
         status:
             controller.hasAssistantPendingRun ||
-                executionTarget == AssistantExecutionTarget.singleAgent ||
                 connectionState.connected
             ? 'running'
             : 'queued',
@@ -256,12 +250,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
   List<ComposerSkillOptionInternal> availableSkillOptionsInternal(
     AppController controller,
   ) {
-    if (controller.isSingleAgentMode) {
-      return controller
-          .assistantImportedSkillsForSession(controller.currentSessionKey)
-          .map(skillOptionFromThreadSkillInternal)
-          .toList(growable: false);
-    }
     final options = <ComposerSkillOptionInternal>[];
     final seenKeys = <String>{};
 
@@ -306,7 +294,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     required List<String> attachmentNames,
     required List<String> selectedSkillLabels,
     required AssistantExecutionTarget executionTarget,
-    required SingleAgentProvider singleAgentProvider,
     required AssistantPermissionLevel permissionLevel,
   }) {
     final attachmentBlock = attachmentNames.isEmpty
@@ -318,7 +305,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     final executionContext =
         'Execution context:\n'
         '- target: ${executionTarget.promptValue}\n'
-        '${executionTarget == AssistantExecutionTarget.singleAgent ? '- provider: ${singleAgentProvider.providerId}\n' : ''}'
         '- permission: ${permissionLevel.promptValue}\n\n';
 
     return switch (mode) {
@@ -422,10 +408,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     final inheritedTarget = pickDraftThreadExecutionTargetInternal(
       currentTarget: widget.controller.currentAssistantExecutionTarget,
       visibleTargets: widget.controller.visibleAssistantExecutionTargets(
-        const <AssistantExecutionTarget>[
-          AssistantExecutionTarget.singleAgent,
-          AssistantExecutionTarget.gateway,
-        ],
+        const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway],
       ),
       localWorkspaceAvailable: widget.controller.settings.workspacePath
           .trim()
@@ -456,7 +439,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       title: appText('新对话', 'New conversation'),
       executionTarget: inheritedTarget,
       messageViewMode: inheritedViewMode,
-      singleAgentProvider: widget.controller.currentSingleAgentProvider,
     );
     await switchSessionWithRetryInternal(sessionKey);
   }
@@ -534,7 +516,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       executionTarget: resolvedVisibleExecutionTargetInternal(
         widget.controller,
         supportedTargets: const <AssistantExecutionTarget>[
-          AssistantExecutionTarget.singleAgent,
           AssistantExecutionTarget.gateway,
         ],
       ),
@@ -812,9 +793,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
 
   String buildDraftSessionKeyInternal(AppController controller) {
     final stamp = DateTime.now().millisecondsSinceEpoch;
-    if (controller.isSingleAgentMode) {
-      return 'draft:$stamp';
-    }
     final selectedAgentId = controller.selectedAgentId.trim();
     if (selectedAgentId.isEmpty) {
       return 'draft:$stamp';

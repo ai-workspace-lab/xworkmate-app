@@ -179,14 +179,9 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                   inputController: inputControllerInternal,
                   focusNode: composerFocusNodeInternal,
                   thinkingLabel: thinkingLabelInternal,
-                  showModelControl:
-                      !controller.isSingleAgentMode
-                      ? true
-                      : controller.currentSingleAgentShouldShowModelControl,
+                  showModelControl: true,
                   modelLabel:
-                      controller.isSingleAgentMode
-                      ? controller.currentSingleAgentModelDisplayLabel
-                      : controller.resolvedAssistantModel.isEmpty
+                      controller.resolvedAssistantModel.isEmpty
                       ? appText('未选择模型', 'No model selected')
                       : controller.resolvedAssistantModel,
                   modelOptions: controller.assistantModelChoices,

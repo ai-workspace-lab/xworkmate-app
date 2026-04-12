@@ -513,22 +513,11 @@ bool isLegacyAutoThreadExecutionModeValue(String? value) {
   return value?.trim().toLowerCase() == 'auto';
 }
 
-enum ThreadExecutionMode { localAgent, gateway }
+enum ThreadExecutionMode { gateway }
 
 extension ThreadExecutionModeCopy on ThreadExecutionMode {
   static ThreadExecutionMode fromJsonValue(String? value) {
-    final normalized = value?.trim();
-    switch (normalized) {
-      case 'singleAgent':
-      case 'single-agent':
-      case 'localAgent':
-      case 'agent':
-        return ThreadExecutionMode.localAgent;
-      case 'gateway':
-        return ThreadExecutionMode.gateway;
-      default:
-        return ThreadExecutionMode.localAgent;
-    }
+    return ThreadExecutionMode.gateway;
   }
 }
 
@@ -722,19 +711,13 @@ class ExecutionBinding {
 ThreadExecutionMode threadExecutionModeFromAssistantExecutionTarget(
   AssistantExecutionTarget target,
 ) {
-  return switch (target) {
-    AssistantExecutionTarget.singleAgent => ThreadExecutionMode.localAgent,
-    AssistantExecutionTarget.gateway => ThreadExecutionMode.gateway,
-  };
+  return ThreadExecutionMode.gateway;
 }
 
 AssistantExecutionTarget assistantExecutionTargetFromExecutionMode(
   ThreadExecutionMode mode,
 ) {
-  return switch (mode) {
-    ThreadExecutionMode.localAgent => AssistantExecutionTarget.singleAgent,
-    ThreadExecutionMode.gateway => AssistantExecutionTarget.gateway,
-  };
+  return AssistantExecutionTarget.gateway;
 }
 
 WorkspaceRefKind workspaceRefKindFromWorkspaceKind(WorkspaceKind kind) {
@@ -1018,7 +1001,7 @@ class TaskThread {
        executionBinding =
            executionBinding ??
            ExecutionBinding(
-             executionMode: ThreadExecutionMode.localAgent,
+             executionMode: ThreadExecutionMode.gateway,
              executorId: SingleAgentProvider.unspecified.providerId,
              providerId: SingleAgentProvider.unspecified.providerId,
              endpointId: '',

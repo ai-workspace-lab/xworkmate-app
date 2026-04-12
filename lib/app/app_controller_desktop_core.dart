@@ -43,7 +43,6 @@ import 'task_thread_repositories.dart';
 import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
-import 'app_controller_desktop_single_agent.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_actions.dart';
 import 'app_controller_desktop_workspace_execution.dart';
@@ -319,8 +318,6 @@ class AppController extends ChangeNotifier {
       <String, HttpClient>{};
   final Set<String> aiGatewayPendingSessionKeysInternal = <String>{};
   final Set<String> aiGatewayAbortedSessionKeysInternal = <String>{};
-  final Set<String> singleAgentExternalCliPendingSessionKeysInternal =
-      <String>{};
   final Map<String, Future<void>> assistantThreadTurnQueuesInternal =
       <String, Future<void>>{};
   bool multiAgentRunPendingInternal = false;
@@ -483,9 +480,7 @@ class AppController extends ChangeNotifier {
   bool get hasPendingSettingsApply => pendingSettingsApplyInternal;
   String get settingsDraftStatusMessage => settingsDraftStatusMessageInternal;
   List<GatewayAgentSummary> get agents => agentsControllerInternal.agents;
-  List<GatewaySessionSummary> get sessions => isSingleAgentMode
-      ? assistantSessionSummariesInternal()
-      : sessionsControllerInternal.sessions;
+  List<GatewaySessionSummary> get sessions => sessionsControllerInternal.sessions;
   List<GatewaySessionSummary> get assistantSessions =>
       assistantSessionsInternal();
   List<GatewayInstanceSummary> get instances =>
@@ -523,8 +518,6 @@ class AppController extends ChangeNotifier {
       settingsControllerInternal.effectiveAiGatewayBaseUrl.trim();
   bool get hasStoredAiGatewayApiKey =>
       settingsControllerInternal.hasEffectiveAiGatewayApiKey;
-  bool get isSingleAgentMode =>
-      currentAssistantExecutionTarget == AssistantExecutionTarget.singleAgent;
   bool get isCodexBridgeBusy => isCodexBridgeBusyInternal;
   String? get codexBridgeError => codexBridgeErrorInternal;
   String? get codexRuntimeWarning => codexRuntimeWarningInternal;
@@ -535,8 +528,6 @@ class AppController extends ChangeNotifier {
   CodexCooperationState get codexCooperationState =>
       codexCooperationStateInternal;
   bool get isMultiAgentRunPending => multiAgentRunPendingInternal;
-  bool get showsSingleAgentRuntimeDebugMessagesInternal =>
-      settings.experimentalDebug;
   bool desktopPlatformBusyInternal = false;
 
   static const String draftAiGatewayApiKeyKeyInternal = 'ai_gateway_api_key';
@@ -552,11 +543,9 @@ class AppController extends ChangeNotifier {
       resolvedAiGatewayModel.isNotEmpty;
 
   int get activeGatewayProfileIndexInternal {
-    final target = currentAssistantExecutionTarget;
-    if (target == AssistantExecutionTarget.singleAgent) {
-      return kGatewayRemoteProfileIndex;
-    }
-    return gatewayProfileIndexForExecutionTargetInternal(target);
+    return gatewayProfileIndexForExecutionTargetInternal(
+      currentAssistantExecutionTarget,
+    );
   }
 
   bool hasStoredGatewayTokenForProfile(int profileIndex) =>
@@ -593,27 +582,7 @@ class AppController extends ChangeNotifier {
 
   List<AssistantExecutionTarget> visibleAssistantExecutionTargets(
     Iterable<AssistantExecutionTarget> supportedTargets,
-  ) {
-    final supported = supportedTargets.toSet();
-    final visible = <AssistantExecutionTarget>[];
-    if (supported.contains(AssistantExecutionTarget.singleAgent) &&
-        bridgeProviderCatalog.isNotEmpty) {
-      visible.add(AssistantExecutionTarget.singleAgent);
-    }
-    if (supported.contains(AssistantExecutionTarget.gateway)) {
-      visible.add(AssistantExecutionTarget.gateway);
-    }
-    if (!supportedTargets.contains(AssistantExecutionTarget.singleAgent) ||
-        visible.contains(AssistantExecutionTarget.singleAgent)) {
-      return visible;
-    }
-    return <AssistantExecutionTarget>[
-      AssistantExecutionTarget.singleAgent,
-      ...visible.where(
-        (target) => target != AssistantExecutionTarget.singleAgent,
-      ),
-    ];
-  }
+  ) => const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway];
 
   List<String> get aiGatewayConversationModelChoices {
     final availableModels =
@@ -654,9 +623,6 @@ class AppController extends ChangeNotifier {
   String resolvedAssistantModelForTargetInternal(
     AssistantExecutionTarget target,
   ) {
-    if (target == AssistantExecutionTarget.singleAgent) {
-      return '';
-    }
     final resolved = resolvedDefaultModel.trim();
     if (resolved.isNotEmpty) {
       return resolved;

@@ -66,7 +66,7 @@ class ExternalCodeAgentAcpDesktopTransport
         'workingDirectory': workingDirectory.trim(),
         'routing': routing.toJson(),
       },
-      endpointOverride: _endpointResolver(AssistantExecutionTarget.singleAgent),
+      endpointOverride: _endpointResolver(AssistantExecutionTarget.gateway),
     );
     return ExternalCodeAgentAcpRoutingResolution(
       raw: _castMap(response['result']),
