@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller_desktop_core.dart';
+import 'package:xworkmate/app/app_controller_desktop_workspace_execution.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_bar.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_models.dart';
@@ -108,6 +109,108 @@ void main() {
       matchesGoldenFile(
         'goldens/assistant_page_composer_working_directory.png',
       ),
+    );
+  });
+
+  testWidgets('renders composer with gateway provider lobster badge', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 320));
+    addTearDown(() async => tester.binding.setSurfaceSize(null));
+
+    final root = Directory.systemTemp.createTempSync(
+      'xworkmate-composer-golden-gateway-',
+    );
+    final store = SecureConfigStore(
+      enableSecureStorage: false,
+      appDataRootPathResolver: () async => '${root.path}/settings.sqlite3',
+      secretRootPathResolver: () async => root.path,
+      supportRootPathResolver: () async => root.path,
+    );
+    final controller = AppController(
+      store: store,
+      desktopPlatformService: UnsupportedDesktopPlatformService(),
+      skillDirectoryAccessService: _GoldenSkillDirectoryAccessService(
+        root.path,
+      ),
+      goTaskServiceClient: const _GoldenGoTaskServiceClient(),
+      singleAgentSharedSkillScanRootOverrides: const <String>[],
+    );
+    _seedBridgeProviders(controller, const <SingleAgentProvider>[
+      SingleAgentProvider.codex,
+    ]);
+    final inputController = TextEditingController(text: '请整理今天的任务进展');
+    final focusNode = FocusNode();
+
+    addTearDown(() async {
+      controller.dispose();
+      inputController.dispose();
+      focusNode.dispose();
+      if (root.existsSync()) {
+        await root.delete(recursive: true);
+      }
+    });
+
+    controller.appUiStateInternal = controller.appUiState.copyWith(
+      savedGatewayTargets: const <String>['gateway'],
+    );
+    controller.lastObservedSettingsSnapshotInternal =
+        controller.settingsController.snapshotInternal;
+    controller.initializeAssistantThreadContext(
+      controller.currentSessionKey,
+      executionTarget: AssistantExecutionTarget.gateway,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(platform: TargetPlatform.macOS),
+        home: Scaffold(
+          body: Center(
+            child: RepaintBoundary(
+              key: const ValueKey('assistant-gateway-composer-boundary'),
+              child: SizedBox(
+                width: 1280,
+                child: ComposerBarInternal(
+                  controller: controller,
+                  inputController: inputController,
+                  focusNode: focusNode,
+                  thinkingLabel: 'Normal',
+                  showModelControl: false,
+                  modelLabel: '',
+                  modelOptions: const <String>[],
+                  attachments: const <ComposerAttachmentInternal>[],
+                  availableSkills: const <ComposerSkillOptionInternal>[],
+                  selectedSkillKeys: const <String>[],
+                  onRemoveAttachment: (_) {},
+                  onToggleSkill: (_) {},
+                  onThinkingChanged: (_) {},
+                  onModelChanged: (_) async {},
+                  onOpenGateway: () {},
+                  onOpenAiGatewaySettings: () {},
+                  onReconnectGateway: () async {},
+                  onPickAttachments: () {},
+                  onAddAttachment: (_) {},
+                  onPasteImageAttachment: () async => null,
+                  onContentHeightChanged: (_) {},
+                  onInputHeightChanged: (_) {},
+                  onSend: () async {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(
+      find.byKey(const Key('assistant-gateway-provider-badge')),
+      findsOneWidget,
+    );
+
+    await expectLater(
+      find.byKey(const ValueKey('assistant-gateway-composer-boundary')),
+      matchesGoldenFile('goldens/assistant_page_composer_gateway_provider.png'),
     );
   });
 }

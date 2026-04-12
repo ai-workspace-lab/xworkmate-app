@@ -246,3 +246,35 @@ class SingleAgentProviderBadgeInternal extends StatelessWidget {
     );
   }
 }
+
+class GatewayProviderBadgeInternal extends StatelessWidget {
+  const GatewayProviderBadgeInternal({
+    super.key,
+    this.size = 18,
+    this.fontSize = 11,
+  });
+
+  final double size;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: palette.surfaceSecondary,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: palette.strokeSoft),
+      ),
+      child: Text(
+        '🦞',
+        maxLines: 1,
+        overflow: TextOverflow.clip,
+        style: TextStyle(fontSize: fontSize, height: 1),
+      ),
+    );
+  }
+}
