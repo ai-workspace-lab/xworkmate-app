@@ -736,7 +736,26 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   Uri? resolveBridgeAcpEndpointInternal() {
-    final uri = Uri.tryParse(kCanonicalBridgeAcpEndpoint);
+    final endpoint =
+        settingsControllerInternal
+                .accountSyncState
+                ?.syncedDefaults
+                .bridgeServerUrl
+                .trim()
+                .isNotEmpty ==
+            true
+        ? settingsControllerInternal
+              .accountSyncState!
+              .syncedDefaults
+              .bridgeServerUrl
+              .trim()
+        : settings
+              .acpBridgeServerModeConfig
+              .cloudSynced
+              .remoteServerSummary
+              .endpoint
+              .trim();
+    final uri = Uri.tryParse(endpoint);
     final scheme = uri?.scheme.trim().toLowerCase() ?? '';
     if (uri == null || !kSupportedExternalAcpEndpointSchemes.contains(scheme)) {
       return null;
@@ -780,20 +799,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       if (bridgeToken.isNotEmpty) {
         return 'Bearer $bridgeToken';
       }
-    }
-    final profileIndex =
-        gatewayProfileIndexMatchingEndpointInternal(endpoint) ??
-        kGatewayRemoteProfileIndex;
-    final gatewayToken = await settingsControllerInternal
-        .loadEffectiveGatewayToken(profileIndex: profileIndex);
-    if (gatewayToken.isNotEmpty) {
-      return 'Bearer $gatewayToken';
-    }
-    final gatewayPassword = await settingsControllerInternal
-        .loadEffectiveGatewayPassword(profileIndex: profileIndex);
-    if (gatewayPassword.isNotEmpty) {
-      final encoded = base64Encode(utf8.encode('operator:$gatewayPassword'));
-      return 'Basic $encoded';
     }
     return null;
   }

@@ -69,8 +69,6 @@ class GatewayAcpMultiAgentRequest {
     required this.workingDirectory,
     required this.attachments,
     required this.selectedSkills,
-    required this.aiGatewayBaseUrl,
-    required this.aiGatewayApiKey,
     required this.resumeSession,
   });
 
@@ -80,8 +78,6 @@ class GatewayAcpMultiAgentRequest {
   final String workingDirectory;
   final List<CollaborationAttachment> attachments;
   final List<String> selectedSkills;
-  final String aiGatewayBaseUrl;
-  final String aiGatewayApiKey;
   final bool resumeSession;
 }
 
@@ -162,7 +158,7 @@ class GatewayAcpClient {
         providers.add(provider);
       }
     }
-    return normalizeSingleAgentProviderList(providers);
+    return normalizeBridgeOwnedSingleAgentProviderList(providers);
   }
 
   Stream<MultiAgentRunEvent> runMultiAgent(
@@ -196,8 +192,6 @@ class GatewayAcpClient {
               )
               .toList(growable: false),
           'selectedSkills': request.selectedSkills,
-          'aiGatewayBaseUrl': request.aiGatewayBaseUrl,
-          'aiGatewayApiKey': request.aiGatewayApiKey,
         },
       );
       var lastSequence = -1;

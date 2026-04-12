@@ -86,9 +86,7 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
               sessionKey,
               null,
             )
-          : controller.singleAgentNeedsAiGatewayConfigurationForSession(
-              sessionKey,
-            )
+          : controller.singleAgentNeedsBridgeProviderForSession(sessionKey)
           ? singleAgentUnavailableLabelDesktopInternal(
               controller,
               sessionKey,
@@ -124,7 +122,6 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
         return;
       }
 
-      final aiGatewayApiKey = await controller.loadAiGatewayApiKey();
       if (!effectiveProvider.isUnspecified) {
         appendSingleAgentRuntimeStatusDesktopInternal(
           controller,
@@ -161,8 +158,6 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
           selectedSkills: selectedSkills,
           inlineAttachments: attachments,
           localAttachments: localAttachments,
-          aiGatewayBaseUrl: controller.aiGatewayUrl,
-          aiGatewayApiKey: aiGatewayApiKey,
           agentId: '',
           metadata: const <String, dynamic>{},
           routing: routing,
