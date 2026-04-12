@@ -51,8 +51,8 @@ String singleAgentProviderTooltipInternal(
 );
 
 String gatewayProviderTooltipInternal() => appText(
-  'Gateway Provider: $kCanonicalGatewayProviderLabel',
-  'Gateway Provider: $kCanonicalGatewayProviderLabel',
+  'Gateway Provider: 🦞 $kCanonicalGatewayProviderLabel',
+  'Gateway Provider: 🦞 $kCanonicalGatewayProviderLabel',
 );
 
 String modelTooltipInternal(String modelLabel) =>

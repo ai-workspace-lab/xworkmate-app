@@ -524,7 +524,9 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                       key: Key('assistant-gateway-provider-menu-item-openclaw'),
                       child: Row(
                         children: [
-                          Icon(Icons.cloud_outlined, size: 18),
+                          GatewayProviderBadgeInternal(
+                            key: Key('assistant-gateway-provider-menu-badge'),
+                          ),
                           SizedBox(width: 10),
                           Expanded(child: Text(kCanonicalGatewayProviderLabel)),
                           Icon(Icons.check_rounded, size: 18),
@@ -533,7 +535,9 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                     ),
                   ],
                   child: ComposerToolbarChipInternal(
-                    icon: Icons.cloud_outlined,
+                    leading: const GatewayProviderBadgeInternal(
+                      key: Key('assistant-gateway-provider-badge'),
+                    ),
                     tooltip: gatewayProviderTooltipInternal(),
                     showChevron: true,
                     padding: const EdgeInsets.symmetric(
