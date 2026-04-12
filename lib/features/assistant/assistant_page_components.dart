@@ -527,8 +527,8 @@ class AssistantEmptyStateInternal extends StatelessWidget {
         : connected
         ? appText('开始对话或运行任务', 'Start a chat or run a task')
         : connectionState.status == RuntimeConnectionStatus.error
-        ? appText('Gateway 连接失败', 'Gateway connection failed')
-        : appText('先连接 Gateway', 'Connect a gateway first');
+        ? appText('Bridge 连接失败', 'Bridge connection failed')
+        : appText('先连接 Bridge', 'Connect xworkmate-bridge first');
     final description = singleAgent
         ? connected
               ? appText(
@@ -566,8 +566,8 @@ class AssistantEmptyStateInternal extends StatelessWidget {
           )
         : !connected
         ? appText(
-            '当前线程目标网关尚未连接。请先连接对应 Gateway，再继续当前任务。',
-            'The selected gateway target for this thread is not connected yet. Connect that Gateway first, then continue this task.',
+            '当前 xworkmate-bridge 尚未连接。请先恢复 bridge 连接，再继续当前任务。',
+            'xworkmate-bridge is not connected yet. Restore the bridge connection, then continue this task.',
           )
         : (connectionState.lastError?.trim().isNotEmpty == true
               ? connectionState.lastError!.trim()
@@ -627,8 +627,11 @@ class AssistantEmptyStateInternal extends StatelessWidget {
                             : singleAgent
                             ? appText('查看线程工具栏', 'Open toolbar')
                             : reconnectAvailable
-                            ? appText('重新连接', 'Reconnect')
-                            : appText('连接 Gateway', 'Connect gateway'),
+                            ? appText('重新连接 Bridge', 'Reconnect bridge')
+                            : appText(
+                                '连接 Bridge',
+                                'Connect xworkmate-bridge',
+                              ),
                       ),
                       style: FilledButton.styleFrom(
                         minimumSize: const Size(0, 28),
@@ -641,32 +644,6 @@ class AssistantEmptyStateInternal extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (!connected && !singleAgent)
-                      OutlinedButton.icon(
-                        onPressed: singleAgent
-                            ? onOpenAiGatewaySettings
-                            : onOpenGateway,
-                        icon: Icon(
-                          singleAgent
-                              ? Icons.hub_outlined
-                              : Icons.settings_rounded,
-                        ),
-                        label: Text(
-                          singleAgent
-                              ? appText('打开设置中心', 'Open settings')
-                              : appText('编辑连接', 'Edit connection'),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 28),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ],

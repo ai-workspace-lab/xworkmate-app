@@ -27,28 +27,13 @@ void main() {
           supportRootPathResolver: () async => root.path,
         );
         await store.initialize();
-        await store.saveSettingsSnapshot(
-          SettingsSnapshot.defaults().copyWith(
-            acpBridgeServerModeConfig: SettingsSnapshot.defaults()
-                .acpBridgeServerModeConfig
-                .copyWith(
-                  cloudSynced: SettingsSnapshot.defaults()
-                      .acpBridgeServerModeConfig
-                      .cloudSynced
-                      .copyWith(
-                        remoteServerSummary:
-                            const AcpBridgeServerRemoteServerSummary(
-                              endpoint: 'https://bridge.customer.example',
-                              hasAdvancedOverrides: false,
-                            ),
-                      ),
-                ),
-          ),
-        );
         final client = _CapturingGoTaskServiceClient();
         final controller = AppController(
           store: store,
           goTaskServiceClient: client,
+          environmentOverride: const <String, String>{
+            'BRIDGE_SERVER_URL': 'https://bridge.customer.example/acp',
+          },
         );
         _seedBridgeProviders(controller, const <SingleAgentProvider>[
           SingleAgentProvider.codex,
@@ -138,6 +123,8 @@ void main() {
         );
         await controller.switchSession(sessionKey);
 
+        expect(controller.currentSingleAgentNeedsBridgeProvider, isFalse);
+
         await controller.sendChatMessage('first turn');
 
         expect(client.requests, isEmpty);
@@ -151,7 +138,7 @@ void main() {
     );
 
     test(
-      'single-agent turns stop before routing when bridge has no advertised provider',
+      'single-agent turns still dispatch when bridge routing resolves a provider even if the local catalog is empty',
       () async {
         final root = await Directory.systemTemp.createTemp(
           'xworkmate-missing-bridge-provider-',
@@ -163,28 +150,13 @@ void main() {
           supportRootPathResolver: () async => root.path,
         );
         await store.initialize();
-        await store.saveSettingsSnapshot(
-          SettingsSnapshot.defaults().copyWith(
-            acpBridgeServerModeConfig: SettingsSnapshot.defaults()
-                .acpBridgeServerModeConfig
-                .copyWith(
-                  cloudSynced: SettingsSnapshot.defaults()
-                      .acpBridgeServerModeConfig
-                      .cloudSynced
-                      .copyWith(
-                        remoteServerSummary:
-                            const AcpBridgeServerRemoteServerSummary(
-                              endpoint: 'https://bridge.customer.example',
-                              hasAdvancedOverrides: false,
-                            ),
-                      ),
-                ),
-          ),
-        );
         final client = _CapturingGoTaskServiceClient();
         final controller = AppController(
           store: store,
           goTaskServiceClient: client,
+          environmentOverride: const <String, String>{
+            'BRIDGE_SERVER_URL': 'https://bridge.customer.example/acp',
+          },
         );
         addTearDown(() async {
           controller.dispose();
@@ -202,18 +174,19 @@ void main() {
         await controller.switchSession(sessionKey);
         _seedBridgeProviders(controller, const <SingleAgentProvider>[]);
 
-        expect(controller.currentSingleAgentNeedsBridgeProvider, isTrue);
-
         await controller.sendChatMessage('first turn');
 
-        expect(client.requests, isEmpty);
+        expect(client.requests, hasLength(1));
         expect(
           client.resolveExternalAcpRoutingCallCount,
-          0,
+          1,
           reason:
-              'single-agent turns should not call routing.resolve when bridge provider state is already unavailable in app state',
+              'single-agent turns should trust bridge routing.resolve instead of short-circuiting on the app-side provider cache',
         );
-        expect(controller.chatMessages.last.text, 'Bridge 当前没有可用 Provider。');
+        expect(
+          controller.chatMessages.last.text,
+          isNot('Bridge 当前没有可用 Provider。'),
+        );
       },
     );
 
@@ -386,8 +359,4 @@ class _CapturingGoTaskServiceClient implements GoTaskServiceClient {
     );
   }
 
-  @override
-  Future<void> syncExternalProviders(
-    List<ExternalCodeAgentAcpSyncedProvider> providers,
-  ) async {}
 }
