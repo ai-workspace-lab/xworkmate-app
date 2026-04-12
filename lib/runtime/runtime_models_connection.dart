@@ -335,14 +335,27 @@ const List<SingleAgentProvider> kPresetExternalAcpProviders =
 
 const String kCanonicalGatewayProviderId = 'openclaw';
 const String kCanonicalGatewayProviderLabel = 'OpenClaw';
-const String kCanonicalBridgeAcpEndpoint = 'https://xworkmate-bridge.svc.plus';
 
-const List<SingleAgentProvider> kKnownSingleAgentProviders =
+const List<SingleAgentProvider> kBridgeOwnedSingleAgentProviders =
     <SingleAgentProvider>[
       SingleAgentProvider.codex,
       SingleAgentProvider.opencode,
-      SingleAgentProvider.claude,
       SingleAgentProvider.gemini,
     ];
 
-const Set<String> kLegacyExternalAcpProviderIds = <String>{'claude'};
+bool isBridgeOwnedSingleAgentProviderId(String providerId) {
+  final normalized = normalizeSingleAgentProviderId(providerId);
+  return kBridgeOwnedSingleAgentProviders.any(
+    (item) => item.providerId == normalized,
+  );
+}
+
+List<SingleAgentProvider> normalizeBridgeOwnedSingleAgentProviderList(
+  Iterable<SingleAgentProvider> providers,
+) {
+  return normalizeSingleAgentProviderList(
+    providers.where(
+      (provider) => isBridgeOwnedSingleAgentProviderId(provider.providerId),
+    ),
+  );
+}

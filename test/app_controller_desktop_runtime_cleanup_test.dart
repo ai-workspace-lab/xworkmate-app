@@ -10,6 +10,7 @@ import 'package:xworkmate/runtime/desktop_platform_service.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
+import 'package:xworkmate/runtime/single_agent_capabilities.dart';
 import 'package:xworkmate/runtime/skill_directory_access.dart';
 
 void main() {
@@ -114,10 +115,10 @@ void main() {
         ),
         goTaskServiceClient: const _FakeGoTaskServiceClient(),
         singleAgentSharedSkillScanRootOverrides: const <String>[],
-        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
-        ],
       );
+      _seedBridgeProviders(controller, const <SingleAgentProvider>[
+        SingleAgentProvider.codex,
+      ]);
       addTearDown(() async {
         controller.dispose();
         await server.close(force: true);
@@ -196,10 +197,10 @@ void main() {
         ),
         goTaskServiceClient: const _FakeGoTaskServiceClient(),
         singleAgentSharedSkillScanRootOverrides: const <String>[],
-        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
-        ],
       );
+      _seedBridgeProviders(controller, const <SingleAgentProvider>[
+        SingleAgentProvider.codex,
+      ]);
       addTearDown(() async {
         controller.dispose();
         if (root.existsSync()) {
@@ -217,21 +218,39 @@ void main() {
         executionTarget: AssistantExecutionTarget.singleAgent,
       );
 
+      expect(
+        controller.singleAgentProviderForSession('draft:bridge-default'),
+        SingleAgentProvider.codex,
+      );
+      expect(
+        controller.singleAgentResolvedProviderForSession(
+          'draft:bridge-default',
+        ),
+        SingleAgentProvider.codex,
+      );
+
       final thread = controller.taskThreadForSessionInternal(
         'draft:bridge-default',
       );
       expect(thread, isNotNull);
-      expect(
-        thread!.executionBinding.providerId,
-        SingleAgentProvider.codex.providerId,
-      );
-      expect(
-        thread.executionBinding.providerSource,
-        ThreadSelectionSource.inherited,
-      );
-      expect(thread.hasExplicitProviderSelection, isFalse);
+      expect(thread!.hasExplicitProviderSelection, isFalse);
     },
   );
+}
+
+void _seedBridgeProviders(
+  AppController controller,
+  List<SingleAgentProvider> providers,
+) {
+  controller.bridgeAdvertisedProvidersInternal = providers;
+  controller.singleAgentCapabilitiesByProviderInternal = {
+    for (final provider in providers)
+      provider: SingleAgentCapabilities(
+        available: true,
+        supportedProviders: <SingleAgentProvider>[provider],
+        endpoint: 'bridge',
+      ),
+  };
 }
 
 class _FakeSkillDirectoryAccessService implements SkillDirectoryAccessService {
@@ -326,8 +345,6 @@ class _FakeGoTaskServiceClient implements GoTaskServiceClient {
     required String taskPrompt,
     required String workingDirectory,
     required ExternalCodeAgentAcpRoutingConfig routing,
-    String aiGatewayBaseUrl = '',
-    String aiGatewayApiKey = '',
   }) async {
     return const ExternalCodeAgentAcpRoutingResolution(
       raw: <String, dynamic>{

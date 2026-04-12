@@ -72,8 +72,6 @@ void main() {
           selectedSkills: <String>[],
           inlineAttachments: <GatewayChatAttachmentPayload>[],
           localAttachments: <CollaborationAttachment>[],
-          aiGatewayBaseUrl: '',
-          aiGatewayApiKey: '',
           agentId: '',
           metadata: <String, dynamic>{},
         ),
