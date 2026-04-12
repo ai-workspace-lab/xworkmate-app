@@ -216,7 +216,7 @@ void _seedBridgeProviders(
   AppController controller,
   List<SingleAgentProvider> providers,
 ) {
-  controller.bridgeAdvertisedProvidersInternal = providers;
+  controller.bridgeProviderCatalogInternal = providers;
 }
 
 class _CapturingGoTaskServiceClient implements GoTaskServiceClient {

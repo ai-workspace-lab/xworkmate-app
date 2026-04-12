@@ -239,6 +239,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
     ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
     String? latestResolvedRuntimeModel,
+    String? latestResolvedProviderId,
     String? lifecycleStatus,
     double? lastRunAtMs,
     String? lastResultCode,
@@ -348,6 +349,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
                   permissionLevel: AssistantPermissionLevel.defaultAccess,
                   messageViewMode: AssistantMessageViewMode.rendered,
                   latestResolvedRuntimeModel: '',
+                  latestResolvedProviderId: '',
                   gatewayEntryState: gatewayEntryStateForTargetInternal(
                     nextExecutionTarget,
                   ),
@@ -372,6 +374,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
                   selectedSkillsSource ??
                   existing?.contextState.selectedSkillsSource,
               latestResolvedRuntimeModel: latestResolvedRuntimeModel,
+              latestResolvedProviderId: latestResolvedProviderId,
               gatewayEntryState: gatewayEntryState,
               lastRemoteWorkingDirectory: lastRemoteWorkingDirectory,
               lastRemoteWorkspaceRefKind: lastRemoteWorkspaceRefKind,

@@ -40,6 +40,16 @@ void main() {
       expect(decoded.toJson().containsKey('codexCliPath'), isFalse);
     });
 
+    test('single-agent provider selection preserves bridge catalog ids', () {
+      final decoded = SettingsSnapshot.defaults();
+      final provider = SingleAgentProvider.fromJsonValue(
+        'xworkmate-bridge-foo',
+        label: 'Bridge Foo',
+      );
+
+      expect(decoded.sanitizeSingleAgentProviderSelection(provider), provider);
+    });
+
     test('removed ui restore and local provider fields are not serialized', () {
       final json = SettingsSnapshot.defaults().toJson();
 
@@ -55,27 +65,34 @@ void main() {
   });
 
   group('AcpBridgeServerModeConfig advanced overrides', () {
-    test('legacy ACP bridge server profiles are ignored and not reserialized', () {
-      final config = AcpBridgeServerModeConfig.fromJson(<String, dynamic>{
-        'advancedOverrides': <String, dynamic>{
-          'acpBridgeServerProfiles': <Map<String, dynamic>>[
-            <String, dynamic>{
-              'providerKey': 'opencode',
-              'label': 'OpenCode',
-              'badge': 'O',
-              'endpoint': 'https://opencode.example.com',
-              'authRef': 'secret://opencode',
-              'enabled': true,
-            },
-          ],
-        },
-      });
+    test(
+      'legacy ACP bridge server profiles are ignored and not reserialized',
+      () {
+        final config = AcpBridgeServerModeConfig.fromJson(<String, dynamic>{
+          'advancedOverrides': <String, dynamic>{
+            'acpBridgeServerProfiles': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'providerKey': 'opencode',
+                'label': 'OpenCode',
+                'badge': 'O',
+                'endpoint': 'https://opencode.example.com',
+                'authRef': 'secret://opencode',
+                'enabled': true,
+              },
+            ],
+          },
+        });
 
-      final json = config.toJson();
-      final advancedOverrides = (json['advancedOverrides'] as Map?)?.cast<String, dynamic>();
+        final json = config.toJson();
+        final advancedOverrides = (json['advancedOverrides'] as Map?)
+            ?.cast<String, dynamic>();
 
-      expect(advancedOverrides, isNotNull);
-      expect(advancedOverrides!.containsKey('acpBridgeServerProfiles'), isFalse);
-    });
+        expect(advancedOverrides, isNotNull);
+        expect(
+          advancedOverrides!.containsKey('acpBridgeServerProfiles'),
+          isFalse,
+        );
+      },
+    );
   });
 }

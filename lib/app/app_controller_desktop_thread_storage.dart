@@ -693,10 +693,8 @@ extension AppControllerDesktopThreadStorage on AppController {
       );
       final recordProvider =
           recordExecutionTarget == AssistantExecutionTarget.singleAgent
-          ? settings.sanitizeSingleAgentProviderSelection(
-              SingleAgentProviderCopy.fromJsonValue(
-                record.executionBinding.providerId,
-              ),
+          ? SingleAgentProviderCopy.fromJsonValue(
+              record.executionBinding.providerId,
             )
           : const SingleAgentProvider(
               providerId: kCanonicalGatewayProviderId,
