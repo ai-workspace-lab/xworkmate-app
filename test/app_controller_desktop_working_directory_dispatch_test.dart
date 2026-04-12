@@ -9,6 +9,7 @@ import 'package:xworkmate/app/app_controller_desktop_workspace_execution.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
+import 'package:xworkmate/runtime/single_agent_capabilities.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -49,10 +50,10 @@ void main() {
         final controller = AppController(
           store: store,
           goTaskServiceClient: client,
-          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-            SingleAgentProvider.codex,
-          ],
         );
+        _seedBridgeProviders(controller, const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ]);
         addTearDown(() async {
           controller.dispose();
           store.dispose();
@@ -101,16 +102,33 @@ void main() {
     );
 
     test(
-      'single-agent turns go through the canonical bridge entry without synced endpoint state',
+      'single-agent turns stop before dispatch when BRIDGE_SERVER_URL is missing',
       () async {
+        final root = await Directory.systemTemp.createTemp(
+          'xworkmate-missing-bridge-server-',
+        );
+        final store = SecureConfigStore(
+          enableSecureStorage: false,
+          appDataRootPathResolver: () async => '${root.path}/settings.sqlite3',
+          secretRootPathResolver: () async => root.path,
+          supportRootPathResolver: () async => root.path,
+        );
+        await store.initialize();
         final client = _CapturingGoTaskServiceClient();
         final controller = AppController(
+          store: store,
           goTaskServiceClient: client,
-          availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-            SingleAgentProvider.codex,
-          ],
         );
-        addTearDown(controller.dispose);
+        _seedBridgeProviders(controller, const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ]);
+        addTearDown(() async {
+          controller.dispose();
+          store.dispose();
+          if (await root.exists()) {
+            await root.delete(recursive: true);
+          }
+        });
 
         const sessionKey = 'draft:single-agent-missing-bridge-server';
         controller.initializeAssistantThreadContext(
@@ -121,18 +139,15 @@ void main() {
 
         await controller.sendChatMessage('first turn');
 
-        expect(client.requests, hasLength(1));
-        expect(client.requests.single.sessionId, sessionKey);
-        expect(client.requests.single.threadId, sessionKey);
+        expect(client.requests, isEmpty);
       },
     );
 
     test('each task thread keeps an independent workingDirectory', () async {
-      final controller = AppController(
-        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
-        ],
-      );
+      final controller = AppController();
+      _seedBridgeProviders(controller, const <SingleAgentProvider>[
+        SingleAgentProvider.codex,
+      ]);
       addTearDown(controller.dispose);
 
       const sessionKey = 'draft:thread-working-directory-a';
@@ -166,12 +181,11 @@ void main() {
     });
 
     test('new task threads do not inherit another thread provider choice', () {
-      final controller = AppController(
-        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
-          SingleAgentProvider.gemini,
-        ],
-      );
+      final controller = AppController();
+      _seedBridgeProviders(controller, const <SingleAgentProvider>[
+        SingleAgentProvider.codex,
+        SingleAgentProvider.gemini,
+      ]);
       addTearDown(controller.dispose);
 
       const firstSessionKey = 'draft:thread-provider-a';
@@ -197,6 +211,21 @@ void main() {
       );
     });
   });
+}
+
+void _seedBridgeProviders(
+  AppController controller,
+  List<SingleAgentProvider> providers,
+) {
+  controller.bridgeAdvertisedProvidersInternal = providers;
+  controller.singleAgentCapabilitiesByProviderInternal = {
+    for (final provider in providers)
+      provider: SingleAgentCapabilities(
+        available: true,
+        supportedProviders: <SingleAgentProvider>[provider],
+        endpoint: 'bridge',
+      ),
+  };
 }
 
 class _CapturingGoTaskServiceClient implements GoTaskServiceClient {
@@ -269,8 +298,6 @@ class _CapturingGoTaskServiceClient implements GoTaskServiceClient {
     required String taskPrompt,
     required String workingDirectory,
     required ExternalCodeAgentAcpRoutingConfig routing,
-    String aiGatewayBaseUrl = '',
-    String aiGatewayApiKey = '',
   }) async {
     resolveExternalAcpRoutingCallCount += 1;
     return const ExternalCodeAgentAcpRoutingResolution(

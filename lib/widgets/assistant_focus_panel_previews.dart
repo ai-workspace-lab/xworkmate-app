@@ -114,7 +114,7 @@ class SkillsFocusPreviewInternal extends StatelessWidget {
     if (items.isEmpty) {
       return PreviewEmptyStateInternal(
         message: typedController.isSingleAgentMode
-            ? (typedController.currentSingleAgentNeedsAiGatewayConfiguration
+            ? (typedController.currentSingleAgentNeedsBridgeProvider
                   ? appText(
                       '当前没有可用的 Bridge Provider，请先在设置里配置并同步连接。',
                       'No bridge provider is available. Configure and sync a connection in Settings first.',

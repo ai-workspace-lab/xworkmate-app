@@ -219,8 +219,6 @@ class GoTaskServiceRequest {
     required this.selectedSkills,
     required this.inlineAttachments,
     required this.localAttachments,
-    required this.aiGatewayBaseUrl,
-    required this.aiGatewayApiKey,
     required this.agentId,
     required this.metadata,
     this.routing,
@@ -242,8 +240,6 @@ class GoTaskServiceRequest {
   final List<String> selectedSkills;
   final List<GatewayChatAttachmentPayload> inlineAttachments;
   final List<CollaborationAttachment> localAttachments;
-  final String aiGatewayBaseUrl;
-  final String aiGatewayApiKey;
   final String agentId;
   final Map<String, dynamic> metadata;
   final ExternalCodeAgentAcpRoutingConfig? routing;
@@ -328,10 +324,6 @@ class GoTaskServiceRequest {
         'remoteWorkingDirectoryHint': remoteWorkingDirectoryHint.trim(),
       if (model.trim().isNotEmpty) 'model': model.trim(),
       if (thinking.trim().isNotEmpty) 'thinking': thinking.trim(),
-      if (aiGatewayBaseUrl.trim().isNotEmpty)
-        'aiGatewayBaseUrl': aiGatewayBaseUrl.trim(),
-      if (aiGatewayApiKey.trim().isNotEmpty)
-        'aiGatewayApiKey': aiGatewayApiKey.trim(),
       'routing': resolvedRouting.toJson(),
       if (routingHint.trim().isNotEmpty) 'routingHint': routingHint.trim(),
       'requestedExecutionTarget': normalizedTarget.promptValue,
@@ -625,8 +617,6 @@ abstract class ExternalCodeAgentAcpTransport {
     required String taskPrompt,
     required String workingDirectory,
     required ExternalCodeAgentAcpRoutingConfig routing,
-    String aiGatewayBaseUrl = '',
-    String aiGatewayApiKey = '',
   });
 
   Future<GoTaskServiceResult> executeTask(
@@ -663,8 +653,6 @@ abstract class GoTaskServiceClient {
     required String taskPrompt,
     required String workingDirectory,
     required ExternalCodeAgentAcpRoutingConfig routing,
-    String aiGatewayBaseUrl = '',
-    String aiGatewayApiKey = '',
   });
 
   Future<GoTaskServiceResult> executeTask(
