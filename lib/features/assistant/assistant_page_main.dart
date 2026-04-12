@@ -527,9 +527,6 @@ class AssistantLowerPaneInternal extends StatelessWidget {
     required this.onToggleSkill,
     required this.onThinkingChanged,
     required this.onModelChanged,
-    required this.onOpenGateway,
-    required this.onOpenAiGatewaySettings,
-    required this.onReconnectGateway,
     required this.onPickAttachments,
     required this.onAddAttachment,
     required this.onPasteImageAttachment,
@@ -553,9 +550,6 @@ class AssistantLowerPaneInternal extends StatelessWidget {
   final ValueChanged<String> onToggleSkill;
   final ValueChanged<String> onThinkingChanged;
   final Future<void> Function(String modelId) onModelChanged;
-  final VoidCallback onOpenGateway;
-  final VoidCallback onOpenAiGatewaySettings;
-  final Future<void> Function() onReconnectGateway;
   final VoidCallback onPickAttachments;
   final ValueChanged<ComposerAttachmentInternal> onAddAttachment;
   final AssistantClipboardImageReader onPasteImageAttachment;
@@ -587,9 +581,6 @@ class AssistantLowerPaneInternal extends StatelessWidget {
           onToggleSkill: onToggleSkill,
           onThinkingChanged: onThinkingChanged,
           onModelChanged: onModelChanged,
-          onOpenGateway: onOpenGateway,
-          onOpenAiGatewaySettings: onOpenAiGatewaySettings,
-          onReconnectGateway: onReconnectGateway,
           onPickAttachments: onPickAttachments,
           onAddAttachment: onAddAttachment,
           onPasteImageAttachment: onPasteImageAttachment,

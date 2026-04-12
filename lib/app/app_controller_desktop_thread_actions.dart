@@ -301,6 +301,7 @@ extension AppControllerDesktopThreadActions on AppController {
               sessionId: sessionKey,
               threadId: sessionKey,
               target: currentTarget,
+              provider: assistantProviderForSession(sessionKey),
               prompt: message,
               workingDirectory: workingDirectory,
               model: assistantModelForSession(sessionKey),

@@ -64,7 +64,12 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
             .where((item) => item.trim().isNotEmpty)
             .toList(growable: false);
 
-    const resolvedExplicitProviderId = '';
+    final resolvedProvider = assistantProviderForSession(normalizedSessionKey);
+    final resolvedExplicitProviderId =
+        thread?.hasExplicitProviderSelection == true &&
+            !resolvedProvider.isUnspecified
+        ? resolvedProvider.providerId
+        : '';
     final resolvedExplicitModel = thread?.hasExplicitModelSelection ?? false
         ? assistantModelForSession(normalizedSessionKey)
         : '';
