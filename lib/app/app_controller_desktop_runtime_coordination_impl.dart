@@ -75,7 +75,6 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
         .reconcile(
           config: currentConfig,
           aiGatewayUrl: controller.aiGatewayUrl,
-          configuredCodexCliPath: controller.configuredCodexCliPath,
         );
     if (jsonEncode(nextConfig.toJson()) != jsonEncode(currentConfig.toJson())) {
       await controller.settingsControllerInternal.saveSnapshot(
@@ -100,15 +99,6 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
       );
   controller.bridgeAdvertisedProvidersInternal =
       normalizeSingleAgentProviderList(capabilities.providerCatalog);
-  final next = <SingleAgentProvider, SingleAgentCapabilities>{};
-  for (final provider in controller.bridgeAdvertisedProvidersInternal) {
-    next[provider] = SingleAgentCapabilities(
-      available: true,
-      supportedProviders: <SingleAgentProvider>[provider],
-      endpoint: 'go-task-service',
-    );
-  }
-  controller.singleAgentCapabilitiesByProviderInternal = next;
   if (!controller.disposedInternal) {
     controller.notifyListeners();
   }
@@ -248,8 +238,6 @@ CodeAgentNodeState buildCodeAgentNodeStateRuntimeInternal(
     bridgeEnabled: controller.isCodexBridgeEnabledInternal,
     bridgeState: controller.codexCooperationStateInternal.name,
     preferredProviderId: 'codex',
-    resolvedCodexCliPath: controller.resolvedCodexCliPathInternal,
-    configuredCodexCliPath: controller.configuredCodexCliPath,
   );
 }
 
@@ -313,11 +301,6 @@ Future<void> ensureCodexGatewayRegistrationRuntimeInternal(
         'providerId': 'codex',
         'runtimeMode': controller.effectiveCodeAgentRuntimeMode.name,
         'gatewayMode': bridgeGatewayModeRuntimeInternal(controller).name,
-        'binaryConfigured':
-            (controller.resolvedCodexCliPath ??
-                    controller.configuredCodexCliPath)
-                .trim()
-                .isNotEmpty,
         'capabilities': const <String>[
           'chat',
           'code-edit',
