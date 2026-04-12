@@ -292,18 +292,8 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
   final resolvedBridgeServerUrl = bridgeServerUrlOverride.trim().isNotEmpty
       ? bridgeServerUrlOverride.trim()
       : controller.accountSyncStateInternal?.syncedDefaults.bridgeServerUrl
-                .trim()
-                .isNotEmpty ==
-            true
-      ? controller.accountSyncStateInternal!.syncedDefaults.bridgeServerUrl
-            .trim()
-      : controller
-            .snapshotInternal
-            .acpBridgeServerModeConfig
-            .cloudSynced
-            .remoteServerSummary
-            .endpoint
-            .trim();
+                .trim() ??
+            '';
   if (!isSupportedExternalAcpEndpoint(resolvedBridgeServerUrl)) {
     const result = AccountSyncResult(
       state: 'blocked',
@@ -391,6 +381,58 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     state: 'ready',
     message: 'Bridge access synced',
   );
+}
+
+Future<AccountSyncState?> recoverBridgeAccountSyncStateInternal(
+  SettingsController controller,
+  AccountSyncState? currentState,
+) async {
+  final currentBridgeServerUrl =
+      currentState?.syncedDefaults.bridgeServerUrl.trim() ?? '';
+  if (currentBridgeServerUrl.isNotEmpty) {
+    return currentState;
+  }
+  if (controller.snapshotInternal.accountLocalMode) {
+    return currentState;
+  }
+
+  final cloudSynced =
+      controller.snapshotInternal.acpBridgeServerModeConfig.cloudSynced;
+  final legacyBridgeServerUrl = cloudSynced.remoteServerSummary.endpoint.trim();
+  if (!isSupportedExternalAcpEndpoint(legacyBridgeServerUrl)) {
+    return currentState;
+  }
+
+  final defaults = AccountSyncState.defaults();
+  final baseline = currentState ?? defaults;
+  final hasBridgeToken = controller.secureRefsInternal.containsKey(
+    kAccountManagedSecretTargetBridgeAuthToken,
+  );
+  final recoveredState = baseline.copyWith(
+    syncedDefaults: baseline.syncedDefaults.copyWith(
+      bridgeServerUrl: legacyBridgeServerUrl,
+    ),
+    syncState: baseline.syncState == defaults.syncState
+        ? 'ready'
+        : baseline.syncState,
+    syncMessage: baseline.syncMessage == defaults.syncMessage
+        ? 'Bridge access synced'
+        : baseline.syncMessage,
+    lastSyncAtMs: baseline.lastSyncAtMs > 0
+        ? baseline.lastSyncAtMs
+        : cloudSynced.lastSyncAt,
+    lastSyncSource: baseline.lastSyncSource.trim().isNotEmpty
+        ? baseline.lastSyncSource
+        : legacyBridgeServerUrl,
+    profileScope: baseline.profileScope.trim().isNotEmpty
+        ? baseline.profileScope
+        : 'bridge',
+    tokenConfigured: baseline.tokenConfigured.copyWith(
+      bridge: baseline.tokenConfigured.bridge || hasBridgeToken,
+    ),
+  );
+  await controller.storeInternal.saveAccountSyncState(recoveredState);
+  return recoveredState;
 }
 
 Future<void> logoutAccountSettingsInternal(

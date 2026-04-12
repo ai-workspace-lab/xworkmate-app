@@ -48,8 +48,13 @@ String providerTooltipInternal(SingleAgentProvider provider) => appText(
   'Agent provider: ${provider.label}',
 );
 
-String modelTooltipInternal(String modelLabel) =>
-    appText('模型: $modelLabel', 'Model: $modelLabel');
+String modelTooltipInternal(String modelLabel) {
+  final normalized = modelLabel.trim();
+  if (normalized.isEmpty) {
+    return '';
+  }
+  return appText('模型: $normalized', 'Model: $normalized');
+}
 
 String skillsTooltipInternal(int selectedCount) => selectedCount <= 0
     ? appText('技能', 'Skills')

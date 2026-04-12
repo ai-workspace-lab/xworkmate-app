@@ -346,19 +346,13 @@ List<String> assistantModelChoicesForSessionThreadSessionInternal(
   AppController controller,
   String sessionKey,
 ) {
-  final runtimeModels = connectedGatewayModelChoicesThreadSessionInternal(
-    controller,
-  );
-  if (runtimeModels.isNotEmpty) {
-    return runtimeModels;
+  final target = controller.assistantExecutionTargetForSession(sessionKey);
+  if (target.isGateway) {
+    return connectedGatewayModelChoicesThreadSessionInternal(controller);
   }
-  final resolved = resolvedDefaultModelThreadSessionInternal(controller).trim();
-  if (resolved.isNotEmpty) {
-    return <String>[resolved];
-  }
-  final localDefault = controller.settings.ollamaLocal.defaultModel.trim();
-  if (localDefault.isNotEmpty) {
-    return <String>[localDefault];
+  final aiGatewayModels = controller.aiGatewayConversationModelChoices;
+  if (aiGatewayModels.isNotEmpty) {
+    return aiGatewayModels;
   }
   return const <String>[];
 }
