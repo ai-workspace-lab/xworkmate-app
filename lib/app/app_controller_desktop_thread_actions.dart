@@ -285,15 +285,6 @@ extension AppControllerDesktopThreadActions on AppController {
         recomputeTasksInternal();
         notifyIfActiveInternal();
         try {
-          if (resolveExternalAcpEndpointForTargetInternal(currentTarget) ==
-              null) {
-            throw StateError(
-              appText(
-                'BRIDGE_SERVER_URL 未配置，无法启动任务对话。',
-                'BRIDGE_SERVER_URL is unavailable, so task chat cannot start.',
-              ),
-            );
-          }
           final dispatch = await codeAgentNodeOrchestratorInternal
               .buildGatewayDispatch(buildCodeAgentNodeStateInternal());
           final result = await goTaskServiceClientInternal.executeTask(

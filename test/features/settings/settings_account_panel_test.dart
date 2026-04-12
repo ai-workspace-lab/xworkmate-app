@@ -35,7 +35,6 @@ void main() {
             onVerifyMfa: () async {},
             onCancelMfa: () async {},
             onSync: () async {},
-            onDisconnect: () async {},
             onLogout: () async {},
           ),
         ),
@@ -51,7 +50,7 @@ void main() {
         findsNothing,
       );
       expect(
-        find.byKey(const ValueKey('settings-account-disconnect-button')),
+        find.byKey(const ValueKey('settings-account-logout-button')),
         findsNothing,
       );
 
@@ -63,17 +62,16 @@ void main() {
       expect(loginCount, 1);
     });
 
-    testWidgets('shows sync and disconnect actions for managed account state', (
+    testWidgets('shows sync and logout actions on the same row', (
       tester,
     ) async {
       final controllers = _TestControllers();
       addTearDown(controllers.dispose);
 
       var syncCount = 0;
-      var disconnectCount = 0;
+      var logoutCount = 0;
 
       final settings = SettingsSnapshot.defaults().copyWith(
-        accountLocalMode: false,
         accountBaseUrl: 'https://accounts.svc.plus',
         accountUsername: 'review@svc.plus',
         acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
@@ -131,31 +129,45 @@ void main() {
             onSync: () async {
               syncCount += 1;
             },
-            onDisconnect: () async {
-              disconnectCount += 1;
+            onLogout: () async {
+              logoutCount += 1;
             },
-            onLogout: () async {},
           ),
         ),
       );
 
       expect(find.text('账号登录与同步'), findsOneWidget);
       expect(find.textContaining('svc.plus 托管配置'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('settings-account-disconnect-button')),
+        findsNothing,
+      );
+      expect(find.textContaining('本地配置'), findsNothing);
+      expect(find.textContaining('已断开'), findsNothing);
+      expect(find.textContaining('当前使用本地连接配置'), findsNothing);
+
+      final syncTop = tester.getTopLeft(
+        find.byKey(const ValueKey('settings-account-sync-button')),
+      );
+      final logoutTop = tester.getTopLeft(
+        find.byKey(const ValueKey('settings-account-logout-button')),
+      );
+      expect(syncTop.dy, logoutTop.dy);
 
       await tester.tap(
         find.byKey(const ValueKey('settings-account-sync-button')),
       );
       await tester.pump();
       await tester.tap(
-        find.byKey(const ValueKey('settings-account-disconnect-button')),
+        find.byKey(const ValueKey('settings-account-logout-button')),
       );
       await tester.pump();
 
       expect(syncCount, 1);
-      expect(disconnectCount, 1);
+      expect(logoutCount, 1);
     });
 
-    testWidgets('disables disconnect when account already uses local config', (
+    testWidgets('keeps managed connection copy when account is signed in', (
       tester,
     ) async {
       final controllers = _TestControllers();
@@ -190,20 +202,19 @@ void main() {
             onVerifyMfa: () async {},
             onCancelMfa: () async {},
             onSync: () async {},
-            onDisconnect: () async {},
             onLogout: () async {},
           ),
         ),
       );
 
-      expect(find.textContaining('本地配置'), findsOneWidget);
-      expect(find.textContaining('已断开'), findsOneWidget);
-      expect(find.textContaining('当前使用本地连接配置'), findsOneWidget);
-
-      final disconnectButton = tester.widget<FilledButton>(
+      expect(find.textContaining('svc.plus 托管配置'), findsOneWidget);
+      expect(find.textContaining('本地配置'), findsNothing);
+      expect(find.textContaining('已断开'), findsNothing);
+      expect(find.textContaining('当前使用本地连接配置'), findsNothing);
+      expect(
         find.byKey(const ValueKey('settings-account-disconnect-button')),
+        findsNothing,
       );
-      expect(disconnectButton.onPressed, isNull);
     });
   });
 }

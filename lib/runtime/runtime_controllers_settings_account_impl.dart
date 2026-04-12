@@ -146,7 +146,6 @@ Future<void> completeAccountSignInSettingsInternal(
     controller,
     baseUrl: baseUrl,
     bridgeTokenOverride: _resolveBridgeAuthorizationToken(payload),
-    bridgeServerUrlOverride: _resolveBridgeServerUrl(payload),
     quiet: true,
   );
   await controller.reloadDerivedStateInternal();
@@ -224,7 +223,6 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
   String baseUrl = '',
   bool quiet = false,
   String bridgeTokenOverride = '',
-  String bridgeServerUrlOverride = '',
 }) async {
   final sessionToken =
       (await controller.storeInternal.loadAccountSessionToken())?.trim() ?? '';
@@ -288,39 +286,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     target: kAccountManagedSecretTargetBridgeAuthToken,
     value: bridgeToken,
   );
-
-  final resolvedBridgeServerUrl = bridgeServerUrlOverride.trim().isNotEmpty
-      ? bridgeServerUrlOverride.trim()
-      : controller.accountSyncStateInternal?.syncedDefaults.bridgeServerUrl
-                .trim() ??
-            '';
-  if (!isSupportedExternalAcpEndpoint(resolvedBridgeServerUrl)) {
-    const result = AccountSyncResult(
-      state: 'blocked',
-      message: 'BRIDGE_SERVER_URL is unavailable',
-    );
-    await _persistAccountSyncStateInternal(
-      controller,
-      AccountSyncState.defaults().copyWith(
-        syncState: result.state,
-        syncMessage: result.message,
-        lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
-        lastSyncError: result.message,
-        profileScope: 'bridge',
-        tokenConfigured: const AccountTokenConfigured(
-          bridge: true,
-          vault: false,
-          apisix: false,
-        ),
-      ),
-    );
-    controller.accountStatusInternal = result.message;
-    if (!quiet) {
-      controller.accountBusyInternal = false;
-      controller.notifyListeners();
-    }
-    return result;
-  }
+  const resolvedBridgeServerUrl = kManagedBridgeServerUrl;
   await controller.storeInternal.clearAccountManagedSecret(
     target: kAccountManagedSecretTargetAIGatewayAccessToken,
   );
@@ -360,10 +326,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     ),
   );
   final sanitizedSettings = _sanitizeBridgeOnlyAccountSyncSettings(
-    currentSettings.copyWith(
-      accountLocalMode: false,
-      acpBridgeServerModeConfig: nextModeConfig,
-    ),
+    currentSettings.copyWith(acpBridgeServerModeConfig: nextModeConfig),
   );
   if (sanitizedSettings.toJsonString() != currentSettings.toJsonString()) {
     await controller.saveSnapshot(sanitizedSettings);
@@ -390,9 +353,6 @@ Future<AccountSyncState?> recoverBridgeAccountSyncStateInternal(
   final currentBridgeServerUrl =
       currentState?.syncedDefaults.bridgeServerUrl.trim() ?? '';
   if (currentBridgeServerUrl.isNotEmpty) {
-    return currentState;
-  }
-  if (controller.snapshotInternal.accountLocalMode) {
     return currentState;
   }
 
@@ -465,58 +425,17 @@ Future<void> logoutAccountSettingsInternal(
             .remoteServerSummary
             .copyWith(endpoint: '', hasAdvancedOverrides: false),
       );
-  if (!controller.snapshotInternal.accountLocalMode) {
-    await controller.saveSnapshot(
-      currentSnapshot.copyWith(
-        accountLocalMode: true,
-        acpBridgeServerModeConfig: currentSnapshot.acpBridgeServerModeConfig
-            .copyWith(cloudSynced: clearedCloudSync),
-      ),
-    );
-  } else {
-    controller.snapshotInternal = currentSnapshot.copyWith(
+  await controller.saveSnapshot(
+    currentSnapshot.copyWith(
       acpBridgeServerModeConfig: currentSnapshot.acpBridgeServerModeConfig
           .copyWith(cloudSynced: clearedCloudSync),
-    );
-    await controller.reloadDerivedStateInternal();
-  }
+    ),
+  );
   controller.accountStatusInternal = statusMessage;
   if (!quiet) {
     controller.accountBusyInternal = false;
     controller.notifyListeners();
   }
-}
-
-Future<void> disconnectManagedAccountBaseSettingsInternal(
-  SettingsController controller,
-) async {
-  final currentSnapshot = controller.snapshotInternal;
-  final cloudSynced = currentSnapshot.acpBridgeServerModeConfig.cloudSynced;
-  final nextState =
-      controller.accountSyncStateInternal ?? AccountSyncState.defaults();
-  await _persistAccountSyncStateInternal(
-    controller,
-    nextState.copyWith(
-      syncState: 'disconnected',
-      syncMessage: 'Using local connection settings',
-      lastSyncError: '',
-      profileScope: nextState.profileScope.trim().isEmpty
-          ? 'bridge'
-          : nextState.profileScope,
-    ),
-  );
-  await controller.saveSnapshot(
-    currentSnapshot.copyWith(
-      accountLocalMode: true,
-      acpBridgeServerModeConfig: currentSnapshot.acpBridgeServerModeConfig
-          .copyWith(
-            cloudSynced: cloudSynced.copyWith(
-              accountBaseUrl: '',
-              accountIdentifier: '',
-            ),
-          ),
-    ),
-  );
 }
 
 Future<void> cancelAccountMfaChallengeSettingsInternal(
@@ -589,14 +508,6 @@ String _resolveBridgeAuthorizationToken(Map<String, dynamic> payload) {
   final internalServiceToken = _stringValue(payload['internalServiceToken']);
   if (internalServiceToken.isNotEmpty) {
     return internalServiceToken;
-  }
-  return '';
-}
-
-String _resolveBridgeServerUrl(Map<String, dynamic> payload) {
-  final explicit = _stringValue(payload['BRIDGE_SERVER_URL']);
-  if (explicit.isNotEmpty) {
-    return explicit;
   }
   return '';
 }

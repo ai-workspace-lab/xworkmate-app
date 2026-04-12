@@ -21,7 +21,6 @@ class SettingsAccountPanel extends StatelessWidget {
     required this.onVerifyMfa,
     required this.onCancelMfa,
     required this.onSync,
-    required this.onDisconnect,
     required this.onLogout,
   });
 
@@ -40,10 +39,7 @@ class SettingsAccountPanel extends StatelessWidget {
   final Future<void> Function() onVerifyMfa;
   final Future<void> Function() onCancelMfa;
   final Future<void> Function() onSync;
-  final Future<void> Function() onDisconnect;
   final Future<void> Function() onLogout;
-
-  bool get _managedConnected => !settings.accountLocalMode;
 
   @override
   Widget build(BuildContext context) {
@@ -72,9 +68,7 @@ class SettingsAccountPanel extends StatelessWidget {
       accountSession: accountSession,
       accountState: accountState,
       accountBusy: accountBusy,
-      managedConnected: _managedConnected,
       onSync: onSync,
-      onDisconnect: onDisconnect,
       onLogout: onLogout,
     );
   }
@@ -290,9 +284,7 @@ class _SignedInAccountPanel extends StatelessWidget {
     required this.accountSession,
     required this.accountState,
     required this.accountBusy,
-    required this.managedConnected,
     required this.onSync,
-    required this.onDisconnect,
     required this.onLogout,
   });
 
@@ -300,9 +292,7 @@ class _SignedInAccountPanel extends StatelessWidget {
   final AccountSessionSummary? accountSession;
   final AccountSyncState? accountState;
   final bool accountBusy;
-  final bool managedConnected;
   final Future<void> Function() onSync;
-  final Future<void> Function() onDisconnect;
   final Future<void> Function() onLogout;
 
   @override
@@ -320,14 +310,10 @@ class _SignedInAccountPanel extends StatelessWidget {
     final syncScope = accountState?.profileScope.trim().isNotEmpty == true
         ? accountState!.profileScope.trim()
         : appText('待同步', 'Pending sync');
-    final syncState = !managedConnected
-        ? appText('已断开', 'Disconnected')
-        : accountState?.syncState.trim().isNotEmpty == true
+    final syncState = accountState?.syncState.trim().isNotEmpty == true
         ? accountState!.syncState.trim()
         : 'idle';
-    final syncMessage = !managedConnected
-        ? appText('当前使用本地连接配置', 'Using local connection settings')
-        : accountState?.syncMessage.trim().isNotEmpty == true
+    final syncMessage = accountState?.syncMessage.trim().isNotEmpty == true
         ? accountState!.syncMessage.trim()
         : appText('尚未同步远端配置', 'Remote config not synced yet');
     final mfaEnabled =
@@ -389,7 +375,7 @@ class _SignedInAccountPanel extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                '${appText('连接来源', 'Connection Source')}: ${managedConnected ? appText('svc.plus 托管配置', 'svc.plus managed profile') : appText('本地配置', 'Local profile')}',
+                '${appText('连接来源', 'Connection Source')}: ${appText('svc.plus 托管配置', 'svc.plus managed profile')}',
                 key: const ValueKey(
                   'settings-account-summary-connection-source',
                 ),
@@ -429,20 +415,12 @@ class _SignedInAccountPanel extends StatelessWidget {
               onPressed: accountBusy ? null : () => onSync(),
               child: Text(appText('重新同步', 'Sync Again')),
             ),
-            FilledButton.tonal(
-              key: const ValueKey('settings-account-disconnect-button'),
-              onPressed: accountBusy || !managedConnected
-                  ? null
-                  : () => onDisconnect(),
-              child: Text(appText('断开', 'Disconnect')),
+            TextButton(
+              key: const ValueKey('settings-account-logout-button'),
+              onPressed: accountBusy ? null : () => onLogout(),
+              child: Text(appText('退出登录', 'Log Out')),
             ),
           ],
-        ),
-        const SizedBox(height: 8),
-        TextButton(
-          key: const ValueKey('settings-account-logout-button'),
-          onPressed: accountBusy ? null : () => onLogout(),
-          child: Text(appText('退出登录', 'Log Out')),
         ),
       ],
     );

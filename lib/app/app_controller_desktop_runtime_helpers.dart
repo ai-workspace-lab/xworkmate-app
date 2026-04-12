@@ -655,22 +655,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   Uri? resolveBridgeAcpEndpointInternal() {
-    final endpoint =
-        runtimeEnvironmentValueInternal('BRIDGE_SERVER_URL') ??
-        (() {
-          final synced =
-              settingsControllerInternal
-                  .accountSyncState
-                  ?.syncedDefaults
-                  .bridgeServerUrl
-                  .trim() ??
-              '';
-          return synced.isEmpty ? null : synced;
-        })();
-    if (endpoint == null) {
-      return null;
-    }
-    final uri = Uri.tryParse(endpoint);
+    final uri = Uri.tryParse(kManagedBridgeServerUrl);
     final scheme = uri?.scheme.trim().toLowerCase() ?? '';
     if (uri == null || !kSupportedExternalAcpEndpointSchemes.contains(scheme)) {
       return null;
@@ -734,16 +719,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   RuntimeConnectionMode modeFromHostInternal(String host) {
-    final trimmed = host.trim().toLowerCase();
-    if (isLoopbackHostInternal(trimmed)) {
-      return RuntimeConnectionMode.local;
-    }
     return RuntimeConnectionMode.remote;
-  }
-
-  bool isLoopbackHostInternal(String host) {
-    final trimmed = host.trim().toLowerCase();
-    return trimmed == '127.0.0.1' || trimmed == 'localhost';
   }
 
   AssistantExecutionTarget assistantExecutionTargetForModeInternal(

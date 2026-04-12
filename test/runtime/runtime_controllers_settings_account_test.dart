@@ -58,85 +58,59 @@ void main() {
       },
     );
 
-    test(
-      'disconnectManagedAccountBase switches the snapshot to local mode',
-      () async {
-        final storeRoot = await Directory.systemTemp.createTemp(
-          'xworkmate-account-disconnect-',
-        );
-        addTearDown(() async {
-          if (await storeRoot.exists()) {
-            await storeRoot.delete(recursive: true);
-          }
-        });
+    test('syncAccountSettings pins the managed bridge cloud entry', () async {
+      final storeRoot = await Directory.systemTemp.createTemp(
+        'xworkmate-account-managed-bridge-',
+      );
+      addTearDown(() async {
+        if (await storeRoot.exists()) {
+          await storeRoot.delete(recursive: true);
+        }
+      });
 
-        final store = SecureConfigStore(
-          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
-          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
-          supportRootPathResolver: () async => '${storeRoot.path}/support',
-          enableSecureStorage: false,
-        );
-        await store.initialize();
-        await store.saveSettingsSnapshot(
-          SettingsSnapshot.defaults().copyWith(
-            accountLocalMode: false,
-            accountBaseUrl: 'https://accounts.svc.plus',
-            accountUsername: 'review@svc.plus',
-            acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
-                .copyWith(
-                  cloudSynced: AcpBridgeServerModeConfig.defaults().cloudSynced
-                      .copyWith(
-                        accountIdentifier: 'review@svc.plus',
-                        remoteServerSummary:
-                            AcpBridgeServerModeConfig.defaults()
-                                .cloudSynced
-                                .remoteServerSummary
-                                .copyWith(endpoint: 'https://bridge.svc.plus'),
-                      ),
-                ),
-          ),
-        );
-        await store.saveAccountSyncState(
-          AccountSyncState.defaults().copyWith(
-            syncState: 'ready',
-            syncMessage: 'Bridge access synced',
-            profileScope: 'bridge',
-            lastSyncAtMs: DateTime(2026, 4, 12, 10).millisecondsSinceEpoch,
-          ),
-        );
+      final store = SecureConfigStore(
+        secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+        appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+        supportRootPathResolver: () async => '${storeRoot.path}/support',
+        enableSecureStorage: false,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          accountBaseUrl: 'https://accounts.svc.plus',
+          accountUsername: 'review@svc.plus',
+        ),
+      );
+      await store.saveAccountSessionToken('session-token');
+      await store.saveAccountManagedSecret(
+        target: kAccountManagedSecretTargetBridgeAuthToken,
+        value: 'bridge-token',
+      );
 
-        final controller = SettingsController(store);
-        addTearDown(controller.dispose);
-        await controller.initialize();
+      final controller = SettingsController(store);
+      addTearDown(controller.dispose);
+      await controller.initialize();
 
-        await controller.disconnectManagedAccountBase();
+      final result = await controller.syncAccountSettings(
+        baseUrl: 'https://accounts.svc.plus',
+      );
 
-        expect(controller.snapshot.accountLocalMode, isTrue);
-        expect(
-          controller
-              .snapshot
-              .acpBridgeServerModeConfig
-              .cloudSynced
-              .accountBaseUrl,
-          isEmpty,
-        );
-        expect(
-          controller
-              .snapshot
-              .acpBridgeServerModeConfig
-              .cloudSynced
-              .accountIdentifier,
-          isEmpty,
-        );
-        expect(controller.accountSyncState, isNotNull);
-        expect(controller.accountSyncState!.syncState, 'disconnected');
-        expect(
-          controller.accountSyncState!.syncMessage,
-          'Using local connection settings',
-        );
-        expect(controller.accountSyncState!.profileScope, 'bridge');
-      },
-    );
+      expect(result.state, 'ready');
+      expect(controller.accountSyncState, isNotNull);
+      expect(
+        controller.accountSyncState!.syncedDefaults.bridgeServerUrl,
+        kManagedBridgeServerUrl,
+      );
+      expect(
+        controller
+            .snapshot
+            .acpBridgeServerModeConfig
+            .cloudSynced
+            .remoteServerSummary
+            .endpoint,
+        kManagedBridgeServerUrl,
+      );
+    });
 
     test(
       'recovers bridge sync state from cloud-synced snapshot when support state is missing',
@@ -159,7 +133,6 @@ void main() {
         await store.initialize();
         await store.saveSettingsSnapshot(
           SettingsSnapshot.defaults().copyWith(
-            accountLocalMode: false,
             acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
                 .copyWith(
                   cloudSynced: AcpBridgeServerModeConfig.defaults().cloudSynced
@@ -202,51 +175,6 @@ void main() {
           persisted!.syncedDefaults.bridgeServerUrl,
           'https://bridge.svc.plus',
         );
-      },
-    );
-
-    test(
-      'does not recover bridge sync state from cloud-synced snapshot in local mode',
-      () async {
-        final storeRoot = await Directory.systemTemp.createTemp(
-          'xworkmate-account-local-mode-',
-        );
-        addTearDown(() async {
-          if (await storeRoot.exists()) {
-            await storeRoot.delete(recursive: true);
-          }
-        });
-
-        final store = SecureConfigStore(
-          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
-          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
-          supportRootPathResolver: () async => '${storeRoot.path}/support',
-          enableSecureStorage: false,
-        );
-        await store.initialize();
-        await store.saveSettingsSnapshot(
-          SettingsSnapshot.defaults().copyWith(
-            accountLocalMode: true,
-            acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
-                .copyWith(
-                  cloudSynced: AcpBridgeServerModeConfig.defaults().cloudSynced
-                      .copyWith(
-                        remoteServerSummary:
-                            AcpBridgeServerModeConfig.defaults()
-                                .cloudSynced
-                                .remoteServerSummary
-                                .copyWith(endpoint: 'https://bridge.svc.plus'),
-                      ),
-                ),
-          ),
-        );
-
-        final controller = SettingsController(store);
-        addTearDown(controller.dispose);
-        await controller.initialize();
-
-        expect(controller.accountSyncState, isNull);
-        expect(await store.loadAccountSyncState(), isNull);
       },
     );
   });
