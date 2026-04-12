@@ -161,6 +161,33 @@ extension AppControllerDesktopThreadSessions on AppController {
     );
   }
 
+  String assistantDisplayModelForSession(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final availableChoices = assistantModelChoicesForSessionInternal(
+      normalizedSessionKey,
+    );
+    if (availableChoices.isEmpty) {
+      return '';
+    }
+    final thread = taskThreadForSessionInternal(normalizedSessionKey);
+    final latestResolvedModel = thread?.latestResolvedRuntimeModel.trim() ?? '';
+    if (availableChoices.contains(latestResolvedModel)) {
+      return latestResolvedModel;
+    }
+    final selectedModel = thread?.assistantModelId.trim() ?? '';
+    if (availableChoices.contains(selectedModel)) {
+      return selectedModel;
+    }
+    final target = assistantExecutionTargetForSession(normalizedSessionKey);
+    final defaultModel = resolvedAssistantModelForTargetInternal(target).trim();
+    if (availableChoices.contains(defaultModel)) {
+      return defaultModel;
+    }
+    return availableChoices.length == 1 ? availableChoices.first : '';
+  }
+
   String assistantWorkspacePathForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,

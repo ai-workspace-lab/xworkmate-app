@@ -137,5 +137,117 @@ void main() {
         expect(controller.accountSyncState!.profileScope, 'bridge');
       },
     );
+
+    test(
+      'recovers bridge sync state from cloud-synced snapshot when support state is missing',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-account-recover-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            await storeRoot.delete(recursive: true);
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(
+            accountLocalMode: false,
+            acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
+                .copyWith(
+                  cloudSynced: AcpBridgeServerModeConfig.defaults().cloudSynced
+                      .copyWith(
+                        lastSyncAt: DateTime(
+                          2026,
+                          4,
+                          12,
+                          11,
+                        ).millisecondsSinceEpoch,
+                        remoteServerSummary:
+                            AcpBridgeServerModeConfig.defaults()
+                                .cloudSynced
+                                .remoteServerSummary
+                                .copyWith(endpoint: 'https://bridge.svc.plus'),
+                      ),
+                ),
+          ),
+        );
+        await store.saveSecretValueByRef(
+          kAccountManagedSecretTargetBridgeAuthToken,
+          'bridge-token',
+        );
+
+        final controller = SettingsController(store);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        expect(controller.accountSyncState, isNotNull);
+        expect(
+          controller.accountSyncState!.syncedDefaults.bridgeServerUrl,
+          'https://bridge.svc.plus',
+        );
+        expect(controller.accountSyncState!.syncState, 'ready');
+        expect(controller.accountSyncState!.profileScope, 'bridge');
+
+        final persisted = await store.loadAccountSyncState();
+        expect(persisted, isNotNull);
+        expect(
+          persisted!.syncedDefaults.bridgeServerUrl,
+          'https://bridge.svc.plus',
+        );
+      },
+    );
+
+    test(
+      'does not recover bridge sync state from cloud-synced snapshot in local mode',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-account-local-mode-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            await storeRoot.delete(recursive: true);
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(
+            accountLocalMode: true,
+            acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
+                .copyWith(
+                  cloudSynced: AcpBridgeServerModeConfig.defaults().cloudSynced
+                      .copyWith(
+                        remoteServerSummary:
+                            AcpBridgeServerModeConfig.defaults()
+                                .cloudSynced
+                                .remoteServerSummary
+                                .copyWith(endpoint: 'https://bridge.svc.plus'),
+                      ),
+                ),
+          ),
+        );
+
+        final controller = SettingsController(store);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        expect(controller.accountSyncState, isNull);
+        expect(await store.loadAccountSyncState(), isNull);
+      },
+    );
   });
 }
