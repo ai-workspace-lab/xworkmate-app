@@ -323,8 +323,7 @@ class AssistantThreadConnectionState {
   final bool gatewayTokenMissing;
   final String? lastError;
 
-  bool get isSingleAgent =>
-      executionTarget == AssistantExecutionTarget.singleAgent;
+  bool get isSingleAgent => false;
 
   bool get connected => ready;
 

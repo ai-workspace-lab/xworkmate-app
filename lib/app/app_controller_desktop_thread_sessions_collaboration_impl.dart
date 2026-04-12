@@ -346,21 +346,6 @@ List<String> assistantModelChoicesForSessionThreadSessionInternal(
   AppController controller,
   String sessionKey,
 ) {
-  final normalizedSessionKey = normalizeAssistantSessionKeyThreadInternal(
-    sessionKey,
-  );
-  final target = controller.assistantExecutionTargetForSession(
-    normalizedSessionKey,
-  );
-  if (target == AssistantExecutionTarget.singleAgent) {
-    final runtimeModel = controller.singleAgentRuntimeModelForSession(
-      normalizedSessionKey,
-    );
-    if (runtimeModel.isNotEmpty) {
-      return <String>[runtimeModel];
-    }
-    return const <String>[];
-  }
   final runtimeModels = connectedGatewayModelChoicesThreadSessionInternal(
     controller,
   );
@@ -402,9 +387,6 @@ String resolvedDefaultModelThreadSessionInternal(AppController controller) {
 
 bool canQuickConnectGatewayThreadSessionInternal(AppController controller) {
   final target = controller.currentAssistantExecutionTarget;
-  if (target == AssistantExecutionTarget.singleAgent) {
-    return false;
-  }
   final profile = controller.gatewayProfileForAssistantExecutionTargetInternal(
     target,
   );
@@ -418,12 +400,7 @@ bool canQuickConnectGatewayThreadSessionInternal(AppController controller) {
   if (profile.mode == RuntimeConnectionMode.local) {
     return true;
   }
-  final defaults = switch (target) {
-    AssistantExecutionTarget.singleAgent => GatewayConnectionProfile.emptySlot(
-      index: kGatewayRemoteProfileIndex,
-    ),
-    AssistantExecutionTarget.gateway => GatewayConnectionProfile.defaults(),
-  };
+  final defaults = GatewayConnectionProfile.defaults();
   return controller.hasStoredGatewayCredential ||
       host != defaults.host ||
       profile.port != defaults.port ||

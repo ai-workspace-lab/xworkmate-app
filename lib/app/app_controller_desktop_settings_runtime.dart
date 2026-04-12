@@ -283,13 +283,12 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     String tokenOverride = '',
     String passwordOverride = '',
   }) async {
-    if (executionTarget == AssistantExecutionTarget.singleAgent ||
-        profile.mode == RuntimeConnectionMode.unconfigured) {
+    if (profile.mode == RuntimeConnectionMode.unconfigured) {
       return (
         state: 'inactive',
         message: appText(
-          '当前模式使用单机智能体，不建立 OpenClaw Gateway 会话。',
-          'The current mode uses Single Agent and does not open an OpenClaw Gateway session.',
+          '当前未配置可用 Gateway 连接。',
+          'No active gateway connection is configured.',
         ),
         endpoint: '',
       );
@@ -408,8 +407,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       }
 
       await refreshAcpCapabilitiesInternal(forceRefresh: true);
-      await refreshSingleAgentCapabilitiesInternal(forceRefresh: true);
-
       await runtimeCoordinatorInternal.configureCodexForGateway(
         gatewayUrl: gatewayUrl,
         apiKey: apiKey,
@@ -527,7 +524,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
         settings.launchAtLogin,
       );
       registerCodexExternalProviderInternal();
-      await refreshSingleAgentCapabilitiesInternal();
       await refreshAcpCapabilitiesInternal(persistMountTargets: true);
       if (disposedInternal) {
         return;
@@ -550,9 +546,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       await ensureActiveAssistantThreadInternal();
       await ensureDesktopTaskThreadBindingInternal(currentSessionKey);
       unawaited(startupRefreshSharedSingleAgentLocalSkillsCacheInternal());
-      if (isSingleAgentMode) {
-        await refreshSingleAgentSkillsForSession(currentSessionKey);
-      }
       runtimeEventsSubscriptionInternal = runtimeCoordinatorInternal
           .gateway
           .events
@@ -561,7 +554,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
         startupTarget,
       );
       final shouldAutoConnect =
-          startupTarget != AssistantExecutionTarget.singleAgent &&
           startupProfile != null &&
           startupProfile.useSetupCode &&
           startupProfile.setupCode.trim().isNotEmpty;
@@ -789,7 +781,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     if (previous.codeAgentRuntimeMode != current.codeAgentRuntimeMode) {
       registerCodexExternalProviderInternal();
     }
-    unawaited(refreshSingleAgentCapabilitiesInternal().catchError((_) {}));
     if (previous.linuxDesktop.toJson().toString() !=
             current.linuxDesktop.toJson().toString() ||
         previous.launchAtLogin != current.launchAtLogin) {
@@ -806,19 +797,11 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       if (disposedInternal) {
         return;
       }
-      if (assistantExecutionTargetForSession(currentSessionKey) ==
-          AssistantExecutionTarget.singleAgent) {
-        await refreshSingleAgentSkillsForSession(currentSessionKey);
-      }
     }
     if (previous.workspacePath != current.workspacePath) {
       await ensureDesktopTaskThreadBindingInternal(currentSessionKey);
       if (disposedInternal) {
         return;
-      }
-      if (assistantExecutionTargetForSession(currentSessionKey) ==
-          AssistantExecutionTarget.singleAgent) {
-        await refreshSingleAgentSkillsForSession(currentSessionKey);
       }
     }
     if (refreshAfterSave) {
@@ -855,9 +838,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       sessionKey: sessionKey,
       persistDefaultSelection: false,
     );
-    if (target == AssistantExecutionTarget.singleAgent) {
-      await refreshSingleAgentSkillsForSession(sessionKey);
-    }
     recomputeTasksInternal();
     notifyIfActiveInternal();
   }
