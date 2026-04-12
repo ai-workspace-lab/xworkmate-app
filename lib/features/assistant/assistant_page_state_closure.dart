@@ -219,15 +219,6 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                         controller.currentSessionKey,
                         modelId,
                       ),
-                  onOpenGateway: AssistantPageStateActionsInternal(
-                    this,
-                  ).openGatewaySettingsInternal,
-                  onOpenAiGatewaySettings: AssistantPageStateActionsInternal(
-                    this,
-                  ).openAiGatewaySettingsInternal,
-                  onReconnectGateway: AssistantPageStateActionsInternal(
-                    this,
-                  ).connectFromSavedSettingsOrShowDialogInternal,
                   onPickAttachments: AssistantPageStateActionsInternal(
                     this,
                   ).pickAttachmentsInternal,
