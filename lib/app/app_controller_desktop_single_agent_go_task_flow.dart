@@ -57,9 +57,6 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
         sessionKey,
       );
       final selection = controller.singleAgentProviderForSession(sessionKey);
-      final effectiveProvider =
-          controller.resolvedSingleAgentProviderInternal(selection) ??
-          selection;
       final preflightWorkingDirectory = controller
           .resolveSingleAgentWorkingDirectoryForSessionInternal(sessionKey);
       if (preflightWorkingDirectory == null ||
@@ -79,8 +76,50 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
         );
         throw error;
       }
+      if (controller.resolveExternalAcpEndpointForTargetInternal(
+            AssistantExecutionTarget.singleAgent,
+          ) ==
+          null) {
+        controller.upsertTaskThreadInternal(
+          sessionKey,
+          lifecycleStatus: 'ready',
+          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          lastResultCode: 'error',
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        );
+        controller.appendAssistantThreadMessageInternal(
+          sessionKey,
+          assistantErrorMessageSingleAgentDesktopInternal(
+            controller,
+            appText(
+              'Bridge ACP 入口当前不可用。',
+              'The bridge ACP entrypoint is currently unavailable.',
+            ),
+          ),
+        );
+        return;
+      }
+      final routingResolution = await controller.goTaskServiceClientInternal
+          .resolveExternalAcpRouting(
+            taskPrompt: message,
+            workingDirectory: preflightWorkingDirectory,
+            routing: routing,
+          );
+      final resolvedProvider = SingleAgentProviderCopy.fromJsonValue(
+        routingResolution.resolvedProviderId,
+      );
+      final effectiveProvider = !resolvedProvider.isUnspecified
+          ? resolvedProvider
+          : controller.advertisedSingleAgentProviderInternal(selection) ??
+                selection;
       final unavailableReason =
-          controller.singleAgentShouldSuggestAcpSwitchForSession(sessionKey)
+          routingResolution.unavailable
+          ? singleAgentUnavailableLabelDesktopInternal(
+              controller,
+              sessionKey,
+              routingResolution.unavailableMessage,
+            )
+          : controller.singleAgentShouldSuggestAcpSwitchForSession(sessionKey)
           ? singleAgentUnavailableLabelDesktopInternal(
               controller,
               sessionKey,
@@ -94,14 +133,6 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
                 'Bridge 当前没有同步到可用 Provider。',
                 'The bridge does not currently have any synced providers.',
               ),
-            )
-          : controller.resolveExternalAcpEndpointForTargetInternal(
-                  AssistantExecutionTarget.singleAgent,
-                ) ==
-                null
-          ? appText(
-              'Bridge ACP 入口当前不可用。',
-              'The bridge ACP entrypoint is currently unavailable.',
             )
           : null;
       if (unavailableReason != null) {

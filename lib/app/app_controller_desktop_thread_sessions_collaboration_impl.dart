@@ -79,7 +79,6 @@ Future<void> refreshMultiAgentMountsThreadSessionInternal(
   var nextConfig = await controller.multiAgentMountManagerInternal.reconcile(
     config: effectiveConfig,
     aiGatewayUrl: controller.aiGatewayUrl,
-    configuredCodexCliPath: controller.configuredCodexCliPath,
   );
   if (nextConfig.autoSync != currentConfig.autoSync) {
     nextConfig = nextConfig.copyWith(autoSync: currentConfig.autoSync);
@@ -354,12 +353,6 @@ List<String> assistantModelChoicesForSessionThreadSessionInternal(
     normalizedSessionKey,
   );
   if (target == AssistantExecutionTarget.singleAgent) {
-    final singleAgentUsesAiGatewayFallback =
-        !controller.hasAnyAvailableSingleAgentProvider &&
-        controller.canUseAiGatewayConversation;
-    if (singleAgentUsesAiGatewayFallback) {
-      return controller.aiGatewayConversationModelChoices;
-    }
     final runtimeModel = controller.singleAgentRuntimeModelForSession(
       normalizedSessionKey,
     );

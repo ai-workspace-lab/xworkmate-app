@@ -10,7 +10,6 @@ import 'package:xworkmate/runtime/desktop_platform_service.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
-import 'package:xworkmate/runtime/single_agent_capabilities.dart';
 import 'package:xworkmate/runtime/skill_directory_access.dart';
 
 void main() {
@@ -49,7 +48,63 @@ void main() {
         reason:
             'app-side runtime coordination should not own provider auth side-channels',
       );
+      expect(
+        source.contains('configuredCodexCliPath'),
+        isFalse,
+        reason:
+            'runtime coordination should not pass configured Codex CLI paths into runtime flows',
+      );
+      expect(
+        source.contains('resolvedCodexCliPath'),
+        isFalse,
+        reason:
+            'runtime coordination should not retain detected Codex CLI paths',
+      );
     }
+
+    final settingsSnapshot = File('lib/runtime/runtime_models_settings_snapshot.dart')
+        .readAsStringSync();
+    expect(
+      settingsSnapshot.contains('providerSyncDefinitions'),
+      isFalse,
+      reason:
+          'settings snapshots should not persist provider catalog mirror data',
+    );
+    expect(
+      settingsSnapshot.contains('codexCliPath'),
+      isFalse,
+      reason: 'settings snapshots should not persist app-side Codex CLI paths',
+    );
+
+    final accountModels = File('lib/runtime/runtime_models_account.dart')
+        .readAsStringSync();
+    expect(
+      accountModels.contains('acpBridgeServerProfiles'),
+      isFalse,
+      reason:
+          'account advanced overrides should not mirror bridge provider catalogs',
+    );
+
+    final orchestrator = File('lib/runtime/code_agent_node_orchestrator.dart')
+        .readAsStringSync();
+    expect(
+      orchestrator.contains('configuredCodexCliPath'),
+      isFalse,
+      reason:
+          'node metadata should not expose configured Codex CLI paths anymore',
+    );
+    expect(
+      orchestrator.contains('resolvedCodexCliPath'),
+      isFalse,
+      reason:
+          'node metadata should not expose detected Codex CLI paths anymore',
+    );
+    expect(
+      orchestrator.contains('binaryConfigured'),
+      isFalse,
+      reason:
+          'node metadata should not derive binaryConfigured from local CLI detection',
+    );
   });
 
   test(
@@ -123,20 +178,14 @@ void main() {
         controller.dispose();
         await server.close(force: true);
         if (root.existsSync()) {
-          await root.delete(recursive: true);
+          try {
+            await root.delete(recursive: true);
+          } catch (_) {}
         }
       });
 
-      final endpoint = 'http://${server.address.address}:${server.port}';
-      final nextSettings = controller.settings.copyWith(
-        providerSyncDefinitions: <ExternalAcpEndpointProfile>[
-          ExternalAcpEndpointProfile.defaultsForProvider(
-            SingleAgentProvider.codex,
-          ).copyWith(endpoint: endpoint),
-        ],
-      );
-      controller.settingsController.snapshotInternal = nextSettings;
-      controller.lastObservedSettingsSnapshotInternal = nextSettings;
+      controller.settingsController.snapshotInternal = controller.settings;
+      controller.lastObservedSettingsSnapshotInternal = controller.settings;
 
       const sessionKey = 'draft:runtime-cleanup';
       controller.initializeAssistantThreadContext(
@@ -204,7 +253,9 @@ void main() {
       addTearDown(() async {
         controller.dispose();
         if (root.existsSync()) {
-          await root.delete(recursive: true);
+          try {
+            await root.delete(recursive: true);
+          } catch (_) {}
         }
       });
 
@@ -243,14 +294,6 @@ void _seedBridgeProviders(
   List<SingleAgentProvider> providers,
 ) {
   controller.bridgeAdvertisedProvidersInternal = providers;
-  controller.singleAgentCapabilitiesByProviderInternal = {
-    for (final provider in providers)
-      provider: SingleAgentCapabilities(
-        available: true,
-        supportedProviders: <SingleAgentProvider>[provider],
-        endpoint: 'bridge',
-      ),
-  };
 }
 
 class _FakeSkillDirectoryAccessService implements SkillDirectoryAccessService {

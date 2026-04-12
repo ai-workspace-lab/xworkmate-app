@@ -526,7 +526,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       await desktopPlatformServiceInternal.setLaunchAtLogin(
         settings.launchAtLogin,
       );
-      await refreshResolvedCodexCliPathInternal();
       registerCodexExternalProviderInternal();
       await refreshSingleAgentCapabilitiesInternal();
       await refreshAcpCapabilitiesInternal(persistMountTargets: true);
@@ -787,9 +786,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     if (disposedInternal) {
       return;
     }
-    if (previous.codexCliPath != current.codexCliPath ||
-        previous.codeAgentRuntimeMode != current.codeAgentRuntimeMode) {
-      await refreshResolvedCodexCliPathInternal();
+    if (previous.codeAgentRuntimeMode != current.codeAgentRuntimeMode) {
       registerCodexExternalProviderInternal();
     }
     unawaited(refreshSingleAgentCapabilitiesInternal().catchError((_) {}));

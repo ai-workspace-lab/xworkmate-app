@@ -10,7 +10,6 @@ import 'package:xworkmate/runtime/desktop_platform_service.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
-import 'package:xworkmate/runtime/single_agent_capabilities.dart';
 import 'package:xworkmate/runtime/skill_directory_access.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
@@ -118,14 +117,6 @@ void _seedBridgeProviders(
   List<SingleAgentProvider> providers,
 ) {
   controller.bridgeAdvertisedProvidersInternal = providers;
-  controller.singleAgentCapabilitiesByProviderInternal = {
-    for (final provider in providers)
-      provider: SingleAgentCapabilities(
-        available: true,
-        supportedProviders: <SingleAgentProvider>[provider],
-        endpoint: 'bridge',
-      ),
-  };
 }
 
 class _GoldenSkillDirectoryAccessService

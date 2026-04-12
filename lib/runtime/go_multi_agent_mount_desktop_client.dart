@@ -16,7 +16,6 @@ class GoMultiAgentMountDesktopClient implements MultiAgentMountResolver {
   Future<MultiAgentConfig?> reconcile({
     required MultiAgentConfig config,
     required String aiGatewayUrl,
-    String configuredCodexCliPath = '',
     required String codexHome,
     required String opencodeHome,
     required ArisMountProbe arisProbe,
@@ -32,7 +31,6 @@ class GoMultiAgentMountDesktopClient implements MultiAgentMountResolver {
               .toList(growable: false),
         },
         'aiGatewayUrl': aiGatewayUrl.trim(),
-        'configuredCodexCliPath': configuredCodexCliPath.trim(),
         'codexHome': codexHome.trim(),
         'opencodeHome': opencodeHome.trim(),
         'aris': arisProbe.toJson(),

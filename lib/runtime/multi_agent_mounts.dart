@@ -52,12 +52,10 @@ class MultiAgentMountManager {
   Future<MultiAgentConfig> reconcile({
     required MultiAgentConfig config,
     required String aiGatewayUrl,
-    String configuredCodexCliPath = '',
   }) async {
     final resolved = await _resolver?.reconcile(
       config: config,
       aiGatewayUrl: aiGatewayUrl,
-      configuredCodexCliPath: configuredCodexCliPath,
       codexHome: _codexConfigBridge.codexHome,
       opencodeHome: _opencodeConfigBridge.opencodeHome,
       arisProbe: await _buildArisProbe(),
@@ -68,7 +66,6 @@ class MultiAgentMountManager {
     return _reconcileLocally(
       config: config,
       aiGatewayUrl: aiGatewayUrl,
-      configuredCodexCliPath: configuredCodexCliPath,
     );
   }
 
@@ -94,7 +91,6 @@ class MultiAgentMountManager {
   Future<MultiAgentConfig> _reconcileLocally({
     required MultiAgentConfig config,
     required String aiGatewayUrl,
-    String configuredCodexCliPath = '',
   }) async {
     final states = <ManagedMountTargetState>[];
     for (final adapter in _adapters) {
@@ -103,7 +99,6 @@ class MultiAgentMountManager {
           await adapter.reconcile(
             config: config,
             aiGatewayUrl: aiGatewayUrl,
-            configuredCodexCliPath: configuredCodexCliPath,
           ),
         );
       } catch (error) {
@@ -115,9 +110,7 @@ class MultiAgentMountManager {
             supportsMcp: adapter.supportsMcp,
             supportsAiGatewayInjection: adapter.supportsAiGatewayInjection,
           ).copyWith(
-            available: await adapter.isInstalled(
-              configuredCodexCliPath: configuredCodexCliPath,
-            ),
+            available: await adapter.isInstalled(),
             discoveryState: 'error',
             syncState: 'error',
             detail: error.toString(),
@@ -150,12 +143,11 @@ abstract class CliMountAdapter {
   bool get supportsMcp;
   bool get supportsAiGatewayInjection;
 
-  Future<bool> isInstalled({String configuredCodexCliPath = ''});
+  Future<bool> isInstalled();
 
   Future<ManagedMountTargetState> reconcile({
     required MultiAgentConfig config,
     required String aiGatewayUrl,
-    String configuredCodexCliPath = '',
   });
 
   Future<String> _runCommand(List<String> command) async {
@@ -186,15 +178,6 @@ abstract class CliMountAdapter {
         .where((item) => !item.startsWith('│'))
         .where((item) => !item.startsWith('└'))
         .length;
-  }
-
-  Future<bool> _binaryExists(String command) async {
-    final check = await Process.run(
-      Platform.isWindows ? 'where' : 'which',
-      <String>[command],
-      runInShell: true,
-    );
-    return check.exitCode == 0 && '${check.stdout}'.trim().isNotEmpty;
   }
 
   int countMcpTomlSections(String content) {
@@ -230,7 +213,7 @@ class ArisMountAdapter extends CliMountAdapter {
   bool get supportsAiGatewayInjection => false;
 
   @override
-  Future<bool> isInstalled({String configuredCodexCliPath = ''}) async {
+  Future<bool> isInstalled() async {
     try {
       await _bundleRepository.loadManifest();
       return true;
@@ -243,7 +226,6 @@ class ArisMountAdapter extends CliMountAdapter {
   Future<ManagedMountTargetState> reconcile({
     required MultiAgentConfig config,
     required String aiGatewayUrl,
-    String configuredCodexCliPath = '',
   }) async {
     try {
       final bundle = await _bundleRepository.ensureReady();
@@ -313,23 +295,14 @@ class CodexMountAdapter extends CliMountAdapter {
   bool get supportsAiGatewayInjection => true;
 
   @override
-  Future<bool> isInstalled({String configuredCodexCliPath = ''}) async {
-    final configuredPath = configuredCodexCliPath.trim();
-    if (configuredPath.isNotEmpty && await File(configuredPath).exists()) {
-      return true;
-    }
-    return _binaryExists('codex');
-  }
+  Future<bool> isInstalled() async => false;
 
   @override
   Future<ManagedMountTargetState> reconcile({
     required MultiAgentConfig config,
     required String aiGatewayUrl,
-    String configuredCodexCliPath = '',
   }) async {
-    final available = await isInstalled(
-      configuredCodexCliPath: configuredCodexCliPath,
-    );
+    final available = await isInstalled();
     final configFile = File('${_bridge.codexHome}/config.toml');
     final content = await configFile.exists()
         ? await configFile.readAsString()
@@ -391,14 +364,12 @@ class ClaudeMountAdapter extends CliMountAdapter {
   bool get supportsAiGatewayInjection => true;
 
   @override
-  Future<bool> isInstalled({String configuredCodexCliPath = ''}) =>
-      _binaryExists('claude');
+  Future<bool> isInstalled() async => false;
 
   @override
   Future<ManagedMountTargetState> reconcile({
     required MultiAgentConfig config,
     required String aiGatewayUrl,
-    String configuredCodexCliPath = '',
   }) async {
     final available = await isInstalled();
     final discoveredMcpCount = available
@@ -441,14 +412,12 @@ class GeminiMountAdapter extends CliMountAdapter {
   bool get supportsAiGatewayInjection => true;
 
   @override
-  Future<bool> isInstalled({String configuredCodexCliPath = ''}) =>
-      _binaryExists('gemini');
+  Future<bool> isInstalled() async => false;
 
   @override
   Future<ManagedMountTargetState> reconcile({
     required MultiAgentConfig config,
     required String aiGatewayUrl,
-    String configuredCodexCliPath = '',
   }) async {
     final available = await isInstalled();
     final discoveredMcpCount = available
@@ -495,14 +464,12 @@ class OpencodeMountAdapter extends CliMountAdapter {
   bool get supportsAiGatewayInjection => true;
 
   @override
-  Future<bool> isInstalled({String configuredCodexCliPath = ''}) =>
-      _binaryExists('opencode');
+  Future<bool> isInstalled() async => false;
 
   @override
   Future<ManagedMountTargetState> reconcile({
     required MultiAgentConfig config,
     required String aiGatewayUrl,
-    String configuredCodexCliPath = '',
   }) async {
     final available = await isInstalled();
     final content = await _bridge.readConfig();
@@ -562,14 +529,12 @@ class OpenClawMountAdapter extends CliMountAdapter {
   bool get supportsAiGatewayInjection => true;
 
   @override
-  Future<bool> isInstalled({String configuredCodexCliPath = ''}) =>
-      _binaryExists('openclaw');
+  Future<bool> isInstalled() async => false;
 
   @override
   Future<ManagedMountTargetState> reconcile({
     required MultiAgentConfig config,
     required String aiGatewayUrl,
-    String configuredCodexCliPath = '',
   }) async {
     final available = await isInstalled();
     final configFile = File(

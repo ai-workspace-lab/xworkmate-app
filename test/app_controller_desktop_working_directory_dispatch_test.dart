@@ -9,7 +9,6 @@ import 'package:xworkmate/app/app_controller_desktop_workspace_execution.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
-import 'package:xworkmate/runtime/single_agent_capabilities.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -94,9 +93,9 @@ void main() {
         );
         expect(
           client.resolveExternalAcpRoutingCallCount,
-          0,
+          2,
           reason:
-              'single-agent turns should go straight to session.start/session.message without app-side routing preflight',
+              'single-agent turns should preflight through bridge routing.resolve once per turn before dispatch',
         );
       },
     );
@@ -218,14 +217,6 @@ void _seedBridgeProviders(
   List<SingleAgentProvider> providers,
 ) {
   controller.bridgeAdvertisedProvidersInternal = providers;
-  controller.singleAgentCapabilitiesByProviderInternal = {
-    for (final provider in providers)
-      provider: SingleAgentCapabilities(
-        available: true,
-        supportedProviders: <SingleAgentProvider>[provider],
-        endpoint: 'bridge',
-      ),
-  };
 }
 
 class _CapturingGoTaskServiceClient implements GoTaskServiceClient {
