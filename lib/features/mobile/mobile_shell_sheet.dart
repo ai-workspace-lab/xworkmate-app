@@ -245,8 +245,8 @@ class MobileSafeSheetInternal extends StatelessWidget {
                     if (!controller.runtime.isConnected)
                       Text(
                         appText(
-                          '连接 Gateway 后加载待审批设备与已配对设备。',
-                          'Connect the gateway to load pending and paired devices.',
+                          '恢复 xworkmate-bridge 连接后加载待审批设备与已配对设备。',
+                          'Pending and paired devices load again after xworkmate-bridge reconnects.',
                         ),
                         style: theme.textTheme.bodyMedium,
                       )
@@ -279,8 +279,8 @@ class MobileSafeSheetInternal extends StatelessWidget {
                     if (!controller.runtime.isConnected)
                       Text(
                         appText(
-                          '连接 Gateway 后可查看 paired device，并在移动端直接吊销。',
-                          'Connect the gateway to view paired devices and revoke them from mobile.',
+                          '恢复 xworkmate-bridge 连接后可查看 paired device，并在移动端直接吊销。',
+                          'Paired devices are visible again after xworkmate-bridge reconnects, and can be revoked from mobile.',
                         ),
                         style: theme.textTheme.bodyMedium,
                       )

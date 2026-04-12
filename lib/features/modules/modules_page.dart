@@ -259,8 +259,8 @@ class _NodesPanel extends StatelessWidget {
               controller.connection.status == RuntimeConnectionStatus.connected
                   ? appText('暂时还没有上报在线实例。', 'No live instances reported yet.')
                   : appText(
-                      '连接 Gateway 后可加载实例与在线状态。',
-                      'Connect a gateway to load instances / presence.',
+                      '恢复 xworkmate-bridge 连接后可加载实例与在线状态。',
+                      'Instances and presence return after xworkmate-bridge reconnects.',
                     ),
             ),
           )
@@ -366,8 +366,8 @@ class _AgentsPanel extends StatelessWidget {
                       'No agents reported by the gateway.',
                     )
                   : appText(
-                      '连接 Gateway 后可加载代理。',
-                      'Connect a gateway to load agents.',
+                      '恢复 xworkmate-bridge 连接后可加载代理。',
+                      'Agents return after xworkmate-bridge reconnects.',
                     ),
             ),
           );
@@ -539,8 +539,8 @@ class _SkillsPanel extends StatelessWidget {
                       'No skills loaded for the active gateway / agent.',
                     )
                   : appText(
-                      '连接 Gateway 后可加载技能。',
-                      'Connect a gateway to load skills.',
+                      '恢复 xworkmate-bridge 连接后可加载技能。',
+                      'Skills return after xworkmate-bridge reconnects.',
                     ),
             ),
           )

@@ -76,32 +76,6 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
         );
         throw error;
       }
-      final preflightUnavailableReason =
-          controller.singleAgentShouldSuggestAcpSwitchForSession(sessionKey) ||
-              controller.singleAgentNeedsBridgeProviderForSession(sessionKey)
-          ? singleAgentUnavailableLabelDesktopInternal(
-              controller,
-              sessionKey,
-              null,
-            )
-          : null;
-      if (preflightUnavailableReason != null) {
-        controller.upsertTaskThreadInternal(
-          sessionKey,
-          lifecycleStatus: 'ready',
-          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          lastResultCode: 'error',
-          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        );
-        controller.appendAssistantThreadMessageInternal(
-          sessionKey,
-          assistantErrorMessageSingleAgentDesktopInternal(
-            controller,
-            preflightUnavailableReason,
-          ),
-        );
-        return;
-      }
       if (controller.resolveExternalAcpEndpointForTargetInternal(
             AssistantExecutionTarget.singleAgent,
           ) ==
@@ -148,19 +122,13 @@ Future<void> sendSingleAgentMessageDesktopGoTaskFlowInternal(
               sessionKey,
               routingResolution.unavailableMessage,
             )
-          : controller.singleAgentShouldSuggestAcpSwitchForSession(sessionKey)
-          ? singleAgentUnavailableLabelDesktopInternal(
-              controller,
-              sessionKey,
-              null,
-            )
-          : controller.singleAgentNeedsBridgeProviderForSession(sessionKey)
+          : resolvedProviderId.isEmpty && effectiveProvider.isUnspecified
           ? singleAgentUnavailableLabelDesktopInternal(
               controller,
               sessionKey,
               appText(
-                'Bridge 当前没有同步到可用 Provider。',
-                'The bridge does not currently have any synced providers.',
+                'Bridge 当前没有广告可用 Provider。',
+                'The bridge is not advertising any available providers.',
               ),
             )
           : null;

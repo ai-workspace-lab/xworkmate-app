@@ -92,7 +92,7 @@ class MobileWorkspaceLauncherInternal extends StatelessWidget {
             ),
             primaryLabel: connection.status == RuntimeConnectionStatus.connected
                 ? appText('查看连接', 'Connection')
-                : appText('连接 Gateway', 'Connect Gateway'),
+                : appText('连接 Bridge', 'Connect Bridge'),
             secondaryLabel: appText('返回助手', 'Open Assistant'),
             onPrimaryPressed: onOpenGatewayConnect,
             onSecondaryPressed: () =>

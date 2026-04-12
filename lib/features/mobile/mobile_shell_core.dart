@@ -203,8 +203,8 @@ class MobileShellStateInternal extends State<MobileShell> {
         SnackBar(
           content: Text(
             appText(
-              '已写入配置码并开始连接 Gateway。',
-              'Setup code applied and Gateway connection started.',
+              '已写入配置码并开始连接 xworkmate-bridge。',
+              'Setup code applied and xworkmate-bridge connection started.',
             ),
           ),
         ),

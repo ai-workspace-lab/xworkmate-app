@@ -170,13 +170,7 @@ void main() {
   });
 
   group('resolveGatewayThreadConnectionStateInternal', () {
-    test('uses the thread target profile as the only address source', () {
-      final targetProfile = GatewayConnectionProfile.defaults().copyWith(
-        mode: RuntimeConnectionMode.remote,
-        host: 'bridge.example.internal',
-        port: 443,
-        tls: true,
-      );
+    test('uses the current bridge connection address as the only address source', () {
       final state = resolveGatewayThreadConnectionStateInternal(
         target: AssistantExecutionTarget.gateway,
         connection:
@@ -184,9 +178,8 @@ void main() {
               mode: RuntimeConnectionMode.remote,
             ).copyWith(
               status: RuntimeConnectionStatus.connected,
-              remoteAddress: 'legacy-loopback:18789',
+              remoteAddress: 'bridge.example.internal:443',
             ),
-        targetProfile: targetProfile,
       );
 
       expect(state.status, RuntimeConnectionStatus.connected);
@@ -194,13 +187,7 @@ void main() {
       expect(state.ready, isTrue);
     });
 
-    test('marks mismatched local snapshot as offline for remote threads', () {
-      final targetProfile = GatewayConnectionProfile.defaults().copyWith(
-        mode: RuntimeConnectionMode.remote,
-        host: 'bridge.example.internal',
-        port: 443,
-        tls: true,
-      );
+    test('uses current bridge snapshot even when the connection was established locally before', () {
       final state = resolveGatewayThreadConnectionStateInternal(
         target: AssistantExecutionTarget.gateway,
         connection:
@@ -210,19 +197,17 @@ void main() {
               status: RuntimeConnectionStatus.connected,
               remoteAddress: 'legacy-loopback:18789',
             ),
-        targetProfile: targetProfile,
       );
 
-      expect(state.status, RuntimeConnectionStatus.offline);
-      expect(state.detailLabel, 'bridge.example.internal:443');
-      expect(state.ready, isFalse);
-      expect(state.lastError, isNull);
+      expect(state.status, RuntimeConnectionStatus.connected);
+      expect(state.detailLabel, 'legacy-loopback:18789');
+      expect(state.ready, isTrue);
     });
   });
 
   group('assistantConnectionStateForSession', () {
     test(
-      'uses target profile address instead of connection snapshot address',
+      'uses bridge connection address instead of thread target profile address',
       () {
         final gateway = _FakeGatewayRuntime(
           GatewayConnectionSnapshot.initial(
@@ -257,7 +242,7 @@ void main() {
         final state = controller.assistantConnectionStateForSession(sessionKey);
 
         expect(state.status, RuntimeConnectionStatus.connected);
-        expect(state.detailLabel, '未连接目标');
+        expect(state.detailLabel, 'legacy-loopback:18789');
         expect(state.ready, isTrue);
       },
     );

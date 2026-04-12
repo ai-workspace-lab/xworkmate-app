@@ -215,7 +215,7 @@ void main() {
       );
       expect(
         controller.singleAgentResolvedProviderForSession(sessionKey),
-        SingleAgentProvider.codex,
+        isNull,
       );
 
       await controller.refreshSingleAgentSkillsForSession(sessionKey);
@@ -281,7 +281,7 @@ void main() {
         controller.singleAgentResolvedProviderForSession(
           'draft:bridge-default',
         ),
-        SingleAgentProvider.codex,
+        isNull,
       );
 
       final thread = controller.taskThreadForSessionInternal(
@@ -523,8 +523,4 @@ class _FakeGoTaskServiceClient implements GoTaskServiceClient {
     );
   }
 
-  @override
-  Future<void> syncExternalProviders(
-    List<ExternalCodeAgentAcpSyncedProvider> providers,
-  ) async {}
 }

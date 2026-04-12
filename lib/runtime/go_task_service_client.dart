@@ -76,32 +76,6 @@ class ExternalCodeAgentAcpRoutingResolution {
       raw['unavailableMessage']?.toString().trim() ?? '';
 }
 
-class ExternalCodeAgentAcpSyncedProvider {
-  const ExternalCodeAgentAcpSyncedProvider({
-    required this.providerId,
-    required this.label,
-    required this.endpoint,
-    required this.authorizationHeader,
-    required this.enabled,
-  });
-
-  final String providerId;
-  final String label;
-  final String endpoint;
-  final String authorizationHeader;
-  final bool enabled;
-
-  Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'providerId': providerId.trim(),
-      'label': label.trim(),
-      'endpoint': endpoint.trim(),
-      'authorizationHeader': authorizationHeader.trim(),
-      'enabled': enabled,
-    };
-  }
-}
-
 enum ExternalCodeAgentAcpRoutingMode { auto, explicit }
 
 class ExternalCodeAgentAcpAvailableSkill {
@@ -604,10 +578,6 @@ String? goTaskServiceGatewayEntryState({
 }
 
 abstract class ExternalCodeAgentAcpTransport {
-  Future<void> syncExternalProviders(
-    List<ExternalCodeAgentAcpSyncedProvider> providers,
-  );
-
   Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
@@ -640,10 +610,6 @@ abstract class ExternalCodeAgentAcpTransport {
 }
 
 abstract class GoTaskServiceClient {
-  Future<void> syncExternalProviders(
-    List<ExternalCodeAgentAcpSyncedProvider> providers,
-  );
-
   Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
