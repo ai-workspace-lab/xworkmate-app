@@ -280,7 +280,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     value: bridgeToken,
   );
 
-  final bridgeServerUrl = bridgeServerUrlOverride.trim().isNotEmpty
+  final resolvedBridgeServerUrl = bridgeServerUrlOverride.trim().isNotEmpty
       ? bridgeServerUrlOverride.trim()
       : controller.accountSyncStateInternal?.syncedDefaults.bridgeServerUrl
                 .trim()
@@ -294,20 +294,33 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
             .cloudSynced
             .remoteServerSummary
             .endpoint
-            .trim()
-            .isNotEmpty
-      ? controller
-            .snapshotInternal
-            .acpBridgeServerModeConfig
-            .cloudSynced
-            .remoteServerSummary
-            .endpoint
-            .trim()
-      : '';
-  final resolvedBridgeServerUrl =
-      isSupportedExternalAcpEndpoint(bridgeServerUrl)
-      ? bridgeServerUrl
-      : kCanonicalBridgeAcpEndpoint;
+            .trim();
+  if (!isSupportedExternalAcpEndpoint(resolvedBridgeServerUrl)) {
+    const result = AccountSyncResult(
+      state: 'blocked',
+      message: 'BRIDGE_SERVER_URL is unavailable',
+    );
+    await controller.storeInternal.saveAccountSyncState(
+      AccountSyncState.defaults().copyWith(
+        syncState: result.state,
+        syncMessage: result.message,
+        lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
+        lastSyncError: result.message,
+        profileScope: 'bridge',
+        tokenConfigured: const AccountTokenConfigured(
+          bridge: true,
+          vault: false,
+          apisix: false,
+        ),
+      ),
+    );
+    controller.accountStatusInternal = result.message;
+    if (!quiet) {
+      controller.accountBusyInternal = false;
+      controller.notifyListeners();
+    }
+    return result;
+  }
   await controller.storeInternal.clearAccountManagedSecret(
     target: kAccountManagedSecretTargetAIGatewayAccessToken,
   );

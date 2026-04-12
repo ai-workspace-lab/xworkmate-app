@@ -91,7 +91,7 @@ String singleAgentUnavailableLabelDesktopInternal(
             'This thread is pinned to ${selection.label}: $detail XWorkmate will not reroute to another bridge provider automatically. Switch to an available provider manually.',
           );
   }
-  if (controller.singleAgentNeedsAiGatewayConfigurationForSession(
+  if (controller.singleAgentNeedsBridgeProviderForSession(
     normalizedSessionKey,
   )) {
     return detail.isEmpty

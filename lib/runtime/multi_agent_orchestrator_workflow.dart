@@ -20,8 +20,6 @@ extension MultiAgentOrchestratorWorkflowInternal on MultiAgentOrchestrator {
     String task, {
     required FrameworkPreset preset,
     required List<String> selectedSkills,
-    required String aiGatewayBaseUrl,
-    required String aiGatewayApiKey,
   }) async {
     final stopwatch = Stopwatch()..start();
 
@@ -50,8 +48,6 @@ extension MultiAgentOrchestratorWorkflowInternal on MultiAgentOrchestrator {
             instructionBlock,
           ),
           cwd: '',
-          aiGatewayBaseUrl: aiGatewayBaseUrl,
-          aiGatewayApiKey: aiGatewayApiKey,
         );
         stopwatch.stop();
 
@@ -91,8 +87,6 @@ extension MultiAgentOrchestratorWorkflowInternal on MultiAgentOrchestrator {
     List<CollaborationAttachment> attachments, {
     required FrameworkPreset preset,
     required List<String> selectedSkills,
-    required String aiGatewayBaseUrl,
-    required String aiGatewayApiKey,
   }) async {
     final stopwatch = Stopwatch()..start();
     final tool = await resolveToolForRoleInternal(
@@ -139,8 +133,6 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
       ),
       prompt: prompt,
       cwd: workingDirectory,
-      aiGatewayBaseUrl: aiGatewayBaseUrl,
-      aiGatewayApiKey: aiGatewayApiKey,
     );
     stopwatch.stop();
 
@@ -156,8 +148,6 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
   Future<TesterResult> runTesterInternal(
     String codeOutput, {
     required FrameworkPreset preset,
-    required String aiGatewayBaseUrl,
-    required String aiGatewayApiKey,
   }) async {
     final stopwatch = Stopwatch()..start();
     final tool = await resolveToolForRoleInternal(
@@ -212,8 +202,6 @@ ${codeOutput.length > 4000 ? '${codeOutput.substring(0, 4000)}\n...[代码已截
             model: testerModel,
             prompt: prompt,
             cwd: '',
-            aiGatewayBaseUrl: aiGatewayBaseUrl,
-            aiGatewayApiKey: aiGatewayApiKey,
           );
     stopwatch.stop();
 
@@ -234,8 +222,6 @@ ${codeOutput.length > 4000 ? '${codeOutput.substring(0, 4000)}\n...[代码已截
     String feedback,
     String workingDirectory, {
     required FrameworkPreset preset,
-    required String aiGatewayBaseUrl,
-    required String aiGatewayApiKey,
   }) async {
     final stopwatch = Stopwatch()..start();
     final tool = await resolveToolForRoleInternal(
@@ -272,8 +258,6 @@ $originalCode
       ),
       prompt: prompt,
       cwd: workingDirectory,
-      aiGatewayBaseUrl: aiGatewayBaseUrl,
-      aiGatewayApiKey: aiGatewayApiKey,
     );
     stopwatch.stop();
 
@@ -292,8 +276,6 @@ $originalCode
     required String model,
     required String prompt,
     required String cwd,
-    required String aiGatewayBaseUrl,
-    required String aiGatewayApiKey,
   }) async {
     late final List<String> args;
     late final String command;
@@ -306,11 +288,7 @@ $originalCode
     switch (tool) {
       case 'claude':
         command = useOllamaLaunch ? 'ollama' : resolveCliPathInternal('claude');
-        envVars = buildCliEnvVarsInternal(
-          tool: tool,
-          aiGatewayBaseUrl: aiGatewayBaseUrl,
-          aiGatewayApiKey: aiGatewayApiKey,
-        );
+        envVars = buildCliEnvVarsInternal(tool: tool);
         if (useOllamaLaunch) {
           args = buildOllamaLaunchArgsInternal(
             tool: tool,
@@ -327,11 +305,7 @@ $originalCode
 
       case 'codex':
         command = useOllamaLaunch ? 'ollama' : resolveCliPathInternal('codex');
-        envVars = buildCliEnvVarsInternal(
-          tool: tool,
-          aiGatewayBaseUrl: aiGatewayBaseUrl,
-          aiGatewayApiKey: aiGatewayApiKey,
-        );
+        envVars = buildCliEnvVarsInternal(tool: tool);
         if (useOllamaLaunch) {
           args = buildOllamaLaunchArgsInternal(
             tool: tool,
@@ -364,11 +338,7 @@ $originalCode
 
       case 'gemini':
         command = resolveCliPathInternal('gemini');
-        envVars = buildCliEnvVarsInternal(
-          tool: tool,
-          aiGatewayBaseUrl: aiGatewayBaseUrl,
-          aiGatewayApiKey: aiGatewayApiKey,
-        );
+        envVars = buildCliEnvVarsInternal(tool: tool);
         if (model.isNotEmpty) {
           args = ['--model', model, '-p', prompt];
         } else {
@@ -380,11 +350,7 @@ $originalCode
         command = useOllamaLaunch
             ? 'ollama'
             : resolveCliPathInternal('opencode');
-        envVars = buildCliEnvVarsInternal(
-          tool: tool,
-          aiGatewayBaseUrl: aiGatewayBaseUrl,
-          aiGatewayApiKey: aiGatewayApiKey,
-        );
+        envVars = buildCliEnvVarsInternal(tool: tool);
         args = useOllamaLaunch
             ? buildOllamaLaunchArgsInternal(
                 tool: tool,
@@ -408,13 +374,7 @@ $originalCode
 
     final cliAvailable = await binaryExistsInternal(command);
     if (configInternal.usesAris && !cliAvailable) {
-      return runArisFallbackInternal(
-        role: role,
-        model: model,
-        prompt: prompt,
-        aiGatewayBaseUrl: aiGatewayBaseUrl,
-        aiGatewayApiKey: aiGatewayApiKey,
-      );
+      return runArisFallbackInternal(role: role, model: model, prompt: prompt);
     }
 
     try {
@@ -464,8 +424,6 @@ $originalCode
           role: role,
           model: model,
           prompt: prompt,
-          aiGatewayBaseUrl: aiGatewayBaseUrl,
-          aiGatewayApiKey: aiGatewayApiKey,
         );
       }
       return cliResult;
@@ -476,8 +434,6 @@ $originalCode
           role: role,
           model: model,
           prompt: prompt,
-          aiGatewayBaseUrl: aiGatewayBaseUrl,
-          aiGatewayApiKey: aiGatewayApiKey,
         );
       }
       return CliResult(output: '', error: e.toString(), exitCode: -1);
@@ -606,15 +562,11 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
     required MultiAgentRole role,
     required String model,
     required String prompt,
-    required String aiGatewayBaseUrl,
-    required String aiGatewayApiKey,
   }) async {
     if (role == MultiAgentRole.testerDoc) {
       final viaLlmChat = await runArisTesterViaLlmChatInternal(
         model: model,
         prompt: prompt,
-        aiGatewayBaseUrl: aiGatewayBaseUrl,
-        aiGatewayApiKey: aiGatewayApiKey,
       );
       if (viaLlmChat.success) {
         return viaLlmChat;
@@ -624,23 +576,17 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
       role: role,
       model: model,
       prompt: prompt,
-      aiGatewayBaseUrl: aiGatewayBaseUrl,
-      aiGatewayApiKey: aiGatewayApiKey,
     );
   }
 
   Future<CliResult> runArisTesterViaLlmChatInternal({
     required String model,
     required String prompt,
-    required String aiGatewayBaseUrl,
-    required String aiGatewayApiKey,
   }) async {
     return runOpenAiCompatiblePromptInternal(
       role: MultiAgentRole.testerDoc,
       model: model,
       prompt: prompt,
-      aiGatewayBaseUrl: aiGatewayBaseUrl,
-      aiGatewayApiKey: aiGatewayApiKey,
     );
   }
 
@@ -655,8 +601,6 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
         model: model,
         prompt: prompt,
         cwd: '',
-        aiGatewayBaseUrl: '',
-        aiGatewayApiKey: '',
       );
     }
     return CliResult(
@@ -670,21 +614,19 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
     required MultiAgentRole role,
     required String model,
     required String prompt,
-    required String aiGatewayBaseUrl,
-    required String aiGatewayApiKey,
   }) async {
     final client = httpClientFactoryInternal();
     activeHttpClientInternal = client;
     try {
       final request = await client.postUrl(
         Uri.parse(
-          '${openAiCompatibleBaseUrlInternal(aiGatewayBaseUrl: aiGatewayBaseUrl).replaceAll(RegExp(r'/$'), '')}/chat/completions',
+          '${openAiCompatibleBaseUrlInternal().replaceAll(RegExp(r'/$'), '')}/chat/completions',
         ),
       );
       request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
       request.headers.set(
         HttpHeaders.authorizationHeader,
-        'Bearer ${openAiCompatibleApiKeyInternal(aiGatewayApiKey: aiGatewayApiKey)}',
+        'Bearer ${openAiCompatibleApiKeyInternal()}',
       );
       request.add(
         utf8.encode(

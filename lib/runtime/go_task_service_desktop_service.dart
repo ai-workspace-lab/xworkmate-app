@@ -30,14 +30,10 @@ class DesktopGoTaskService implements GoTaskServiceClient {
     required String taskPrompt,
     required String workingDirectory,
     required ExternalCodeAgentAcpRoutingConfig routing,
-    String aiGatewayBaseUrl = '',
-    String aiGatewayApiKey = '',
   }) => _acpTransport.resolveExternalAcpRouting(
     taskPrompt: taskPrompt,
     workingDirectory: workingDirectory,
     routing: routing,
-    aiGatewayBaseUrl: aiGatewayBaseUrl,
-    aiGatewayApiKey: aiGatewayApiKey,
   );
 
   @override

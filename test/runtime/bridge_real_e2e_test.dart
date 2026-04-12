@@ -32,9 +32,7 @@ void main() {
     late ExternalCodeAgentAcpDesktopTransport transport;
 
     setUpAll(() async {
-      if (!runRealE2E ||
-          bridgeAuthToken.isEmpty ||
-          bridgeAcpEndpoint.isEmpty) {
+      if (!runRealE2E || bridgeAuthToken.isEmpty || bridgeAcpEndpoint.isEmpty) {
         return;
       }
       final client = GatewayAcpClient(
@@ -69,9 +67,7 @@ void main() {
     });
 
     test('loads external ACP capabilities and provider catalog', () async {
-      if (!runRealE2E ||
-          bridgeAuthToken.isEmpty ||
-          bridgeAcpEndpoint.isEmpty) {
+      if (!runRealE2E || bridgeAuthToken.isEmpty || bridgeAcpEndpoint.isEmpty) {
         return;
       }
       final capabilities = await transport.loadExternalAcpCapabilities(
@@ -350,8 +346,6 @@ GoTaskServiceRequest _buildRequest({
     selectedSkills: selectedSkills,
     inlineAttachments: const <GatewayChatAttachmentPayload>[],
     localAttachments: const <CollaborationAttachment>[],
-    aiGatewayBaseUrl: '',
-    aiGatewayApiKey: '',
     agentId: '',
     metadata: const <String, dynamic>{},
     routing: ExternalCodeAgentAcpRoutingConfig(
