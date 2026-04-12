@@ -113,7 +113,9 @@ void main() {
           supportRootPathResolver: () async => root.path,
         );
         await store.initialize();
-        final client = _CapturingGoTaskServiceClient();
+        final client = _CapturingGoTaskServiceClient(
+          advertisedProviders: const <SingleAgentProvider>[],
+        );
         final controller = AppController(
           store: store,
           goTaskServiceClient: client,
@@ -139,6 +141,79 @@ void main() {
         await controller.sendChatMessage('first turn');
 
         expect(client.requests, isEmpty);
+        expect(
+          client.resolveExternalAcpRoutingCallCount,
+          0,
+          reason:
+              'single-agent turns should stop before routing.resolve when the bridge ACP entrypoint is missing',
+        );
+      },
+    );
+
+    test(
+      'single-agent turns stop before routing when bridge has no advertised provider',
+      () async {
+        final root = await Directory.systemTemp.createTemp(
+          'xworkmate-missing-bridge-provider-',
+        );
+        final store = SecureConfigStore(
+          enableSecureStorage: false,
+          appDataRootPathResolver: () async => '${root.path}/settings.sqlite3',
+          secretRootPathResolver: () async => root.path,
+          supportRootPathResolver: () async => root.path,
+        );
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(
+            acpBridgeServerModeConfig: SettingsSnapshot.defaults()
+                .acpBridgeServerModeConfig
+                .copyWith(
+                  cloudSynced: SettingsSnapshot.defaults()
+                      .acpBridgeServerModeConfig
+                      .cloudSynced
+                      .copyWith(
+                        remoteServerSummary:
+                            const AcpBridgeServerRemoteServerSummary(
+                              endpoint: 'https://bridge.customer.example',
+                              hasAdvancedOverrides: false,
+                            ),
+                      ),
+                ),
+          ),
+        );
+        final client = _CapturingGoTaskServiceClient();
+        final controller = AppController(
+          store: store,
+          goTaskServiceClient: client,
+        );
+        addTearDown(() async {
+          controller.dispose();
+          store.dispose();
+          if (await root.exists()) {
+            await root.delete(recursive: true);
+          }
+        });
+
+        const sessionKey = 'draft:single-agent-missing-bridge-provider';
+        controller.initializeAssistantThreadContext(
+          sessionKey,
+          executionTarget: AssistantExecutionTarget.singleAgent,
+        );
+        await controller.switchSession(sessionKey);
+        _seedBridgeProviders(controller, const <SingleAgentProvider>[]);
+
+        expect(controller.currentSingleAgentNeedsBridgeProvider, isTrue);
+
+        await controller.sendChatMessage('first turn');
+
+        expect(client.requests, isEmpty);
+        expect(
+          client.resolveExternalAcpRoutingCallCount,
+          0,
+          reason:
+              'single-agent turns should not call routing.resolve when bridge provider state is already unavailable in app state',
+        );
+        expect(controller.chatMessages.last.text, 'Bridge 当前没有可用 Provider。');
       },
     );
 
@@ -220,6 +295,13 @@ void _seedBridgeProviders(
 }
 
 class _CapturingGoTaskServiceClient implements GoTaskServiceClient {
+  _CapturingGoTaskServiceClient({
+    this.advertisedProviders = const <SingleAgentProvider>[
+      SingleAgentProvider.codex,
+    ],
+  });
+
+  final List<SingleAgentProvider> advertisedProviders;
   final List<GoTaskServiceRequest> requests = <GoTaskServiceRequest>[];
   int resolveExternalAcpRoutingCallCount = 0;
 
@@ -275,10 +357,10 @@ class _CapturingGoTaskServiceClient implements GoTaskServiceClient {
     required AssistantExecutionTarget target,
     bool forceRefresh = false,
   }) async {
-    return const ExternalCodeAgentAcpCapabilities(
+    return ExternalCodeAgentAcpCapabilities(
       singleAgent: true,
       multiAgent: true,
-      providerCatalog: <SingleAgentProvider>[SingleAgentProvider.codex],
+      providerCatalog: advertisedProviders,
       gatewayProviders: <Map<String, dynamic>>[],
       raw: <String, dynamic>{},
     );
