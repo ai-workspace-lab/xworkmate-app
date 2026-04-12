@@ -474,12 +474,10 @@ class SettingsSnapshot {
     if (resolved.isUnspecified) {
       return SingleAgentProvider.unspecified;
     }
-    if (kKnownSingleAgentProviders.any(
-      (item) => item.providerId == resolved.providerId,
-    )) {
+    if (isBridgeOwnedSingleAgentProviderId(resolved.providerId)) {
       return resolved;
     }
-    return resolved;
+    return SingleAgentProvider.unspecified;
   }
 
   SettingsSnapshot copyWithProviderSyncDefinitionForProvider(

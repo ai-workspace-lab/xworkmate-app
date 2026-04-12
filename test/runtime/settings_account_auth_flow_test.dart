@@ -135,7 +135,7 @@ void main() {
     });
 
     test(
-      'login still syncs bridge access when sync data omits bridge server',
+      'login blocks bridge sync when sync data omits BRIDGE_SERVER_URL',
       () async {
         final root = await Directory.systemTemp.createTemp(
           'xworkmate-account-auth-missing-bridge-server-',
@@ -179,10 +179,10 @@ void main() {
           controller.accountStatus,
           'Signed in as review@customer.example',
         );
-        expect(controller.accountSyncState?.syncState, 'ready');
+        expect(controller.accountSyncState?.syncState, 'blocked');
         expect(
           controller.accountSyncState?.syncMessage,
-          'Bridge access synced',
+          'BRIDGE_SERVER_URL is unavailable',
         );
         expect(
           controller
@@ -191,7 +191,7 @@ void main() {
               .cloudSynced
               .remoteServerSummary
               .endpoint,
-          kCanonicalBridgeAcpEndpoint,
+          isEmpty,
         );
         expect(
           await store.loadAccountManagedSecret(

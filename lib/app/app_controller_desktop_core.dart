@@ -124,7 +124,6 @@ class AppController extends ChangeNotifier {
     SkillDirectoryAccessService? skillDirectoryAccessService,
     AccountRuntimeClient Function(String baseUrl)? accountClientFactory,
     List<String>? singleAgentSharedSkillScanRootOverrides,
-    List<SingleAgentProvider>? availableSingleAgentProvidersOverride,
     ArisBundleRepository? arisBundleRepository,
     GoTaskServiceClient? goTaskServiceClient,
     MultiAgentMountManager? multiAgentMountManager,
@@ -197,8 +196,6 @@ class AppController extends ChangeNotifier {
       endpointResolver: resolveGatewayAcpEndpointInternal,
       authorizationResolver: resolveGatewayAcpAuthorizationHeaderInternal,
     );
-    availableSingleAgentProvidersOverrideInternal =
-        availableSingleAgentProvidersOverride;
     arisBundleRepositoryInternal =
         arisBundleRepository ?? ArisBundleRepository();
     runtimeCoordinatorInternal.attachDispatchResolver(
@@ -287,8 +284,6 @@ class AppController extends ChangeNotifier {
   late final SkillDirectoryAccessService skillDirectoryAccessServiceInternal;
   late final List<String>? singleAgentSharedSkillScanRootOverridesInternal;
   late final GatewayAcpClient gatewayAcpClientInternal;
-  late final List<SingleAgentProvider>?
-  availableSingleAgentProvidersOverrideInternal;
   late final ArisBundleRepository arisBundleRepositoryInternal;
   late final GoTaskServiceClient goTaskServiceClientInternal;
   late final MultiAgentOrchestrator multiAgentOrchestratorInternal;
@@ -584,16 +579,14 @@ class AppController extends ChangeNotifier {
       );
 
   List<SingleAgentProvider> get configuredSingleAgentProviders =>
-      normalizeSingleAgentProviderList(bridgeAdvertisedProvidersInternal);
+      normalizeBridgeOwnedSingleAgentProviderList(
+        bridgeAdvertisedProvidersInternal,
+      );
 
   List<SingleAgentProvider> get availableSingleAgentProviders =>
-      availableSingleAgentProvidersOverrideInternal != null
-      ? normalizeSingleAgentProviderList(
-          availableSingleAgentProvidersOverrideInternal!,
-        )
-      : configuredSingleAgentProviders
-            .where(canUseSingleAgentProviderInternal)
-            .toList(growable: false);
+      configuredSingleAgentProviders
+          .where(canUseSingleAgentProviderInternal)
+          .toList(growable: false);
 
   List<AssistantExecutionTarget> visibleAssistantExecutionTargets(
     Iterable<AssistantExecutionTarget> supportedTargets,
@@ -604,8 +597,7 @@ class AppController extends ChangeNotifier {
         availableSingleAgentProviders.isNotEmpty) {
       visible.add(AssistantExecutionTarget.singleAgent);
     }
-    if (supported.contains(AssistantExecutionTarget.gateway) &&
-        appUiState.isGatewayTargetSaved(AssistantExecutionTarget.gateway)) {
+    if (supported.contains(AssistantExecutionTarget.gateway)) {
       visible.add(AssistantExecutionTarget.gateway);
     }
     if (!supportedTargets.contains(AssistantExecutionTarget.singleAgent) ||
@@ -624,10 +616,6 @@ class AppController extends ChangeNotifier {
       availableSingleAgentProviders.isNotEmpty;
 
   bool canUseSingleAgentProviderInternal(SingleAgentProvider provider) {
-    final override = availableSingleAgentProvidersOverrideInternal;
-    if (override != null) {
-      return !provider.isUnspecified && override.contains(provider);
-    }
     if (provider.isUnspecified) {
       return false;
     }

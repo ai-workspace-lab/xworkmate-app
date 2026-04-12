@@ -147,8 +147,6 @@ class MultiAgentOrchestrator extends ChangeNotifier {
     required String workingDirectory,
     List<CollaborationAttachment> attachments = const [],
     List<String> selectedSkills = const [],
-    String aiGatewayBaseUrl = '',
-    String aiGatewayApiKey = '',
     void Function(MultiAgentRunEvent event)? onEvent,
   }) async {
     assertEmbeddedProcessesAllowedInternal();
@@ -192,8 +190,6 @@ class MultiAgentOrchestrator extends ChangeNotifier {
         taskPrompt,
         preset: preset,
         selectedSkills: selectedSkills,
-        aiGatewayBaseUrl: aiGatewayBaseUrl,
-        aiGatewayApiKey: aiGatewayApiKey,
       );
       steps.add(
         CollaborationStep(
@@ -242,8 +238,6 @@ class MultiAgentOrchestrator extends ChangeNotifier {
         attachments,
         preset: preset,
         selectedSkills: selectedSkills,
-        aiGatewayBaseUrl: aiGatewayBaseUrl,
-        aiGatewayApiKey: aiGatewayApiKey,
       );
       steps.add(
         CollaborationStep(
@@ -286,8 +280,6 @@ class MultiAgentOrchestrator extends ChangeNotifier {
       final testerResult = await runTesterInternal(
         engineerResult.codeOutput,
         preset: preset,
-        aiGatewayBaseUrl: aiGatewayBaseUrl,
-        aiGatewayApiKey: aiGatewayApiKey,
       );
       steps.add(
         CollaborationStep(
@@ -335,8 +327,6 @@ class MultiAgentOrchestrator extends ChangeNotifier {
             testerResult.feedback,
             workingDirectory,
             preset: preset,
-            aiGatewayBaseUrl: aiGatewayBaseUrl,
-            aiGatewayApiKey: aiGatewayApiKey,
           );
           steps.add(
             CollaborationStep(
@@ -352,8 +342,6 @@ class MultiAgentOrchestrator extends ChangeNotifier {
           final reReview = await runTesterInternal(
             fixedResult.codeOutput,
             preset: preset,
-            aiGatewayBaseUrl: aiGatewayBaseUrl,
-            aiGatewayApiKey: aiGatewayApiKey,
           );
           steps.add(
             CollaborationStep(

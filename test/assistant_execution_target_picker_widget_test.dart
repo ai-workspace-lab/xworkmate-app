@@ -11,6 +11,7 @@ import 'package:xworkmate/runtime/desktop_platform_service.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
+import 'package:xworkmate/runtime/single_agent_capabilities.dart';
 import 'package:xworkmate/runtime/skill_directory_access.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
@@ -37,10 +38,10 @@ void main() {
         ),
         goTaskServiceClient: const _FakeGoTaskServiceClient(),
         singleAgentSharedSkillScanRootOverrides: const <String>[],
-        availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
-        ],
       );
+      _seedBridgeProviders(controller, const <SingleAgentProvider>[
+        SingleAgentProvider.codex,
+      ]);
       final inputController = TextEditingController();
       final focusNode = FocusNode();
       addTearDown(() async {
@@ -152,10 +153,10 @@ void main() {
       skillDirectoryAccessService: _FakeSkillDirectoryAccessService(root.path),
       goTaskServiceClient: const _FakeGoTaskServiceClient(),
       singleAgentSharedSkillScanRootOverrides: const <String>[],
-      availableSingleAgentProvidersOverride: const <SingleAgentProvider>[
-        SingleAgentProvider.codex,
-      ],
     );
+    _seedBridgeProviders(controller, const <SingleAgentProvider>[
+      SingleAgentProvider.codex,
+    ]);
     final inputController = TextEditingController();
     final focusNode = FocusNode();
     addTearDown(() async {
@@ -239,6 +240,21 @@ void main() {
   });
 }
 
+void _seedBridgeProviders(
+  AppController controller,
+  List<SingleAgentProvider> providers,
+) {
+  controller.bridgeAdvertisedProvidersInternal = providers;
+  controller.singleAgentCapabilitiesByProviderInternal = {
+    for (final provider in providers)
+      provider: SingleAgentCapabilities(
+        available: true,
+        supportedProviders: <SingleAgentProvider>[provider],
+        endpoint: 'bridge',
+      ),
+  };
+}
+
 class _FakeSkillDirectoryAccessService implements SkillDirectoryAccessService {
   const _FakeSkillDirectoryAccessService(this.homeDirectory);
 
@@ -317,8 +333,6 @@ class _FakeGoTaskServiceClient implements GoTaskServiceClient {
     required String taskPrompt,
     required String workingDirectory,
     required ExternalCodeAgentAcpRoutingConfig routing,
-    String aiGatewayBaseUrl = '',
-    String aiGatewayApiKey = '',
   }) async {
     return const ExternalCodeAgentAcpRoutingResolution(
       raw: <String, dynamic>{
