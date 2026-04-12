@@ -191,8 +191,12 @@ flutter test test/features/assistant_page_suite.dart
 - `https://accounts.svc.plus`
 - `review@svc.plus`
 - `***REMOVED-CREDENTIAL***`
-- `BRIDGE_SERVER_URL=https:xworkmate-bridge.svc.plus`
+- managed bridge origin: `https://xworkmate-bridge.svc.plus`
 - `BRIDGE_AUTH_TOKEN=...`
+
+补充口径：
+
+- `BRIDGE_SERVER_URL` 若仍出现在账户返回中，仅作为 metadata，不再是运行期入口前置条件。
 
 额外约定：
 

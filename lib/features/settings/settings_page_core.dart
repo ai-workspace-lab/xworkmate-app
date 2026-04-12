@@ -152,10 +152,6 @@ class _SettingsPageState extends State<SettingsPage> {
     _accountMfaCodeController.clear();
   }
 
-  Future<void> _disconnectManagedBase() async {
-    await widget.controller.settingsController.disconnectManagedAccountBase();
-  }
-
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -217,7 +213,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 onVerifyMfa: () => _verifyAccountMfa(currentSettings),
                 onCancelMfa: _cancelAccountMfa,
                 onSync: () => _syncAccount(currentSettings),
-                onDisconnect: _disconnectManagedBase,
                 onLogout: _logoutAccount,
               ),
             ),
