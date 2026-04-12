@@ -7,6 +7,7 @@ import 'package:xworkmate/app/app_controller_desktop_workspace_execution.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_bar.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_models.dart';
+import 'package:xworkmate/features/assistant/assistant_page_components.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
@@ -248,13 +249,72 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
   });
+
+  testWidgets(
+    'single-agent empty state no longer routes users to Settings -> Integrations',
+    (tester) async {
+      final root = Directory.systemTemp.createTempSync(
+        'xworkmate-empty-state-widget-test-',
+      );
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        appDataRootPathResolver: () async => '${root.path}/settings.sqlite3',
+        secretRootPathResolver: () async => root.path,
+        supportRootPathResolver: () async => root.path,
+      );
+      final controller = AppController(
+        store: store,
+        desktopPlatformService: UnsupportedDesktopPlatformService(),
+        skillDirectoryAccessService: _FakeSkillDirectoryAccessService(
+          root.path,
+        ),
+        goTaskServiceClient: const _FakeGoTaskServiceClient(),
+        singleAgentSharedSkillScanRootOverrides: const <String>[],
+      );
+      addTearDown(() async {
+        controller.dispose();
+        if (root.existsSync()) {
+          await root.delete(recursive: true);
+        }
+      });
+
+      controller.initializeAssistantThreadContext(
+        controller.currentSessionKey,
+        executionTarget: AssistantExecutionTarget.singleAgent,
+        singleAgentProvider: SingleAgentProvider.codex,
+      );
+      controller.bridgeProviderCatalogInternal = const <SingleAgentProvider>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(platform: TargetPlatform.macOS),
+          home: Scaffold(
+            body: AssistantEmptyStateInternal(
+              controller: controller,
+              onFocusComposer: () {},
+              onOpenGateway: () {},
+              onOpenAiGatewaySettings: () {},
+              onReconnectGateway: () async {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('设置 -> 集成'), findsNothing);
+      expect(find.textContaining('本地集成配置'), findsOneWidget);
+      expect(find.text('打开配置中心'), findsNothing);
+      expect(find.text('打开设置中心'), findsNothing);
+      expect(find.text('查看线程工具栏'), findsOneWidget);
+    },
+  );
 }
 
 void _seedBridgeProviders(
   AppController controller,
   List<SingleAgentProvider> providers,
 ) {
-  controller.bridgeAdvertisedProvidersInternal = providers;
+  controller.bridgeProviderCatalogInternal = providers;
 }
 
 class _FakeSkillDirectoryAccessService implements SkillDirectoryAccessService {

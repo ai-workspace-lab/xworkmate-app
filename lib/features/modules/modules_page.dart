@@ -663,7 +663,7 @@ class _SkillsPanel extends StatelessWidget {
             ? StatusInfo(appText('当前模式', 'Current mode'), StatusTone.accent)
             : StatusInfo(appText('可切换', 'Available'), StatusTone.success),
         chips: [
-          for (final provider in controller.configuredSingleAgentProviders)
+          for (final provider in controller.bridgeProviderCatalog)
             provider.label,
         ],
         skills: singleAgentSkills.map((item) => item.name).toList(),

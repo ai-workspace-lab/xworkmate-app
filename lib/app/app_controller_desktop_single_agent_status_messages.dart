@@ -75,9 +75,9 @@ String singleAgentUnavailableLabelDesktopInternal(
     sessionKey,
   );
   final detail = reason?.trim() ?? '';
-  final selection = controller.singleAgentProviderForSession(
-    normalizedSessionKey,
-  );
+  final selection =
+      controller.currentSingleAgentResolvedProvider ??
+      controller.singleAgentProviderForSession(normalizedSessionKey);
   if (controller.singleAgentShouldSuggestAcpSwitchForSession(
     normalizedSessionKey,
   )) {

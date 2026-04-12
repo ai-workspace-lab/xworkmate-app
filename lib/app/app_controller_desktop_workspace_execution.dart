@@ -86,6 +86,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       executionTargetSource: ThreadSelectionSource.explicit,
       gatewayEntryState: gatewayEntryStateForTargetInternal(resolvedTarget),
       latestResolvedRuntimeModel: '',
+      latestResolvedProviderId: '',
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     recomputeTasksInternal();
@@ -128,6 +129,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       singleAgentProvider: sanitizedProvider,
       singleAgentProviderSource: ThreadSelectionSource.explicit,
       latestResolvedRuntimeModel: '',
+      latestResolvedProviderId: '',
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     recomputeTasksInternal();
@@ -196,6 +198,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       upsertTaskThreadInternal(
         normalizedSessionKey,
         latestResolvedRuntimeModel: '',
+        latestResolvedProviderId: '',
         updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       );
     }

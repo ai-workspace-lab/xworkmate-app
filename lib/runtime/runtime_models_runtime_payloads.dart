@@ -753,6 +753,7 @@ class ThreadContextState {
     required this.permissionLevel,
     required this.messageViewMode,
     required this.latestResolvedRuntimeModel,
+    required this.latestResolvedProviderId,
     this.selectedModelSource = ThreadSelectionSource.inherited,
     this.selectedSkillsSource = ThreadSelectionSource.inherited,
     this.gatewayEntryState,
@@ -769,6 +770,7 @@ class ThreadContextState {
   final AssistantPermissionLevel permissionLevel;
   final AssistantMessageViewMode messageViewMode;
   final String latestResolvedRuntimeModel;
+  final String latestResolvedProviderId;
   final ThreadSelectionSource selectedModelSource;
   final ThreadSelectionSource selectedSkillsSource;
   final String? gatewayEntryState;
@@ -785,6 +787,7 @@ class ThreadContextState {
     AssistantPermissionLevel? permissionLevel,
     AssistantMessageViewMode? messageViewMode,
     String? latestResolvedRuntimeModel,
+    String? latestResolvedProviderId,
     ThreadSelectionSource? selectedModelSource,
     ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
@@ -803,6 +806,8 @@ class ThreadContextState {
       messageViewMode: messageViewMode ?? this.messageViewMode,
       latestResolvedRuntimeModel:
           latestResolvedRuntimeModel ?? this.latestResolvedRuntimeModel,
+      latestResolvedProviderId:
+          latestResolvedProviderId ?? this.latestResolvedProviderId,
       selectedModelSource: selectedModelSource ?? this.selectedModelSource,
       selectedSkillsSource: selectedSkillsSource ?? this.selectedSkillsSource,
       gatewayEntryState: clearGatewayEntryState
@@ -829,6 +834,7 @@ class ThreadContextState {
       'permissionLevel': permissionLevel.name,
       'messageViewMode': messageViewMode.name,
       'latestResolvedRuntimeModel': latestResolvedRuntimeModel,
+      'latestResolvedProviderId': latestResolvedProviderId,
       'selectedModelSource': selectedModelSource.name,
       'selectedSkillsSource': selectedSkillsSource.name,
       'gatewayEntryState': gatewayEntryState,
@@ -890,6 +896,8 @@ class ThreadContextState {
       ),
       latestResolvedRuntimeModel:
           json['latestResolvedRuntimeModel']?.toString() ?? '',
+      latestResolvedProviderId:
+          json['latestResolvedProviderId']?.toString() ?? '',
       selectedModelSource: ThreadSelectionSourceCopy.fromJsonValue(
         json['selectedModelSource']?.toString(),
       ),
@@ -989,6 +997,7 @@ class TaskThread {
     String? gatewayEntryState,
     AssistantPermissionLevel? permissionLevel,
     String? latestResolvedRuntimeModel,
+    String? latestResolvedProviderId,
     double? lastRunAtMs,
     String? lastResultCode,
     String? lastRemoteWorkingDirectory,
@@ -1028,6 +1037,7 @@ class TaskThread {
                  messageViewMode ?? AssistantMessageViewMode.rendered,
              latestResolvedRuntimeModel:
                  latestResolvedRuntimeModel?.trim() ?? '',
+             latestResolvedProviderId: latestResolvedProviderId?.trim() ?? '',
              gatewayEntryState: gatewayEntryState?.trim(),
              lastRemoteWorkingDirectory:
                  lastRemoteWorkingDirectory?.trim().isNotEmpty == true
@@ -1079,6 +1089,7 @@ class TaskThread {
   String? get lastArtifactSyncStatus => contextState.lastArtifactSyncStatus;
   String get latestResolvedRuntimeModel =>
       contextState.latestResolvedRuntimeModel;
+  String get latestResolvedProviderId => contextState.latestResolvedProviderId;
   bool get hasExplicitExecutionTargetSelection =>
       executionBinding.executionModeSource == ThreadSelectionSource.explicit;
   bool get hasExplicitProviderSelection =>
@@ -1113,6 +1124,7 @@ class TaskThread {
     String? gatewayEntryState,
     bool clearGatewayEntryState = false,
     String? latestResolvedRuntimeModel,
+    String? latestResolvedProviderId,
     String? lastRemoteWorkingDirectory,
     WorkspaceRefKind? lastRemoteWorkspaceRefKind,
     double? lastArtifactSyncAtMs,
@@ -1133,6 +1145,7 @@ class TaskThread {
         selectedModelSource: assistantModelSource,
         selectedSkillsSource: selectedSkillsSource,
         latestResolvedRuntimeModel: latestResolvedRuntimeModel,
+        latestResolvedProviderId: latestResolvedProviderId,
         gatewayEntryState: gatewayEntryState,
         clearGatewayEntryState: clearGatewayEntryState,
         lastRemoteWorkingDirectory: lastRemoteWorkingDirectory,
@@ -1247,6 +1260,7 @@ class TaskThread {
         'permissionLevel': json['permissionLevel'],
         'messageViewMode': json['messageViewMode'],
         'latestResolvedRuntimeModel': json['latestResolvedRuntimeModel'],
+        'latestResolvedProviderId': json['latestResolvedProviderId'],
         'selectedModelSource': json['assistantModelSource'],
         'selectedSkillsSource': json['selectedSkillsSource'],
         'gatewayEntryState': json['gatewayEntryState'],

@@ -230,8 +230,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
             lowered.contains('missing acp endpoint')) &&
         target == AssistantExecutionTarget.singleAgent) {
       return appText(
-        '当前线程还没有同步到 Bridge Server。请先登录账号并在设置里完成同步后再重试。',
-        'This thread does not have a synced bridge server yet. Sign in and complete Settings sync before trying again.',
+        '当前线程缺少可用的 Bridge Server，暂时无法继续。',
+        'This thread does not have an available bridge server yet.',
       );
     }
     if (lowered.contains('gateway not connected') ||
@@ -241,20 +241,19 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         final selection = singleAgentProviderForSession(
           sessionsControllerInternal.currentSessionKey,
         );
-        final provider =
-            advertisedSingleAgentProviderInternal(selection) ?? selection;
+        final provider = currentSingleAgentResolvedProvider ?? selection;
         final providerLabel = provider.isUnspecified
             ? appText('Bridge Provider', 'Bridge Provider')
             : provider.label;
         final address = _extractGatewayAddressFromErrorInternal(raw);
         return address.isEmpty
             ? appText(
-                '当前线程的 Bridge Provider（$providerLabel）未连接。请先在设置里连接并同步后再重试。',
-                'The Bridge Provider for this thread ($providerLabel) is not connected. Connect and sync it from Settings, then try again.',
+                '当前线程的 Bridge Provider（$providerLabel）未连接。请先恢复该 Provider 对应连接后再重试。',
+                'The Bridge Provider for this thread ($providerLabel) is offline. Restore that provider connection, then try again.',
               )
             : appText(
-                '当前线程的 Bridge Provider（$providerLabel）未连接：$address。请先在设置里连接并同步后再重试。',
-                'The Bridge Provider for this thread ($providerLabel) is not connected: $address. Connect and sync it from Settings, then try again.',
+                '当前线程的 Bridge Provider（$providerLabel）未连接：$address。请先恢复该 Provider 对应连接后再重试。',
+                'The Bridge Provider for this thread ($providerLabel) is offline: $address. Restore that provider connection, then try again.',
               );
       }
       final profile = gatewayProfileForAssistantExecutionTargetInternal(target);
@@ -439,9 +438,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (normalizedRuntimeMode == snapshot.codeAgentRuntimeMode) {
       return snapshot;
     }
-    return snapshot.copyWith(
-      codeAgentRuntimeMode: normalizedRuntimeMode,
-    );
+    return snapshot.copyWith(codeAgentRuntimeMode: normalizedRuntimeMode);
   }
 
   Future<void> refreshAcpCapabilitiesInternal({
@@ -700,26 +697,31 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     return resolveBridgeAcpEndpointInternal();
   }
 
+  String? runtimeEnvironmentValueInternal(String key) {
+    final override = environmentOverrideInternal?[key]?.trim() ?? '';
+    if (override.isNotEmpty) {
+      return override;
+    }
+    final value = Platform.environment[key]?.trim() ?? '';
+    return value.isEmpty ? null : value;
+  }
+
   Uri? resolveBridgeAcpEndpointInternal() {
     final endpoint =
-        settingsControllerInternal
-                .accountSyncState
-                ?.syncedDefaults
-                .bridgeServerUrl
-                .trim()
-                .isNotEmpty ==
-            true
-        ? settingsControllerInternal
-              .accountSyncState!
-              .syncedDefaults
-              .bridgeServerUrl
-              .trim()
-        : settings
-              .acpBridgeServerModeConfig
-              .cloudSynced
-              .remoteServerSummary
-              .endpoint
-              .trim();
+        runtimeEnvironmentValueInternal('BRIDGE_SERVER_URL') ??
+        (() {
+          final synced =
+              settingsControllerInternal
+                  .accountSyncState
+                  ?.syncedDefaults
+                  .bridgeServerUrl
+                  .trim() ??
+              '';
+          return synced.isEmpty ? null : synced;
+        })();
+    if (endpoint == null) {
+      return null;
+    }
     final uri = Uri.tryParse(endpoint);
     final scheme = uri?.scheme.trim().toLowerCase() ?? '';
     if (uri == null || !kSupportedExternalAcpEndpointSchemes.contains(scheme)) {
@@ -757,12 +759,14 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         (bridgePort <= 0 || endpoint.port == bridgePort);
     if (matchesBridgeEndpoint) {
       final bridgeToken =
+          runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN') ??
+          runtimeEnvironmentValueInternal('INTERNAL_SERVICE_TOKEN') ??
           (await storeInternal.loadAccountManagedSecret(
             target: kAccountManagedSecretTargetBridgeAuthToken,
-          ))?.trim() ??
-          '';
-      if (bridgeToken.isNotEmpty) {
-        return 'Bearer $bridgeToken';
+          ))?.trim();
+      final normalizedToken = bridgeToken?.trim() ?? '';
+      if (normalizedToken.isNotEmpty) {
+        return 'Bearer $normalizedToken';
       }
     }
     return null;

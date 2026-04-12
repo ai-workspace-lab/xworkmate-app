@@ -52,7 +52,6 @@
 | 失败恢复 | 错误 endpoint / 失败任务在原线程展示清晰错误，允许原线程重试 | 已设计 + 部分自动化 | runtime / feature | `test/runtime/gateway_acp_client_suite.dart` `test/features/settings_page_gateway_acp_messages_suite.dart` | 线程级失败回退还可继续加强 |
 | 结果表面一致性 | 本地执行型与在线执行型都通过统一 result surface 暴露结果 | 已设计 + 部分自动化 | runtime / feature | `test/runtime/desktop_thread_artifact_service_test.dart` | 统一 artifact surface 已有基础，但在线媒体任务仍是缺口 |
 | UI 冒烟 | 登录流程、首页流程、桌面导航流程、桌面设置流程 | 已自动化 | integration | `integration_test/login_flow_test.dart` `integration_test/home_flow_test.dart` `integration_test/desktop_navigation_flow_test.dart` `integration_test/desktop_settings_flow_test.dart` | 更偏入口联通验证，不替代业务细场景 |
-| UI 表现稳定性 | Home / Login golden 基线 | 已自动化 | golden | `test/golden/home_golden_test.dart` `test/golden/login_golden_test.dart` | 当前 golden 覆盖面较窄，更多页面仍未纳入 |
 
 ## 4. 按层看当前测试重点
 
@@ -61,7 +60,6 @@
 | runtime | endpoint 规范化、账户同步、secret 边界、线程归属、provider 切换、artifact 回写、线程隔离 |
 | feature | 设置页提示语与输入行为、assistant 页技能选择与提交、installed-skill E2E 壳层闭环 |
 | integration | 桌面端导航、设置入口联通、登录与首页 happy path 冒烟 |
-| golden | 首页 / 登录页视觉基线 |
 | manual | 在线媒体任务、外部服务依赖场景、需要真实服务/真实账号/真实产物确认的 case |
 
 ## 5. 当前最值得关注的缺口
@@ -92,19 +90,6 @@
 - 长任务中间态是否稳定可见
 - 失败是否稳定回写线程消息
 - 在线结果是否与本地结果保持统一展示模型
-
-### 5.3 Golden 覆盖面较窄
-
-当前 golden 只有：
-
-- `home`
-- `login`
-
-若后续设置页、assistant 页、skills 页发生明显 UI 变化，建议补充：
-
-- settings shell
-- assistant home shell
-- 关键线程结果面
 
 ## 6. 建议维护方式
 
@@ -137,4 +122,4 @@
 
 - 媒体类技能自动化
 - 在线长任务闭环
-- 更广的 UI golden 基线
+- 更贴近真实交互的桌面集成回归
