@@ -239,9 +239,7 @@ extension AppControllerDesktopGateway on AppController {
     await agentsControllerInternal.refresh();
     await sessionsControllerInternal.refresh();
     chatControllerInternal.clear();
-    await instancesControllerInternal.refresh();
     await skillsControllerInternal.refresh();
-    await connectorsControllerInternal.refresh();
     await modelsControllerInternal.refresh();
     await cronJobsControllerInternal.refresh();
     devicesControllerInternal.clear();
@@ -278,13 +276,11 @@ extension AppControllerDesktopGateway on AppController {
     await refreshGatewayHealth();
     await refreshAgents();
     await refreshSessions();
-    await instancesControllerInternal.refresh();
     await skillsControllerInternal.refresh(
       agentId: agentsControllerInternal.selectedAgentId.isEmpty
           ? null
           : agentsControllerInternal.selectedAgentId,
     );
-    await connectorsControllerInternal.refresh();
     await modelsControllerInternal.refresh();
     await cronJobsControllerInternal.refresh();
     await devicesControllerInternal.refresh(quiet: true);

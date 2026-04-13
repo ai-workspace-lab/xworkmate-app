@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../features/assistant/assistant_page.dart';
-import '../features/claw_hub/claw_hub_page.dart';
-import '../features/mcp_server/mcp_server_page.dart';
-import '../features/modules/modules_page.dart';
 import '../features/settings/settings_page.dart';
-import '../features/skills/skills_page.dart';
-import '../features/tasks/tasks_page.dart';
 import '../models/app_models.dart';
 import 'app_controller.dart';
 
@@ -45,74 +40,6 @@ workspacePageSpecsInternal = <WorkspaceDestination, WorkspacePageSpec>{
       showStandaloneTaskRail: false,
     ),
   ),
-  WorkspaceDestination.tasks: WorkspacePageSpec(
-    destination: WorkspaceDestination.tasks,
-    desktopBuilder: (controller, onOpenDetail) =>
-        TasksPage(controller: controller, onOpenDetail: onOpenDetail),
-    mobileBuilder: (controller, onOpenDetail) =>
-        TasksPage(controller: controller, onOpenDetail: onOpenDetail),
-  ),
-  WorkspaceDestination.skills: WorkspacePageSpec(
-    destination: WorkspaceDestination.skills,
-    desktopBuilder: (controller, onOpenDetail) =>
-        SkillsPage(controller: controller, onOpenDetail: onOpenDetail),
-    mobileBuilder: (controller, onOpenDetail) =>
-        SkillsPage(controller: controller, onOpenDetail: onOpenDetail),
-  ),
-  WorkspaceDestination.nodes: WorkspacePageSpec(
-    destination: WorkspaceDestination.nodes,
-    desktopBuilder: (controller, onOpenDetail) => ModulesPage(
-      controller: controller,
-      onOpenDetail: onOpenDetail,
-      initialTab: controller.modulesTab,
-    ),
-    mobileBuilder: (controller, onOpenDetail) => ModulesPage(
-      controller: controller,
-      onOpenDetail: onOpenDetail,
-      initialTab: controller.modulesTab,
-    ),
-  ),
-  WorkspaceDestination.agents: WorkspacePageSpec(
-    destination: WorkspaceDestination.agents,
-    desktopBuilder: (controller, onOpenDetail) => ModulesPage(
-      controller: controller,
-      onOpenDetail: onOpenDetail,
-      initialTab: controller.modulesTab,
-    ),
-    mobileBuilder: (controller, onOpenDetail) => ModulesPage(
-      controller: controller,
-      onOpenDetail: onOpenDetail,
-      initialTab: controller.modulesTab,
-    ),
-  ),
-  WorkspaceDestination.mcpServer: WorkspacePageSpec(
-    destination: WorkspaceDestination.mcpServer,
-    desktopBuilder: (controller, onOpenDetail) =>
-        McpServerPage(controller: controller, onOpenDetail: onOpenDetail),
-    mobileBuilder: (controller, onOpenDetail) =>
-        McpServerPage(controller: controller, onOpenDetail: onOpenDetail),
-  ),
-  WorkspaceDestination.clawHub: WorkspacePageSpec(
-    destination: WorkspaceDestination.clawHub,
-    desktopBuilder: (controller, onOpenDetail) =>
-        ClawHubPage(controller: controller, onOpenDetail: onOpenDetail),
-    mobileBuilder: (controller, onOpenDetail) =>
-        ClawHubPage(controller: controller, onOpenDetail: onOpenDetail),
-  ),
-  WorkspaceDestination.secrets: WorkspacePageSpec(
-    destination: WorkspaceDestination.secrets,
-    desktopBuilder: (controller, onOpenDetail) =>
-        SettingsPage(controller: controller, initialTab: SettingsTab.gateway),
-    mobileBuilder: (controller, onOpenDetail) =>
-        SettingsPage(controller: controller, initialTab: SettingsTab.gateway),
-  ),
-  WorkspaceDestination.aiGateway: WorkspacePageSpec(
-    destination: WorkspaceDestination.aiGateway,
-    desktopBuilder: (controller, onOpenDetail) =>
-        SettingsPage(controller: controller, initialTab: SettingsTab.gateway),
-    mobileBuilder: (controller, onOpenDetail) =>
-        SettingsPage(controller: controller, initialTab: SettingsTab.gateway),
-  ),
   WorkspaceDestination.settings: WorkspacePageSpec(
     destination: WorkspaceDestination.settings,
     desktopBuilder: (controller, onOpenDetail) => SettingsPage(
@@ -127,13 +54,6 @@ workspacePageSpecsInternal = <WorkspaceDestination, WorkspacePageSpec>{
       initialDetail: controller.settingsDetail,
       navigationContext: controller.settingsNavigationContext,
     ),
-  ),
-  WorkspaceDestination.account: WorkspacePageSpec(
-    destination: WorkspaceDestination.account,
-    desktopBuilder: (controller, onOpenDetail) =>
-        SettingsPage(controller: controller, initialTab: SettingsTab.gateway),
-    mobileBuilder: (controller, onOpenDetail) =>
-        SettingsPage(controller: controller, initialTab: SettingsTab.gateway),
   ),
 };
 

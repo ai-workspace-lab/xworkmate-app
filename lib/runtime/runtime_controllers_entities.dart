@@ -11,40 +11,6 @@ import 'runtime_controllers_settings.dart';
 import 'runtime_controllers_gateway.dart';
 import 'runtime_controllers_derived_tasks.dart';
 
-class InstancesController extends ChangeNotifier {
-  InstancesController(this.runtimeInternal);
-
-  final GatewayRuntime runtimeInternal;
-
-  List<GatewayInstanceSummary> itemsInternal = const <GatewayInstanceSummary>[];
-  bool loadingInternal = false;
-  String? errorInternal;
-
-  List<GatewayInstanceSummary> get items => itemsInternal;
-  bool get loading => loadingInternal;
-  String? get error => errorInternal;
-
-  Future<void> refresh() async {
-    if (!runtimeInternal.isConnected) {
-      itemsInternal = const <GatewayInstanceSummary>[];
-      errorInternal = null;
-      notifyListeners();
-      return;
-    }
-    loadingInternal = true;
-    errorInternal = null;
-    notifyListeners();
-    try {
-      itemsInternal = await runtimeInternal.listInstances();
-    } catch (error) {
-      errorInternal = error.toString();
-    } finally {
-      loadingInternal = false;
-      notifyListeners();
-    }
-  }
-}
-
 class SkillsController extends ChangeNotifier {
   SkillsController(this.runtimeInternal);
 
@@ -70,41 +36,6 @@ class SkillsController extends ChangeNotifier {
     notifyListeners();
     try {
       itemsInternal = await runtimeInternal.listSkills(agentId: agentId);
-    } catch (error) {
-      errorInternal = error.toString();
-    } finally {
-      loadingInternal = false;
-      notifyListeners();
-    }
-  }
-}
-
-class ConnectorsController extends ChangeNotifier {
-  ConnectorsController(this.runtimeInternal);
-
-  final GatewayRuntime runtimeInternal;
-
-  List<GatewayConnectorSummary> itemsInternal =
-      const <GatewayConnectorSummary>[];
-  bool loadingInternal = false;
-  String? errorInternal;
-
-  List<GatewayConnectorSummary> get items => itemsInternal;
-  bool get loading => loadingInternal;
-  String? get error => errorInternal;
-
-  Future<void> refresh() async {
-    if (!runtimeInternal.isConnected) {
-      itemsInternal = const <GatewayConnectorSummary>[];
-      errorInternal = null;
-      notifyListeners();
-      return;
-    }
-    loadingInternal = true;
-    errorInternal = null;
-    notifyListeners();
-    try {
-      itemsInternal = await runtimeInternal.listConnectors();
     } catch (error) {
       errorInternal = error.toString();
     } finally {
