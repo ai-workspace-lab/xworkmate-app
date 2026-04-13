@@ -214,7 +214,7 @@ class MobileGatewayPairingGuidePage extends StatelessWidget {
                           ),
                         ),
                         child: Text(
-                          '输入验证码',
+                          '输入配置码',
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
@@ -367,10 +367,7 @@ String? resolveGatewaySetupCodeFromScan(String raw) {
   if (decodeGatewaySetupCode(candidate) != null) {
     return candidate;
   }
-  if (decodeBridgeBootstrapEnvelope(candidate) != null) {
-    return candidate;
-  }
-  return isBridgeBootstrapShortCode(candidate) ? candidate : null;
+  return null;
 }
 
 String? _extractSetupCodeFromJsonPayload(String raw) {

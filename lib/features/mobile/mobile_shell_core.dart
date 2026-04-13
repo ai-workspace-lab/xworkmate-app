@@ -156,45 +156,19 @@ class MobileShellStateInternal extends State<MobileShell> {
   }
 
   Future<void> promptBridgeVerificationCodeInternal() async {
-    final accountSignedIn =
-        (await widget.controller.storeInternal.loadAccountSessionToken())
-            ?.trim()
-            .isNotEmpty ??
-        false;
-    if (!mounted) {
-      return;
-    }
-    if (!accountSignedIn) {
-      await openGatewaySetupCodeEntryInternal();
-      if (!mounted) {
-        return;
-      }
-      final messenger = ScaffoldMessenger.maybeOf(context);
-      messenger?.showSnackBar(
-        SnackBar(
-          content: Text(
-            appText(
-              '未登录账号时，请先手动输入配置码。登录 accounts.svc.plus 后可使用验证码接入。',
-              'When account sign-in is unavailable, enter a setup code manually. Sign in to accounts.svc.plus first to use bridge verification codes.',
-            ),
-          ),
-        ),
-      );
-      return;
-    }
     final codeController = TextEditingController();
     final enteredCode = await showDialog<String>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: Text(appText('输入验证码', 'Enter Verification Code')),
+          title: Text(appText('输入配置码', 'Enter Setup Code')),
           content: TextField(
             controller: codeController,
             autofocus: true,
             textCapitalization: TextCapitalization.characters,
             decoration: InputDecoration(
-              labelText: appText('验证码', 'Verification Code'),
-              hintText: 'AB12CD34',
+              labelText: appText('配置码', 'Setup Code'),
+              hintText: appText('粘贴配置码', 'Paste setup code'),
             ),
           ),
           actions: [
@@ -290,7 +264,9 @@ class MobileShellStateInternal extends State<MobileShell> {
           if (features.isEnabledPath(UiFeatureKeys.navigationSettings))
             MobileShellTab.settings,
         ];
-        final currentTab = tabForDestinationInternal(widget.controller.destination);
+        final currentTab = tabForDestinationInternal(
+          widget.controller.destination,
+        );
         final resolvedCurrentTab = availableTabs.contains(currentTab)
             ? currentTab
             : (availableTabs.isEmpty ? currentTab : availableTabs.first);
