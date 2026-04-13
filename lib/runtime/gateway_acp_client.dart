@@ -637,11 +637,33 @@ class GatewayAcpClient {
     Uri endpoint, {
     String authorizationOverride = '',
   }) async {
-    final override = authorizationOverride.trim();
+    final override = _normalizeAuthorizationHeader(authorizationOverride);
     if (override.isNotEmpty) {
       return override;
     }
-    return (await authorizationResolver?.call(endpoint))?.trim() ?? '';
+    return _normalizeAuthorizationHeader(
+      (await authorizationResolver?.call(endpoint))?.trim() ?? '',
+    );
+  }
+
+  String _normalizeAuthorizationHeader(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+    if (_looksLikeAuthorizationHeader(trimmed)) {
+      return trimmed;
+    }
+    return 'Bearer $trimmed';
+  }
+
+  bool _looksLikeAuthorizationHeader(String raw) {
+    final separatorIndex = raw.indexOf(RegExp(r'\s'));
+    if (separatorIndex <= 0 || separatorIndex >= raw.length - 1) {
+      return false;
+    }
+    final scheme = raw.substring(0, separatorIndex);
+    return RegExp(r"^[A-Za-z][A-Za-z0-9!#$%&'*+.^_`|~-]*$").hasMatch(scheme);
   }
 
   Future<Map<String, dynamic>> _consumeSseRpcResponse({
