@@ -1,6 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
+import '../../app/app_metadata.dart';
 import '../../app/workspace_navigation.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
@@ -9,6 +14,7 @@ import '../../runtime/runtime_models.dart';
 import '../../widgets/settings_page_shell.dart';
 import '../../widgets/surface_card.dart';
 import 'settings_account_panel.dart';
+import 'settings_about_panel.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
@@ -34,6 +40,8 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _accountIdentifierController;
   late final TextEditingController _accountPasswordController;
   late final TextEditingController _accountMfaCodeController;
+  SettingsAboutSnapshot _aboutSnapshot = const SettingsAboutSnapshot.defaults();
+  bool _aboutBusy = false;
   String _lastSavedAccountBaseUrl = '';
   String _lastSavedAccountIdentifier = '';
 
@@ -51,6 +59,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
     _accountPasswordController = TextEditingController();
     _accountMfaCodeController = TextEditingController();
+    unawaited(_refreshAboutSnapshot());
   }
 
   @override
@@ -108,6 +117,7 @@ class _SettingsPageState extends State<SettingsPage> {
       baseUrl: _accountBaseUrlController.text.trim(),
     );
     await _refreshBridgeCapabilities();
+    await _refreshAboutSnapshot();
   }
 
   Future<void> _verifyAccountMfa(SettingsSnapshot settings) async {
@@ -150,6 +160,87 @@ class _SettingsPageState extends State<SettingsPage> {
     await widget.controller.settingsController.logoutAccount();
     _accountPasswordController.clear();
     _accountMfaCodeController.clear();
+    await _refreshAboutSnapshot();
+  }
+
+  Future<void> _refreshAboutSnapshot() async {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _aboutBusy = true;
+    });
+    final snapshot = await _loadAboutSnapshot();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _aboutSnapshot = snapshot;
+      _aboutBusy = false;
+    });
+  }
+
+  Future<SettingsAboutSnapshot> _loadAboutSnapshot() async {
+    final bridgeMetadata = await _loadBridgeMetadata();
+    return SettingsAboutSnapshot(
+      appVersion: kAppVersion,
+      appBuildNumber: kAppBuildNumber,
+      appBuildDate: kAppBuildDate,
+      appCommit: kAppBuildCommit,
+      bridgeEndpoint: kManagedBridgeServerUrl,
+      bridgeStatus: _stringValue(bridgeMetadata['status']),
+      bridgeVersion: _resolveBridgeVersion(bridgeMetadata),
+      bridgeBuildDate: _resolveBridgeBuildDate(bridgeMetadata),
+      bridgeCommit: _stringValue(bridgeMetadata['commit']),
+      bridgeImage: _stringValue(bridgeMetadata['image']),
+    );
+  }
+
+  Future<Map<String, dynamic>> _loadBridgeMetadata() async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
+    try {
+      final request = await client
+          .getUrl(Uri.parse('$kManagedBridgeServerUrl/api/ping'))
+          .timeout(const Duration(seconds: 4));
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      final response = await request.close().timeout(const Duration(seconds: 4));
+      final body = await utf8
+          .decodeStream(response)
+          .timeout(const Duration(seconds: 4));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return <String, dynamic>{
+          'status': 'error',
+          'version': '',
+          'commit': '',
+          'image': '',
+          'buildDate': '',
+        };
+      }
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      if (decoded is Map) {
+        return decoded.cast<String, dynamic>();
+      }
+    } catch (_) {
+      return const <String, dynamic>{
+        'status': 'unavailable',
+        'version': '',
+        'commit': '',
+        'image': '',
+        'buildDate': '',
+      };
+    } finally {
+      client.close(force: true);
+    }
+    return const <String, dynamic>{
+      'status': 'unavailable',
+      'version': '',
+      'commit': '',
+      'image': '',
+      'buildDate': '',
+    };
   }
 
   @override
@@ -165,6 +256,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _syncAccountControllers(currentSettings);
         final accountState = controller.settingsController.accountSyncState;
         final accountBusy = controller.settingsController.accountBusy;
+        final accountStatus = controller.settingsController.accountStatus;
         final accountSignedIn = controller.settingsController.accountSignedIn;
         final accountMfaRequired =
             controller.settingsController.accountMfaRequired;
@@ -201,6 +293,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 accountSession: accountSession,
                 accountState: accountState,
                 accountBusy: accountBusy,
+                accountStatus: accountStatus,
                 accountSignedIn: accountSignedIn,
                 accountMfaRequired: accountMfaRequired,
                 accountBaseUrlController: _accountBaseUrlController,
@@ -216,9 +309,50 @@ class _SettingsPageState extends State<SettingsPage> {
                 onLogout: _logoutAccount,
               ),
             ),
+            const SizedBox(height: 24),
+            SurfaceCard(
+              key: const ValueKey('settings-about-panel-card'),
+              child: SettingsAboutPanel(
+                snapshot: _aboutSnapshot,
+                busy: _aboutBusy,
+                onRefresh: _refreshAboutSnapshot,
+              ),
+            ),
           ],
         );
       },
     );
   }
+}
+
+String _stringValue(Object? value) {
+  return value == null ? '' : value.toString().trim();
+}
+
+String _resolveBridgeVersion(Map<String, dynamic> payload) {
+  final explicit = _stringValue(payload['version']);
+  if (explicit.isNotEmpty) {
+    return explicit;
+  }
+  final tag = _stringValue(payload['tag']);
+  if (tag.isNotEmpty) {
+    return tag;
+  }
+  return '';
+}
+
+String _resolveBridgeBuildDate(Map<String, dynamic> payload) {
+  final candidates = <Object?>[
+    payload['buildDate'],
+    payload['build-date'],
+    payload['builtAt'],
+    payload['build_at'],
+  ];
+  for (final candidate in candidates) {
+    final value = _stringValue(candidate);
+    if (value.isNotEmpty) {
+      return value;
+    }
+  }
+  return '';
 }

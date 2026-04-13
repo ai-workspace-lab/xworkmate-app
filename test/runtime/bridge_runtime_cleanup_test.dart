@@ -119,6 +119,25 @@ void main() {
     );
 
     test(
+      'ignores legacy INTERNAL_SERVICE_TOKEN for managed bridge auth resolution',
+      () async {
+        final controller = AppController(
+          environmentOverride: const <String, String>{
+            'INTERNAL_SERVICE_TOKEN': 'legacy-bridge-token',
+          },
+        );
+        addTearDown(controller.dispose);
+
+        final bridgeHeader = await controller
+            .resolveGatewayAcpAuthorizationHeaderInternal(
+              Uri.parse('https://xworkmate-bridge.svc.plus/acp/rpc'),
+            );
+
+        expect(bridgeHeader, isNull);
+      },
+    );
+
+    test(
       'runtime coordinator only exposes remote and offline gateway modes',
       () {
         final controller = AppController();

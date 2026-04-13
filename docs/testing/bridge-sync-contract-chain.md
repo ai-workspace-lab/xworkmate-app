@@ -17,6 +17,7 @@ and the two key client-side parsing assertions:
 
 - `BRIDGE_SERVER_URL` may be retained in account sync metadata, but does not drive runtime endpoint selection
 - `BRIDGE_AUTH_TOKEN` is written into secure storage
+- account sync no longer parses `INTERNAL_SERVICE_TOKEN` as a bridge token fallback
 
 ## Sync Chain
 
@@ -81,5 +82,6 @@ flowchart TD
 - The app-facing managed bridge origin is fixed to `https://xworkmate-bridge.svc.plus`.
 - `BRIDGE_SERVER_URL`, when present, is metadata only.
 - `BRIDGE_AUTH_TOKEN` is the only bridge token field used by the sync contract.
+- `INTERNAL_SERVICE_TOKEN` is not part of the app-side account sync token contract.
 - `BRIDGE_AUTH_TOKEN` must never be written into normal settings snapshot, profile JSON, or UI-visible text.
 - Client requests must assemble the header as `Authorization: Bearer <token>`.

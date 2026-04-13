@@ -1,0 +1,254 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../../app/app_controller.dart';
+import '../../app/ui_feature_manifest.dart';
+import '../../i18n/app_language.dart';
+import '../../runtime/runtime_models.dart';
+import '../../theme/app_palette.dart';
+import '../../theme/app_theme.dart';
+import 'assistant_page_composer_support.dart';
+
+class AssistantTaskDialogModeControlsInternal extends StatelessWidget {
+  const AssistantTaskDialogModeControlsInternal({
+    super.key,
+    required this.controller,
+  });
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final uiFeatures = controller.featuresFor(
+      resolveUiFeaturePlatformFromContext(context),
+    );
+    final visibleExecutionTargets = controller.visibleAssistantExecutionTargets(
+      uiFeatures.availableExecutionTargets,
+    );
+    if (visibleExecutionTargets.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final currentExecutionTarget =
+        resolveAssistantExecutionTargetFromVisibleTargets(
+          visibleExecutionTargets,
+          currentTarget: controller.assistantExecutionTarget,
+        );
+    final executionTarget = collapseAssistantExecutionTargetForDisplay(
+      currentExecutionTarget,
+    );
+    final providerMenuProviders = _taskDialogProviderCatalogForTarget(
+      controller: controller,
+      executionTarget: executionTarget,
+    );
+
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _TaskDialogExecutionTargetMenuButtonInternal(
+          controller: controller,
+          executionTarget: executionTarget,
+          visibleExecutionTargets: visibleExecutionTargets,
+        ),
+        if (providerMenuProviders.isNotEmpty)
+          _TaskDialogProviderMenuButtonInternal(
+            controller: controller,
+            executionTarget: executionTarget,
+            selectedProvider: controller.assistantProviderForSession(
+              controller.currentSessionKey,
+            ),
+            providers: providerMenuProviders,
+          ),
+      ],
+    );
+  }
+}
+
+List<SingleAgentProvider> _taskDialogProviderCatalogForTarget({
+  required AppController controller,
+  required AssistantExecutionTarget executionTarget,
+}) {
+  if (executionTarget.isGateway) {
+    return <SingleAgentProvider>[
+      controller.assistantProviderForSession(controller.currentSessionKey),
+    ];
+  }
+  return controller.assistantProviderCatalog;
+}
+
+class _TaskDialogExecutionTargetMenuButtonInternal extends StatelessWidget {
+  const _TaskDialogExecutionTargetMenuButtonInternal({
+    required this.controller,
+    required this.executionTarget,
+    required this.visibleExecutionTargets,
+  });
+
+  final AppController controller;
+  final AssistantExecutionTarget executionTarget;
+  final List<AssistantExecutionTarget> visibleExecutionTargets;
+
+  @override
+  Widget build(BuildContext context) {
+    final compactExecutionTargets = compactAssistantExecutionTargets(
+      visibleExecutionTargets,
+    );
+    final palette = context.palette;
+    final selectedLabel = executionTarget.label;
+
+    return PopupMenuButton<AssistantExecutionTarget>(
+      key: const Key('assistant-execution-target-button'),
+      tooltip: appText('任务对话模式', 'Task Dialog Mode'),
+      onSelected: (value) {
+        unawaited(_handleExecutionTargetSelected(value));
+      },
+      itemBuilder: (context) => compactExecutionTargets
+          .map(
+            (value) => PopupMenuItem<AssistantExecutionTarget>(
+              value: value,
+              key: Key('assistant-execution-target-menu-item-${value.name}'),
+              child: Row(
+                children: [
+                  Icon(value.icon, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(value.label)),
+                  if (value == executionTarget)
+                    const Icon(Icons.check_rounded, size: 18),
+                ],
+              ),
+            ),
+          )
+          .toList(growable: false),
+      child: _TaskDialogSelectorChipInternal(
+        leading: Icon(executionTarget.icon, size: 14, color: palette.textMuted),
+        label: selectedLabel,
+        tooltip: appText('任务对话模式', 'Task Dialog Mode'),
+      ),
+    );
+  }
+
+  Future<void> _handleExecutionTargetSelected(
+    AssistantExecutionTarget value,
+  ) async {
+    final resolvedTarget = resolveAssistantExecutionTargetFromVisibleTargets(
+      visibleExecutionTargets,
+      currentTarget: value,
+    );
+    await controller.setAssistantExecutionTarget(resolvedTarget);
+  }
+}
+
+class _TaskDialogProviderMenuButtonInternal extends StatelessWidget {
+  const _TaskDialogProviderMenuButtonInternal({
+    required this.controller,
+    required this.executionTarget,
+    required this.selectedProvider,
+    required this.providers,
+  });
+
+  final AppController controller;
+  final AssistantExecutionTarget executionTarget;
+  final SingleAgentProvider selectedProvider;
+  final List<SingleAgentProvider> providers;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayProvider = selectedProvider.isUnspecified
+        ? SingleAgentProvider.openclaw
+        : selectedProvider;
+
+    return PopupMenuButton<SingleAgentProvider>(
+      key: const Key('assistant-provider-button'),
+      tooltip: appText('智能体 Provider', 'Agent Provider'),
+      onSelected: (provider) {
+        unawaited(_handleProviderSelected(provider));
+      },
+      itemBuilder: (context) => providers
+          .map(
+            (provider) => PopupMenuItem<SingleAgentProvider>(
+              value: provider,
+              key: Key('assistant-provider-menu-item-${provider.providerId}'),
+              child: Row(
+                children: [
+                  SingleAgentProviderBadgeInternal(
+                    key: Key(
+                      'assistant-provider-menu-badge-${provider.providerId}',
+                    ),
+                    provider: provider,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(provider.label)),
+                  if (provider == displayProvider)
+                    const Icon(Icons.check_rounded, size: 18),
+                ],
+              ),
+            ),
+          )
+          .toList(growable: false),
+      child: _TaskDialogSelectorChipInternal(
+        leading: SingleAgentProviderBadgeInternal(
+          key: const Key('assistant-provider-badge'),
+          provider: displayProvider,
+        ),
+        label: displayProvider.label,
+        tooltip: appText('智能体 Provider', 'Agent Provider'),
+      ),
+    );
+  }
+
+  Future<void> _handleProviderSelected(SingleAgentProvider provider) async {
+    if (executionTarget.isGateway) {
+      return;
+    }
+    await controller.setAssistantSingleAgentProvider(provider);
+  }
+}
+
+class _TaskDialogSelectorChipInternal extends StatelessWidget {
+  const _TaskDialogSelectorChipInternal({
+    required this.leading,
+    required this.label,
+    required this.tooltip,
+  });
+
+  final Widget leading;
+  final String label;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: 5,
+        ),
+        decoration: BoxDecoration(
+          color: palette.surfaceSecondary,
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+          border: Border.all(color: palette.strokeSoft),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            leading,
+            const SizedBox(width: 6),
+            Text(label, style: theme.textTheme.labelMedium),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 14,
+              color: palette.textMuted,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
