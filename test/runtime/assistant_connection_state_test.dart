@@ -111,6 +111,35 @@ void main() {
       },
     );
 
+    test(
+      'treats missing endpoint as true offline instead of bridge failure',
+      () async {
+        final controller = AppController();
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('session-1');
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+
+        controller.runtimeInternal.snapshotInternal = controller
+            .runtimeInternal
+            .snapshot
+            .copyWith(
+              status: RuntimeConnectionStatus.error,
+              statusText: 'Missing gateway endpoint',
+              lastError: 'Configure setup code or manual host / port first.',
+              lastErrorCode: 'MISSING_ENDPOINT',
+              clearRemoteAddress: true,
+            );
+
+        final state = controller.currentAssistantConnectionState;
+        expect(state.status, RuntimeConnectionStatus.offline);
+        expect(state.primaryLabel, '离线');
+        expect(state.detailLabel, 'xworkmate-bridge 未连接');
+      },
+    );
+
     test('desktop snapshot uses derived assistant connection labels', () async {
       final controller = AppController();
       addTearDown(controller.dispose);

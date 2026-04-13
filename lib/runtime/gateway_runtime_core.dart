@@ -104,7 +104,8 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
   bool get usesSessionClient => sessionClientInternal != null;
 
   @visibleForTesting
-  GatewayRuntimeSessionClient? get sessionClientForTest => sessionClientInternal;
+  GatewayRuntimeSessionClient? get sessionClientForTest =>
+      sessionClientInternal;
 
   Future<void> initialize() async {
     sessionUpdatesInternal ??= sessionClientInternal?.updates.listen(
@@ -234,9 +235,6 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
       );
       snapshotInternal = GatewayConnectionSnapshot.initial(mode: profile.mode)
           .copyWith(
-            statusText: 'Missing gateway endpoint',
-            lastError: 'Configure setup code or manual host / port first.',
-            lastErrorCode: 'MISSING_ENDPOINT',
             deviceId: identity.deviceId,
             connectAuthMode: connectAuthMode,
             connectAuthFields: connectAuthFields,

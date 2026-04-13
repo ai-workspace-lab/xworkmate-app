@@ -505,6 +505,12 @@ String _resolveBridgeAuthorizationToken(Map<String, dynamic> payload) {
   if (explicit.isNotEmpty) {
     return explicit;
   }
+  final uppercaseInternalServiceToken = _stringValue(
+    payload['INTERNAL_SERVICE_TOKEN'],
+  );
+  if (uppercaseInternalServiceToken.isNotEmpty) {
+    return uppercaseInternalServiceToken;
+  }
   final internalServiceToken = _stringValue(payload['internalServiceToken']);
   if (internalServiceToken.isNotEmpty) {
     return internalServiceToken;
