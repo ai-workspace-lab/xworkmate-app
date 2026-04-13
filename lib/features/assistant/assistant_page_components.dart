@@ -510,16 +510,18 @@ class AssistantEmptyStateInternal extends StatelessWidget {
             '输入需求后即可开始执行，结果会回到当前会话并同步到任务页。',
             'Type a request to start execution. Results return to this session and the Tasks page.',
           )
-        : connectionState.pairingRequired
-        ? appText(
-            '当前设备还没通过 Gateway 配对审批。请先在已授权设备上批准该 pairing request，再重新连接。',
-            'This device has not been approved yet. Approve the pairing request from an authorized device, then reconnect.',
-          )
         : connectionState.gatewayTokenMissing
         ? appText(
             '首次连接需要共享 Token；配对完成后可继续使用本机的 device token。',
             'The first connection requires a shared token; after pairing, this device can continue with its device token.',
           )
+        : connectionState.status == RuntimeConnectionStatus.error
+        ? (connectionState.lastError?.trim().isNotEmpty == true
+              ? connectionState.lastError!.trim()
+              : appText(
+                  '当前 bridge 连接失败。请重试连接；如果问题持续存在，请检查 bridge 运行状态和本机身份材料。',
+                  'The bridge connection failed. Retry the connection, and if it keeps failing, check bridge health and local device identity material.',
+                ))
         : !connected
         ? appText(
             '当前 xworkmate-bridge 尚未连接。请先恢复 bridge 连接，再继续当前任务。',
