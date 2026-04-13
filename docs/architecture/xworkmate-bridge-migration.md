@@ -1,60 +1,56 @@
 # XWorkmate Bridge Migration
 
+Last Updated: 2026-04-13
+
 ## Summary
 
-The ACP Bridge Server implementation was migrated out of `xworkmate-app` into the standalone sibling repository `xworkmate-bridge`.
+`xworkmate-app` 已不再承载内嵌 Go bridge 实现；bridge runtime、ACP forwarding、gateway runtime 与 upstream routing 的主设计都已经迁移到独立 sibling repo：
 
-This migration separates the embedded Go bridge/server from the Flutter application repository. The app now depends on the sibling `xworkmate-bridge` repo for the helper/runtime contract instead of carrying an in-repo Go bridge copy.
+- repo: `/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-bridge`
 
-## New Repository
+这个迁移不是兼容壳，而是当前真实的 cross-repo runtime contract。
 
-- Repository path: `/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-bridge`
-- Go module: `xworkmate-bridge`
-- Helper binary output name: `xworkmate-go-core`
+## Current Repo Split
 
-## What Moved
+### xworkmate-app Owns
 
-The previous `xworkmate-app/go/go_core` implementation was migrated to `xworkmate-bridge`, including:
+- `assistant + settings` 双端 surface
+- feature flags、shell、registry、navigation
+- app controller、本地状态编排、secure storage 消费
+- bridge contract client：`GoTaskService`、`GatewayAcpClient`、`ExternalCodeAgentAcpDesktopTransport`
 
-- ACP Bridge HTTP/WebSocket server
-- ACP stdio entrypoint
-- internal routing, dispatch, mounts, shared RPC helpers, gateway runtime support, memory, skills, and toolbridge packages
-- Go tests for ACP routing/contracts and bridge helper behavior
-- legacy static token auth helper code previously stored under `xworkmate-app/go_service`
+### xworkmate-bridge Owns
 
-## What Stayed In xworkmate-app
+- ACP entrypoints 与 forwarding topology
+- provider catalog、routing resolve、gateway runtime
+- upstream ACP adapter / gateway adapter
+- internal service auth injection 与 bridge-owned routing truth
 
-The following app-side concerns remain in `xworkmate-app`:
+## Canonical Cross-Repo Docs
 
-- Flutter UI and settings pages
-- ACP Bridge client-side configuration and secure-storage handling
-- Dart runtime launch/locator logic for the helper binary
+建议按下面顺序阅读当前主链文档：
+
+1. app surface inventory
+   - [XWorkmate Core Module Inventory](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/xworkmate-core-module-inventory-2026-04-13.md)
+2. app control-plane view
+   - [Task Control Plane Unification](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/task-control-plane-unification.md)
+3. bridge forwarding view
+   - [ACP Forwarding Topology](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-bridge/docs/architecture/acp-forwarding-topology.md)
+4. bridge entrypoint ADR
+   - [ADR: Unified Bridge Entry Points](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-bridge/docs/architecture/adr-unified-bridge-entrypoints.md)
 
 ## Build Contract
 
-`xworkmate-app` expects the helper artifact named `xworkmate-go-core`.
+`xworkmate-app` 仍然消费名为 `xworkmate-go-core` 的 helper artifact。
 
-This is the current cross-repo runtime contract for local development flows, not a legacy compatibility shim. The helper is built from `xworkmate-bridge` and consumed by `xworkmate-app` outside the shipped app bundle.
+这表示：
 
-## App Repository Changes
-
-In `xworkmate-app`:
-
-- `go/go_core` was removed
-- `scripts/build-go-core.sh` now resolves and builds from sibling repo `xworkmate-bridge`
-- the script supports both normal workspace layout and worktree layout
-- release notes references were updated to point at the new repository
-
-## Validation
-
-Validated during migration:
-
-- `cd xworkmate-bridge && go test ./...`
-- `cd xworkmate-bridge && bash scripts/build-helper.sh`
-- `cd xworkmate-app && bash scripts/build-go-core.sh`
+- helper 从 `xworkmate-bridge` 构建
+- app 负责定位与调用 helper
+- helper 内部的 bridge/runtime 行为以 bridge repo 为准，不再在 app repo 内保留并列设计文档
 
 ## Operational Note
 
-For local development and packaging, `xworkmate-bridge` must exist as a sibling repository next to `xworkmate-app`, unless `XWORKMATE_BRIDGE_DIR` is set explicitly.
-
-At runtime, the app treats bridge-related discovery, provider sync, connection metadata, and ACP conversation forwarding as bridge-owned concerns. Account sync only updates bridge-linked configuration attributes and secure secret references; it does not auto-connect the bridge.
+- 本地开发默认要求 `xworkmate-app` 与 `xworkmate-bridge` 以 sibling repo 形式存在
+- 若目录布局不同，可通过 `XWORKMATE_BRIDGE_DIR` 显式指定 bridge 仓库位置
+- app 端只消费 bridge capability、routing、gateway runtime 合同，不再在本地恢复旧 provider/module 真源
