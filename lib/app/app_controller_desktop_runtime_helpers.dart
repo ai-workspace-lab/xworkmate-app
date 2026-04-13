@@ -678,7 +678,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (matchesBridgeEndpoint) {
       final bridgeToken =
           runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN') ??
-          runtimeEnvironmentValueInternal('INTERNAL_SERVICE_TOKEN') ??
           (await storeInternal.loadAccountManagedSecret(
             target: kAccountManagedSecretTargetBridgeAuthToken,
           ))?.trim();

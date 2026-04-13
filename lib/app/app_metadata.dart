@@ -11,4 +11,12 @@ const kAppBuildNumber = String.fromEnvironment(
   'XWORKMATE_BUILD_NUMBER',
   defaultValue: '20260311',
 );
+const kAppBuildDate = String.fromEnvironment(
+  'XWORKMATE_BUILD_DATE',
+  defaultValue: '2026-03-28',
+);
+const kAppBuildCommit = String.fromEnvironment(
+  'XWORKMATE_BUILD_COMMIT',
+  defaultValue: 'f153d7b',
+);
 const kAppVersionLabel = 'Version $kAppVersion';

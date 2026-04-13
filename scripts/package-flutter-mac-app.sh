@@ -50,12 +50,16 @@ if [[ -z "$VERSION_LINE" ]]; then
   echo "Unable to read version from $PUBSPEC_PATH" >&2
   exit 1
 fi
+BUILD_DATE_LINE="$(sed -n 's/^build-date:[[:space:]]*//p' "$PUBSPEC_PATH" | head -n 1)"
+BUILD_ID_LINE="$(sed -n 's/^build-id:[[:space:]]*//p' "$PUBSPEC_PATH" | head -n 1)"
 
 APP_VERSION="${VERSION_LINE%%+*}"
 APP_BUILD="${VERSION_LINE#*+}"
 if [[ "$APP_BUILD" == "$VERSION_LINE" ]]; then
   APP_BUILD="1"
 fi
+APP_BUILD_DATE="${BUILD_DATE_LINE:-unknown}"
+APP_BUILD_COMMIT="${BUILD_ID_LINE:-unknown}"
 
 BUILD_APP_PATH="$APP_DIR/build/macos/Build/Products/$PRODUCTS_DIR_NAME/$APP_NAME.app"
 DIST_APP_PATH="$DIST_DIR/$APP_NAME.app"
@@ -77,6 +81,8 @@ BUILD_ARGS=(
   --build-number="$APP_BUILD"
   --dart-define="XWORKMATE_DISPLAY_VERSION=$APP_VERSION"
   --dart-define="XWORKMATE_BUILD_NUMBER=$APP_BUILD"
+  --dart-define="XWORKMATE_BUILD_DATE=$APP_BUILD_DATE"
+  --dart-define="XWORKMATE_BUILD_COMMIT=$APP_BUILD_COMMIT"
   "$APP_STORE_DEFINE"
 )
 
