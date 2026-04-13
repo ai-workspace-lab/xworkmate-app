@@ -97,6 +97,57 @@ void main() {
 
       expect(header, isNull);
     });
+
+    test(
+      'desktop auth resolver reuses the matching gateway profile token',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-acp-auth-matching-profile-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            try {
+              await storeRoot.delete(recursive: true);
+            } on FileSystemException {
+              // Temp cleanup is best effort here. The controller does not own
+              // the lifecycle of the OS temp directory.
+            }
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWithGatewayProfileAt(
+            kGatewayRemoteProfileIndex,
+            GatewayConnectionProfile.defaults().copyWith(
+              host: 'gateway.example.com',
+              port: 8443,
+              tls: true,
+            ),
+          ),
+        );
+        await store.saveSecretValueByRef('gateway_token_0', 'gateway-token');
+
+        final controller = AppController(store: store);
+        addTearDown(controller.dispose);
+        await controller.settingsControllerInternal.resetSnapshot(
+          await store.loadSettingsSnapshot(),
+        );
+
+        final header = await controller
+            .resolveGatewayAcpAuthorizationHeaderInternal(
+              Uri.parse('https://gateway.example.com:8443/acp/rpc'),
+            );
+
+        expect(header, 'gateway-token');
+      },
+    );
   });
 }
 
