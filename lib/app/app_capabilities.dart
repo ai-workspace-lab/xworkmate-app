@@ -8,7 +8,6 @@ class AppCapabilities {
     required this.supportsLocalGateway,
     required this.supportsRelayGateway,
     required this.supportsDesktopRuntime,
-    required this.supportsDiagnostics,
   });
 
   final Set<WorkspaceDestination> allowedDestinations;
@@ -16,7 +15,6 @@ class AppCapabilities {
   final bool supportsLocalGateway;
   final bool supportsRelayGateway;
   final bool supportsDesktopRuntime;
-  final bool supportsDiagnostics;
 
   bool supportsDestination(WorkspaceDestination destination) {
     return allowedDestinations.contains(destination);
@@ -29,7 +27,6 @@ class AppCapabilities {
       supportsLocalGateway: access.supportsLocalGateway,
       supportsRelayGateway: access.supportsRelayGateway,
       supportsDesktopRuntime: access.supportsDesktopRuntime,
-      supportsDiagnostics: access.supportsDiagnostics,
     );
   }
 }
