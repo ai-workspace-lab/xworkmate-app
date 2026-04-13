@@ -13,8 +13,12 @@ PUBSPEC_BUILD_ID := $(shell sed -n 's/^build-id:[[:space:]]*//p' pubspec.yaml | 
 APP_VERSION := $(firstword $(subst +, ,$(PUBSPEC_VERSION_LINE)))
 APP_BUILD_NUMBER_RAW := $(word 2,$(subst +, ,$(PUBSPEC_VERSION_LINE)))
 APP_BUILD_NUMBER := $(if $(APP_BUILD_NUMBER_RAW),$(APP_BUILD_NUMBER_RAW),1)
+APP_BUILD_DATE := $(if $(PUBSPEC_BUILD_DATE),$(PUBSPEC_BUILD_DATE),unknown)
+APP_BUILD_COMMIT := $(if $(PUBSPEC_BUILD_ID),$(PUBSPEC_BUILD_ID),unknown)
 APP_DART_DEFINE_VERSION ?= --dart-define=XWORKMATE_DISPLAY_VERSION=$(APP_VERSION)
 APP_DART_DEFINE_BUILD ?= --dart-define=XWORKMATE_BUILD_NUMBER=$(APP_BUILD_NUMBER)
+APP_DART_DEFINE_BUILD_DATE ?= --dart-define=XWORKMATE_BUILD_DATE=$(APP_BUILD_DATE)
+APP_DART_DEFINE_BUILD_COMMIT ?= --dart-define=XWORKMATE_BUILD_COMMIT=$(APP_BUILD_COMMIT)
 
 .PHONY: help deps analyze test test-all test-flutter test-golden test-integration test-integration-macos test-patrol test-go test-ci check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs check-export-compliance test-real-env-login-chain inspect-xworkmate-bridge-service
 
@@ -81,14 +85,14 @@ open-macos-xcode: ## Open the supported macOS Xcode workspace entrypoint
 	open macos/Runner.xcworkspace
 
 build-linux: ## Build the Linux app in release mode
-	$(FLUTTER) build linux --release
+	$(FLUTTER) build linux --release --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD) $(APP_DART_DEFINE_BUILD_DATE) $(APP_DART_DEFINE_BUILD_COMMIT)
 
 build-macos: ## Build the macOS app in release mode
-	$(FLUTTER) build macos --release $(APP_STORE_DART_DEFINE) --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD)
+	$(FLUTTER) build macos --release $(APP_STORE_DART_DEFINE) --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD) $(APP_DART_DEFINE_BUILD_DATE) $(APP_DART_DEFINE_BUILD_COMMIT)
 	bash scripts/check-apple-export-compliance.sh build/macos/Build/Products/Release/XWorkmate.app
 
 build-ios-sim: ## Build the iOS app for the simulator
-	$(FLUTTER) build ios --simulator $(APP_STORE_DART_DEFINE) --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD)
+	$(FLUTTER) build ios --simulator $(APP_STORE_DART_DEFINE) --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD) $(APP_DART_DEFINE_BUILD_DATE) $(APP_DART_DEFINE_BUILD_COMMIT)
 	bash scripts/check-apple-export-compliance.sh build/ios/iphonesimulator/Runner.app
 
 build-go-core: ## Build the external ACP bridge helper from xworkmate-bridge

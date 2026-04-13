@@ -216,6 +216,56 @@ void main() {
         findsNothing,
       );
     });
+
+    testWidgets('shows live syncing feedback while resync is running', (
+      tester,
+    ) async {
+      final controllers = _TestControllers();
+      addTearDown(controllers.dispose);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: SettingsAccountPanel(
+            settings: SettingsSnapshot.defaults().copyWith(
+              accountBaseUrl: 'https://accounts.svc.plus',
+              accountUsername: 'review@svc.plus',
+            ),
+            accountSession: const AccountSessionSummary(
+              userId: 'u-1',
+              email: 'review@svc.plus',
+              name: 'Review User',
+              role: 'operator',
+              mfaEnabled: true,
+            ),
+            accountState: AccountSyncState.defaults().copyWith(
+              syncState: 'ready',
+              syncMessage: 'Bridge access synced',
+              profileScope: 'bridge',
+            ),
+            accountBusy: true,
+            accountStatus: 'Syncing bridge access...',
+            accountSignedIn: true,
+            accountMfaRequired: false,
+            accountBaseUrlController: controllers.baseUrl,
+            accountIdentifierController: controllers.identifier,
+            accountPasswordController: controllers.password,
+            accountMfaCodeController: controllers.mfaCode,
+            onSaveAccountProfile: () async {},
+            onLogin: () async {},
+            onVerifyMfa: () async {},
+            onCancelMfa: () async {},
+            onSync: () async {},
+            onLogout: () async {},
+          ),
+        ),
+      );
+
+      expect(find.textContaining('Syncing bridge access...'), findsOneWidget);
+      final syncButton = tester.widget<FilledButton>(
+        find.byKey(const ValueKey('settings-account-sync-button')),
+      );
+      expect(syncButton.onPressed, isNull);
+    });
   });
 }
 

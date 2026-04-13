@@ -79,6 +79,10 @@ flowchart TD
 - `acp.capabilities.providerCatalog` 是 assistant provider picker 的唯一上游真源
 - 持久化在线程上的 `providerId` 只表示用户历史选择，不负责反向生成 catalog
 - provider unavailable 文案与 resolved provider 都来自 `xworkmate.routing.resolve`
+- 任务对话模式的 provider 菜单按 execution target 分流：
+  - `agent` 只展示 bridge-owned provider catalog，即 `codex / opencode / gemini`
+  - `gateway` 只展示 canonical gateway provider，即 `OpenClaw`
+- 这里不保留旧的 provider matrix、preset fallback 或双真源选择路径
 
 ### Gateway Truth
 
