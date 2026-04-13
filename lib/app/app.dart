@@ -11,9 +11,9 @@ import 'app_shell.dart';
 import 'ui_feature_manifest.dart';
 
 class XWorkmateApp extends StatefulWidget {
-  const XWorkmateApp({super.key, this.featureManifest});
+  const XWorkmateApp({super.key, required this.featureManifest});
 
-  final UiFeatureManifest? featureManifest;
+  final UiFeatureManifest featureManifest;
 
   @override
   State<XWorkmateApp> createState() => _XWorkmateAppState();
@@ -31,9 +31,7 @@ class _XWorkmateAppState extends State<XWorkmateApp> {
   void initState() {
     super.initState();
     _themeSurface = resolveAppThemeSurface();
-    _controller = AppController(
-      uiFeatureManifest: widget.featureManifest ?? UiFeatureManifest.fallback(),
-    );
+    _controller = AppController(uiFeatureManifest: widget.featureManifest);
     if (_supportsDesktopLifecycleChannel) {
       _appLifecycleChannel.setMethodCallHandler(_handleAppLifecycleCall);
     }

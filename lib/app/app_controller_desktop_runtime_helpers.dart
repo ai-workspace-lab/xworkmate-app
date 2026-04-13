@@ -388,23 +388,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
 
   SettingsSnapshot sanitizeCodeAgentSettingsInternal(
     SettingsSnapshot snapshot,
-  ) {
-    final normalizedRuntimeMode =
-        snapshot.codeAgentRuntimeMode == CodeAgentRuntimeMode.builtIn
-        ? CodeAgentRuntimeMode.externalCli
-        : snapshot.codeAgentRuntimeMode;
-    codexRuntimeWarningInternal =
-        snapshot.codeAgentRuntimeMode == CodeAgentRuntimeMode.builtIn
-        ? appText(
-            '内置 Codex 运行时当前仅保留为未来扩展位；已自动切换为 External Codex CLI。',
-            'Built-in Codex runtime is reserved for a future release; XWorkmate switched back to External Codex CLI automatically.',
-          )
-        : null;
-    if (normalizedRuntimeMode == snapshot.codeAgentRuntimeMode) {
-      return snapshot;
-    }
-    return snapshot.copyWith(codeAgentRuntimeMode: normalizedRuntimeMode);
-  }
+  ) => snapshot;
 
   Future<void> refreshAcpCapabilitiesInternal({
     bool forceRefresh = false,

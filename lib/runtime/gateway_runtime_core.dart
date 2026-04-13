@@ -26,13 +26,10 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
     required SecureConfigStore store,
     required DeviceIdentityStore identityStore,
     GatewayRuntimeSessionClient? sessionClient,
-    bool allowDirectSocketFallbackOnSessionClientFailure = false,
     String runtimeId = '',
   }) : storeInternal = store,
        identityStoreInternal = identityStore,
        sessionClientInternal = sessionClient,
-       allowDirectSocketFallbackOnSessionClientFailureInternal =
-           allowDirectSocketFallbackOnSessionClientFailure,
        runtimeIdInternal = runtimeId.trim().isNotEmpty
            ? runtimeId.trim()
            : randomIdInternal();
@@ -40,7 +37,6 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
   final SecureConfigStore storeInternal;
   final DeviceIdentityStore identityStoreInternal;
   final GatewayRuntimeSessionClient? sessionClientInternal;
-  final bool allowDirectSocketFallbackOnSessionClientFailureInternal;
   final String runtimeIdInternal;
   final StreamController<GatewayPushEvent> eventsInternal =
       StreamController<GatewayPushEvent>.broadcast();
@@ -316,50 +312,40 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
         notifyListeners();
         return;
       } on GatewayRuntimeException catch (error) {
-        if (allowDirectSocketFallbackOnSessionClientFailureInternal &&
-            _shouldFallbackToDirectRuntimeInternal(error)) {
+        if (error.detailCode == 'AUTH_DEVICE_TOKEN_MISMATCH' &&
+            deviceToken.isNotEmpty &&
+            sharedToken.isEmpty) {
+          await storeInternal.clearDeviceToken(
+            deviceId: identity.deviceId,
+            role: 'operator',
+          );
+        } else if (usedStoredDeviceTokenOnly &&
+            isPairingRequiredErrorInternal(error.code, error.detailCode)) {
+          await storeInternal.clearDeviceToken(
+            deviceId: identity.deviceId,
+            role: 'operator',
+          );
           appendLogInternal(
             this,
             'warn',
-            'connect',
-            'go-core runtime unavailable, falling back to direct websocket | code: ${error.code ?? 'unknown'}',
+            'auth',
+            'cleared stale device token after pairing-required response',
           );
-        } else {
-          if (error.detailCode == 'AUTH_DEVICE_TOKEN_MISMATCH' &&
-              deviceToken.isNotEmpty &&
-              sharedToken.isEmpty) {
-            await storeInternal.clearDeviceToken(
-              deviceId: identity.deviceId,
-              role: 'operator',
-            );
-          } else if (usedStoredDeviceTokenOnly &&
-              isPairingRequiredErrorInternal(error.code, error.detailCode)) {
-            await storeInternal.clearDeviceToken(
-              deviceId: identity.deviceId,
-              role: 'operator',
-            );
-            appendLogInternal(
-              this,
-              'warn',
-              'auth',
-              'cleared stale device token after pairing-required response',
-            );
-          }
-          snapshotInternal = snapshotInternal.copyWith(
-            status: RuntimeConnectionStatus.error,
-            statusText: 'Connection failed',
-            lastError: error.toString(),
-            lastErrorCode: error.code,
-            lastErrorDetailCode: error.detailCode,
-            connectAuthMode: connectAuthMode,
-            connectAuthFields: connectAuthFields,
-            connectAuthSources: connectAuthSources,
-            hasSharedAuth: sharedToken.isNotEmpty || password.isNotEmpty,
-            hasDeviceToken: deviceToken.isNotEmpty,
-          );
-          notifyListeners();
-          rethrow;
         }
+        snapshotInternal = snapshotInternal.copyWith(
+          status: RuntimeConnectionStatus.error,
+          statusText: 'Connection failed',
+          lastError: error.toString(),
+          lastErrorCode: error.code,
+          lastErrorDetailCode: error.detailCode,
+          connectAuthMode: connectAuthMode,
+          connectAuthFields: connectAuthFields,
+          connectAuthSources: connectAuthSources,
+          hasSharedAuth: sharedToken.isNotEmpty || password.isNotEmpty,
+          hasDeviceToken: deviceToken.isNotEmpty,
+        );
+        notifyListeners();
+        rethrow;
       }
     }
 
@@ -554,19 +540,6 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
           hasDeviceToken: snapshotInternal.hasDeviceToken,
         );
     notifyListeners();
-  }
-
-  bool _shouldFallbackToDirectRuntimeInternal(GatewayRuntimeException error) {
-    switch (error.code) {
-      case 'GO_GATEWAY_RUNTIME_ENDPOINT_MISSING':
-      case 'GO_GATEWAY_RUNTIME_TRANSPORT_UNAVAILABLE':
-      case 'GO_GATEWAY_RUNTIME_WS_CONNECT_TIMEOUT':
-      case 'GO_GATEWAY_RUNTIME_WS_CLOSED':
-      case 'GO_GATEWAY_RUNTIME_WS_ERROR':
-        return true;
-      default:
-        return false;
-    }
   }
 
   Future<Map<String, dynamic>> health() => _healthInternal();
