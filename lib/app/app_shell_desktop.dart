@@ -26,6 +26,10 @@ class _AppShellState extends State<AppShell> {
   static const _sidebarViewportPadding = 72.0;
   static const _mainContentMinWidth = 640.0;
   static const _sidebarExpandedBaseWidth = 336.0;
+  static const _desktopDestinations = <WorkspaceDestination>[
+    WorkspaceDestination.assistant,
+    WorkspaceDestination.settings,
+  ];
   double? _sidebarExpandedWidth;
 
   static const _mobileDestinations = [
@@ -482,12 +486,27 @@ class _AppShellState extends State<AppShell> {
   }
 
   Widget _buildCurrentPage(ValueChanged<DetailPanelData> onOpenDetail) {
+    final currentDestination = _resolveDesktopDestination(
+      widget.controller.destination,
+    );
     return IndexedStack(
-      index: widget.controller.destination.index,
-      children: WorkspaceDestination.values
+      index: _desktopDestinations.indexOf(currentDestination),
+      children: _desktopDestinations
           .map((destination) => _pageForDestination(destination, onOpenDetail))
           .toList(),
     );
+  }
+
+  WorkspaceDestination _resolveDesktopDestination(
+    WorkspaceDestination destination,
+  ) {
+    if (destination == WorkspaceDestination.account) {
+      return WorkspaceDestination.settings;
+    }
+    if (_desktopDestinations.contains(destination)) {
+      return destination;
+    }
+    return WorkspaceDestination.assistant;
   }
 
   Widget _pageForDestination(

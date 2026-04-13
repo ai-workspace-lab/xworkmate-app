@@ -23,7 +23,7 @@ mobile:
       description: Mobile assistant destination
       ui_surface: mobile_shell
     tasks:
-      enabled: true
+      enabled: false
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Mobile tasks destination
@@ -48,25 +48,25 @@ mobile:
       ui_surface: mobile_shell
   workspace:
     skills:
-      enabled: true
+      enabled: false
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Mobile workspace skills launcher
       ui_surface: mobile_workspace_hub
     nodes:
-      enabled: true
+      enabled: false
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Mobile workspace nodes launcher
       ui_surface: mobile_workspace_hub
     agents:
-      enabled: true
+      enabled: false
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Mobile workspace agents launcher
       ui_surface: mobile_workspace_hub
     mcp_server:
-      enabled: true
+      enabled: false
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Mobile workspace MCP launcher
@@ -275,13 +275,13 @@ desktop:
       description: Desktop ClawHub destination
       ui_surface: sidebar_navigation
     secrets:
-      enabled: true
+      enabled: false
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Desktop secrets destination
       ui_surface: sidebar_navigation
     ai_gateway:
-      enabled: true
+      enabled: false
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Desktop LLM API destination
@@ -293,7 +293,7 @@ desktop:
       description: Desktop settings destination
       ui_surface: sidebar_navigation
     account:
-      enabled: true
+      enabled: false
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Desktop account destination
