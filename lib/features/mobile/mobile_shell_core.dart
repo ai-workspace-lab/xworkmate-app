@@ -213,24 +213,6 @@ class MobileShellStateInternal extends State<MobileShell> {
       if (!mounted) {
         return;
       }
-      if (widget.controller.connection.pairingRequired) {
-        messenger?.showSnackBar(
-          SnackBar(
-            content: Text(
-              appText(
-                '配置码有效，已向 Gateway 发起配对请求。请先在已授权设备上审批。',
-                'Setup code accepted. This device has requested pairing and now waits for approval.',
-              ),
-            ),
-          ),
-        );
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            showMobileSafeSheetInternal();
-          }
-        });
-        return;
-      }
       await openGatewaySetupCodeEntryInternal(prefilledSetupCode: setupCode);
       if (!mounted) {
         return;

@@ -54,25 +54,32 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
 }) {
   final bridgeAddress = connection.remoteAddress?.trim() ?? '';
   final rawStatus = connection.status;
-  final pairingRequired = connection.pairingRequired;
   final gatewayTokenMissing = connection.gatewayTokenMissing;
-  final status = pairingRequired || gatewayTokenMissing
+  final hasFailureEvidence =
+      rawStatus == RuntimeConnectionStatus.error ||
+      (connection.lastError?.trim().isNotEmpty ?? false) ||
+      (connection.lastErrorCode?.trim().isNotEmpty ?? false) ||
+      (connection.lastErrorDetailCode?.trim().isNotEmpty ?? false);
+  final genericFailure = !gatewayTokenMissing && hasFailureEvidence;
+  final status = gatewayTokenMissing || genericFailure
       ? RuntimeConnectionStatus.error
       : rawStatus;
-  final primaryLabel = pairingRequired
-      ? appText('需配对', 'Pairing Required')
-      : gatewayTokenMissing
+  final primaryLabel = gatewayTokenMissing
       ? appText('缺少令牌', 'Missing Token')
+      : genericFailure
+      ? appText('连接失败', 'Connection Failed')
       : status.label;
+  final detailLabel = bridgeAddress.isNotEmpty
+      ? bridgeAddress
+      : genericFailure
+      ? appText('xworkmate-bridge 连接失败', 'xworkmate-bridge connection failed')
+      : appText('xworkmate-bridge 未连接', 'xworkmate-bridge is not connected');
   return AssistantThreadConnectionState(
     executionTarget: target,
     status: status,
     primaryLabel: primaryLabel,
-    detailLabel: bridgeAddress.isEmpty
-        ? appText('xworkmate-bridge 未连接', 'xworkmate-bridge is not connected')
-        : bridgeAddress,
+    detailLabel: detailLabel,
     ready: status == RuntimeConnectionStatus.connected,
-    pairingRequired: pairingRequired,
     gatewayTokenMissing: gatewayTokenMissing,
     lastError: connection.lastError?.trim(),
   );

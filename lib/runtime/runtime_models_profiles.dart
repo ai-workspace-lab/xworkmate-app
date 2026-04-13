@@ -309,7 +309,6 @@ class AssistantThreadConnectionState {
     required this.primaryLabel,
     required this.detailLabel,
     required this.ready,
-    required this.pairingRequired,
     required this.gatewayTokenMissing,
     required this.lastError,
   });
@@ -319,7 +318,6 @@ class AssistantThreadConnectionState {
   final String primaryLabel;
   final String detailLabel;
   final bool ready;
-  final bool pairingRequired;
   final bool gatewayTokenMissing;
   final String? lastError;
 
