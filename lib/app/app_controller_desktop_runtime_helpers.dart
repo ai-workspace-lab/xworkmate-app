@@ -680,21 +680,22 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
           runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN') ??
           (await storeInternal.loadAccountManagedSecret(
             target: kAccountManagedSecretTargetBridgeAuthToken,
-          ))?.trim();
-      final normalizedToken = bridgeToken?.trim() ?? '';
+          ))?.trim() ??
+          await settingsControllerInternal.loadEffectiveGatewayToken(
+            profileIndex: kGatewayRemoteProfileIndex,
+          );
+      final normalizedToken = bridgeToken.trim();
       if (normalizedToken.isNotEmpty) {
         return normalizedToken;
       }
     }
-    final matchingGatewayProfileIndex = gatewayProfileIndexMatchingEndpointInternal(
-      endpoint,
-    );
+    final matchingGatewayProfileIndex =
+        gatewayProfileIndexMatchingEndpointInternal(endpoint);
     if (matchingGatewayProfileIndex == null) {
       return null;
     }
-    final gatewayToken = await settingsControllerInternal.loadEffectiveGatewayToken(
-      profileIndex: matchingGatewayProfileIndex,
-    );
+    final gatewayToken = await settingsControllerInternal
+        .loadEffectiveGatewayToken(profileIndex: matchingGatewayProfileIndex);
     final normalizedGatewayToken = gatewayToken.trim();
     return normalizedGatewayToken.isEmpty ? null : normalizedGatewayToken;
   }
