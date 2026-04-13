@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:yaml/yaml.dart';
 import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
-import 'ui_feature_manifest_fallback.dart';
 
 enum UiFeaturePlatform { mobile, desktop, web }
 
@@ -127,7 +126,6 @@ class UiFeatureManifest {
 
   static const String assetPath = 'config/feature_flags.yaml';
 
-  static const String fallbackYaml = fallbackUiFeatureManifestYamlInternal;
   final Map<UiFeatureBuildMode, Set<UiFeatureReleaseTier>> releasePolicy;
   final Map<UiFeaturePlatform, Map<String, Map<String, UiFeatureFlag>>>
   flagsByPlatformInternal;
@@ -150,10 +148,6 @@ class UiFeatureManifest {
       releasePolicy: releasePolicy,
       flagsByPlatform: flagsByPlatform,
     );
-  }
-
-  factory UiFeatureManifest.fallback() {
-    return UiFeatureManifest.fromYamlString(fallbackYaml);
   }
 
   UiFeatureAccess forPlatform(
@@ -538,8 +532,10 @@ class UiFeatureManifestLoader {
     try {
       final raw = await bundle.loadString(assetPath);
       return UiFeatureManifest.fromYamlString(raw);
-    } catch (_) {
-      return UiFeatureManifest.fallback();
+    } catch (error) {
+      throw StateError(
+        'Failed to load required UI feature manifest "$assetPath": $error',
+      );
     }
   }
 }

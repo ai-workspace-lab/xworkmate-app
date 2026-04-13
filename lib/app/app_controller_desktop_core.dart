@@ -119,6 +119,7 @@ class AppController extends ChangeNotifier {
     RuntimeCoordinator? runtimeCoordinator,
     DesktopPlatformService? desktopPlatformService,
     UiFeatureManifest? uiFeatureManifest,
+    List<SingleAgentProvider>? initialBridgeProviderCatalog,
     SkillDirectoryAccessService? skillDirectoryAccessService,
     AccountRuntimeClient Function(String baseUrl)? accountClientFactory,
     Map<String, String>? environmentOverride,
@@ -129,7 +130,7 @@ class AppController extends ChangeNotifier {
   }) {
     storeInternal = store ?? SecureConfigStore();
     uiFeatureManifestInternal =
-        uiFeatureManifest ?? UiFeatureManifest.fallback();
+        uiFeatureManifest ?? loadRepoUiFeatureManifestSyncInternal();
     hostUiFeaturePlatformInternal = Platform.isIOS || Platform.isAndroid
         ? UiFeaturePlatform.mobile
         : UiFeaturePlatform.desktop;
@@ -230,6 +231,9 @@ class AppController extends ChangeNotifier {
             endpointResolver: resolveGatewayAcpEndpointInternal,
           ),
         );
+    bridgeProviderCatalogInternal = normalizeBridgeOwnedSingleAgentProviderList(
+      initialBridgeProviderCatalog ?? const <SingleAgentProvider>[],
+    );
 
     attachChildListenersInternal();
     unawaited(initializeInternal());
@@ -436,7 +440,6 @@ class AppController extends ChangeNotifier {
   bool isCodexBridgeEnabledInternal = false;
   bool isCodexBridgeBusyInternal = false;
   String? codexBridgeErrorInternal;
-  String? codexRuntimeWarningInternal;
   CodexCooperationState codexCooperationStateInternal =
       CodexCooperationState.notStarted;
   SettingsController get settingsController => settingsControllerInternal;
@@ -521,7 +524,6 @@ class AppController extends ChangeNotifier {
       settingsControllerInternal.hasEffectiveAiGatewayApiKey;
   bool get isCodexBridgeBusy => isCodexBridgeBusyInternal;
   String? get codexBridgeError => codexBridgeErrorInternal;
-  String? get codexRuntimeWarning => codexRuntimeWarningInternal;
   CodeAgentRuntimeMode get configuredCodeAgentRuntimeMode =>
       settings.codeAgentRuntimeMode;
   CodeAgentRuntimeMode get effectiveCodeAgentRuntimeMode =>
@@ -568,15 +570,10 @@ class AppController extends ChangeNotifier {
   List<SingleAgentProvider> get bridgeProviderCatalog =>
       normalizeSingleAgentProviderList(bridgeProviderCatalogInternal);
 
-  List<SingleAgentProvider> get assistantProviderCatalog {
-    final catalog = normalizeBridgeOwnedSingleAgentProviderList(
-      bridgeProviderCatalogInternal,
-    );
-    if (catalog.isNotEmpty) {
-      return catalog;
-    }
-    return kPresetExternalAcpProviders;
-  }
+  List<SingleAgentProvider> get assistantProviderCatalog =>
+      normalizeBridgeOwnedSingleAgentProviderList(
+        bridgeProviderCatalogInternal,
+      );
 
   SingleAgentProvider? bridgeProviderForId(String providerId) {
     final normalizedProviderId = normalizeSingleAgentProviderId(providerId);
@@ -621,6 +618,16 @@ class AppController extends ChangeNotifier {
       return SingleAgentProvider.openclaw;
     }
     return resolveAssistantProvider(thread?.executionBinding.providerId);
+  }
+
+  UiFeatureManifest loadRepoUiFeatureManifestSyncInternal() {
+    final file = File(UiFeatureManifest.assetPath);
+    if (!file.existsSync()) {
+      throw StateError(
+        'UiFeatureManifest is required and "${UiFeatureManifest.assetPath}" is missing.',
+      );
+    }
+    return UiFeatureManifest.fromYamlString(file.readAsStringSync());
   }
 
   List<AssistantExecutionTarget> visibleAssistantExecutionTargets(

@@ -22,20 +22,5 @@ void main() {
         },
       );
     });
-
-    test('fallback manifest only exposes assistant and settings on desktop', () {
-      final desktop = UiFeatureManifest.fallback().forPlatform(
-        UiFeaturePlatform.desktop,
-        buildMode: UiFeatureBuildMode.debug,
-      );
-
-      expect(
-        desktop.allowedDestinations,
-        <WorkspaceDestination>{
-          WorkspaceDestination.assistant,
-          WorkspaceDestination.settings,
-        },
-      );
-    });
   });
 }

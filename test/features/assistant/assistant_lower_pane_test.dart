@@ -4,13 +4,20 @@ import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_models.dart';
 import 'package:xworkmate/features/assistant/assistant_page_main.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 import 'package:xworkmate/widgets/surface_card.dart';
 
 void main() {
   group('AssistantLowerPaneInternal', () {
     testWidgets('shows agent and gateway task dialog modes', (tester) async {
-      final controller = AppController();
+      final controller = AppController(
+        initialBridgeProviderCatalog: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
+          SingleAgentProvider.gemini,
+        ],
+      );
       addTearDown(controller.dispose);
 
       await controller.sessionsController.switchSession('session-1');
@@ -66,7 +73,13 @@ void main() {
     testWidgets('shows assistant providers and allows switching provider', (
       tester,
     ) async {
-      final controller = AppController();
+      final controller = AppController(
+        initialBridgeProviderCatalog: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
+          SingleAgentProvider.gemini,
+        ],
+      );
       addTearDown(controller.dispose);
 
       await controller.sessionsController.switchSession('session-1');
