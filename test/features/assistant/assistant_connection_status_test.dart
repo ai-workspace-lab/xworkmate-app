@@ -110,6 +110,45 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets(
+      'treats missing endpoint as offline and hides stale english setup copy',
+      (tester) async {
+        final controller = AppController();
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('session-1');
+        controller.runtimeInternal.snapshotInternal = controller
+            .runtimeInternal
+            .snapshot
+            .copyWith(
+              status: RuntimeConnectionStatus.error,
+              statusText: 'Missing gateway endpoint',
+              lastError: 'Configure setup code or manual host / port first.',
+              lastErrorCode: 'MISSING_ENDPOINT',
+              clearRemoteAddress: true,
+            );
+
+        await tester.binding.setSurfaceSize(const Size(1440, 960));
+        addTearDown(() async {
+          await tester.binding.setSurfaceSize(null);
+        });
+
+        await tester.pumpWidget(_buildAssistantPage(controller));
+        await tester.pump(const Duration(milliseconds: 100));
+
+        expect(find.text('Bridge 连接失败'), findsNothing);
+        expect(find.text('先连接 Bridge'), findsOneWidget);
+        expect(
+          find.text('Configure setup code or manual host / port first.'),
+          findsNothing,
+        );
+        expect(
+          find.text('当前 xworkmate-bridge 尚未连接。请先恢复 bridge 连接，再继续当前任务。'),
+          findsOneWidget,
+        );
+      },
+    );
   });
 }
 

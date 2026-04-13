@@ -55,14 +55,20 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
   final bridgeAddress = connection.remoteAddress?.trim() ?? '';
   final rawStatus = connection.status;
   final gatewayTokenMissing = connection.gatewayTokenMissing;
+  final missingEndpoint =
+      (connection.lastErrorCode?.trim().toUpperCase() ?? '') ==
+      'MISSING_ENDPOINT';
   final hasFailureEvidence =
-      rawStatus == RuntimeConnectionStatus.error ||
-      (connection.lastError?.trim().isNotEmpty ?? false) ||
-      (connection.lastErrorCode?.trim().isNotEmpty ?? false) ||
-      (connection.lastErrorDetailCode?.trim().isNotEmpty ?? false);
+      !missingEndpoint &&
+      (rawStatus == RuntimeConnectionStatus.error ||
+          (connection.lastError?.trim().isNotEmpty ?? false) ||
+          (connection.lastErrorCode?.trim().isNotEmpty ?? false) ||
+          (connection.lastErrorDetailCode?.trim().isNotEmpty ?? false));
   final genericFailure = !gatewayTokenMissing && hasFailureEvidence;
   final status = gatewayTokenMissing || genericFailure
       ? RuntimeConnectionStatus.error
+      : missingEndpoint
+      ? RuntimeConnectionStatus.offline
       : rawStatus;
   final primaryLabel = gatewayTokenMissing
       ? appText('缺少令牌', 'Missing Token')

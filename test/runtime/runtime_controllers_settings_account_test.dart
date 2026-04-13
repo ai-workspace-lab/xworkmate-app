@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xworkmate/runtime/account_runtime_client.dart';
 import 'package:xworkmate/runtime/runtime_controllers.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
@@ -55,6 +56,64 @@ void main() {
           'Bridge authorization is unavailable',
         );
         expect(controller.accountStatus, 'Bridge authorization is unavailable');
+      },
+    );
+
+    test(
+      'login sync accepts INTERNAL_SERVICE_TOKEN payload for managed bridge auth',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-account-sync-uppercase-token-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            await storeRoot.delete(recursive: true);
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(
+            accountBaseUrl: 'https://accounts.svc.plus',
+          ),
+        );
+
+        final controller = SettingsController(
+          store,
+          accountClientFactory: (_) => _FakeAccountRuntimeClient(
+            loginPayload: <String, dynamic>{
+              'token': 'session-token',
+              'INTERNAL_SERVICE_TOKEN': 'bridge-token-from-login',
+              'user': <String, dynamic>{
+                'id': 'user-1',
+                'email': 'review@svc.plus',
+              },
+            },
+          ),
+        );
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        await controller.loginAccount(
+          baseUrl: 'https://accounts.svc.plus',
+          identifier: 'review@svc.plus',
+          password: 'password',
+        );
+
+        expect(controller.accountSyncState, isNotNull);
+        expect(controller.accountSyncState!.syncState, 'ready');
+        expect(
+          await store.loadAccountManagedSecret(
+            target: kAccountManagedSecretTargetBridgeAuthToken,
+          ),
+          'bridge-token-from-login',
+        );
       },
     );
 
@@ -178,4 +237,19 @@ void main() {
       },
     );
   });
+}
+
+class _FakeAccountRuntimeClient extends AccountRuntimeClient {
+  _FakeAccountRuntimeClient({required this.loginPayload})
+    : super(baseUrl: 'https://accounts.svc.plus');
+
+  final Map<String, dynamic> loginPayload;
+
+  @override
+  Future<Map<String, dynamic>> login({
+    required String identifier,
+    required String password,
+  }) async {
+    return loginPayload;
+  }
 }
