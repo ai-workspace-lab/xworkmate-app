@@ -331,6 +331,13 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     final selectedProvider = controller.assistantProviderForSession(
       controller.currentSessionKey,
     );
+    final providerMenuProviders = switch (executionTarget) {
+      AssistantExecutionTarget.gateway =>
+        selectedProvider.isUnspecified
+            ? const <SingleAgentProvider>[]
+            : <SingleAgentProvider>[selectedProvider],
+      AssistantExecutionTarget.agent => availableProviders,
+    };
     final selectedSkills = widget.availableSkills
         .where((skill) => widget.selectedSkillKeys.contains(skill.key))
         .toList(growable: false);
@@ -425,11 +432,14 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                 ),
                 const SizedBox(width: 4),
               ],
-              if (executionTarget.isAgent && availableProviders.isNotEmpty) ...[
+              if (providerMenuProviders.isNotEmpty) ...[
                 PopupMenuButton<String>(
                   key: const Key('assistant-provider-button'),
                   tooltip: appText('智能体 Provider', 'Agent Provider'),
                   onSelected: (providerId) async {
+                    if (executionTarget.isGateway) {
+                      return;
+                    }
                     await controller.setAssistantSingleAgentProvider(
                       controller.resolveAssistantProvider(providerId),
                     );
@@ -437,7 +447,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                       setState(() {});
                     }
                   },
-                  itemBuilder: (context) => availableProviders
+                  itemBuilder: (context) => providerMenuProviders
                       .map(
                         (provider) => PopupMenuItem<String>(
                           value: provider.providerId,

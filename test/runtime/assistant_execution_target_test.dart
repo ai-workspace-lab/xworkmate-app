@@ -62,7 +62,12 @@ void main() {
         );
         addTearDown(() async {
           if (await storeRoot.exists()) {
-            await storeRoot.delete(recursive: true);
+            try {
+              await storeRoot.delete(recursive: true);
+            } on FileSystemException {
+              // Temp cleanup is best effort here. The controller may still be
+              // releasing files when teardown starts.
+            }
           }
         });
 
