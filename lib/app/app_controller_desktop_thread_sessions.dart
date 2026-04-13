@@ -321,11 +321,6 @@ extension AppControllerDesktopThreadSessions on AppController {
   String gatewayAddressLabelInternal(GatewayConnectionProfile profile) =>
       gatewayAddressLabelThreadSessionInternal(profile);
 
-  List<SecretReferenceEntry> get secretReferences =>
-      settingsControllerInternal.buildSecretReferences();
-  List<SecretAuditEntry> get secretAuditTrail =>
-      settingsControllerInternal.auditTrail;
-  List<RuntimeLogEntry> get runtimeLogs => runtimeInternal.logs;
   List<AssistantFocusEntry> get assistantNavigationDestinations =>
       normalizeAssistantNavigationDestinations(
         appUiState.assistantNavigationDestinations,

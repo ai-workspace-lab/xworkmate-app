@@ -1,364 +1,17 @@
 // ignore_for_file: unused_import, unnecessary_import
 
 import 'package:flutter/material.dart';
+
 import '../app/app_controller.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
+import 'assistant_focus_panel_core.dart';
+import 'assistant_focus_panel_support.dart';
 import 'chrome_quick_action_buttons.dart';
 import 'settings_focus_quick_actions.dart';
 import 'surface_card.dart';
-import 'assistant_focus_panel_core.dart';
-import 'assistant_focus_panel_support.dart';
-
-class TasksFocusPreviewInternal extends StatelessWidget {
-  const TasksFocusPreviewInternal({super.key, required this.controller});
-
-  final AssistantFocusControllerInternal controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final typedController = castAssistantFocusControllerInternal(controller);
-    final items = <DerivedTaskItem>[
-      ...typedController.tasksController.running.take(2),
-      ...typedController.tasksController.queue.take(2),
-      ...typedController.tasksController.history.take(1),
-    ].take(4).toList(growable: false);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            FocusPillInternal(
-              label: appText(
-                '运行中 ${typedController.tasksController.running.length}',
-                'Running ${typedController.tasksController.running.length}',
-              ),
-            ),
-            FocusPillInternal(
-              label: appText(
-                '队列 ${typedController.tasksController.queue.length}',
-                'Queue ${typedController.tasksController.queue.length}',
-              ),
-            ),
-            FocusPillInternal(
-              label: appText(
-                '计划 ${typedController.tasksController.scheduled.length}',
-                'Scheduled ${typedController.tasksController.scheduled.length}',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (items.isEmpty)
-          PreviewEmptyStateInternal(
-            message:
-                typedController.connection.status ==
-                    RuntimeConnectionStatus.connected
-                ? appText('当前没有任务摘要。', 'No task summary yet.')
-                : appText(
-                    '恢复 xworkmate-bridge 连接后这里会显示任务摘要。',
-                    'Task summaries appear here after xworkmate-bridge reconnects.',
-                  ),
-          )
-        else
-          ...items.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: FocusListTileInternal(
-                title: item.title,
-                subtitle: item.summary,
-                trailing: item.status,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class SkillsFocusPreviewInternal extends StatelessWidget {
-  const SkillsFocusPreviewInternal({super.key, required this.controller});
-
-  final AssistantFocusControllerInternal controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final typedController = castAssistantFocusControllerInternal(controller);
-    final items = typedController.skills.take(4).toList(growable: false);
-    if (items.isEmpty) {
-      final bridgeEndpointMissing =
-          typedController.resolveExternalAcpEndpointForTargetInternal(
-                AssistantExecutionTarget.gateway,
-              ) ==
-              null;
-      return PreviewEmptyStateInternal(
-        message: bridgeEndpointMissing
-            ? appText(
-                'Bridge Server 当前不可用。恢复后这里会显示线程技能摘要。',
-                'The bridge server is currently unavailable. Thread skill summaries will appear here after it recovers.',
-              )
-            : typedController.connection.status == RuntimeConnectionStatus.connected
-            ? appText(
-                '当前代理没有已加载技能。',
-                'No skills are loaded for the active agent.',
-              )
-            : appText(
-                '恢复 xworkmate-bridge 连接后可查看技能摘要。',
-                'Skill summaries are available again after xworkmate-bridge reconnects.',
-              ),
-      );
-    }
-    return Column(
-      children: items
-          .map(
-            (skill) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: FocusListTileInternal(
-                title: skill.name,
-                subtitle: skill.description,
-                trailing: skill.disabled
-                    ? appText('已禁用', 'Disabled')
-                    : appText('已启用', 'Enabled'),
-              ),
-            ),
-          )
-          .toList(growable: false),
-    );
-  }
-}
-
-class NodesFocusPreviewInternal extends StatelessWidget {
-  const NodesFocusPreviewInternal({super.key, required this.controller});
-
-  final AssistantFocusControllerInternal controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final typedController = castAssistantFocusControllerInternal(controller);
-    final items = typedController.instances.take(4).toList(growable: false);
-    if (items.isEmpty) {
-      return PreviewEmptyStateInternal(
-        message: appText('当前没有节点可显示。', 'No nodes are available right now.'),
-      );
-    }
-    return Column(
-      children: items
-          .map(
-            (instance) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: FocusListTileInternal(
-                title: instance.host?.trim().isNotEmpty == true
-                    ? instance.host!
-                    : instance.id,
-                subtitle:
-                    [instance.platform, instance.deviceFamily, instance.ip]
-                        .whereType<String>()
-                        .where((item) => item.trim().isNotEmpty)
-                        .join(' · '),
-                trailing: instance.mode ?? appText('未知', 'Unknown'),
-              ),
-            ),
-          )
-          .toList(growable: false),
-    );
-  }
-}
-
-class AgentsFocusPreviewInternal extends StatelessWidget {
-  const AgentsFocusPreviewInternal({super.key, required this.controller});
-
-  final AssistantFocusControllerInternal controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final typedController = castAssistantFocusControllerInternal(controller);
-    final items = typedController.agents.take(5).toList(growable: false);
-    if (items.isEmpty) {
-      return PreviewEmptyStateInternal(
-        message: appText('当前没有代理摘要。', 'No agents are available right now.'),
-      );
-    }
-    return Column(
-      children: items
-          .map(
-            (agent) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: FocusListTileInternal(
-                title: '${agent.emoji} ${agent.name}',
-                subtitle: agent.id,
-                trailing: agent.name == typedController.activeAgentName
-                    ? appText('当前', 'Active')
-                    : agent.theme,
-              ),
-            ),
-          )
-          .toList(growable: false),
-    );
-  }
-}
-
-class McpFocusPreviewInternal extends StatelessWidget {
-  const McpFocusPreviewInternal({super.key, required this.controller});
-
-  final AssistantFocusControllerInternal controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final typedController = castAssistantFocusControllerInternal(controller);
-    final items = typedController.connectors.take(4).toList(growable: false);
-    if (items.isEmpty) {
-      return PreviewEmptyStateInternal(
-        message: appText(
-          '当前没有 MCP 连接器。恢复 xworkmate-bridge 连接后这里会显示工具摘要。',
-          'No MCP connectors yet. Tool summaries appear here after xworkmate-bridge reconnects.',
-        ),
-      );
-    }
-    return Column(
-      children: items
-          .map(
-            (connector) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: FocusListTileInternal(
-                title: connector.label,
-                subtitle: connector.detailLabel,
-                trailing: connector.status,
-              ),
-            ),
-          )
-          .toList(growable: false),
-    );
-  }
-}
-
-class ClawHubFocusPreviewInternal extends StatelessWidget {
-  const ClawHubFocusPreviewInternal({super.key, required this.controller});
-
-  final AssistantFocusControllerInternal controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final typedController = castAssistantFocusControllerInternal(controller);
-    final skillCount = typedController.skills.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            FocusPillInternal(
-              label: appText('已加载技能 $skillCount', 'Loaded skills $skillCount'),
-            ),
-            FocusPillInternal(
-              label: appText(
-                '关注入口 ${typedController.assistantNavigationDestinations.length}',
-                'Pinned ${typedController.assistantNavigationDestinations.length}',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        PreviewEmptyStateInternal(
-          message: appText(
-            'ClawHub 适合放在侧板做快速搜索或安装入口；需要完整终端交互时，再打开全页。',
-            'Use ClawHub in the side panel for quick access. Open the full page when you need the terminal workflow.',
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class SecretsFocusPreviewInternal extends StatelessWidget {
-  const SecretsFocusPreviewInternal({super.key, required this.controller});
-
-  final AssistantFocusControllerInternal controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final typedController = castAssistantFocusControllerInternal(controller);
-    final items = typedController.secretReferences
-        .take(4)
-        .toList(growable: false);
-    if (items.isEmpty) {
-      return PreviewEmptyStateInternal(
-        message: appText(
-          '当前没有密钥引用摘要。',
-          'No masked secret references are available yet.',
-        ),
-      );
-    }
-    return Column(
-      children: items
-          .map(
-            (secret) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: FocusListTileInternal(
-                title: secret.name,
-                subtitle: '${secret.provider} · ${secret.module}',
-                trailing: secret.status,
-              ),
-            ),
-          )
-          .toList(growable: false),
-    );
-  }
-}
-
-class AiGatewayFocusPreviewInternal extends StatelessWidget {
-  const AiGatewayFocusPreviewInternal({super.key, required this.controller});
-
-  final AssistantFocusControllerInternal controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final typedController = castAssistantFocusControllerInternal(controller);
-    final items = typedController.models.take(4).toList(growable: false);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            FocusPillInternal(label: typedController.connection.status.label),
-            FocusPillInternal(
-              label: appText(
-                '模型 ${typedController.models.length}',
-                'Models ${typedController.models.length}',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (items.isEmpty)
-          PreviewEmptyStateInternal(
-            message: appText(
-              '当前没有 LLM API 模型摘要。',
-              'No LLM API model summary is available yet.',
-            ),
-          )
-        else
-          ...items.map(
-            (model) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: FocusListTileInternal(
-                title: model.name,
-                subtitle: model.provider,
-                trailing: model.id,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
 
 class SettingsFocusPreviewInternal extends StatelessWidget {
   const SettingsFocusPreviewInternal({super.key, required this.controller});
@@ -524,102 +177,45 @@ class FocusListTileInternal extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final theme = Theme.of(context);
-
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       decoration: BoxDecoration(
         color: palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: palette.strokeSoft),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: palette.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: palette.textSecondary,
-              height: 1.3,
-            ),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(width: 12),
           Text(
             trailing,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
               color: palette.textPrimary,
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class FocusPillInternal extends StatelessWidget {
-  const FocusPillInternal({super.key, required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: palette.strokeSoft),
-      ),
-      child: Text(
-        label,
-        style: theme.textTheme.labelLarge?.copyWith(
-          color: palette.textSecondary,
-        ),
-      ),
-    );
-  }
-}
-
-class PreviewEmptyStateInternal extends StatelessWidget {
-  const PreviewEmptyStateInternal({super.key, required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final theme = Theme.of(context);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: palette.strokeSoft),
-      ),
-      child: Text(
-        message,
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: palette.textSecondary,
-          height: 1.35,
-        ),
       ),
     );
   }

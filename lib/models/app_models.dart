@@ -4,45 +4,18 @@ import '../i18n/app_language.dart';
 
 enum WorkspaceDestination {
   assistant,
-  tasks,
-  skills,
-  nodes,
-  agents,
-  mcpServer,
-  clawHub,
-  secrets,
-  aiGateway,
   settings,
-  account,
 }
 
 extension WorkspaceDestinationCopy on WorkspaceDestination {
   String get label => switch (this) {
     WorkspaceDestination.assistant => appText('助手', 'Assistant'),
-    WorkspaceDestination.tasks => appText('任务', 'Tasks'),
-    WorkspaceDestination.skills => appText('技能', 'Skills'),
-    WorkspaceDestination.nodes => appText('节点', 'Nodes'),
-    WorkspaceDestination.agents => appText('代理', 'Agents'),
-    WorkspaceDestination.mcpServer => 'MCP Hub',
-    WorkspaceDestination.clawHub => 'ClawHub',
-    WorkspaceDestination.secrets => appText('密钥', 'Secrets'),
-    WorkspaceDestination.aiGateway => 'LLM API',
     WorkspaceDestination.settings => appText('设置', 'Settings'),
-    WorkspaceDestination.account => appText('在线账户', 'Online Account'),
   };
 
   IconData get icon => switch (this) {
     WorkspaceDestination.assistant => Icons.chat_bubble_outline_rounded,
-    WorkspaceDestination.tasks => Icons.layers_rounded,
-    WorkspaceDestination.skills => Icons.auto_awesome_rounded,
-    WorkspaceDestination.nodes => Icons.developer_board_rounded,
-    WorkspaceDestination.agents => Icons.hub_rounded,
-    WorkspaceDestination.mcpServer => Icons.dns_rounded,
-    WorkspaceDestination.clawHub => Icons.extension_rounded,
-    WorkspaceDestination.secrets => Icons.key_rounded,
-    WorkspaceDestination.aiGateway => Icons.smart_toy_rounded,
     WorkspaceDestination.settings => Icons.tune_rounded,
-    WorkspaceDestination.account => Icons.account_circle_rounded,
   };
 
   String get description => switch (this) {
@@ -50,45 +23,9 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
       'AI 主入口，优先承接自然输入和高频工作发起。',
       'Primary AI entry point for natural input and frequent task starts.',
     ),
-    WorkspaceDestination.tasks => appText(
-      '任务队列、运行态、失败项和调度历史的统一视图。',
-      'Unified view for queue, running, failed, and history.',
-    ),
-    WorkspaceDestination.skills => appText(
-      '管理技能包与能力扩展，浏览和安装 ClawHub 技能。',
-      'Manage skill packages and extensions, browse and install from ClawHub.',
-    ),
-    WorkspaceDestination.nodes => appText(
-      '管理边缘节点与实例，监控运行状态与负载。',
-      'Manage edge nodes and instances, monitor status and load.',
-    ),
-    WorkspaceDestination.agents => appText(
-      '管理代理实例，配置行为与能力。',
-      'Manage agent instances, configure behaviors and capabilities.',
-    ),
-    WorkspaceDestination.mcpServer => appText(
-      '管理 MCP Hub 连接与工具配置。',
-      'Manage MCP Hub connections and tool configurations.',
-    ),
-    WorkspaceDestination.clawHub => appText(
-      '浏览和安装技能包、代理模板与连接器。',
-      'Browse and install skill packages, agent templates and connectors.',
-    ),
-    WorkspaceDestination.secrets => appText(
-      '密钥与 Vault 配置统一收口到设置中心。',
-      'Secrets and Vault configuration now live in the Settings center.',
-    ),
-    WorkspaceDestination.aiGateway => appText(
-      'LLM API 配置统一收口到设置中心。',
-      'LLM API configuration now lives in the Settings center.',
-    ),
     WorkspaceDestination.settings => appText(
-      '全局配置中心，只负责系统设置与诊断，不承担业务模块入口。',
-      'Global settings and diagnostics, separated from business modules.',
-    ),
-    WorkspaceDestination.account => appText(
-      '在线账户、工作区切换、登录会话与 ACP Bridge Server 同步管理。',
-      'Online account, workspace switching, login sessions, and ACP Bridge Server sync.',
+      '桥接、账户与集成配置统一收口到设置中心。',
+      'Bridge, account, and integration settings are consolidated in Settings.',
     ),
   };
 
@@ -106,14 +43,6 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
 }
 
 enum AssistantFocusEntry {
-  tasks,
-  skills,
-  nodes,
-  agents,
-  mcpServer,
-  clawHub,
-  secrets,
-  aiGateway,
   settings,
   language,
   theme,
@@ -121,69 +50,21 @@ enum AssistantFocusEntry {
 
 extension AssistantFocusEntryCopy on AssistantFocusEntry {
   String get label => switch (this) {
-    AssistantFocusEntry.tasks => appText('任务', 'Tasks'),
-    AssistantFocusEntry.skills => appText('技能', 'Skills'),
-    AssistantFocusEntry.nodes => appText('节点', 'Nodes'),
-    AssistantFocusEntry.agents => appText('代理', 'Agents'),
-    AssistantFocusEntry.mcpServer => 'MCP Hub',
-    AssistantFocusEntry.clawHub => 'ClawHub',
-    AssistantFocusEntry.secrets => appText('密钥', 'Secrets'),
-    AssistantFocusEntry.aiGateway => 'LLM API',
     AssistantFocusEntry.settings => appText('设置', 'Settings'),
     AssistantFocusEntry.language => appText('语言', 'Language'),
     AssistantFocusEntry.theme => appText('主题/亮度', 'Theme / Brightness'),
   };
 
   IconData get icon => switch (this) {
-    AssistantFocusEntry.tasks => Icons.layers_rounded,
-    AssistantFocusEntry.skills => Icons.auto_awesome_rounded,
-    AssistantFocusEntry.nodes => Icons.developer_board_rounded,
-    AssistantFocusEntry.agents => Icons.hub_rounded,
-    AssistantFocusEntry.mcpServer => Icons.dns_rounded,
-    AssistantFocusEntry.clawHub => Icons.extension_rounded,
-    AssistantFocusEntry.secrets => Icons.key_rounded,
-    AssistantFocusEntry.aiGateway => Icons.smart_toy_rounded,
     AssistantFocusEntry.settings => Icons.tune_rounded,
     AssistantFocusEntry.language => Icons.translate_rounded,
     AssistantFocusEntry.theme => Icons.brightness_6_rounded,
   };
 
   String get description => switch (this) {
-    AssistantFocusEntry.tasks => appText(
-      '任务队列、运行态、失败项和调度历史的统一视图。',
-      'Unified view for queue, running, failed, and history.',
-    ),
-    AssistantFocusEntry.skills => appText(
-      '管理技能包与能力扩展，浏览和安装 ClawHub 技能。',
-      'Manage skill packages and extensions, browse and install from ClawHub.',
-    ),
-    AssistantFocusEntry.nodes => appText(
-      '管理边缘节点与实例，监控运行状态与负载。',
-      'Manage edge nodes and instances, monitor status and load.',
-    ),
-    AssistantFocusEntry.agents => appText(
-      '管理代理实例，配置行为与能力。',
-      'Manage agent instances, configure behaviors and capabilities.',
-    ),
-    AssistantFocusEntry.mcpServer => appText(
-      '管理 MCP Hub 连接与工具配置。',
-      'Manage MCP Hub connections and tool configurations.',
-    ),
-    AssistantFocusEntry.clawHub => appText(
-      '浏览和安装技能包、代理模板与连接器。',
-      'Browse and install skill packages, agent templates and connectors.',
-    ),
-    AssistantFocusEntry.secrets => appText(
-      '密钥与 Vault 配置统一收口到设置中心。',
-      'Secrets and Vault configuration now live in the Settings center.',
-    ),
-    AssistantFocusEntry.aiGateway => appText(
-      'LLM API 配置统一收口到设置中心。',
-      'LLM API configuration now lives in the Settings center.',
-    ),
     AssistantFocusEntry.settings => appText(
-      '全局配置中心，只负责系统设置与诊断，不承担业务模块入口。',
-      'Global settings and diagnostics, separated from business modules.',
+      '打开设置中心，管理 Bridge、账户与集成配置。',
+      'Open Settings to manage bridge, account, and integration configuration.',
     ),
     AssistantFocusEntry.language => appText(
       '快速切换中英文界面语言，无需先进入设置页。',
@@ -196,14 +77,6 @@ extension AssistantFocusEntryCopy on AssistantFocusEntry {
   };
 
   WorkspaceDestination? get destination => switch (this) {
-    AssistantFocusEntry.tasks => WorkspaceDestination.tasks,
-    AssistantFocusEntry.skills => WorkspaceDestination.skills,
-    AssistantFocusEntry.nodes => WorkspaceDestination.nodes,
-    AssistantFocusEntry.agents => WorkspaceDestination.agents,
-    AssistantFocusEntry.mcpServer => WorkspaceDestination.mcpServer,
-    AssistantFocusEntry.clawHub => WorkspaceDestination.clawHub,
-    AssistantFocusEntry.secrets => WorkspaceDestination.secrets,
-    AssistantFocusEntry.aiGateway => WorkspaceDestination.aiGateway,
     AssistantFocusEntry.settings => WorkspaceDestination.settings,
     AssistantFocusEntry.language => null,
     AssistantFocusEntry.theme => null,
@@ -228,17 +101,8 @@ extension AssistantFocusEntryCopy on AssistantFocusEntry {
 
   static AssistantFocusEntry fromDestination(WorkspaceDestination destination) {
     return switch (destination) {
-      WorkspaceDestination.tasks => AssistantFocusEntry.tasks,
-      WorkspaceDestination.skills => AssistantFocusEntry.skills,
-      WorkspaceDestination.nodes => AssistantFocusEntry.nodes,
-      WorkspaceDestination.agents => AssistantFocusEntry.agents,
-      WorkspaceDestination.mcpServer => AssistantFocusEntry.mcpServer,
-      WorkspaceDestination.clawHub => AssistantFocusEntry.clawHub,
-      WorkspaceDestination.secrets => AssistantFocusEntry.secrets,
-      WorkspaceDestination.aiGateway => AssistantFocusEntry.aiGateway,
       WorkspaceDestination.settings => AssistantFocusEntry.settings,
-      WorkspaceDestination.assistant ||
-      WorkspaceDestination.account => throw ArgumentError.value(
+      WorkspaceDestination.assistant => throw ArgumentError.value(
         destination,
         'destination',
         'Focused assistant entries only support pinnable workspace targets.',
@@ -252,14 +116,6 @@ const List<AssistantFocusEntry> kAssistantNavigationDestinationDefaults =
 
 const List<AssistantFocusEntry> kAssistantNavigationDestinationCandidates =
     <AssistantFocusEntry>[
-      AssistantFocusEntry.tasks,
-      AssistantFocusEntry.skills,
-      AssistantFocusEntry.nodes,
-      AssistantFocusEntry.agents,
-      AssistantFocusEntry.mcpServer,
-      AssistantFocusEntry.clawHub,
-      AssistantFocusEntry.secrets,
-      AssistantFocusEntry.aiGateway,
       AssistantFocusEntry.settings,
       AssistantFocusEntry.language,
       AssistantFocusEntry.theme,
@@ -300,84 +156,15 @@ extension AssistantModeCopy on AssistantMode {
   };
 }
 
-enum TasksTab { queue, running, history, failed, scheduled }
-
-extension TasksTabCopy on TasksTab {
-  String get label => switch (this) {
-    TasksTab.queue => appText('队列', 'Queue'),
-    TasksTab.running => appText('运行中', 'Running'),
-    TasksTab.history => appText('历史', 'History'),
-    TasksTab.failed => appText('失败', 'Failed'),
-    TasksTab.scheduled => appText('计划中', 'Scheduled'),
-  };
-}
-
-enum ModulesTab { gateway, nodes, agents, skills, clawHub, connectors }
-
-extension ModulesTabCopy on ModulesTab {
-  String get label => switch (this) {
-    ModulesTab.gateway => appText('网关', 'Gateway'),
-    ModulesTab.nodes => appText('节点', 'Nodes'),
-    ModulesTab.agents => appText('代理', 'Agents'),
-    ModulesTab.skills => appText('技能', 'Skills'),
-    ModulesTab.clawHub => 'ClawHub',
-    ModulesTab.connectors => appText('连接器', 'Connectors'),
-  };
-}
-
-enum SecretsTab { vault, localStore, providers, audit }
-
-extension SecretsTabCopy on SecretsTab {
-  String get label => switch (this) {
-    SecretsTab.vault => 'Vault',
-    SecretsTab.localStore => appText('本地存储', 'Local Store'),
-    SecretsTab.providers => appText('提供方', 'Providers'),
-    SecretsTab.audit => appText('审计', 'Audit'),
-  };
-}
-
-enum SettingsTab {
-  general,
-  workspace,
-  gateway,
-  agents,
-  appearance,
-  diagnostics,
-  experimental,
-  about,
-}
+enum SettingsTab { gateway }
 
 extension SettingsTabCopy on SettingsTab {
   String get label => switch (this) {
-    SettingsTab.general => appText('通用', 'General'),
-    SettingsTab.workspace => appText('工作区', 'Workspace'),
     SettingsTab.gateway => appText('集成', 'Integrations'),
-    SettingsTab.agents => appText('多 Agent', 'Multi-Agent'),
-    SettingsTab.appearance => appText('外观', 'Appearance'),
-    SettingsTab.diagnostics => appText('诊断', 'Diagnostics'),
-    SettingsTab.experimental => appText('实验特性', 'Experimental'),
-    SettingsTab.about => appText('关于', 'About'),
   };
 }
 
-enum AiGatewayTab { models, agents, endpoints, tools }
-
-extension AiGatewayTabCopy on AiGatewayTab {
-  String get label => switch (this) {
-    AiGatewayTab.models => appText('模型', 'Models'),
-    AiGatewayTab.agents => appText('代理', 'Agents'),
-    AiGatewayTab.endpoints => appText('端点', 'Endpoints'),
-    AiGatewayTab.tools => appText('工具', 'Tools'),
-  };
-}
-
-enum SettingsDetailPage {
-  gatewayConnection,
-  aiGatewayIntegration,
-  vaultProvider,
-  externalAgents,
-  diagnosticsAdvanced,
-}
+enum SettingsDetailPage { gatewayConnection }
 
 extension SettingsDetailPageCopy on SettingsDetailPage {
   String get label => switch (this) {
@@ -385,30 +172,10 @@ extension SettingsDetailPageCopy on SettingsDetailPage {
       'Gateway 连接参数',
       'Gateway Connection',
     ),
-    SettingsDetailPage.aiGatewayIntegration => appText(
-      'LLM 接入点',
-      'LLM Endpoints',
-    ),
-    SettingsDetailPage.vaultProvider => appText(
-      'Vault 提供方参数',
-      'Vault Provider',
-    ),
-    SettingsDetailPage.externalAgents => appText(
-      '多 Agent 协作参数',
-      'External Agents',
-    ),
-    SettingsDetailPage.diagnosticsAdvanced => appText(
-      '高级诊断参数',
-      'Advanced Diagnostics',
-    ),
   };
 
   SettingsTab get tab => switch (this) {
-    SettingsDetailPage.gatewayConnection ||
-    SettingsDetailPage.aiGatewayIntegration ||
-    SettingsDetailPage.vaultProvider => SettingsTab.gateway,
-    SettingsDetailPage.externalAgents => SettingsTab.agents,
-    SettingsDetailPage.diagnosticsAdvanced => SettingsTab.diagnostics,
+    SettingsDetailPage.gatewayConnection => SettingsTab.gateway,
   };
 }
 
@@ -418,9 +185,6 @@ class SettingsNavigationContext {
     required this.rootLabel,
     required this.destination,
     this.sectionLabel,
-    this.modulesTab,
-    this.secretsTab,
-    this.aiGatewayTab,
     this.settingsTab,
     this.gatewayProfileIndex,
     this.prefersGatewaySetupCode,
@@ -429,9 +193,6 @@ class SettingsNavigationContext {
   final String rootLabel;
   final WorkspaceDestination destination;
   final String? sectionLabel;
-  final ModulesTab? modulesTab;
-  final SecretsTab? secretsTab;
-  final AiGatewayTab? aiGatewayTab;
   final SettingsTab? settingsTab;
   final int? gatewayProfileIndex;
   final bool? prefersGatewaySetupCode;

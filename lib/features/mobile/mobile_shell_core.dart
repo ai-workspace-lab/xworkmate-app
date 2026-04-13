@@ -1,7 +1,9 @@
 // ignore_for_file: unused_import, unnecessary_import
 
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../../app/app_controller.dart';
 import '../../app/ui_feature_manifest.dart';
 import '../../app/workspace_page_registry.dart';
@@ -12,35 +14,23 @@ import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/detail_drawer.dart';
 import 'mobile_gateway_pairing_guide_page.dart';
-import 'mobile_shell_strip.dart';
-import 'mobile_shell_sheet.dart';
-import 'mobile_shell_workspace.dart';
 import 'mobile_shell_nav.dart';
+import 'mobile_shell_sheet.dart';
+import 'mobile_shell_strip.dart';
 
-enum MobileShellTab { assistant, tasks, workspace, secrets, settings }
+enum MobileShellTab { assistant, settings }
 
 extension MobileShellTabPresentationInternal on MobileShellTab {
   String get label => switch (this) {
     MobileShellTab.assistant => appText('助手', 'Assistant'),
-    MobileShellTab.tasks => appText('任务', 'Tasks'),
-    MobileShellTab.workspace => appText('工作区', 'Workspace'),
-    MobileShellTab.secrets => appText('密钥', 'Secrets'),
     MobileShellTab.settings => appText('设置', 'Settings'),
   };
 
   IconData get icon => switch (this) {
     MobileShellTab.assistant => Icons.chat_bubble_outline_rounded,
-    MobileShellTab.tasks => Icons.layers_rounded,
-    MobileShellTab.workspace => Icons.grid_view_rounded,
-    MobileShellTab.secrets => Icons.key_rounded,
     MobileShellTab.settings => Icons.settings_rounded,
   };
 }
-
-const tealSoftInternal = Color(0xFFDDF3EF);
-const tealLineInternal = Color(0xFF49A892);
-const violetSoftInternal = Color(0xFFECE2FF);
-const violetLineInternal = Color(0xFF7A61B6);
 
 class MobileShell extends StatefulWidget {
   const MobileShell({super.key, required this.controller});
@@ -52,90 +42,22 @@ class MobileShell extends StatefulWidget {
 }
 
 class MobileShellStateInternal extends State<MobileShell> {
-  bool showWorkspaceHubInternal = false;
-  late WorkspaceDestination lastDestinationInternal;
-
-  @override
-  void initState() {
-    super.initState();
-    lastDestinationInternal = widget.controller.destination;
-    widget.controller.addListener(handleControllerChangedInternal);
-  }
-
-  @override
-  void didUpdateWidget(covariant MobileShell oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller == widget.controller) {
-      return;
-    }
-    oldWidget.controller.removeListener(handleControllerChangedInternal);
-    lastDestinationInternal = widget.controller.destination;
-    widget.controller.addListener(handleControllerChangedInternal);
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(handleControllerChangedInternal);
-    super.dispose();
-  }
-
-  void handleControllerChangedInternal() {
-    final destination = widget.controller.destination;
-    if (destination == lastDestinationInternal) {
-      return;
-    }
-    lastDestinationInternal = destination;
-    if (showWorkspaceHubInternal && mounted) {
-      setState(() {
-        showWorkspaceHubInternal = false;
-      });
-    }
-  }
-
   MobileShellTab tabForDestinationInternal(WorkspaceDestination destination) {
     return switch (destination) {
       WorkspaceDestination.assistant => MobileShellTab.assistant,
-      WorkspaceDestination.tasks => MobileShellTab.tasks,
-      WorkspaceDestination.skills ||
-      WorkspaceDestination.nodes ||
-      WorkspaceDestination.agents ||
-      WorkspaceDestination.mcpServer ||
-      WorkspaceDestination.clawHub ||
-      WorkspaceDestination.aiGateway => MobileShellTab.workspace,
-      WorkspaceDestination.secrets => MobileShellTab.secrets,
       WorkspaceDestination.settings => MobileShellTab.settings,
-      WorkspaceDestination.account => MobileShellTab.settings,
     };
   }
 
   void selectTabInternal(MobileShellTab tab) {
     switch (tab) {
       case MobileShellTab.assistant:
-        setState(() => showWorkspaceHubInternal = false);
         widget.controller.navigateTo(WorkspaceDestination.assistant);
         return;
-      case MobileShellTab.tasks:
-        setState(() => showWorkspaceHubInternal = false);
-        widget.controller.navigateTo(WorkspaceDestination.tasks);
-        return;
-      case MobileShellTab.workspace:
-        prefetchMobileSafeStateInternal();
-        setState(() => showWorkspaceHubInternal = true);
-        return;
-      case MobileShellTab.secrets:
-        setState(() => showWorkspaceHubInternal = false);
-        widget.controller.navigateTo(WorkspaceDestination.secrets);
-        return;
       case MobileShellTab.settings:
-        setState(() => showWorkspaceHubInternal = false);
         widget.controller.navigateTo(WorkspaceDestination.settings);
         return;
     }
-  }
-
-  void openWorkspaceDestinationInternal(WorkspaceDestination destination) {
-    setState(() => showWorkspaceHubInternal = false);
-    widget.controller.navigateTo(destination);
   }
 
   void openDetailSheetInternal(DetailPanelData detail) {
@@ -157,6 +79,7 @@ class MobileShellStateInternal extends State<MobileShell> {
         rootLabel: appText('移动端', 'Mobile'),
         destination: WorkspaceDestination.settings,
         sectionLabel: appText('集成', 'Integrations'),
+        settingsTab: SettingsTab.gateway,
         gatewayProfileIndex: kGatewayRemoteProfileIndex,
         prefersGatewaySetupCode: false,
       ),
@@ -185,6 +108,7 @@ class MobileShellStateInternal extends State<MobileShell> {
         rootLabel: appText('移动端', 'Mobile'),
         destination: WorkspaceDestination.settings,
         sectionLabel: appText('集成', 'Integrations'),
+        settingsTab: SettingsTab.gateway,
         gatewayProfileIndex: kGatewayRemoteProfileIndex,
         prefersGatewaySetupCode: true,
       ),
@@ -256,9 +180,6 @@ class MobileShellStateInternal extends State<MobileShell> {
           ),
         ),
       );
-      return;
-    }
-    if (!mounted) {
       return;
     }
     final codeController = TextEditingController();
@@ -347,18 +268,8 @@ class MobileShellStateInternal extends State<MobileShell> {
   }
 
   Widget buildCurrentPageInternal() {
-    final features = widget.controller.featuresFor(UiFeaturePlatform.mobile);
-    if (showWorkspaceHubInternal && features.showsWorkspaceHub) {
-      return MobileWorkspaceLauncherInternal(
-        controller: widget.controller,
-        onOpenGatewayConnect: showConnectSheetInternal,
-        onSelectDestination: openWorkspaceDestinationInternal,
-      );
-    }
-
-    final destination = widget.controller.destination;
     return buildWorkspacePage(
-      destination: destination,
+      destination: widget.controller.destination,
       controller: widget.controller,
       onOpenDetail: openDetailSheetInternal,
       surface: WorkspacePageSurface.mobile,
@@ -376,25 +287,16 @@ class MobileShellStateInternal extends State<MobileShell> {
         final availableTabs = <MobileShellTab>[
           if (features.isEnabledPath(UiFeatureKeys.navigationAssistant))
             MobileShellTab.assistant,
-          if (features.isEnabledPath(UiFeatureKeys.navigationTasks))
-            MobileShellTab.tasks,
-          if (features.showsWorkspaceHub) MobileShellTab.workspace,
-          if (features.isEnabledPath(UiFeatureKeys.navigationSecrets))
-            MobileShellTab.secrets,
           if (features.isEnabledPath(UiFeatureKeys.navigationSettings))
             MobileShellTab.settings,
         ];
-        final currentTab = showWorkspaceHubInternal
-            ? MobileShellTab.workspace
-            : tabForDestinationInternal(widget.controller.destination);
+        final currentTab = tabForDestinationInternal(widget.controller.destination);
         final resolvedCurrentTab = availableTabs.contains(currentTab)
             ? currentTab
             : (availableTabs.isEmpty ? currentTab : availableTabs.first);
-        final destinationKey = showWorkspaceHubInternal
-            ? const ValueKey<String>('mobile-shell-workspace')
-            : ValueKey<String>(
-                'mobile-shell-${widget.controller.destination.name}',
-              );
+        final destinationKey = ValueKey<String>(
+          'mobile-shell-${widget.controller.destination.name}',
+        );
         final detailPanel = widget.controller.detailPanel;
         final palette = context.palette;
         return Scaffold(

@@ -34,9 +34,6 @@ class _AppShellState extends State<AppShell> {
 
   static const _mobileDestinations = [
     WorkspaceDestination.assistant,
-    WorkspaceDestination.tasks,
-    WorkspaceDestination.skills,
-    WorkspaceDestination.secrets,
     WorkspaceDestination.settings,
   ];
 
@@ -189,10 +186,7 @@ class _AppShellState extends State<AppShell> {
                       final showPinnedDetail =
                           controller.detailPanel != null &&
                           constraints.maxWidth > 1280;
-                      final mobileDestination =
-                          controller.destination == WorkspaceDestination.account
-                          ? WorkspaceDestination.settings
-                          : controller.destination;
+                      final mobileDestination = controller.destination;
                       final availableMobileDestinations = _mobileDestinations
                           .where(controller.capabilities.supportsDestination)
                           .toList(growable: false);
@@ -320,9 +314,10 @@ class _AppShellState extends State<AppShell> {
                                   onExpandFromCollapsed: () =>
                                       _toggleSidebarVisibility(controller),
                                   onOpenHome: controller.navigateHome,
-                                  onOpenAccount: () => controller.navigateTo(
-                                    WorkspaceDestination.account,
-                                  ),
+                                  onOpenAccount: () =>
+                                      controller.openSettings(
+                                        tab: SettingsTab.gateway,
+                                      ),
                                   onOpenThemeToggle: () =>
                                       controller.setThemeMode(
                                         controller.themeMode == ThemeMode.dark
@@ -500,9 +495,6 @@ class _AppShellState extends State<AppShell> {
   WorkspaceDestination _resolveDesktopDestination(
     WorkspaceDestination destination,
   ) {
-    if (destination == WorkspaceDestination.account) {
-      return WorkspaceDestination.settings;
-    }
     if (_desktopDestinations.contains(destination)) {
       return destination;
     }
