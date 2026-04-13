@@ -52,7 +52,22 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(controller.assistantExecutionTarget.name, 'gateway');
-      expect(find.byKey(const Key('assistant-provider-button')), findsNothing);
+      expect(
+        find.byKey(const Key('assistant-provider-button')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('assistant-provider-button')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('assistant-provider-menu-item-openclaw')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const Key('assistant-provider-menu-item-openclaw')),
+      );
+      await tester.pumpAndSettle();
 
       await tester.tap(
         find.byKey(const Key('assistant-execution-target-button')),
