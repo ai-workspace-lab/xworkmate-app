@@ -20,92 +20,6 @@ class AccountRuntimeException implements Exception {
   }
 }
 
-class BridgeBootstrapIssue {
-  const BridgeBootstrapIssue({
-    required this.ticket,
-    required this.shortCode,
-    required this.bridgeOrigin,
-    required this.scheme,
-    required this.expiresAt,
-    required this.scopes,
-    required this.oneTime,
-    required this.qrPayload,
-  });
-
-  final String ticket;
-  final String shortCode;
-  final String bridgeOrigin;
-  final String scheme;
-  final String expiresAt;
-  final List<String> scopes;
-  final bool oneTime;
-  final String qrPayload;
-
-  static String _stringValueStatic(Object? raw) {
-    return raw == null ? '' : raw.toString().trim();
-  }
-
-  factory BridgeBootstrapIssue.fromJson(Map<String, dynamic> json) {
-    List<String> scopes = const <String>[];
-    if (json['scopes'] is List) {
-      scopes = (json['scopes'] as List)
-          .map((item) => item.toString().trim())
-          .where((item) => item.isNotEmpty)
-          .toList(growable: false);
-    }
-    return BridgeBootstrapIssue(
-      ticket: BridgeBootstrapIssue._stringValueStatic(json['ticket']),
-      shortCode: BridgeBootstrapIssue._stringValueStatic(json['shortCode']),
-      bridgeOrigin: BridgeBootstrapIssue._stringValueStatic(json['bridge']),
-      scheme: BridgeBootstrapIssue._stringValueStatic(json['scheme']),
-      expiresAt: BridgeBootstrapIssue._stringValueStatic(json['expiresAt']),
-      scopes: scopes,
-      oneTime: json['oneTime'] as bool? ?? false,
-      qrPayload: BridgeBootstrapIssue._stringValueStatic(json['qrPayload']),
-    );
-  }
-}
-
-class BridgeBootstrapConsumeResult {
-  const BridgeBootstrapConsumeResult({
-    required this.setupCode,
-    required this.bridgeOrigin,
-    required this.authMode,
-    required this.expiresAt,
-    required this.issuedBy,
-  });
-
-  final String setupCode;
-  final String bridgeOrigin;
-  final String authMode;
-  final String expiresAt;
-  final String issuedBy;
-
-  static String _stringValueStatic(Object? raw) {
-    return raw == null ? '' : raw.toString().trim();
-  }
-
-  factory BridgeBootstrapConsumeResult.fromJson(Map<String, dynamic> json) {
-    return BridgeBootstrapConsumeResult(
-      setupCode: BridgeBootstrapConsumeResult._stringValueStatic(
-        json['setupCode'],
-      ),
-      bridgeOrigin: BridgeBootstrapConsumeResult._stringValueStatic(
-        json['bridgeOrigin'],
-      ),
-      authMode: BridgeBootstrapConsumeResult._stringValueStatic(
-        json['authMode'],
-      ),
-      expiresAt: BridgeBootstrapConsumeResult._stringValueStatic(
-        json['expiresAt'],
-      ),
-      issuedBy: BridgeBootstrapConsumeResult._stringValueStatic(
-        json['issuedBy'],
-      ),
-    );
-  }
-}
-
 class AccountRuntimeClient {
   AccountRuntimeClient({required String baseUrl})
     : baseUrl = _normalizeBaseUrl(baseUrl);
@@ -166,44 +80,14 @@ class AccountRuntimeClient {
     );
   }
 
-  Future<BridgeBootstrapIssue> createBridgeBootstrapTicket({
+  Future<Map<String, dynamic>> loadXWorkmateProfileSync({
     required String token,
-  }) async {
-    final payload = await _requestJson(
-      method: 'POST',
-      path: '/api/auth/xworkmate/bridge/bootstrap',
-      bearerToken: token,
-      body: const <String, Object?>{},
-    );
-    return BridgeBootstrapIssue.fromJson(payload);
-  }
-
-  Future<BridgeBootstrapIssue> lookupBridgeBootstrapTicket({
-    required String token,
-    required String shortCode,
-  }) async {
-    final payload = await _requestJson(
+  }) {
+    return _requestJson(
       method: 'GET',
-      path:
-          '/api/auth/xworkmate/bridge/bootstrap/${Uri.encodeComponent(shortCode.trim())}',
+      path: '/api/auth/xworkmate/profile/sync',
       bearerToken: token,
     );
-    return BridgeBootstrapIssue.fromJson(payload);
-  }
-
-  Future<BridgeBootstrapConsumeResult> consumeBridgeBootstrapTicket({
-    required String ticket,
-    required String bridgeOrigin,
-  }) async {
-    final payload = await _requestJson(
-      method: 'POST',
-      path: '/bridge/bootstrap/consume',
-      body: <String, Object?>{
-        'ticket': ticket.trim(),
-        'bridge': bridgeOrigin.trim(),
-      },
-    );
-    return BridgeBootstrapConsumeResult.fromJson(payload);
   }
 
   Future<String> readVaultSecretValue({

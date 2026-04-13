@@ -49,48 +49,6 @@ import 'app_controller_desktop_runtime_helpers.dart';
 extension AppControllerDesktopGateway on AppController {
   Future<String> resolveConnectSetupCode(String rawInput) async {
     final trimmed = rawInput.trim();
-    if (trimmed.isEmpty) {
-      return trimmed;
-    }
-    if (decodeGatewaySetupCode(trimmed) != null) {
-      return trimmed;
-    }
-    final bootstrapEnvelope = decodeBridgeBootstrapEnvelope(trimmed);
-    if (bootstrapEnvelope != null) {
-      final bridgeClient = AccountRuntimeClient(
-        baseUrl: bootstrapEnvelope.bridgeOrigin,
-      );
-      final consumed = await bridgeClient.consumeBridgeBootstrapTicket(
-        ticket: bootstrapEnvelope.ticket,
-        bridgeOrigin: bootstrapEnvelope.bridgeOrigin,
-      );
-      return consumed.setupCode.trim();
-    }
-    if (isBridgeBootstrapShortCode(trimmed)) {
-      final sessionToken =
-          (await storeInternal.loadAccountSessionToken())?.trim() ?? '';
-      final accountBaseUrl = settings.accountBaseUrl.trim().isNotEmpty
-          ? settings.accountBaseUrl.trim()
-          : settingsControllerInternal.snapshot.accountBaseUrl.trim();
-      if (sessionToken.isEmpty || accountBaseUrl.isEmpty) {
-        throw StateError(
-          'Account sign-in is required before using a bridge verification code.',
-        );
-      }
-      final accountClient = settingsControllerInternal.buildAccountClient(
-        accountBaseUrl,
-      );
-      final issue = await accountClient.lookupBridgeBootstrapTicket(
-        token: sessionToken,
-        shortCode: trimmed,
-      );
-      final bridgeClient = AccountRuntimeClient(baseUrl: issue.bridgeOrigin);
-      final consumed = await bridgeClient.consumeBridgeBootstrapTicket(
-        ticket: issue.ticket,
-        bridgeOrigin: issue.bridgeOrigin,
-      );
-      return consumed.setupCode.trim();
-    }
     return trimmed;
   }
 
