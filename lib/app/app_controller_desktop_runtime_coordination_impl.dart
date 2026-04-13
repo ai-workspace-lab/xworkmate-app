@@ -117,9 +117,7 @@ mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal(
         final available = switch (item.targetId) {
           'codex' => providers.contains('codex'),
           'opencode' => providers.contains('opencode'),
-          'claude' => providers.contains('claude'),
           'gemini' => providers.contains('gemini'),
-          'aris' => capabilities.multiAgent,
           'openclaw' => capabilities.multiAgent || capabilities.singleAgent,
           _ => false,
         };
