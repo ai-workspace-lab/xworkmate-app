@@ -201,19 +201,7 @@ class MobileSafeSheetInternal extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (connection.pairingRequired) ...[
-                      const SizedBox(height: 12),
-                      MobileSafetyNoticeInternal(
-                        tone: palette.warning.withValues(alpha: 0.12),
-                        borderColor: palette.warning.withValues(alpha: 0.32),
-                        icon: Icons.approval_outlined,
-                        title: appText('需要设备审批', 'Pairing Required'),
-                        message: appText(
-                          '当前设备已经向 Gateway 发起配对。请在已授权的 operator 设备上审批，然后重新连接。',
-                          'This device already requested pairing. Approve it from an authorized operator device, then reconnect.',
-                        ),
-                      ),
-                    ] else if (connection.gatewayTokenMissing) ...[
+                    if (connection.gatewayTokenMissing) ...[
                       const SizedBox(height: 12),
                       MobileSafetyNoticeInternal(
                         tone: palette.danger.withValues(alpha: 0.1),

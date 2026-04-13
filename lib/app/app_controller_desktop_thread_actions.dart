@@ -462,6 +462,7 @@ extension AppControllerDesktopThreadActions on AppController {
   }
 
   Map<String, dynamic> desktopStatusSnapshot() {
+    final connectionState = currentAssistantConnectionState;
     final pausedTasks = tasksControllerInternal.scheduled
         .where((item) => item.status == 'Disabled')
         .length;
@@ -475,9 +476,9 @@ extension AppControllerDesktopThreadActions on AppController {
     final badgeCount = runningTasks + pausedTasks + timedOutTasks;
     return <String, dynamic>{
       'connectionStatus': desktopConnectionStatusValueInternal(
-        connection.status,
+        connectionState.status,
       ),
-      'connectionLabel': connection.status.label,
+      'connectionLabel': connectionState.primaryLabel,
       'runningTasks': runningTasks,
       'pausedTasks': pausedTasks,
       'timedOutTasks': timedOutTasks,

@@ -158,18 +158,6 @@ class GatewayConnectionSnapshot {
     );
   }
 
-  bool get pairingRequired {
-    if (status == RuntimeConnectionStatus.connected) {
-      return false;
-    }
-    final detailCode = lastErrorDetailCode?.trim().toUpperCase();
-    final errorCode = lastErrorCode?.trim().toUpperCase();
-    final errorText = lastError?.toLowerCase() ?? '';
-    return detailCode == 'PAIRING_REQUIRED' ||
-        errorCode == 'NOT_PAIRED' ||
-        errorText.contains('pairing required');
-  }
-
   bool get gatewayTokenMissing {
     if (status == RuntimeConnectionStatus.connected) {
       return false;
