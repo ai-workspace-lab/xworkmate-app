@@ -53,6 +53,23 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     final currentTarget = assistantExecutionTargetForSession(
       sessionsControllerInternal.currentSessionKey,
     );
+    final shouldRefreshAgentProviders =
+        resolvedTarget.isAgent && assistantProviderCatalog.isEmpty;
+    if (shouldRefreshAgentProviders) {
+      try {
+        await refreshSingleAgentCapabilitiesInternal(forceRefresh: true);
+      } catch (_) {
+        // Keep target selection interactive even when a just-in-time
+        // capabilities refresh fails. The provider picker will remain hidden
+        // until the next successful refresh.
+      }
+      if (currentTarget == resolvedTarget &&
+          settings.assistantExecutionTarget == resolvedTarget) {
+        recomputeTasksInternal();
+        notifyIfActiveInternal();
+        return;
+      }
+    }
     if (currentTarget == resolvedTarget &&
         settings.assistantExecutionTarget == resolvedTarget) {
       return;
