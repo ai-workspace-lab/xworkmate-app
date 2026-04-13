@@ -243,6 +243,15 @@ extension AppControllerDesktopGateway on AppController {
     await cronJobsControllerInternal.refresh();
     await devicesControllerInternal.refresh(quiet: true);
     await settingsControllerInternal.refreshDerivedState();
+    try {
+      await refreshAcpCapabilitiesInternal(
+        forceRefresh: true,
+        persistMountTargets: true,
+      );
+    } catch (_) {
+      // Keep the Gateway connect flow usable even if ACP capability refresh
+      // trails the runtime handshake.
+    }
     await ensureCodexGatewayRegistrationInternal();
     recomputeTasksInternal();
   }
