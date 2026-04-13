@@ -470,9 +470,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     agentsControllerInternal.addListener(relayChildChangeInternal);
     sessionsControllerInternal.addListener(relayChildChangeInternal);
     chatControllerInternal.addListener(relayChildChangeInternal);
-    instancesControllerInternal.addListener(relayChildChangeInternal);
     skillsControllerInternal.addListener(relayChildChangeInternal);
-    connectorsControllerInternal.addListener(relayChildChangeInternal);
     modelsControllerInternal.addListener(relayChildChangeInternal);
     cronJobsControllerInternal.addListener(relayChildChangeInternal);
     devicesControllerInternal.addListener(relayChildChangeInternal);
@@ -488,9 +486,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     agentsControllerInternal.removeListener(relayChildChangeInternal);
     sessionsControllerInternal.removeListener(relayChildChangeInternal);
     chatControllerInternal.removeListener(relayChildChangeInternal);
-    instancesControllerInternal.removeListener(relayChildChangeInternal);
     skillsControllerInternal.removeListener(relayChildChangeInternal);
-    connectorsControllerInternal.removeListener(relayChildChangeInternal);
     modelsControllerInternal.removeListener(relayChildChangeInternal);
     cronJobsControllerInternal.removeListener(relayChildChangeInternal);
     devicesControllerInternal.removeListener(relayChildChangeInternal);

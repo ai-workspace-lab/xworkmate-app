@@ -29,38 +29,6 @@ UiFeatureManifest applyAppleAppStorePolicy(
   final disabledPaths = <(UiFeaturePlatform, String, String)>[
     (
       hostPlatform,
-      'navigation',
-      _featureKeyLeaf(UiFeatureKeys.navigationAgents),
-    ),
-    (
-      hostPlatform,
-      'navigation',
-      _featureKeyLeaf(UiFeatureKeys.navigationMcpServer),
-    ),
-    (
-      hostPlatform,
-      'navigation',
-      _featureKeyLeaf(UiFeatureKeys.navigationClawHub),
-    ),
-    (hostPlatform, 'workspace', _featureKeyLeaf(UiFeatureKeys.workspaceAgents)),
-    (
-      hostPlatform,
-      'workspace',
-      _featureKeyLeaf(UiFeatureKeys.workspaceMcpServer),
-    ),
-    (
-      hostPlatform,
-      'workspace',
-      _featureKeyLeaf(UiFeatureKeys.workspaceClawHub),
-    ),
-    (hostPlatform, 'settings', _featureKeyLeaf(UiFeatureKeys.settingsAgents)),
-    (
-      hostPlatform,
-      'settings',
-      _featureKeyLeaf(UiFeatureKeys.settingsExperimental),
-    ),
-    (
-      hostPlatform,
       'settings',
       _featureKeyLeaf(UiFeatureKeys.settingsExperimentalCanvas),
     ),

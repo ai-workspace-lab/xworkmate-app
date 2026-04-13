@@ -58,22 +58,6 @@ void openSettingsNavigationContext(
   AppController controller,
   SettingsNavigationContext context,
 ) {
-  if (context.modulesTab != null) {
-    if (context.modulesTab == ModulesTab.gateway) {
-      controller.openSettings(tab: SettingsTab.gateway);
-      return;
-    }
-    controller.openModules(tab: context.modulesTab!);
-    return;
-  }
-  if (context.secretsTab != null) {
-    controller.openSettings(tab: SettingsTab.gateway);
-    return;
-  }
-  if (context.aiGatewayTab != null) {
-    controller.openSettings(tab: SettingsTab.gateway);
-    return;
-  }
   if (context.settingsTab != null ||
       context.destination == WorkspaceDestination.settings) {
     controller.openSettings(tab: context.settingsTab ?? SettingsTab.gateway);
