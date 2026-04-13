@@ -1,79 +1,84 @@
 # Settings Integration Configuration Model
 
-This document records the current logical model behind Settings -> Integrations,
-with the provider catalog aligned to the bridge-only design.
+Last Updated: 2026-04-13
+
+本文件记录当前 `Settings -> Integrations` 在主链中的职责边界。
 
 ## Current Rule
 
-- Settings only manages bridge connection parameters and account sync metadata.
-- The provider picker is not derived from local endpoint presets.
-- `xworkmate-bridge` is the only source of truth for the provider catalog.
+- Settings 只管理 bridge connection 参数与 account sync 元数据
+- app 不从本地 endpoint preset、旧 module 配置、历史 fallback 恢复 provider catalog
+- `xworkmate-bridge` 是 provider catalog、gateway capability、routing resolve 的唯一真源
 
-## Bridge-Only Provider Source Of Truth
+## Bridge-Owned Source Of Truth
 
 ```mermaid
 flowchart TD
-  A["Settings UI
-  仅管理 Bridge 连接参数
-  与账号同步元数据"] --> G["acp.capabilities"]
-  G --> H["providerCatalog[]
-  singleAgent / multiAgent"]
+  subgraph SETTINGS["Settings surface"]
+    A["SettingsPage / SettingsAccountPanel"]
+    B["bridge connection params<br/>account sync metadata<br/>secure refs"]
+    A --> B
+  end
 
-  H --> I["refreshSingleAgentCapabilitiesRuntimeInternal()"]
-  I --> J["bridgeProviderCatalogInternal
-  App 内唯一 provider 名单源"]
-  I --> K["singleAgentCapabilitiesByProviderInternal
-  App 内唯一 provider 可用性源"]
+  subgraph BRIDGE["Bridge contract"]
+    C["acp.capabilities"]
+    D["xworkmate.routing.resolve"]
+    E["xworkmate.gateway.*"]
+    B --> C
+  end
 
-  G --> L["refreshAcpCapabilitiesRuntimeInternal()"]
-  L --> M["GatewayAcpCapabilities
-  providerCatalog / singleAgent / multiAgent"]
-  M --> N["mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal()"]
-  N --> O["ManagedMountTargetState
-  codex / opencode / claude / gemini / aris / openclaw
-  available / discoveryState"]
+  subgraph APPSTATE["App-side derived state"]
+    F["refreshSingleAgentCapabilitiesRuntimeInternal()"]
+    G["bridgeProviderCatalogInternal"]
+    H["singleAgentCapabilitiesByProviderInternal"]
+    I["refreshAcpCapabilitiesRuntimeInternal()"]
+    J["GatewayAcpCapabilities"]
+    K["mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal()"]
+    L["ManagedMountTargetState"]
+    C --> F --> G
+    F --> H
+    C --> I --> J --> K --> L
+  end
 
-  J --> P["bridgeProviderCatalog
-  = bridgeProviderCatalogInternal"]
-  P --> Q["singleAgentProviderOptions
-  Composer / Thread Picker 唯一数据源"]
+  subgraph UI["Visible affordances"]
+    M["assistant provider picker"]
+    N["available assistant targets"]
+    O["settings gateway connection affordances"]
+    G --> M
+    H --> N
+    L --> O
+  end
 
-  K --> R["availableSingleAgentProviders
-  = bridge 当前可用 provider"]
-  R --> S["visibleAssistantExecutionTargets(...)
-  agent / gateway 是否显示
-  只看 bridge runtime capabilities"]
-
-  O --> T["visible gateway affordances
-  gateway discovery 只看 bridge capabilities"]
-
-  Q --> U["setSingleAgentProvider(providerId)
-  仅写入 thread executionBinding.providerId"]
-
-  U --> V["singleAgentProviderForSession()
-  恢复线程已选 providerId"]
-
-  V --> W["sendSingleAgentMessageDesktopGoTaskFlowInternal()"]
-  W --> X["xworkmate.routing.resolve"]
-  X --> Y["bridge 返回 resolvedExecutionTarget /
-  resolvedProviderId /
-  unavailableCode /
-  unavailableMessage"]
-
-  Y --> Z{"unavailable?"}
-  Z -->|"no"| AA["executeTask(... resolved routing ...)"]
-  Z -->|"yes"| AB["provider unavailable UX
-  直接使用 bridge unavailable message"]
+  subgraph EXEC["Execution"]
+    P["setSingleAgentProvider(providerId)"]
+    Q["singleAgentProviderForSession()"]
+    R["executeTask(...)"]
+    S["resolved provider / unavailable message"]
+    T["provider unavailable UX"]
+    M --> P --> Q --> R
+    R --> D --> S
+    S --> T
+    O --> E
+  end
 ```
+
+## What Settings Owns
+
+- bridge host / transport / auth input
+- account-linked bridge configuration metadata
+- secure secret references
+- gateway connection test / connect / disconnect affordance
+
+## What Settings Does Not Own
+
+- 独立 provider catalog
+- 独立 module matrix
+- app-side gateway preset backfill
+- 旧 `ai_gateway` / `secrets` / `account` 页面壳
 
 ## Notes
 
-- Production cloud mode does not use app-side provider sync.
-- Provider visibility and picker contents come from
-  `acp.capabilities.providerCatalog`.
-- Auto-provider resolution and unavailable messaging come from
-  `xworkmate.routing.resolve`.
-- `openclaw` and other mount-target discovery states are also bridge-owned and
-  come from ACP capabilities merged into `ManagedMountTargetState`.
-- Persisted thread `providerId` restores the user's previous selection, but it
-  does not repopulate the provider catalog.
+- `providerCatalog` 只负责 assistant provider picker；不会因为线程里保存过 `providerId` 就被 app 反向重建
+- gateway runtime 可见性来自 bridge capability snapshot 与 `xworkmate.gateway.*` 返回，不来自旧设置页枚举
+- bridge 若返回额外 capability flag，这些 flag 只属于合同元数据，不会自动生成新的 settings tab 或 module page
+- production provider / gateway 选择继续由 bridge 拥有，app 只保留消费与展示

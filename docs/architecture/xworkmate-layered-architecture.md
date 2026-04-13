@@ -1,113 +1,115 @@
-# XWorkmate 整体分层架构
+# XWorkmate Layered Architecture
 
-Last Updated: 2026-04-08
+Last Updated: 2026-04-13
 
-## 目的
+## Purpose
 
-本文件只保留整体分层总览与目录作用，不再把当前兼容旁路写成长期规范。
+本文件只保留当前 `xworkmate-app <-> xworkmate-bridge` 主链的分层总览。
 
-统一口径如下：
+当前仓库已经收敛到：
 
-- `TaskThread` 是线程控制面
-- `GoTaskService.executeTask` 是唯一公开执行入口
-- ACP 是统一控制面
-- `bridge` 是 app 客户端侧的发现 / 配置 / 连接 / 对话枢纽
-- 账户同步只同步 bridge 相关配置属性与安全引用，不负责自动连接
-- 历史旁路与旧的直连叙述不再作为目标架构
+- 顶层 surface 只有 `assistant`、`settings`
+- app 只保留消费 bridge 合同所需的 surface、gate、controller、runtime
+- provider catalog、routing、gateway runtime 能力都由 `xworkmate-bridge` 拥有真源
+- 已删除独立 `tasks / skills / modules / mcp / claw_hub / secrets / ai_gateway / account` 页面壳与 alias 心智
 
-## 总览图
+## Layered View
 
 ```mermaid
-flowchart TB
-    subgraph L1["访问与归属层"]
-        A1["Local user / device"]
-        A2["Web user / browser session"]
-        A3["Remote owner realm"]
+flowchart TD
+    subgraph L1["Surface Visibility"]
+        A1["config/feature_flags.yaml"]
+        A2["UiFeatureManifest / UiFeatureAccess / AppCapabilities"]
+        A3["AppShell / MobileShell / workspace_page_registry.dart"]
+        A4["AssistantPage / SettingsPage"]
     end
 
-    subgraph L2["多端 UI 层"]
-        B1["Desktop / Mobile / Web UI"]
-        B2["AssistantPage / Settings / Tasks"]
+    subgraph L2["App Orchestration"]
+        B1["AppControllerDesktop*"]
+        B2["SettingsController"]
+        B3["GatewaySessionsController"]
+        B4["GatewayChatController"]
+        B5["GatewayAgentsController"]
+        B6["DerivedTasksController"]
+        B7["SkillsController"]
     end
 
-    subgraph L3["线程控制面"]
-        C1["TaskThread"]
-        C2["ownerScope"]
-        C3["workspaceBinding"]
-        C4["executionBinding"]
-        C5["contextState"]
-        C6["lifecycleState"]
+    subgraph L3["Bridge Contract"]
+        C1["GoTaskService.executeTask"]
+        C2["GatewayAcpClient"]
+        C3["ExternalCodeAgentAcpDesktopTransport"]
+        C4["acp.capabilities / xworkmate.routing.resolve / session.* / xworkmate.gateway.*"]
+        C5["managed bridge/account sync contract"]
     end
 
-    subgraph L4["统一任务入口"]
-        D1["AppController*"]
-        D2["GoTaskService.executeTask"]
+    subgraph L4["Bridge And Upstreams"]
+        D1["xworkmate-bridge"]
+        D2["ACP adapters / gateway runtime adapters / upstream services"]
     end
 
-    subgraph L5["ACP Control Plane"]
-        E1["session.start / session.message"]
-        E2["Router.Resolve"]
-        E3["Skills.Resolve"]
-        E4["Memory.Inject / Record"]
-        E5["buildResolvedExecutionParams"]
-    end
-
-    subgraph L6["Bridge / Executors / Adapters"]
-        F1["agent ACP request"]
-        F2["gateway ACP request"]
-        F3["bridge hub<br/>dynamic discovery / config / connect / dialogue / auth injection"]
-        F4["gateway / provider adapters"]
-    end
-
-    A1 --> B1
-    A2 --> B1
-    A3 --> B1
+    A1 --> A2 --> A3 --> A4
+    A4 --> B1
     B1 --> B2
-    B2 --> C1
-    C1 --> C2
-    C1 --> C3
+    B1 --> B3
+    B1 --> B4
+    B1 --> B5
+    B1 --> B6
+    B1 --> B7
+    B1 --> C1
+    B1 --> C2
+    B1 --> C3
+    B2 --> C5
     C1 --> C4
-    C1 --> C5
-    C1 --> C6
-    C1 --> D1
-    D1 --> D2
-    D2 --> E1
-    E1 --> E2
-    E2 --> E3
-    E3 --> E4
-    E4 --> E5
-    E5 --> F1
-    E5 --> F2
-    F1 --> F3
-    F2 --> F3
-    F3 --> F4
+    C2 --> C4
+    C3 --> C4
+    C4 --> D1 --> D2
 ```
 
-## 核心规则
+## Layer Responsibilities
 
-1. UI 不直接决定执行 lane。
-2. `TaskThread` 承载线程级事实，不由页面局部状态拼装。
-3. `GoTaskService.executeTask` 是唯一公开任务入口。
-4. ACP 是统一控制面，负责 routing / skills / memory / resolved execution。
-5. `bridge` 是 app 侧统一枢纽；gateway/provider 适配能力挂在 bridge 后面，不再把历史直连路径写成长期主链。
+### 1. Surface Visibility
 
-## 文档目录
+- `feature_flags.yaml` 是 surface 可见性的唯一声明源
+- `UiFeatureManifest / AppCapabilities` 负责把声明变成当前平台允许能力
+- `AppShell / MobileShell / workspace_page_registry.dart` 只承载已声明且真实存在的 `assistant`、`settings`
+- 不再允许“manifest 已删但 shell/registry 还留旧入口”的双重真源
 
-### 目标规范
+### 2. App Orchestration
 
-- [任务执行链路统一收敛](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/task-control-plane-unification.md)
-- [ACP Forwarding Topology](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-bridge/docs/architecture/acp-forwarding-topology.md)
+- `AssistantPage` 承载当前线程、任务、技能、结果与 bridge 主链交互
+- `SettingsPage` 承载 bridge connection、account sync、integration affordance
+- app controller 只做最小本地编排，不再维护独立模块壳、假矩阵、旧 alias 分流
+- 任务与技能仍可作为 assistant 内部数据面存在，但不再拥有独立页面地位
 
-### 当前实现观察
+### 3. Bridge Contract
 
-- 当前实现观察不再保留独立主设计文档
-- 如需判断规范，以 [任务执行链路统一收敛](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/task-control-plane-unification.md) 为准
+- `GoTaskService.executeTask` 是 app 任务链的统一公开入口
+- `acp.capabilities` 提供 bridge-owned capability snapshot
+- `xworkmate.routing.resolve` 返回执行解析结果与 unavailable 信息
+- `session.*` 承载 ACP 会话流
+- `xworkmate.gateway.*` 承载 gateway runtime 连接与请求流
+- 账户同步只同步 bridge 相关配置属性与安全引用，不负责恢复旧模块心智或自动造 catalog
 
-### 边界与适配器说明
+### 4. Bridge And Upstreams
 
-- 适配器边界统一收敛到本文件与主文档，不再保留旧的并列设计稿
+- `xworkmate-bridge` 是 app 唯一公共集成面
+- upstream ACP service、gateway runtime、provider adapter 都是 bridge 内部关注点
+- app 不直接把 upstream URL、provider topology、gateway backend 细节当成自己的 surface taxonomy
+
+## Canonical Cross-Repo Reading Order
+
+建议按下面顺序理解当前主链：
+
+1. [XWorkmate Core Module Inventory](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/xworkmate-core-module-inventory-2026-04-13.md)
+2. [Task Control Plane Unification](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/task-control-plane-unification.md)
+3. [ACP Forwarding Topology](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-bridge/docs/architecture/acp-forwarding-topology.md)
+4. [ADR: Unified Bridge Entry Points](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-bridge/docs/architecture/adr-unified-bridge-entrypoints.md)
 
 ## Removed From Target
 
-- 旧的 `openClawTask` 公开语义不再是目标架构的一部分
-- 不再把“客户端直接围绕旧 gateway 默认值运转”写成长期主设计
+以下内容都不再作为当前目标架构的一部分：
+
+- `Tasks / Skills / Modules / MCP / ClawHub / Secrets / AiGateway / Account` 独立 surface
+- 旧 alias destination 与 dormant registry
+- app-side provider preset/backfill/fallback 真源
+- 把 upstream URL、gateway backend 或 provider 拓扑直接暴露成 app 一级模块心智
