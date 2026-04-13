@@ -166,13 +166,7 @@ class AppController extends ChangeNotifier {
     chatControllerInternal = GatewayChatController(
       runtimeCoordinatorInternal.gateway,
     );
-    instancesControllerInternal = InstancesController(
-      runtimeCoordinatorInternal.gateway,
-    );
     skillsControllerInternal = SkillsController(
-      runtimeCoordinatorInternal.gateway,
-    );
-    connectorsControllerInternal = ConnectorsController(
       runtimeCoordinatorInternal.gateway,
     );
     modelsControllerInternal = ModelsController(
@@ -253,9 +247,7 @@ class AppController extends ChangeNotifier {
     agentsControllerInternal.dispose();
     sessionsControllerInternal.dispose();
     chatControllerInternal.dispose();
-    instancesControllerInternal.dispose();
     skillsControllerInternal.dispose();
-    connectorsControllerInternal.dispose();
     modelsControllerInternal.dispose();
     cronJobsControllerInternal.dispose();
     devicesControllerInternal.dispose();
@@ -279,9 +271,7 @@ class AppController extends ChangeNotifier {
   late final GatewayAgentsController agentsControllerInternal;
   late final GatewaySessionsController sessionsControllerInternal;
   late final GatewayChatController chatControllerInternal;
-  late final InstancesController instancesControllerInternal;
   late final SkillsController skillsControllerInternal;
-  late final ConnectorsController connectorsControllerInternal;
   late final ModelsController modelsControllerInternal;
   late final CronJobsController cronJobsControllerInternal;
   late final DevicesController devicesControllerInternal;
@@ -330,10 +320,7 @@ class AppController extends ChangeNotifier {
   WorkspaceDestination destinationInternal = WorkspaceDestination.assistant;
   ThemeMode themeModeInternal = ThemeMode.light;
   AppSidebarState sidebarStateInternal = AppSidebarState.expanded;
-  ModulesTab modulesTabInternal = ModulesTab.nodes;
-  SecretsTab secretsTabInternal = SecretsTab.vault;
-  AiGatewayTab aiGatewayTabInternal = AiGatewayTab.models;
-  SettingsTab settingsTabInternal = SettingsTab.general;
+  SettingsTab settingsTabInternal = SettingsTab.gateway;
   SettingsDetailPage? settingsDetailInternal;
   SettingsNavigationContext? settingsNavigationContextInternal;
   DetailPanelData? detailPanelInternal;
@@ -402,9 +389,6 @@ class AppController extends ChangeNotifier {
   );
   ThemeMode get themeMode => themeModeInternal;
   AppSidebarState get sidebarState => sidebarStateInternal;
-  ModulesTab get modulesTab => modulesTabInternal;
-  SecretsTab get secretsTab => secretsTabInternal;
-  AiGatewayTab get aiGatewayTab => aiGatewayTabInternal;
   SettingsTab get settingsTab => settingsTabInternal;
   SettingsDetailPage? get settingsDetail => settingsDetailInternal;
   SettingsNavigationContext? get settingsNavigationContext =>
@@ -451,9 +435,7 @@ class AppController extends ChangeNotifier {
   MultiAgentMountManager get multiAgentMountManager =>
       multiAgentMountManagerInternal;
   GatewayChatController get chatController => chatControllerInternal;
-  InstancesController get instancesController => instancesControllerInternal;
   SkillsController get skillsController => skillsControllerInternal;
-  ConnectorsController get connectorsController => connectorsControllerInternal;
   ModelsController get modelsController => modelsControllerInternal;
   CronJobsController get cronJobsController => cronJobsControllerInternal;
   DevicesController get devicesController => devicesControllerInternal;
@@ -487,11 +469,7 @@ class AppController extends ChangeNotifier {
       sessionsControllerInternal.sessions;
   List<GatewaySessionSummary> get assistantSessions =>
       assistantSessionsInternal();
-  List<GatewayInstanceSummary> get instances =>
-      instancesControllerInternal.items;
   List<GatewaySkillSummary> get skills => skillsControllerInternal.items;
-  List<GatewayConnectorSummary> get connectors =>
-      connectorsControllerInternal.items;
   List<GatewayModelSummary> get models => modelsControllerInternal.items;
   List<GatewayCronJobSummary> get cronJobs => cronJobsControllerInternal.items;
   GatewayDevicePairingList get devices => devicesControllerInternal.items;
@@ -696,9 +674,6 @@ class AppController extends ChangeNotifier {
       AppControllerDesktopNavigation(this).navigateTo(destination);
 
   void navigateHome() => AppControllerDesktopNavigation(this).navigateHome();
-
-  void openModules({ModulesTab tab = ModulesTab.nodes}) =>
-      AppControllerDesktopNavigation(this).openModules(tab: tab);
 
   void openSettings({
     SettingsTab tab = SettingsTab.gateway,

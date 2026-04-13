@@ -318,30 +318,6 @@ class AssistantFocusPreviewInternal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (destination) {
-      AssistantFocusEntry.tasks => TasksFocusPreviewInternal(
-        controller: controller,
-      ),
-      AssistantFocusEntry.skills => SkillsFocusPreviewInternal(
-        controller: controller,
-      ),
-      AssistantFocusEntry.nodes => NodesFocusPreviewInternal(
-        controller: controller,
-      ),
-      AssistantFocusEntry.agents => AgentsFocusPreviewInternal(
-        controller: controller,
-      ),
-      AssistantFocusEntry.mcpServer => McpFocusPreviewInternal(
-        controller: controller,
-      ),
-      AssistantFocusEntry.clawHub => ClawHubFocusPreviewInternal(
-        controller: controller,
-      ),
-      AssistantFocusEntry.secrets => SecretsFocusPreviewInternal(
-        controller: controller,
-      ),
-      AssistantFocusEntry.aiGateway => AiGatewayFocusPreviewInternal(
-        controller: controller,
-      ),
       AssistantFocusEntry.settings => SettingsFocusPreviewInternal(
         controller: controller,
       ),

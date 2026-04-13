@@ -15,7 +15,6 @@ import 'mobile_gateway_pairing_guide_page.dart';
 import 'mobile_shell_core.dart';
 import 'mobile_shell_strip.dart';
 import 'mobile_shell_sheet.dart';
-import 'mobile_shell_workspace.dart';
 
 class BottomPillNavInternal extends StatelessWidget {
   const BottomPillNavInternal({
