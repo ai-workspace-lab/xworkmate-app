@@ -687,15 +687,27 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         return normalizedToken;
       }
     }
-    return null;
+    final matchingGatewayProfileIndex = gatewayProfileIndexMatchingEndpointInternal(
+      endpoint,
+    );
+    if (matchingGatewayProfileIndex == null) {
+      return null;
+    }
+    final gatewayToken = await settingsControllerInternal.loadEffectiveGatewayToken(
+      profileIndex: matchingGatewayProfileIndex,
+    );
+    final normalizedGatewayToken = gatewayToken.trim();
+    return normalizedGatewayToken.isEmpty ? null : normalizedGatewayToken;
   }
 
   int? gatewayProfileIndexMatchingEndpointInternal(Uri endpoint) {
     final normalizedHost = endpoint.host.trim().toLowerCase();
+    final normalizedScheme = endpoint.scheme.trim().toLowerCase();
     final gateway = gatewayProfileBaseUriInternal(
       settings.primaryGatewayProfile,
     );
     if (gateway != null &&
+        gateway.scheme.trim().toLowerCase() == normalizedScheme &&
         gateway.host.trim().toLowerCase() == normalizedHost &&
         gateway.port == endpoint.port) {
       return kGatewayRemoteProfileIndex;
