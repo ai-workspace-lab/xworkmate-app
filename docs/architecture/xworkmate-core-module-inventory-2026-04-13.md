@@ -149,6 +149,7 @@ Status: `Active`
 当前 Assistant 事实：
 
 - provider catalog 只来自 bridge capabilities，不再恢复任何 preset / backfill / fallback provider truth
+- 任务对话模式按 execution target 分流：`智能体` 只提供 `codex / opencode / gemini`，`Gateway` 只提供 `OpenClaw`
 - task state 仍在 assistant 内被消费，但不再拥有独立 `TasksPage`
 - skills 数据仍在 assistant 内被消费，但不再拥有独立 `SkillsPage`
 - assistant focus 只保留仍有真实落点的 `settings / language / theme`

@@ -35,6 +35,7 @@ import 'assistant_page_composer_skill_models.dart';
 import 'assistant_page_composer_skill_picker.dart';
 import 'assistant_page_composer_clipboard.dart';
 import 'assistant_page_components_core.dart';
+import 'assistant_page_task_dialog_controls.dart';
 
 class ComposerBarInternal extends StatefulWidget {
   const ComposerBarInternal({
@@ -310,34 +311,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     final uiFeatures = controller.featuresFor(
       resolveUiFeaturePlatformFromContext(context),
     );
-    final visibleExecutionTargets = controller.visibleAssistantExecutionTargets(
-      uiFeatures.availableExecutionTargets,
-    );
-    final currentExecutionTarget = controller.assistantExecutionTarget;
-    final executionTarget =
-        visibleExecutionTargets.contains(currentExecutionTarget)
-        ? currentExecutionTarget
-        : (visibleExecutionTargets.isNotEmpty
-              ? visibleExecutionTargets.first
-              : currentExecutionTarget);
-    final compactExecutionTargets = compactAssistantExecutionTargets(
-      visibleExecutionTargets,
-    );
-    final compactExecutionTarget = collapseAssistantExecutionTargetForDisplay(
-      executionTarget,
-    );
     final permissionLevel = controller.assistantPermissionLevel;
-    final availableProviders = controller.assistantProviderCatalog;
-    final selectedProvider = controller.assistantProviderForSession(
-      controller.currentSessionKey,
-    );
-    final providerMenuProviders = switch (executionTarget) {
-      AssistantExecutionTarget.gateway =>
-        selectedProvider.isUnspecified
-            ? const <SingleAgentProvider>[]
-            : <SingleAgentProvider>[selectedProvider],
-      AssistantExecutionTarget.agent => availableProviders,
-    };
     final selectedSkills = widget.availableSkills
         .where((skill) => widget.selectedSkillKeys.contains(skill.key))
         .toList(growable: false);
@@ -382,110 +356,8 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                 ),
                 const SizedBox(width: 6),
               ],
-              if (compactExecutionTargets.isNotEmpty) ...[
-                PopupMenuButton<AssistantExecutionTarget>(
-                  key: const Key('assistant-execution-target-button'),
-                  tooltip: appText('任务对话模式', 'Task Dialog Mode'),
-                  onSelected: (value) async {
-                    final resolvedTarget =
-                        resolveAssistantExecutionTargetFromVisibleTargets(
-                          visibleExecutionTargets,
-                          currentTarget: value,
-                        );
-                    await controller.setAssistantExecutionTarget(
-                      resolvedTarget,
-                    );
-                    if (mounted) {
-                      setState(() {});
-                    }
-                  },
-                  itemBuilder: (context) => compactExecutionTargets
-                      .map(
-                        (value) => PopupMenuItem<AssistantExecutionTarget>(
-                          value: value,
-                          key: Key(
-                            'assistant-execution-target-menu-item-${value.name}',
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(value.icon, size: 18),
-                              const SizedBox(width: 10),
-                              Expanded(child: Text(value.compactLabel)),
-                              if (value == compactExecutionTarget)
-                                const Icon(Icons.check_rounded, size: 18),
-                            ],
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  child: ComposerToolbarChipInternal(
-                    icon: compactExecutionTarget.icon,
-                    tooltip: executionTargetTooltipInternal(
-                      compactExecutionTarget,
-                    ),
-                    showChevron: true,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-              ],
-              if (providerMenuProviders.isNotEmpty) ...[
-                PopupMenuButton<String>(
-                  key: const Key('assistant-provider-button'),
-                  tooltip: appText('智能体 Provider', 'Agent Provider'),
-                  onSelected: (providerId) async {
-                    if (executionTarget.isGateway) {
-                      return;
-                    }
-                    await controller.setAssistantSingleAgentProvider(
-                      controller.resolveAssistantProvider(providerId),
-                    );
-                    if (mounted) {
-                      setState(() {});
-                    }
-                  },
-                  itemBuilder: (context) => providerMenuProviders
-                      .map(
-                        (provider) => PopupMenuItem<String>(
-                          value: provider.providerId,
-                          key: Key(
-                            'assistant-provider-menu-item-${provider.providerId}',
-                          ),
-                          child: Row(
-                            children: [
-                              SingleAgentProviderBadgeInternal(
-                                key: Key(
-                                  'assistant-provider-menu-badge-${provider.providerId}',
-                                ),
-                                provider: provider,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(child: Text(provider.label)),
-                              if (provider == selectedProvider)
-                                const Icon(Icons.check_rounded, size: 18),
-                            ],
-                          ),
-                        ),
-                      )
-                      .toList(growable: false),
-                  child: ComposerToolbarChipInternal(
-                    leading: SingleAgentProviderBadgeInternal(
-                      key: const Key('assistant-provider-badge'),
-                      provider: selectedProvider,
-                    ),
-                    tooltip: providerTooltipInternal(selectedProvider),
-                    showChevron: true,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-              ],
+              AssistantTaskDialogModeControlsInternal(controller: controller),
+              const SizedBox(width: 4),
               if (widget.showModelControl) ...[
                 widget.modelOptions.isEmpty
                     ? ComposerToolbarChipInternal(

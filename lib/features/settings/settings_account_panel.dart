@@ -10,6 +10,7 @@ class SettingsAccountPanel extends StatelessWidget {
     required this.accountSession,
     required this.accountState,
     required this.accountBusy,
+    this.accountStatus = '',
     required this.accountSignedIn,
     required this.accountMfaRequired,
     required this.accountBaseUrlController,
@@ -28,6 +29,7 @@ class SettingsAccountPanel extends StatelessWidget {
   final AccountSessionSummary? accountSession;
   final AccountSyncState? accountState;
   final bool accountBusy;
+  final String accountStatus;
   final bool accountSignedIn;
   final bool accountMfaRequired;
   final TextEditingController accountBaseUrlController;
@@ -68,6 +70,7 @@ class SettingsAccountPanel extends StatelessWidget {
       accountSession: accountSession,
       accountState: accountState,
       accountBusy: accountBusy,
+      accountStatus: accountStatus,
       onSync: onSync,
       onLogout: onLogout,
     );
@@ -284,6 +287,7 @@ class _SignedInAccountPanel extends StatelessWidget {
     required this.accountSession,
     required this.accountState,
     required this.accountBusy,
+    required this.accountStatus,
     required this.onSync,
     required this.onLogout,
   });
@@ -292,6 +296,7 @@ class _SignedInAccountPanel extends StatelessWidget {
   final AccountSessionSummary? accountSession;
   final AccountSyncState? accountState;
   final bool accountBusy;
+  final String accountStatus;
   final Future<void> Function() onSync;
   final Future<void> Function() onLogout;
 
@@ -316,6 +321,11 @@ class _SignedInAccountPanel extends StatelessWidget {
     final syncMessage = accountState?.syncMessage.trim().isNotEmpty == true
         ? accountState!.syncMessage.trim()
         : appText('尚未同步远端配置', 'Remote config not synced yet');
+    final effectiveSyncState = accountBusy ? 'syncing' : syncState;
+    final effectiveSyncMessage =
+        accountBusy && accountStatus.trim().isNotEmpty
+        ? accountStatus.trim()
+        : syncMessage;
     final mfaEnabled =
         accountSession?.totpEnabled == true ||
         accountSession?.mfaEnabled == true;
@@ -342,7 +352,7 @@ class _SignedInAccountPanel extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          '${appText('同步状态', 'Sync Status')}: $syncState · $syncMessage',
+          '${appText('同步状态', 'Sync Status')}: $effectiveSyncState · $effectiveSyncMessage',
           key: const ValueKey('settings-account-sync-status'),
           style: Theme.of(context).textTheme.bodySmall,
         ),
@@ -413,7 +423,25 @@ class _SignedInAccountPanel extends StatelessWidget {
             FilledButton.tonal(
               key: const ValueKey('settings-account-sync-button'),
               onPressed: accountBusy ? null : () => onSync(),
-              child: Text(appText('重新同步', 'Sync Again')),
+              child: accountBusy
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            key: const ValueKey(
+                              'settings-account-sync-progress',
+                            ),
+                            strokeWidth: 2,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(appText('同步中', 'Syncing')),
+                      ],
+                    )
+                  : Text(appText('重新同步', 'Sync Again')),
             ),
             TextButton(
               key: const ValueKey('settings-account-logout-button'),
