@@ -399,16 +399,7 @@ class UiFeatureAccess {
         },
         UiFeaturePlatform.desktop: <String, WorkspaceDestination>{
           UiFeatureKeys.navigationAssistant: WorkspaceDestination.assistant,
-          UiFeatureKeys.navigationTasks: WorkspaceDestination.tasks,
-          UiFeatureKeys.navigationSkills: WorkspaceDestination.skills,
-          UiFeatureKeys.navigationNodes: WorkspaceDestination.nodes,
-          UiFeatureKeys.navigationAgents: WorkspaceDestination.agents,
-          UiFeatureKeys.navigationMcpServer: WorkspaceDestination.mcpServer,
-          UiFeatureKeys.navigationClawHub: WorkspaceDestination.clawHub,
-          UiFeatureKeys.navigationSecrets: WorkspaceDestination.secrets,
-          UiFeatureKeys.navigationAiGateway: WorkspaceDestination.aiGateway,
           UiFeatureKeys.navigationSettings: WorkspaceDestination.settings,
-          UiFeatureKeys.navigationAccount: WorkspaceDestination.account,
         },
         UiFeaturePlatform.web: <String, WorkspaceDestination>{
           UiFeatureKeys.navigationAssistant: WorkspaceDestination.assistant,

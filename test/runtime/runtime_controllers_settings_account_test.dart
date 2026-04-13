@@ -60,7 +60,7 @@ void main() {
     );
 
     test(
-      'login sync accepts INTERNAL_SERVICE_TOKEN payload for managed bridge auth',
+      'login sync stores the current bridge contract from login payload',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
           'xworkmate-account-sync-uppercase-token-',
@@ -90,6 +90,7 @@ void main() {
             loginPayload: <String, dynamic>{
               'token': 'session-token',
               'INTERNAL_SERVICE_TOKEN': 'bridge-token-from-login',
+              'BRIDGE_SERVER_URL': 'https://xworkmate-bridge-alt.svc.plus',
               'user': <String, dynamic>{
                 'id': 'user-1',
                 'email': 'review@svc.plus',
@@ -108,6 +109,19 @@ void main() {
 
         expect(controller.accountSyncState, isNotNull);
         expect(controller.accountSyncState!.syncState, 'ready');
+        expect(
+          controller.accountSyncState!.syncedDefaults.bridgeServerUrl,
+          'https://xworkmate-bridge-alt.svc.plus',
+        );
+        expect(
+          controller
+              .snapshot
+              .acpBridgeServerModeConfig
+              .cloudSynced
+              .remoteServerSummary
+              .endpoint,
+          'https://xworkmate-bridge-alt.svc.plus',
+        );
         expect(
           await store.loadAccountManagedSecret(
             target: kAccountManagedSecretTargetBridgeAuthToken,
@@ -172,7 +186,7 @@ void main() {
     });
 
     test(
-      'recovers bridge sync state from cloud-synced snapshot when support state is missing',
+      'does not recover bridge sync state from stale cloud-synced snapshot state',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
           'xworkmate-account-recover-',
@@ -220,20 +234,9 @@ void main() {
         addTearDown(controller.dispose);
         await controller.initialize();
 
-        expect(controller.accountSyncState, isNotNull);
-        expect(
-          controller.accountSyncState!.syncedDefaults.bridgeServerUrl,
-          'https://bridge.svc.plus',
-        );
-        expect(controller.accountSyncState!.syncState, 'ready');
-        expect(controller.accountSyncState!.profileScope, 'bridge');
-
+        expect(controller.accountSyncState, isNull);
         final persisted = await store.loadAccountSyncState();
-        expect(persisted, isNotNull);
-        expect(
-          persisted!.syncedDefaults.bridgeServerUrl,
-          'https://bridge.svc.plus',
-        );
+        expect(persisted, isNull);
       },
     );
   });

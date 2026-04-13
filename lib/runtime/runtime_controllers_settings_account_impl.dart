@@ -146,6 +146,7 @@ Future<void> completeAccountSignInSettingsInternal(
     controller,
     baseUrl: baseUrl,
     bridgeTokenOverride: _resolveBridgeAuthorizationToken(payload),
+    bridgeServerUrlOverride: _resolveBridgeServerUrl(payload),
     quiet: true,
   );
   await controller.reloadDerivedStateInternal();
@@ -223,6 +224,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
   String baseUrl = '',
   bool quiet = false,
   String bridgeTokenOverride = '',
+  String bridgeServerUrlOverride = '',
 }) async {
   final sessionToken =
       (await controller.storeInternal.loadAccountSessionToken())?.trim() ?? '';
@@ -286,7 +288,10 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     target: kAccountManagedSecretTargetBridgeAuthToken,
     value: bridgeToken,
   );
-  const resolvedBridgeServerUrl = kManagedBridgeServerUrl;
+  final resolvedBridgeServerUrl = _resolveCurrentBridgeServerUrl(
+    controller,
+    bridgeServerUrlOverride: bridgeServerUrlOverride,
+  );
   await controller.storeInternal.clearAccountManagedSecret(
     target: kAccountManagedSecretTargetAIGatewayAccessToken,
   );
@@ -344,55 +349,6 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     state: 'ready',
     message: 'Bridge access synced',
   );
-}
-
-Future<AccountSyncState?> recoverBridgeAccountSyncStateInternal(
-  SettingsController controller,
-  AccountSyncState? currentState,
-) async {
-  final currentBridgeServerUrl =
-      currentState?.syncedDefaults.bridgeServerUrl.trim() ?? '';
-  if (currentBridgeServerUrl.isNotEmpty) {
-    return currentState;
-  }
-
-  final cloudSynced =
-      controller.snapshotInternal.acpBridgeServerModeConfig.cloudSynced;
-  final legacyBridgeServerUrl = cloudSynced.remoteServerSummary.endpoint.trim();
-  if (!isSupportedExternalAcpEndpoint(legacyBridgeServerUrl)) {
-    return currentState;
-  }
-
-  final defaults = AccountSyncState.defaults();
-  final baseline = currentState ?? defaults;
-  final hasBridgeToken = controller.secureRefsInternal.containsKey(
-    kAccountManagedSecretTargetBridgeAuthToken,
-  );
-  final recoveredState = baseline.copyWith(
-    syncedDefaults: baseline.syncedDefaults.copyWith(
-      bridgeServerUrl: legacyBridgeServerUrl,
-    ),
-    syncState: baseline.syncState == defaults.syncState
-        ? 'ready'
-        : baseline.syncState,
-    syncMessage: baseline.syncMessage == defaults.syncMessage
-        ? 'Bridge access synced'
-        : baseline.syncMessage,
-    lastSyncAtMs: baseline.lastSyncAtMs > 0
-        ? baseline.lastSyncAtMs
-        : cloudSynced.lastSyncAt,
-    lastSyncSource: baseline.lastSyncSource.trim().isNotEmpty
-        ? baseline.lastSyncSource
-        : legacyBridgeServerUrl,
-    profileScope: baseline.profileScope.trim().isNotEmpty
-        ? baseline.profileScope
-        : 'bridge',
-    tokenConfigured: baseline.tokenConfigured.copyWith(
-      bridge: baseline.tokenConfigured.bridge || hasBridgeToken,
-    ),
-  );
-  await controller.storeInternal.saveAccountSyncState(recoveredState);
-  return recoveredState;
 }
 
 Future<void> logoutAccountSettingsInternal(
@@ -516,6 +472,36 @@ String _resolveBridgeAuthorizationToken(Map<String, dynamic> payload) {
     return internalServiceToken;
   }
   return '';
+}
+
+String _resolveBridgeServerUrl(Map<String, dynamic> payload) {
+  final explicit = _stringValue(payload['BRIDGE_SERVER_URL']);
+  if (explicit.isNotEmpty) {
+    return explicit;
+  }
+  final camelCase = _stringValue(payload['bridgeServerUrl']);
+  if (camelCase.isNotEmpty) {
+    return camelCase;
+  }
+  return '';
+}
+
+String _resolveCurrentBridgeServerUrl(
+  SettingsController controller, {
+  String bridgeServerUrlOverride = '',
+}) {
+  final explicit = bridgeServerUrlOverride.trim();
+  if (isSupportedExternalAcpEndpoint(explicit)) {
+    return explicit;
+  }
+  final syncedBridgeServerUrl =
+      controller.accountSyncStateInternal?.syncedDefaults.bridgeServerUrl
+          .trim() ??
+      '';
+  if (isSupportedExternalAcpEndpoint(syncedBridgeServerUrl)) {
+    return syncedBridgeServerUrl;
+  }
+  return kManagedBridgeServerUrl;
 }
 
 int _parseExpiresAtMs(Object? value) {
