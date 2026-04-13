@@ -153,13 +153,17 @@ class AccountRuntimeClient {
   }
 
   Future<AccountSessionSummary> loadSession({required String token}) async {
-    final payload = await _requestJson(
+    final payload = await loadProfile(token: token);
+    final user = _asMap(payload['user']);
+    return _accountSessionSummaryFromUserJson(user);
+  }
+
+  Future<Map<String, dynamic>> loadProfile({required String token}) {
+    return _requestJson(
       method: 'GET',
       path: '/api/auth/session',
       bearerToken: token,
     );
-    final user = _asMap(payload['user']);
-    return _accountSessionSummaryFromUserJson(user);
   }
 
   Future<BridgeBootstrapIssue> createBridgeBootstrapTicket({

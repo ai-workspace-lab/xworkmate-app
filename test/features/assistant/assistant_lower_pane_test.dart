@@ -10,7 +10,7 @@ import 'package:xworkmate/widgets/surface_card.dart';
 
 void main() {
   group('AssistantLowerPaneInternal', () {
-    testWidgets('shows agent and gateway task dialog modes', (tester) async {
+    testWidgets('shows mode-specific provider catalogs', (tester) async {
       final controller = AppController(
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
@@ -27,28 +27,51 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(find.byKey(const Key('assistant-provider-button')));
+      await tester.pumpAndSettle();
+
       expect(
-        find.byKey(const Key('assistant-provider-button')),
+        find.byKey(const Key('assistant-provider-menu-item-codex')),
         findsOneWidget,
       );
-
+      expect(
+        find.byKey(const Key('assistant-provider-menu-item-opencode')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('assistant-provider-menu-item-gemini')),
+        findsOneWidget,
+      );
       await tester.tap(
-        find.byKey(const Key('assistant-execution-target-button')),
+        find.byKey(const Key('assistant-provider-menu-item-codex')),
       );
       await tester.pumpAndSettle();
 
       expect(
-        find.byKey(const Key('assistant-execution-target-menu-item-agent')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('assistant-execution-target-menu-item-gateway')),
+        find.byKey(const Key('assistant-execution-target-button')),
         findsOneWidget,
       );
 
-      await tester.tap(
-        find.byKey(const Key('assistant-execution-target-menu-item-gateway')),
+      final gatewayThread = controller
+          .requireTaskThreadForSessionInternal('session-1')
+          .copyWith(
+            executionBinding: ExecutionBinding(
+              executionMode: threadExecutionModeFromAssistantExecutionTarget(
+                AssistantExecutionTarget.gateway,
+              ),
+              executorId: SingleAgentProvider.openclaw.providerId,
+              providerId: SingleAgentProvider.openclaw.providerId,
+              endpointId: '',
+              executionModeSource: ThreadSelectionSource.explicit,
+              providerSource: ThreadSelectionSource.explicit,
+            ),
+            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          );
+      controller.taskThreadRepositoryInternal.replace(
+        gatewayThread,
+        persist: false,
       );
+      controller.notifyListeners();
       await tester.pumpAndSettle();
 
       expect(controller.assistantExecutionTarget.name, 'gateway');
@@ -64,23 +87,68 @@ void main() {
         find.byKey(const Key('assistant-provider-menu-item-openclaw')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const Key('assistant-provider-menu-item-codex')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('assistant-provider-menu-item-opencode')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('assistant-provider-menu-item-gemini')),
+        findsNothing,
+      );
       await tester.tap(
         find.byKey(const Key('assistant-provider-menu-item-openclaw')),
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.byKey(const Key('assistant-execution-target-button')),
+      final agentThread = controller
+          .requireTaskThreadForSessionInternal('session-1')
+          .copyWith(
+            executionBinding: ExecutionBinding(
+              executionMode: threadExecutionModeFromAssistantExecutionTarget(
+                AssistantExecutionTarget.agent,
+              ),
+              executorId: SingleAgentProvider.codex.providerId,
+              providerId: SingleAgentProvider.codex.providerId,
+              endpointId: '',
+              executionModeSource: ThreadSelectionSource.explicit,
+              providerSource: ThreadSelectionSource.explicit,
+            ),
+            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          );
+      controller.taskThreadRepositoryInternal.replace(
+        agentThread,
+        persist: false,
       );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('assistant-execution-target-menu-item-agent')),
-      );
+      controller.notifyListeners();
       await tester.pumpAndSettle();
 
       expect(controller.assistantExecutionTarget.name, 'agent');
       expect(
         find.byKey(const Key('assistant-provider-button')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('assistant-provider-button')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('assistant-provider-menu-item-codex')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('assistant-provider-menu-item-openclaw')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('assistant-provider-menu-item-opencode')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('assistant-provider-menu-item-gemini')),
         findsOneWidget,
       );
     });
