@@ -684,7 +684,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
           ))?.trim();
       final normalizedToken = bridgeToken?.trim() ?? '';
       if (normalizedToken.isNotEmpty) {
-        return 'Bearer $normalizedToken';
+        return normalizedToken;
       }
     }
     return null;
