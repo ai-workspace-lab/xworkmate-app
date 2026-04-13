@@ -145,8 +145,6 @@ Future<void> completeAccountSignInSettingsInternal(
   await syncAccountSettingsInternal(
     controller,
     baseUrl: baseUrl,
-    bridgeTokenOverride: _resolveBridgeAuthorizationToken(payload),
-    bridgeServerUrlOverride: _resolveBridgeServerUrl(payload),
     profilePayloadOverride: payload,
     quiet: true,
   );
@@ -181,7 +179,9 @@ Future<void> restoreAccountSessionSettingsInternal(
   try {
     final client = controller.buildAccountClient(normalizedBaseUrl);
     final payload = await client.loadProfile(token: token);
-    final session = _accountSessionSummaryFromUserPayload(_asMap(payload['user']));
+    final session = _accountSessionSummaryFromUserPayload(
+      _asMap(payload['user']),
+    );
     await controller.storeInternal.saveAccountSessionSummary(session);
     if (session.userId.trim().isNotEmpty) {
       await controller.storeInternal.saveAccountSessionUserId(session.userId);
@@ -226,8 +226,6 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
   SettingsController controller, {
   String baseUrl = '',
   bool quiet = false,
-  String bridgeTokenOverride = '',
-  String bridgeServerUrlOverride = '',
   Map<String, dynamic> profilePayloadOverride = const <String, dynamic>{},
 }) async {
   final normalizedBaseUrl = normalizeAccountBaseUrlSettingsInternal(
@@ -252,17 +250,17 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
   }
 
   try {
+    if (normalizedBaseUrl.isEmpty) {
+      return _persistAccountSyncContractFailureInternal(
+        controller,
+        message: 'Account base URL is required',
+        quiet: quiet,
+      );
+    }
+
+    final client = controller.buildAccountClient(normalizedBaseUrl);
     Map<String, dynamic> profilePayload = profilePayloadOverride;
     if (profilePayload.isEmpty) {
-      if (normalizedBaseUrl.isEmpty) {
-        return _persistAccountSyncFailureInternal(
-          controller,
-          state: 'blocked',
-          message: 'Account base URL is required',
-          quiet: quiet,
-        );
-      }
-      final client = controller.buildAccountClient(normalizedBaseUrl);
       profilePayload = await client.loadProfile(token: sessionToken);
     }
     await _persistAccountSessionSummaryFromProfilePayloadInternal(
@@ -270,19 +268,13 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
       profilePayload,
     );
 
-    final profileBridgeToken = _resolveBridgeAuthorizationToken(profilePayload);
-    final bridgeToken = bridgeTokenOverride.trim().isNotEmpty
-        ? bridgeTokenOverride.trim()
-        : profileBridgeToken.trim().isNotEmpty
-        ? profileBridgeToken.trim()
-        : ((await controller.storeInternal.loadAccountManagedSecret(
-                target: kAccountManagedSecretTargetBridgeAuthToken,
-              ))?.trim() ??
-              '');
+    final syncPayload = await client.loadXWorkmateProfileSync(
+      token: sessionToken,
+    );
+    final bridgeToken = _stringValue(syncPayload['BRIDGE_AUTH_TOKEN']);
     if (bridgeToken.isEmpty) {
-      return _persistAccountSyncFailureInternal(
+      return _persistAccountSyncContractFailureInternal(
         controller,
-        state: 'blocked',
         message: 'Bridge authorization is unavailable',
         quiet: quiet,
       );
@@ -292,11 +284,17 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
       target: kAccountManagedSecretTargetBridgeAuthToken,
       value: bridgeToken,
     );
+    final syncedBridgeServerUrl = _resolveBridgeServerUrl(syncPayload);
+    if (!isSupportedExternalAcpEndpoint(syncedBridgeServerUrl)) {
+      return _persistAccountSyncContractFailureInternal(
+        controller,
+        message: 'Bridge endpoint is unavailable',
+        quiet: quiet,
+      );
+    }
     final resolvedBridgeServerUrl = _resolveCurrentBridgeServerUrl(
       controller,
-      bridgeServerUrlOverride: bridgeServerUrlOverride.trim().isNotEmpty
-          ? bridgeServerUrlOverride
-          : _resolveBridgeServerUrl(profilePayload),
+      bridgeServerUrlOverride: syncedBridgeServerUrl,
     );
     await controller.storeInternal.clearAccountManagedSecret(
       target: kAccountManagedSecretTargetAIGatewayAccessToken,
@@ -356,16 +354,14 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
       message: 'Bridge access synced',
     );
   } on AccountRuntimeException catch (error) {
-    return _persistAccountSyncFailureInternal(
+    return _persistAccountSyncContractFailureInternal(
       controller,
-      state: 'error',
       message: error.message,
       quiet: quiet,
     );
   } catch (error) {
-    return _persistAccountSyncFailureInternal(
+    return _persistAccountSyncContractFailureInternal(
       controller,
-      state: 'error',
       message: error.toString(),
       quiet: quiet,
     );
@@ -532,9 +528,20 @@ Future<AccountSyncResult> _persistAccountSyncFailureInternal(
   return AccountSyncResult(state: state, message: message);
 }
 
-String _resolveBridgeAuthorizationToken(Map<String, dynamic> payload) {
-  final explicit = _stringValue(payload['BRIDGE_AUTH_TOKEN']);
-  return explicit;
+Future<AccountSyncResult> _persistAccountSyncContractFailureInternal(
+  SettingsController controller, {
+  required String message,
+  required bool quiet,
+}) async {
+  await controller.storeInternal.clearAccountManagedSecret(
+    target: kAccountManagedSecretTargetBridgeAuthToken,
+  );
+  return _persistAccountSyncFailureInternal(
+    controller,
+    state: 'blocked',
+    message: message,
+    quiet: quiet,
+  );
 }
 
 String _resolveBridgeServerUrl(Map<String, dynamic> payload) {
