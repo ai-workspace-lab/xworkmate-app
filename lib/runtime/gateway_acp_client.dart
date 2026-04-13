@@ -107,7 +107,7 @@ class GatewayAcpClient {
       return _cachedCapabilities;
     }
 
-    final response = await _requestWithFallback(
+    final response = await _requestForResolvedEndpoint(
       _GatewayAcpRpcRequest(
         id: _nextRequestId('capabilities'),
         method: 'acp.capabilities',
@@ -196,7 +196,7 @@ class GatewayAcpClient {
       );
       var lastSequence = -1;
       try {
-        final response = await _requestWithFallback(
+        final response = await _requestForResolvedEndpoint(
           rpcRequest,
           onNotification: (notification) {
             final event = _multiAgentEventFromNotification(notification);
@@ -256,7 +256,7 @@ class GatewayAcpClient {
     Uri? endpointOverride,
     String authorizationOverride = '',
   }) async {
-    await _requestWithFallback(
+    await _requestForResolvedEndpoint(
       _GatewayAcpRpcRequest(
         id: _nextRequestId('cancel'),
         method: 'session.cancel',
@@ -274,7 +274,7 @@ class GatewayAcpClient {
     Uri? endpointOverride,
     String authorizationOverride = '',
   }) async {
-    await _requestWithFallback(
+    await _requestForResolvedEndpoint(
       _GatewayAcpRpcRequest(
         id: _nextRequestId('close'),
         method: 'session.close',
@@ -293,7 +293,7 @@ class GatewayAcpClient {
     Uri? endpointOverride,
     String authorizationOverride = '',
   }) async {
-    return _requestWithFallback(
+    return _requestForResolvedEndpoint(
       _GatewayAcpRpcRequest(
         id: _nextRequestId(method),
         method: method,
@@ -307,7 +307,7 @@ class GatewayAcpClient {
 
   Future<void> dispose() async {}
 
-  Future<Map<String, dynamic>> _requestWithFallback(
+  Future<Map<String, dynamic>> _requestForResolvedEndpoint(
     _GatewayAcpRpcRequest request, {
     required void Function(Map<String, dynamic>) onNotification,
     Uri? endpointOverride,

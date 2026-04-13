@@ -316,13 +316,6 @@ List<SingleAgentProvider> normalizeSingleAgentProviderList(
   return normalized;
 }
 
-const List<SingleAgentProvider> kPresetExternalAcpProviders =
-    <SingleAgentProvider>[
-      SingleAgentProvider.codex,
-      SingleAgentProvider.opencode,
-      SingleAgentProvider.gemini,
-    ];
-
 const String kCanonicalGatewayProviderId = 'openclaw';
 const String kCanonicalGatewayProviderLabel = 'OpenClaw';
 

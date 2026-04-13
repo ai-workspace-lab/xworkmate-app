@@ -94,10 +94,7 @@ class CodeAgentNodeOrchestrator {
         'state': state.bridgeState,
         'gatewayConnected': state.gatewayConnected,
         'runtimeMode': state.runtimeMode.name,
-        'localTransport': switch (state.runtimeMode) {
-          CodeAgentRuntimeMode.externalCli => 'stdio-jsonrpc',
-          CodeAgentRuntimeMode.builtIn => 'ffi-runtime',
-        },
+        'localTransport': 'stdio-jsonrpc',
       },
       if (provider != null)
         'provider': <String, dynamic>{

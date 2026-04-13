@@ -50,12 +50,19 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
   bool forceRefresh = false,
   bool persistMountTargets = false,
 }) async {
+  GatewayAcpCapabilities? capabilities;
   try {
-    await controller.gatewayAcpClientInternal.loadCapabilities(
+    capabilities = await controller.gatewayAcpClientInternal.loadCapabilities(
       forceRefresh: forceRefresh,
     );
   } catch (_) {
     // Keep mount refresh resilient when ACP is temporarily unavailable.
+  }
+  if (capabilities != null) {
+    controller.bridgeProviderCatalogInternal =
+        normalizeBridgeOwnedSingleAgentProviderList(
+          capabilities.providerCatalog,
+        );
   }
   if (persistMountTargets && !controller.disposedInternal) {
     final currentConfig = controller.settings.multiAgent;
@@ -79,7 +86,21 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
 Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
   AppController controller, {
   bool forceRefresh = false,
-}) async {}
+}) async {
+  try {
+    final capabilities = await controller.gatewayAcpClientInternal
+        .loadCapabilities(forceRefresh: forceRefresh);
+    controller.bridgeProviderCatalogInternal =
+        normalizeBridgeOwnedSingleAgentProviderList(
+          capabilities.providerCatalog,
+        );
+  } catch (_) {
+    controller.bridgeProviderCatalogInternal = const <SingleAgentProvider>[];
+  }
+  if (!controller.disposedInternal) {
+    controller.notifyListeners();
+  }
+}
 
 List<ManagedMountTargetState>
 mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal(
