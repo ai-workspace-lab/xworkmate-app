@@ -50,29 +50,17 @@ extension AppControllerDesktopNavigation on AppController {
     if (!capabilities.supportsDestination(destination)) {
       return;
     }
-    if (destination == WorkspaceDestination.aiGateway ||
-        destination == WorkspaceDestination.secrets) {
-      openSettings(tab: SettingsTab.gateway);
-      return;
-    }
-    final nextModulesTab = switch (destination) {
-      WorkspaceDestination.nodes => ModulesTab.nodes,
-      WorkspaceDestination.agents => ModulesTab.agents,
-      _ => modulesTabInternal,
-    };
     final shouldClearSettingsDrillIn =
         settingsDetailInternal != null ||
         settingsNavigationContextInternal != null;
     final changed =
         destinationInternal != destination ||
         detailPanelInternal != null ||
-        shouldClearSettingsDrillIn ||
-        nextModulesTab != modulesTabInternal;
+        shouldClearSettingsDrillIn;
     if (!changed) {
       return;
     }
     destinationInternal = destination;
-    modulesTabInternal = nextModulesTab;
     settingsDetailInternal = null;
     settingsNavigationContextInternal = null;
     detailPanelInternal = null;
@@ -105,74 +93,6 @@ extension AppControllerDesktopNavigation on AppController {
     if (sessionsControllerInternal.currentSessionKey != mainSessionKey) {
       unawaited(switchSession(mainSessionKey));
     }
-  }
-
-  void openModules({ModulesTab tab = ModulesTab.nodes}) {
-    if (tab == ModulesTab.gateway) {
-      openSettings(tab: SettingsTab.gateway);
-      return;
-    }
-    final destination = tab == ModulesTab.agents
-        ? WorkspaceDestination.agents
-        : WorkspaceDestination.nodes;
-    if (!capabilities.supportsDestination(destination)) {
-      return;
-    }
-    final changed =
-        destinationInternal != destination ||
-        modulesTabInternal != tab ||
-        detailPanelInternal != null ||
-        settingsDetailInternal != null ||
-        settingsNavigationContextInternal != null;
-    if (!changed) {
-      return;
-    }
-    destinationInternal = destination;
-    modulesTabInternal = tab;
-    detailPanelInternal = null;
-    settingsDetailInternal = null;
-    settingsNavigationContextInternal = null;
-    notifyListeners();
-  }
-
-  void setModulesTab(ModulesTab tab) {
-    if (modulesTabInternal == tab) {
-      return;
-    }
-    modulesTabInternal = tab;
-    notifyListeners();
-  }
-
-  void openSecrets({SecretsTab tab = SecretsTab.vault}) {
-    if (!capabilities.supportsDestination(WorkspaceDestination.settings)) {
-      return;
-    }
-    secretsTabInternal = tab;
-    openSettings(tab: SettingsTab.gateway);
-  }
-
-  void setSecretsTab(SecretsTab tab) {
-    if (secretsTabInternal == tab) {
-      return;
-    }
-    secretsTabInternal = tab;
-    notifyListeners();
-  }
-
-  void openAiGateway({AiGatewayTab tab = AiGatewayTab.models}) {
-    if (!capabilities.supportsDestination(WorkspaceDestination.settings)) {
-      return;
-    }
-    aiGatewayTabInternal = tab;
-    openSettings(tab: SettingsTab.gateway);
-  }
-
-  void setAiGatewayTab(AiGatewayTab tab) {
-    if (aiGatewayTabInternal == tab) {
-      return;
-    }
-    aiGatewayTabInternal = tab;
-    notifyListeners();
   }
 
   void openSettings({

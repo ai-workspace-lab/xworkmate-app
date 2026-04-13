@@ -36,26 +36,7 @@ UiFeaturePlatform resolveUiFeaturePlatformFromContext(BuildContext context) {
 
 abstract final class UiFeatureKeys {
   static const navigationAssistant = 'navigation.assistant';
-  static const navigationTasks = 'navigation.tasks';
-  static const navigationWorkspace = 'navigation.workspace';
-  static const navigationSkills = 'navigation.skills';
-  static const navigationNodes = 'navigation.nodes';
-  static const navigationAgents = 'navigation.agents';
-  static const navigationMcpServer = 'navigation.mcp_server';
-  static const navigationClawHub = 'navigation.claw_hub';
-  static const navigationSecrets = 'navigation.secrets';
-  static const navigationAiGateway = 'navigation.ai_gateway';
   static const navigationSettings = 'navigation.settings';
-  static const navigationAccount = 'navigation.account';
-
-  static const workspaceSkills = 'workspace.skills';
-  static const workspaceNodes = 'workspace.nodes';
-  static const workspaceAgents = 'workspace.agents';
-  static const workspaceMcpServer = 'workspace.mcp_server';
-  static const workspaceClawHub = 'workspace.claw_hub';
-  static const workspaceConnectors = 'workspace.connectors';
-  static const workspaceAiGateway = 'workspace.ai_gateway';
-  static const workspaceAccount = 'workspace.account';
 
   static const assistantDirectAi = 'assistant.direct_ai';
   static const assistantLocalGateway = 'assistant.local_gateway';
@@ -64,8 +45,6 @@ abstract final class UiFeatureKeys {
   static const assistantMultiAgent = 'assistant.multi_agent';
   static const assistantLocalRuntime = 'assistant.local_runtime';
 
-  static const settingsGeneral = 'settings.general';
-  static const settingsWorkspace = 'settings.workspace';
   static const settingsGateway = 'settings.gateway';
   static const settingsAccountAccess = 'settings.account_access';
   static const settingsVaultServer = 'settings.vault_server';
@@ -74,11 +53,6 @@ abstract final class UiFeatureKeys {
   static const settingsGatewayAdvancedCustomMode =
       'settings.gateway_advanced_custom_mode';
   static const settingsGatewaySetupCode = 'settings.gateway_setup_code';
-  static const settingsAgents = 'settings.agents';
-  static const settingsAppearance = 'settings.appearance';
-  static const settingsDiagnostics = 'settings.diagnostics';
-  static const settingsExperimental = 'settings.experimental';
-  static const settingsAbout = 'settings.about';
   static const settingsExperimentalCanvas = 'settings.experimental_canvas';
   static const settingsExperimentalBridge = 'settings.experimental_bridge';
   static const settingsExperimentalDebug = 'settings.experimental_debug';
@@ -380,16 +354,7 @@ class UiFeatureAccess {
       <UiFeaturePlatform, Map<String, WorkspaceDestination>>{
         UiFeaturePlatform.mobile: <String, WorkspaceDestination>{
           UiFeatureKeys.navigationAssistant: WorkspaceDestination.assistant,
-          UiFeatureKeys.navigationTasks: WorkspaceDestination.tasks,
-          UiFeatureKeys.navigationSecrets: WorkspaceDestination.secrets,
           UiFeatureKeys.navigationSettings: WorkspaceDestination.settings,
-          UiFeatureKeys.workspaceSkills: WorkspaceDestination.skills,
-          UiFeatureKeys.workspaceNodes: WorkspaceDestination.nodes,
-          UiFeatureKeys.workspaceAgents: WorkspaceDestination.agents,
-          UiFeatureKeys.workspaceMcpServer: WorkspaceDestination.mcpServer,
-          UiFeatureKeys.workspaceClawHub: WorkspaceDestination.clawHub,
-          UiFeatureKeys.workspaceAiGateway: WorkspaceDestination.aiGateway,
-          UiFeatureKeys.workspaceAccount: WorkspaceDestination.account,
         },
         UiFeaturePlatform.desktop: <String, WorkspaceDestination>{
           UiFeatureKeys.navigationAssistant: WorkspaceDestination.assistant,
@@ -397,11 +362,7 @@ class UiFeatureAccess {
         },
         UiFeaturePlatform.web: <String, WorkspaceDestination>{
           UiFeatureKeys.navigationAssistant: WorkspaceDestination.assistant,
-          UiFeatureKeys.navigationTasks: WorkspaceDestination.tasks,
-          UiFeatureKeys.navigationSkills: WorkspaceDestination.skills,
-          UiFeatureKeys.navigationNodes: WorkspaceDestination.nodes,
-          UiFeatureKeys.navigationSecrets: WorkspaceDestination.secrets,
-          UiFeatureKeys.navigationAiGateway: WorkspaceDestination.aiGateway,
+          UiFeatureKeys.navigationSettings: WorkspaceDestination.settings,
         },
       };
 
@@ -439,9 +400,7 @@ class UiFeatureAccess {
     return allowed;
   }
 
-  bool get showsWorkspaceHub =>
-      platform == UiFeaturePlatform.mobile &&
-      isEnabledPath(UiFeatureKeys.navigationWorkspace);
+  bool get showsWorkspaceHub => false;
 
   bool get supportsDirectAi => isEnabledPath(UiFeatureKeys.assistantDirectAi);
 
@@ -460,9 +419,6 @@ class UiFeatureAccess {
   bool get supportsDesktopRuntime =>
       platform == UiFeaturePlatform.desktop &&
       isEnabledPath(UiFeatureKeys.assistantLocalRuntime);
-
-  bool get supportsDiagnostics =>
-      isEnabledPath(UiFeatureKeys.settingsDiagnostics);
 
   bool get supportsAccountAccess =>
       isEnabledPath(UiFeatureKeys.settingsAccountAccess);
