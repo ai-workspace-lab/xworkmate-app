@@ -553,6 +553,14 @@ class AppController extends ChangeNotifier {
         bridgeProviderCatalogInternal,
       );
 
+  List<SingleAgentProvider> get assistantProviderCatalogForDisplay {
+    final liveCatalog = assistantProviderCatalog;
+    if (liveCatalog.isNotEmpty) {
+      return liveCatalog;
+    }
+    return kBridgeOwnedSingleAgentProviders;
+  }
+
   SingleAgentProvider? bridgeProviderForId(String providerId) {
     final normalizedProviderId = normalizeSingleAgentProviderId(providerId);
     if (normalizedProviderId.isEmpty) {
@@ -570,7 +578,7 @@ class AppController extends ChangeNotifier {
     final normalizedProviderId = normalizeSingleAgentProviderId(
       providerId ?? '',
     );
-    final catalog = assistantProviderCatalog;
+    final catalog = assistantProviderCatalogForDisplay;
     if (normalizedProviderId.isNotEmpty) {
       for (final provider in catalog) {
         if (provider.providerId == normalizedProviderId) {

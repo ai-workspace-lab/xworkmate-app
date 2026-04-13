@@ -10,6 +10,46 @@ import 'package:xworkmate/widgets/surface_card.dart';
 
 void main() {
   group('AssistantLowerPaneInternal', () {
+    testWidgets(
+      'keeps canonical agent providers visible when live capabilities are unavailable',
+      (tester) async {
+        final controller = AppController();
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('session-1');
+
+        await tester.pumpWidget(
+          _buildTestApp(child: _buildLowerPane(controller: controller)),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('assistant-provider-button')),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.byKey(const Key('assistant-provider-button')));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('assistant-provider-menu-item-codex')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('assistant-provider-menu-item-opencode')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('assistant-provider-menu-item-gemini')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('assistant-provider-menu-item-openclaw')),
+          findsNothing,
+        );
+      },
+    );
+
     testWidgets('shows mode-specific provider catalogs', (tester) async {
       final controller = AppController(
         initialBridgeProviderCatalog: const <SingleAgentProvider>[

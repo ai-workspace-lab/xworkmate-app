@@ -76,7 +76,7 @@ List<SingleAgentProvider> _taskDialogProviderCatalogForTarget({
       controller.assistantProviderForSession(controller.currentSessionKey),
     ];
   }
-  return controller.assistantProviderCatalog;
+  return controller.assistantProviderCatalogForDisplay;
 }
 
 class _TaskDialogExecutionTargetMenuButtonInternal extends StatelessWidget {
@@ -156,7 +156,7 @@ class _TaskDialogProviderMenuButtonInternal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayProvider = selectedProvider.isUnspecified
-        ? SingleAgentProvider.openclaw
+        ? _fallbackDisplayProvider()
         : selectedProvider;
 
     return PopupMenuButton<SingleAgentProvider>(
@@ -196,6 +196,16 @@ class _TaskDialogProviderMenuButtonInternal extends StatelessWidget {
         tooltip: appText('智能体 Provider', 'Agent Provider'),
       ),
     );
+  }
+
+  SingleAgentProvider _fallbackDisplayProvider() {
+    if (executionTarget.isGateway) {
+      return SingleAgentProvider.openclaw;
+    }
+    if (providers.isNotEmpty) {
+      return providers.first;
+    }
+    return SingleAgentProvider.codex;
   }
 
   Future<void> _handleProviderSelected(SingleAgentProvider provider) async {

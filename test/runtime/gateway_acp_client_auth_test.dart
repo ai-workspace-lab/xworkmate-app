@@ -201,6 +201,55 @@ void main() {
         expect(capture.requestPath, '/acp/rpc');
       },
     );
+
+    test(
+      'desktop bridge auth resolver falls back to the remote gateway token for bridge ACP',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-acp-auth-bridge-fallback-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            try {
+              await storeRoot.delete(recursive: true);
+            } on FileSystemException {
+              // Temp cleanup is best effort here. The controller may still be
+              // releasing files when teardown starts.
+            }
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWithGatewayProfileAt(
+            kGatewayRemoteProfileIndex,
+            GatewayConnectionProfile.defaults().copyWith(
+              host: 'xworkmate.svc.plus',
+              port: 443,
+              tls: true,
+            ),
+          ),
+        );
+        await store.saveSecretValueByRef('gateway_token_0', 'gateway-token');
+
+        final controller = AppController(store: store);
+        addTearDown(controller.dispose);
+        await controller.settingsControllerInternal.initialize();
+
+        final header = await controller
+            .resolveGatewayAcpAuthorizationHeaderInternal(
+              Uri.parse('https://xworkmate-bridge.svc.plus/acp/rpc'),
+            );
+
+        expect(header, 'gateway-token');
+      },
+    );
   });
 }
 

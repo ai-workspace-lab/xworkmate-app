@@ -60,8 +60,8 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         await refreshSingleAgentCapabilitiesInternal(forceRefresh: true);
       } catch (_) {
         // Keep target selection interactive even when a just-in-time
-        // capabilities refresh fails. The provider picker will remain hidden
-        // until the next successful refresh.
+        // capabilities refresh fails. The dialog still shows the canonical
+        // single-agent providers while the live catalog catches up.
       }
       if (currentTarget == resolvedTarget &&
           settings.assistantExecutionTarget == resolvedTarget) {
