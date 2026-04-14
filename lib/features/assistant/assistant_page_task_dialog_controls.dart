@@ -61,7 +61,6 @@ class AssistantTaskDialogModeControlsInternal extends StatelessWidget {
         ),
         _TaskDialogProviderMenuButtonInternal(
           controller: controller,
-          executionTarget: executionTarget,
           selectedProvider: controller.assistantProviderForSession(
             controller.currentSessionKey,
           ),
@@ -137,22 +136,21 @@ class _TaskDialogExecutionTargetMenuButtonInternal extends StatelessWidget {
 class _TaskDialogProviderMenuButtonInternal extends StatelessWidget {
   const _TaskDialogProviderMenuButtonInternal({
     required this.controller,
-    required this.executionTarget,
     required this.selectedProvider,
     required this.providers,
   });
 
   final AppController controller;
-  final AssistantExecutionTarget executionTarget;
   final SingleAgentProvider selectedProvider;
   final List<SingleAgentProvider> providers;
 
   @override
   Widget build(BuildContext context) {
-    final displayProvider = selectedProvider.isUnspecified
-        ? _fallbackDisplayProvider()
-        : selectedProvider;
     final isEnabled = providers.isNotEmpty;
+    final hasSelection = !selectedProvider.isUnspecified;
+    final label = hasSelection
+        ? selectedProvider.label
+        : appText('Provider', 'Provider');
 
     return PopupMenuButton<SingleAgentProvider>(
       key: const Key('assistant-provider-button'),
@@ -176,7 +174,7 @@ class _TaskDialogProviderMenuButtonInternal extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   Expanded(child: Text(provider.label)),
-                  if (provider == displayProvider)
+                  if (provider == selectedProvider)
                     const Icon(Icons.check_rounded, size: 18),
                 ],
               ),
@@ -184,23 +182,15 @@ class _TaskDialogProviderMenuButtonInternal extends StatelessWidget {
           )
           .toList(growable: false),
       child: _TaskDialogSelectorChipInternal(
-        leading: SingleAgentProviderBadgeInternal(
-          key: const Key('assistant-provider-badge'),
-          provider: displayProvider,
-        ),
-        label: displayProvider.label,
+        leading: hasSelection
+            ? SingleAgentProviderBadgeInternal(
+                key: const Key('assistant-provider-badge'),
+                provider: selectedProvider,
+              )
+            : Icon(Icons.hub_outlined, size: 14, color: context.palette.textMuted),
+        label: label,
         tooltip: appText('智能体 Provider', 'Agent Provider'),
       ),
-    );
-  }
-
-  SingleAgentProvider _fallbackDisplayProvider() {
-    return SingleAgentProvider(
-      providerId: '',
-      label: appText('未提供', 'Unavailable'),
-      badge: '?',
-      supportedTargets: <AssistantExecutionTarget>[executionTarget],
-      enabled: false,
     );
   }
 

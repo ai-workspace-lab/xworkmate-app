@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/runtime/account_runtime_client.dart';
 import 'package:xworkmate/runtime/runtime_controllers.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
@@ -352,6 +353,61 @@ void main() {
         expect(
           controller.snapshot.assistantExecutionTarget,
           AssistantExecutionTarget.gateway,
+        );
+      },
+    );
+
+    test(
+      'synced bridge url stays metadata only while runtime uses the managed bridge endpoint',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-account-managed-bridge-runtime-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            await storeRoot.delete(recursive: true);
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        await store.saveAccountSyncState(
+          AccountSyncState.defaults().copyWith(
+            syncState: 'ready',
+            syncedDefaults: AccountRemoteProfile.defaults().copyWith(
+              bridgeServerUrl: 'https://xworkmate-bridge-alt.svc.plus',
+            ),
+          ),
+        );
+        await store.saveAccountManagedSecret(
+          target: kAccountManagedSecretTargetBridgeAuthToken,
+          value: 'bridge-token',
+        );
+
+        final controller = AppController(store: store);
+        addTearDown(controller.dispose);
+        await controller.settingsControllerInternal.initialize();
+
+        expect(
+          controller.resolveGatewayAcpEndpointInternal()?.toString(),
+          kManagedBridgeServerUrl,
+        );
+        expect(
+          await controller.resolveGatewayAcpAuthorizationHeaderInternal(
+            Uri.parse('$kManagedBridgeServerUrl/acp/rpc'),
+          ),
+          'bridge-token',
+        );
+        expect(
+          await controller.resolveGatewayAcpAuthorizationHeaderInternal(
+            Uri.parse('https://xworkmate-bridge-alt.svc.plus/acp/rpc'),
+          ),
+          isNull,
         );
       },
     );

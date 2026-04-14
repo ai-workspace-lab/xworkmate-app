@@ -50,34 +50,39 @@ import 'app_controller_desktop_thread_sessions_collaboration_impl.dart';
 
 AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
   required AssistantExecutionTarget target,
-  required GatewayConnectionSnapshot connection,
+  required bool bridgeReady,
+  required String bridgeLabel,
+  required AccountSyncState? accountSyncState,
 }) {
-  final bridgeAddress = connection.remoteAddress?.trim() ?? '';
-  final rawStatus = connection.status;
-  final gatewayTokenMissing = connection.gatewayTokenMissing;
-  final missingEndpoint =
-      (connection.lastErrorCode?.trim().toUpperCase() ?? '') ==
-      'MISSING_ENDPOINT';
-  final hasFailureEvidence =
-      !missingEndpoint &&
-      (rawStatus == RuntimeConnectionStatus.error ||
-          (connection.lastError?.trim().isNotEmpty ?? false) ||
-          (connection.lastErrorCode?.trim().isNotEmpty ?? false) ||
-          (connection.lastErrorDetailCode?.trim().isNotEmpty ?? false));
-  final genericFailure = !gatewayTokenMissing && hasFailureEvidence;
-  final status = gatewayTokenMissing || genericFailure
+  if (bridgeReady) {
+    return AssistantThreadConnectionState(
+      executionTarget: target,
+      status: RuntimeConnectionStatus.connected,
+      primaryLabel: RuntimeConnectionStatus.connected.label,
+      detailLabel: bridgeLabel,
+      ready: true,
+      gatewayTokenMissing: false,
+      lastError: null,
+    );
+  }
+
+  final syncState = accountSyncState?.syncState.trim().toLowerCase() ?? '';
+  final syncMessage = accountSyncState?.syncMessage.trim() ?? '';
+  final tokenMissing = syncMessage == 'Bridge authorization is unavailable';
+  final endpointMissing = syncMessage == 'Bridge endpoint is unavailable';
+  final blocked = syncState == 'blocked';
+  final failed = blocked && !tokenMissing && !endpointMissing;
+  final status = tokenMissing || failed
       ? RuntimeConnectionStatus.error
-      : missingEndpoint
-      ? RuntimeConnectionStatus.offline
-      : rawStatus;
-  final primaryLabel = gatewayTokenMissing
+      : RuntimeConnectionStatus.offline;
+  final primaryLabel = tokenMissing
       ? appText('缺少令牌', 'Missing Token')
-      : genericFailure
+      : failed
       ? appText('连接失败', 'Connection Failed')
       : status.label;
-  final detailLabel = bridgeAddress.isNotEmpty
-      ? bridgeAddress
-      : genericFailure
+  final detailLabel = tokenMissing
+      ? appText('xworkmate-bridge 授权不可用', 'xworkmate-bridge authorization unavailable')
+      : failed
       ? appText('xworkmate-bridge 连接失败', 'xworkmate-bridge connection failed')
       : appText('xworkmate-bridge 未连接', 'xworkmate-bridge is not connected');
   return AssistantThreadConnectionState(
@@ -85,9 +90,9 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
     status: status,
     primaryLabel: primaryLabel,
     detailLabel: detailLabel,
-    ready: status == RuntimeConnectionStatus.connected,
-    gatewayTokenMissing: gatewayTokenMissing,
-    lastError: connection.lastError?.trim(),
+    ready: false,
+    gatewayTokenMissing: tokenMissing,
+    lastError: failed ? syncMessage : null,
   );
 }
 
@@ -273,9 +278,20 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
+    final providers = providerCatalogForExecutionTarget(target);
+    final availableTargets = bridgeAvailableExecutionTargets;
+    final bridgeReady =
+        providers.isNotEmpty &&
+        (availableTargets.isEmpty || availableTargets.contains(target));
+    final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
+    final bridgeLabel = bridgeEndpoint?.host.trim().isNotEmpty == true
+        ? bridgeEndpoint!.host.trim()
+        : 'xworkmate-bridge';
     return resolveGatewayThreadConnectionStateInternal(
       target: target,
-      connection: connection,
+      bridgeReady: bridgeReady,
+      bridgeLabel: bridgeLabel,
+      accountSyncState: settingsControllerInternal.accountSyncState,
     );
   }
 

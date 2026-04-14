@@ -578,12 +578,20 @@ class AppController extends ChangeNotifier {
     final source = executionTarget.isGateway
         ? gatewayProviderCatalog
         : assistantProviderCatalog;
-    return source
-        .where(
-          (provider) =>
-              provider.supportedTargets.isEmpty ||
-              provider.supportedTargets.contains(executionTarget),
-        )
+    final visibleProviderIds = executionTarget.isGateway
+        ? const <String>[kCanonicalGatewayProviderId]
+        : const <String>['codex', 'opencode', 'gemini'];
+    final providersById = <String, SingleAgentProvider>{};
+    for (final provider in source) {
+      if (provider.supportedTargets.isNotEmpty &&
+          !provider.supportedTargets.contains(executionTarget)) {
+        continue;
+      }
+      providersById[provider.providerId] = provider;
+    }
+    return visibleProviderIds
+        .map((providerId) => providersById[providerId])
+        .whereType<SingleAgentProvider>()
         .toList(growable: false);
   }
 
