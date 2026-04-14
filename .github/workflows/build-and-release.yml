@@ -164,21 +164,36 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
 
+      - name: Set up Java 17 for Android
+        if: ${{ matrix.platform == 'android' }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Preflight platform lane
+        id: preflight
+        shell: bash
+        run: bash ./scripts/ci/platform_preflight.sh "$PLATFORM" "$SHOULD_RELEASE"
+
+      - name: Install platform dependencies
+        if: ${{ steps.preflight.outputs.should_build_platform == 'true' }}
+        shell: bash
+        run: bash ./scripts/ci/setup_platform_deps.sh "$PLATFORM"
+
       - name: Install Go
-        if: ${{ matrix.platform == 'macos' }}
+        if: ${{ matrix.platform == 'macos' && steps.preflight.outputs.should_build_platform == 'true' }}
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
           go-version: "1.24.1"
 
-      - name: Install platform dependencies
-        shell: bash
-        run: bash ./scripts/ci/setup_platform_deps.sh "$PLATFORM"
-
       - name: Build platform artifacts
+        if: ${{ steps.preflight.outputs.should_build_platform == 'true' }}
         shell: bash
         run: bash ./scripts/ci/build_matrix_artifacts.sh "$PLATFORM" "$ARCH" "$SHOULD_RELEASE"
 
       - name: Upload build artifacts
+        if: ${{ steps.preflight.outputs.should_build_platform == 'true' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ${{ matrix.artifact_name }}
