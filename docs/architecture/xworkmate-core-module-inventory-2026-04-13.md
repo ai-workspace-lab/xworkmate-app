@@ -1,6 +1,6 @@
 # XWorkmate Core Module Inventory
 
-Last Updated: 2026-04-13
+Last Updated: 2026-04-14
 
 ## Repo Context
 
@@ -151,6 +151,9 @@ Status: `Active`
 - provider catalog 只来自 bridge capabilities，不再恢复任何 preset / backfill / fallback provider truth
 - 任务对话模式只保留两类一级目标：`agent` / `gateway`
 - 每个目标下的 provider 菜单都只消费 `xworkmate-bridge` 返回的动态 catalog；app 不维护 `codex / opencode / gemini / openclaw` 这类本地固定列表
+- app 侧 provider 选择主链统一为 `providerCatalogForExecutionTarget(...) -> resolveProviderForExecutionTarget(...) -> setAssistantProvider(...)`
+- `agent` catalog 只对应 ACP server bridges；`gateway` catalog 只对应 bridge 返回的 gateway provider 列表，当前为 `openclaw`，未来可扩展 `hermes` 等项
+- provider fallback 文档口径统一使用通用 provider 语义，不再保留 “single-agent provider” 术语
 - task state 仍在 assistant 内被消费，但不再拥有独立 `TasksPage`
 - skills 数据仍在 assistant 内被消费，但不再拥有独立 `SkillsPage`
 - assistant focus 只保留仍有真实落点的 `settings / language / theme`
@@ -217,3 +220,4 @@ Status: `Removed surface`
 - `xworkmate-app` 不再维护独立模块壳；任何新的 bridge 能力都只能落到 `assistant` 或 `settings`，不能恢复 `tasks/modules/...` 独立 page matrix。
 - provider、routing、bridge endpoint、managed account sync 的真源继续归 `xworkmate-bridge` 合同与同步链拥有，app 只做消费与最小本地编排。
 - 不再维护兼容 alias、休眠 destination、伪模块矩阵；发现新的 `legacy / fallback / compat` 残留时，默认动作仍然是删除而不是保留占位。 
+- 任务对话框 provider 选择细则以 [Task Dialog Provider Selection Mainline](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/task-dialog-provider-selection-mainline.md) 为准。

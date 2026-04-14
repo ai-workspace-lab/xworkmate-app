@@ -1,6 +1,6 @@
 # Task Control Plane Unification
 
-Last Updated: 2026-04-13
+Last Updated: 2026-04-14
 
 ## Background
 
@@ -80,6 +80,12 @@ flowchart TD
 - 持久化在线程上的 `providerId` 只表示用户历史选择，不负责反向生成 catalog
 - provider unavailable 文案与 resolved provider 都来自 `xworkmate.routing.resolve`
 - bridge 返回 `availableExecutionTargets` 与 target-scoped provider catalog；app 只做目标切换与展示，不做静态拆分或 canonical 单项硬编码
+- app 侧任务对话框 provider 选择主链固定为：
+  - `providerCatalogForExecutionTarget(...)`
+  - `resolveProviderForExecutionTarget(...)`
+  - `setAssistantProvider(...)`
+- `agent` catalog 只消费 bridge 广告的 ACP server bridges
+- `gateway` catalog 只消费 bridge 返回的 gateway provider 列表；当前为 `openclaw`，未来可扩展 `hermes` 等项
 - app 只负责：
   - 展示 `agent` / `gateway` 目标切换
   - 请求 bridge contract
@@ -109,6 +115,7 @@ flowchart TD
 
 ## See Also
 
+- [Task Dialog Provider Selection Mainline](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/task-dialog-provider-selection-mainline.md)
 - [XWorkmate Core Module Inventory](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/xworkmate-core-module-inventory-2026-04-13.md)
 - [Settings Integration Configuration Model](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/settings-integration-configuration-model.md)
 - [ACP Forwarding Topology](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-bridge/docs/architecture/acp-forwarding-topology.md)

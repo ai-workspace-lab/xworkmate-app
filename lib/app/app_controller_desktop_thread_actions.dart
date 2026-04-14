@@ -257,6 +257,40 @@ extension AppControllerDesktopThreadActions on AppController {
       recomputeTasksInternal();
       throw error;
     }
+    if (currentTarget.isGateway &&
+        providerCatalogForExecutionTarget(currentTarget).isEmpty) {
+      try {
+        await refreshSingleAgentCapabilitiesInternal(forceRefresh: true);
+      } catch (_) {
+        // Keep the local guard focused on the post-refresh catalog state.
+      }
+      if (providerCatalogForExecutionTarget(currentTarget).isEmpty) {
+        final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+          currentSessionKey,
+        );
+        upsertTaskThreadInternal(
+          normalizedSessionKey,
+          selectedProvider: SingleAgentProvider.unspecified,
+          selectedProviderSource: ThreadSelectionSource.inherited,
+          latestResolvedProviderId: '',
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        );
+        final error = StateError(
+          appText(
+            'Gateway ACP 未报告可用的 gateway provider，当前无法发送。',
+            'Gateway ACP did not report a usable gateway provider, so this Gateway task cannot run yet.',
+          ),
+        );
+        appendAssistantThreadMessageInternal(
+          normalizedSessionKey,
+          assistantErrorMessageInternal(error.message),
+        );
+        await flushAssistantThreadPersistenceInternal();
+        recomputeTasksInternal();
+        notifyIfActiveInternal();
+        throw error;
+      }
+    }
     await enqueueThreadTurnInternal<void>(
       normalizedAssistantSessionKeyInternal(currentSessionKey),
       () async {
