@@ -4,16 +4,12 @@ set -euo pipefail
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 dist_dir="$root_dir/dist/ios"
 export_method="${APPLE_EXPORT_METHOD:-ad-hoc}"
+app_store_define="${APP_STORE_DEFINE:---dart-define=XWORKMATE_APP_STORE=${XWORKMATE_APP_STORE:-true}}"
+source "$root_dir/scripts/ci/apple_signing.sh"
+APPLE_SIGNING_CLEANUP_COMMANDS=()
+trap apple_run_cleanup EXIT
 
 mkdir -p "$dist_dir"
-
-decode_base64() {
-  if base64 --help 2>&1 | grep -q -- '--decode'; then
-    base64 --decode
-  else
-    base64 -D
-  fi
-}
 
 required_vars=(
   APPLE_CERT_P12_BASE64
@@ -34,36 +30,25 @@ if [[ "${#missing[@]}" -gt 0 ]]; then
   exit 1
 fi
 
-tmp_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/xworkmate-ios.XXXXXX")"
-keychain_name="xworkmate-build.keychain-db"
-keychain_path="$HOME/Library/Keychains/$keychain_name"
-cert_path="$tmp_dir/dist-cert.p12"
-profile_path="$tmp_dir/profile.mobileprovision"
+eval "$(python3 "$root_dir/scripts/ci/build_version.py" --format shell)"
+app_version="$DISPLAY_VERSION"
+app_build="$BUILD_NUMBER"
+apple_setup_signing_keychain
+apple_install_provision_profile "xworkmate.mobileprovision"
+
+tmp_dir="$APPLE_SIGNING_TMP_DIR"
 export_options_path="$tmp_dir/ExportOptions.plist"
-
-cleanup() {
-  security delete-keychain "$keychain_path" >/dev/null 2>&1 || true
-  rm -rf "$tmp_dir"
-}
-trap cleanup EXIT
-
-printf '%s' "$APPLE_CERT_P12_BASE64" | decode_base64 > "$cert_path"
-printf '%s' "$APPLE_PROVISION_PROFILE_BASE64" | decode_base64 > "$profile_path"
-
-security create-keychain -p "$APPLE_KEYCHAIN_PASSWORD" "$keychain_name"
-security set-keychain-settings -lut 21600 "$keychain_path"
-security unlock-keychain -p "$APPLE_KEYCHAIN_PASSWORD" "$keychain_path"
-security import "$cert_path" -P "$APPLE_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
-security list-keychains -d user -s "$keychain_path"
-security set-key-partition-list -S apple-tool:,apple: -s -k "$APPLE_KEYCHAIN_PASSWORD" "$keychain_path"
-
-mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-cp "$profile_path" "$HOME/Library/MobileDevice/Provisioning Profiles/xworkmate.mobileprovision"
 
 sed "s|\${EXPORT_METHOD}|$export_method|g" "$root_dir/ios/ExportOptions.plist" > "$export_options_path"
 
 flutter pub get
-flutter build ipa --release --export-options-plist="$export_options_path"
+flutter build ipa --release \
+  --build-name="$PLATFORM_RELEASE_VERSION" \
+  --build-number="$app_build" \
+  --dart-define="XWORKMATE_DISPLAY_VERSION=$app_version" \
+  --dart-define="XWORKMATE_BUILD_NUMBER=$app_build" \
+  "$app_store_define" \
+  --export-options-plist="$export_options_path"
 
 archive_path="$root_dir/build/ios/archive/Runner.xcarchive"
 if [[ -d "$archive_path" ]]; then
