@@ -20,7 +20,7 @@ APP_DART_DEFINE_BUILD ?= --dart-define=XWORKMATE_BUILD_NUMBER=$(APP_BUILD_NUMBER
 APP_DART_DEFINE_BUILD_DATE ?= --dart-define=XWORKMATE_BUILD_DATE=$(APP_BUILD_DATE)
 APP_DART_DEFINE_BUILD_COMMIT ?= --dart-define=XWORKMATE_BUILD_COMMIT=$(APP_BUILD_COMMIT)
 
-.PHONY: help deps analyze test test-all test-flutter test-golden test-integration test-integration-macos test-patrol test-go test-ci check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs check-export-compliance test-real-env-login-chain inspect-xworkmate-bridge-service
+.PHONY: help deps analyze test test-all test-flutter test-golden test-integration test-integration-macos test-patrol test-go test-ci check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs docs-public-api check-export-compliance test-real-env-login-chain inspect-xworkmate-bridge-service
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -71,6 +71,9 @@ format: ## Format Dart sources
 
 render-release-docs: ## Render feature matrix, roadmap, release notes, and changelog docs
 	$(DART) run tool/render_release_docs.dart
+
+docs-public-api: ## Generate the public API inventory docs payload
+	python3 scripts/docs/extract_public_api_inventory.py
 
 sync-version: ## Show the version/build metadata sourced from pubspec.yaml
 	@echo "version=$(APP_VERSION)"
