@@ -19,6 +19,7 @@ on:
       - "linux/**"
       - "windows/**"
       - "rust/**"
+      - "test/**"
       - "scripts/**"
       - "pubspec.*"
       - "Makefile"
@@ -88,6 +89,23 @@ jobs:
       - name: Run Flutter verification suite
         shell: bash
         run: bash ./scripts/ci/run_flutter_ci_suite.sh
+
+  remote_contract:
+    runs-on: ubuntu-22.04
+    needs:
+      - verify
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Verify accounts to bridge provider contract
+        shell: bash
+        env:
+          REVIEW_ACCOUNT_BASE_URL: ${{ vars.REVIEW_ACCOUNT_BASE_URL }}
+          REVIEW_ACCOUNT_LOGIN_NAME: ${{ vars.REVIEW_ACCOUNT_LOGIN_NAME }}
+          REVIEW_ACCOUNT_LOGIN_PASSWORD: ${{ secrets.REVIEW_ACCOUNT_LOGIN_PASSWORD }}
+        run: bash ./scripts/ci/verify_remote_provider_contract.sh
 
 
   build:
