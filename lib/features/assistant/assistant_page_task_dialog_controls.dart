@@ -23,16 +23,22 @@ class AssistantTaskDialogModeControlsInternal extends StatelessWidget {
     final uiFeatures = controller.featuresFor(
       resolveUiFeaturePlatformFromContext(context),
     );
-    final visibleExecutionTargets = controller.visibleAssistantExecutionTargets(
+    final supportedExecutionTargets = compactAssistantExecutionTargets(
       uiFeatures.availableExecutionTargets,
     );
-    if (visibleExecutionTargets.isEmpty) {
+    if (supportedExecutionTargets.isEmpty) {
       return const SizedBox.shrink();
     }
+    final visibleExecutionTargets = controller.visibleAssistantExecutionTargets(
+      supportedExecutionTargets,
+    );
+    final resolutionTargets = visibleExecutionTargets.isNotEmpty
+        ? visibleExecutionTargets
+        : supportedExecutionTargets;
 
     final currentExecutionTarget =
         resolveAssistantExecutionTargetFromVisibleTargets(
-          visibleExecutionTargets,
+          resolutionTargets,
           currentTarget: controller.assistantExecutionTarget,
         );
     final executionTarget = collapseAssistantExecutionTargetForDisplay(
@@ -51,17 +57,17 @@ class AssistantTaskDialogModeControlsInternal extends StatelessWidget {
         _TaskDialogExecutionTargetMenuButtonInternal(
           controller: controller,
           executionTarget: executionTarget,
+          supportedExecutionTargets: supportedExecutionTargets,
           visibleExecutionTargets: visibleExecutionTargets,
         ),
-        if (providerMenuProviders.isNotEmpty)
-          _TaskDialogProviderMenuButtonInternal(
-            controller: controller,
-            executionTarget: executionTarget,
-            selectedProvider: controller.assistantProviderForSession(
-              controller.currentSessionKey,
-            ),
-            providers: providerMenuProviders,
+        _TaskDialogProviderMenuButtonInternal(
+          controller: controller,
+          executionTarget: executionTarget,
+          selectedProvider: controller.assistantProviderForSession(
+            controller.currentSessionKey,
           ),
+          providers: providerMenuProviders,
+        ),
       ],
     );
   }
@@ -71,30 +77,24 @@ List<SingleAgentProvider> _taskDialogProviderCatalogForTarget({
   required AppController controller,
   required AssistantExecutionTarget executionTarget,
 }) {
-  if (executionTarget.isGateway) {
-    return <SingleAgentProvider>[
-      controller.assistantProviderForSession(controller.currentSessionKey),
-    ];
-  }
-  return controller.assistantProviderCatalogForDisplay;
+  return controller.providerCatalogForExecutionTarget(executionTarget);
 }
 
 class _TaskDialogExecutionTargetMenuButtonInternal extends StatelessWidget {
   const _TaskDialogExecutionTargetMenuButtonInternal({
     required this.controller,
     required this.executionTarget,
+    required this.supportedExecutionTargets,
     required this.visibleExecutionTargets,
   });
 
   final AppController controller;
   final AssistantExecutionTarget executionTarget;
+  final List<AssistantExecutionTarget> supportedExecutionTargets;
   final List<AssistantExecutionTarget> visibleExecutionTargets;
 
   @override
   Widget build(BuildContext context) {
-    final compactExecutionTargets = compactAssistantExecutionTargets(
-      visibleExecutionTargets,
-    );
     final palette = context.palette;
     final selectedLabel = executionTarget.label;
 
@@ -104,21 +104,25 @@ class _TaskDialogExecutionTargetMenuButtonInternal extends StatelessWidget {
       onSelected: (value) {
         unawaited(_handleExecutionTargetSelected(value));
       },
-      itemBuilder: (context) => compactExecutionTargets
+      itemBuilder: (context) => supportedExecutionTargets
           .map(
-            (value) => PopupMenuItem<AssistantExecutionTarget>(
-              value: value,
-              key: Key('assistant-execution-target-menu-item-${value.name}'),
-              child: Row(
-                children: [
-                  Icon(value.icon, size: 18),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(value.label)),
-                  if (value == executionTarget)
-                    const Icon(Icons.check_rounded, size: 18),
-                ],
-              ),
-            ),
+            (value) {
+              final enabled = visibleExecutionTargets.contains(value);
+              return PopupMenuItem<AssistantExecutionTarget>(
+                value: value,
+                enabled: enabled,
+                key: Key('assistant-execution-target-menu-item-${value.name}'),
+                child: Row(
+                  children: [
+                    Icon(value.icon, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(value.label)),
+                    if (value == executionTarget)
+                      const Icon(Icons.check_rounded, size: 18),
+                  ],
+                ),
+              );
+            },
           )
           .toList(growable: false),
       child: _TaskDialogSelectorChipInternal(
@@ -156,11 +160,13 @@ class _TaskDialogProviderMenuButtonInternal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayProvider = selectedProvider.isUnspecified
-        ? _fallbackDisplayProvider()
+        ? _fallbackDisplayProvider(context)
         : selectedProvider;
+    final isEnabled = providers.isNotEmpty;
 
     return PopupMenuButton<SingleAgentProvider>(
       key: const Key('assistant-provider-button'),
+      enabled: isEnabled,
       tooltip: appText('智能体 Provider', 'Agent Provider'),
       onSelected: (provider) {
         unawaited(_handleProviderSelected(provider));
@@ -198,18 +204,21 @@ class _TaskDialogProviderMenuButtonInternal extends StatelessWidget {
     );
   }
 
-  SingleAgentProvider _fallbackDisplayProvider() {
-    if (executionTarget.isGateway) {
-      return SingleAgentProvider.openclaw;
-    }
+  SingleAgentProvider _fallbackDisplayProvider(BuildContext context) {
     if (providers.isNotEmpty) {
       return providers.first;
     }
-    return SingleAgentProvider.codex;
+    return SingleAgentProvider(
+      providerId: '',
+      label: appText('未提供', 'Unavailable'),
+      badge: '?',
+      supportedTargets: <AssistantExecutionTarget>[executionTarget],
+      enabled: false,
+    );
   }
 
   Future<void> _handleProviderSelected(SingleAgentProvider provider) async {
-    if (executionTarget.isGateway) {
+    if (executionTarget.isGateway || providers.isEmpty) {
       return;
     }
     await controller.setAssistantSingleAgentProvider(provider);

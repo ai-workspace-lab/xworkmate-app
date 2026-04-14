@@ -59,9 +59,13 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
     // Keep mount refresh resilient when ACP is temporarily unavailable.
   }
   if (capabilities != null) {
-    controller.bridgeProviderCatalogInternal =
-        normalizeBridgeOwnedSingleAgentProviderList(
-          capabilities.providerCatalog,
+    controller.bridgeAgentProviderCatalogInternal =
+        normalizeSingleAgentProviderList(capabilities.providerCatalog);
+    controller.bridgeGatewayProviderCatalogInternal =
+        normalizeSingleAgentProviderList(capabilities.gatewayProviderCatalog);
+    controller.bridgeAvailableExecutionTargetsInternal =
+        compactAssistantExecutionTargets(
+          capabilities.availableExecutionTargets,
         );
   }
   if (persistMountTargets && !controller.disposedInternal) {
@@ -90,12 +94,21 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
   try {
     final capabilities = await controller.gatewayAcpClientInternal
         .loadCapabilities(forceRefresh: forceRefresh);
-    controller.bridgeProviderCatalogInternal =
-        normalizeBridgeOwnedSingleAgentProviderList(
-          capabilities.providerCatalog,
+    controller.bridgeAgentProviderCatalogInternal =
+        normalizeSingleAgentProviderList(capabilities.providerCatalog);
+    controller.bridgeGatewayProviderCatalogInternal =
+        normalizeSingleAgentProviderList(capabilities.gatewayProviderCatalog);
+    controller.bridgeAvailableExecutionTargetsInternal =
+        compactAssistantExecutionTargets(
+          capabilities.availableExecutionTargets,
         );
   } catch (_) {
-    controller.bridgeProviderCatalogInternal = const <SingleAgentProvider>[];
+    controller.bridgeAgentProviderCatalogInternal =
+        const <SingleAgentProvider>[];
+    controller.bridgeGatewayProviderCatalogInternal =
+        const <SingleAgentProvider>[];
+    controller.bridgeAvailableExecutionTargetsInternal =
+        const <AssistantExecutionTarget>[];
   }
   if (!controller.disposedInternal) {
     controller.notifyListeners();
@@ -109,16 +122,19 @@ mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal(
   GatewayAcpCapabilities capabilities,
 ) {
   final source = current.isEmpty ? ManagedMountTargetState.defaults() : current;
-  final providers = capabilities.providerCatalog
+  final agentProviders = capabilities.providerCatalog
+      .map((item) => item.providerId)
+      .toSet();
+  final gatewayProviders = capabilities.gatewayProviderCatalog
       .map((item) => item.providerId)
       .toSet();
   return source
       .map((item) {
         final available = switch (item.targetId) {
-          'codex' => providers.contains('codex'),
-          'opencode' => providers.contains('opencode'),
-          'gemini' => providers.contains('gemini'),
-          'openclaw' => capabilities.multiAgent || capabilities.singleAgent,
+          'codex' => agentProviders.contains('codex'),
+          'opencode' => agentProviders.contains('opencode'),
+          'gemini' => agentProviders.contains('gemini'),
+          'openclaw' => gatewayProviders.contains('openclaw'),
           _ => false,
         };
         return item.copyWith(

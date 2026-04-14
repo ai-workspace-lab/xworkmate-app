@@ -29,7 +29,7 @@ flowchart TD
 
   subgraph APPSTATE["App-side derived state"]
     F["refreshSingleAgentCapabilitiesRuntimeInternal()"]
-    G["bridgeProviderCatalogInternal"]
+    G["bridgeAgentProviderCatalogInternal<br/>bridgeGatewayProviderCatalogInternal<br/>bridgeAvailableExecutionTargetsInternal"]
     H["singleAgentCapabilitiesByProviderInternal"]
     I["refreshAcpCapabilitiesRuntimeInternal()"]
     J["GatewayAcpCapabilities"]
@@ -78,7 +78,7 @@ flowchart TD
 
 ## Notes
 
-- `providerCatalog` 只负责 assistant provider picker；不会因为线程里保存过 `providerId` 就被 app 反向重建
+- provider picker 的真源只来自 bridge 返回的 target-scoped catalog；不会因为线程里保存过 `providerId` 就被 app 反向重建
 - gateway runtime 可见性来自 bridge capability snapshot 与 `xworkmate.gateway.*` 返回，不来自旧设置页枚举
 - bridge 若返回额外 capability flag，这些 flag 只属于合同元数据，不会自动生成新的 settings tab 或 module page
 - production provider / gateway 选择继续由 bridge 拥有，app 只保留消费与展示

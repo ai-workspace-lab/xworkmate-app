@@ -8,6 +8,7 @@ class ExternalCodeAgentAcpCapabilities {
   const ExternalCodeAgentAcpCapabilities({
     required this.singleAgent,
     required this.multiAgent,
+    required this.availableExecutionTargets,
     required this.providerCatalog,
     required this.gatewayProviders,
     required this.raw,
@@ -16,14 +17,16 @@ class ExternalCodeAgentAcpCapabilities {
   const ExternalCodeAgentAcpCapabilities.empty()
     : singleAgent = false,
       multiAgent = false,
+      availableExecutionTargets = const <AssistantExecutionTarget>[],
       providerCatalog = const <SingleAgentProvider>[],
-      gatewayProviders = const <Map<String, dynamic>>[],
+      gatewayProviders = const <SingleAgentProvider>[],
       raw = const <String, dynamic>{};
 
   final bool singleAgent;
   final bool multiAgent;
+  final List<AssistantExecutionTarget> availableExecutionTargets;
   final List<SingleAgentProvider> providerCatalog;
-  final List<Map<String, dynamic>> gatewayProviders;
+  final List<SingleAgentProvider> gatewayProviders;
   final Map<String, dynamic> raw;
 }
 

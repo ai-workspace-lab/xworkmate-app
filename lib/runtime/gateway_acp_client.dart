@@ -20,7 +20,9 @@ class GatewayAcpCapabilities {
   const GatewayAcpCapabilities({
     required this.singleAgent,
     required this.multiAgent,
+    required this.availableExecutionTargets,
     required this.providerCatalog,
+    required this.gatewayProviderCatalog,
     required this.raw,
     this.diagnostics = const <String, dynamic>{},
   });
@@ -28,13 +30,17 @@ class GatewayAcpCapabilities {
   const GatewayAcpCapabilities.empty()
     : singleAgent = false,
       multiAgent = false,
+      availableExecutionTargets = const <AssistantExecutionTarget>[],
       providerCatalog = const <SingleAgentProvider>[],
+      gatewayProviderCatalog = const <SingleAgentProvider>[],
       raw = const <String, dynamic>{},
       diagnostics = const <String, dynamic>{};
 
   final bool singleAgent;
   final bool multiAgent;
+  final List<AssistantExecutionTarget> availableExecutionTargets;
   final List<SingleAgentProvider> providerCatalog;
+  final List<SingleAgentProvider> gatewayProviderCatalog;
   final Map<String, dynamic> raw;
   final Map<String, dynamic> diagnostics;
 }
@@ -121,6 +127,11 @@ class GatewayAcpClient {
     final caps = asMap(result['capabilities']);
     final providerCatalog = _parseProviderCatalog(
       result['providerCatalog'] ?? caps['providerCatalog'],
+      defaultTarget: AssistantExecutionTarget.agent,
+    );
+    final gatewayProviderCatalog = _parseProviderCatalog(
+      result['gatewayProviders'] ?? caps['gatewayProviders'],
+      defaultTarget: AssistantExecutionTarget.gateway,
     );
     final singleAgent =
         boolValue(result['singleAgent']) ??
@@ -133,7 +144,13 @@ class GatewayAcpClient {
     _cachedCapabilities = GatewayAcpCapabilities(
       singleAgent: singleAgent,
       multiAgent: multiAgent,
+      availableExecutionTargets: _parseAvailableExecutionTargets(
+        result['availableExecutionTargets'] ?? caps['availableExecutionTargets'],
+        singleAgent: singleAgent,
+        gatewayProviderCatalog: gatewayProviderCatalog,
+      ),
       providerCatalog: providerCatalog,
+      gatewayProviderCatalog: gatewayProviderCatalog,
       raw: result,
       diagnostics: asMap(response['_xworkmateDiagnostics']),
     );
@@ -141,7 +158,10 @@ class GatewayAcpClient {
     return _cachedCapabilities;
   }
 
-  List<SingleAgentProvider> _parseProviderCatalog(Object? raw) {
+  List<SingleAgentProvider> _parseProviderCatalog(
+    Object? raw, {
+    required AssistantExecutionTarget defaultTarget,
+  }) {
     final providers = <SingleAgentProvider>[];
     for (final item in asList(raw)) {
       final entry = asMap(item);
@@ -150,15 +170,86 @@ class GatewayAcpClient {
         continue;
       }
       final label = entry['label']?.toString().trim();
+      final providerDisplay = asMap(entry['providerDisplay']);
+      final targets = _parseProviderTargets(
+        entry['targets'] ?? entry['executionTarget'],
+        defaultTarget: defaultTarget,
+      );
       final provider = SingleAgentProviderCopy.fromJsonValue(
         providerId,
         label: label?.isNotEmpty == true ? label : null,
+        badge: entry['badge']?.toString().trim().isNotEmpty == true
+            ? entry['badge']?.toString().trim()
+            : providerDisplay['badge']?.toString().trim(),
+        logoEmoji: entry['logoEmoji']?.toString().trim().isNotEmpty == true
+            ? entry['logoEmoji']?.toString().trim()
+            : providerDisplay['logoEmoji']?.toString().trim(),
+        supportedTargets: targets,
+        enabled: boolValue(entry['enabled']) ?? true,
+        unavailableReason:
+            entry['unavailableReason']?.toString().trim().isNotEmpty == true
+            ? entry['unavailableReason']?.toString().trim()
+            : '',
       );
       if (!provider.isUnspecified) {
         providers.add(provider);
       }
     }
-    return normalizeBridgeOwnedSingleAgentProviderList(providers);
+    return normalizeSingleAgentProviderList(providers);
+  }
+
+  List<AssistantExecutionTarget> _parseAvailableExecutionTargets(
+    Object? raw, {
+    required bool singleAgent,
+    required List<SingleAgentProvider> gatewayProviderCatalog,
+  }) {
+    final parsed = <AssistantExecutionTarget>[];
+    for (final item in asList(raw)) {
+      final normalized = item?.toString().trim().toLowerCase() ?? '';
+      if (normalized == 'agent' || normalized == 'single-agent') {
+        if (!parsed.contains(AssistantExecutionTarget.agent)) {
+          parsed.add(AssistantExecutionTarget.agent);
+        }
+      } else if (normalized == 'gateway') {
+        if (!parsed.contains(AssistantExecutionTarget.gateway)) {
+          parsed.add(AssistantExecutionTarget.gateway);
+        }
+      }
+    }
+    if (parsed.isNotEmpty) {
+      return parsed;
+    }
+    if (singleAgent) {
+      parsed.add(AssistantExecutionTarget.agent);
+    }
+    if (gatewayProviderCatalog.isNotEmpty) {
+      parsed.add(AssistantExecutionTarget.gateway);
+    }
+    return parsed;
+  }
+
+  List<AssistantExecutionTarget> _parseProviderTargets(
+    Object? raw, {
+    required AssistantExecutionTarget defaultTarget,
+  }) {
+    final parsed = <AssistantExecutionTarget>[];
+    final items = raw is List ? raw : <Object?>[raw];
+    for (final item in items) {
+      final normalized = item?.toString().trim().toLowerCase() ?? '';
+      if (normalized == 'agent' || normalized == 'single-agent') {
+        if (!parsed.contains(AssistantExecutionTarget.agent)) {
+          parsed.add(AssistantExecutionTarget.agent);
+        }
+      } else if (normalized == 'gateway') {
+        if (!parsed.contains(AssistantExecutionTarget.gateway)) {
+          parsed.add(AssistantExecutionTarget.gateway);
+        }
+      }
+    }
+    if (parsed.isNotEmpty) {
+      return parsed;
+    }
+    return <AssistantExecutionTarget>[defaultTarget];
   }
 
   Stream<MultiAgentRunEvent> runMultiAgent(

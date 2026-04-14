@@ -120,6 +120,8 @@ class AppController extends ChangeNotifier {
     DesktopPlatformService? desktopPlatformService,
     UiFeatureManifest? uiFeatureManifest,
     List<SingleAgentProvider>? initialBridgeProviderCatalog,
+    List<SingleAgentProvider>? initialGatewayProviderCatalog,
+    List<AssistantExecutionTarget>? initialAvailableExecutionTargets,
     SkillDirectoryAccessService? skillDirectoryAccessService,
     AccountRuntimeClient Function(String baseUrl)? accountClientFactory,
     Map<String, String>? environmentOverride,
@@ -225,8 +227,14 @@ class AppController extends ChangeNotifier {
             endpointResolver: resolveGatewayAcpEndpointInternal,
           ),
         );
-    bridgeProviderCatalogInternal = normalizeBridgeOwnedSingleAgentProviderList(
+    bridgeAgentProviderCatalogInternal = normalizeSingleAgentProviderList(
       initialBridgeProviderCatalog ?? const <SingleAgentProvider>[],
+    );
+    bridgeGatewayProviderCatalogInternal = normalizeSingleAgentProviderList(
+      initialGatewayProviderCatalog ?? const <SingleAgentProvider>[],
+    );
+    bridgeAvailableExecutionTargetsInternal = compactAssistantExecutionTargets(
+      initialAvailableExecutionTargets ?? const <AssistantExecutionTarget>[],
     );
 
     attachChildListenersInternal();
@@ -290,8 +298,12 @@ class AppController extends ChangeNotifier {
 
   GatewayAcpClient get gatewayAcpClientForTest => gatewayAcpClientInternal;
 
-  List<SingleAgentProvider> bridgeProviderCatalogInternal =
+  List<SingleAgentProvider> bridgeAgentProviderCatalogInternal =
       const <SingleAgentProvider>[];
+  List<SingleAgentProvider> bridgeGatewayProviderCatalogInternal =
+      const <SingleAgentProvider>[];
+  List<AssistantExecutionTarget> bridgeAvailableExecutionTargetsInternal =
+      const <AssistantExecutionTarget>[];
   final Map<String, List<GatewayChatMessage>> assistantThreadMessagesInternal =
       <String, List<GatewayChatMessage>>{};
   late final DesktopTaskThreadRepository taskThreadRepositoryInternal =
@@ -546,19 +558,30 @@ class AppController extends ChangeNotifier {
       );
 
   List<SingleAgentProvider> get bridgeProviderCatalog =>
-      normalizeSingleAgentProviderList(bridgeProviderCatalogInternal);
+      normalizeSingleAgentProviderList(<SingleAgentProvider>[
+        ...bridgeAgentProviderCatalogInternal,
+        ...bridgeGatewayProviderCatalogInternal,
+      ]);
 
   List<SingleAgentProvider> get assistantProviderCatalog =>
-      normalizeBridgeOwnedSingleAgentProviderList(
-        bridgeProviderCatalogInternal,
-      );
+      normalizeSingleAgentProviderList(bridgeAgentProviderCatalogInternal);
+
+  List<SingleAgentProvider> get gatewayProviderCatalog =>
+      normalizeSingleAgentProviderList(bridgeGatewayProviderCatalogInternal);
+
+  List<AssistantExecutionTarget> get bridgeAvailableExecutionTargets =>
+      compactAssistantExecutionTargets(bridgeAvailableExecutionTargetsInternal);
 
   List<SingleAgentProvider> get assistantProviderCatalogForDisplay {
-    final liveCatalog = assistantProviderCatalog;
-    if (liveCatalog.isNotEmpty) {
-      return liveCatalog;
-    }
-    return kBridgeOwnedSingleAgentProviders;
+    return assistantProviderCatalog;
+  }
+
+  List<SingleAgentProvider> providerCatalogForExecutionTarget(
+    AssistantExecutionTarget executionTarget,
+  ) {
+    return executionTarget.isGateway
+        ? gatewayProviderCatalog
+        : assistantProviderCatalogForDisplay;
   }
 
   SingleAgentProvider? bridgeProviderForId(String providerId) {
@@ -574,11 +597,14 @@ class AppController extends ChangeNotifier {
     return null;
   }
 
-  SingleAgentProvider resolveAssistantProvider(String? providerId) {
+  SingleAgentProvider resolveProviderForExecutionTarget(
+    String? providerId, {
+    required AssistantExecutionTarget executionTarget,
+  }) {
     final normalizedProviderId = normalizeSingleAgentProviderId(
       providerId ?? '',
     );
-    final catalog = assistantProviderCatalogForDisplay;
+    final catalog = providerCatalogForExecutionTarget(executionTarget);
     if (normalizedProviderId.isNotEmpty) {
       for (final provider in catalog) {
         if (provider.providerId == normalizedProviderId) {
@@ -589,7 +615,21 @@ class AppController extends ChangeNotifier {
     if (catalog.isNotEmpty) {
       return catalog.first;
     }
+    if (normalizedProviderId.isNotEmpty) {
+      return SingleAgentProvider.fromJsonValue(
+        normalizedProviderId,
+        supportedTargets: <AssistantExecutionTarget>[executionTarget],
+        enabled: false,
+      );
+    }
     return SingleAgentProvider.unspecified;
+  }
+
+  SingleAgentProvider resolveAssistantProvider(String? providerId) {
+    return resolveProviderForExecutionTarget(
+      providerId,
+      executionTarget: AssistantExecutionTarget.agent,
+    );
   }
 
   SingleAgentProvider assistantProviderForSession(String sessionKey) {
@@ -600,10 +640,10 @@ class AppController extends ChangeNotifier {
     final executionTarget = assistantExecutionTargetForSession(
       normalizedSessionKey,
     );
-    if (executionTarget.isGateway) {
-      return SingleAgentProvider.openclaw;
-    }
-    return resolveAssistantProvider(thread?.executionBinding.providerId);
+    return resolveProviderForExecutionTarget(
+      thread?.executionBinding.providerId,
+      executionTarget: executionTarget,
+    );
   }
 
   UiFeatureManifest loadRepoUiFeatureManifestSyncInternal() {
@@ -618,7 +658,16 @@ class AppController extends ChangeNotifier {
 
   List<AssistantExecutionTarget> visibleAssistantExecutionTargets(
     Iterable<AssistantExecutionTarget> supportedTargets,
-  ) => compactAssistantExecutionTargets(supportedTargets);
+  ) {
+    final visible = compactAssistantExecutionTargets(supportedTargets);
+    final bridgeVisible = bridgeAvailableExecutionTargets;
+    if (bridgeVisible.isEmpty) {
+      return visible;
+    }
+    return visible
+        .where((item) => bridgeVisible.contains(item))
+        .toList(growable: false);
+  }
 
   List<String> get aiGatewayConversationModelChoices {
     final availableModels =
