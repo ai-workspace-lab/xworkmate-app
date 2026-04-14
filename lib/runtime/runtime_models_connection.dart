@@ -128,7 +128,7 @@ String normalizeSingleAgentProviderId(String value) {
   return buffer.toString().replaceAll(RegExp(r'^[-_.]+|[-_.]+$'), '');
 }
 
-String singleAgentProviderFallbackLabelInternal(String providerId) {
+String providerFallbackLabelInternal(String providerId) {
   final normalized = normalizeSingleAgentProviderId(providerId);
   if (normalized.isEmpty) {
     return appText('Bridge Provider', 'Bridge Provider');
@@ -140,7 +140,7 @@ String singleAgentProviderFallbackLabelInternal(String providerId) {
       .join(' ');
 }
 
-String singleAgentProviderFallbackBadgeInternal({
+String providerFallbackBadgeInternal({
   required String providerId,
   required String label,
 }) {
@@ -259,10 +259,10 @@ class SingleAgentProvider {
     return SingleAgentProvider(
       providerId: resolvedProviderId,
       label: resolvedLabel.isEmpty
-          ? singleAgentProviderFallbackLabelInternal(resolvedProviderId)
+          ? providerFallbackLabelInternal(resolvedProviderId)
           : resolvedLabel,
       badge: resolvedBadge.isEmpty
-          ? singleAgentProviderFallbackBadgeInternal(
+          ? providerFallbackBadgeInternal(
               providerId: resolvedProviderId,
               label: resolvedLabel,
             )
@@ -297,10 +297,10 @@ class SingleAgentProvider {
       'auto' || '' => unspecified,
       _ => SingleAgentProvider(
         providerId: normalized,
-        label: singleAgentProviderFallbackLabelInternal(normalized),
-        badge: singleAgentProviderFallbackBadgeInternal(
+        label: providerFallbackLabelInternal(normalized),
+        badge: providerFallbackBadgeInternal(
           providerId: normalized,
-          label: singleAgentProviderFallbackLabelInternal(normalized),
+          label: providerFallbackLabelInternal(normalized),
         ),
       ),
     };

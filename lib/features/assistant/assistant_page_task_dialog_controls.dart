@@ -44,9 +44,8 @@ class AssistantTaskDialogModeControlsInternal extends StatelessWidget {
     final executionTarget = collapseAssistantExecutionTargetForDisplay(
       currentExecutionTarget,
     );
-    final providerMenuProviders = _taskDialogProviderCatalogForTarget(
-      controller: controller,
-      executionTarget: executionTarget,
+    final providerMenuProviders = controller.providerCatalogForExecutionTarget(
+      executionTarget,
     );
 
     return Wrap(
@@ -71,13 +70,6 @@ class AssistantTaskDialogModeControlsInternal extends StatelessWidget {
       ],
     );
   }
-}
-
-List<SingleAgentProvider> _taskDialogProviderCatalogForTarget({
-  required AppController controller,
-  required AssistantExecutionTarget executionTarget,
-}) {
-  return controller.providerCatalogForExecutionTarget(executionTarget);
 }
 
 class _TaskDialogExecutionTargetMenuButtonInternal extends StatelessWidget {
@@ -160,7 +152,7 @@ class _TaskDialogProviderMenuButtonInternal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayProvider = selectedProvider.isUnspecified
-        ? _fallbackDisplayProvider(context)
+        ? _fallbackDisplayProvider()
         : selectedProvider;
     final isEnabled = providers.isNotEmpty;
 
@@ -204,7 +196,7 @@ class _TaskDialogProviderMenuButtonInternal extends StatelessWidget {
     );
   }
 
-  SingleAgentProvider _fallbackDisplayProvider(BuildContext context) {
+  SingleAgentProvider _fallbackDisplayProvider() {
     if (providers.isNotEmpty) {
       return providers.first;
     }
@@ -218,10 +210,10 @@ class _TaskDialogProviderMenuButtonInternal extends StatelessWidget {
   }
 
   Future<void> _handleProviderSelected(SingleAgentProvider provider) async {
-    if (executionTarget.isGateway || providers.isEmpty) {
+    if (providers.isEmpty) {
       return;
     }
-    await controller.setAssistantSingleAgentProvider(provider);
+    await controller.setAssistantProvider(provider);
   }
 }
 

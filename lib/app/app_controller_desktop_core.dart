@@ -572,16 +572,19 @@ class AppController extends ChangeNotifier {
   List<AssistantExecutionTarget> get bridgeAvailableExecutionTargets =>
       compactAssistantExecutionTargets(bridgeAvailableExecutionTargetsInternal);
 
-  List<SingleAgentProvider> get assistantProviderCatalogForDisplay {
-    return assistantProviderCatalog;
-  }
-
   List<SingleAgentProvider> providerCatalogForExecutionTarget(
     AssistantExecutionTarget executionTarget,
   ) {
-    return executionTarget.isGateway
+    final source = executionTarget.isGateway
         ? gatewayProviderCatalog
-        : assistantProviderCatalogForDisplay;
+        : assistantProviderCatalog;
+    return source
+        .where(
+          (provider) =>
+              provider.supportedTargets.isEmpty ||
+              provider.supportedTargets.contains(executionTarget),
+        )
+        .toList(growable: false);
   }
 
   SingleAgentProvider? bridgeProviderForId(String providerId) {
@@ -623,13 +626,6 @@ class AppController extends ChangeNotifier {
       );
     }
     return SingleAgentProvider.unspecified;
-  }
-
-  SingleAgentProvider resolveAssistantProvider(String? providerId) {
-    return resolveProviderForExecutionTarget(
-      providerId,
-      executionTarget: AssistantExecutionTarget.agent,
-    );
   }
 
   SingleAgentProvider assistantProviderForSession(String sessionKey) {
