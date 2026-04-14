@@ -572,16 +572,29 @@ class AppController extends ChangeNotifier {
   List<AssistantExecutionTarget> get bridgeAvailableExecutionTargets =>
       compactAssistantExecutionTargets(bridgeAvailableExecutionTargetsInternal);
 
-  List<SingleAgentProvider> get assistantProviderCatalogForDisplay {
-    return assistantProviderCatalog;
-  }
-
   List<SingleAgentProvider> providerCatalogForExecutionTarget(
     AssistantExecutionTarget executionTarget,
   ) {
-    return executionTarget.isGateway
+    final source = executionTarget.isGateway
         ? gatewayProviderCatalog
-        : assistantProviderCatalogForDisplay;
+        : assistantProviderCatalog;
+    return source
+        .where(
+          (provider) =>
+              provider.supportedTargets.isEmpty ||
+              provider.supportedTargets.contains(executionTarget),
+        )
+        .toList(growable: false);
+  }
+
+  SingleAgentProvider defaultProviderForExecutionTarget(
+    AssistantExecutionTarget executionTarget,
+  ) {
+    final catalog = providerCatalogForExecutionTarget(executionTarget);
+    if (catalog.isNotEmpty) {
+      return catalog.first;
+    }
+    return SingleAgentProvider.unspecified;
   }
 
   SingleAgentProvider? bridgeProviderForId(String providerId) {
@@ -600,6 +613,7 @@ class AppController extends ChangeNotifier {
   SingleAgentProvider resolveProviderForExecutionTarget(
     String? providerId, {
     required AssistantExecutionTarget executionTarget,
+    bool defaultToCatalog = false,
   }) {
     final normalizedProviderId = normalizeSingleAgentProviderId(
       providerId ?? '',
@@ -612,24 +626,10 @@ class AppController extends ChangeNotifier {
         }
       }
     }
-    if (catalog.isNotEmpty) {
+    if (defaultToCatalog && catalog.isNotEmpty) {
       return catalog.first;
     }
-    if (normalizedProviderId.isNotEmpty) {
-      return SingleAgentProvider.fromJsonValue(
-        normalizedProviderId,
-        supportedTargets: <AssistantExecutionTarget>[executionTarget],
-        enabled: false,
-      );
-    }
     return SingleAgentProvider.unspecified;
-  }
-
-  SingleAgentProvider resolveAssistantProvider(String? providerId) {
-    return resolveProviderForExecutionTarget(
-      providerId,
-      executionTarget: AssistantExecutionTarget.agent,
-    );
   }
 
   SingleAgentProvider assistantProviderForSession(String sessionKey) {

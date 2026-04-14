@@ -53,23 +53,6 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     final currentTarget = assistantExecutionTargetForSession(
       sessionsControllerInternal.currentSessionKey,
     );
-    final shouldRefreshAgentProviders =
-        providerCatalogForExecutionTarget(resolvedTarget).isEmpty;
-    if (shouldRefreshAgentProviders) {
-      try {
-        await refreshSingleAgentCapabilitiesInternal(forceRefresh: true);
-      } catch (_) {
-        // Keep target selection interactive even when a just-in-time
-        // capabilities refresh fails. The dialog stays interactive while the
-        // live catalog catches up from bridge capabilities.
-      }
-      if (currentTarget == resolvedTarget &&
-          settings.assistantExecutionTarget == resolvedTarget) {
-        recomputeTasksInternal();
-        notifyIfActiveInternal();
-        return;
-      }
-    }
     if (currentTarget == resolvedTarget &&
         settings.assistantExecutionTarget == resolvedTarget) {
       return;
@@ -99,13 +82,13 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       sessionsControllerInternal.currentSessionKey,
       executionTarget: resolvedTarget,
       executionTargetSource: ThreadSelectionSource.explicit,
-      singleAgentProvider: resolveProviderForExecutionTarget(
+      selectedProvider: resolveProviderForExecutionTarget(
         taskThreadForSessionInternal(
           sessionsControllerInternal.currentSessionKey,
         )?.executionBinding.providerId,
         executionTarget: resolvedTarget,
       ),
-      singleAgentProviderSource: ThreadSelectionSource.explicit,
+      selectedProviderSource: ThreadSelectionSource.explicit,
       gatewayEntryState: gatewayEntryStateForTargetInternal(resolvedTarget),
       latestResolvedRuntimeModel: '',
       latestResolvedProviderId: '',
@@ -125,10 +108,17 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     notifyIfActiveInternal();
   }
 
-  Future<void> setAssistantSingleAgentProvider(
-    SingleAgentProvider provider,
-  ) async {
-    final resolvedProvider = resolveAssistantProvider(provider.providerId);
+  Future<void> setAssistantProvider(SingleAgentProvider provider) async {
+    final executionTarget = assistantExecutionTargetForSession(
+      sessionsControllerInternal.currentSessionKey,
+    );
+    final resolvedProvider = resolveProviderForExecutionTarget(
+      provider.providerId,
+      executionTarget: executionTarget,
+    );
+    if (resolvedProvider.isUnspecified) {
+      return;
+    }
     final sessionKey = normalizedAssistantSessionKeyInternal(
       sessionsControllerInternal.currentSessionKey,
     );
@@ -146,26 +136,19 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     if (!assistantThreadRecordsInternal.containsKey(sessionKey)) {
       initializeAssistantThreadContext(
         sessionKey,
-        executionTarget: AssistantExecutionTarget.agent,
+        executionTarget: executionTarget,
         messageViewMode: assistantMessageViewModeForSession(sessionKey),
       );
     }
     upsertTaskThreadInternal(
       sessionKey,
-      executionTarget: AssistantExecutionTarget.agent,
+      executionTarget: executionTarget,
       executionTargetSource: ThreadSelectionSource.explicit,
-      singleAgentProvider: resolvedProvider,
-      singleAgentProviderSource: ThreadSelectionSource.explicit,
-      gatewayEntryState: gatewayEntryStateForTargetInternal(
-        AssistantExecutionTarget.agent,
-      ),
+      selectedProvider: resolvedProvider,
+      selectedProviderSource: ThreadSelectionSource.explicit,
+      gatewayEntryState: gatewayEntryStateForTargetInternal(executionTarget),
       latestResolvedProviderId: '',
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
-    await applyAssistantExecutionTargetInternal(
-      AssistantExecutionTarget.agent,
-      sessionKey: sessionKey,
-      persistDefaultSelection: true,
     );
     await flushAssistantThreadPersistenceInternal();
     recomputeTasksInternal();
@@ -222,13 +205,13 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     );
     upsertTaskThreadInternal(
       normalizedSessionKey,
-      singleAgentProvider: resolveProviderForExecutionTarget(
-        taskThreadForSessionInternal(normalizedSessionKey)
-            ?.executionBinding
-            .providerId,
+      selectedProvider: resolveProviderForExecutionTarget(
+        taskThreadForSessionInternal(
+          normalizedSessionKey,
+        )?.executionBinding.providerId,
         executionTarget: resolvedTarget,
       ),
-      singleAgentProviderSource: ThreadSelectionSource.explicit,
+      selectedProviderSource: ThreadSelectionSource.explicit,
       latestResolvedRuntimeModel: '',
       latestResolvedProviderId: '',
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),

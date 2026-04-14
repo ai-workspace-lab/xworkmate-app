@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -139,6 +140,16 @@ void main() {
             target: kAccountManagedSecretTargetBridgeAuthToken,
           ),
           'bridge-token-from-sync',
+        );
+        expect(
+          controller.snapshot.toJsonString().contains('bridge-token-from-sync'),
+          isFalse,
+        );
+        expect(
+          jsonEncode(
+            controller.accountSyncState!.toJson(),
+          ).contains('bridge-token-from-sync'),
+          isFalse,
         );
       },
     );
