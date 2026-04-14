@@ -176,20 +176,17 @@ void main() {
           enableSecureStorage: false,
         );
         await store.initialize();
-        await store.saveAccountSyncState(
-          AccountSyncState.defaults().copyWith(
-            syncedDefaults: AccountRemoteProfile.defaults().copyWith(
-              bridgeServerUrl: capture.baseEndpoint.toString(),
-            ),
-            syncState: 'ready',
-          ),
-        );
         await store.saveAccountManagedSecret(
           target: kAccountManagedSecretTargetBridgeAuthToken,
           value: 'bridge-token',
         );
 
-        final controller = AppController(store: store);
+        final controller = AppController(
+          store: store,
+          environmentOverride: <String, String>{
+            'BRIDGE_SERVER_URL': capture.baseEndpoint.toString(),
+          },
+        );
         addTearDown(controller.dispose);
         await controller.settingsControllerInternal.initialize();
 

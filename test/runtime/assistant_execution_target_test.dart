@@ -108,7 +108,7 @@ void main() {
     );
 
     test(
-      'returns an unspecified provider when a saved provider is no longer in the bridge catalog',
+      'returns unspecified when a saved provider is no longer in the current catalog',
       () {
         final controller = AppController();
         addTearDown(controller.dispose);
@@ -120,6 +120,61 @@ void main() {
             );
 
         expect(unavailableProvider, SingleAgentProvider.unspecified);
+      },
+    );
+
+    test(
+      'does not recover a stale gateway provider from an empty gateway catalog',
+      () {
+        final controller = AppController(
+          initialBridgeProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+            SingleAgentProvider.opencode,
+            SingleAgentProvider.gemini,
+          ],
+        );
+        addTearDown(controller.dispose);
+
+        final provider = controller.resolveProviderForExecutionTarget(
+          'openclaw',
+          executionTarget: AssistantExecutionTarget.gateway,
+        );
+
+        expect(provider, SingleAgentProvider.unspecified);
+      },
+    );
+
+    test(
+      'locks the gateway provider catalog to the canonical openclaw contract',
+      () {
+        final controller = AppController(
+          initialGatewayProviderCatalog: <SingleAgentProvider>[
+            SingleAgentProvider.fromJsonValue(
+              'hermes',
+              label: 'Hermes',
+              badge: 'H',
+              supportedTargets: const <AssistantExecutionTarget>[
+                AssistantExecutionTarget.gateway,
+              ],
+            ),
+            SingleAgentProvider.openclaw.copyWith(
+              supportedTargets: const <AssistantExecutionTarget>[
+                AssistantExecutionTarget.gateway,
+              ],
+            ),
+          ],
+        );
+        addTearDown(controller.dispose);
+
+        expect(
+          controller
+              .providerCatalogForExecutionTarget(
+                AssistantExecutionTarget.gateway,
+              )
+              .map((item) => item.providerId)
+              .toList(growable: false),
+          const <String>['openclaw'],
+        );
       },
     );
 
@@ -161,7 +216,8 @@ void main() {
 
         final controller = AppController(
           store: store,
-          environmentOverride: const <String, String>{
+          environmentOverride: <String, String>{
+            'BRIDGE_SERVER_URL': capture.baseEndpoint.toString(),
             'BRIDGE_AUTH_TOKEN': 'bridge-token',
           },
         );
