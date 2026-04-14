@@ -8,9 +8,13 @@ $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $sourceDir = Join-Path $root "build\windows\x64\runner\Release"
 $distDir = Join-Path $root "dist\windows"
 $wxsPath = Join-Path $root "packaging\windows\main.wxs"
-$versionLine = (Get-Content (Join-Path $root "pubspec.yaml") | Select-String '^version:\s*').ToString()
-$versionValue = ($versionLine -replace '^version:\s*', '').Split('+')[0]
-$msiPath = Join-Path $distDir "xworkmate-$versionValue-$Arch.msi"
+$metadataScript = (Join-Path $root "scripts\ci\build_version.py").Replace('\', '/')
+$metadata = (& python $metadataScript --format json | ConvertFrom-Json)
+$displayVersion = $metadata.display_version
+$platformReleaseVersion = $metadata.platform_release_version
+$buildNumber = $metadata.build_number
+Write-Host "Packaging Windows MSI for $displayVersion (build $buildNumber)"
+$msiPath = Join-Path $distDir "xworkmate-$displayVersion-$Arch.msi"
 $zipPath = Join-Path $distDir "xworkmate-windows-$Arch.zip"
 
 if (-not (Test-Path $sourceDir)) {
@@ -24,15 +28,10 @@ if (Test-Path $zipPath) {
 }
 Compress-Archive -Path (Join-Path $sourceDir '*') -DestinationPath $zipPath
 
-$wixVersion = $versionValue
-if ($wixVersion -notmatch '^\d+\.\d+\.\d+$') {
-  $wixVersion = "0.0.0"
-}
-
 & wix build $wxsPath `
   -arch x64 `
   -d SourceDir=$sourceDir `
-  -d ProductVersion=$wixVersion `
+  -d ProductVersion=$platformReleaseVersion `
   -o $msiPath
 
 if ($env:WINDOWS_PFX_BASE64 -and $env:WINDOWS_PFX_PASSWORD) {
