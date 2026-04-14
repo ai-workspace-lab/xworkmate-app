@@ -94,6 +94,10 @@ void main() {
         find.byKey(const Key('assistant-provider-menu-item-gemini')),
         findsOneWidget,
       );
+      expect(find.text('Codex'), findsOneWidget);
+      expect(find.text('OpenCode'), findsOneWidget);
+      expect(find.text('Gemini'), findsOneWidget);
+      expect(find.byIcon(Icons.check_rounded), findsNothing);
       await tester.tap(
         find.byKey(const Key('assistant-provider-menu-item-codex')),
       );
@@ -151,6 +155,8 @@ void main() {
         find.byKey(const Key('assistant-provider-menu-item-gemini')),
         findsNothing,
       );
+      expect(find.text('OpenClaw'), findsWidgets);
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
       await tester.tap(
         find.byKey(const Key('assistant-provider-menu-item-openclaw')),
       );
@@ -203,6 +209,7 @@ void main() {
         find.byKey(const Key('assistant-provider-menu-item-gemini')),
         findsOneWidget,
       );
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
     });
 
     testWidgets('shows assistant providers and allows switching provider', (
@@ -252,6 +259,75 @@ void main() {
         'opencode',
       );
     });
+
+    testWidgets(
+      'does not reverse-infer a menu selection from a stale saved provider',
+      (tester) async {
+        final controller = AppController(
+          initialBridgeProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+            SingleAgentProvider.opencode,
+            SingleAgentProvider.gemini,
+          ],
+        );
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('session-1');
+        controller.initializeAssistantThreadContext(
+          'session-1',
+          executionTarget: AssistantExecutionTarget.agent,
+          messageViewMode: controller.assistantMessageViewModeForSession(
+            'session-1',
+          ),
+        );
+        final staleThread = controller
+            .requireTaskThreadForSessionInternal('session-1')
+            .copyWith(
+              executionBinding: ExecutionBinding(
+                executionMode: threadExecutionModeFromAssistantExecutionTarget(
+                  AssistantExecutionTarget.agent,
+                ),
+                executorId: 'legacy-provider',
+                providerId: 'legacy-provider',
+                endpointId: '',
+                executionModeSource: ThreadSelectionSource.explicit,
+                providerSource: ThreadSelectionSource.explicit,
+              ),
+              updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            );
+        controller.taskThreadRepositoryInternal.replace(
+          staleThread,
+          persist: false,
+        );
+        controller.notifyListeners();
+
+        await tester.pumpWidget(
+          _buildTestApp(child: _buildLowerPane(controller: controller)),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('assistant-provider-button')));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('assistant-provider-menu-item-codex')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('assistant-provider-menu-item-opencode')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('assistant-provider-menu-item-gemini')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('assistant-provider-menu-item-openclaw')),
+          findsNothing,
+        );
+        expect(find.byIcon(Icons.check_rounded), findsNothing);
+      },
+    );
 
     testWidgets('uses submit button instead of connect action', (tester) async {
       final controller = AppController();
