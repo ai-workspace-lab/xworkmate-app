@@ -97,25 +97,23 @@ class _TaskDialogExecutionTargetMenuButtonInternal extends StatelessWidget {
         unawaited(_handleExecutionTargetSelected(value));
       },
       itemBuilder: (context) => supportedExecutionTargets
-          .map(
-            (value) {
-              final enabled = visibleExecutionTargets.contains(value);
-              return PopupMenuItem<AssistantExecutionTarget>(
-                value: value,
-                enabled: enabled,
-                key: Key('assistant-execution-target-menu-item-${value.name}'),
-                child: Row(
-                  children: [
-                    Icon(value.icon, size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(value.label)),
-                    if (value == executionTarget)
-                      const Icon(Icons.check_rounded, size: 18),
-                  ],
-                ),
-              );
-            },
-          )
+          .map((value) {
+            final enabled = visibleExecutionTargets.contains(value);
+            return PopupMenuItem<AssistantExecutionTarget>(
+              value: value,
+              enabled: enabled,
+              key: Key('assistant-execution-target-menu-item-${value.name}'),
+              child: Row(
+                children: [
+                  Icon(value.icon, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(value.label)),
+                  if (value == executionTarget)
+                    const Icon(Icons.check_rounded, size: 18),
+                ],
+              ),
+            );
+          })
           .toList(growable: false),
       child: _TaskDialogSelectorChipInternal(
         leading: Icon(executionTarget.icon, size: 14, color: palette.textMuted),
@@ -197,9 +195,6 @@ class _TaskDialogProviderMenuButtonInternal extends StatelessWidget {
   }
 
   SingleAgentProvider _fallbackDisplayProvider() {
-    if (providers.isNotEmpty) {
-      return providers.first;
-    }
     return SingleAgentProvider(
       providerId: '',
       label: appText('未提供', 'Unavailable'),

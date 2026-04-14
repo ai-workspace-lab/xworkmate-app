@@ -222,9 +222,16 @@ extension AppControllerDesktopThreadBinding on AppController {
     final persistedProviderId = normalizeSingleAgentProviderId(
       existingBinding?.providerId ?? '',
     );
+    final existingTarget = existingBinding == null
+        ? null
+        : assistantExecutionTargetFromExecutionMode(
+            existingBinding.executionMode,
+          );
     final selectedProvider = resolveProviderForExecutionTarget(
       persistedProviderId,
       executionTarget: executionTarget,
+      defaultToCatalog:
+          existingBinding == null || existingTarget != executionTarget,
     );
     return (existingBinding ??
             ExecutionBinding(

@@ -80,7 +80,7 @@ void main() {
         expect(controller.currentAssistantExecutionTarget.isAgent, isTrue);
         expect(
           controller.assistantProviderForSession(controller.currentSessionKey),
-          SingleAgentProvider.codex,
+          SingleAgentProvider.unspecified,
         );
 
         await controller.setAssistantExecutionTarget(
@@ -108,23 +108,23 @@ void main() {
     );
 
     test(
-      'returns an unavailable provider placeholder when a saved provider is no longer in the bridge catalog',
+      'returns an unspecified provider when a saved provider is no longer in the bridge catalog',
       () {
         final controller = AppController();
         addTearDown(controller.dispose);
 
-        final unavailableProvider = controller.resolveProviderForExecutionTarget(
-          'gemini',
-          executionTarget: AssistantExecutionTarget.agent,
-        );
+        final unavailableProvider = controller
+            .resolveProviderForExecutionTarget(
+              'gemini',
+              executionTarget: AssistantExecutionTarget.agent,
+            );
 
-        expect(unavailableProvider.providerId, 'gemini');
-        expect(unavailableProvider.enabled, isFalse);
+        expect(unavailableProvider, SingleAgentProvider.unspecified);
       },
     );
 
     test(
-      'refreshes agent provider catalog when agent mode is selected with an empty catalog',
+      'does not refresh agent provider catalog when agent mode is selected with an empty catalog',
       () async {
         final capture = await _startCapabilityServer();
         addTearDown(capture.close);
@@ -169,18 +169,18 @@ void main() {
 
         await controller.sessionsController.switchSession('session-1');
         await _waitForRequest(capture, minimumCount: 1);
+        await Future<void>.delayed(const Duration(milliseconds: 200));
 
         expect(controller.assistantProviderCatalog, isEmpty);
+        final requestCountBefore = capture.requestCount;
 
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.agent,
         );
+        await Future<void>.delayed(const Duration(milliseconds: 200));
 
-        expect(
-          controller.assistantProviderCatalog.map((item) => item.providerId),
-          containsAll(<String>['codex', 'opencode', 'gemini']),
-        );
-        expect(capture.requestCount, greaterThanOrEqualTo(2));
+        expect(controller.assistantProviderCatalog, isEmpty);
+        expect(capture.requestCount, requestCountBefore);
         expect(capture.lastAuthorizationHeader, 'Bearer bridge-token');
       },
     );
