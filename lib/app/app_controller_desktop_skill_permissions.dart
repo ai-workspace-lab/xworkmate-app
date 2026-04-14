@@ -300,9 +300,10 @@ extension AppControllerDesktopSkillPermissions on AppController {
           existing?.contextState.latestResolvedProviderId ??
           '',
     );
-    final nextProvider = nextProviderId.isEmpty
-        ? SingleAgentProvider.unspecified
-        : resolveAssistantProvider(nextProviderId);
+    final nextProvider = resolveProviderForExecutionTarget(
+      nextProviderId,
+      executionTarget: nextExecutionTarget,
+    );
     final nextProviderSource =
         singleAgentProviderSource ??
         existing?.executionBinding.providerSource ??

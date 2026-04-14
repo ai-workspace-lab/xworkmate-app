@@ -11,7 +11,7 @@ import 'package:xworkmate/widgets/surface_card.dart';
 void main() {
   group('AssistantLowerPaneInternal', () {
     testWidgets(
-      'keeps canonical agent providers visible when live capabilities are unavailable',
+      'does not fabricate providers when live capabilities are unavailable',
       (tester) async {
         final controller = AppController();
         addTearDown(controller.dispose);
@@ -33,15 +33,15 @@ void main() {
 
         expect(
           find.byKey(const Key('assistant-provider-menu-item-codex')),
-          findsOneWidget,
+          findsNothing,
         );
         expect(
           find.byKey(const Key('assistant-provider-menu-item-opencode')),
-          findsOneWidget,
+          findsNothing,
         );
         expect(
           find.byKey(const Key('assistant-provider-menu-item-gemini')),
-          findsOneWidget,
+          findsNothing,
         );
         expect(
           find.byKey(const Key('assistant-provider-menu-item-openclaw')),
@@ -56,6 +56,18 @@ void main() {
           SingleAgentProvider.codex,
           SingleAgentProvider.opencode,
           SingleAgentProvider.gemini,
+        ],
+        initialGatewayProviderCatalog: <SingleAgentProvider>[
+          SingleAgentProvider.openclaw.copyWith(
+            logoEmoji: '🦞',
+            supportedTargets: const <AssistantExecutionTarget>[
+              AssistantExecutionTarget.gateway,
+            ],
+          ),
+        ],
+        initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+          AssistantExecutionTarget.agent,
+          AssistantExecutionTarget.gateway,
         ],
       );
       addTearDown(controller.dispose);

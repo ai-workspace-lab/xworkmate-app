@@ -54,14 +54,14 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       sessionsControllerInternal.currentSessionKey,
     );
     final shouldRefreshAgentProviders =
-        resolvedTarget.isAgent && assistantProviderCatalog.isEmpty;
+        providerCatalogForExecutionTarget(resolvedTarget).isEmpty;
     if (shouldRefreshAgentProviders) {
       try {
         await refreshSingleAgentCapabilitiesInternal(forceRefresh: true);
       } catch (_) {
         // Keep target selection interactive even when a just-in-time
-        // capabilities refresh fails. The dialog still shows the canonical
-        // single-agent providers while the live catalog catches up.
+        // capabilities refresh fails. The dialog stays interactive while the
+        // live catalog catches up from bridge capabilities.
       }
       if (currentTarget == resolvedTarget &&
           settings.assistantExecutionTarget == resolvedTarget) {
@@ -99,6 +99,13 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       sessionsControllerInternal.currentSessionKey,
       executionTarget: resolvedTarget,
       executionTargetSource: ThreadSelectionSource.explicit,
+      singleAgentProvider: resolveProviderForExecutionTarget(
+        taskThreadForSessionInternal(
+          sessionsControllerInternal.currentSessionKey,
+        )?.executionBinding.providerId,
+        executionTarget: resolvedTarget,
+      ),
+      singleAgentProviderSource: ThreadSelectionSource.explicit,
       gatewayEntryState: gatewayEntryStateForTargetInternal(resolvedTarget),
       latestResolvedRuntimeModel: '',
       latestResolvedProviderId: '',
@@ -215,6 +222,13 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     );
     upsertTaskThreadInternal(
       normalizedSessionKey,
+      singleAgentProvider: resolveProviderForExecutionTarget(
+        taskThreadForSessionInternal(normalizedSessionKey)
+            ?.executionBinding
+            .providerId,
+        executionTarget: resolvedTarget,
+      ),
+      singleAgentProviderSource: ThreadSelectionSource.explicit,
       latestResolvedRuntimeModel: '',
       latestResolvedProviderId: '',
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),

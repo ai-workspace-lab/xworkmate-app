@@ -149,7 +149,8 @@ Status: `Active`
 当前 Assistant 事实：
 
 - provider catalog 只来自 bridge capabilities，不再恢复任何 preset / backfill / fallback provider truth
-- 任务对话模式按 execution target 分流：`智能体` 只提供 `codex / opencode / gemini`，`Gateway` 只提供 `OpenClaw`
+- 任务对话模式只保留两类一级目标：`agent` / `gateway`
+- 每个目标下的 provider 菜单都只消费 `xworkmate-bridge` 返回的动态 catalog；app 不维护 `codex / opencode / gemini / openclaw` 这类本地固定列表
 - task state 仍在 assistant 内被消费，但不再拥有独立 `TasksPage`
 - skills 数据仍在 assistant 内被消费，但不再拥有独立 `SkillsPage`
 - assistant focus 只保留仍有真实落点的 `settings / language / theme`

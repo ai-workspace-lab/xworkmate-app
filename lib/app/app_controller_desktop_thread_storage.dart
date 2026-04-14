@@ -688,15 +688,11 @@ extension AppControllerDesktopThreadStorage on AppController {
       final recordProviderId = normalizeSingleAgentProviderId(
         record.executionBinding.providerId,
       );
-      final recordProvider = recordProviderId.isEmpty
-          ? SingleAgentProvider.unspecified
-          : resolveAssistantProvider(recordProviderId);
-      final normalizedExecutionTarget =
-          recordExecutionTarget.isGateway &&
-              recordProviderId.isNotEmpty &&
-              isBridgeOwnedSingleAgentProviderId(recordProviderId)
-          ? AssistantExecutionTarget.agent
-          : recordExecutionTarget;
+      final normalizedExecutionTarget = recordExecutionTarget;
+      final recordProvider = resolveProviderForExecutionTarget(
+        recordProviderId,
+        executionTarget: normalizedExecutionTarget,
+      );
       final workspaceBinding = record.workspaceBinding.copyWith(
         workspaceId: sessionKey,
         displayPath: record.workspaceKind == WorkspaceKind.localFs

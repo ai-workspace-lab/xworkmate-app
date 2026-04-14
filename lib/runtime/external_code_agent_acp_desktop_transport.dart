@@ -34,9 +34,11 @@ class ExternalCodeAgentAcpDesktopTransport
     final caps = _castMap(result['capabilities']);
     final providerCatalog = _parseProviderCatalog(
       result['providerCatalog'] ?? caps['providerCatalog'],
+      defaultTarget: AssistantExecutionTarget.agent,
     );
-    final gatewayProviders = _castMapList(
+    final gatewayProviders = _parseProviderCatalog(
       result['gatewayProviders'] ?? caps['gatewayProviders'],
+      defaultTarget: AssistantExecutionTarget.gateway,
     );
     return ExternalCodeAgentAcpCapabilities(
       singleAgent:
@@ -47,6 +49,14 @@ class ExternalCodeAgentAcpDesktopTransport
           _boolValue(result['multiAgent']) ??
           _boolValue(caps['multi_agent']) ??
           true,
+      availableExecutionTargets: _parseAvailableExecutionTargets(
+        result['availableExecutionTargets'] ?? caps['availableExecutionTargets'],
+        singleAgent:
+            _boolValue(result['singleAgent']) ??
+            _boolValue(caps['single_agent']) ??
+            providerCatalog.isNotEmpty,
+        gatewayProviders: gatewayProviders,
+      ),
       providerCatalog: providerCatalog,
       gatewayProviders: gatewayProviders,
       raw: result,
@@ -166,10 +176,6 @@ class ExternalCodeAgentAcpDesktopTransport
     return const <Object?>[];
   }
 
-  List<Map<String, dynamic>> _castMapList(Object? raw) {
-    return _asList(raw).map(_castMap).toList(growable: false);
-  }
-
   bool? _boolValue(Object? raw) {
     if (raw is bool) {
       return raw;
@@ -190,7 +196,10 @@ class ExternalCodeAgentAcpDesktopTransport
     return null;
   }
 
-  List<SingleAgentProvider> _parseProviderCatalog(Object? raw) {
+  List<SingleAgentProvider> _parseProviderCatalog(
+    Object? raw, {
+    required AssistantExecutionTarget defaultTarget,
+  }) {
     final providers = <SingleAgentProvider>[];
     for (final item in _asList(raw)) {
       final entry = _castMap(item);
@@ -199,14 +208,85 @@ class ExternalCodeAgentAcpDesktopTransport
         continue;
       }
       final label = entry['label']?.toString().trim();
+      final providerDisplay = _castMap(entry['providerDisplay']);
+      final targets = _parseProviderTargets(
+        entry['targets'] ?? entry['executionTarget'],
+        defaultTarget: defaultTarget,
+      );
       final provider = SingleAgentProviderCopy.fromJsonValue(
         providerId,
         label: label?.isNotEmpty == true ? label : null,
+        badge: entry['badge']?.toString().trim().isNotEmpty == true
+            ? entry['badge']?.toString().trim()
+            : providerDisplay['badge']?.toString().trim(),
+        logoEmoji: entry['logoEmoji']?.toString().trim().isNotEmpty == true
+            ? entry['logoEmoji']?.toString().trim()
+            : providerDisplay['logoEmoji']?.toString().trim(),
+        supportedTargets: targets,
+        enabled: _boolValue(entry['enabled']) ?? true,
+        unavailableReason:
+            entry['unavailableReason']?.toString().trim().isNotEmpty == true
+            ? entry['unavailableReason']?.toString().trim()
+            : '',
       );
       if (!provider.isUnspecified) {
         providers.add(provider);
       }
     }
-    return normalizeBridgeOwnedSingleAgentProviderList(providers);
+    return normalizeSingleAgentProviderList(providers);
+  }
+
+  List<AssistantExecutionTarget> _parseAvailableExecutionTargets(
+    Object? raw, {
+    required bool singleAgent,
+    required List<SingleAgentProvider> gatewayProviders,
+  }) {
+    final parsed = <AssistantExecutionTarget>[];
+    for (final item in _asList(raw)) {
+      final normalized = item?.toString().trim().toLowerCase() ?? '';
+      if (normalized == 'agent' || normalized == 'single-agent') {
+        if (!parsed.contains(AssistantExecutionTarget.agent)) {
+          parsed.add(AssistantExecutionTarget.agent);
+        }
+      } else if (normalized == 'gateway') {
+        if (!parsed.contains(AssistantExecutionTarget.gateway)) {
+          parsed.add(AssistantExecutionTarget.gateway);
+        }
+      }
+    }
+    if (parsed.isNotEmpty) {
+      return parsed;
+    }
+    if (singleAgent) {
+      parsed.add(AssistantExecutionTarget.agent);
+    }
+    if (gatewayProviders.isNotEmpty) {
+      parsed.add(AssistantExecutionTarget.gateway);
+    }
+    return parsed;
+  }
+
+  List<AssistantExecutionTarget> _parseProviderTargets(
+    Object? raw, {
+    required AssistantExecutionTarget defaultTarget,
+  }) {
+    final parsed = <AssistantExecutionTarget>[];
+    final items = raw is List ? raw : <Object?>[raw];
+    for (final item in items) {
+      final normalized = item?.toString().trim().toLowerCase() ?? '';
+      if (normalized == 'agent' || normalized == 'single-agent') {
+        if (!parsed.contains(AssistantExecutionTarget.agent)) {
+          parsed.add(AssistantExecutionTarget.agent);
+        }
+      } else if (normalized == 'gateway') {
+        if (!parsed.contains(AssistantExecutionTarget.gateway)) {
+          parsed.add(AssistantExecutionTarget.gateway);
+        }
+      }
+    }
+    if (parsed.isNotEmpty) {
+      return parsed;
+    }
+    return <AssistantExecutionTarget>[defaultTarget];
   }
 }
