@@ -1,5 +1,10 @@
 # TaskThread SessionKey 隔离修正（2026-03-29）
 
+术语说明：
+
+- 本文写于 `single-agent` 仍是主术语的阶段；凡正文出现 `single-agent`，当前都应读作任务对话模式下的 `agent` 一级目标
+- 当前任务对话框 provider 选择与 target/catalog 真源口径，以 [Task Dialog Provider Selection Mainline](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/task-dialog-provider-selection-mainline.md) 为准
+
 本文补充并修正 XWorkmate 当前“任务线 / 线程 / 工作目录”设计中的一个关键约束：
 
 - 左侧任务线不能只是派生 UI 项

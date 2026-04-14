@@ -1073,7 +1073,8 @@ class TaskThread {
   bool get hasExplicitExecutionTargetSelection =>
       executionBinding.executionModeSource == ThreadSelectionSource.explicit;
   bool get hasExplicitProviderSelection =>
-      executionBinding.providerSource == ThreadSelectionSource.explicit;
+      executionBinding.providerSource == ThreadSelectionSource.explicit &&
+      executionBinding.providerId.trim().isNotEmpty;
   bool get hasExplicitModelSelection =>
       contextState.selectedModelSource == ThreadSelectionSource.explicit;
   bool get hasExplicitSkillSelection =>

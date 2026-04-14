@@ -1,45 +1,51 @@
 # APP 侧对齐当前 xworkmate-bridge API
 
-本轮 APP 侧对接以当前 `xworkmate-bridge` 实际返回为准，不再额外定义前端私有 contract。
+Last Updated: 2026-04-14
+
+本文件只记录当前 `xworkmate-app` 实际消费的 bridge 合同口径，不再延续旧的 `single-agent provider picker` 叙述。
 
 ## 当前后端事实
 
-- `acp.capabilities` 当前继续返回：
-  - `singleAgent`
-  - `multiAgent`
+- `acp.capabilities` 当前 app 主链消费的核心字段是：
+  - `availableExecutionTargets`
   - `providerCatalog`
   - `gatewayProviders`
-- `xworkmate.routing.resolve` 当前继续返回：
-  - `resolvedExecutionTarget`
-  - `resolvedEndpointTarget`
-  - `resolvedProviderId`
-  - `resolvedGatewayProviderId`
-- `session.start` / `session.message` 当前请求仍消费线程级 `workingDirectory`
-- 当前 bridge 还没有项目列表接口
+- 其中：
+  - `providerCatalog` 对应 `agent` 目标下的 ACP server bridges
+  - `gatewayProviders` 对应 `gateway` 目标下的 gateway provider 列表
+- `singleAgent` / `multiAgent` 仍可能作为兼容元数据被解析，但它们不再定义任务对话框的主术语与主状态
 
 ## APP 侧执行约定
 
-- APP 模式选择入口只暴露：
-  - `single-agent`
+- APP 任务对话模式只暴露：
+  - `agent`
   - `gateway`
-- `multi-agent` 仍作为 bridge 可返回状态被解析和展示，但不再作为用户主动选择入口
-- 线程级“项目选择”当前直接等价于 bridge 请求里的 `workingDirectory`
-- `workingDirectory` 与本地 `workspaceBinding` 分离：
-  - `workingDirectory`: 发给 bridge 的执行目录
-  - `workspaceBinding`: APP 本地 artifact 回写目录
+- provider picker 按 target-scoped catalog 渲染：
+  - `agent` catalog 只消费 bridge 返回的 ACP bridge providers
+  - `gateway` catalog 只消费 bridge 返回的 gateway providers；当前为 `openclaw`，未来可扩展 `hermes`
+- APP 不再维护静态 provider 列表，也不从线程历史值反向生成 catalog
 
 ## 当前实现结果
 
-- 每个线程持久化 `selectedWorkingDirectory`
-- `single-agent` 与 `gateway` 都复用同一个线程级 `selectedWorkingDirectory`
-- follow-up 请求继续沿用：
-  - `sessionId == threadId == sessionKey`
-  - 同一线程绑定的 `workingDirectory`
-- 若线程没有选项目目录，APP 会阻断发送并提示先选择项目
+- 每个线程持久化：
+  - `executionTarget`
+  - `providerId`
+  - `selectedWorkingDirectory`
+- `agent` 与 `gateway` 都复用同一个线程级 `selectedWorkingDirectory`
+- provider 选择主链统一为：
+  - `providerCatalogForExecutionTarget(...)`
+  - `resolveProviderForExecutionTarget(...)`
+  - `setAssistantProvider(...)`
+- 渲染态读取统一通过：
+  - `assistantProviderForSession(sessionKey)`
 
-## 兼容策略
+## 当前兼容边界
 
-- 继续解析 `resolvedEndpointTarget`，但它不再作为前端主状态来源
-- 继续解析 `multiAgent`，但不提供手动切换入口
-- `providerCatalog` 继续驱动 single-agent provider picker
-- `gatewayProviders` 继续按 bridge 返回结构保存和消费，不在 APP 侧硬编码扩展
+- transport / capability parser 可以继续兼容解析 `single-agent` 旧字段值
+- 这种兼容只存在于低层解析，不再抬升为 UI 文案、架构主术语或设计文档口径
+- gateway provider 若 bridge 当前未广告，APP 显示为空或禁用，不再伪造 `openclaw` 默认入口
+
+## See Also
+
+- [Task Dialog Provider Selection Mainline](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/task-dialog-provider-selection-mainline.md)
+- [Task Control Plane Unification](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/task-control-plane-unification.md)

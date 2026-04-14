@@ -310,6 +310,9 @@ extension AppControllerDesktopSkillPermissions on AppController {
         selectedProviderSource ??
         existing?.executionBinding.providerSource ??
         ThreadSelectionSource.inherited;
+    final normalizedProviderSource = nextProvider.isUnspecified
+        ? ThreadSelectionSource.inherited
+        : nextProviderSource;
     final nextExecutionBinding =
         (executionBinding ??
                 existing?.executionBinding ??
@@ -331,7 +334,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
               executionModeSource:
                   executionTargetSource ??
                   existing?.executionBinding.executionModeSource,
-              providerSource: nextProviderSource,
+              providerSource: normalizedProviderSource,
             );
     final nextContextState =
         (contextState ??

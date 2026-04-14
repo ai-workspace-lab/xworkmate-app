@@ -24,7 +24,7 @@
 
 ### 2. Assistant 线程体验
 
-- single-agent 线程首次发送时自动绑定完整 `workspaceBinding`。
+- `agent` 线程首次发送时自动绑定完整 `workspaceBinding`。
 - 当前线程的 provider、workspace、artifact 只属于当前线程，不污染其他线程。
 - 二次追问继续复用当前线程与当前本地 workspace。
 - prompt 文本不能覆盖已绑定 workspace。
@@ -40,7 +40,7 @@
 
 - 无 provider 时，UI 给出 ACP-only 的明确提示。
 - 已绑定但当前不可用的 provider，UI 给出“不可自动改线”的提示。
-- debug runtime 开启时，UI 可以显示 single-agent runtime/provider 状态。
+- debug runtime 开启时，UI 可以显示当前 target 的 runtime/provider 状态。
 - provider 未就绪、workspace 缺失、执行失败时，提示文案与线程状态一致。
 
 ## Test Scope by Layer
@@ -50,7 +50,7 @@
 重点看用户实际能看到什么：
 
 - provider selector
-- single-agent mode chip / label
+- task dialog target chip / label（`agent` / `gateway`）
 - thread workspace 与 artifact 可见性
 - 错误提示与状态提示
 - thread 切换后的 provider / artifact 隔离
@@ -94,7 +94,7 @@ flutter test test/runtime/account_bridge_smoke_suite.dart
 flutter test test/features/settings_page_external_acp_end_to_end_suite.dart
 ```
 
-### Phase 2: Single-Agent Runtime 回归
+### Phase 2: Agent Runtime 回归
 
 验证 thread / provider / workspace / artifact 主链路：
 
@@ -145,8 +145,10 @@ flutter test test/features/assistant_page_suite.dart
 ### Provider / UI 断言
 
 - provider selector 的选项来自 bridge 当前广告结果。
+- `agent` target 只展示 bridge 当前广告的 ACP bridge providers。
+- `gateway` target 只展示 bridge 当前广告的 gateway providers。
 - UI 不会展示 bridge 未广告的 provider 作为可执行项。
-- `auto` 模式下，UI 显示的是 bridge 当前解析后的状态，而不是硬编码 provider。
+- bridge 未返回 catalog 时，provider 菜单为空或禁用，而不是硬编码 provider。
 - provider 不可用时，线程提示信息正确。
 
 ### Thread / Workspace 断言
@@ -167,7 +169,7 @@ flutter test test/features/assistant_page_suite.dart
 
 - 无 provider 时，错误提示明确指向 bridge/provider 配置问题。
 - provider 已绑定但不可用时，UI 不会偷偷改线到其他 provider。
-- debug runtime 打开时，single-agent provider/runtime 状态对用户可见。
+- debug runtime 打开时，当前 target 的 provider/runtime 状态对用户可见。
 
 ## Execution Order
 
@@ -201,7 +203,7 @@ flutter test test/features/assistant_page_suite.dart
 额外约定：
 
 - UI 本轮不改结构，只验证 provider 列表来源、展示结果与 thread 内状态。
-- `openclaw` 作为扩展路由的一部分，若 bridge 当前未广告，可 `skip`，但保留入口。
+- `gateway` target 若 bridge 当前未广告任何 gateway provider，可 `skip`，但 UI 不得伪造 `openclaw` 默认入口。
 - 如果某些长耗时在线任务未在默认时间窗内完成，允许先记录为 `timeout`，再用专项 case 延长超时补验。
 
 ## Deliverable
@@ -210,6 +212,6 @@ flutter test test/features/assistant_page_suite.dart
 
 - UI 能证明 provider 列表来自 bridge 动态发现
 - thread / workspace / artifact 语义已通过 runtime 回归
-- feature 层能看到 single-agent 结果、状态和错误提示
+- feature 层能看到 `agent / gateway` 结果、状态和错误提示
 - 6 个典型 case 都有最小 UI 验收骨架
 - 所有断言都围绕“用户在 APP 里能否看到正确 provider、正确线程、正确结果”展开
