@@ -227,9 +227,9 @@ extension AppControllerDesktopSkillPermissions on AppController {
     List<AssistantThreadSkillEntry>? importedSkills,
     List<String>? selectedSkillKeys,
     String? assistantModelId,
-    SingleAgentProvider? singleAgentProvider,
+    SingleAgentProvider? selectedProvider,
     ThreadSelectionSource? executionTargetSource,
-    ThreadSelectionSource? singleAgentProviderSource,
+    ThreadSelectionSource? selectedProviderSource,
     ThreadSelectionSource? assistantModelSource,
     ThreadSelectionSource? selectedSkillsSource,
     String? gatewayEntryState,
@@ -291,8 +291,8 @@ extension AppControllerDesktopSkillPermissions on AppController {
         'TaskThread $normalizedSessionKey is missing a complete workspaceBinding.',
       );
     }
-    final requestedProvider = singleAgentProvider?.isUnspecified == false
-        ? singleAgentProvider
+    final requestedProvider = selectedProvider?.isUnspecified == false
+        ? selectedProvider
         : null;
     final nextProviderId = normalizeSingleAgentProviderId(
       requestedProvider?.providerId ??
@@ -300,12 +300,14 @@ extension AppControllerDesktopSkillPermissions on AppController {
           existing?.contextState.latestResolvedProviderId ??
           '',
     );
+    final shouldDefaultProvider = existing == null && nextProviderId.isEmpty;
     final nextProvider = resolveProviderForExecutionTarget(
       nextProviderId,
       executionTarget: nextExecutionTarget,
+      defaultToCatalog: shouldDefaultProvider,
     );
     final nextProviderSource =
-        singleAgentProviderSource ??
+        selectedProviderSource ??
         existing?.executionBinding.providerSource ??
         ThreadSelectionSource.inherited;
     final nextExecutionBinding =
