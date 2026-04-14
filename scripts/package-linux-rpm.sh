@@ -3,14 +3,8 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 app_name="xworkmate"
-version="$(python3 - <<'PY'
-from pathlib import Path
-import re
-text = Path("pubspec.yaml").read_text()
-match = re.search(r"^version:\s*([^\n+]+)", text, re.M)
-print(match.group(1) if match else "0.0.0")
-PY
-)"
+
+eval "$(python3 "$repo_root/scripts/ci/build_version.py" --format shell)"
 
 bundle_dir="$repo_root/build/linux/x64/release/bundle"
 rpm_root="$repo_root/build/linux/rpm"
@@ -34,8 +28,8 @@ cp "$repo_root/linux/packaging/icons/xworkmate.svg" \
 
 cat > "$spec_file" <<EOF
 Name: $app_name
-Version: $version
-Release: 1%{?dist}
+Version: $PLATFORM_RELEASE_VERSION
+Release: $BUILD_NUMBER%{?dist}
 Summary: XWorkmate Linux desktop shell
 License: Proprietary
 BuildArch: x86_64
