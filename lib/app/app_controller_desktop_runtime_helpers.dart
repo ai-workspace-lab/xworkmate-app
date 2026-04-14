@@ -635,10 +635,10 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   Uri? resolveBridgeAcpEndpointInternal() {
-    final syncedBridgeServerUrl =
-        settingsControllerInternal.accountProfile?.bridgeServerUrl.trim() ?? '';
-    final candidate = isSupportedExternalAcpEndpoint(syncedBridgeServerUrl)
-        ? syncedBridgeServerUrl
+    final explicitBridgeServerUrl =
+        runtimeEnvironmentValueInternal('BRIDGE_SERVER_URL')?.trim() ?? '';
+    final candidate = isSupportedExternalAcpEndpoint(explicitBridgeServerUrl)
+        ? explicitBridgeServerUrl
         : kManagedBridgeServerUrl;
     final uri = Uri.tryParse(candidate);
     final scheme = uri?.scheme.trim().toLowerCase() ?? '';
