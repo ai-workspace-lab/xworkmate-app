@@ -300,9 +300,11 @@ extension AppControllerDesktopSkillPermissions on AppController {
           existing?.contextState.latestResolvedProviderId ??
           '',
     );
+    final shouldDefaultProvider = existing == null && nextProviderId.isEmpty;
     final nextProvider = resolveProviderForExecutionTarget(
       nextProviderId,
       executionTarget: nextExecutionTarget,
+      defaultToCatalog: shouldDefaultProvider,
     );
     final nextProviderSource =
         selectedProviderSource ??

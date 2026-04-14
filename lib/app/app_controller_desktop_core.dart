@@ -587,6 +587,16 @@ class AppController extends ChangeNotifier {
         .toList(growable: false);
   }
 
+  SingleAgentProvider defaultProviderForExecutionTarget(
+    AssistantExecutionTarget executionTarget,
+  ) {
+    final catalog = providerCatalogForExecutionTarget(executionTarget);
+    if (catalog.isNotEmpty) {
+      return catalog.first;
+    }
+    return SingleAgentProvider.unspecified;
+  }
+
   SingleAgentProvider? bridgeProviderForId(String providerId) {
     final normalizedProviderId = normalizeSingleAgentProviderId(providerId);
     if (normalizedProviderId.isEmpty) {
@@ -603,6 +613,7 @@ class AppController extends ChangeNotifier {
   SingleAgentProvider resolveProviderForExecutionTarget(
     String? providerId, {
     required AssistantExecutionTarget executionTarget,
+    bool defaultToCatalog = false,
   }) {
     final normalizedProviderId = normalizeSingleAgentProviderId(
       providerId ?? '',
@@ -615,15 +626,8 @@ class AppController extends ChangeNotifier {
         }
       }
     }
-    if (catalog.isNotEmpty) {
+    if (defaultToCatalog && catalog.isNotEmpty) {
       return catalog.first;
-    }
-    if (normalizedProviderId.isNotEmpty) {
-      return SingleAgentProvider.fromJsonValue(
-        normalizedProviderId,
-        supportedTargets: <AssistantExecutionTarget>[executionTarget],
-        enabled: false,
-      );
     }
     return SingleAgentProvider.unspecified;
   }
