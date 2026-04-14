@@ -458,16 +458,7 @@ AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordsForTest(
   final record = primaryRecord ?? fallbackRecord;
   return record == null
       ? AssistantExecutionTarget.agent
-      : (() {
-          final resolved = assistantExecutionTargetFromExecutionMode(
-            record.executionBinding.executionMode,
-          );
-          if (resolved.isGateway &&
-              isBridgeOwnedSingleAgentProviderId(
-                record.executionBinding.providerId,
-              )) {
-            return AssistantExecutionTarget.agent;
-          }
-          return resolved;
-        })();
+      : assistantExecutionTargetFromExecutionMode(
+          record.executionBinding.executionMode,
+        );
 }

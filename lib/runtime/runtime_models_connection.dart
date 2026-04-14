@@ -185,6 +185,10 @@ class SingleAgentProvider {
     required this.providerId,
     required this.label,
     required this.badge,
+    this.logoEmoji = '',
+    this.supportedTargets = const <AssistantExecutionTarget>[],
+    this.enabled = true,
+    this.unavailableReason = '',
     this.source = SingleAgentProviderSource.externalExtension,
   });
 
@@ -227,6 +231,10 @@ class SingleAgentProvider {
   final String providerId;
   final String label;
   final String badge;
+  final String logoEmoji;
+  final List<AssistantExecutionTarget> supportedTargets;
+  final bool enabled;
+  final String unavailableReason;
   final SingleAgentProviderSource source;
 
   bool get isUnspecified => providerId.trim().isEmpty;
@@ -237,6 +245,10 @@ class SingleAgentProvider {
     String? providerId,
     String? label,
     String? badge,
+    String? logoEmoji,
+    List<AssistantExecutionTarget>? supportedTargets,
+    bool? enabled,
+    String? unavailableReason,
     SingleAgentProviderSource? source,
   }) {
     final resolvedProviderId = normalizeSingleAgentProviderId(
@@ -255,6 +267,13 @@ class SingleAgentProvider {
               label: resolvedLabel,
             )
           : resolvedBadge,
+      logoEmoji: (logoEmoji ?? this.logoEmoji).trim(),
+      supportedTargets:
+          supportedTargets ??
+          List<AssistantExecutionTarget>.from(this.supportedTargets),
+      enabled: enabled ?? this.enabled,
+      unavailableReason:
+          (unavailableReason ?? this.unavailableReason).trim(),
       source: source ?? this.source,
     );
   }
@@ -263,6 +282,10 @@ class SingleAgentProvider {
     String? value, {
     String? label,
     String? badge,
+    String? logoEmoji,
+    List<AssistantExecutionTarget>? supportedTargets,
+    bool? enabled,
+    String? unavailableReason,
   }) {
     final normalized = normalizeSingleAgentProviderId(value ?? '');
     final base = switch (normalized) {
@@ -281,7 +304,14 @@ class SingleAgentProvider {
         ),
       ),
     };
-    return base.copyWith(label: label, badge: badge);
+    return base.copyWith(
+      label: label,
+      badge: badge,
+      logoEmoji: logoEmoji,
+      supportedTargets: supportedTargets,
+      enabled: enabled,
+      unavailableReason: unavailableReason,
+    );
   }
 
   @override
@@ -298,7 +328,19 @@ extension SingleAgentProviderCopy on SingleAgentProvider {
     String? value, {
     String? label,
     String? badge,
-  }) => SingleAgentProvider.fromJsonValue(value, label: label, badge: badge);
+    String? logoEmoji,
+    List<AssistantExecutionTarget>? supportedTargets,
+    bool? enabled,
+    String? unavailableReason,
+  }) => SingleAgentProvider.fromJsonValue(
+    value,
+    label: label,
+    badge: badge,
+    logoEmoji: logoEmoji,
+    supportedTargets: supportedTargets,
+    enabled: enabled,
+    unavailableReason: unavailableReason,
+  );
 }
 
 enum SingleAgentProviderSource { externalExtension }
@@ -319,26 +361,9 @@ List<SingleAgentProvider> normalizeSingleAgentProviderList(
 const String kCanonicalGatewayProviderId = 'openclaw';
 const String kCanonicalGatewayProviderLabel = 'OpenClaw';
 
-const List<SingleAgentProvider> kBridgeOwnedSingleAgentProviders =
-    <SingleAgentProvider>[
-      SingleAgentProvider.codex,
-      SingleAgentProvider.opencode,
-      SingleAgentProvider.gemini,
-    ];
-
 bool isBridgeOwnedSingleAgentProviderId(String providerId) {
   final normalized = normalizeSingleAgentProviderId(providerId);
-  return kBridgeOwnedSingleAgentProviders.any(
-    (item) => item.providerId == normalized,
-  );
-}
-
-List<SingleAgentProvider> normalizeBridgeOwnedSingleAgentProviderList(
-  Iterable<SingleAgentProvider> providers,
-) {
-  return normalizeSingleAgentProviderList(
-    providers.where(
-      (provider) => isBridgeOwnedSingleAgentProviderId(provider.providerId),
-    ),
-  );
+  return normalized == 'codex' ||
+      normalized == 'opencode' ||
+      normalized == 'gemini';
 }

@@ -52,6 +52,78 @@ void main() {
     });
 
     test(
+      'switching a session to gateway uses the bridge-provided gateway catalog',
+      () async {
+        final controller = AppController(
+          initialBridgeProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+            SingleAgentProvider.opencode,
+            SingleAgentProvider.gemini,
+          ],
+          initialGatewayProviderCatalog: <SingleAgentProvider>[
+            SingleAgentProvider.openclaw.copyWith(
+              logoEmoji: '🦞',
+              supportedTargets: const <AssistantExecutionTarget>[
+                AssistantExecutionTarget.gateway,
+              ],
+            ),
+          ],
+          initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.agent,
+            AssistantExecutionTarget.gateway,
+          ],
+        );
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('session-1');
+
+        expect(controller.currentAssistantExecutionTarget.isAgent, isTrue);
+        expect(
+          controller.assistantProviderForSession(controller.currentSessionKey),
+          SingleAgentProvider.codex,
+        );
+
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+
+        final record = controller.requireTaskThreadForSessionInternal(
+          'session-1',
+        );
+        expect(
+          controller.assistantExecutionTargetForSession('session-1').isGateway,
+          isTrue,
+        );
+        expect(
+          assistantExecutionTargetFromExecutionMode(
+            record.executionBinding.executionMode,
+          ),
+          AssistantExecutionTarget.gateway,
+        );
+        expect(
+          controller.assistantProviderForSession('session-1'),
+          SingleAgentProvider.openclaw,
+        );
+      },
+    );
+
+    test(
+      'returns an unavailable provider placeholder when a saved provider is no longer in the bridge catalog',
+      () {
+        final controller = AppController();
+        addTearDown(controller.dispose);
+
+        final unavailableProvider = controller.resolveProviderForExecutionTarget(
+          'gemini',
+          executionTarget: AssistantExecutionTarget.agent,
+        );
+
+        expect(unavailableProvider.providerId, 'gemini');
+        expect(unavailableProvider.enabled, isFalse);
+      },
+    );
+
+    test(
       'refreshes agent provider catalog when agent mode is selected with an empty catalog',
       () async {
         final capture = await _startCapabilityServer();

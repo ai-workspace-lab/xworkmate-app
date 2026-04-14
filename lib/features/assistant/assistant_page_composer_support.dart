@@ -217,6 +217,7 @@ class SingleAgentProviderBadgeInternal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final logoEmoji = provider.logoEmoji.trim();
     final candidate = provider.badge.trim().isEmpty
         ? provider.label
         : provider.badge;
@@ -235,13 +236,13 @@ class SingleAgentProviderBadgeInternal extends StatelessWidget {
         border: Border.all(color: palette.strokeSoft),
       ),
       child: Text(
-        display,
+        logoEmoji.isEmpty ? display : logoEmoji,
         maxLines: 1,
         overflow: TextOverflow.clip,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: palette.textMuted,
           fontWeight: FontWeight.w700,
-          fontSize: 9,
+          fontSize: logoEmoji.isEmpty ? 9 : 11,
           height: 1,
         ),
       ),
