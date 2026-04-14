@@ -13,6 +13,9 @@ PRODUCTS_DIR_NAME="$(tr '[:lower:]' '[:upper:]' <<< "${BUILD_MODE:0:1}")${BUILD_
 FLUTTER_BUILD_STATE_DIR="${ROOT_DIR}/.dart_tool/flutter_build"
 MACOS_BUILD_DIR="${ROOT_DIR}/build/macos"
 NATIVE_ASSETS_DIR="${ROOT_DIR}/build/native_assets"
+source "$ROOT_DIR/scripts/ci/apple_signing.sh"
+APPLE_SIGNING_CLEANUP_COMMANDS=()
+trap apple_run_cleanup EXIT
 
 remove_tree_with_retries() {
   local path="$1"
@@ -45,19 +48,13 @@ if [[ ! -f "$PUBSPEC_PATH" ]]; then
   exit 1
 fi
 
-VERSION_LINE="$(sed -n 's/^version:[[:space:]]*//p' "$PUBSPEC_PATH" | head -n 1)"
-if [[ -z "$VERSION_LINE" ]]; then
-  echo "Unable to read version from $PUBSPEC_PATH" >&2
-  exit 1
-fi
+eval "$(python3 "$ROOT_DIR/scripts/ci/build_version.py" --format shell)"
 BUILD_DATE_LINE="$(sed -n 's/^build-date:[[:space:]]*//p' "$PUBSPEC_PATH" | head -n 1)"
 BUILD_ID_LINE="$(sed -n 's/^build-id:[[:space:]]*//p' "$PUBSPEC_PATH" | head -n 1)"
 
-APP_VERSION="${VERSION_LINE%%+*}"
-APP_BUILD="${VERSION_LINE#*+}"
-if [[ "$APP_BUILD" == "$VERSION_LINE" ]]; then
-  APP_BUILD="1"
-fi
+APP_VERSION="$DISPLAY_VERSION"
+APP_RELEASE_VERSION="$PLATFORM_RELEASE_VERSION"
+APP_BUILD="$BUILD_NUMBER"
 APP_BUILD_DATE="${BUILD_DATE_LINE:-unknown}"
 APP_BUILD_COMMIT="${BUILD_ID_LINE:-unknown}"
 
@@ -74,10 +71,19 @@ remove_tree_with_retries "$FLUTTER_BUILD_STATE_DIR"
 remove_tree_with_retries "$MACOS_BUILD_DIR"
 remove_tree_with_retries "$NATIVE_ASSETS_DIR"
 
+if [[ -n "${APPLE_CERT_P12_BASE64:-}" &&
+      -n "${APPLE_CERT_PASSWORD:-}" &&
+      -n "${APPLE_KEYCHAIN_PASSWORD:-}" ]]; then
+  echo "Provisioning Apple signing certificate for macOS build..."
+  apple_setup_signing_keychain
+else
+  echo "Apple signing secrets not set; using existing local macOS signing context."
+fi
+
 BUILD_ARGS=(
   flutter build macos
   "--$BUILD_MODE"
-  --build-name="$APP_VERSION"
+  --build-name="$APP_RELEASE_VERSION"
   --build-number="$APP_BUILD"
   --dart-define="XWORKMATE_DISPLAY_VERSION=$APP_VERSION"
   --dart-define="XWORKMATE_BUILD_NUMBER=$APP_BUILD"

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$repo_root"
+eval "$(python3 "$repo_root/scripts/ci/build_version.py" --format shell)"
 platform="${1:?platform is required}"
 arch="${2:?arch is required}"
 should_release="${3:-false}"
@@ -17,7 +20,9 @@ case "$platform" in
     find dist -maxdepth 1 -name '*.dmg' -exec mv {} dist/macos/ \;
     ;;
   windows)
-    flutter build windows --release
+    flutter build windows --release \
+      --build-name="$PLATFORM_RELEASE_VERSION" \
+      --build-number="$BUILD_NUMBER"
     pwsh -File ./scripts/package-windows-msi.ps1 -Arch "$arch"
     ;;
   ios)
@@ -25,7 +30,11 @@ case "$platform" in
       bash ./scripts/package-ios-ipa.sh
     else
       echo "Release secrets not required for non-release runs; building unsigned iOS app bundle."
-      flutter build ios --release --no-codesign
+      flutter build ios --release --no-codesign \
+        --build-name="$PLATFORM_RELEASE_VERSION" \
+        --build-number="$BUILD_NUMBER" \
+        --dart-define="XWORKMATE_DISPLAY_VERSION=$DISPLAY_VERSION" \
+        --dart-define="XWORKMATE_BUILD_NUMBER=$BUILD_NUMBER"
       mkdir -p dist/ios
       (
         cd build/ios/iphoneos

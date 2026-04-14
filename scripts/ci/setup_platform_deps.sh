@@ -2,6 +2,8 @@
 set -euo pipefail
 
 platform="${1:?platform is required}"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$repo_root"
 
 case "$platform" in
   linux)
@@ -52,16 +54,14 @@ case "$platform" in
 
     flutter_bin="$(command -v flutter)"
     flutter_root="$(cd "$(dirname "$flutter_bin")/.." && pwd)"
-    app_version="$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n 1)"
-    app_version="${app_version%%+*}"
-    version_code="${GITHUB_RUN_NUMBER:-1}"
+    eval "$(python3 "$repo_root/scripts/ci/build_version.py" --format shell)"
 
     cat > android/local.properties <<EOF
 sdk.dir=$android_sdk_root
 flutter.sdk=$flutter_root
 flutter.buildMode=release
-flutter.versionName=$app_version
-flutter.versionCode=$version_code
+flutter.versionName=$DISPLAY_VERSION
+flutter.versionCode=$BUILD_NUMBER
 EOF
     ;;
   macos)
