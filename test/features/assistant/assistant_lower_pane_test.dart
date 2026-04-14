@@ -253,6 +253,101 @@ void main() {
       );
     });
 
+    testWidgets('allows switching gateway providers from the dynamic catalog', (
+      tester,
+    ) async {
+      final controller = AppController(
+        initialBridgeProviderCatalog: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
+          SingleAgentProvider.gemini,
+        ],
+        initialGatewayProviderCatalog: <SingleAgentProvider>[
+          SingleAgentProvider.openclaw.copyWith(
+            logoEmoji: '🦞',
+            supportedTargets: const <AssistantExecutionTarget>[
+              AssistantExecutionTarget.gateway,
+            ],
+          ),
+          SingleAgentProvider.fromJsonValue(
+            'hermes',
+            label: 'Hermes',
+            badge: 'H',
+            supportedTargets: const <AssistantExecutionTarget>[
+              AssistantExecutionTarget.gateway,
+            ],
+          ),
+        ],
+        initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+          AssistantExecutionTarget.agent,
+          AssistantExecutionTarget.gateway,
+        ],
+      );
+      addTearDown(controller.dispose);
+
+      await controller.sessionsController.switchSession('session-1');
+      controller.initializeAssistantThreadContext(
+        'session-1',
+        executionTarget: AssistantExecutionTarget.gateway,
+        messageViewMode: controller.assistantMessageViewModeForSession(
+          'session-1',
+        ),
+      );
+      final gatewayThread = controller
+          .requireTaskThreadForSessionInternal('session-1')
+          .copyWith(
+            executionBinding: ExecutionBinding(
+              executionMode: threadExecutionModeFromAssistantExecutionTarget(
+                AssistantExecutionTarget.gateway,
+              ),
+              executorId: SingleAgentProvider.openclaw.providerId,
+              providerId: SingleAgentProvider.openclaw.providerId,
+              endpointId: '',
+              executionModeSource: ThreadSelectionSource.explicit,
+              providerSource: ThreadSelectionSource.explicit,
+            ),
+            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          );
+      controller.taskThreadRepositoryInternal.replace(
+        gatewayThread,
+        persist: false,
+      );
+      controller.notifyListeners();
+
+      await tester.pumpWidget(
+        _buildTestApp(child: _buildLowerPane(controller: controller)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('assistant-provider-button')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('assistant-provider-menu-item-openclaw')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('assistant-provider-menu-item-hermes')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('assistant-provider-menu-item-codex')),
+        findsNothing,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('assistant-provider-menu-item-hermes')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        controller
+            .assistantProviderForSession(controller.currentSessionKey)
+            .providerId,
+        'hermes',
+      );
+    });
+
     testWidgets('uses submit button instead of connect action', (tester) async {
       final controller = AppController();
       addTearDown(controller.dispose);
