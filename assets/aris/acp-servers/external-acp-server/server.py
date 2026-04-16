@@ -327,25 +327,29 @@ class AcpServer:
 
         try:
             if method == "acp.capabilities":
-                return JsonRpcResponse(id=request.id, result=self.get_capabilities())
+                response = JsonRpcResponse(id=request.id, result=self.get_capabilities())
 
             elif method == "session.start":
-                return await self._handle_session_start(request, notify)
+                response = await self._handle_session_start(request, notify)
 
             elif method == "session.message":
-                return await self._handle_session_message(request, notify)
+                response = await self._handle_session_message(request, notify)
 
             elif method == "session.cancel":
-                return self._handle_session_cancel(request)
+                response = self._handle_session_cancel(request)
 
             elif method == "session.close":
-                return self._handle_session_close(request)
+                response = self._handle_session_close(request)
 
             else:
-                return JsonRpcResponse(
+                response = JsonRpcResponse(
                     id=request.id,
                     error={"code": -32601, "message": f"Unknown method: {method}"}
                 )
+
+            if response and response.id is None:
+                response.id = request.id
+            return response
 
         except asyncio.CancelledError:
             raise
@@ -486,7 +490,6 @@ class AcpServer:
                 "error": True
             }, notify)
             return JsonRpcResponse(
-                id=None,
                 error={"code": -32602, "message": f"Unknown provider: {provider_name}"}
             )
 
@@ -499,7 +502,6 @@ class AcpServer:
                 "error": True
             }, notify)
             return JsonRpcResponse(
-                id=None,
                 error={"code": -32602, "message": f"Provider not available: {provider_name}"}
             )
 

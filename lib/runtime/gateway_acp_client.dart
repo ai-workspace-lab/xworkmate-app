@@ -801,8 +801,8 @@ class GatewayAcpClient {
       consumeEventPayload(eventLines.join('\n'));
     }
     if (!completer.isCompleted) {
-      throw const GatewayAcpException(
-        'ACP SSE ended without JSON-RPC response',
+      throw GatewayAcpException(
+        'ACP SSE ended without JSON-RPC response for request $requestId',
         code: 'ACP_SSE_NO_RESULT',
       );
     }
