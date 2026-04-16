@@ -97,7 +97,7 @@ void main() {
         find.byKey(const Key('assistant-provider-menu-item-gemini')),
         findsOneWidget,
       );
-      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.check_rounded), findsNothing);
       await tester.tap(
         find.byKey(const Key('assistant-provider-menu-item-codex')),
       );
