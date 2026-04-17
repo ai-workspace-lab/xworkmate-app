@@ -123,7 +123,6 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
     );
-    await widget.controller.settingsController.saveSnapshot(nextSettings);
     if (isManual && _bridgeTokenController.text.isNotEmpty) {
       await widget.controller.settingsController.saveSecretValueByRef(
         nextSettings.acpBridgeServerModeConfig.selfHosted.passwordRef,
@@ -132,6 +131,8 @@ class _SettingsPageState extends State<SettingsPage> {
         module: 'Manual',
       );
     }
+    await widget.controller.saveSettings(nextSettings);
+
     _lastSavedAccountBaseUrl = nextSettings.accountBaseUrl;
     _lastSavedAccountIdentifier = nextSettings.accountUsername;
     _lastSavedBridgeUrl = nextSettings.acpBridgeServerModeConfig.selfHosted.serverUrl;
