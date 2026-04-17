@@ -40,10 +40,13 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _accountIdentifierController;
   late final TextEditingController _accountPasswordController;
   late final TextEditingController _accountMfaCodeController;
+  late final TextEditingController _bridgeUrlController;
+  late final TextEditingController _bridgeTokenController;
   SettingsAboutSnapshot _aboutSnapshot = const SettingsAboutSnapshot.defaults();
   bool _aboutBusy = false;
   String _lastSavedAccountBaseUrl = '';
   String _lastSavedAccountIdentifier = '';
+  String _lastSavedBridgeUrl = '';
 
   @override
   void initState() {
@@ -51,6 +54,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final settings = widget.controller.settings;
     _lastSavedAccountBaseUrl = settings.accountBaseUrl;
     _lastSavedAccountIdentifier = settings.accountUsername;
+    _lastSavedBridgeUrl = settings.acpBridgeServerModeConfig.selfHosted.serverUrl;
     _accountBaseUrlController = TextEditingController(
       text: _lastSavedAccountBaseUrl,
     );
@@ -59,7 +63,10 @@ class _SettingsPageState extends State<SettingsPage> {
     );
     _accountPasswordController = TextEditingController();
     _accountMfaCodeController = TextEditingController();
+    _bridgeUrlController = TextEditingController(text: _lastSavedBridgeUrl);
+    _bridgeTokenController = TextEditingController();
     unawaited(_refreshAboutSnapshot());
+    unawaited(_loadBridgeToken());
   }
 
   @override
@@ -69,7 +76,17 @@ class _SettingsPageState extends State<SettingsPage> {
     _accountIdentifierController.dispose();
     _accountPasswordController.dispose();
     _accountMfaCodeController.dispose();
+    _bridgeUrlController.dispose();
+    _bridgeTokenController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadBridgeToken() async {
+    final token = await widget.controller.settingsController
+        .loadSecretValueByRef(widget.controller.settings.acpBridgeServerModeConfig.selfHosted.passwordRef);
+    if (mounted) {
+      _bridgeTokenController.text = token;
+    }
   }
 
   void _syncAccountControllers(SettingsSnapshot settings) {
@@ -83,16 +100,41 @@ class _SettingsPageState extends State<SettingsPage> {
     }
     _lastSavedAccountBaseUrl = settings.accountBaseUrl;
     _lastSavedAccountIdentifier = settings.accountUsername;
+
+    final bridgeConfig = settings.acpBridgeServerModeConfig;
+    if (_bridgeUrlController.text == _lastSavedBridgeUrl &&
+        bridgeConfig.selfHosted.serverUrl != _lastSavedBridgeUrl) {
+      _bridgeUrlController.text = bridgeConfig.selfHosted.serverUrl;
+    }
+    _lastSavedBridgeUrl = bridgeConfig.selfHosted.serverUrl;
   }
 
   Future<void> _saveAccountProfile(SettingsSnapshot settings) async {
+    final bridgeConfig = settings.acpBridgeServerModeConfig;
+    final isManual = DefaultTabController.of(context).index == 1;
+
     final nextSettings = settings.copyWith(
       accountBaseUrl: _accountBaseUrlController.text.trim(),
       accountUsername: _accountIdentifierController.text.trim(),
+      acpBridgeServerModeConfig: bridgeConfig.copyWith(
+        mode: isManual ? AcpBridgeServerMode.manual : AcpBridgeServerMode.cloudSynced,
+        selfHosted: bridgeConfig.selfHosted.copyWith(
+          serverUrl: _bridgeUrlController.text.trim(),
+        ),
+      ),
     );
     await widget.controller.settingsController.saveSnapshot(nextSettings);
+    if (isManual && _bridgeTokenController.text.isNotEmpty) {
+      await widget.controller.settingsController.saveSecretValueByRef(
+        nextSettings.acpBridgeServerModeConfig.selfHosted.passwordRef,
+        _bridgeTokenController.text,
+        provider: 'Bridge',
+        module: 'Manual',
+      );
+    }
     _lastSavedAccountBaseUrl = nextSettings.accountBaseUrl;
     _lastSavedAccountIdentifier = nextSettings.accountUsername;
+    _lastSavedBridgeUrl = nextSettings.acpBridgeServerModeConfig.selfHosted.serverUrl;
   }
 
   Future<void> _loginAccount(SettingsSnapshot settings) async {
@@ -300,6 +342,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 accountIdentifierController: _accountIdentifierController,
                 accountPasswordController: _accountPasswordController,
                 accountMfaCodeController: _accountMfaCodeController,
+                bridgeUrlController: _bridgeUrlController,
+                bridgeTokenController: _bridgeTokenController,
                 onSaveAccountProfile: () =>
                     _saveAccountProfile(currentSettings),
                 onLogin: () => _loginAccount(currentSettings),
