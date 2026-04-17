@@ -143,7 +143,17 @@ class StoreLayoutResolver {
         await _resolvePath(_supportRootPathResolver) ??
         await _defaultSupportRootPath();
     if (supportRootPath == null) {
-      throw StateError('Cannot resolve persistent storage root.');
+      // Fallback to a temporary directory instead of failing fast with an error.
+      // This ensures the app remains usable in "memory-only" or "ephemeral" mode.
+      final tempDir = await Directory.systemTemp.createTemp('xworkmate-fallback-');
+      final layout = StoreLayout(
+        rootDirectory: tempDir,
+        configDirectory: await ensureDirectory('${tempDir.path}/config'),
+        tasksDirectory: await ensureDirectory('${tempDir.path}/tasks'),
+        secretDirectory: await ensureDirectory('${tempDir.path}/secrets'),
+      );
+      _cached = layout;
+      return layout;
     }
     final appDataRootPath =
         await _resolvePath(_appDataRootPathResolver) ?? supportRootPath;
