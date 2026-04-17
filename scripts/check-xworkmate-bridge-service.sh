@@ -6,8 +6,9 @@ if [[ -f .env ]]; then
   set -a && source ./.env && set +a
 fi
 
-SSH_TARGET="${XWORKMATE_TEST_SSH_TARGET:-root@p-xhttp-contabo.svc.plus}"
+SSH_TARGET="${XWORKMATE_TEST_SSH_TARGET:-root@xworkmate-bridge.svc.plus}"
 BRIDGE_SERVICE="${XWORKMATE_TEST_BRIDGE_SERVICE:-xworkmate-bridge.svc.plus}"
+CADDY_CONFIG="${XWORKMATE_TEST_CADDY_CONFIG:-/etc/caddy/conf.d/xworkmate-bridge.caddy}"
 SSH_BIN="${SSH_BIN:-ssh}"
 SSH_CONNECT_TIMEOUT="${XWORKMATE_TEST_SSH_CONNECT_TIMEOUT:-8}"
 SSH_EXTRA_OPTS="${XWORKMATE_TEST_SSH_OPTS:-}"
@@ -20,16 +21,26 @@ echo "==> Inspecting ${BRIDGE_SERVICE} on ${SSH_TARGET}"
   -o BatchMode=yes \
   -o ConnectTimeout="${SSH_CONNECT_TIMEOUT}" \
   ${SSH_EXTRA_OPTS} \
-  "${SSH_TARGET}" bash -s -- "${BRIDGE_SERVICE}" "${JOURNAL_LINES}" <<'REMOTE'
+  "${SSH_TARGET}" bash -s -- "${BRIDGE_SERVICE}" "${JOURNAL_LINES}" "${CADDY_CONFIG}" <<'REMOTE'
 set -euo pipefail
 
 service_name="${1}"
 journal_lines="${2}"
+caddy_config="${3}"
 
 echo "## Access"
 echo "host=$(hostname -f 2>/dev/null || hostname)"
 echo "time=$(date -Is)"
 echo "kernel=$(uname -srmo)"
+echo
+
+echo "## Caddy Configuration"
+if [[ -f "${caddy_config}" ]]; then
+  echo "path: ${caddy_config}"
+  cat "${caddy_config}"
+else
+  echo "Caddy config not found at ${caddy_config}"
+fi
 echo
 
 echo "## System"
