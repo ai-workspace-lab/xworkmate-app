@@ -247,6 +247,57 @@ void main() {
         expect(header, 'gateway-token');
       },
     );
+
+    test(
+      'desktop bridge auth resolver resolves manual bridge token when configured',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-acp-auth-bridge-manual-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            try {
+              await storeRoot.delete(recursive: true);
+            } on FileSystemException {
+              // Temp cleanup is best effort here.
+            }
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+
+        final settings = SettingsSnapshot.defaults().copyWith(
+          acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults().copyWith(
+            mode: AcpBridgeServerMode.manual,
+            selfHosted: AcpBridgeServerSelfHostedConfig.defaults().copyWith(
+              serverUrl: 'https://manual-bridge.example.com',
+            ),
+          ),
+        );
+        await store.saveSettingsSnapshot(settings);
+        await store.saveSecretValueByRef(
+          settings.acpBridgeServerModeConfig.selfHosted.passwordRef,
+          'manual-token',
+        );
+
+        final controller = AppController(store: store);
+        addTearDown(controller.dispose);
+        await controller.settingsControllerInternal.initialize();
+
+        final header = await controller
+            .resolveGatewayAcpAuthorizationHeaderInternal(
+              Uri.parse('https://manual-bridge.example.com/acp/rpc'),
+            );
+
+        expect(header, 'manual-token');
+      },
+    );
   });
 }
 

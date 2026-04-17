@@ -264,7 +264,16 @@ class AccountRemoteProfile {
   }
 }
 
-enum AcpBridgeServerMode { cloudSynced }
+enum AcpBridgeServerMode { cloudSynced, manual }
+
+extension AcpBridgeServerModeCopy on AcpBridgeServerMode {
+  static AcpBridgeServerMode fromJsonValue(String? value) {
+    return AcpBridgeServerMode.values.firstWhere(
+      (item) => item.name == value,
+      orElse: () => AcpBridgeServerMode.cloudSynced,
+    );
+  }
+}
 
 class AcpBridgeServerRemoteServerSummary {
   const AcpBridgeServerRemoteServerSummary({
@@ -542,11 +551,11 @@ class AcpBridgeServerModeConfig {
     );
   }
 
-  bool get usesSelfHostedBase => false;
+  bool get usesSelfHostedBase => mode == AcpBridgeServerMode.manual;
 
-  bool get usesCloudSyncBase => true;
+  bool get usesCloudSyncBase => mode == AcpBridgeServerMode.cloudSynced;
 
-  String get sourceTag => 'cloudSynced';
+  String get sourceTag => mode.name;
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
@@ -559,7 +568,7 @@ class AcpBridgeServerModeConfig {
 
   factory AcpBridgeServerModeConfig.fromJson(Map<String, dynamic> json) {
     return AcpBridgeServerModeConfig(
-      mode: AcpBridgeServerMode.cloudSynced,
+      mode: AcpBridgeServerModeCopy.fromJsonValue(json['mode'] as String?),
       cloudSynced: AcpBridgeServerCloudSyncConfig.fromJson(
         (json['cloudSynced'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
