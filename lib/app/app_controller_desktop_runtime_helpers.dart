@@ -637,10 +637,17 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   Uri? resolveBridgeAcpEndpointInternal() {
     final explicitBridgeServerUrl =
         runtimeEnvironmentValueInternal('BRIDGE_SERVER_URL')?.trim() ?? '';
-    final candidate = isSupportedExternalAcpEndpoint(explicitBridgeServerUrl)
-        ? explicitBridgeServerUrl
+    if (isSupportedExternalAcpEndpoint(explicitBridgeServerUrl)) {
+      final uri = Uri.tryParse(explicitBridgeServerUrl);
+      if (uri != null) {
+        return uri.replace(query: null, fragment: null);
+      }
+    }
+    final modeConfig = settings.acpBridgeServerModeConfig;
+    final candidate = modeConfig.mode == AcpBridgeServerMode.manual
+        ? modeConfig.selfHosted.serverUrl.trim()
         : kManagedBridgeServerUrl;
-    final uri = Uri.tryParse(candidate);
+    final uri = Uri.tryParse(candidate.isEmpty ? kManagedBridgeServerUrl : candidate);
     final scheme = uri?.scheme.trim().toLowerCase() ?? '';
     if (uri == null || !kSupportedExternalAcpEndpointSchemes.contains(scheme)) {
       return null;
@@ -687,6 +694,14 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       final normalizedToken = bridgeToken.trim();
       if (normalizedToken.isNotEmpty) {
         return normalizedToken;
+      }
+      final modeConfig = settings.acpBridgeServerModeConfig;
+      if (modeConfig.mode == AcpBridgeServerMode.manual) {
+        final manualToken = await settingsControllerInternal
+            .loadSecretValueByRef(modeConfig.selfHosted.passwordRef);
+        if (manualToken.trim().isNotEmpty) {
+          return manualToken.trim();
+        }
       }
     }
     final matchingGatewayProfileIndex =

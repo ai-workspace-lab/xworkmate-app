@@ -17,6 +17,8 @@ class SettingsAccountPanel extends StatelessWidget {
     required this.accountIdentifierController,
     required this.accountPasswordController,
     required this.accountMfaCodeController,
+    required this.bridgeUrlController,
+    required this.bridgeTokenController,
     required this.onSaveAccountProfile,
     required this.onLogin,
     required this.onVerifyMfa,
@@ -36,6 +38,8 @@ class SettingsAccountPanel extends StatelessWidget {
   final TextEditingController accountIdentifierController;
   final TextEditingController accountPasswordController;
   final TextEditingController accountMfaCodeController;
+  final TextEditingController bridgeUrlController;
+  final TextEditingController bridgeTokenController;
   final Future<void> Function() onSaveAccountProfile;
   final Future<void> Function() onLogin;
   final Future<void> Function() onVerifyMfa;
@@ -46,13 +50,54 @@ class SettingsAccountPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!accountSignedIn && !accountMfaRequired) {
-      return _SignedOutAccountPanel(
-        accountBusy: accountBusy,
-        accountBaseUrlController: accountBaseUrlController,
-        accountIdentifierController: accountIdentifierController,
-        accountPasswordController: accountPasswordController,
-        onSaveAccountProfile: onSaveAccountProfile,
-        onLogin: onLogin,
+      return DefaultTabController(
+        length: 2,
+        initialIndex: settings.acpBridgeServerModeConfig.mode ==
+                AcpBridgeServerMode.manual
+            ? 1
+            : 0,
+        child: Column(
+          children: [
+            TabBar(
+              tabs: [
+                Tab(text: appText('svc.plus 云端同步', 'svc.plus Cloud Sync')),
+                Tab(text: appText('手动 Bridge 配置', 'Manual Bridge Config')),
+              ],
+              onTap: (index) {
+                final mode = index == 1
+                    ? AcpBridgeServerMode.manual
+                    : AcpBridgeServerMode.cloudSynced;
+                if (settings.acpBridgeServerModeConfig.mode != mode) {
+                  onSaveAccountProfile(); // This should trigger a save with the new mode
+                }
+              },
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 480,
+              child: TabBarView(
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _SignedOutAccountPanel(
+                    accountBusy: accountBusy,
+                    accountBaseUrlController: accountBaseUrlController,
+                    accountIdentifierController: accountIdentifierController,
+                    accountPasswordController: accountPasswordController,
+                    onSaveAccountProfile: onSaveAccountProfile,
+                    onLogin: onLogin,
+                  ),
+                  _ManualBridgePanel(
+                    settings: settings,
+                    accountBusy: accountBusy,
+                    bridgeUrlController: bridgeUrlController,
+                    bridgeTokenController: bridgeTokenController,
+                    onSaveAccountProfile: onSaveAccountProfile,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       );
     }
     if (accountMfaRequired) {
@@ -73,6 +118,93 @@ class SettingsAccountPanel extends StatelessWidget {
       accountStatus: accountStatus,
       onSync: onSync,
       onLogout: onLogout,
+    );
+  }
+}
+
+class _ManualBridgePanel extends StatelessWidget {
+  const _ManualBridgePanel({
+    required this.settings,
+    required this.accountBusy,
+    required this.bridgeUrlController,
+    required this.bridgeTokenController,
+    required this.onSaveAccountProfile,
+  });
+
+  final SettingsSnapshot settings;
+  final bool accountBusy;
+  final TextEditingController bridgeUrlController;
+  final TextEditingController bridgeTokenController;
+  final Future<void> Function() onSaveAccountProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.link_outlined,
+              size: 72,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              appText('手动 Bridge 配置', 'Manual Bridge Config'),
+              style: theme.textTheme.headlineMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              appText(
+                '直接配置本地或私有 xworkmate-bridge 地址与令牌。',
+                'Configure local or private xworkmate-bridge address and token directly.',
+              ),
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.8,
+                ),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 28),
+            TextFormField(
+              key: const ValueKey('settings-manual-bridge-url-field'),
+              controller: bridgeUrlController,
+              decoration: InputDecoration(
+                labelText: appText('Bridge 地址', 'Bridge URL'),
+                prefixIcon: const Icon(Icons.dns_outlined),
+                hintText: 'https://xworkmate-bridge.svc.plus',
+              ),
+              onFieldSubmitted: (_) => onSaveAccountProfile(),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              key: const ValueKey('settings-manual-bridge-token-field'),
+              controller: bridgeTokenController,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: appText('鉴权令牌 (TOKEN)', 'Auth Token'),
+                prefixIcon: const Icon(Icons.key_outlined),
+              ),
+              onFieldSubmitted: (_) => onSaveAccountProfile(),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                key: const ValueKey('settings-manual-bridge-save-button'),
+                onPressed: accountBusy ? null : () => onSaveAccountProfile(),
+                child: Text(appText('保存配置', 'Save Configuration')),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
