@@ -11,7 +11,7 @@ import 'ui_feature_manifest.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/device_identity_store.dart';
-import '../runtime/aris_bundle.dart';
+
 import '../runtime/go_core.dart';
 import '../runtime/runtime_bootstrap.dart';
 import '../runtime/desktop_platform_service.dart';

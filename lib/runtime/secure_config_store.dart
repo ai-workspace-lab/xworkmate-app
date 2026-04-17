@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-export 'file_store_support.dart';
-export 'secret_store.dart';
-export 'settings_store.dart';
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/package_info_plus.dart';
 
 import 'file_store_support.dart';
 import 'runtime_models.dart';
@@ -12,319 +11,71 @@ import 'settings_store.dart';
 
 class SecureConfigStore {
   SecureConfigStore({
-    Future<String?> Function()? secretRootPathResolver,
-    Future<String?> Function()? appDataRootPathResolver,
-    Future<String?> Function()? supportRootPathResolver,
-    SecureStorageClient? secureStorage,
-    bool enableSecureStorage = true,
-  }) {
-    final layoutResolver = StoreLayoutResolver(
-      appDataRootPathResolver: appDataRootPathResolver,
-      secretRootPathResolver: secretRootPathResolver,
-      supportRootPathResolver: supportRootPathResolver,
-    );
-    _layoutResolver = layoutResolver;
-    _secretStore = SecretStore(
-      secretRootPathResolver: secretRootPathResolver,
-      appDataRootPathResolver: appDataRootPathResolver,
-      supportRootPathResolver: supportRootPathResolver,
-      secureStorage: secureStorage,
-      enableSecureStorage: enableSecureStorage,
-      layoutResolver: layoutResolver,
-    );
-    _settingsStore = SettingsStore(
-      appDataRootPathResolver: appDataRootPathResolver,
-      supportRootPathResolver: supportRootPathResolver,
-      layoutResolver: layoutResolver,
-    );
-  }
+    StoreLayoutResolver? layoutResolver,
+    SettingsStore? settingsStore,
+    SecretStore? secretStore,
+  }) : _layoutResolver = layoutResolver ?? StoreLayoutResolver(),
+       _settingsStore = settingsStore ?? SettingsStore(layoutResolver ?? StoreLayoutResolver()),
+       _secretStore = secretStore ?? SecretStore(layoutResolver ?? StoreLayoutResolver());
 
-  late final SecretStore _secretStore;
-  late final SettingsStore _settingsStore;
-  late final StoreLayoutResolver _layoutResolver;
+  final StoreLayoutResolver _layoutResolver;
+  final SettingsStore _settingsStore;
+  final SecretStore _secretStore;
 
   Future<void> initialize() async {
-    await _secretStore.initialize();
     await _settingsStore.initialize();
+    await _secretStore.initialize();
   }
 
-  Future<SettingsSnapshot> loadSettingsSnapshot() {
-    return _settingsStore.loadSettingsSnapshot();
-  }
+  Future<SettingsSnapshot> loadSettingsSnapshot() => _settingsStore.loadSnapshot();
+  Future<void> saveSettingsSnapshot(SettingsSnapshot snapshot) => _settingsStore.saveSnapshot(snapshot);
+  Future<SettingsSnapshotReloadResult> reloadSettingsSnapshotResult() => _settingsStore.reloadSnapshotResult();
 
-  Future<SettingsSnapshot> reloadSettingsSnapshot() {
-    return _settingsStore.reloadSettingsSnapshot();
-  }
+  Future<Map<String, String>> loadAccountManagedSecrets() => _secretStore.loadAccountManagedSecrets();
+  Future<void> saveAccountManagedSecret({required String target, required String value}) => _secretStore.saveAccountManagedSecret(target: target, value: value);
+  Future<void> clearAccountManagedSecret({required String target}) => _secretStore.clearAccountManagedSecret(target: target);
+  Future<void> clearAccountManagedSecrets() => _secretStore.clearAccountManagedSecrets();
 
-  Future<SettingsSnapshotReloadResult> reloadSettingsSnapshotResult() {
-    return _settingsStore.reloadSettingsSnapshotResult();
-  }
+  Future<String?> loadAccountSessionToken() => _secretStore.loadAccountSessionToken();
+  Future<void> saveAccountSessionToken(String value) => _secretStore.saveAccountSessionToken(value);
+  Future<void> clearAccountSessionToken() => _secretStore.clearAccountSessionToken();
 
-  Future<void> saveSettingsSnapshot(SettingsSnapshot snapshot) {
-    return _settingsStore.saveSettingsSnapshot(snapshot);
-  }
+  Future<int?> loadAccountSessionExpiresAtMs() => _secretStore.loadAccountSessionExpiresAtMs();
+  Future<void> saveAccountSessionExpiresAtMs(int value) => _secretStore.saveAccountSessionExpiresAtMs(value);
+  Future<void> clearAccountSessionExpiresAtMs() => _secretStore.clearAccountSessionExpiresAtMs();
 
-  Future<File?> resolvedSettingsFile() {
-    return _settingsStore.resolvedSettingsFile();
-  }
+  Future<String?> loadAccountSessionUserId() => _secretStore.loadAccountSessionUserId();
+  Future<void> saveAccountSessionUserId(String value) => _secretStore.saveAccountSessionUserId(value);
+  Future<void> clearAccountSessionUserId() => _secretStore.clearAccountSessionUserId();
 
-  Future<Directory?> resolvedSettingsWatchDirectory() {
-    return _settingsStore.resolvedSettingsWatchDirectory();
-  }
+  Future<String?> loadAccountSessionIdentifier() => _secretStore.loadAccountSessionIdentifier();
+  Future<void> saveAccountSessionIdentifier(String value) => _secretStore.saveAccountSessionIdentifier(value);
+  Future<void> clearAccountSessionIdentifier() => _secretStore.clearAccountSessionIdentifier();
 
-  Future<List<TaskThread>> loadTaskThreads() {
-    return _settingsStore.loadTaskThreads();
-  }
+  Future<AccountSessionSummary?> loadAccountSessionSummary() => _secretStore.loadAccountSessionSummary();
+  Future<void> saveAccountSessionSummary(AccountSessionSummary value) => _secretStore.saveAccountSessionSummary(value);
+  Future<void> clearAccountSessionSummary() => _secretStore.clearAccountSessionSummary();
 
-  List<SkippedTaskThreadRecord> get lastSkippedInvalidTaskThreadRecords =>
-      _settingsStore.lastSkippedInvalidTaskThreadRecords;
+  Future<AccountSyncState?> loadAccountSyncState() => _secretStore.loadAccountSyncState();
+  Future<void> saveAccountSyncState(AccountSyncState value) => _secretStore.saveAccountSyncState(value);
+  Future<void> clearAccountSyncState() => _secretStore.clearAccountSyncState();
 
-  List<String> get lastSkippedInvalidTaskThreadIds =>
-      _settingsStore.lastSkippedInvalidTaskThreadIds;
+  Future<Map<String, TaskThread>> loadTaskThreads() => _settingsStore.loadTaskThreads();
+  Future<void> saveTaskThreads(Map<String, TaskThread> threads) => _settingsStore.saveTaskThreads(threads);
 
-  Future<void> saveTaskThreads(List<TaskThread> records) {
-    return _settingsStore.saveTaskThreads(records);
-  }
+  Future<List<SecretAuditEntry>> loadAuditTrail() => _secretStore.loadAuditTrail();
+  Future<void> appendAudit(SecretAuditEntry entry) => _secretStore.appendAudit(entry);
 
-  Future<void> clearAssistantLocalState() {
-    return _settingsStore.clearAssistantLocalState();
-  }
+  Future<File?> resolvedSettingsFile() => _layoutResolver.resolve().then((l) => File('${l.configDirectory.path}/settings.yaml'));
+  Future<Directory?> resolvedSettingsWatchDirectory() => _layoutResolver.resolve().then((l) => l.configDirectory);
 
-  Future<List<SecretAuditEntry>> loadAuditTrail() {
-    return _settingsStore.loadAuditTrail();
-  }
-
-  Future<void> appendAudit(SecretAuditEntry entry) {
-    return _settingsStore.appendAudit(entry);
-  }
-
-  Future<Map<String, dynamic>?> loadSupportJson(String relativePath) async {
-    final file = await supportFile(relativePath);
-    if (file == null || !await file.exists()) {
-      return null;
-    }
-    final raw = await file.readAsString();
-    final decoded = jsonDecode(raw);
-    return decoded is Map<String, dynamic> ? decoded : null;
-  }
-
-  Future<void> saveSupportJson(
-    String relativePath,
-    Map<String, dynamic> payload,
-  ) async {
-    final file = await supportFile(relativePath);
-    if (file == null) {
-      return;
-    }
-    await atomicWriteString(file, jsonEncode(payload), ownerOnly: true);
-  }
-
-  Future<File?> supportFile(String relativePath) async {
-    final normalized = relativePath.trim();
-    if (normalized.isEmpty) {
-      return null;
-    }
-    final layout = await _layoutResolver.resolve();
-    return File('${layout.rootDirectory.path}/$normalized');
-  }
-
-  Future<Map<String, String>> loadSecureRefs() {
-    return _secretStore.loadSecureRefs();
-  }
-
-  Future<String?> loadSecretValueByRef(String refName) =>
-      _secretStore.loadSecretValueByRef(refName);
-
-  Future<void> saveSecretValueByRef(String refName, String value) =>
-      _secretStore.saveSecretValueByRef(refName, value);
-
-  Future<void> clearSecretValueByRef(String refName) =>
-      _secretStore.clearSecretValueByRef(refName);
-
-  Future<String?> loadGatewayToken({int? profileIndex}) =>
-      _secretStore.loadGatewayToken(profileIndex: profileIndex);
-
-  Future<void> saveGatewayToken(String value, {int? profileIndex}) =>
-      _secretStore.saveGatewayToken(value, profileIndex: profileIndex);
-
-  Future<void> clearGatewayToken({int? profileIndex}) =>
-      _secretStore.clearGatewayToken(profileIndex: profileIndex);
-
-  Future<String?> loadGatewayPassword({int? profileIndex}) =>
-      _secretStore.loadGatewayPassword(profileIndex: profileIndex);
-
-  Future<void> saveGatewayPassword(String value, {int? profileIndex}) =>
-      _secretStore.saveGatewayPassword(value, profileIndex: profileIndex);
-
-  Future<void> clearGatewayPassword({int? profileIndex}) =>
-      _secretStore.clearGatewayPassword(profileIndex: profileIndex);
-
-  Future<String?> loadOllamaCloudApiKey() =>
-      _secretStore.loadOllamaCloudApiKey();
-
-  Future<void> saveOllamaCloudApiKey(String value) =>
-      _secretStore.saveOllamaCloudApiKey(value);
-
-  Future<String?> loadVaultToken() => _secretStore.loadVaultToken();
-
-  Future<void> saveVaultToken(String value) =>
-      _secretStore.saveVaultToken(value);
-
-  Future<String?> loadAiGatewayApiKey() => _secretStore.loadAiGatewayApiKey();
-
-  Future<void> saveAiGatewayApiKey(String value) =>
-      _secretStore.saveAiGatewayApiKey(value);
-
-  Future<void> clearAiGatewayApiKey() => _secretStore.clearAiGatewayApiKey();
-
-  Future<String?> loadAccountSessionToken() =>
-      _secretStore.loadAccountSessionToken();
-
-  Future<void> saveAccountSessionToken(String value) =>
-      _secretStore.saveAccountSessionToken(value);
-
-  Future<void> clearAccountSessionToken() =>
-      _secretStore.clearAccountSessionToken();
-
-  Future<int> loadAccountSessionExpiresAtMs() =>
-      _secretStore.loadAccountSessionExpiresAtMs();
-
-  Future<void> saveAccountSessionExpiresAtMs(int value) =>
-      _secretStore.saveAccountSessionExpiresAtMs(value);
-
-  Future<void> clearAccountSessionExpiresAtMs() =>
-      _secretStore.clearAccountSessionExpiresAtMs();
-
-  Future<String?> loadAccountSessionUserId() =>
-      _secretStore.loadAccountSessionUserId();
-
-  Future<void> saveAccountSessionUserId(String value) =>
-      _secretStore.saveAccountSessionUserId(value);
-
-  Future<void> clearAccountSessionUserId() =>
-      _secretStore.clearAccountSessionUserId();
-
-  Future<String?> loadAccountSessionIdentifier() =>
-      _secretStore.loadAccountSessionIdentifier();
-
-  Future<void> saveAccountSessionIdentifier(String value) =>
-      _secretStore.saveAccountSessionIdentifier(value);
-
-  Future<void> clearAccountSessionIdentifier() =>
-      _secretStore.clearAccountSessionIdentifier();
-
-  Future<AccountSessionSummary?> loadAccountSessionSummary() =>
-      _secretStore.loadAccountSessionSummary();
-
-  Future<void> saveAccountSessionSummary(AccountSessionSummary value) =>
-      _secretStore.saveAccountSessionSummary(value);
-
-  Future<void> clearAccountSessionSummary() =>
-      _secretStore.clearAccountSessionSummary();
-
-  Future<AccountSyncState?> loadAccountSyncState() async {
-    final payload = await loadSupportJson('account/sync_state.json');
-    if (payload == null) {
-      return null;
-    }
-    return AccountSyncState.fromJson(payload);
-  }
-
-  Future<void> saveAccountSyncState(AccountSyncState value) =>
-      saveSupportJson('account/sync_state.json', value.toJson());
-
-  Future<void> clearAccountSyncState() async {
-    final file = await supportFile('account/sync_state.json');
-    if (file != null && await file.exists()) {
-      await file.delete();
-    }
-  }
-
-  Future<AppUiState> loadAppUiState() async {
-    final payload = await loadSupportJson('ui/state.json');
-    if (payload == null) {
-      return AppUiState.defaults();
-    }
-    try {
-      return AppUiState.fromJson(payload);
-    } catch (_) {
-      return AppUiState.defaults();
-    }
-  }
-
-  Future<void> saveAppUiState(AppUiState value) =>
-      saveSupportJson('ui/state.json', value.toJson());
-
-  Future<void> clearAppUiState() async {
-    final file = await supportFile('ui/state.json');
-    if (file == null) {
-      return;
-    }
-    await deleteIfExists(file);
-  }
-
-  Future<String?> loadAccountManagedSecret({required String target}) =>
-      _secretStore.loadAccountManagedSecret(target: target);
-
-  Future<void> saveAccountManagedSecret({
-    required String target,
-    required String value,
-  }) => _secretStore.saveAccountManagedSecret(target: target, value: value);
-
-  Future<void> clearAccountManagedSecret({required String target}) =>
-      _secretStore.clearAccountManagedSecret(target: target);
-
-  Future<void> clearAccountManagedSecrets() =>
-      _secretStore.clearAccountManagedSecrets();
-
-  Future<LocalDeviceIdentity?> loadDeviceIdentity() {
-    return _secretStore.loadDeviceIdentity();
-  }
-
-  Future<void> saveDeviceIdentity(LocalDeviceIdentity identity) {
-    return _secretStore.saveDeviceIdentity(identity);
-  }
-
-  Future<String?> loadDeviceToken({
-    required String deviceId,
-    required String role,
-  }) {
-    return _secretStore.loadDeviceToken(deviceId: deviceId, role: role);
-  }
-
-  Future<void> saveDeviceToken({
-    required String deviceId,
-    required String role,
-    required String token,
-  }) {
-    return _secretStore.saveDeviceToken(
-      deviceId: deviceId,
-      role: role,
-      token: token,
-    );
-  }
-
-  Future<void> clearDeviceToken({
-    required String deviceId,
-    required String role,
-  }) {
-    return _secretStore.clearDeviceToken(deviceId: deviceId, role: role);
-  }
-
-  PersistentWriteFailures get persistentWriteFailures =>
-      PersistentWriteFailures(
-        settings: _settingsStore.settingsWriteFailure,
-        tasks: _settingsStore.tasksWriteFailure,
-        secrets: _secretStore.secretsWriteFailure,
-        audit: _settingsStore.auditWriteFailure,
-      );
+  Map<String, String> get secureRefs => _secretStore.secureRefs;
+  String? get settingsWriteFailure => _settingsStore.auditWriteFailure;
 
   void dispose() {
     _settingsStore.dispose();
     _secretStore.dispose();
   }
 
-  static String maskValue(String value) {
-    return SecretStore.maskValue(value);
-  }
+  static String maskValue(String value) => SecretStore.maskValue(value);
 }
