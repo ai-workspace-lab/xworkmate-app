@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 
 import 'codex_config_bridge.dart';
@@ -14,12 +17,6 @@ export 'runtime_external_code_agents.dart';
 enum CoordinatorState { disconnected, connecting, connected, ready, error }
 
 /// Unified runtime coordinator for managing Gateway and Code Agent runtime.
-///
-/// This class coordinates:
-/// - GatewayRuntime: Connection to OpenClaw Gateway
-/// - CodexRuntime: Code agent runtime (external CLI or built-in runtime mode)
-/// - ModeSwitcher: Remote/Offline mode switching
-/// - Extensible external code-agent provider descriptors for future CLIs
 class RuntimeCoordinator extends ChangeNotifier {
   final GatewayRuntime gateway;
   final CodexRuntime codex;
@@ -40,23 +37,13 @@ class RuntimeCoordinator extends ChangeNotifier {
   String? get lastError => _lastError;
   bool get isReady => _state == CoordinatorState.ready;
 
-  /// Current code-agent runtime mode.
   CodeAgentRuntimeMode get runtimeMode => _runtimeMode;
   String? get codeAgentPath => _codexPath;
-
-  /// Current gateway mode.
   GatewayMode get currentMode => modeSwitcher.currentMode;
-
-  /// Current capabilities based on mode.
   ModeCapabilities get capabilities => modeSwitcher.capabilities;
-
-  /// Whether cloud memory is available.
   bool get hasCloudMemory => modeSwitcher.capabilities.hasCloudMemory;
-
-  /// Whether task queue is available.
   bool get hasTaskQueue => modeSwitcher.capabilities.hasTaskQueue;
 
-  /// Registered external code agent providers (future extension point).
   List<ExternalCodeAgentProvider> get externalCodeAgents =>
       List<ExternalCodeAgentProvider>.unmodifiable(_externalCodeAgents.values);
 
@@ -70,10 +57,6 @@ class RuntimeCoordinator extends ChangeNotifier {
        modeSwitcher = modeSwitcher ?? ModeSwitcher(gateway),
        _dispatchResolver = dispatchResolver;
 
-  /// Register an external Code Agent CLI provider descriptor.
-  ///
-  /// This reserves integration slots for additional CLI-based agents while
-  /// keeping invocation, capability discovery, and scheduling metadata unified.
   void registerExternalCodeAgent(ExternalCodeAgentProvider provider) {
     final normalizedId = provider.id.trim();
     if (normalizedId.isEmpty) {
@@ -81,15 +64,9 @@ class RuntimeCoordinator extends ChangeNotifier {
     }
     final normalizedCommand = provider.command.trim();
     if (normalizedCommand.isEmpty) {
-      throw ArgumentError.value(
-        provider.command,
-        'provider.command',
-        'Cannot be empty',
-      );
+      throw ArgumentError.value(provider.command, 'provider.command', 'Cannot be empty');
     }
-    final normalizedCapabilities = _normalizeCapabilitySet(
-      provider.capabilities,
-    ).toList(growable: false)..sort();
+    final normalizedCapabilities = _normalizeCapabilitySet(provider.capabilities).toList(growable: false)..sort();
 
     _externalCodeAgents[normalizedId] = ExternalCodeAgentProvider(
       id: normalizedId,
@@ -103,7 +80,6 @@ class RuntimeCoordinator extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Remove an external Code Agent CLI provider descriptor.
   bool unregisterExternalCodeAgent(String providerId) {
     final removed = _externalCodeAgents.remove(providerId.trim()) != null;
     if (removed) {
@@ -112,32 +88,21 @@ class RuntimeCoordinator extends ChangeNotifier {
     return removed;
   }
 
-  /// Check whether an external provider is known.
   bool hasExternalCodeAgent(String providerId) {
     return _externalCodeAgents.containsKey(providerId.trim());
   }
 
-  /// Discover providers that can satisfy required capabilities.
-  ///
-  /// This runtime-level surface is the extension point for future capability
-  /// discovery and provider scheduling.
   List<ExternalCodeAgentProvider> discoverExternalCodeAgents({
     Iterable<String> requiredCapabilities = const <String>[],
   }) {
     final required = _normalizeCapabilitySet(requiredCapabilities);
-    final providers =
-        _externalCodeAgents.values
+    final providers = _externalCodeAgents.values
             .where((provider) => _providerSupports(provider, required))
             .toList(growable: false)
           ..sort((a, b) => a.id.compareTo(b.id));
     return providers;
   }
 
-  /// Select one provider for dispatch based on preference and capabilities.
-  ///
-  /// Scheduling policy is intentionally simple for phase 1:
-  /// - honor preferred provider when it satisfies capability requirements
-  /// - otherwise pick the first discovered provider in deterministic id order
   Future<ExternalCodeAgentProvider?> selectExternalCodeAgent({
     String? preferredProviderId,
     Iterable<String> requiredCapabilities = const <String>[],
@@ -182,16 +147,13 @@ class RuntimeCoordinator extends ChangeNotifier {
       }
     }
 
-    final discovered = discoverExternalCodeAgents(
-      requiredCapabilities: required,
-    );
+    final discovered = discoverExternalCodeAgents(requiredCapabilities: required);
     if (discovered.isEmpty) {
       return null;
     }
     return discovered.first;
   }
 
-  /// Initialize the coordinator with Gateway profile and Codex.
   Future<void> initialize({
     GatewayConnectionProfile? profile,
     String? codexPath,
@@ -207,13 +169,10 @@ class RuntimeCoordinator extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Step 1: Connect to Gateway based on preferred mode
       final result = await _switchMode(preferredMode);
-
       if (!result.success) {
         throw StateError('Failed to connect: ${result.error}');
       }
-
       _state = CoordinatorState.ready;
       notifyListeners();
     } catch (e) {
@@ -224,7 +183,6 @@ class RuntimeCoordinator extends ChangeNotifier {
     }
   }
 
-  /// Initialize with auto mode selection.
   Future<void> initializeAuto({
     String? codexPath,
     String? workingDirectory,
@@ -257,7 +215,6 @@ class RuntimeCoordinator extends ChangeNotifier {
     }
   }
 
-  /// Configure Codex to use AI Gateway.
   Future<void> configureCodexForGateway({
     required String gatewayUrl,
     required String apiKey,
@@ -268,7 +225,6 @@ class RuntimeCoordinator extends ChangeNotifier {
     );
   }
 
-  /// Resolve the external Codex CLI path from explicit settings or PATH lookup.
   Future<String?> resolveCodexPath({String? codexPath}) async {
     final overridePath = codexPath?.trim() ?? '';
     if (overridePath.isNotEmpty) {
@@ -276,12 +232,10 @@ class RuntimeCoordinator extends ChangeNotifier {
       if (await file.exists()) {
         return overridePath;
       }
-      return null;
     }
     return null;
   }
 
-  /// Start the code-agent runtime without changing the Gateway connection state.
   Future<void> startCodeAgentRuntime({
     required CodeAgentRuntimeMode runtimeMode,
     String? codexPath,
@@ -296,55 +250,33 @@ class RuntimeCoordinator extends ChangeNotifier {
   }
 
   Future<void> stopCodeAgentRuntime() async {
-    _state = gateway.isConnected
-        ? CoordinatorState.ready
-        : CoordinatorState.disconnected;
+    _state = gateway.isConnected ? CoordinatorState.ready : CoordinatorState.disconnected;
     notifyListeners();
   }
 
-  /// Switch to a different mode.
   Future<void> switchMode(GatewayMode newMode) async {
     final result = await _switchMode(newMode);
-
     if (!result.success) {
       throw StateError('Failed to switch mode: ${result.error}');
     }
-
     notifyListeners();
   }
 
-  /// Check if current mode supports a capability.
   bool supportsCapability(String capability) {
     switch (capability) {
-      case 'cloud-memory':
-        return capabilities.hasCloudMemory;
-      case 'task-queue':
-        return capabilities.hasTaskQueue;
-      case 'multi-agent':
-        return capabilities.hasMultiAgent;
-      case 'local-models':
-        return capabilities.hasLocalModels;
-      case 'code-agent':
-        return capabilities.hasCodeAgent;
-      default:
-        return false;
+      case 'cloud-memory': return capabilities.hasCloudMemory;
+      case 'task-queue': return capabilities.hasTaskQueue;
+      case 'multi-agent': return capabilities.hasMultiAgent;
+      case 'local-models': return capabilities.hasLocalModels;
+      case 'code-agent': return capabilities.hasCodeAgent;
+      default: return false;
     }
   }
 
-  /// Get available modes based on current state.
   List<GatewayMode> getAvailableModes() {
-    final modes = <GatewayMode>[];
-
-    // Remote mode requires network
-    modes.add(GatewayMode.remote);
-
-    // Offline mode is always available
-    modes.add(GatewayMode.offline);
-
-    return modes;
+    return [GatewayMode.remote, GatewayMode.offline];
   }
 
-  /// Get available capabilities description.
   String get capabilitiesDescription {
     final caps = <String>[];
     if (capabilities.hasCloudMemory) caps.add('Cloud Memory');
@@ -355,37 +287,25 @@ class RuntimeCoordinator extends ChangeNotifier {
     return caps.isEmpty ? 'None' : caps.join(', ');
   }
 
-  /// Shutdown all runtimes.
   Future<void> shutdown() async {
     _state = CoordinatorState.disconnected;
     notifyListeners();
-
     await gateway.disconnect();
   }
 
   Future<ModeSwitchResult> _switchMode(GatewayMode mode) {
     switch (mode) {
-      case GatewayMode.remote:
-        return modeSwitcher.switchToRemote();
-      case GatewayMode.offline:
-        return modeSwitcher.switchToOffline();
+      case GatewayMode.remote: return modeSwitcher.switchToRemote();
+      case GatewayMode.offline: return modeSwitcher.switchToOffline();
     }
   }
 
   static Set<String> _normalizeCapabilitySet(Iterable<String> capabilities) {
-    return capabilities
-        .map((item) => item.trim().toLowerCase())
-        .where((item) => item.isNotEmpty)
-        .toSet();
+    return capabilities.map((item) => item.trim().toLowerCase()).where((item) => item.isNotEmpty).toSet();
   }
 
-  static bool _providerSupports(
-    ExternalCodeAgentProvider provider,
-    Set<String> requiredCapabilities,
-  ) {
-    if (requiredCapabilities.isEmpty) {
-      return true;
-    }
+  static bool _providerSupports(ExternalCodeAgentProvider provider, Set<String> requiredCapabilities) {
+    if (requiredCapabilities.isEmpty) return true;
     final provided = _normalizeCapabilitySet(provider.capabilities);
     return requiredCapabilities.every(provided.contains);
   }
