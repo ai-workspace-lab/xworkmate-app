@@ -4,7 +4,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'aris_bundle.dart';
 import 'embedded_agent_launch_policy.dart';
 import 'multi_agent_frameworks.dart';
 import 'runtime_models.dart';
@@ -24,13 +23,10 @@ import 'multi_agent_orchestrator_support.dart';
 class MultiAgentOrchestrator extends ChangeNotifier {
   MultiAgentOrchestrator({
     required MultiAgentConfig config,
-    ArisBundleRepository? arisBundleRepository,
     Future<bool> Function(String command)? binaryExistsResolver,
     HttpClient Function()? httpClientFactory,
     CliProcessStarter? processStarter,
   }) : configInternal = config,
-       arisBundleRepositoryInternal =
-           arisBundleRepository ?? ArisBundleRepository(),
        binaryExistsResolverInternal = binaryExistsResolver,
        httpClientFactoryInternal = httpClientFactory ?? HttpClient.new,
        processStarterInternal =
@@ -47,7 +43,6 @@ class MultiAgentOrchestrator extends ChangeNotifier {
   /// 当前配置
   MultiAgentConfig configInternal;
   MultiAgentConfig get config => configInternal;
-  final ArisBundleRepository arisBundleRepositoryInternal;
   final Future<bool> Function(String command)? binaryExistsResolverInternal;
   final HttpClient Function() httpClientFactoryInternal;
   final CliProcessStarter processStarterInternal;
@@ -164,7 +159,7 @@ class MultiAgentOrchestrator extends ChangeNotifier {
     final startTime = DateTime.now();
     final steps = <CollaborationStep>[];
     final preset = configInternal.usesAris
-        ? ArisFrameworkPreset(arisBundleRepositoryInternal)
+        ? const ArisFrameworkPreset()
         : const NativeFrameworkPreset();
 
     try {
