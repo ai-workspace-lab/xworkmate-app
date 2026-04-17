@@ -54,3 +54,9 @@ Last Updated: 2026-04-13
 - 本地开发默认要求 `xworkmate-app` 与 `xworkmate-bridge` 以 sibling repo 形式存在
 - 若目录布局不同，可通过 `XWORKMATE_BRIDGE_DIR` 显式指定 bridge 仓库位置
 - app 端只消费 bridge capability、routing、gateway runtime 合同，不再在本地恢复旧 provider/module 真源
+
+## Communication Protocol
+
+- **Standard**: 全面转向 **JSON-RPC 2.0** 作为 APP 与 Bridge 之间的默认通信协议。
+- **Client Implementation**: `GatewayAcpClient` 与 `GatewayRuntime` 已完成健壮性升级，支持自动识别 JSON-RPC 2.0 报文。
+- **Compatibility**: 当前处于混合过渡期，Bridge 响应报文会同时包含 JSON-RPC 2.0 字段（`result`/`error`）与 Legacy 字段（`ok`/`type`/`payload`），确保旧版逻辑不会崩溃。
