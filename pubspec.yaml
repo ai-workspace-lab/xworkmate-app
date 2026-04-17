@@ -55,6 +55,3 @@ flutter:
   assets:
     - config/feature_flags.yaml
     - assets/branding/
-    - assets/aris/manifest.json
-    - assets/aris/skills/
-    - assets/aris/mcp-servers/
