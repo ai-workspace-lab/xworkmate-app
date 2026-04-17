@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'aris_bundle.dart';
 import 'codex_config_bridge.dart';
 import 'multi_agent_mount_resolver.dart';
 import 'opencode_config_bridge.dart';
@@ -11,7 +10,6 @@ class MultiAgentMountManager {
   MultiAgentMountManager({
     CodexConfigBridge? codexConfigBridge,
     OpencodeConfigBridge? opencodeConfigBridge,
-    ArisBundleRepository? arisBundleRepository,
     MultiAgentMountResolver? resolver,
   }) : this._(
          codexConfigBridge: codexConfigBridge ?? CodexConfigBridge(),

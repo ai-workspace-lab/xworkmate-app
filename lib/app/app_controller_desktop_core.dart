@@ -113,6 +113,11 @@ class AppController extends ChangeNotifier {
           scope: 'workspace',
         ),
       ];
+
+  static const String draftAiGatewayApiKeyKeyInternal = 'ai_gateway_api_key';
+  static const String draftVaultTokenKeyInternal = 'vault_token';
+  static const String draftOllamaApiKeyKeyInternal = 'ollama_cloud_api_key';
+
   AppController({
     SecureConfigStore? store,
     RuntimeCoordinator? runtimeCoordinator,
@@ -176,9 +181,10 @@ class AppController extends ChangeNotifier {
     cronJobsControllerInternal = CronJobsController(
       runtimeCoordinatorInternal.gateway,
     );
-    devicesControllerInternal = DevicesController(
+    dogsControllerInternal = DevicesController(
       runtimeCoordinatorInternal.gateway,
     );
+    devicesControllerInternal = dogsControllerInternal;
     tasksControllerInternal = DerivedTasksController();
     desktopPlatformServiceInternal =
         desktopPlatformService ?? createDesktopPlatformService();
@@ -277,6 +283,7 @@ class AppController extends ChangeNotifier {
   late final ModelsController modelsControllerInternal;
   late final CronJobsController cronJobsControllerInternal;
   late final DevicesController devicesControllerInternal;
+  late final DevicesController dogsControllerInternal;
   late final DerivedTasksController tasksControllerInternal;
   late final DesktopPlatformService desktopPlatformServiceInternal;
   late final SkillDirectoryAccessService skillDirectoryAccessServiceInternal;
@@ -424,7 +431,6 @@ class AppController extends ChangeNotifier {
   GatewayRuntime get runtimeInternal => runtimeCoordinatorInternal.gateway;
   GatewayRuntime get runtime => runtimeInternal;
 
-  /// Whether Codex bridge is enabled and configured
   bool get isCodexBridgeEnabled => isCodexBridgeEnabledInternal;
   bool isCodexBridgeEnabledInternal = false;
   bool isCodexBridgeBusyInternal = false;
@@ -449,6 +455,11 @@ class AppController extends ChangeNotifier {
       desktopPlatformServiceInternal.state;
   bool get supportsDesktopIntegration => desktopIntegration.isSupported;
   bool get desktopPlatformBusy => desktopPlatformBusyInternal;
+  set desktopPlatformBusyInternal(bool value) {
+    desktopPlatformBusyInternal = value;
+    notifyListeners();
+  }
+  bool desktopPlatformBusyInternal = false;
 
   GatewayConnectionSnapshot get connection => runtimeInternal.snapshot;
   SettingsSnapshot get settings => settingsControllerInternal.snapshot;
@@ -491,6 +502,175 @@ class AppController extends ChangeNotifier {
       assistantMessageViewModeForSession(currentSessionKey);
   AssistantPermissionLevel get assistantPermissionLevel =>
       settings.assistantPermissionLevel;
+
+  bool get hasStoredGatewayCredential =>
+      hasStoredGatewayTokenForProfile(activeGatewayProfileIndexInternal) ||
+      hasStoredGatewayPasswordForProfile(activeGatewayProfileIndexInternal) ||
+      settingsControllerInternal.secureRefs.containsKey(
+        'gateway_device_token_operator',
+      );
+  String get aiGatewayUrl =>
+      settingsControllerInternal.effectiveAiGatewayBaseUrl.trim();
+  bool get hasStoredAiGatewayApiKey =>
+      settingsControllerInternal.hasEffectiveAiGatewayApiKey;
+  CodeAgentRuntimeMode get effectiveCodeAgentRuntimeMode =>
+      settings.codeAgentRuntimeMode;
+  bool get hasAssistantPendingRun =>
+      assistantSessionHasPendingRun(currentSessionKey);
+
+  List<String> get aiGatewayConversationModelChoices {
+    final availableModels =
+        settingsControllerInternal.effectiveAiGatewayAvailableModels;
+    final selected = settings.aiGateway.selectedModels
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty && availableModels.contains(item))
+        .toList(growable: false);
+    if (selected.isNotEmpty) return selected;
+    return availableModels
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  int get activeGatewayProfileIndexInternal =>
+      gatewayProfileIndexForExecutionTargetInternal(
+        currentAssistantExecutionTarget,
+      );
+
+  bool hasStoredGatewayTokenForProfile(int profileIndex) =>
+      settingsControllerInternal.hasStoredGatewayTokenForProfile(profileIndex);
+
+  bool hasStoredGatewayPasswordForProfile(int profileIndex) =>
+      settingsControllerInternal.hasStoredGatewayPasswordForProfile(
+        profileIndex,
+      );
+
+  List<SingleAgentProvider> get bridgeProviderCatalog =>
+      normalizeSingleAgentProviderList(<SingleAgentProvider>[
+        ...bridgeAgentProviderCatalogInternal,
+        ...bridgeGatewayProviderCatalogInternal,
+      ]);
+
+  List<SingleAgentProvider> get assistantProviderCatalog =>
+      normalizeSingleAgentProviderList(bridgeAgentProviderCatalogInternal);
+
+  List<SingleAgentProvider> get gatewayProviderCatalog =>
+      normalizeSingleAgentProviderList(bridgeGatewayProviderCatalogInternal);
+
+  List<AssistantExecutionTarget> get bridgeAvailableExecutionTargets =>
+      compactAssistantExecutionTargets(bridgeAvailableExecutionTargetsInternal);
+
+  List<SingleAgentProvider> providerCatalogForExecutionTarget(
+    AssistantExecutionTarget executionTarget,
+  ) {
+    final source = executionTarget.isGateway
+        ? gatewayProviderCatalog
+        : assistantProviderCatalog;
+    final visibleProviderIds = executionTarget.isGateway
+        ? const <String>[kCanonicalGatewayProviderId]
+        : const <String>['codex', 'opencode', 'gemini'];
+    final providersById = <String, SingleAgentProvider>{
+      for (final p in source) p.providerId: p,
+    };
+    return visibleProviderIds
+        .map((id) => providersById[id])
+        .whereType<SingleAgentProvider>()
+        .toList(growable: false);
+  }
+
+  SingleAgentProvider resolveProviderForExecutionTarget(
+    String? providerId, {
+    required AssistantExecutionTarget executionTarget,
+    bool defaultToCatalog = false,
+  }) {
+    final normalizedId = normalizeSingleAgentProviderId(providerId ?? '');
+    final catalog = providerCatalogForExecutionTarget(executionTarget);
+    if (normalizedId.isNotEmpty) {
+      for (final p in catalog) {
+        if (p.providerId == normalizedId) return p;
+      }
+    }
+    return (defaultToCatalog && catalog.isNotEmpty)
+        ? catalog.first
+        : SingleAgentProvider.unspecified;
+  }
+
+  SingleAgentProvider assistantProviderForSession(String sessionKey) {
+    final normalizedKey = normalizedAssistantSessionKeyInternal(sessionKey);
+    final thread = taskThreadForSessionInternal(normalizedKey);
+    final target = assistantExecutionTargetForSession(normalizedKey);
+    return resolveProviderForExecutionTarget(
+      thread?.executionBinding.providerId,
+      executionTarget: target,
+    );
+  }
+
+  UiFeatureManifest loadRepoUiFeatureManifestSyncInternal() {
+    final file = File(UiFeatureManifest.assetPath);
+    if (!file.existsSync()) {
+      throw StateError(
+        'UiFeatureManifest is required and "${UiFeatureManifest.assetPath}" is missing.',
+      );
+    }
+    return UiFeatureManifest.fromYamlString(file.readAsStringSync());
+  }
+
+  List<AssistantExecutionTarget> visibleAssistantExecutionTargets(
+    Iterable<AssistantExecutionTarget> supportedTargets,
+  ) {
+    final visible = compactAssistantExecutionTargets(supportedTargets);
+    final bridgeVisible = bridgeAvailableExecutionTargets;
+    if (bridgeVisible.isEmpty) return visible;
+    return visible.where((item) => bridgeVisible.contains(item)).toList();
+  }
+
+  String resolvedAssistantModelForTargetInternal(
+    AssistantExecutionTarget target,
+  ) => resolvedDefaultModel.trim();
+
+  List<AssistantThreadSkillEntry> assistantImportedSkillsForSession(
+    String sessionKey,
+  ) =>
+      assistantThreadRecordsInternal[normalizedAssistantSessionKeyInternal(
+        sessionKey,
+      )]?.importedSkills ??
+      const [];
+
+  void navigateTo(WorkspaceDestination destination) =>
+      AppControllerDesktopNavigation(this).navigateTo(destination);
+
+  void navigateHome() => AppControllerDesktopNavigation(this).navigateHome();
+
+  void openSettings({
+    SettingsTab tab = SettingsTab.gateway,
+    SettingsDetailPage? detail,
+    SettingsNavigationContext? navigationContext,
+  }) => AppControllerDesktopNavigation(this).openSettings(
+    tab: tab,
+    detail: detail,
+    navigationContext: navigationContext,
+  );
+
+  void openDetail(DetailPanelData detailPanel) =>
+      AppControllerDesktopNavigation(this).openDetail(detailPanel);
+
+  Future<void> sendChatMessage(
+    String message, {
+    String thinking = 'off',
+    List<GatewayChatAttachmentPayload> attachments = const [],
+    List<CollaborationAttachment> localAttachments = const [],
+    List<String> selectedSkillLabels = const [],
+  }) => AppControllerDesktopThreadActions(this).sendChatMessage(
+    message,
+    thinking: thinking,
+    attachments: attachments,
+    localAttachments: localAttachments,
+    selectedSkillLabels: selectedSkillLabels,
+  );
+
+  Future<void> refreshMultiAgentMounts({bool sync = false}) =>
+      AppControllerDesktopThreadSessions(this).refreshMultiAgentMounts(sync: sync);
+
   double get assistantSkillCount => 0; // Legacy
   int get currentAssistantSkillCount => 0; // Legacy
 }
