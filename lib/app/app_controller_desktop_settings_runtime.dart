@@ -11,7 +11,7 @@ import 'ui_feature_manifest.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/device_identity_store.dart';
-import '../runtime/aris_bundle.dart';
+
 import '../runtime/go_core.dart';
 import '../runtime/runtime_bootstrap.dart';
 import '../runtime/desktop_platform_service.dart';
@@ -755,8 +755,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     await settingsControllerInternal.saveSnapshot(sanitized);
     settingsDraftInternal = sanitized;
     settingsDraftInitializedInternal = true;
-  }
-
   Future<void> applyPersistedSettingsSideEffectsInternal({
     required SettingsSnapshot previous,
     required SettingsSnapshot current,
@@ -774,7 +772,20 @@ extension AppControllerDesktopSettingsRuntime on AppController {
               ?.selectedAgentId ??
           '',
     );
-    modelsControllerInternal.restoreFromSettings(current.aiGateway);
+    themeModeInternal = current.themeMode;
+
+    final bridgeChanged =
+        previous.acpBridgeServerModeConfig.toJsonString() !=
+        current.acpBridgeServerModeConfig.toJsonString();
+
+    if (refreshAfterSave || bridgeChanged) {
+      // Re-trigger Bridge capability discovery if the mode or endpoint changed.
+      unawaited(refreshAcpCapabilitiesInternal(quiet: true));
+    }
+
+    notifyListeners();
+  }
+
     if (disposedInternal) {
       return;
     }

@@ -207,11 +207,15 @@ mixin GatewayRuntimeHelpersInternal on ChangeNotifier {
   ) {
     final text = raw is String ? raw : utf8.decode(raw as List<int>);
     final decoded = jsonDecode(text) as Map<String, dynamic>;
+
+    // Handle Events / Notifications
+    final event = stringValue(decoded['event']) ?? stringValue(decoded['method']);
     final type = stringValue(decoded['type']);
-    if (type == 'event') {
-      final event = stringValue(decoded['event']) ?? '';
-      final payload = decoded['payload'];
-      if (event == 'connect.challenge') {
+
+    if (event != null || type == 'event') {
+      final resolvedEvent = event ?? '';
+      final payload = decoded['payload'] ?? decoded['params'];
+      if (resolvedEvent == 'connect.challenge') {
         final nonce = stringValue(asMap(payload)['nonce']);
         if (nonce != null && !challenge.isCompleted) {
           challenge.complete(nonce);
@@ -219,36 +223,35 @@ mixin GatewayRuntimeHelpersInternal on ChangeNotifier {
         appendLogInternal(runtime, 'debug', 'connect', 'challenge received');
         return;
       }
-      if (event == 'health') {
+      if (resolvedEvent == 'health') {
         runtime.snapshotInternal = runtime.snapshotInternal.copyWith(
           healthPayload: asMap(payload),
         );
         appendLogInternal(runtime, 'debug', 'health', 'push health update');
         runtime.notifyListeners();
-      } else if (event == 'device.pair.requested' ||
-          event == 'device.pair.resolved') {
+      } else if (resolvedEvent == 'device.pair.requested' ||
+          resolvedEvent == 'device.pair.resolved') {
         final eventPayload = asMap(payload);
         appendLogInternal(
           runtime,
           'info',
           'pairing',
-          '$event | request: ${stringValue(eventPayload['requestId']) ?? 'unknown'} | device: ${stringValue(eventPayload['deviceId']) ?? 'unknown'}',
+          '$resolvedEvent | request: ${stringValue(eventPayload['requestId']) ?? 'unknown'} | device: ${stringValue(eventPayload['deviceId']) ?? 'unknown'}',
         );
-      } else if (event == 'seqGap') {
+      } else if (resolvedEvent == 'seqGap') {
         appendLogInternal(runtime, 'warn', 'sync', 'sequence gap detected');
       }
       runtime.eventsInternal.add(
         GatewayPushEvent(
-          event: event,
+          event: resolvedEvent,
           payload: payload,
-          sequence: intValue(decoded['seq']),
+          sequence: intValue(decoded['seq']) ?? 0,
         ),
       );
       return;
     }
-    if (type != 'res') {
-      return;
-    }
+
+    // Handle Responses
     final id = stringValue(decoded['id']);
     if (id == null) {
       return;
@@ -257,9 +260,13 @@ mixin GatewayRuntimeHelpersInternal on ChangeNotifier {
     if (completer == null || completer.isCompleted) {
       return;
     }
-    final ok = boolValue(decoded['ok']) ?? false;
-    final payload = decoded['payload'];
+
+    final hasResult = decoded.containsKey('result');
+    final hasError = decoded.containsKey('error');
+    final ok = boolValue(decoded['ok']) ?? (hasResult && !hasError);
+    final payload = decoded['payload'] ?? decoded['result'];
     final error = asMap(decoded['error']);
+
     if (!ok) {
       appendLogInternal(
         runtime,
