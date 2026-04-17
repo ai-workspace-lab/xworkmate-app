@@ -4,7 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'aris_bundle.dart';
+
 import 'embedded_agent_launch_policy.dart';
 import 'go_core.dart';
 import 'aris_llm_chat_client.dart';

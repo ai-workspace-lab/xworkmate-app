@@ -454,12 +454,12 @@ class AppController extends ChangeNotifier {
   DesktopIntegrationState get desktopIntegration =>
       desktopPlatformServiceInternal.state;
   bool get supportsDesktopIntegration => desktopIntegration.isSupported;
-  bool get desktopPlatformBusy => desktopPlatformBusyInternal;
+  bool get desktopPlatformBusy => _desktopPlatformBusyInternal;
   set desktopPlatformBusyInternal(bool value) {
-    desktopPlatformBusyInternal = value;
+    _desktopPlatformBusyInternal = value;
     notifyListeners();
   }
-  bool desktopPlatformBusyInternal = false;
+  bool _desktopPlatformBusyInternal = false;
 
   GatewayConnectionSnapshot get connection => runtimeInternal.snapshot;
   SettingsSnapshot get settings => settingsControllerInternal.snapshot;
