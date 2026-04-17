@@ -11,7 +11,6 @@ import 'ui_feature_manifest.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/device_identity_store.dart';
-import '../runtime/aris_bundle.dart';
 import '../runtime/go_core.dart';
 import '../runtime/runtime_bootstrap.dart';
 import '../runtime/desktop_platform_service.dart';
@@ -126,7 +125,6 @@ class AppController extends ChangeNotifier {
     AccountRuntimeClient Function(String baseUrl)? accountClientFactory,
     Map<String, String>? environmentOverride,
     List<String>? singleAgentSharedSkillScanRootOverrides,
-    ArisBundleRepository? arisBundleRepository,
     GoTaskServiceClient? goTaskServiceClient,
     MultiAgentMountManager? multiAgentMountManager,
   }) {
@@ -195,8 +193,6 @@ class AppController extends ChangeNotifier {
       endpointResolver: resolveGatewayAcpEndpointInternal,
       authorizationResolver: resolveGatewayAcpAuthorizationHeaderInternal,
     );
-    arisBundleRepositoryInternal =
-        arisBundleRepository ?? ArisBundleRepository();
     runtimeCoordinatorInternal.attachDispatchResolver(
       GoRuntimeDispatchDesktopClient(
         client: gatewayAcpClientInternal,
@@ -216,12 +212,10 @@ class AppController extends ChangeNotifier {
       config: resolveMultiAgentConfigInternal(
         settingsControllerInternal.snapshot,
       ),
-      arisBundleRepository: arisBundleRepositoryInternal,
     );
     multiAgentMountManagerInternal =
         multiAgentMountManager ??
         MultiAgentMountManager(
-          arisBundleRepository: arisBundleRepositoryInternal,
           resolver: GoMultiAgentMountDesktopClient(
             client: gatewayAcpClientInternal,
             endpointResolver: resolveGatewayAcpEndpointInternal,
@@ -288,7 +282,6 @@ class AppController extends ChangeNotifier {
   late final SkillDirectoryAccessService skillDirectoryAccessServiceInternal;
   late final List<String>? singleAgentSharedSkillScanRootOverridesInternal;
   late final GatewayAcpClient gatewayAcpClientInternal;
-  late final ArisBundleRepository arisBundleRepositoryInternal;
   late final GoTaskServiceClient goTaskServiceClientInternal;
   late final MultiAgentOrchestrator multiAgentOrchestratorInternal;
   late final MultiAgentMountManager multiAgentMountManagerInternal;
@@ -498,279 +491,6 @@ class AppController extends ChangeNotifier {
       assistantMessageViewModeForSession(currentSessionKey);
   AssistantPermissionLevel get assistantPermissionLevel =>
       settings.assistantPermissionLevel;
-  bool get hasStoredGatewayCredential =>
-      hasStoredGatewayTokenForProfile(activeGatewayProfileIndexInternal) ||
-      hasStoredGatewayPasswordForProfile(activeGatewayProfileIndexInternal) ||
-      settingsControllerInternal.secureRefs.containsKey(
-        'gateway_device_token_operator',
-      );
-  bool get hasStoredGatewayToken =>
-      hasStoredGatewayTokenForProfile(activeGatewayProfileIndexInternal);
-  String? get storedGatewayTokenMask =>
-      storedGatewayTokenMaskForProfile(activeGatewayProfileIndexInternal);
-  String get aiGatewayUrl =>
-      settingsControllerInternal.effectiveAiGatewayBaseUrl.trim();
-  bool get hasStoredAiGatewayApiKey =>
-      settingsControllerInternal.hasEffectiveAiGatewayApiKey;
-  bool get isCodexBridgeBusy => isCodexBridgeBusyInternal;
-  String? get codexBridgeError => codexBridgeErrorInternal;
-  CodeAgentRuntimeMode get configuredCodeAgentRuntimeMode =>
-      settings.codeAgentRuntimeMode;
-  CodeAgentRuntimeMode get effectiveCodeAgentRuntimeMode =>
-      configuredCodeAgentRuntimeMode;
-  CodexCooperationState get codexCooperationState =>
-      codexCooperationStateInternal;
-  bool get isMultiAgentRunPending => multiAgentRunPendingInternal;
-  bool desktopPlatformBusyInternal = false;
-
-  static const String draftAiGatewayApiKeyKeyInternal = 'ai_gateway_api_key';
-  static const String draftVaultTokenKeyInternal = 'vault_token';
-  static const String draftOllamaApiKeyKeyInternal = 'ollama_cloud_api_key';
-
-  bool get hasAssistantPendingRun =>
-      assistantSessionHasPendingRun(currentSessionKey);
-
-  bool get canUseAiGatewayConversation =>
-      aiGatewayUrl.isNotEmpty &&
-      hasStoredAiGatewayApiKey &&
-      resolvedAiGatewayModel.isNotEmpty;
-
-  int get activeGatewayProfileIndexInternal {
-    return gatewayProfileIndexForExecutionTargetInternal(
-      currentAssistantExecutionTarget,
-    );
-  }
-
-  bool hasStoredGatewayTokenForProfile(int profileIndex) =>
-      settingsControllerInternal.hasStoredGatewayTokenForProfile(profileIndex);
-
-  bool hasStoredGatewayPasswordForProfile(int profileIndex) =>
-      settingsControllerInternal.hasStoredGatewayPasswordForProfile(
-        profileIndex,
-      );
-
-  String? storedGatewayTokenMaskForProfile(int profileIndex) =>
-      settingsControllerInternal.storedGatewayTokenMaskForProfile(profileIndex);
-
-  String? storedGatewayPasswordMaskForProfile(int profileIndex) =>
-      settingsControllerInternal.storedGatewayPasswordMaskForProfile(
-        profileIndex,
-      );
-
-  List<SingleAgentProvider> get bridgeProviderCatalog =>
-      normalizeSingleAgentProviderList(<SingleAgentProvider>[
-        ...bridgeAgentProviderCatalogInternal,
-        ...bridgeGatewayProviderCatalogInternal,
-      ]);
-
-  List<SingleAgentProvider> get assistantProviderCatalog =>
-      normalizeSingleAgentProviderList(bridgeAgentProviderCatalogInternal);
-
-  List<SingleAgentProvider> get gatewayProviderCatalog =>
-      normalizeSingleAgentProviderList(bridgeGatewayProviderCatalogInternal);
-
-  List<AssistantExecutionTarget> get bridgeAvailableExecutionTargets =>
-      compactAssistantExecutionTargets(bridgeAvailableExecutionTargetsInternal);
-
-  List<SingleAgentProvider> providerCatalogForExecutionTarget(
-    AssistantExecutionTarget executionTarget,
-  ) {
-    final source = executionTarget.isGateway
-        ? gatewayProviderCatalog
-        : assistantProviderCatalog;
-    final visibleProviderIds = executionTarget.isGateway
-        ? const <String>[kCanonicalGatewayProviderId]
-        : const <String>['codex', 'opencode', 'gemini'];
-    final providersById = <String, SingleAgentProvider>{};
-    for (final provider in source) {
-      if (provider.supportedTargets.isNotEmpty &&
-          !provider.supportedTargets.contains(executionTarget)) {
-        continue;
-      }
-      providersById[provider.providerId] = provider;
-    }
-    return visibleProviderIds
-        .map((providerId) => providersById[providerId])
-        .whereType<SingleAgentProvider>()
-        .toList(growable: false);
-  }
-
-  SingleAgentProvider defaultProviderForExecutionTarget(
-    AssistantExecutionTarget executionTarget,
-  ) {
-    final catalog = providerCatalogForExecutionTarget(executionTarget);
-    if (catalog.isNotEmpty) {
-      return catalog.first;
-    }
-    return SingleAgentProvider.unspecified;
-  }
-
-  SingleAgentProvider? bridgeProviderForId(String providerId) {
-    final normalizedProviderId = normalizeSingleAgentProviderId(providerId);
-    if (normalizedProviderId.isEmpty) {
-      return null;
-    }
-    for (final provider in bridgeProviderCatalog) {
-      if (provider.providerId == normalizedProviderId) {
-        return provider;
-      }
-    }
-    return null;
-  }
-
-  SingleAgentProvider resolveProviderForExecutionTarget(
-    String? providerId, {
-    required AssistantExecutionTarget executionTarget,
-    bool defaultToCatalog = false,
-  }) {
-    final normalizedProviderId = normalizeSingleAgentProviderId(
-      providerId ?? '',
-    );
-    final catalog = providerCatalogForExecutionTarget(executionTarget);
-    if (normalizedProviderId.isNotEmpty) {
-      for (final provider in catalog) {
-        if (provider.providerId == normalizedProviderId) {
-          return provider;
-        }
-      }
-    }
-    if (defaultToCatalog && catalog.isNotEmpty) {
-      return catalog.first;
-    }
-    return SingleAgentProvider.unspecified;
-  }
-
-  SingleAgentProvider assistantProviderForSession(String sessionKey) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final thread = taskThreadForSessionInternal(normalizedSessionKey);
-    final executionTarget = assistantExecutionTargetForSession(
-      normalizedSessionKey,
-    );
-    return resolveProviderForExecutionTarget(
-      thread?.executionBinding.providerId,
-      executionTarget: executionTarget,
-    );
-  }
-
-  UiFeatureManifest loadRepoUiFeatureManifestSyncInternal() {
-    final file = File(UiFeatureManifest.assetPath);
-    if (!file.existsSync()) {
-      throw StateError(
-        'UiFeatureManifest is required and "${UiFeatureManifest.assetPath}" is missing.',
-      );
-    }
-    return UiFeatureManifest.fromYamlString(file.readAsStringSync());
-  }
-
-  List<AssistantExecutionTarget> visibleAssistantExecutionTargets(
-    Iterable<AssistantExecutionTarget> supportedTargets,
-  ) {
-    final visible = compactAssistantExecutionTargets(supportedTargets);
-    final bridgeVisible = bridgeAvailableExecutionTargets;
-    if (bridgeVisible.isEmpty) {
-      return visible;
-    }
-    return visible
-        .where((item) => bridgeVisible.contains(item))
-        .toList(growable: false);
-  }
-
-  List<String> get aiGatewayConversationModelChoices {
-    final availableModels =
-        settingsControllerInternal.effectiveAiGatewayAvailableModels;
-    final selected = settings.aiGateway.selectedModels
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty && availableModels.contains(item))
-        .toList(growable: false);
-    if (selected.isNotEmpty) {
-      return selected;
-    }
-    final available = availableModels
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toList(growable: false);
-    if (available.isNotEmpty) {
-      return available;
-    }
-    return const <String>[];
-  }
-
-  String get resolvedAiGatewayModel {
-    final current = settings.defaultModel.trim();
-    final choices = aiGatewayConversationModelChoices;
-    if (choices.contains(current)) {
-      return current;
-    }
-    if (choices.isNotEmpty) {
-      return choices.first;
-    }
-    return '';
-  }
-
-  String get resolvedAssistantModel {
-    return assistantModelForSession(currentSessionKey);
-  }
-
-  String resolvedAssistantModelForTargetInternal(
-    AssistantExecutionTarget target,
-  ) {
-    final resolved = resolvedDefaultModel.trim();
-    if (resolved.isNotEmpty) {
-      return resolved;
-    }
-    return '';
-  }
-
-  List<AssistantThreadSkillEntry> assistantImportedSkillsForSession(
-    String sessionKey,
-  ) {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    return assistantThreadRecordsInternal[normalizedSessionKey]
-            ?.importedSkills ??
-        const <AssistantThreadSkillEntry>[];
-  }
-
-  // Keep these public navigation APIs as class members for cross-library callers.
-  void navigateTo(WorkspaceDestination destination) =>
-      AppControllerDesktopNavigation(this).navigateTo(destination);
-
-  void navigateHome() => AppControllerDesktopNavigation(this).navigateHome();
-
-  void openSettings({
-    SettingsTab tab = SettingsTab.gateway,
-    SettingsDetailPage? detail,
-    SettingsNavigationContext? navigationContext,
-  }) => AppControllerDesktopNavigation(this).openSettings(
-    tab: tab,
-    detail: detail,
-    navigationContext: navigationContext,
-  );
-
-  void openDetail(DetailPanelData detailPanel) =>
-      AppControllerDesktopNavigation(this).openDetail(detailPanel);
-
-  Future<void> sendChatMessage(
-    String message, {
-    String thinking = 'off',
-    List<GatewayChatAttachmentPayload> attachments =
-        const <GatewayChatAttachmentPayload>[],
-    List<CollaborationAttachment> localAttachments =
-        const <CollaborationAttachment>[],
-    List<String> selectedSkillLabels = const <String>[],
-  }) => AppControllerDesktopThreadActions(this).sendChatMessage(
-    message,
-    thinking: thinking,
-    attachments: attachments,
-    localAttachments: localAttachments,
-    selectedSkillLabels: selectedSkillLabels,
-  );
-
-  Future<void> refreshMultiAgentMounts({bool sync = false}) =>
-      AppControllerDesktopThreadSessions(
-        this,
-      ).refreshMultiAgentMounts(sync: sync);
+  double get assistantSkillCount => 0; // Legacy
+  int get currentAssistantSkillCount => 0; // Legacy
 }

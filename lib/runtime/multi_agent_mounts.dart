@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'aris_bundle.dart';
-import 'go_core.dart';
 import 'codex_config_bridge.dart';
 import 'multi_agent_mount_resolver.dart';
 import 'opencode_config_bridge.dart';
@@ -13,29 +12,21 @@ class MultiAgentMountManager {
     CodexConfigBridge? codexConfigBridge,
     OpencodeConfigBridge? opencodeConfigBridge,
     ArisBundleRepository? arisBundleRepository,
-    GoCoreLocator? goCoreLocator,
     MultiAgentMountResolver? resolver,
   }) : this._(
-         arisAdapter: ArisMountAdapter(
-           arisBundleRepository ?? ArisBundleRepository(),
-           goCoreLocator ?? GoCoreLocator(),
-         ),
          codexConfigBridge: codexConfigBridge ?? CodexConfigBridge(),
          opencodeConfigBridge: opencodeConfigBridge ?? OpencodeConfigBridge(),
          resolver: resolver,
        );
 
   MultiAgentMountManager._({
-    required ArisMountAdapter arisAdapter,
     required CodexConfigBridge codexConfigBridge,
     required OpencodeConfigBridge opencodeConfigBridge,
     MultiAgentMountResolver? resolver,
-  }) : _arisAdapter = arisAdapter,
-       _codexConfigBridge = codexConfigBridge,
+  }) : _codexConfigBridge = codexConfigBridge,
        _opencodeConfigBridge = opencodeConfigBridge,
        _resolver = resolver,
        _adapters = <CliMountAdapter>[
-         arisAdapter,
          CodexMountAdapter(codexConfigBridge),
          ClaudeMountAdapter(),
          GeminiMountAdapter(),
@@ -43,7 +34,6 @@ class MultiAgentMountManager {
          OpenClawMountAdapter(),
        ];
 
-  final ArisMountAdapter _arisAdapter;
   final CodexConfigBridge _codexConfigBridge;
   final OpencodeConfigBridge _opencodeConfigBridge;
   final MultiAgentMountResolver? _resolver;
@@ -74,18 +64,15 @@ class MultiAgentMountManager {
   }
 
   Future<ArisMountProbe> _buildArisProbe() async {
-    try {
-      final bundle = await _arisAdapter._bundleRepository.ensureReady();
-      return ArisMountProbe(
-        available: true,
-        bundleVersion: bundle.manifest.bundleVersion,
-        llmChatServerPath: bundle.manifest.llmChatServerPath.trim(),
-        skillCount: await _arisAdapter._bundleRepository.countSkillFiles(),
-        bridgeAvailable: await _arisAdapter._goCoreLocator.isAvailable(),
-      );
-    } catch (error) {
-      return ArisMountProbe.unavailable(error: error.toString());
-    }
+    // ARIS is legacy and has been removed from assets.
+    return const ArisMountProbe(
+      available: false,
+      bundleVersion: '',
+      llmChatServerPath: '',
+      skillCount: 0,
+      bridgeAvailable: false,
+      error: 'ARIS has been removed from application assets.',
+    );
   }
 
   Future<MultiAgentConfig> _reconcileLocally({
@@ -118,20 +105,10 @@ class MultiAgentMountManager {
         );
       }
     }
-    final arisState = states.firstWhere(
-      (item) => item.targetId == _arisAdapter.targetId,
-      orElse: () => ManagedMountTargetState.placeholder(
-        targetId: _arisAdapter.targetId,
-        label: _arisAdapter.label,
-        supportsSkills: _arisAdapter.supportsSkills,
-        supportsMcp: _arisAdapter.supportsMcp,
-        supportsAiGatewayInjection: _arisAdapter.supportsAiGatewayInjection,
-      ),
-    );
     return config.copyWith(
       mountTargets: states,
-      arisBundleVersion: _arisAdapter.lastBundleVersion,
-      arisCompatStatus: arisState.syncState,
+      arisBundleVersion: '',
+      arisCompatStatus: 'missing',
     );
   }
 }
@@ -185,92 +162,6 @@ abstract class CliMountAdapter {
       r'^\[mcp_servers\.[^\]]+\]',
       multiLine: true,
     ).allMatches(content).length;
-  }
-}
-
-class ArisMountAdapter extends CliMountAdapter {
-  ArisMountAdapter(this._bundleRepository, this._goCoreLocator);
-
-  final ArisBundleRepository _bundleRepository;
-  final GoCoreLocator _goCoreLocator;
-  String _lastBundleVersion = '';
-
-  String get lastBundleVersion => _lastBundleVersion;
-
-  @override
-  String get targetId => 'aris';
-
-  @override
-  String get label => 'ARIS';
-
-  @override
-  bool get supportsSkills => true;
-
-  @override
-  bool get supportsMcp => true;
-
-  @override
-  bool get supportsAiGatewayInjection => false;
-
-  @override
-  Future<bool> isInstalled() async {
-    try {
-      await _bundleRepository.loadManifest();
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Future<ManagedMountTargetState> reconcile({
-    required MultiAgentConfig config,
-    required String aiGatewayUrl,
-  }) async {
-    try {
-      final bundle = await _bundleRepository.ensureReady();
-      _lastBundleVersion = bundle.manifest.bundleVersion;
-      final skillCount = await _bundleRepository.countSkillFiles();
-      final bridgeAvailable = await _goCoreLocator.isAvailable();
-      final llmChatEntry = bundle.manifest.llmChatServerPath.trim();
-      final llmChatReady = llmChatEntry.isNotEmpty;
-      return ManagedMountTargetState.placeholder(
-        targetId: targetId,
-        label: label,
-        supportsSkills: supportsSkills,
-        supportsMcp: supportsMcp,
-        supportsAiGatewayInjection: supportsAiGatewayInjection,
-      ).copyWith(
-        available: true,
-        discoveryState: 'ready',
-        syncState: config.usesAris && llmChatReady && bridgeAvailable
-            ? 'ready'
-            : 'embedded',
-        discoveredSkillCount: skillCount,
-        discoveredMcpCount: llmChatReady ? 1 : 0,
-        managedMcpCount: config.usesAris && llmChatReady && bridgeAvailable
-            ? 1
-            : 0,
-        detail: llmChatReady
-            ? bridgeAvailable
-                  ? 'Embedded bundle ${bundle.manifest.bundleVersion} ready; XWorkmate Go core manages llm-chat and claude-review.'
-                  : 'Embedded bundle is ready, but the XWorkmate Go core is not available yet.'
-            : 'Embedded bundle extracted, but llm-chat metadata is missing.',
-      );
-    } catch (error) {
-      return ManagedMountTargetState.placeholder(
-        targetId: targetId,
-        label: label,
-        supportsSkills: supportsSkills,
-        supportsMcp: supportsMcp,
-        supportsAiGatewayInjection: supportsAiGatewayInjection,
-      ).copyWith(
-        available: false,
-        discoveryState: 'error',
-        syncState: 'error',
-        detail: error.toString(),
-      );
-    }
   }
 }
 
