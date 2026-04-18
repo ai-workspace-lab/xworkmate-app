@@ -24,9 +24,9 @@ The app does not define or sync production upstreams.
 
 Bridge-owned production routing is:
 
-- `codex` -> `https://acp-server.svc.plus/codex/acp/rpc`
-- `opencode` -> `https://acp-server.svc.plus/opencode/acp/rpc`
-- `gemini` -> `https://acp-server.svc.plus/gemini/acp/rpc`
+- `codex` -> `https://xworkmate-bridge.svc.plus/codex/acp/rpc`
+- `opencode` -> `https://xworkmate-bridge.svc.plus/opencode/acp/rpc`
+- `gemini` -> `https://xworkmate-bridge.svc.plus/gemini/acp/rpc`
 - gateway -> `wss://openclaw.svc.plus`
 
 The app only talks to:
@@ -54,7 +54,7 @@ The app only talks to:
 - no production provider catalog from `providerSyncDefinitions`
 - no execution-time use of account-synced `openclawUrl`
 - no execution-time use of account-synced `apisixUrl`
-- no direct app calls to `acp-server.svc.plus/*`
+- no direct app calls to `xworkmate-bridge.svc.plus/*`
 - no direct app calls to `openclaw.svc.plus`
 
 ## State Rules
