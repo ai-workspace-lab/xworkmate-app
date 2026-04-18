@@ -104,7 +104,7 @@ flowchart TD
 2. Settings 只管理 bridge connection 参数、account sync 元数据与 gateway/integration affordance。
 3. provider catalog、routing resolve、gateway runtime state 都由 bridge 提供。
 4. bridge 若暴露额外 capability flag 或协作模式，它们属于合同元数据，不自动抬升为 app shell / module taxonomy。
-5. app 不直接调用 `acp-server.svc.plus/*`、`openclaw.svc.plus` 等 upstream 地址。
+5. app 不直接调用 `xworkmate-bridge.svc.plus/*`、`openclaw.svc.plus` 等 upstream 地址。
 
 ## Removed From Target
 
