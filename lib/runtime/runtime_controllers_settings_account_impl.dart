@@ -337,9 +337,10 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     final sanitizedSettings = _sanitizeBridgeOnlyAccountSyncSettings(
       currentSettings.copyWith(acpBridgeServerModeConfig: nextModeConfig),
     );
-    if (sanitizedSettings.toJsonString() != currentSettings.toJsonString()) {
-      await controller.saveSnapshot(sanitizedSettings);
-    }
+    // Always save the snapshot after a successful sync to ensure Token and URL updates
+    // are correctly persisted in the store and reflected in the UI.
+    await controller.saveSnapshot(sanitizedSettings);
+
     await controller.reloadDerivedStateInternal();
     final email = controller.accountSessionInternal?.email.trim() ?? '';
     controller.accountStatusInternal = email.isEmpty
