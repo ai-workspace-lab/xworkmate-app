@@ -110,11 +110,10 @@ package-rpm: ## Create the Linux .rpm package
 package-linux: ## Create both Linux packages
 	bash scripts/package-linux.sh
 
-package-mac: ## Create the macOS .app and DMG
+package-mac: ffi-integrate build-go-core ## Create the macOS .app and DMG
 	XWORKMATE_APP_STORE=true bash scripts/package-flutter-mac-app.sh
 
-install-mac: ## Package and install the macOS app into /Applications
-	XWORKMATE_APP_STORE=true bash scripts/package-flutter-mac-app.sh
+install-mac: package-mac ## Package and install the macOS app into /Applications
 	bash scripts/install-flutter-mac-dmg.sh
 
 clean: ## Remove generated artifacts
@@ -129,12 +128,12 @@ check-export-compliance: ## Verify source and built Apple plist export-complianc
 
 rust-build: rust-build-release ## Build Rust FFI library (release mode)
 
-rust-build-release: ## Build Rust FFI library for macOS (arm64)
-	cd rust && cargo build --release --target aarch64-apple-darwin
+rust-build-release: ## Build Rust FFI library for macOS (universal)
+	bash scripts/build_rust_ffi.sh release
 	@echo "Rust FFI library built successfully"
 
 rust-build-debug: ## Build Rust FFI library in debug mode
-	cd rust && cargo build --target aarch64-apple-darwin
+	bash scripts/build_rust_ffi.sh debug
 
 rust-test: ## Run Rust tests
 	cd rust && cargo test
