@@ -12,6 +12,7 @@ RUST_DIR="$PROJECT_ROOT/rust"
 # Source FFI library location
 UNIVERSAL_LIB="$RUST_DIR/target/universal/libcodex_ffi.dylib"
 ARM_LIB="$RUST_DIR/target/aarch64-apple-darwin/release/libcodex_ffi.dylib"
+RELEASE_LIB="$RUST_DIR/target/release/libcodex_ffi.dylib"
 DEBUG_LIB="$RUST_DIR/target/debug/libcodex_ffi.dylib"
 
 # Ensure Frameworks directory exists
@@ -24,6 +25,9 @@ if [[ -f "$UNIVERSAL_LIB" ]]; then
 elif [[ -f "$ARM_LIB" ]]; then
     echo "Copying arm64 FFI library..."
     cp "$ARM_LIB" "$FRAMEWORKS_DIR/"
+elif [[ -f "$RELEASE_LIB" ]]; then
+    echo "Copying release FFI library..."
+    cp "$RELEASE_LIB" "$FRAMEWORKS_DIR/"
 elif [[ -f "$DEBUG_LIB" ]]; then
     echo "Copying debug FFI library..."
     cp "$DEBUG_LIB" "$FRAMEWORKS_DIR/"
@@ -32,6 +36,7 @@ else
     echo "Expected one of:"
     echo "  - $UNIVERSAL_LIB"
     echo "  - $ARM_LIB"
+    echo "  - $RELEASE_LIB"
     echo "  - $DEBUG_LIB"
     exit 0  # Don't fail the build if library doesn't exist yet
 fi
