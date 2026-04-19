@@ -635,14 +635,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   Uri? resolveBridgeAcpEndpointInternal() {
-    final explicitBridgeServerUrl =
-        runtimeEnvironmentValueInternal('BRIDGE_SERVER_URL')?.trim() ?? '';
-    if (isSupportedExternalAcpEndpoint(explicitBridgeServerUrl)) {
-      final uri = Uri.tryParse(explicitBridgeServerUrl);
-      if (uri != null) {
-        return uri.replace(query: null, fragment: null);
-      }
-    }
     final modeConfig = settings.acpBridgeServerModeConfig;
     final candidate = modeConfig.usesSelfHostedBase
         ? modeConfig.selfHosted.serverUrl.trim()
@@ -683,9 +675,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         normalizedHost == bridgeHost &&
         (bridgePort <= 0 || endpoint.port == bridgePort);
     if (matchesBridgeEndpoint) {
-      final bridgeToken =
-          runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN') ??
-          (await storeInternal.loadAccountManagedSecret(
+      final bridgeToken = (await storeInternal.loadAccountManagedSecret(
             target: kAccountManagedSecretTargetBridgeAuthToken,
           ))?.trim() ??
           await settingsControllerInternal.loadEffectiveGatewayToken(

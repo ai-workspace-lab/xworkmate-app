@@ -319,6 +319,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
         apisix: false,
       ),
     );
+    await _persistAccountSyncStateInternal(controller, nextState);
     final currentSettings = controller.snapshotInternal;
     final currentModeConfig = currentSettings.acpBridgeServerModeConfig;
     
@@ -622,6 +623,10 @@ String _resolveCurrentBridgeServerUrl(
   SettingsController controller, {
   String bridgeServerUrlOverride = '',
 }) {
+  final override = bridgeServerUrlOverride.trim();
+  if (override.isNotEmpty) {
+    return override;
+  }
   return controller.snapshotInternal.acpBridgeServerModeConfig.effective.endpoint;
 }
 
