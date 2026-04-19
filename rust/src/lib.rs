@@ -9,7 +9,7 @@ mod types;
 
 pub use error::CodexError;
 pub use runtime::{CodexRuntime, CodexConfig, CodexConfigRust, ThreadHandle, RuntimeState};
-pub use types::{CodexResult, CodexMessage, CodexEvent};
+pub use types::{CodexResult, CodexEvent};
 
 use std::ffi::CStr;
 use std::os::raw::c_char;

@@ -33,19 +33,6 @@ impl CodexResult {
     }
 }
 
-/// FFI-safe message type.
-#[repr(C)]
-pub struct CodexMessage {
-    /// Message type (text, code, tool_call, etc.).
-    pub message_type: *const c_char,
-    /// Message content.
-    pub content: *const c_char,
-    /// Thread ID.
-    pub thread_id: *const c_char,
-    /// Turn ID.
-    pub turn_id: *const c_char,
-}
-
 /// FFI-safe event type.
 #[repr(C)]
 pub struct CodexEvent {
@@ -59,34 +46,6 @@ pub struct CodexEvent {
     pub data: *const c_char,
     /// Timestamp (Unix millis).
     pub timestamp: i64,
-}
-
-/// FFI-safe model info.
-#[repr(C)]
-pub struct CodexModelInfo {
-    /// Model ID.
-    pub id: *const c_char,
-    /// Model name.
-    pub name: *const c_char,
-    /// Provider name.
-    pub provider: *const c_char,
-    /// Is online.
-    pub is_online: bool,
-}
-
-/// FFI-safe account info.
-#[repr(C)]
-pub struct CodexAccountInfo {
-    /// Email.
-    pub email: *const c_char,
-    /// Plan type.
-    pub plan: *const c_char,
-    /// Has credits.
-    pub has_credits: bool,
-    /// Credits balance.
-    pub credits_balance: f64,
-    /// Rate limits JSON.
-    pub rate_limits: *const c_char,
 }
 
 #[cfg(test)]
