@@ -2,7 +2,7 @@
 
 Status: Implementing V1
 
-Date: 2026-04-11
+Date: 2026-04-19
 
 Scope:
 - `xworkmate-app`
@@ -10,9 +10,12 @@ Scope:
 
 ## V1 Decision
 
-Production cloud mode is bridge-only:
+Production cloud mode is bridge-owned, with explicit effective-config priority:
 
-- app-facing cloud endpoint is fixed to `https://xworkmate-bridge.svc.plus`
+- `selfHosted` manual Bridge configuration has highest priority
+- `cloudSynced` svc.plus configuration is the fallback when manual Bridge is not configured
+- `default` managed server is the last-resort fallback
+- app-facing cloud entry remains fixed to `https://xworkmate-bridge.svc.plus`
 - production provider catalog is bridge-owned
 - production gateway upstream is bridge-owned
 - account sync is metadata-only for session state, status, and managed secret references
@@ -71,12 +74,24 @@ The app only talks to:
 - may retain `openclawUrl` / `apisixUrl` as account profile metadata
 - does not overwrite executable cloud routing targets
 
+`acpBridgeServerModeConfig.effective`
+
+- represents the actual runtime source of truth
+- resolves to `selfHosted` first, then `cloudSynced`, then `default`
+- is what UI and runtime should read when deciding the active Bridge endpoint
+
 `acpBridgeServerModeConfig.cloudSynced.remoteServerSummary.endpoint`
 
 - represents bridge cloud entry only
 - fixed to `https://xworkmate-bridge.svc.plus` while signed in and synced
 - is not an upstream provider URL
 - is not a gateway upstream URL
+
+`acpBridgeServerModeConfig.selfHosted.serverUrl`
+
+- represents the manual Bridge endpoint
+- overrides cloud-synced bridge endpoint when configured
+- is the first priority in effective-config resolution
 
 ## Workflow
 
@@ -99,6 +114,11 @@ flowchart TD
   APPLY --> SKIP1["do not overwrite gateway executable endpoint"]
   APPLY --> SKIP2["do not overwrite ACP executable endpoint"]
 
+  LOAD --> RESOLVE["resolveAcpBridgeServerEffectiveConfigInternal()"]
+  RESOLVE --> BRIDGE["selfHosted.isConfigured == true"]
+  RESOLVE --> CLOUD["cloudSynced usable"]
+  RESOLVE --> DEFAULT["managed default fallback"]
+
   UI --> BRIDGE_CAPS["acp.capabilities via bridge"]
   UI --> BRIDGE_ROUTE["xworkmate.routing.resolve via bridge"]
   UI --> BRIDGE_RUN["session.* via bridge"]
@@ -111,3 +131,5 @@ flowchart TD
 - account sync may update metadata, but not production execution targets.
 - gateway runtime status shown in the app must come from bridge runtime results.
 - bridge capability/provider availability shown in the app must come from `acp.capabilities`.
+- `effective` must never be inferred from stale local fallback state when `selfHosted` is configured.
+- cloud sync is allowed to coexist with manual Bridge config, but it does not outrank it.

@@ -1,14 +1,18 @@
 # Settings Integration Configuration Model
 
-Last Updated: 2026-04-14
+Last Updated: 2026-04-19
 
-本文件记录当前 `Settings -> Integrations` 在主链中的职责边界。
+本文件记录当前 `Settings -> Integrations` 在主链中的职责边界，以及
+`acpBridgeServerModeConfig` 的有效配置仲裁规则。
 
 ## Current Rule
 
-- Settings 只管理 bridge connection 参数与 account sync 元数据
+- Settings 只管理 Bridge 连接参数、account sync 元数据和本地编辑态
+- `AcpBridgeServerModeConfig.effective` 是运行时实际生效配置
+- `selfHosted` 优先级高于 `cloudSynced`
+- `cloudSynced` 只在 manual Bridge 未配置时作为有效回退来源
 - app 不从本地 endpoint preset、旧 module 配置、历史 fallback 恢复 provider catalog
-- `xworkmate-bridge` 是 provider catalog、gateway capability、routing resolve 的唯一真源
+- `xworkmate-bridge` 仍然是 provider catalog、gateway capability、routing resolve 的唯一真源
 
 ## Bridge-Owned Source Of Truth
 
@@ -63,6 +67,9 @@ flowchart TD
 
 - bridge host / transport / auth input
 - account-linked bridge configuration metadata
+- `acpBridgeServerModeConfig.cloudSynced`
+- `acpBridgeServerModeConfig.selfHosted`
+- `acpBridgeServerModeConfig.effective`
 - secure secret references
 - gateway connection test / connect / disconnect affordance
 
@@ -75,6 +82,10 @@ flowchart TD
 
 ## Notes
 
+- `AcpBridgeServerModeConfig` 的实际仲裁顺序是 `selfHosted -> cloudSynced -> default`
+- `selfHosted.isConfigured == true` 时，`effective.source == 'bridge'`
+- `selfHosted` 未配置且 `accountSyncState` 提供了可用云端桥接信息时，`effective.source == 'cloud'`
+- 两者都不可用时，`effective.source == 'default'`
 - 当前任务对话框 provider 选择主链固定为 `providerCatalogForExecutionTarget() -> resolveProviderForExecutionTarget() -> setAssistantProvider()`
 - `agent` catalog 只对应 bridge 广告的 ACP server bridges
 - `gateway` catalog 只对应 bridge 返回的 gateway provider 列表；当前为 `openclaw`，未来可扩展 `hermes` 等项
@@ -83,6 +94,37 @@ flowchart TD
 - bridge 若返回额外 capability flag，这些 flag 只属于合同元数据，不会自动生成新的 settings tab 或 module page
 - bridge 若未返回 catalog，provider 菜单为空或禁用；app 不伪造 `codex / opencode / gemini / openclaw`
 - production provider / gateway 选择继续由 bridge 拥有，app 只保留消费与展示
+
+## Effective Config Mermaid
+
+```mermaid
+stateDiagram-v2
+    [*] --> EvaluateEffective
+
+    EvaluateEffective --> BridgeEffective: selfHosted.isConfigured == true
+    EvaluateEffective --> CloudEffective: selfHosted 未配置 且 cloudSynced 可用
+    EvaluateEffective --> DefaultEffective: 两者都不可用
+
+    BridgeEffective --> CloudEffective: 关闭 manual Bridge
+    CloudEffective --> BridgeEffective: manual Bridge 配置生效
+    CloudEffective --> DefaultEffective: cloud sync 失效
+    DefaultEffective --> CloudEffective: cloud sync 恢复
+
+    note right of BridgeEffective
+        source = bridge
+        effective.endpoint = selfHosted.serverUrl
+    end note
+
+    note right of CloudEffective
+        source = cloud
+        effective.endpoint = accountSyncState.syncedDefaults.bridgeServerUrl
+    end note
+
+    note right of DefaultEffective
+        source = default
+        effective.endpoint = kManagedBridgeServerUrl
+    end note
+```
 
 ## See Also
 

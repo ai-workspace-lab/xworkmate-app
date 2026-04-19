@@ -129,11 +129,10 @@ check-export-compliance: ## Verify source and built Apple plist export-complianc
 rust-build: rust-build-release ## Build Rust FFI library (release mode)
 
 rust-build-release: ## Build Rust FFI library for macOS (release)
-	cd rust && cargo build --release
-	@echo "Rust FFI library built successfully"
+	@echo "Skip cargo build (external management)"
 
 rust-build-debug: ## Build Rust FFI library in debug mode
-	cd rust && cargo build
+	@echo "Skip cargo build (external management)"
 
 rust-test: ## Run Rust tests
 	cd rust && cargo test
@@ -144,7 +143,7 @@ ffi-copy: ## Copy FFI library to macOS Frameworks
 ffi-generate: ## Generate FFI bindings using flutter_rust_bridge
 	bash scripts/generate_ffi_bindings.sh
 
-ffi-integrate: rust-build-release ffi-copy ## Build and copy FFI library (full integration)
+ffi-integrate: ffi-copy ## Copy FFI library (full integration)
 
 # Build with FFI integration
-build-macos-ffi: rust-build-release ffi-copy build-macos ## Build macOS app with FFI integration
+build-macos-ffi: ffi-copy build-macos ## Build macOS app with FFI integration
