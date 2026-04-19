@@ -121,8 +121,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
 
     // Resolve the effective config based on the new sources
-    final nextEffective = resolveAcpBridgeServerEffectiveConfig(
-      widget.controller.settingsController,
+    final nextEffective = widget.controller.settingsController.resolveAcpBridgeServerEffectiveConfig(
       config: nextBridgeConfig,
       accountSyncState: widget.controller.settingsController.accountSyncState,
     );

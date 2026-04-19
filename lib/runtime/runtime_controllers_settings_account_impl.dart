@@ -322,7 +322,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     final currentSettings = controller.snapshotInternal;
     final currentModeConfig = currentSettings.acpBridgeServerModeConfig;
     
-    final nextEffective = resolveAcpBridgeServerEffectiveConfig(
+    final nextEffective = resolveAcpBridgeServerEffectiveConfigInternal(
       controller,
       config: currentModeConfig,
       accountSyncState: nextState,
@@ -580,7 +580,7 @@ String _resolveBridgeServerUrl(Map<String, dynamic> payload) {
   return '';
 }
 
-AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfig(
+AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfigInternal(
   SettingsController controller, {
   required AcpBridgeServerModeConfig config,
   AccountSyncState? accountSyncState,

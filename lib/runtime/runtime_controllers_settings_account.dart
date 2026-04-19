@@ -118,6 +118,15 @@ extension SettingsControllerAccountExtension on SettingsController {
   Future<void> cancelAccountMfaChallenge() =>
       cancelAccountMfaChallengeSettingsInternal(this);
 
+  AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfig({
+    required AcpBridgeServerModeConfig config,
+    AccountSyncState? accountSyncState,
+  }) => resolveAcpBridgeServerEffectiveConfigInternal(
+    this,
+    config: config,
+    accountSyncState: accountSyncState,
+  );
+
   List<SecretReferenceEntry> buildSecretReferences() {
     final entries = <SecretReferenceEntry>[
       ...secureRefsInternal.entries.map(
