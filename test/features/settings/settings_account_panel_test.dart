@@ -30,7 +30,7 @@ void main() {
             accountMfaCodeController: controllers.mfaCode,
             bridgeUrlController: controllers.bridgeUrl,
             bridgeTokenController: controllers.bridgeToken,
-            onSaveAccountProfile: () async {},
+            onSaveAccountProfile: ({required bool isManualBridge}) async {},
             onLogin: () async {
               loginCount += 1;
             },
@@ -126,7 +126,7 @@ void main() {
             accountMfaCodeController: controllers.mfaCode,
             bridgeUrlController: controllers.bridgeUrl,
             bridgeTokenController: controllers.bridgeToken,
-            onSaveAccountProfile: () async {},
+            onSaveAccountProfile: ({required bool isManualBridge}) async {},
             onLogin: () async {},
             onVerifyMfa: () async {},
             onCancelMfa: () async {},
@@ -205,7 +205,7 @@ void main() {
             accountMfaCodeController: controllers.mfaCode,
             bridgeUrlController: controllers.bridgeUrl,
             bridgeTokenController: controllers.bridgeToken,
-            onSaveAccountProfile: () async {},
+            onSaveAccountProfile: ({required bool isManualBridge}) async {},
             onLogin: () async {},
             onVerifyMfa: () async {},
             onCancelMfa: () async {},
@@ -271,7 +271,7 @@ void main() {
             accountMfaCodeController: controllers.mfaCode,
             bridgeUrlController: controllers.bridgeUrl,
             bridgeTokenController: controllers.bridgeToken,
-            onSaveAccountProfile: () async {
+            onSaveAccountProfile: ({required bool isManualBridge}) async {
               saveCount += 1;
             },
             onLogin: () async {},
@@ -334,7 +334,7 @@ void main() {
             accountMfaCodeController: controllers.mfaCode,
             bridgeUrlController: controllers.bridgeUrl,
             bridgeTokenController: controllers.bridgeToken,
-            onSaveAccountProfile: () async {},
+            onSaveAccountProfile: ({required bool isManualBridge}) async {},
             onLogin: () async {},
             onVerifyMfa: () async {},
             onCancelMfa: () async {},
