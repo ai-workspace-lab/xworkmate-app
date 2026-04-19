@@ -127,6 +127,13 @@ void main() {
           controller.accountSyncState!.syncedDefaults.bridgeServerUrl,
           'https://xworkmate-bridge-alt.svc.plus',
         );
+        final persisted = await store.loadAccountSyncState();
+        expect(persisted, isNotNull);
+        expect(persisted!.syncState, 'ready');
+        expect(
+          persisted.syncedDefaults.bridgeServerUrl,
+          'https://xworkmate-bridge-alt.svc.plus',
+        );
         expect(
           controller
               .snapshot

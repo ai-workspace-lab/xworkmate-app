@@ -28,6 +28,8 @@ void main() {
             accountIdentifierController: controllers.identifier,
             accountPasswordController: controllers.password,
             accountMfaCodeController: controllers.mfaCode,
+            bridgeUrlController: controllers.bridgeUrl,
+            bridgeTokenController: controllers.bridgeToken,
             onSaveAccountProfile: () async {},
             onLogin: () async {
               loginCount += 1;
@@ -122,6 +124,8 @@ void main() {
             accountIdentifierController: controllers.identifier,
             accountPasswordController: controllers.password,
             accountMfaCodeController: controllers.mfaCode,
+            bridgeUrlController: controllers.bridgeUrl,
+            bridgeTokenController: controllers.bridgeToken,
             onSaveAccountProfile: () async {},
             onLogin: () async {},
             onVerifyMfa: () async {},
@@ -197,6 +201,8 @@ void main() {
             accountIdentifierController: controllers.identifier,
             accountPasswordController: controllers.password,
             accountMfaCodeController: controllers.mfaCode,
+            bridgeUrlController: controllers.bridgeUrl,
+            bridgeTokenController: controllers.bridgeToken,
             onSaveAccountProfile: () async {},
             onLogin: () async {},
             onVerifyMfa: () async {},
@@ -250,6 +256,8 @@ void main() {
             accountIdentifierController: controllers.identifier,
             accountPasswordController: controllers.password,
             accountMfaCodeController: controllers.mfaCode,
+            bridgeUrlController: controllers.bridgeUrl,
+            bridgeTokenController: controllers.bridgeToken,
             onSaveAccountProfile: () async {},
             onLogin: () async {},
             onVerifyMfa: () async {},
@@ -289,11 +297,19 @@ class _TestControllers {
   );
   final TextEditingController password = TextEditingController();
   final TextEditingController mfaCode = TextEditingController();
+  final TextEditingController bridgeUrl = TextEditingController(
+    text: 'https://xworkmate-bridge.svc.plus',
+  );
+  final TextEditingController bridgeToken = TextEditingController(
+    text: 'bridge-token',
+  );
 
   void dispose() {
     baseUrl.dispose();
     identifier.dispose();
     password.dispose();
     mfaCode.dispose();
+    bridgeUrl.dispose();
+    bridgeToken.dispose();
   }
 }
