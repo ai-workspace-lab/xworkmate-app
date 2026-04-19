@@ -109,14 +109,15 @@ class _SettingsPageState extends State<SettingsPage> {
     _lastSavedBridgeUrl = bridgeConfig.selfHosted.serverUrl;
   }
 
-  Future<void> _saveAccountProfile(SettingsSnapshot settings) async {
+  Future<void> _saveAccountProfile(
+    SettingsSnapshot settings, {
+    required bool isManualBridge,
+  }) async {
     final bridgeConfig = settings.acpBridgeServerModeConfig;
-    final isManual = DefaultTabController.of(context).index == 1;
-
     var nextBridgeConfig = bridgeConfig.copyWith(
       selfHosted: bridgeConfig.selfHosted.copyWith(
         serverUrl: _bridgeUrlController.text.trim(),
-        username: isManual ? 'admin' : bridgeConfig.selfHosted.username,
+        username: isManualBridge ? 'admin' : bridgeConfig.selfHosted.username,
       ),
     );
 
@@ -133,7 +134,7 @@ class _SettingsPageState extends State<SettingsPage> {
         effective: nextEffective,
       ),
     );
-    if (isManual && _bridgeTokenController.text.isNotEmpty) {
+    if (isManualBridge && _bridgeTokenController.text.isNotEmpty) {
       await widget.controller.settingsController.saveSecretValueByRef(
         nextSettings.acpBridgeServerModeConfig.selfHosted.passwordRef,
         _bridgeTokenController.text,
@@ -152,7 +153,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final baseUrl = _accountBaseUrlController.text.trim();
     final identifier = _accountIdentifierController.text.trim();
     try {
-      await _saveAccountProfile(settings);
+      await _saveAccountProfile(settings, isManualBridge: false);
       await widget.controller.settingsController.loginAccount(
         baseUrl: baseUrl,
         identifier: identifier,
@@ -165,7 +166,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _syncAccount(SettingsSnapshot settings) async {
-    await _saveAccountProfile(settings);
+    await _saveAccountProfile(settings, isManualBridge: false);
     await widget.controller.settingsController.syncAccountSettings(
       baseUrl: _accountBaseUrlController.text.trim(),
     );
@@ -175,7 +176,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _verifyAccountMfa(SettingsSnapshot settings) async {
     try {
-      await _saveAccountProfile(settings);
+      await _saveAccountProfile(settings, isManualBridge: false);
       await widget.controller.settingsController.verifyAccountMfa(
         baseUrl: _accountBaseUrlController.text.trim(),
         code: _accountMfaCodeController.text.trim(),
@@ -355,12 +356,15 @@ class _SettingsPageState extends State<SettingsPage> {
                 accountMfaCodeController: _accountMfaCodeController,
                 bridgeUrlController: _bridgeUrlController,
                 bridgeTokenController: _bridgeTokenController,
-                onSaveAccountProfile: () =>
-                    _saveAccountProfile(currentSettings),
-                onLogin: () => _loginAccount(currentSettings),
-                onVerifyMfa: () => _verifyAccountMfa(currentSettings),
+                onSaveAccountProfile: ({required bool isManualBridge}) =>
+                    _saveAccountProfile(
+                      widget.controller.settings,
+                      isManualBridge: isManualBridge,
+                    ),
+                onLogin: () => _loginAccount(widget.controller.settings),
+                onVerifyMfa: () => _verifyAccountMfa(widget.controller.settings),
                 onCancelMfa: _cancelAccountMfa,
-                onSync: () => _syncAccount(currentSettings),
+                onSync: () => _syncAccount(widget.controller.settings),
                 onLogout: _logoutAccount,
               ),
             ),
