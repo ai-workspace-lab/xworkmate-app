@@ -12,9 +12,7 @@ echo "Integrating Rust FFI with Flutter..."
 # Build Rust library if not exists
 RUST_LIB="$PROJECT_ROOT/rust/target/universal/libcodex_ffi.dylib"
 if [[ ! -f "$RUST_LIB" ]]; then
-    echo "Rust library not found, building..."
-    # Attempt to build using Makefile target if available
-    (cd "$PROJECT_ROOT" && make rust-build-release)
+    echo "Rust library not found. Please build it manually or ensure it exists in target/."
 fi
 
 # Ensure Frameworks directory exists
@@ -31,9 +29,6 @@ else
     if [[ -f "$ARM_LIB" ]]; then
         cp "$ARM_LIB" "$FRAMEWORKS_DIR/"
         echo "Copied arm64 library to $FRAMEWORKS_DIR/"
-    else
-        echo "Error: No Rust library found. Please run 'make rust-build-release' first."
-        exit 1
     fi
 fi
 

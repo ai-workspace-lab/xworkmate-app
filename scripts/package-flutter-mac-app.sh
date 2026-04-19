@@ -109,6 +109,8 @@ if [[ -f "$SOURCE_FFI_LIB" ]]; then
   echo "Embedding FFI library into app bundle..."
   mkdir -p "$(dirname "$TARGET_FFI_LIB")"
   cp "$SOURCE_FFI_LIB" "$TARGET_FFI_LIB"
+  # Fix install name to be @rpath-based so it is portable within the bundle
+  install_name_tool -id "@rpath/$(basename "$TARGET_FFI_LIB")" "$TARGET_FFI_LIB"
 fi
 
 # Embed xworkmate-go-core for local/non-App-Store builds if available
@@ -140,17 +142,33 @@ validate_bundle_dependencies "$BUILD_APP_PATH"
 
 rm -rf "$DIST_APP_PATH" "$DIST_DMG_PATH"
 ditto "$BUILD_APP_PATH" "$DIST_APP_PATH"
-if [[ -n "$SIGN_IDENTITY" ]]; then
-  echo "Re-signing app bundle with explicit identity..."
-  codesign --force --deep --sign "$SIGN_IDENTITY" \
-    --preserve-metadata=entitlements,requirements,flags,runtime \
-    --timestamp=none "$DIST_APP_PATH"
-else
-  echo "Ad-hoc re-signing app bundle to account for manual additions..."
-  codesign --force --deep --sign - \
-    --preserve-metadata=entitlements,requirements,flags,runtime \
-    --timestamp=none "$DIST_APP_PATH"
+
+echo "Re-signing app bundle to account for manual additions..."
+# Components must be signed from inside out.
+# 1. Sign all dylibs and frameworks
+find "$DIST_APP_PATH/Contents/Frameworks" -name "*.dylib" -type f | while read -r dylib; do
+  echo "Signing nested dylib: $dylib"
+  codesign --force --sign "${SIGN_IDENTITY:--}" --timestamp=none "$dylib"
+done
+
+find "$DIST_APP_PATH/Contents/Frameworks" -name "*.framework" -type d | while read -r framework; do
+  echo "Signing nested framework: $framework"
+  codesign --force --sign "${SIGN_IDENTITY:--}" --timestamp=none "$framework"
+done
+
+# 2. Sign our manually added binaries if any
+if [[ -f "$DIST_APP_PATH/Contents/MacOS/build/bin/xworkmate-go-core" ]]; then
+  echo "Signing embedded helper: xworkmate-go-core"
+  codesign --force --sign "${SIGN_IDENTITY:--}" --timestamp=none "$DIST_APP_PATH/Contents/MacOS/build/bin/xworkmate-go-core"
 fi
+
+# 3. Sign the main executable
+echo "Signing main executable..."
+codesign --force --sign "${SIGN_IDENTITY:--}" --timestamp=none "$DIST_APP_PATH/Contents/MacOS/$APP_NAME"
+
+# 4. Finally sign the app bundle itself
+echo "Signing app bundle..."
+codesign --force --sign "${SIGN_IDENTITY:--}" --timestamp=none "$DIST_APP_PATH"
 
 verify_bundle_signature "$DIST_APP_PATH"
 validate_bundle_dependencies "$DIST_APP_PATH"
