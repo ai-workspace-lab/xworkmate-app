@@ -97,6 +97,15 @@ if [[ -d "$MOUNT_POINT" ]]; then
   sleep 2
 fi
 hdiutil attach "$DMG_RW_PATH" -mountpoint "$MOUNT_POINT" -nobrowse
+sleep 2 # Wait for mount to stabilize
+
+if [[ "${SKIP_DMG_STYLE:-0}" != "1" ]]; then
+  # Verify volume is actually available for Finder
+  if ! osascript -e "tell application \"Finder\" to exists disk \"$DMG_VOLUME_NAME\"" 2>/dev/null | grep -q "true"; then
+     echo "WARN: Volume $DMG_VOLUME_NAME not visible to Finder, skipping styling" >&2
+     SKIP_DMG_STYLE=1
+  fi
+fi
 
 if [[ "${SKIP_DMG_STYLE:-0}" != "1" ]]; then
   mkdir -p "$MOUNT_POINT/.background"
@@ -134,7 +143,15 @@ tell application "Finder"
     set label position of viewOptions to bottom
     set shows item info of viewOptions to false
     set shows icon preview of viewOptions to true
-    set position of item "${APP_NAME}.app" of container window to {$(to_applescript_pair "$DMG_APP_POS")}
+    try
+      set position of item "${APP_NAME}.app" of container window to {$(to_applescript_pair "$DMG_APP_POS")}
+    on error
+      try
+        set position of (first item of container window whose name ends with ".app") to {$(to_applescript_pair "$DMG_APP_POS")}
+      on error
+        log "Could not set position of .app"
+      end try
+    end try
     set position of item "Applications" of container window to {$(to_applescript_pair "$DMG_APPS_POS")}
     update without registering applications
     delay 2
