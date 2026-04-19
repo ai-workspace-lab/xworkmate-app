@@ -45,7 +45,7 @@ Future<String> testOllamaConnectionDraftSettingsInternal(
   }
   final cloudApiKey = apiKeyOverride.trim().isNotEmpty
       ? apiKeyOverride.trim()
-      : (await controller.storeInternal.loadOllamaCloudApiKey())?.trim() ?? '';
+      : (await controller.storeInternal.loadSecretValueByRef('ollama_cloud_api_key'))?.trim() ?? '';
   try {
     final uri = Uri.parse(
       cloud ? base : '$base${base.endsWith('/') ? '' : '/'}api/tags',
@@ -103,7 +103,7 @@ Future<String> testVaultConnectionDraftSettingsInternal(
     };
     final token = tokenOverride.trim().isNotEmpty
         ? tokenOverride.trim()
-        : (await controller.storeInternal.loadVaultToken())?.trim() ?? '';
+        : (await controller.storeInternal.loadSecretValueByRef('vault_token'))?.trim() ?? '';
     if (token.trim().isNotEmpty) {
       headers['X-Vault-Token'] = token.trim();
     }

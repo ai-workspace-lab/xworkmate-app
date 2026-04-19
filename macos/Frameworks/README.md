@@ -11,7 +11,7 @@ The Rust FFI library for Codex CLI integration.
 Run the build script from the project root:
 
 ```bash
-./scripts/build_rust_ffi.sh release
+make rust-build-release
 ```
 
 ### Integration

@@ -1,6 +1,7 @@
 // ignore_for_file: unused_import, unnecessary_import
 
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import 'runtime_models_account.dart';
@@ -34,6 +35,7 @@ class SettingsSnapshot {
     required this.aiGateway,
     required this.webSessionPersistence,
     required this.multiAgent,
+    required this.themeMode,
     required this.experimentalCanvas,
     required this.experimentalBridge,
     required this.experimentalDebug,
@@ -66,6 +68,7 @@ class SettingsSnapshot {
   final AiGatewayProfile aiGateway;
   final WebSessionPersistenceConfig webSessionPersistence;
   final MultiAgentConfig multiAgent;
+  final ThemeMode themeMode;
   final bool experimentalCanvas;
   final bool experimentalBridge;
   final bool experimentalDebug;
@@ -99,6 +102,7 @@ class SettingsSnapshot {
       aiGateway: AiGatewayProfile.defaults(),
       webSessionPersistence: WebSessionPersistenceConfig.defaults(),
       multiAgent: MultiAgentConfig.defaults(),
+      themeMode: ThemeMode.system,
       experimentalCanvas: false,
       experimentalBridge: false,
       experimentalDebug: false,
@@ -133,6 +137,7 @@ class SettingsSnapshot {
     AiGatewayProfile? aiGateway,
     WebSessionPersistenceConfig? webSessionPersistence,
     MultiAgentConfig? multiAgent,
+    ThemeMode? themeMode,
     bool? experimentalCanvas,
     bool? experimentalBridge,
     bool? experimentalDebug,
@@ -175,6 +180,7 @@ class SettingsSnapshot {
       webSessionPersistence:
           webSessionPersistence ?? this.webSessionPersistence,
       multiAgent: multiAgent ?? this.multiAgent,
+      themeMode: themeMode ?? this.themeMode,
       experimentalCanvas: experimentalCanvas ?? this.experimentalCanvas,
       experimentalBridge: experimentalBridge ?? this.experimentalBridge,
       experimentalDebug: experimentalDebug ?? this.experimentalDebug,
@@ -218,6 +224,7 @@ class SettingsSnapshot {
       'aiGateway': aiGateway.toJson(),
       'webSessionPersistence': webSessionPersistence.toJson(),
       'multiAgent': multiAgent.toJson(),
+      'themeMode': themeMode.name,
       'experimentalCanvas': experimentalCanvas,
       'experimentalBridge': experimentalBridge,
       'experimentalDebug': experimentalDebug,
@@ -304,6 +311,10 @@ class SettingsSnapshot {
       ),
       multiAgent: MultiAgentConfig.fromJson(
         (json['multiAgent'] as Map?)?.cast<String, dynamic>() ?? const {},
+      ),
+      themeMode: ThemeMode.values.firstWhere(
+        (m) => m.name == json['themeMode'],
+        orElse: () => ThemeMode.system,
       ),
       experimentalCanvas: json['experimentalCanvas'] as bool? ?? false,
       experimentalBridge: json['experimentalBridge'] as bool? ?? false,
