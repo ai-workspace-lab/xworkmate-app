@@ -64,7 +64,7 @@ void main() {
       expect(loginCount, 1);
     });
 
-    testWidgets('shows sync and logout actions on the same row', (
+    testWidgets('shows account sync status, resync, and exit in signed-in mode', (
       tester,
     ) async {
       final controllers = _TestControllers();
@@ -141,22 +141,18 @@ void main() {
       );
 
       expect(find.text('账号登录与同步'), findsOneWidget);
-      expect(find.textContaining('svc.plus 托管配置'), findsOneWidget);
+      expect(find.text('账号同步'), findsOneWidget);
+      expect(find.textContaining('账号同步状态'), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-account-sync-button')), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-account-manual-reset-button')), findsNothing);
       expect(
-        find.byKey(const ValueKey('settings-account-disconnect-button')),
-        findsNothing,
-      );
-      expect(find.textContaining('本地配置'), findsNothing);
-      expect(find.textContaining('已断开'), findsNothing);
-      expect(find.textContaining('当前使用本地连接配置'), findsNothing);
-
-      final syncTop = tester.getTopLeft(
-        find.byKey(const ValueKey('settings-account-sync-button')),
-      );
-      final logoutTop = tester.getTopLeft(
         find.byKey(const ValueKey('settings-account-logout-button')),
+        findsOneWidget,
       );
-      expect(syncTop.dy, logoutTop.dy);
+
+      expect(find.byKey(const ValueKey('settings-account-summary-service-url')), findsNothing);
+      expect(find.byKey(const ValueKey('settings-account-summary-account-identifier')), findsNothing);
+      expect(find.byKey(const ValueKey('settings-account-summary-remote-summary')), findsNothing);
 
       await tester.tap(
         find.byKey(const ValueKey('settings-account-sync-button')),
@@ -171,7 +167,7 @@ void main() {
       expect(logoutCount, 1);
     });
 
-    testWidgets('keeps managed connection copy when account is signed in', (
+    testWidgets('keeps details collapsed by default and expands diagnostics', (
       tester,
     ) async {
       final controllers = _TestControllers();
@@ -193,6 +189,12 @@ void main() {
             accountState: AccountSyncState.defaults().copyWith(
               syncState: 'ready',
               syncMessage: 'Bridge access synced',
+              profileScope: 'bridge',
+              tokenConfigured: const AccountTokenConfigured(
+                bridge: true,
+                vault: false,
+                apisix: false,
+              ),
             ),
             accountBusy: false,
             accountSignedIn: true,
@@ -213,14 +215,88 @@ void main() {
         ),
       );
 
-      expect(find.textContaining('svc.plus 托管配置'), findsOneWidget);
-      expect(find.textContaining('本地配置'), findsNothing);
-      expect(find.textContaining('已断开'), findsNothing);
-      expect(find.textContaining('当前使用本地连接配置'), findsNothing);
+      expect(find.byKey(const ValueKey('settings-account-summary-service-url')), findsNothing);
+      expect(find.byKey(const ValueKey('settings-account-summary-account-identifier')), findsNothing);
       expect(
-        find.byKey(const ValueKey('settings-account-disconnect-button')),
-        findsNothing,
+        find.byKey(const ValueKey('settings-account-summary-expansion')),
+        findsOneWidget,
       );
+
+      await tester.tap(find.byType(ExpansionTile));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('settings-account-summary-service-url')), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-account-summary-account-identifier')), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-account-summary-remote-summary')), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-account-summary-last-sync')), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-account-summary-mfa-status')), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-account-summary-sync-scope')), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-account-summary-token-configured')), findsOneWidget);
+    });
+
+    testWidgets('shows manual bridge save status and reset action when not account sync', (
+      tester,
+    ) async {
+      final controllers = _TestControllers();
+      addTearDown(controllers.dispose);
+
+      var saveCount = 0;
+      var logoutCount = 0;
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: SettingsAccountPanel(
+            settings: SettingsSnapshot.defaults().copyWith(
+              acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults().copyWith(
+                selfHosted: AcpBridgeServerModeConfig.defaults().selfHosted.copyWith(
+                  serverUrl: 'https://xworkmate-bridge.svc.plus',
+                  passwordRef: 'bridge-token-ref',
+                ),
+              ),
+            ),
+            accountSession: const AccountSessionSummary(
+              userId: 'u-1',
+              email: 'review@svc.plus',
+              name: 'Review User',
+              role: 'operator',
+              mfaEnabled: false,
+            ),
+            accountState: null,
+            accountBusy: false,
+            accountSignedIn: true,
+            accountMfaRequired: false,
+            accountBaseUrlController: controllers.baseUrl,
+            accountIdentifierController: controllers.identifier,
+            accountPasswordController: controllers.password,
+            accountMfaCodeController: controllers.mfaCode,
+            bridgeUrlController: controllers.bridgeUrl,
+            bridgeTokenController: controllers.bridgeToken,
+            onSaveAccountProfile: () async {
+              saveCount += 1;
+            },
+            onLogin: () async {},
+            onVerifyMfa: () async {},
+            onCancelMfa: () async {},
+            onSync: () async {},
+            onLogout: () async {
+              logoutCount += 1;
+            },
+          ),
+        ),
+      );
+
+      expect(find.text('手动 Bridge'), findsOneWidget);
+      expect(find.textContaining('保存状态'), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-account-manual-reset-button')), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-account-sync-button')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('settings-account-manual-reset-button')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('settings-account-logout-button')));
+      await tester.pump();
+
+      expect(saveCount, 1);
+      expect(logoutCount, 1);
     });
 
     testWidgets('shows live syncing feedback while resync is running', (
