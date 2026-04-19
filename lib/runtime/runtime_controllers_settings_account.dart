@@ -51,6 +51,19 @@ extension SettingsControllerAccountExtension on SettingsController {
   Future<String> loadEffectiveGatewayToken({int? profileIndex}) async {
     final resolvedProfileIndex = (profileIndex ?? kGatewayRemoteProfileIndex)
         .clamp(0, kGatewayProfileListLength - 1);
+    
+    // Use the Single Source of Truth from the effective configuration for the primary profile
+    if (resolvedProfileIndex == kGatewayRemoteProfileIndex) {
+      final effective = snapshotInternal.acpBridgeServerModeConfig.effective;
+      if (effective.tokenRef.isNotEmpty) {
+        final token = await loadSecretValueByRef(effective.tokenRef);
+        if (token.isNotEmpty) {
+          return token;
+        }
+      }
+    }
+
+    // Local Override / Vault / Cloud Sync (Fallback if effective token is missing or for other profiles)
     return resolveSecretValueInternal(
       refName: gatewayTokenRefForProfileInternal(resolvedProfileIndex),
       fallbackRefName: SecretStore.gatewayTokenRefKey(resolvedProfileIndex),
@@ -63,6 +76,11 @@ extension SettingsControllerAccountExtension on SettingsController {
   Future<String> loadEffectiveGatewayPassword({int? profileIndex}) async {
     final resolvedProfileIndex = (profileIndex ?? kGatewayRemoteProfileIndex)
         .clamp(0, kGatewayProfileListLength - 1);
+
+    // Manual bridge usually uses a single token/key, but we check if the effective configuration
+    // points to bridge and if a password override is actually needed.
+    // For now, we fall back to the standard resolution logic.
+
     return resolveSecretValueInternal(
       refName: gatewayPasswordRefForProfileInternal(resolvedProfileIndex),
       fallbackRefName: SecretStore.gatewayPasswordRefKey(resolvedProfileIndex),

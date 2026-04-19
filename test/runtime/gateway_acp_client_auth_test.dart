@@ -274,9 +274,15 @@ void main() {
 
         final settings = SettingsSnapshot.defaults().copyWith(
           acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults().copyWith(
-            mode: AcpBridgeServerMode.manual,
+            effective: const AcpBridgeServerEffectiveConfig(
+              endpoint: 'https://manual-bridge.example.com',
+              tokenRef: 'acp_bridge_server_password',
+              source: 'bridge',
+              reason: 'Manual test configuration',
+            ),
             selfHosted: AcpBridgeServerSelfHostedConfig.defaults().copyWith(
               serverUrl: 'https://manual-bridge.example.com',
+              username: 'admin',
             ),
           ),
         );
