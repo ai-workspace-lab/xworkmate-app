@@ -319,17 +319,31 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
         apisix: false,
       ),
     );
-    await controller.storeInternal.saveAccountSyncState(nextState);
     final currentSettings = controller.snapshotInternal;
     final currentModeConfig = currentSettings.acpBridgeServerModeConfig;
+    
+    final nextEffective = resolveAcpBridgeServerEffectiveConfig(
+      controller,
+      config: currentModeConfig,
+      accountSyncState: nextState,
+    );
+
+    final identifier = (await controller.storeInternal.loadAccountSessionIdentifier())
+            ?.trim() ??
+        '';
     final nextModeConfig = currentModeConfig.copyWith(
+      effective: nextEffective,
       cloudSynced: currentModeConfig.cloudSynced.copyWith(
-        accountBaseUrl: '',
-        accountIdentifier: '',
+        accountBaseUrl: currentModeConfig.cloudSynced.accountBaseUrl.trim().isEmpty
+            ? normalizedBaseUrl
+            : currentModeConfig.cloudSynced.accountBaseUrl,
+        accountIdentifier: currentModeConfig.cloudSynced.accountIdentifier.trim().isEmpty
+            ? identifier
+            : currentModeConfig.cloudSynced.accountIdentifier,
         lastSyncAt: nextState.lastSyncAtMs,
         remoteServerSummary: currentModeConfig.cloudSynced.remoteServerSummary
             .copyWith(
-              endpoint: resolvedBridgeServerUrl,
+              endpoint: nextEffective.endpoint,
               hasAdvancedOverrides: false,
             ),
       ),
@@ -390,8 +404,12 @@ Future<void> logoutAccountSettingsInternal(
   final currentSnapshot = controller.snapshotInternal;
   final clearedCloudSync = currentSnapshot.acpBridgeServerModeConfig.cloudSynced
       .copyWith(
-        accountBaseUrl: '',
-        accountIdentifier: '',
+        accountBaseUrl: quiet
+            ? currentSnapshot.acpBridgeServerModeConfig.cloudSynced.accountBaseUrl
+            : '',
+        accountIdentifier: quiet
+            ? currentSnapshot.acpBridgeServerModeConfig.cloudSynced.accountIdentifier
+            : '',
         lastSyncAt: 0,
         remoteServerSummary: currentSnapshot
             .acpBridgeServerModeConfig
@@ -495,6 +513,11 @@ Future<void> _persistAccountSessionSummaryFromProfilePayloadInternal(
   if (summary.userId.trim().isNotEmpty) {
     await controller.storeInternal.saveAccountSessionUserId(summary.userId);
   }
+  if (summary.email.trim().isNotEmpty) {
+    await controller.storeInternal.saveAccountSessionIdentifier(
+      summary.email.trim(),
+    );
+  }
   final identifier = summary.email.trim().isNotEmpty
       ? summary.email.trim()
       : (await controller.storeInternal.loadAccountSessionIdentifier())
@@ -557,22 +580,49 @@ String _resolveBridgeServerUrl(Map<String, dynamic> payload) {
   return '';
 }
 
+AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfig(
+  SettingsController controller, {
+  required AcpBridgeServerModeConfig config,
+  AccountSyncState? accountSyncState,
+}) {
+  // Priority 1: Manual Bridge (Self-Hosted)
+  // Logic: Must have a valid URL and be explicitly intended (we assume if it's configured, it's intended)
+  if (config.selfHosted.isConfigured) {
+    return AcpBridgeServerEffectiveConfig(
+      endpoint: config.selfHosted.serverUrl,
+      tokenRef: config.selfHosted.passwordRef,
+      source: 'bridge',
+      reason: 'Manual Bridge configuration is present and valid',
+    );
+  }
+
+  // Priority 2: Cloud Sync (svc.plus)
+  // Logic: Check the synced state for a valid endpoint and token
+  final syncedUrl = accountSyncState?.syncedDefaults.bridgeServerUrl.trim() ?? '';
+  final hasSyncedToken = accountSyncState?.tokenConfigured.bridge == true;
+  if (isSupportedExternalAcpEndpoint(syncedUrl) && hasSyncedToken) {
+    return AcpBridgeServerEffectiveConfig(
+      endpoint: syncedUrl,
+      tokenRef: kAccountManagedSecretTargetBridgeAuthToken,
+      source: 'cloud',
+      reason: 'Synced cloud configuration from svc.plus is active',
+    );
+  }
+
+  // Priority 3: Default Managed Fallback
+  return AcpBridgeServerEffectiveConfig(
+    endpoint: kManagedBridgeServerUrl,
+    tokenRef: '',
+    source: 'default',
+    reason: 'Falling back to default managed server',
+  );
+}
+
 String _resolveCurrentBridgeServerUrl(
   SettingsController controller, {
   String bridgeServerUrlOverride = '',
 }) {
-  final explicit = bridgeServerUrlOverride.trim();
-  if (isSupportedExternalAcpEndpoint(explicit)) {
-    return explicit;
-  }
-  final syncedBridgeServerUrl =
-      controller.accountSyncStateInternal?.syncedDefaults.bridgeServerUrl
-          .trim() ??
-      '';
-  if (isSupportedExternalAcpEndpoint(syncedBridgeServerUrl)) {
-    return syncedBridgeServerUrl;
-  }
-  return kManagedBridgeServerUrl;
+  return controller.snapshotInternal.acpBridgeServerModeConfig.effective.endpoint;
 }
 
 int _parseExpiresAtMs(Object? value) {

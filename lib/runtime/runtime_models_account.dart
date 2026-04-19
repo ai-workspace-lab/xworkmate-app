@@ -265,17 +265,6 @@ class AccountRemoteProfile {
   }
 }
 
-enum AcpBridgeServerMode { cloudSynced, manual }
-
-extension AcpBridgeServerModeCopy on AcpBridgeServerMode {
-  static AcpBridgeServerMode fromJsonValue(String? value) {
-    return AcpBridgeServerMode.values.firstWhere(
-      (item) => item.name == value,
-      orElse: () => AcpBridgeServerMode.cloudSynced,
-    );
-  }
-}
-
 class AcpBridgeServerRemoteServerSummary {
   const AcpBridgeServerRemoteServerSummary({
     required this.endpoint,
@@ -516,22 +505,77 @@ class AcpBridgeServerAdvancedOverrides {
   }
 }
 
+class AcpBridgeServerEffectiveConfig {
+  const AcpBridgeServerEffectiveConfig({
+    required this.endpoint,
+    required this.tokenRef,
+    required this.source,
+    required this.reason,
+  });
+
+  final String endpoint;
+  final String tokenRef;
+  final String source; // 'bridge' | 'cloud' | 'default'
+  final String reason;
+
+  factory AcpBridgeServerEffectiveConfig.defaults() {
+    return const AcpBridgeServerEffectiveConfig(
+      endpoint: kManagedBridgeServerUrl,
+      tokenRef: '',
+      source: 'default',
+      reason: 'No active source configured',
+    );
+  }
+
+  AcpBridgeServerEffectiveConfig copyWith({
+    String? endpoint,
+    String? tokenRef,
+    String? source,
+    String? reason,
+  }) {
+    return AcpBridgeServerEffectiveConfig(
+      endpoint: endpoint ?? this.endpoint,
+      tokenRef: tokenRef ?? this.tokenRef,
+      source: source ?? this.source,
+      reason: reason ?? this.reason,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'endpoint': endpoint,
+      'tokenRef': tokenRef,
+      'source': source,
+      'reason': reason,
+    };
+  }
+
+  factory AcpBridgeServerEffectiveConfig.fromJson(Map<String, dynamic> json) {
+    return AcpBridgeServerEffectiveConfig(
+      endpoint: json['endpoint'] as String? ?? kManagedBridgeServerUrl,
+      tokenRef: json['tokenRef'] as String? ?? '',
+      source: json['source'] as String? ?? 'default',
+      reason: json['reason'] as String? ?? '',
+    );
+  }
+}
+
 class AcpBridgeServerModeConfig {
   const AcpBridgeServerModeConfig({
-    required this.mode,
+    required this.effective,
     required this.cloudSynced,
     required this.selfHosted,
     required this.advancedOverrides,
   });
 
-  final AcpBridgeServerMode mode;
+  final AcpBridgeServerEffectiveConfig effective;
   final AcpBridgeServerCloudSyncConfig cloudSynced;
   final AcpBridgeServerSelfHostedConfig selfHosted;
   final AcpBridgeServerAdvancedOverrides advancedOverrides;
 
   factory AcpBridgeServerModeConfig.defaults() {
     return AcpBridgeServerModeConfig(
-      mode: AcpBridgeServerMode.cloudSynced,
+      effective: AcpBridgeServerEffectiveConfig.defaults(),
       cloudSynced: AcpBridgeServerCloudSyncConfig.defaults(),
       selfHosted: AcpBridgeServerSelfHostedConfig.defaults(),
       advancedOverrides: AcpBridgeServerAdvancedOverrides.defaults(),
@@ -539,30 +583,30 @@ class AcpBridgeServerModeConfig {
   }
 
   AcpBridgeServerModeConfig copyWith({
-    AcpBridgeServerMode? mode,
+    AcpBridgeServerEffectiveConfig? effective,
     AcpBridgeServerCloudSyncConfig? cloudSynced,
     AcpBridgeServerSelfHostedConfig? selfHosted,
     AcpBridgeServerAdvancedOverrides? advancedOverrides,
   }) {
     return AcpBridgeServerModeConfig(
-      mode: mode ?? this.mode,
+      effective: effective ?? this.effective,
       cloudSynced: cloudSynced ?? this.cloudSynced,
       selfHosted: selfHosted ?? this.selfHosted,
       advancedOverrides: advancedOverrides ?? this.advancedOverrides,
     );
   }
 
-  bool get usesSelfHostedBase => mode == AcpBridgeServerMode.manual;
+  bool get usesSelfHostedBase => effective.source == 'bridge';
 
-  bool get usesCloudSyncBase => mode == AcpBridgeServerMode.cloudSynced;
+  bool get usesCloudSyncBase => !usesSelfHostedBase;
 
-  String get sourceTag => mode.name;
+  String get sourceTag => effective.source;
 
   String toJsonString() => jsonEncode(toJson());
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
-      'mode': mode.name,
+      'effective': effective.toJson(),
       'cloudSynced': cloudSynced.toJson(),
       'selfHosted': selfHosted.toJson(),
       'advancedOverrides': advancedOverrides.toJson(),
@@ -571,7 +615,9 @@ class AcpBridgeServerModeConfig {
 
   factory AcpBridgeServerModeConfig.fromJson(Map<String, dynamic> json) {
     return AcpBridgeServerModeConfig(
-      mode: AcpBridgeServerModeCopy.fromJsonValue(json['mode'] as String?),
+      effective: AcpBridgeServerEffectiveConfig.fromJson(
+        (json['effective'] as Map?)?.cast<String, dynamic>() ?? const {},
+      ),
       cloudSynced: AcpBridgeServerCloudSyncConfig.fromJson(
         (json['cloudSynced'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),

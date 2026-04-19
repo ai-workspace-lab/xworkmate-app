@@ -52,8 +52,7 @@ class SettingsAccountPanel extends StatelessWidget {
     if (!accountSignedIn && !accountMfaRequired) {
       return DefaultTabController(
         length: 2,
-        initialIndex: settings.acpBridgeServerModeConfig.mode ==
-                AcpBridgeServerMode.manual
+        initialIndex: settings.acpBridgeServerModeConfig.effective.source == 'bridge'
             ? 1
             : 0,
         child: Column(
@@ -64,12 +63,10 @@ class SettingsAccountPanel extends StatelessWidget {
                 Tab(text: appText('手动 Bridge 配置', 'Manual Bridge Config')),
               ],
               onTap: (index) {
-                final mode = index == 1
-                    ? AcpBridgeServerMode.manual
-                    : AcpBridgeServerMode.cloudSynced;
-                if (settings.acpBridgeServerModeConfig.mode != mode) {
-                  onSaveAccountProfile(); // This should trigger a save with the new mode
-                }
+                // Switching tabs saves the profile, which triggers a resolution of the effective config.
+                // We don't need a boolean flag anymore; the presence/validity of sources determines the source.
+                // But we still want to save on tap to persist the user's intent.
+                onSaveAccountProfile();
               },
             ),
             const SizedBox(height: 24),
