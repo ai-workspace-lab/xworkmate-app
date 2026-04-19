@@ -54,9 +54,8 @@ if [[ -z "$DMG_PATH" ]]; then
     echo "No DMG found under $DIST_DIR for $APP_NAME" >&2
     exit 1
   fi
-  IFS=$'\n' dmgs=($(ls -t "${dmgs[@]}"))
-  unset IFS
-  DMG_PATH="${dmgs[0]}"
+  # Sort by modification time and pick the newest
+  DMG_PATH="$(ls -t "${dmgs[@]}" | head -n 1)"
 fi
 
 if [[ ! -f "$DMG_PATH" ]]; then
