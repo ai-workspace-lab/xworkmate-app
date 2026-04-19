@@ -116,52 +116,24 @@ Future<String> loadGatewayTokenSettingsInternal(
   SettingsController controller, {
   int? profileIndex,
 }) async {
-  if (profileIndex == null) {
-    return (await controller.storeInternal.loadGatewayToken())?.trim() ?? '';
-  }
   final refName = gatewayTokenRefForProfileSettingsInternal(
     controller,
-    profileIndex,
+    profileIndex ?? kGatewayRemoteProfileIndex,
   );
-  final byRef =
-      (await controller.storeInternal.loadSecretValueByRef(refName))?.trim() ??
+  return (await controller.storeInternal.loadSecretValueByRef(refName))?.trim() ??
       '';
-  if (byRef.isNotEmpty) {
-    return byRef;
-  }
-  if (refName == SecretStore.gatewayTokenRefKey(profileIndex)) {
-    return (await controller.storeInternal.loadGatewayToken(
-          profileIndex: profileIndex,
-        ))?.trim() ??
-        '';
-  }
-  return '';
 }
 
 Future<String> loadGatewayPasswordSettingsInternal(
   SettingsController controller, {
   int? profileIndex,
 }) async {
-  if (profileIndex == null) {
-    return (await controller.storeInternal.loadGatewayPassword())?.trim() ?? '';
-  }
   final refName = gatewayPasswordRefForProfileSettingsInternal(
     controller,
-    profileIndex,
+    profileIndex ?? kGatewayRemoteProfileIndex,
   );
-  final byRef =
-      (await controller.storeInternal.loadSecretValueByRef(refName))?.trim() ??
+  return (await controller.storeInternal.loadSecretValueByRef(refName))?.trim() ??
       '';
-  if (byRef.isNotEmpty) {
-    return byRef;
-  }
-  if (refName == SecretStore.gatewayPasswordRefKey(profileIndex)) {
-    return (await controller.storeInternal.loadGatewayPassword(
-          profileIndex: profileIndex,
-        ))?.trim() ??
-        '';
-  }
-  return '';
 }
 
 bool hasStoredGatewayTokenForProfileSettingsInternal(
@@ -288,17 +260,8 @@ Future<String> loadOllamaCloudApiKeySettingsInternal(
   SettingsController controller,
 ) async {
   final refName = ollamaCloudApiKeyRefSettingsInternal(controller);
-  final byRef =
-      (await controller.storeInternal.loadSecretValueByRef(refName))?.trim() ??
+  return (await controller.storeInternal.loadSecretValueByRef(refName))?.trim() ??
       '';
-  if (byRef.isNotEmpty) {
-    return byRef;
-  }
-  if (refName == 'ollama_cloud_api_key') {
-    return (await controller.storeInternal.loadOllamaCloudApiKey())?.trim() ??
-        '';
-  }
-  return '';
 }
 
 Future<void> saveVaultTokenSettingsInternal(
@@ -331,16 +294,8 @@ Future<String> loadVaultTokenSettingsInternal(
   SettingsController controller,
 ) async {
   final refName = vaultTokenRefSettingsInternal(controller);
-  final byRef =
-      (await controller.storeInternal.loadSecretValueByRef(refName))?.trim() ??
+  return (await controller.storeInternal.loadSecretValueByRef(refName))?.trim() ??
       '';
-  if (byRef.isNotEmpty) {
-    return byRef;
-  }
-  if (refName == 'vault_token') {
-    return (await controller.storeInternal.loadVaultToken())?.trim() ?? '';
-  }
-  return '';
 }
 
 Future<void> saveAiGatewayApiKeySettingsInternal(
@@ -373,16 +328,8 @@ Future<String> loadAiGatewayApiKeySettingsInternal(
   SettingsController controller,
 ) async {
   final refName = aiGatewayApiKeyRefSettingsInternal(controller);
-  final byRef =
-      (await controller.storeInternal.loadSecretValueByRef(refName))?.trim() ??
+  return (await controller.storeInternal.loadSecretValueByRef(refName))?.trim() ??
       '';
-  if (byRef.isNotEmpty) {
-    return byRef;
-  }
-  if (refName == 'ai_gateway_api_key') {
-    return (await controller.storeInternal.loadAiGatewayApiKey())?.trim() ?? '';
-  }
-  return '';
 }
 
 Future<void> clearAiGatewayApiKeySettingsInternal(
@@ -440,15 +387,7 @@ Future<String> loadVaultTokenForSecretReadsSettingsInternal(
   if (override.isNotEmpty) {
     return override;
   }
-  final token = await loadVaultTokenSettingsInternal(controller);
-  if (token.isNotEmpty) {
-    return token;
-  }
-  final refName = vaultTokenRefSettingsInternal(controller);
-  if (refName == 'vault_token') {
-    return (await controller.storeInternal.loadVaultToken())?.trim() ?? '';
-  }
-  return '';
+  return loadVaultTokenSettingsInternal(controller);
 }
 
 Future<String> readVaultSecretByRefSettingsInternal(

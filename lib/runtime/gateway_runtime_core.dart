@@ -13,6 +13,7 @@ import 'device_identity_store.dart';
 import 'gateway_runtime_session_client.dart';
 import 'platform_environment.dart';
 import 'runtime_models.dart';
+import 'secret_store.dart';
 import 'secure_config_store.dart';
 import 'gateway_runtime_protocol.dart';
 import 'gateway_runtime_events.dart';
@@ -135,17 +136,9 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
         ? SecretStore.gatewayPasswordRefKey(resolvedProfileIndex)
         : profile.passwordRef.trim();
     final storedToken =
-        (await storeInternal.loadSecretValueByRef(tokenRef))?.trim() ??
-        ((await storeInternal.loadGatewayToken(
-              profileIndex: profileIndex,
-            ))?.trim() ??
-            '');
+        (await storeInternal.loadSecretValueByRef(tokenRef))?.trim() ?? '';
     final storedPassword =
-        (await storeInternal.loadSecretValueByRef(passwordRef))?.trim() ??
-        ((await storeInternal.loadGatewayPassword(
-              profileIndex: profileIndex,
-            ))?.trim() ??
-            '');
+        (await storeInternal.loadSecretValueByRef(passwordRef))?.trim() ?? '';
     final explicitToken = authTokenOverride.trim();
     final explicitPassword = authPasswordOverride.trim();
     final passwordSource = explicitPassword.isNotEmpty

@@ -128,12 +128,12 @@ check-export-compliance: ## Verify source and built Apple plist export-complianc
 
 rust-build: rust-build-release ## Build Rust FFI library (release mode)
 
-rust-build-release: ## Build Rust FFI library for macOS (universal)
-	bash scripts/build_rust_ffi.sh release
+rust-build-release: ## Build Rust FFI library for macOS (release)
+	cd rust && cargo build --release
 	@echo "Rust FFI library built successfully"
 
 rust-build-debug: ## Build Rust FFI library in debug mode
-	bash scripts/build_rust_ffi.sh debug
+	cd rust && cargo build
 
 rust-test: ## Run Rust tests
 	cd rust && cargo test
