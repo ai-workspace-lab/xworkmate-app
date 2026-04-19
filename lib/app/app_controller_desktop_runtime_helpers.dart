@@ -644,7 +644,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       }
     }
     final modeConfig = settings.acpBridgeServerModeConfig;
-    final candidate = modeConfig.mode == AcpBridgeServerMode.manual
+    final candidate = modeConfig.usesSelfHostedBase
         ? modeConfig.selfHosted.serverUrl.trim()
         : kManagedBridgeServerUrl;
     final uri = Uri.tryParse(candidate.isEmpty ? kManagedBridgeServerUrl : candidate);
@@ -696,7 +696,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         return normalizedToken;
       }
       final modeConfig = settings.acpBridgeServerModeConfig;
-      if (modeConfig.mode == AcpBridgeServerMode.manual) {
+      if (modeConfig.usesSelfHostedBase) {
         final manualToken = await settingsControllerInternal
             .loadSecretValueByRef(modeConfig.selfHosted.passwordRef);
         if (manualToken.trim().isNotEmpty) {

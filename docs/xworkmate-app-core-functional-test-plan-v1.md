@@ -17,10 +17,23 @@
 
 ### 1. Provider 发现与 UI 展示
 
-- “智能体模式” provider 列表由 bridge `acp.capabilities` 动态驱动。
 - UI 不依赖固定静态 provider 列表。
+- “智能体模式” provider 列表由 bridge `acp.capabilities` 动态驱动。
+- “Gateway 模式” provider 列表由 bridge `目前支持 openclaw
 - 当 bridge 广告能力变化时，provider selector、状态文案和可执行状态同步更新。
 - `auto` 模式下，UI 应表现为“由 bridge 当前可用项决定”，而不是写死默认 provider。
+
+  | Service Endpoint      │ Protocol   │ Result │ Functional Check                  │
+  ├───────────────────────┼────────────┼────────┼───────────────────────────────────┤
+  │ /acp-server/codex/    │ JSON-RPC   │ PASS   │ acp.capabilities returned         │
+  │                       │ (SSE/HTTP) │        │ successfully via /acp/rpc         │
+  │ /acp-server/gemini/   │ JSON-RPC   │ PASS   │ acp.capabilities returned         │
+  │                       │ (SSE/HTTP) │        │ successfully via /acp/rpc         │
+  │ /acp-server/opencode/ │ JSON-RPC   │ PASS   │ acp.capabilities returned         │
+  │                       │ (SSE/HTTP) │        │ successfully via /acp/rpc         │
+  │ /gateway/openclaw/    │ WSS / RPC  │ PASS   │ WebSocket handshake successful at │
+  │                       │            │        │ /acp; received connect.challenge
+
 
 ### 2. Assistant 线程体验
 
@@ -76,9 +89,9 @@
 
 | Case | UI 侧目标能力 | 核心验收点 |
 | --- | --- | --- |
-| `pptx` | 展示生成中的文稿任务与追问续写 | 首次生成结果可见；继续追问仍在同线程；workspace 不变；新文件或新版本可见 |
 | `docx` | 展示文档生成结果 | `.docx` 写回当前线程；assistant 结果与 artifact 面板一致；后续补写仍在同线程 |
 | `xlsx` | 展示表格与计算结果 | `.xlsx` 结果写回当前线程；后续追问继续修改同一线程内容 |
+| `pptx` | 展示生成中的文稿任务与追问续写 | 首次生成结果可见；继续追问仍在同线程；workspace 不变；新文件或新版本可见 |
 | `pdf` | 展示文件转换结果 | `.pdf` 产物可见；转换后结果属于当前线程；继续操作不漂移 |
 | `image-resizer` | 展示图片处理结果 | 输出图片写回当前线程；artifact 面板可见；尺寸变化可通过测试或 fixture 校验 |
 | `browser` | 展示摘要、截图、日志 | assistant 文本有摘要；截图 / 日志进入 artifact 面板；继续浏览仍在当前线程 |

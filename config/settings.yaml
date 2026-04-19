@@ -1,0 +1,32 @@
+schemaVersion: 2
+appLanguage: zh
+workspacePath: ''
+cliPath: openclaw
+defaultProvider: gateway
+accountBaseUrl: https://accounts.svc.plus
+accountUsername: ''
+acpBridgeServerModeConfig:
+  effective:
+    endpoint: https://xworkmate-bridge.svc.plus
+    tokenRef: bridge.auth_token
+    source: cloud
+    reason: Synced cloud configuration from svc.plus is active
+  cloudSynced:
+    accountBaseUrl: https://accounts.svc.plus
+    accountIdentifier: ''
+    lastSyncAt: 0
+    remoteServerSummary:
+      endpoint: https://xworkmate-bridge.svc.plus
+      hasAdvancedOverrides: false
+  selfHosted:
+    serverUrl: ''
+    username: ''
+    passwordRef: acp_bridge_server_password
+gatewayProfiles:
+- mode: unconfigured
+  useSetupCode: false
+  host: ''
+  port: 443
+  tls: true
+  tokenRef: gateway_token_0
+  passwordRef: gateway_password_0

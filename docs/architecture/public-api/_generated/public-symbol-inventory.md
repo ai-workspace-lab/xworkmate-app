@@ -1382,7 +1382,6 @@ _No extracted public top-level symbols._
 | 68 | `class` | `AccountTokenConfigured` | `class AccountTokenConfigured {` |
 | 108 | `class` | `AccountSecretLocator` | `class AccountSecretLocator {` |
 | 166 | `class` | `AccountRemoteProfile` | `class AccountRemoteProfile {` |
-| 267 | `enum` | `AcpBridgeServerMode` | `enum AcpBridgeServerMode { cloudSynced }` |
 | 269 | `class` | `AcpBridgeServerRemoteServerSummary` | `class AcpBridgeServerRemoteServerSummary {` |
 | 312 | `class` | `AcpBridgeServerCloudSyncConfig` | `class AcpBridgeServerCloudSyncConfig {` |
 | 370 | `class` | `AcpBridgeServerSelfHostedConfig` | `class AcpBridgeServerSelfHostedConfig {` |

@@ -113,14 +113,25 @@ class _SettingsPageState extends State<SettingsPage> {
     final bridgeConfig = settings.acpBridgeServerModeConfig;
     final isManual = DefaultTabController.of(context).index == 1;
 
+    var nextBridgeConfig = bridgeConfig.copyWith(
+      selfHosted: bridgeConfig.selfHosted.copyWith(
+        serverUrl: _bridgeUrlController.text.trim(),
+        username: isManual ? 'admin' : bridgeConfig.selfHosted.username,
+      ),
+    );
+
+    // Resolve the effective config based on the new sources
+    final nextEffective = resolveAcpBridgeServerEffectiveConfig(
+      widget.controller.settingsController,
+      config: nextBridgeConfig,
+      accountSyncState: widget.controller.settingsController.accountSyncState,
+    );
+
     final nextSettings = settings.copyWith(
       accountBaseUrl: _accountBaseUrlController.text.trim(),
       accountUsername: _accountIdentifierController.text.trim(),
-      acpBridgeServerModeConfig: bridgeConfig.copyWith(
-        mode: isManual ? AcpBridgeServerMode.manual : AcpBridgeServerMode.cloudSynced,
-        selfHosted: bridgeConfig.selfHosted.copyWith(
-          serverUrl: _bridgeUrlController.text.trim(),
-        ),
+      acpBridgeServerModeConfig: nextBridgeConfig.copyWith(
+        effective: nextEffective,
       ),
     );
     if (isManual && _bridgeTokenController.text.isNotEmpty) {
