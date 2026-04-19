@@ -96,6 +96,7 @@ class SecretStore {
       'xworkmate.account.session.identifier';
   static const String _accountSessionSummaryKey =
       'xworkmate.account.session.summary';
+  static const String _accountSyncStateKey = 'xworkmate.account.sync_state';
   static const String _customSecretRefRegistryKey =
       'xworkmate.secret.ref_registry';
 
@@ -106,6 +107,8 @@ class SecretStore {
   SecureStorageClient? _secureStorage;
   bool _initialized = false;
   PersistentWriteFailure? _secretsWriteFailure;
+
+  Map<String, String> get secureRefs => Map<String, String>.unmodifiable(_memorySecure);
 
   PersistentWriteFailure? get secretsWriteFailure => _secretsWriteFailure;
 
@@ -253,6 +256,27 @@ class SecretStore {
 
   Future<void> clearAccountSessionSummary() =>
       _deleteSecure(_accountSessionSummaryKey);
+
+  Future<AccountSyncState?> loadAccountSyncState() async {
+    final raw = await _readSecure(_accountSyncStateKey);
+    if ((raw ?? '').trim().isEmpty) {
+      return null;
+    }
+    try {
+      return AccountSyncState.fromJson(
+        (jsonDecode(raw!) as Map).cast<String, dynamic>(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveAccountSyncState(AccountSyncState value) =>
+      _writeSecure(_accountSyncStateKey, jsonEncode(value.toJson()));
+
+  Future<void> clearAccountSyncState() => _deleteSecure(_accountSyncStateKey);
+
+  Future<Map<String, String>> loadAccountManagedSecrets() => loadSecureRefs();
 
   Future<String?> loadAccountManagedSecret({required String target}) =>
       _readSecure(_accountManagedSecretKey(target));

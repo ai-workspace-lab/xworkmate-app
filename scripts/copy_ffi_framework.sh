@@ -28,7 +28,7 @@ elif [[ -f "$DEBUG_LIB" ]]; then
     echo "Copying debug FFI library..."
     cp "$DEBUG_LIB" "$FRAMEWORKS_DIR/"
 else
-    echo "Warning: FFI library not found. Run scripts/build_rust_ffi.sh first."
+    echo "Warning: FFI library not found. Run make rust-build-release first."
     echo "Expected one of:"
     echo "  - $UNIVERSAL_LIB"
     echo "  - $ARM_LIB"

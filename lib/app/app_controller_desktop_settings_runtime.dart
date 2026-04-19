@@ -18,6 +18,8 @@ import '../runtime/desktop_platform_service.dart';
 import '../runtime/gateway_runtime.dart';
 import '../runtime/runtime_controllers.dart';
 import '../runtime/runtime_models.dart';
+import '../runtime/secret_store.dart';
+import '../runtime/settings_store.dart';
 import '../runtime/secure_config_store.dart';
 import '../runtime/embedded_agent_launch_policy.dart';
 import '../runtime/runtime_coordinator.dart';
@@ -755,6 +757,8 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     await settingsControllerInternal.saveSnapshot(sanitized);
     settingsDraftInternal = sanitized;
     settingsDraftInitializedInternal = true;
+  }
+
   Future<void> applyPersistedSettingsSideEffectsInternal({
     required SettingsSnapshot previous,
     required SettingsSnapshot current,
@@ -780,11 +784,8 @@ extension AppControllerDesktopSettingsRuntime on AppController {
 
     if (refreshAfterSave || bridgeChanged) {
       // Re-trigger Bridge capability discovery if the mode or endpoint changed.
-      unawaited(refreshAcpCapabilitiesInternal(quiet: true));
+      unawaited(refreshAcpCapabilitiesInternal());
     }
-
-    notifyListeners();
-  }
 
     if (disposedInternal) {
       return;

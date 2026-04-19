@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'runtime_models_configs.dart';
 import 'runtime_models_profiles.dart';
 
@@ -556,6 +557,8 @@ class AcpBridgeServerModeConfig {
   bool get usesCloudSyncBase => mode == AcpBridgeServerMode.cloudSynced;
 
   String get sourceTag => mode.name;
+
+  String toJsonString() => jsonEncode(toJson());
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{

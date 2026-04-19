@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'account_runtime_client.dart';
 import 'gateway_runtime.dart';
 import 'runtime_models.dart';
+import 'secret_store.dart';
 import 'secure_config_store.dart';
 import 'runtime_controllers_gateway.dart';
 import 'runtime_controllers_entities.dart';

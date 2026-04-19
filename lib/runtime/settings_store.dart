@@ -17,19 +17,45 @@ class SettingsSnapshotReloadResult {
   final SettingsSnapshot snapshot;
 }
 
+enum SkippedTaskThreadReason {
+  removedAutoExecutionMode,
+  incompleteWorkspaceBinding,
+  invalidPersistedThreadData,
+}
+
+class SkippedTaskThreadRecord {
+  const SkippedTaskThreadRecord({
+    required this.threadId,
+    required this.reason,
+  });
+
+  final String threadId;
+  final SkippedTaskThreadReason reason;
+}
+
 class SettingsStore {
   SettingsStore(this._layoutResolver);
 
   final StoreLayoutResolver _layoutResolver;
-  String? _auditWriteFailure;
-  String? get auditWriteFailure => _auditWriteFailure;
+  
+  PersistentWriteFailure? _settingsWriteFailure;
+  PersistentWriteFailure? get settingsWriteFailure => _settingsWriteFailure;
+
+  PersistentWriteFailure? _tasksWriteFailure;
+  PersistentWriteFailure? get tasksWriteFailure => _tasksWriteFailure;
+
+  PersistentWriteFailure? _auditWriteFailure;
+  PersistentWriteFailure? get auditWriteFailure => _auditWriteFailure;
+
+  final List<SkippedTaskThreadRecord> _lastSkippedInvalidTaskThreadRecords = [];
+  List<SkippedTaskThreadRecord> get lastSkippedInvalidTaskThreadRecords => List.unmodifiable(_lastSkippedInvalidTaskThreadRecords);
 
   Future<void> initialize() async {
     // Basic connectivity check.
     try {
       await _layoutResolver.resolve();
     } catch (e) {
-      _auditWriteFailure = 'Storage unavailable: $e';
+      _settingsWriteFailure = _wrapFailure('initialize', PersistentStoreScope.settings, e);
     }
   }
 
@@ -42,7 +68,7 @@ class SettingsStore {
         return SettingsSnapshot.fromJsonString(content);
       }
     } catch (e) {
-      _auditWriteFailure = 'Failed to load settings: $e';
+       _settingsWriteFailure = _wrapFailure('loadSnapshot', PersistentStoreScope.settings, e);
     }
     return SettingsSnapshot.defaults();
   }
@@ -52,10 +78,9 @@ class SettingsStore {
       final layout = await _layoutResolver.resolve();
       final file = File('${layout.configDirectory.path}/settings.yaml');
       await file.writeAsString(snapshot.toJsonString(), flush: true);
-      _auditWriteFailure = null;
+      _settingsWriteFailure = null;
     } catch (e) {
-      _auditWriteFailure = 'Failed to save settings: $e';
-      // In-memory fallback happens at Controller level via current snapshot retention.
+      _settingsWriteFailure = _wrapFailure('saveSnapshot', PersistentStoreScope.settings, e);
     }
   }
 
@@ -64,31 +89,84 @@ class SettingsStore {
     return SettingsSnapshotReloadResult(applied: true, snapshot: next);
   }
 
-  Future<Map<String, TaskThread>> loadTaskThreads() async {
+  Future<List<TaskThread>> loadTaskThreads() async {
     try {
       final layout = await _layoutResolver.resolve();
       final file = File('${layout.tasksDirectory.path}/threads.json');
       if (await file.exists()) {
         final content = await file.readAsString();
         final decoded = jsonDecode(content);
-        if (decoded is Map<String, dynamic>) {
-          return decoded.map((key, value) => MapEntry(key, TaskThread.fromJson(value)));
+        if (decoded is List) {
+          return decoded.map((e) => TaskThread.fromJson(e)).toList();
+        }
+      }
+    } catch (e) {
+      _tasksWriteFailure = _wrapFailure('loadTaskThreads', PersistentStoreScope.tasks, e);
+    }
+    return const [];
+  }
+
+  Future<void> saveTaskThreads(List<TaskThread> threads) async {
+    try {
+      final layout = await _layoutResolver.resolve();
+      final file = File('${layout.tasksDirectory.path}/threads.json');
+      await file.writeAsString(jsonEncode(threads), flush: true);
+      _tasksWriteFailure = null;
+    } catch (e) {
+      _tasksWriteFailure = _wrapFailure('saveTaskThreads', PersistentStoreScope.tasks, e);
+    }
+  }
+
+  Future<void> clearAssistantLocalState() async {
+    try {
+      final layout = await _layoutResolver.resolve();
+      await deleteIfExists(File('${layout.tasksDirectory.path}/threads.json'));
+      await deleteIfExists(File('${layout.configDirectory.path}/settings.yaml'));
+    } catch (_) {
+      // Ignore errors for secondary persistence.
+    }
+  }
+
+  Future<List<SecretAuditEntry>> loadAuditTrail() async {
+    try {
+      final layout = await _layoutResolver.resolve();
+      final file = File('${layout.configDirectory.path}/audit.json');
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        final decoded = jsonDecode(content);
+        if (decoded is List) {
+          return decoded.map((e) => SecretAuditEntry.fromJson(e)).toList();
         }
       }
     } catch (_) {
       // Ignore errors for secondary persistence.
     }
-    return const {};
+    return const [];
   }
 
-  Future<void> saveTaskThreads(Map<String, TaskThread> threads) async {
+  Future<void> appendAudit(SecretAuditEntry entry) async {
     try {
+      final items = (await loadAuditTrail()).toList(growable: true);
+      items.insert(0, entry);
+      if (items.length > 40) {
+        items.removeRange(40, items.length);
+      }
       final layout = await _layoutResolver.resolve();
-      final file = File('${layout.tasksDirectory.path}/threads.json');
-      await file.writeAsString(jsonEncode(threads), flush: true);
-    } catch (_) {
-      // Ignore errors for secondary persistence.
+      final file = File('${layout.configDirectory.path}/audit.json');
+      await file.writeAsString(jsonEncode(items), flush: true);
+      _auditWriteFailure = null;
+    } catch (e) {
+      _auditWriteFailure = _wrapFailure('appendAudit', PersistentStoreScope.audit, e);
     }
+  }
+
+  PersistentWriteFailure _wrapFailure(String operation, PersistentStoreScope scope, Object error) {
+    return PersistentWriteFailure(
+      scope: scope,
+      operation: operation,
+      message: error.toString(),
+      timestampMs: DateTime.now().millisecondsSinceEpoch,
+    );
   }
 
   void dispose() {}
