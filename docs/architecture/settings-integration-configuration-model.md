@@ -13,6 +13,14 @@ Last Updated: 2026-04-19
 - `cloudSynced` 只在 manual Bridge 未配置时作为有效回退来源
 - app 不从本地 endpoint preset、旧 module 配置、历史 fallback 恢复 provider catalog
 - `xworkmate-bridge` 仍然是 provider catalog、gateway capability、routing resolve 的唯一真源
+- `BRIDGE_SERVER_URL` 只属于 `AccountSyncState` 元数据
+- `BRIDGE_AUTH_TOKEN` 只进入 secure storage / managed secret
+
+## Canonical State Model
+
+For the detailed state diagram and ownership rules, see:
+
+- [Account Sync, Settings, and Bridge State Model](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/account-sync-settings-bridge-state-model.md)
 
 ## Bridge-Owned Source Of Truth
 

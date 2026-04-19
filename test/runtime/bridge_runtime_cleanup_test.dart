@@ -9,14 +9,19 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 void main() {
   group('Bridge runtime cleanup', () {
     test(
-      'resolves the current synced bridge endpoint before env leftovers',
+      'keeps runtime pinned to managed bridge while preserving synced metadata',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
           'xworkmate-bridge-runtime-cleanup-',
         );
         addTearDown(() async {
           if (await storeRoot.exists()) {
-            await storeRoot.delete(recursive: true);
+            try {
+              await storeRoot.delete(recursive: true);
+            } on FileSystemException {
+              // Best-effort cleanup. Flutter tests can still hold temporary files
+              // briefly when teardown starts.
+            }
           }
         });
 
@@ -47,7 +52,7 @@ void main() {
 
         expect(
           controller.resolveBridgeAcpEndpointInternal()?.toString(),
-          'https://xworkmate-bridge-alt.svc.plus',
+          kManagedBridgeServerUrl,
         );
         expect(
           controller
@@ -55,6 +60,14 @@ void main() {
                 AssistantExecutionTarget.gateway,
               )
               ?.toString(),
+          kManagedBridgeServerUrl,
+        );
+        expect(
+          await store.loadAccountSyncState(),
+          isNotNull,
+        );
+        expect(
+          (await store.loadAccountSyncState())!.syncedDefaults.bridgeServerUrl,
           'https://xworkmate-bridge-alt.svc.plus',
         );
       },
