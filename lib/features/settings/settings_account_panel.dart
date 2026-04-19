@@ -40,7 +40,8 @@ class SettingsAccountPanel extends StatelessWidget {
   final TextEditingController accountMfaCodeController;
   final TextEditingController bridgeUrlController;
   final TextEditingController bridgeTokenController;
-  final Future<void> Function() onSaveAccountProfile;
+  final Future<void> Function({required bool isManualBridge})
+  onSaveAccountProfile;
   final Future<void> Function() onLogin;
   final Future<void> Function() onVerifyMfa;
   final Future<void> Function() onCancelMfa;
@@ -63,10 +64,7 @@ class SettingsAccountPanel extends StatelessWidget {
                 Tab(text: appText('手动 Bridge 配置', 'Manual Bridge Config')),
               ],
               onTap: (index) {
-                // Switching tabs saves the profile, which triggers a resolution of the effective config.
-                // We don't need a boolean flag anymore; the presence/validity of sources determines the source.
-                // But we still want to save on tap to persist the user's intent.
-                onSaveAccountProfile();
+                onSaveAccountProfile(isManualBridge: index == 1);
               },
             ),
             const SizedBox(height: 24),
@@ -133,7 +131,8 @@ class _ManualBridgePanel extends StatelessWidget {
   final bool accountBusy;
   final TextEditingController bridgeUrlController;
   final TextEditingController bridgeTokenController;
-  final Future<void> Function() onSaveAccountProfile;
+  final Future<void> Function({required bool isManualBridge})
+  onSaveAccountProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -178,7 +177,8 @@ class _ManualBridgePanel extends StatelessWidget {
                 prefixIcon: const Icon(Icons.dns_outlined),
                 hintText: 'https://xworkmate-bridge.svc.plus',
               ),
-              onFieldSubmitted: (_) => onSaveAccountProfile(),
+              onFieldSubmitted: (_) =>
+                  onSaveAccountProfile(isManualBridge: true),
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -189,14 +189,17 @@ class _ManualBridgePanel extends StatelessWidget {
                 labelText: appText('鉴权令牌 (TOKEN)', 'Auth Token'),
                 prefixIcon: const Icon(Icons.key_outlined),
               ),
-              onFieldSubmitted: (_) => onSaveAccountProfile(),
+              onFieldSubmitted: (_) =>
+                  onSaveAccountProfile(isManualBridge: true),
             ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
                 key: const ValueKey('settings-manual-bridge-save-button'),
-                onPressed: accountBusy ? null : () => onSaveAccountProfile(),
+                onPressed: accountBusy
+                    ? null
+                    : () => onSaveAccountProfile(isManualBridge: true),
                 child: Text(appText('保存配置', 'Save Configuration')),
               ),
             ),
@@ -221,7 +224,8 @@ class _SignedOutAccountPanel extends StatelessWidget {
   final TextEditingController accountBaseUrlController;
   final TextEditingController accountIdentifierController;
   final TextEditingController accountPasswordController;
-  final Future<void> Function() onSaveAccountProfile;
+  final Future<void> Function({required bool isManualBridge})
+  onSaveAccountProfile;
   final Future<void> Function() onLogin;
 
   @override
@@ -266,7 +270,8 @@ class _SignedOutAccountPanel extends StatelessWidget {
                 labelText: appText('服务地址', 'Service URL'),
                 prefixIcon: const Icon(Icons.dns_outlined),
               ),
-              onFieldSubmitted: (_) => onSaveAccountProfile(),
+              onFieldSubmitted: (_) =>
+                  onSaveAccountProfile(isManualBridge: false),
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -276,7 +281,8 @@ class _SignedOutAccountPanel extends StatelessWidget {
                 labelText: appText('邮箱或账号', 'Email or Username'),
                 prefixIcon: const Icon(Icons.person_outline_rounded),
               ),
-              onFieldSubmitted: (_) => onSaveAccountProfile(),
+              onFieldSubmitted: (_) =>
+                  onSaveAccountProfile(isManualBridge: false),
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -428,7 +434,8 @@ class _SignedInAccountPanel extends StatelessWidget {
   final AccountSyncState? accountState;
   final bool accountBusy;
   final String accountStatus;
-  final Future<void> Function() onSaveAccountProfile;
+  final Future<void> Function({required bool isManualBridge})
+  onSaveAccountProfile;
   final Future<void> Function() onSync;
   final Future<void> Function() onLogout;
 
@@ -476,7 +483,9 @@ class _SignedInAccountPanel extends StatelessWidget {
     final primaryActionKey = isAccountSyncMode
         ? 'settings-account-sync-button'
         : 'settings-account-manual-reset-button';
-    final primaryAction = isAccountSyncMode ? onSync : onSaveAccountProfile;
+    final primaryAction = isAccountSyncMode
+        ? onSync
+        : () => onSaveAccountProfile(isManualBridge: true);
     final mfaEnabled =
         accountSession?.totpEnabled == true ||
         accountSession?.mfaEnabled == true;
