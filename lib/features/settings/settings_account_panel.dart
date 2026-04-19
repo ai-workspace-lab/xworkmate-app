@@ -113,6 +113,7 @@ class SettingsAccountPanel extends StatelessWidget {
       accountState: accountState,
       accountBusy: accountBusy,
       accountStatus: accountStatus,
+      onSaveAccountProfile: onSaveAccountProfile,
       onSync: onSync,
       onLogout: onLogout,
     );
@@ -417,6 +418,7 @@ class _SignedInAccountPanel extends StatelessWidget {
     required this.accountState,
     required this.accountBusy,
     required this.accountStatus,
+    required this.onSaveAccountProfile,
     required this.onSync,
     required this.onLogout,
   });
@@ -426,11 +428,17 @@ class _SignedInAccountPanel extends StatelessWidget {
   final AccountSyncState? accountState;
   final bool accountBusy;
   final String accountStatus;
+  final Future<void> Function() onSaveAccountProfile;
   final Future<void> Function() onSync;
   final Future<void> Function() onLogout;
 
   @override
   Widget build(BuildContext context) {
+    final mode = _signedInAccountModeFromSettings(
+      settings: settings,
+      accountState: accountState,
+    );
+    final isAccountSyncMode = mode == _SignedInAccountMode.accountSync;
     final cloudSync = settings.acpBridgeServerModeConfig.cloudSynced;
     final serviceUrl = cloudSync.accountBaseUrl.trim().isNotEmpty
         ? cloudSync.accountBaseUrl.trim()
@@ -450,11 +458,25 @@ class _SignedInAccountPanel extends StatelessWidget {
     final syncMessage = accountState?.syncMessage.trim().isNotEmpty == true
         ? accountState!.syncMessage.trim()
         : appText('尚未同步远端配置', 'Remote config not synced yet');
-    final effectiveSyncState = accountBusy ? 'syncing' : syncState;
-    final effectiveSyncMessage =
-        accountBusy && accountStatus.trim().isNotEmpty
+    final modeStateLabel = accountBusy
+        ? (isAccountSyncMode ? appText('同步中', 'Syncing') : appText('保存中', 'Saving'))
+        : (isAccountSyncMode
+              ? _describeAccountSyncState(syncState)
+              : _describeBridgeSaveState(settings));
+    final modeStatusLabel = accountBusy && accountStatus.trim().isNotEmpty
         ? accountStatus.trim()
         : syncMessage;
+    final modeIcon = isAccountSyncMode ? Icons.cloud_outlined : Icons.link_outlined;
+    final modeTitle = isAccountSyncMode
+        ? appText('账号同步', 'Account Sync')
+        : appText('手动 Bridge', 'Manual Bridge');
+    final primaryActionLabel = isAccountSyncMode
+        ? appText('重新同步', 'Resync')
+        : appText('重新设置', 'Reset');
+    final primaryActionKey = isAccountSyncMode
+        ? 'settings-account-sync-button'
+        : 'settings-account-manual-reset-button';
+    final primaryAction = isAccountSyncMode ? onSync : onSaveAccountProfile;
     final mfaEnabled =
         accountSession?.totpEnabled == true ||
         accountSession?.mfaEnabled == true;
@@ -468,22 +490,9 @@ class _SignedInAccountPanel extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           appText(
-            '登录身份和 svc.plus 托管连接同步已合并到这里，直接查看状态并执行重新同步或断开。',
-            'Identity and managed svc.plus connection sync now live together here.',
+            '登录后只保留状态条和主动作，详细信息默认折叠。',
+            'After sign-in, keep only the status bar and primary actions; details stay collapsed by default.',
           ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          accountSession?.email.trim().isNotEmpty == true
-              ? accountSession!.email.trim()
-              : appText('当前账号', 'Current account'),
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '${appText('同步状态', 'Sync Status')}: $effectiveSyncState · $effectiveSyncMessage',
-          key: const ValueKey('settings-account-sync-status'),
-          style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 16),
         Container(
@@ -494,94 +503,242 @@ class _SignedInAccountPanel extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                appText('登录与同步状态', 'Login and Sync Status'),
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${appText('服务地址', 'Service URL')}: ${serviceUrl.isEmpty ? appText('待配置', 'Pending') : serviceUrl}',
-                key: const ValueKey('settings-account-summary-service-url'),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${appText('账户标识', 'Account Identifier')}: ${accountIdentifier.isEmpty ? appText('待登录', 'Not signed in') : accountIdentifier}',
-                key: const ValueKey(
-                  'settings-account-summary-account-identifier',
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${appText('连接来源', 'Connection Source')}: ${appText('svc.plus 托管配置', 'svc.plus managed profile')}',
-                key: const ValueKey(
-                  'settings-account-summary-connection-source',
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${appText('远端摘要', 'Remote Summary')}: ${remoteSummary.isEmpty ? appText('待同步', 'Pending sync') : remoteSummary}',
-                key: const ValueKey('settings-account-summary-remote-summary'),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${appText('最近同步', 'Last Sync')}: ${_formatSyncTime(cloudSync.lastSyncAt)}',
-                key: const ValueKey('settings-account-summary-last-sync'),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${appText('MFA 状态', 'MFA Status')}: ${mfaEnabled ? appText('已启用', 'Enabled') : appText('未启用', 'Disabled')}',
-                key: const ValueKey('settings-account-summary-mfa-status'),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${appText('同步范围', 'Sync Scope')}: $syncScope',
-                key: const ValueKey('settings-account-summary-sync-scope'),
-              ),
-              const SizedBox(height: 6),
-              _TokenConfiguredSummary(accountState: accountState),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            FilledButton.tonal(
-              key: const ValueKey('settings-account-sync-button'),
-              onPressed: accountBusy ? null : () => onSync(),
-              child: accountBusy
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(modeIcon, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            key: const ValueKey(
-                              'settings-account-sync-progress',
-                            ),
-                            strokeWidth: 2,
+                        Text(
+                          modeTitle,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isAccountSyncMode
+                              ? '${appText('账号同步状态', 'Account Sync Status')}: $modeStateLabel'
+                              : '${appText('保存状态', 'Save Status')}: $modeStateLabel',
+                          key: const ValueKey('settings-account-sync-status'),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          accountSession?.email.trim().isNotEmpty == true
+                              ? accountSession!.email.trim()
+                              : appText('当前账号', 'Current account'),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.78),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(appText('同步中', 'Syncing')),
                       ],
-                    )
-                  : Text(appText('重新同步', 'Sync Again')),
-            ),
-            TextButton(
-              key: const ValueKey('settings-account-logout-button'),
-              onPressed: accountBusy ? null : () => onLogout(),
-              child: Text(appText('退出登录', 'Log Out')),
-            ),
-          ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      FilledButton.tonal(
+                        key: ValueKey(primaryActionKey),
+                        onPressed: accountBusy ? null : () => primaryAction(),
+                        child: accountBusy
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      key: const ValueKey(
+                                        'settings-account-sync-progress',
+                                      ),
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    isAccountSyncMode
+                                        ? appText('同步中', 'Syncing')
+                                        : appText('保存中', 'Saving'),
+                                  ),
+                                ],
+                              )
+                            : Text(primaryActionLabel),
+                      ),
+                      TextButton(
+                        key: const ValueKey('settings-account-logout-button'),
+                        onPressed: accountBusy ? null : () => onLogout(),
+                        child: Text(appText('退出', 'Exit')),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                isAccountSyncMode
+                    ? '${appText('同步说明', 'Sync Summary')}: $modeStatusLabel'
+                    : '${appText('保存说明', 'Save Summary')}: $modeStatusLabel',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.78),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ExpansionTile(
+                key: const ValueKey('settings-account-summary-expansion'),
+                initiallyExpanded: false,
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(top: 8),
+                title: Text(
+                  appText('详细信息', 'Details'),
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                subtitle: Text(
+                  appText('查看服务地址、令牌与远端摘要', 'View service URL, tokens, and remote summary'),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                children: [
+                  _SignedInAccountDetails(
+                    settings: settings,
+                    accountSession: accountSession,
+                    accountState: accountState,
+                    serviceUrl: serviceUrl,
+                    accountIdentifier: accountIdentifier,
+                    remoteSummary: remoteSummary,
+                    syncScope: syncScope,
+                    mfaEnabled: mfaEnabled,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
+}
+
+class _SignedInAccountDetails extends StatelessWidget {
+  const _SignedInAccountDetails({
+    required this.settings,
+    required this.accountSession,
+    required this.accountState,
+    required this.serviceUrl,
+    required this.accountIdentifier,
+    required this.remoteSummary,
+    required this.syncScope,
+    required this.mfaEnabled,
+  });
+
+  final SettingsSnapshot settings;
+  final AccountSessionSummary? accountSession;
+  final AccountSyncState? accountState;
+  final String serviceUrl;
+  final String accountIdentifier;
+  final String remoteSummary;
+  final String syncScope;
+  final bool mfaEnabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final cloudSync = settings.acpBridgeServerModeConfig.cloudSynced;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${appText('服务地址', 'Service URL')}: ${serviceUrl.isEmpty ? appText('待配置', 'Pending') : serviceUrl}',
+            key: const ValueKey('settings-account-summary-service-url'),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${appText('账户标识', 'Account Identifier')}: ${accountIdentifier.isEmpty ? appText('待登录', 'Not signed in') : accountIdentifier}',
+            key: const ValueKey('settings-account-summary-account-identifier'),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${appText('连接来源', 'Connection Source')}: ${_connectionSourceLabel(settings, accountState)}',
+            key: const ValueKey('settings-account-summary-connection-source'),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${appText('远端摘要', 'Remote Summary')}: ${remoteSummary.isEmpty ? appText('待同步', 'Pending sync') : remoteSummary}',
+            key: const ValueKey('settings-account-summary-remote-summary'),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${appText('最近同步', 'Last Sync')}: ${_formatSyncTime(cloudSync.lastSyncAt)}',
+            key: const ValueKey('settings-account-summary-last-sync'),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${appText('MFA 状态', 'MFA Status')}: ${mfaEnabled ? appText('已启用', 'Enabled') : appText('未启用', 'Disabled')}',
+            key: const ValueKey('settings-account-summary-mfa-status'),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${appText('同步范围', 'Sync Scope')}: $syncScope',
+            key: const ValueKey('settings-account-summary-sync-scope'),
+          ),
+          const SizedBox(height: 6),
+          _TokenConfiguredSummary(accountState: accountState),
+        ],
+      ),
+    );
+  }
+}
+
+enum _SignedInAccountMode { accountSync, manualBridge }
+
+_SignedInAccountMode _signedInAccountModeFromSettings({
+  required SettingsSnapshot settings,
+  required AccountSyncState? accountState,
+}) {
+  if (accountState?.profileScope.trim().toLowerCase() == 'bridge') {
+    return _SignedInAccountMode.accountSync;
+  }
+  return _SignedInAccountMode.manualBridge;
+}
+
+String _describeAccountSyncState(String syncState) {
+  final normalized = syncState.trim().toLowerCase();
+  switch (normalized) {
+    case 'ready':
+      return appText('已同步', 'Synced');
+    case 'syncing':
+      return appText('同步中', 'Syncing');
+    case 'blocked':
+    case 'error':
+      return appText('失败', 'Failed');
+    default:
+      return appText('待同步', 'Pending sync');
+  }
+}
+
+String _describeBridgeSaveState(SettingsSnapshot settings) {
+  final configured = settings.acpBridgeServerModeConfig.selfHosted.isConfigured;
+  return configured ? appText('已保存', 'Saved') : appText('未保存', 'Not saved');
+}
+
+String _connectionSourceLabel(
+  SettingsSnapshot settings,
+  AccountSyncState? accountState,
+) {
+  final mode = _signedInAccountModeFromSettings(
+    settings: settings,
+    accountState: accountState,
+  );
+  return mode == _SignedInAccountMode.accountSync
+      ? appText('svc.plus 托管配置', 'svc.plus managed profile')
+      : appText('手动 Bridge 配置', 'Manual Bridge configuration');
 }
 
 class _TokenConfiguredSummary extends StatelessWidget {
