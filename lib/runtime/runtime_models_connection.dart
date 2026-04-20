@@ -365,5 +365,6 @@ bool isBridgeOwnedSingleAgentProviderId(String providerId) {
   final normalized = normalizeSingleAgentProviderId(providerId);
   return normalized == 'codex' ||
       normalized == 'opencode' ||
-      normalized == 'gemini';
+      normalized == 'gemini' ||
+      normalized == 'hermes';
 }
