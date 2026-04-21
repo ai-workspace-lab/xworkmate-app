@@ -322,23 +322,26 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     await _persistAccountSyncStateInternal(controller, nextState);
     final currentSettings = controller.snapshotInternal;
     final currentModeConfig = currentSettings.acpBridgeServerModeConfig;
-    
+
     final nextEffective = resolveAcpBridgeServerEffectiveConfigInternal(
       controller,
       config: currentModeConfig,
       accountSyncState: nextState,
     );
 
-    final identifier = (await controller.storeInternal.loadAccountSessionIdentifier())
+    final identifier =
+        (await controller.storeInternal.loadAccountSessionIdentifier())
             ?.trim() ??
         '';
     final nextModeConfig = currentModeConfig.copyWith(
       effective: nextEffective,
       cloudSynced: currentModeConfig.cloudSynced.copyWith(
-        accountBaseUrl: currentModeConfig.cloudSynced.accountBaseUrl.trim().isEmpty
+        accountBaseUrl:
+            currentModeConfig.cloudSynced.accountBaseUrl.trim().isEmpty
             ? normalizedBaseUrl
             : currentModeConfig.cloudSynced.accountBaseUrl,
-        accountIdentifier: currentModeConfig.cloudSynced.accountIdentifier.trim().isEmpty
+        accountIdentifier:
+            currentModeConfig.cloudSynced.accountIdentifier.trim().isEmpty
             ? identifier
             : currentModeConfig.cloudSynced.accountIdentifier,
         lastSyncAt: nextState.lastSyncAtMs,
@@ -406,10 +409,16 @@ Future<void> logoutAccountSettingsInternal(
   final clearedCloudSync = currentSnapshot.acpBridgeServerModeConfig.cloudSynced
       .copyWith(
         accountBaseUrl: quiet
-            ? currentSnapshot.acpBridgeServerModeConfig.cloudSynced.accountBaseUrl
+            ? currentSnapshot
+                  .acpBridgeServerModeConfig
+                  .cloudSynced
+                  .accountBaseUrl
             : '',
         accountIdentifier: quiet
-            ? currentSnapshot.acpBridgeServerModeConfig.cloudSynced.accountIdentifier
+            ? currentSnapshot
+                  .acpBridgeServerModeConfig
+                  .cloudSynced
+                  .accountIdentifier
             : '',
         lastSyncAt: 0,
         remoteServerSummary: currentSnapshot
@@ -599,7 +608,8 @@ AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfigInternal(
 
   // Priority 2: Cloud Sync (svc.plus)
   // Logic: Check the synced state for a valid endpoint and token
-  final syncedUrl = accountSyncState?.syncedDefaults.bridgeServerUrl.trim() ?? '';
+  final syncedUrl =
+      accountSyncState?.syncedDefaults.bridgeServerUrl.trim() ?? '';
   final hasSyncedToken = accountSyncState?.tokenConfigured.bridge == true;
   if (isSupportedExternalAcpEndpoint(syncedUrl) && hasSyncedToken) {
     return AcpBridgeServerEffectiveConfig(
@@ -610,12 +620,11 @@ AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfigInternal(
     );
   }
 
-  // Priority 3: Default Managed Fallback
   return AcpBridgeServerEffectiveConfig(
-    endpoint: kManagedBridgeServerUrl,
+    endpoint: '',
     tokenRef: '',
     source: 'default',
-    reason: 'Falling back to default managed server',
+    reason: 'No active Bridge source is configured',
   );
 }
 
@@ -627,7 +636,11 @@ String _resolveCurrentBridgeServerUrl(
   if (override.isNotEmpty) {
     return override;
   }
-  return controller.snapshotInternal.acpBridgeServerModeConfig.effective.endpoint;
+  return controller
+      .snapshotInternal
+      .acpBridgeServerModeConfig
+      .effective
+      .endpoint;
 }
 
 int _parseExpiresAtMs(Object? value) {

@@ -205,7 +205,7 @@ flutter test test/features/assistant_page_suite.dart
 
 - `https://accounts.svc.plus`
 - `review@svc.plus`
-- `***REMOVED-CREDENTIAL***`
+- `<review-account-password>`
 - managed bridge origin: `https://xworkmate-bridge.svc.plus`
 - `BRIDGE_AUTH_TOKEN=...`
 

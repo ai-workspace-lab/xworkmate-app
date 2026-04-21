@@ -77,3 +77,39 @@ Uri? resolveAcpHttpRpcEndpoint(Uri? endpoint) {
   final paths = AcpEndpointPaths.fromBaseEndpoint(endpoint);
   return endpoint.replace(path: paths.httpRpcPath, query: null, fragment: null);
 }
+
+Uri? resolveBridgeProviderBaseEndpoint(
+  Uri? bridgeBaseEndpoint, {
+  required String providerId,
+  required bool gateway,
+}) {
+  if (bridgeBaseEndpoint == null || bridgeBaseEndpoint.host.trim().isEmpty) {
+    return null;
+  }
+  final normalizedProviderId = providerId.trim().toLowerCase();
+  if (normalizedProviderId.isEmpty) {
+    return bridgeBaseEndpoint.replace(query: null, fragment: null);
+  }
+
+  // Remove trailing slashes and common ACP suffixes from the base path to avoid double-nesting
+  var basePath = bridgeBaseEndpoint.path.trim().replaceFirst(
+    RegExp(r'/+$'),
+    '',
+  );
+  if (basePath.endsWith('/acp/rpc')) {
+    basePath = basePath.substring(0, basePath.length - '/acp/rpc'.length);
+  } else if (basePath.endsWith('/acp')) {
+    basePath = basePath.substring(0, basePath.length - '/acp'.length);
+  }
+  basePath = basePath.replaceFirst(RegExp(r'/+$'), '');
+
+  final providerPath = gateway
+      ? '$basePath/gateway/$normalizedProviderId'
+      : '$basePath/acp-server/$normalizedProviderId';
+
+  return bridgeBaseEndpoint.replace(
+    path: providerPath.replaceFirst(RegExp(r'^//+'), '/'),
+    query: null,
+    fragment: null,
+  );
+}

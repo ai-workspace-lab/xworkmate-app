@@ -13,6 +13,7 @@ import '../models/app_models.dart';
 import '../runtime/device_identity_store.dart';
 
 import '../runtime/go_core.dart';
+import '../runtime/acp_endpoint_paths.dart';
 import '../runtime/runtime_bootstrap.dart';
 import '../runtime/desktop_platform_service.dart';
 import '../runtime/gateway_runtime.dart';
@@ -636,19 +637,75 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
 
   Uri? resolveBridgeAcpEndpointInternal() {
     final modeConfig = settings.acpBridgeServerModeConfig;
-    final candidate = modeConfig.usesSelfHostedBase
-        ? modeConfig.selfHosted.serverUrl.trim()
-        : kManagedBridgeServerUrl;
-    final uri = Uri.tryParse(candidate.isEmpty ? kManagedBridgeServerUrl : candidate);
-    final scheme = uri?.scheme.trim().toLowerCase() ?? '';
-    if (uri == null || !kSupportedExternalAcpEndpointSchemes.contains(scheme)) {
-      return null;
+    
+    // Prioritize the cloud endpoint if available or if we're connected to svc.plus
+    final cloudEndpoint = _activeCloudSyncedBridgeEndpointInternal();
+    if (cloudEndpoint.isNotEmpty) {
+      final uri = Uri.tryParse(cloudEndpoint);
+      if (uri != null) return uri.replace(query: null, fragment: null);
     }
-    return uri.replace(query: null, fragment: null);
+
+    if (modeConfig.usesSelfHostedBase) {
+      final candidate = modeConfig.selfHosted.serverUrl.trim();
+      if (candidate.isNotEmpty) {
+        final uri = Uri.tryParse(candidate);
+        final scheme = uri?.scheme.trim().toLowerCase() ?? '';
+        if (uri != null && kSupportedExternalAcpEndpointSchemes.contains(scheme)) {
+          return uri.replace(query: null, fragment: null);
+        }
+      }
+    }
+
+    return null;
   }
 
   Uri? resolveExternalAcpEndpointForTargetInternal(AssistantExecutionTarget _) {
     return resolveBridgeAcpEndpointInternal();
+  }
+
+  bool isBridgeAcpRuntimeConfiguredInternal() {
+    final modeConfig = settings.acpBridgeServerModeConfig;
+    if (modeConfig.usesSelfHostedBase) {
+      return modeConfig.selfHosted.isConfigured;
+    }
+    return _activeCloudSyncedBridgeEndpointInternal().isNotEmpty;
+  }
+
+  Uri? resolveExternalAcpEndpointForRequestInternal(
+    GoTaskServiceRequest request,
+  ) {
+    final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
+    final providerId = request.target.isGateway
+        ? kCanonicalGatewayProviderId
+        : request.provider.providerId.trim();
+    if (providerId.isEmpty) {
+      return null;
+    }
+    return resolveBridgeProviderBaseEndpoint(
+      bridgeEndpoint,
+      providerId: providerId,
+      gateway: request.target.isGateway,
+    );
+  }
+
+  String _activeCloudSyncedBridgeEndpointInternal() {
+    final syncState = settingsControllerInternal.accountSyncState;
+    final syncedEndpoint = syncState?.syncedDefaults.bridgeServerUrl.trim() ?? '';
+    
+    // If sync is ready and configured, use it.
+    if (syncState?.syncState.trim().toLowerCase() == 'ready' &&
+        syncState?.tokenConfigured.bridge == true &&
+        syncedEndpoint.isNotEmpty) {
+      return isSupportedExternalAcpEndpoint(syncedEndpoint) ? syncedEndpoint : '';
+    }
+
+    // Fallback: If we are logged in with an svc.plus account, default to the known bridge URL.
+    if (settings.accountUsername.endsWith('@svc.plus') || 
+        settings.accountBaseUrl.contains('svc.plus')) {
+      return 'https://xworkmate-bridge.svc.plus';
+    }
+
+    return isSupportedExternalAcpEndpoint(syncedEndpoint) ? syncedEndpoint : '';
   }
 
   Uri? gatewayProfileBaseUriInternal(GatewayConnectionProfile profile) {
@@ -675,16 +732,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         normalizedHost == bridgeHost &&
         (bridgePort <= 0 || endpoint.port == bridgePort);
     if (matchesBridgeEndpoint) {
-      final bridgeToken = (await storeInternal.loadAccountManagedSecret(
-            target: kAccountManagedSecretTargetBridgeAuthToken,
-          ))?.trim() ??
-          await settingsControllerInternal.loadEffectiveGatewayToken(
-            profileIndex: kGatewayRemoteProfileIndex,
-          );
-      final normalizedToken = bridgeToken.trim();
-      if (normalizedToken.isNotEmpty) {
-        return normalizedToken;
-      }
       final modeConfig = settings.acpBridgeServerModeConfig;
       if (modeConfig.usesSelfHostedBase) {
         final manualToken = await settingsControllerInternal
@@ -692,17 +739,20 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         if (manualToken.trim().isNotEmpty) {
           return manualToken.trim();
         }
+        return null;
+      }
+      final syncState = settingsControllerInternal.accountSyncState;
+      if (syncState?.syncState.trim().toLowerCase() == 'ready' &&
+          syncState?.tokenConfigured.bridge == true) {
+        final bridgeToken = (await storeInternal.loadAccountManagedSecret(
+          target: kAccountManagedSecretTargetBridgeAuthToken,
+        ))?.trim();
+        if (bridgeToken?.isNotEmpty == true) {
+          return bridgeToken;
+        }
       }
     }
-    final matchingGatewayProfileIndex =
-        gatewayProfileIndexMatchingEndpointInternal(endpoint);
-    if (matchingGatewayProfileIndex == null) {
-      return null;
-    }
-    final gatewayToken = await settingsControllerInternal
-        .loadEffectiveGatewayToken(profileIndex: matchingGatewayProfileIndex);
-    final normalizedGatewayToken = gatewayToken.trim();
-    return normalizedGatewayToken.isEmpty ? null : normalizedGatewayToken;
+    return null;
   }
 
   int? gatewayProfileIndexMatchingEndpointInternal(Uri endpoint) {

@@ -3,7 +3,9 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/runtime/external_code_agent_acp_desktop_transport.dart';
 import 'package:xworkmate/runtime/gateway_acp_client.dart';
+import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
@@ -99,7 +101,7 @@ void main() {
     });
 
     test(
-      'desktop auth resolver reuses the matching gateway profile token',
+      'desktop auth resolver does not reuse gateway profile token for bridge ACP',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
           'xworkmate-acp-auth-matching-profile-',
@@ -145,7 +147,7 @@ void main() {
               Uri.parse('https://gateway.example.com:8443/acp/rpc'),
             );
 
-        expect(header, 'gateway-token');
+        expect(header, isNull);
       },
     );
 
@@ -180,13 +182,21 @@ void main() {
           target: kAccountManagedSecretTargetBridgeAuthToken,
           value: 'bridge-token',
         );
-
-        final controller = AppController(
-          store: store,
-          environmentOverride: <String, String>{
-            'BRIDGE_SERVER_URL': capture.baseEndpoint.toString(),
-          },
+        await store.saveAccountSyncState(
+          AccountSyncState.defaults().copyWith(
+            syncedDefaults: AccountRemoteProfile.defaults().copyWith(
+              bridgeServerUrl: capture.baseEndpoint.toString(),
+            ),
+            syncState: 'ready',
+            tokenConfigured: const AccountTokenConfigured(
+              bridge: true,
+              vault: false,
+              apisix: false,
+            ),
+          ),
         );
+
+        final controller = AppController(store: store);
         addTearDown(controller.dispose);
         await controller.settingsControllerInternal.initialize();
 
@@ -200,7 +210,7 @@ void main() {
     );
 
     test(
-      'desktop bridge auth resolver falls back to the remote gateway token for bridge ACP',
+      'desktop bridge auth resolver does not fallback to the remote gateway token for bridge ACP',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
           'xworkmate-acp-auth-bridge-fallback-',
@@ -244,7 +254,7 @@ void main() {
               Uri.parse('https://xworkmate-bridge.svc.plus/acp/rpc'),
             );
 
-        expect(header, 'gateway-token');
+        expect(header, isNull);
       },
     );
 
@@ -273,18 +283,19 @@ void main() {
         await store.initialize();
 
         final settings = SettingsSnapshot.defaults().copyWith(
-          acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults().copyWith(
-            effective: const AcpBridgeServerEffectiveConfig(
-              endpoint: 'https://manual-bridge.example.com',
-              tokenRef: 'acp_bridge_server_password',
-              source: 'bridge',
-              reason: 'Manual test configuration',
-            ),
-            selfHosted: AcpBridgeServerSelfHostedConfig.defaults().copyWith(
-              serverUrl: 'https://manual-bridge.example.com',
-              username: 'admin',
-            ),
-          ),
+          acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
+              .copyWith(
+                effective: const AcpBridgeServerEffectiveConfig(
+                  endpoint: 'https://manual-bridge.example.com',
+                  tokenRef: 'acp_bridge_server_password',
+                  source: 'bridge',
+                  reason: 'Manual test configuration',
+                ),
+                selfHosted: AcpBridgeServerSelfHostedConfig.defaults().copyWith(
+                  serverUrl: 'https://manual-bridge.example.com',
+                  username: 'admin',
+                ),
+              ),
         );
         await store.saveSettingsSnapshot(settings);
         await store.saveSecretValueByRef(
@@ -304,7 +315,132 @@ void main() {
         expect(header, 'manual-token');
       },
     );
+
+    test(
+      'desktop task execution routes Hermes through provider public endpoint',
+      () async {
+        final capture = await _startAcpHttpServer();
+        addTearDown(capture.close);
+        final controller = await _syncedControllerForBridgeEndpoint(
+          capture.baseEndpoint,
+        );
+        addTearDown(controller.dispose);
+
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: controller.gatewayAcpClientInternal,
+          endpointResolver:
+              controller.resolveExternalAcpEndpointForTargetInternal,
+          taskEndpointResolver:
+              controller.resolveExternalAcpEndpointForRequestInternal,
+        );
+
+        await transport.executeTask(
+          _taskRequest(
+            target: AssistantExecutionTarget.agent,
+            provider: SingleAgentProvider.fromJsonValue('hermes'),
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(capture.authorizationHeader, 'Bearer bridge-token');
+        expect(capture.requestPath, '/acp-server/hermes/acp/rpc');
+      },
+    );
+
+    test(
+      'desktop task execution routes OpenClaw through gateway public endpoint',
+      () async {
+        final capture = await _startAcpHttpServer();
+        addTearDown(capture.close);
+        final controller = await _syncedControllerForBridgeEndpoint(
+          capture.baseEndpoint,
+        );
+        addTearDown(controller.dispose);
+
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: controller.gatewayAcpClientInternal,
+          endpointResolver:
+              controller.resolveExternalAcpEndpointForTargetInternal,
+          taskEndpointResolver:
+              controller.resolveExternalAcpEndpointForRequestInternal,
+        );
+
+        await transport.executeTask(
+          _taskRequest(
+            target: AssistantExecutionTarget.gateway,
+            provider: SingleAgentProvider.openclaw,
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(capture.authorizationHeader, 'Bearer bridge-token');
+        expect(capture.requestPath, '/gateway/openclaw/acp/rpc');
+      },
+    );
   });
+}
+
+GoTaskServiceRequest _taskRequest({
+  required AssistantExecutionTarget target,
+  required SingleAgentProvider provider,
+}) {
+  return GoTaskServiceRequest(
+    sessionId: 'session-1',
+    threadId: 'session-1',
+    target: target,
+    prompt: 'hi',
+    workingDirectory: '/tmp',
+    model: '',
+    thinking: 'off',
+    selectedSkills: const <String>[],
+    inlineAttachments: const <GatewayChatAttachmentPayload>[],
+    localAttachments: const <CollaborationAttachment>[],
+    agentId: '',
+    metadata: const <String, dynamic>{},
+    provider: provider,
+  );
+}
+
+Future<AppController> _syncedControllerForBridgeEndpoint(Uri endpoint) async {
+  final storeRoot = await Directory.systemTemp.createTemp(
+    'xworkmate-acp-auth-provider-endpoint-',
+  );
+  addTearDown(() async {
+    if (await storeRoot.exists()) {
+      try {
+        await storeRoot.delete(recursive: true);
+      } on FileSystemException {
+        // Temp cleanup is best effort here.
+      }
+    }
+  });
+  final store = SecureConfigStore(
+    secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+    appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+    supportRootPathResolver: () async => '${storeRoot.path}/support',
+    enableSecureStorage: false,
+  );
+  await store.initialize();
+  await store.saveAccountSyncState(
+    AccountSyncState.defaults().copyWith(
+      syncedDefaults: AccountRemoteProfile.defaults().copyWith(
+        bridgeServerUrl: endpoint.toString(),
+      ),
+      syncState: 'ready',
+      tokenConfigured: const AccountTokenConfigured(
+        bridge: true,
+        vault: false,
+        apisix: false,
+      ),
+    ),
+  );
+  await store.saveAccountManagedSecret(
+    target: kAccountManagedSecretTargetBridgeAuthToken,
+    value: 'bridge-token',
+  );
+  final controller = AppController(store: store);
+  await controller.settingsControllerInternal.initialize();
+  return controller;
 }
 
 Future<_CapturedAcpHttpServer> _startAcpHttpServer() async {

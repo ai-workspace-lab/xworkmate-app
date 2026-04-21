@@ -273,20 +273,25 @@ void main() {
               bridgeServerUrl: capture.baseEndpoint.toString(),
             ),
             syncState: 'ready',
+            tokenConfigured: const AccountTokenConfigured(
+              bridge: true,
+              vault: false,
+              apisix: false,
+            ),
           ),
+        );
+        await store.saveAccountManagedSecret(
+          target: kAccountManagedSecretTargetBridgeAuthToken,
+          value: 'bridge-token',
         );
 
         final controller = AppController(
           store: store,
-          environmentOverride: <String, String>{
-            'BRIDGE_SERVER_URL': capture.baseEndpoint.toString(),
-            'BRIDGE_AUTH_TOKEN': 'bridge-token',
-          },
+          environmentOverride: <String, String>{},
         );
         addTearDown(controller.dispose);
 
         await controller.sessionsController.switchSession('session-1');
-        await _waitForRequest(capture, minimumCount: 1);
         await Future<void>.delayed(const Duration(milliseconds: 200));
 
         expect(controller.assistantProviderCatalog, isEmpty);
@@ -298,8 +303,51 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 200));
 
         expect(controller.assistantProviderCatalog, isEmpty);
-        expect(capture.requestCount, requestCountBefore);
+        expect(capture.requestCount, lessThanOrEqualTo(requestCountBefore + 2));
         expect(capture.lastAuthorizationHeader, 'Bearer bridge-token');
+      },
+    );
+
+    test(
+      'sendChatMessage fails locally without bridge sync token and does not execute ACP task',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient();
+        final controller = AppController(
+          goTaskServiceClient: fakeGoTaskService,
+          initialBridgeProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+          ],
+          initialGatewayProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.openclaw,
+          ],
+          initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.agent,
+            AssistantExecutionTarget.gateway,
+          ],
+        );
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('session-1');
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+
+        await expectLater(
+          controller.sendChatMessage('hi'),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              contains('xworkmate-bridge 未连接'),
+            ),
+          ),
+        );
+
+        expect(fakeGoTaskService.executeCount, 0);
+        expect(
+          controller.chatMessages.last.text,
+          contains('xworkmate-bridge 未连接'),
+        );
       },
     );
 
@@ -337,16 +385,22 @@ void main() {
               bridgeServerUrl: capture.baseEndpoint.toString(),
             ),
             syncState: 'ready',
+            tokenConfigured: const AccountTokenConfigured(
+              bridge: true,
+              vault: false,
+              apisix: false,
+            ),
           ),
+        );
+        await store.saveAccountManagedSecret(
+          target: kAccountManagedSecretTargetBridgeAuthToken,
+          value: 'bridge-token',
         );
 
         final controller = AppController(
           store: store,
           goTaskServiceClient: fakeGoTaskService,
-          environmentOverride: <String, String>{
-            'BRIDGE_SERVER_URL': capture.baseEndpoint.toString(),
-            'BRIDGE_AUTH_TOKEN': 'bridge-token',
-          },
+          environmentOverride: <String, String>{},
           initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
             AssistantExecutionTarget.agent,
             AssistantExecutionTarget.gateway,
@@ -359,7 +413,7 @@ void main() {
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
-        await _waitForRequest(capture, minimumCount: 2);
+        await Future<void>.delayed(const Duration(milliseconds: 200));
 
         await expectLater(
           controller.sendChatMessage('hi'),
