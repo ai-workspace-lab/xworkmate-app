@@ -81,7 +81,10 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
       ? appText('连接失败', 'Connection Failed')
       : status.label;
   final detailLabel = tokenMissing
-      ? appText('xworkmate-bridge 授权不可用', 'xworkmate-bridge authorization unavailable')
+      ? appText(
+          'xworkmate-bridge 授权不可用',
+          'xworkmate-bridge authorization unavailable',
+        )
       : failed
       ? appText('xworkmate-bridge 连接失败', 'xworkmate-bridge connection failed')
       : appText('xworkmate-bridge 未连接', 'xworkmate-bridge is not connected');
@@ -268,6 +271,9 @@ extension AppControllerDesktopThreadSessions on AppController {
     return activeAgentName;
   }
 
+  String get resolvedAssistantModel =>
+      resolvedAssistantModelForTargetInternal(currentAssistantExecutionTarget);
+
   AssistantThreadConnectionState get currentAssistantConnectionState =>
       assistantConnectionStateForSession(currentSessionKey);
 
@@ -281,6 +287,7 @@ extension AppControllerDesktopThreadSessions on AppController {
     final providers = providerCatalogForExecutionTarget(target);
     final availableTargets = bridgeAvailableExecutionTargets;
     final bridgeReady =
+        isBridgeAcpRuntimeConfiguredInternal() &&
         providers.isNotEmpty &&
         (availableTargets.isEmpty || availableTargets.contains(target));
     final bridgeEndpoint = resolveBridgeAcpEndpointInternal();

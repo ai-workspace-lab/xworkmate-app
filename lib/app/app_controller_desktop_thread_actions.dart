@@ -233,6 +233,22 @@ extension AppControllerDesktopThreadActions on AppController {
   }) async {
     final currentSessionKey = sessionsControllerInternal.currentSessionKey;
     final currentTarget = assistantExecutionTargetForSession(currentSessionKey);
+    if (!isBridgeAcpRuntimeConfiguredInternal()) {
+      final error = StateError(
+        appText(
+          'xworkmate-bridge 未连接。请先登录 svc.plus 同步 Bridge 访问，或保存手动 Bridge 配置。',
+          'xworkmate-bridge is not connected. Sign in to svc.plus and sync Bridge access, or save a manual Bridge configuration first.',
+        ),
+      );
+      appendAssistantThreadMessageInternal(
+        currentSessionKey,
+        assistantErrorMessageInternal(error.message),
+      );
+      await flushAssistantThreadPersistenceInternal();
+      recomputeTasksInternal();
+      notifyIfActiveInternal();
+      throw error;
+    }
     await ensureDesktopTaskThreadBindingInternal(
       currentSessionKey,
       executionTarget: currentTarget,

@@ -215,6 +215,7 @@ class AppController extends ChangeNotifier {
           acpTransport: ExternalCodeAgentAcpDesktopTransport(
             client: gatewayAcpClientInternal,
             endpointResolver: resolveExternalAcpEndpointForTargetInternal,
+            taskEndpointResolver: resolveExternalAcpEndpointForRequestInternal,
           ),
         );
     multiAgentOrchestratorInternal = MultiAgentOrchestrator(
@@ -462,6 +463,7 @@ class AppController extends ChangeNotifier {
     _desktopPlatformBusyInternal = value;
     notifyListeners();
   }
+
   bool _desktopPlatformBusyInternal = false;
 
   GatewayConnectionSnapshot get connection => runtimeInternal.snapshot;
@@ -571,11 +573,17 @@ class AppController extends ChangeNotifier {
         : assistantProviderCatalog;
     if (executionTarget.isGateway) {
       return source
-          .where((provider) => provider.providerId == kCanonicalGatewayProviderId)
+          .where(
+            (provider) => provider.providerId == kCanonicalGatewayProviderId,
+          )
           .toList(growable: false);
     }
     return source
-        .where((provider) => provider.supportedTargets.contains(executionTarget))
+        .where(
+          (provider) =>
+              provider.supportedTargets.isEmpty ||
+              provider.supportedTargets.contains(executionTarget),
+        )
         .toList(growable: false);
   }
 
@@ -633,8 +641,9 @@ class AppController extends ChangeNotifier {
     String sessionKey,
   ) =>
       assistantThreadRecordsInternal[normalizedAssistantSessionKeyInternal(
-        sessionKey,
-      )]?.importedSkills ??
+            sessionKey,
+          )]
+          ?.importedSkills ??
       const [];
 
   void navigateTo(WorkspaceDestination destination) =>
@@ -670,7 +679,9 @@ class AppController extends ChangeNotifier {
   );
 
   Future<void> refreshMultiAgentMounts({bool sync = false}) =>
-      AppControllerDesktopThreadSessions(this).refreshMultiAgentMounts(sync: sync);
+      AppControllerDesktopThreadSessions(
+        this,
+      ).refreshMultiAgentMounts(sync: sync);
 
   double get assistantSkillCount => 0; // Legacy
   int get currentAssistantSkillCount => 0; // Legacy

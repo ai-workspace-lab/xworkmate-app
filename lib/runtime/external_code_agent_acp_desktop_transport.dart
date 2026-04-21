@@ -11,11 +11,14 @@ class ExternalCodeAgentAcpDesktopTransport
   ExternalCodeAgentAcpDesktopTransport({
     required GatewayAcpClient client,
     required Uri? Function(AssistantExecutionTarget target) endpointResolver,
+    Uri? Function(GoTaskServiceRequest request)? taskEndpointResolver,
   }) : _client = client,
-       _endpointResolver = endpointResolver;
+       _endpointResolver = endpointResolver,
+       _taskEndpointResolver = taskEndpointResolver;
 
   final GatewayAcpClient _client;
   final Uri? Function(AssistantExecutionTarget target) _endpointResolver;
+  final Uri? Function(GoTaskServiceRequest request)? _taskEndpointResolver;
 
   @visibleForTesting
   GatewayAcpClient get clientForTest => _client;
@@ -50,7 +53,8 @@ class ExternalCodeAgentAcpDesktopTransport
           _boolValue(caps['multi_agent']) ??
           true,
       availableExecutionTargets: _parseAvailableExecutionTargets(
-        result['availableExecutionTargets'] ?? caps['availableExecutionTargets'],
+        result['availableExecutionTargets'] ??
+            caps['availableExecutionTargets'],
         singleAgent:
             _boolValue(result['singleAgent']) ??
             _boolValue(caps['single_agent']) ??
@@ -91,10 +95,19 @@ class ExternalCodeAgentAcpDesktopTransport
     var streamedText = '';
     String? completedMessage;
     try {
+      final endpointOverride = _taskEndpointResolver == null
+          ? _endpointResolver(request.target)
+          : _taskEndpointResolver.call(request);
+      if (endpointOverride == null) {
+        throw const GatewayAcpException(
+          'xworkmate-bridge is not connected',
+          code: 'BRIDGE_NOT_CONNECTED',
+        );
+      }
       final response = await _client.request(
         method: request.resumeSession ? 'session.message' : 'session.start',
         params: request.toExternalAcpParams(),
-        endpointOverride: _endpointResolver(request.target),
+        endpointOverride: endpointOverride,
         onNotification: (notification) {
           final update = goTaskServiceUpdateFromAcpNotification(notification);
           if (update == null) {

@@ -365,7 +365,7 @@ void main() {
     );
 
     test(
-      'synced bridge url stays metadata only while runtime uses the managed bridge endpoint',
+      'synced bridge url becomes runtime endpoint only with a configured bridge token',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
           'xworkmate-account-managed-bridge-runtime-',
@@ -394,6 +394,11 @@ void main() {
             syncedDefaults: AccountRemoteProfile.defaults().copyWith(
               bridgeServerUrl: 'https://xworkmate-bridge-alt.svc.plus',
             ),
+            tokenConfigured: const AccountTokenConfigured(
+              bridge: true,
+              vault: false,
+              apisix: false,
+            ),
           ),
         );
         await store.saveAccountManagedSecret(
@@ -407,17 +412,17 @@ void main() {
 
         expect(
           controller.resolveGatewayAcpEndpointInternal()?.toString(),
-          kManagedBridgeServerUrl,
+          'https://xworkmate-bridge-alt.svc.plus',
         );
         expect(
           await controller.resolveGatewayAcpAuthorizationHeaderInternal(
-            Uri.parse('$kManagedBridgeServerUrl/acp/rpc'),
+            Uri.parse('https://xworkmate-bridge-alt.svc.plus/acp/rpc'),
           ),
           'bridge-token',
         );
         expect(
           await controller.resolveGatewayAcpAuthorizationHeaderInternal(
-            Uri.parse('https://xworkmate-bridge-alt.svc.plus/acp/rpc'),
+            Uri.parse('$kManagedBridgeServerUrl/acp/rpc'),
           ),
           isNull,
         );

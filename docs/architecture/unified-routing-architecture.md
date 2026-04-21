@@ -50,7 +50,7 @@ graph TD
 
 ### 3.1 统一鉴权
 所有通过 `xworkmate-bridge.svc.plus` 域名访问的请求（除 Caddy 内部 handle 外）均由 Caddy 强制校验：
-- **Header**: `Authorization: Bearer ***REMOVED-CREDENTIAL***`
+- **Header**: `Authorization: Bearer <bridge-auth-token>`
 - **未授权响应**: `401 Unauthorized`
 
 ### 3.2 SSE / WebSocket 优化

@@ -4,7 +4,36 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   group('Assistant connection state', () {
-    test('maps generic bridge runtime failures to connection failed', () async {
+    test(
+      'keeps signed-out sessions disconnected even when provider catalogs exist',
+      () async {
+        final controller = AppController(
+          initialBridgeProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+          ],
+          initialGatewayProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.openclaw,
+          ],
+          initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.agent,
+            AssistantExecutionTarget.gateway,
+          ],
+        );
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('session-1');
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+
+        final state = controller.currentAssistantConnectionState;
+        expect(state.connected, isFalse);
+        expect(state.status, RuntimeConnectionStatus.offline);
+        expect(state.detailLabel, 'xworkmate-bridge 未连接');
+      },
+    );
+
+    test('keeps signed-out generic runtime failures disconnected', () async {
       final controller = AppController();
       addTearDown(controller.dispose);
 
@@ -26,9 +55,9 @@ void main() {
           );
 
       final state = controller.currentAssistantConnectionState;
-      expect(state.status, RuntimeConnectionStatus.error);
-      expect(state.primaryLabel, '连接失败');
-      expect(state.detailLabel, 'openclaw.svc.plus:443');
+      expect(state.status, RuntimeConnectionStatus.offline);
+      expect(state.primaryLabel, '离线');
+      expect(state.detailLabel, 'xworkmate-bridge 未连接');
     });
 
     test('keeps true offline state as bridge not connected', () async {
@@ -52,7 +81,7 @@ void main() {
     });
 
     test(
-      'maps generic failures without address to bridge connection failed',
+      'keeps signed-out generic failures without address disconnected',
       () async {
         final controller = AppController();
         addTearDown(controller.dispose);
@@ -75,9 +104,9 @@ void main() {
             );
 
         final state = controller.currentAssistantConnectionState;
-        expect(state.status, RuntimeConnectionStatus.error);
-        expect(state.primaryLabel, '连接失败');
-        expect(state.detailLabel, 'xworkmate-bridge 连接失败');
+        expect(state.status, RuntimeConnectionStatus.offline);
+        expect(state.primaryLabel, '离线');
+        expect(state.detailLabel, 'xworkmate-bridge 未连接');
       },
     );
 
@@ -105,8 +134,8 @@ void main() {
             );
 
         final state = controller.currentAssistantConnectionState;
-        expect(state.status, RuntimeConnectionStatus.error);
-        expect(state.primaryLabel, '缺少令牌');
+        expect(state.status, RuntimeConnectionStatus.offline);
+        expect(state.primaryLabel, '离线');
         expect(state.detailLabel, 'xworkmate-bridge 未连接');
       },
     );
@@ -161,8 +190,8 @@ void main() {
           );
 
       final snapshot = controller.desktopStatusSnapshot();
-      expect(snapshot['connectionStatus'], 'error');
-      expect(snapshot['connectionLabel'], '连接失败');
+      expect(snapshot['connectionStatus'], 'disconnected');
+      expect(snapshot['connectionLabel'], '离线');
     });
   });
 }

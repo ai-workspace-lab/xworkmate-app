@@ -1,6 +1,6 @@
 # Account Sync, Settings, and Bridge State Model
 
-Last Updated: 2026-04-19
+Last Updated: 2026-04-21
 
 This document is the canonical state model for:
 
@@ -45,20 +45,37 @@ flowchart TD
 stateDiagram-v2
     [*] --> SignedOut
 
-    SignedOut --> SavingProfile: user edits account/base url/bridge url
-    SavingProfile --> SignedOut: snapshot saved
+    SignedOut: no account session
+    SignedOut --> SignedOut: do not send\nno fallback\nno stale token read
+    SignedOut --> Syncing: svc.plus login
 
-    SignedOut --> LoggingIn: loginAccount(baseUrl, identifier, password)
-    LoggingIn --> MfaRequired: server requests MFA
-    LoggingIn --> Syncing: login succeeds
-    MfaRequired --> Syncing: MFA verified
+    Syncing: sync bridge config after login
+    Syncing --> SyncBlocked: missing BRIDGE_AUTH_TOKEN\nor sync failed
+    Syncing --> BridgeDiscovering: bridge URL + token synced
 
-    Syncing --> Ready: BRIDGE_AUTH_TOKEN + BRIDGE_SERVER_URL processed
-    Syncing --> Blocked: bridge auth token missing
-    Syncing --> Blocked: bridge endpoint unavailable
+    SyncBlocked: signed in but bridge unavailable
+    SyncBlocked --> Syncing: user syncs again
+    SyncBlocked --> SignedOut: logout clears session/token/catalog
 
-    Ready --> SignedOut: logout / clear session
-    Blocked --> SignedOut: logout / clear session
+    BridgeDiscovering: load acp.capabilities from /acp/rpc
+    BridgeDiscovering --> SyncBlocked: 401/403/token missing\nor endpoint missing
+    BridgeDiscovering --> BridgeReady: providerCatalog/gatewayProviders valid
+
+    BridgeReady: assistant can send
+    BridgeReady --> ProviderDispatch: user submits message
+    BridgeReady --> SignedOut: logout clears session/token/catalog
+
+    ProviderDispatch: resolve endpoint by selected provider
+    ProviderDispatch --> AgentEndpoint: Hermes/Codex/Gemini/OpenCode
+    ProviderDispatch --> GatewayEndpoint: OpenClaw Gateway
+
+    AgentEndpoint: /acp-server/{provider}/acp/rpc
+    GatewayEndpoint: /gateway/openclaw/acp/rpc
+
+    AgentEndpoint --> BridgeReady: result returned
+    GatewayEndpoint --> BridgeReady: result returned
+    AgentEndpoint --> SyncBlocked: auth failure
+    GatewayEndpoint --> SyncBlocked: auth failure
 ```
 
 ## Field Semantics
@@ -83,17 +100,19 @@ flowchart TD
     D --> C
     C --> E["bridge runtime"]
 
-    note1["Priority order\n1. selfHosted\n2. cloudSynced when account sync is ready and token exists\n3. default managed bridge endpoint"] --> C
+    note1["Priority order\n1. selfHosted when explicitly configured\n2. cloudSynced when account sync is ready and token exists\n3. disconnected"] --> C
 ```
 
 ### Runtime Invariants
 
 - `selfHosted` always wins when it is configured.
 - `cloudSynced` is valid only when account sync is ready and the managed bridge token exists.
+- Signed-out state is disconnected: runtime must not use a default managed endpoint, stale managed secret, gateway profile token, or loopback ACP endpoint.
+- Missing `BRIDGE_AUTH_TOKEN` is disconnected for the managed cloud-sync path.
 - `BRIDGE_SERVER_URL` may be retained in `AccountSyncState.syncedDefaults.bridgeServerUrl`, but it is metadata only.
 - `BRIDGE_AUTH_TOKEN` is written to secure storage only, never to normal settings.
 - Bridge runtime requests use `Authorization: Bearer <token>` from secure storage.
-- The runtime endpoint remains the managed bridge endpoint unless manual `selfHosted` is configured.
+- Capabilities and routing discovery use the bridge root `/acp/rpc`; assistant execution uses provider-specific public endpoints.
 
 ## Persistence Rules
 

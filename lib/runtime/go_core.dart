@@ -1,7 +1,9 @@
-import 'dart:io';
+import 'dart:async';
 
+/// DEPRECATED: Local Go core execution is disabled.
 enum GoCoreLaunchSource { buildArtifact }
 
+/// DEPRECATED: Local Go core execution is disabled.
 class GoCoreLaunch {
   const GoCoreLaunch({
     required this.executable,
@@ -18,76 +20,17 @@ class GoCoreLaunch {
 
 typedef GoCoreBinaryExistsResolver = Future<bool> Function(String command);
 
+/// DEPRECATED: Local Go core locator is disabled.
 class GoCoreLocator {
   GoCoreLocator({
     GoCoreBinaryExistsResolver? binaryExistsResolver,
     String? workspaceRoot,
     String Function()? resolvedExecutableResolver,
-  }) : _binaryExistsResolver = binaryExistsResolver,
-       _workspaceRoot = workspaceRoot,
-       _resolvedExecutableResolver = resolvedExecutableResolver;
+  });
 
-  final GoCoreBinaryExistsResolver? _binaryExistsResolver;
-  final String? _workspaceRoot;
-  final String Function()? _resolvedExecutableResolver;
+  /// Always returns null as local execution is disabled.
+  Future<GoCoreLaunch?> locate() async => null;
 
-  Future<GoCoreLaunch?> locate() async {
-    for (final root in _candidateRoots()) {
-      final path = '$root/build/bin/xworkmate-go-core';
-      if (await _binaryExists(path)) {
-        return GoCoreLaunch(
-          executable: path,
-          source: GoCoreLaunchSource.buildArtifact,
-        );
-      }
-    }
-    return null;
-  }
-
-  Future<bool> isAvailable() async => await locate() != null;
-
-  List<String> _candidateRoots() {
-    final roots = <String>{};
-    final explicitRoot = _workspaceRoot?.trim() ?? '';
-    if (explicitRoot.isNotEmpty) {
-      roots.add(explicitRoot);
-      roots.addAll(_ancestorPaths(Directory(explicitRoot)));
-    }
-
-    final currentPath = Directory.current.path.trim();
-    if (currentPath.isNotEmpty) {
-      roots.add(currentPath);
-      roots.addAll(_ancestorPaths(Directory(currentPath)));
-    }
-
-    final resolvedExecutable =
-        (_resolvedExecutableResolver?.call() ?? Platform.resolvedExecutable)
-            .trim();
-    if (resolvedExecutable.isNotEmpty) {
-      final executableDirectory = File(resolvedExecutable).parent;
-      roots.add(executableDirectory.path);
-      roots.addAll(_ancestorPaths(executableDirectory));
-    }
-
-    return roots
-        .where((path) => path.trim().isNotEmpty)
-        .toList(growable: false);
-  }
-
-  List<String> _ancestorPaths(Directory start) {
-    final ancestors = <String>[];
-    var current = start.absolute;
-    while (true) {
-      final parent = current.parent;
-      if (parent.path == current.path) {
-        break;
-      }
-      ancestors.add(parent.path);
-      current = parent;
-    }
-    return ancestors;
-  }
-
-  Future<bool> _binaryExists(String command) async =>
-      (_binaryExistsResolver?.call(command)) ?? File(command).exists();
+  /// Always returns false as local execution is disabled.
+  Future<bool> isAvailable() async => false;
 }
