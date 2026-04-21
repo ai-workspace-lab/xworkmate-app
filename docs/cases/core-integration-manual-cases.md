@@ -60,20 +60,20 @@
   - 测试连接结果摘要
   - 截图点：测试连接结果
 
-### `MANUAL-ACP-003` local ACP / local 模式接入
+### `MANUAL-ACP-003` managed bridge ACP 接入
 
 - 前置条件
-  - 本机已有 local / loopback ACP 服务
-  - 确认监听地址与端口
+  - 账号同步已返回 managed bridge endpoint
+  - bridge token 已配置
 - 操作步骤
-  1. 输入 loopback endpoint，例如 `http://127.0.0.1:9001/opencode`
+  1. 登录 svc.plus 并同步 bridge profile
   2. 点击 `测试连接`
   3. 保存并生效
-  4. 关闭设置页后重新进入确认仍然显示 local endpoint
+  4. 关闭设置页后重新进入确认仍然显示 managed bridge endpoint
 - 期望结果
-  - local / loopback 非 TLS 允许通过
-  - 页面明确显示当前为本地配置
-  - 不会把 local endpoint 错误识别为 remote insecure endpoint
+  - App 侧任务发送只使用 managed bridge ACP 主入口
+  - provider catalog 与 gateway provider 来自 `acp.capabilities`
+  - 不会写入或拼接 local / loopback provider endpoint
 - 建议记录项
   - 当前模式
   - loopback endpoint

@@ -1,13 +1,16 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   group('Assistant connection state', () {
     test(
       'keeps signed-out sessions disconnected even when provider catalogs exist',
       () async {
-        final controller = AppController(
+        final controller = await _isolatedController(
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
           ],
@@ -29,12 +32,12 @@ void main() {
         final state = controller.currentAssistantConnectionState;
         expect(state.connected, isFalse);
         expect(state.status, RuntimeConnectionStatus.offline);
-        expect(state.detailLabel, 'xworkmate-bridge 未连接');
+        expect(state.detailLabel, '请先登录 svc.plus');
       },
     );
 
     test('keeps signed-out generic runtime failures disconnected', () async {
-      final controller = AppController();
+      final controller = await _isolatedController();
       addTearDown(controller.dispose);
 
       await controller.sessionsController.switchSession('session-1');
@@ -56,12 +59,12 @@ void main() {
 
       final state = controller.currentAssistantConnectionState;
       expect(state.status, RuntimeConnectionStatus.offline);
-      expect(state.primaryLabel, '离线');
-      expect(state.detailLabel, 'xworkmate-bridge 未连接');
+      expect(state.primaryLabel, '已退出登录');
+      expect(state.detailLabel, '请先登录 svc.plus');
     });
 
     test('keeps true offline state as bridge not connected', () async {
-      final controller = AppController();
+      final controller = await _isolatedController();
       addTearDown(controller.dispose);
 
       await controller.sessionsController.switchSession('session-1');
@@ -76,14 +79,14 @@ void main() {
 
       final state = controller.currentAssistantConnectionState;
       expect(state.status, RuntimeConnectionStatus.offline);
-      expect(state.primaryLabel, '离线');
-      expect(state.detailLabel, 'xworkmate-bridge 未连接');
+      expect(state.primaryLabel, '已退出登录');
+      expect(state.detailLabel, '请先登录 svc.plus');
     });
 
     test(
       'keeps signed-out generic failures without address disconnected',
       () async {
-        final controller = AppController();
+        final controller = await _isolatedController();
         addTearDown(controller.dispose);
 
         await controller.sessionsController.switchSession('session-1');
@@ -105,15 +108,15 @@ void main() {
 
         final state = controller.currentAssistantConnectionState;
         expect(state.status, RuntimeConnectionStatus.offline);
-        expect(state.primaryLabel, '离线');
-        expect(state.detailLabel, 'xworkmate-bridge 未连接');
+        expect(state.primaryLabel, '已退出登录');
+        expect(state.detailLabel, '请先登录 svc.plus');
       },
     );
 
     test(
       'keeps gateway token missing as dedicated app-visible state',
       () async {
-        final controller = AppController();
+        final controller = await _isolatedController();
         addTearDown(controller.dispose);
 
         await controller.sessionsController.switchSession('session-1');
@@ -135,15 +138,15 @@ void main() {
 
         final state = controller.currentAssistantConnectionState;
         expect(state.status, RuntimeConnectionStatus.offline);
-        expect(state.primaryLabel, '离线');
-        expect(state.detailLabel, 'xworkmate-bridge 未连接');
+        expect(state.primaryLabel, '已退出登录');
+        expect(state.detailLabel, '请先登录 svc.plus');
       },
     );
 
     test(
       'treats missing endpoint as true offline instead of bridge failure',
       () async {
-        final controller = AppController();
+        final controller = await _isolatedController();
         addTearDown(controller.dispose);
 
         await controller.sessionsController.switchSession('session-1');
@@ -164,13 +167,13 @@ void main() {
 
         final state = controller.currentAssistantConnectionState;
         expect(state.status, RuntimeConnectionStatus.offline);
-        expect(state.primaryLabel, '离线');
-        expect(state.detailLabel, 'xworkmate-bridge 未连接');
+        expect(state.primaryLabel, '已退出登录');
+        expect(state.detailLabel, '请先登录 svc.plus');
       },
     );
 
     test('desktop snapshot uses derived assistant connection labels', () async {
-      final controller = AppController();
+      final controller = await _isolatedController();
       addTearDown(controller.dispose);
 
       await controller.sessionsController.switchSession('session-1');
@@ -191,7 +194,39 @@ void main() {
 
       final snapshot = controller.desktopStatusSnapshot();
       expect(snapshot['connectionStatus'], 'disconnected');
-      expect(snapshot['connectionLabel'], '离线');
+      expect(snapshot['connectionLabel'], '已退出登录');
     });
   });
+}
+
+Future<AppController> _isolatedController({
+  List<SingleAgentProvider>? initialBridgeProviderCatalog,
+  List<SingleAgentProvider>? initialGatewayProviderCatalog,
+  List<AssistantExecutionTarget>? initialAvailableExecutionTargets,
+}) async {
+  final storeRoot = await Directory.systemTemp.createTemp(
+    'xworkmate-assistant-connection-state-',
+  );
+  addTearDown(() async {
+    if (await storeRoot.exists()) {
+      try {
+        await storeRoot.delete(recursive: true);
+      } on FileSystemException {
+        // Temp cleanup is best effort here.
+      }
+    }
+  });
+  final store = SecureConfigStore(
+    secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+    appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+    supportRootPathResolver: () async => '${storeRoot.path}/support',
+    enableSecureStorage: false,
+  );
+  await store.initialize();
+  return AppController(
+    store: store,
+    initialBridgeProviderCatalog: initialBridgeProviderCatalog,
+    initialGatewayProviderCatalog: initialGatewayProviderCatalog,
+    initialAvailableExecutionTargets: initialAvailableExecutionTargets,
+  );
 }

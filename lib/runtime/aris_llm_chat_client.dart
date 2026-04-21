@@ -1,11 +1,7 @@
 import 'dart:async';
 
 class ArisLlmChatClient {
-  ArisLlmChatClient({
-    Duration rpcTimeout = const Duration(minutes: 2),
-  }) : _rpcTimeout = rpcTimeout;
-
-  final Duration _rpcTimeout;
+  ArisLlmChatClient({Duration rpcTimeout = const Duration(minutes: 2)});
 
   Future<String> chat({
     required String endpoint,
@@ -41,7 +37,7 @@ class ArisLlmChatClient {
   }) async {
     // Local Go core execution is deprecated in favor of bridge-mediated execution.
     throw UnsupportedError(
-      'Local Go core execution is disabled. Use bridge endpoints like /acp-server/hermes instead.',
+      'Local Go core execution is disabled. Use the managed bridge ACP runtime instead.',
     );
   }
 }
