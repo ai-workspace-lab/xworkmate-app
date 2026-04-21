@@ -346,7 +346,7 @@ class CodexRuntime extends ChangeNotifier {
     return null;
   }
 
-  /// Start Codex App Server in stdio mode.
+  /// Start Codex App Server in stdio mode (DEPRECATED: Use bridge instead).
   Future<void> startStdio({
     required String codexPath,
     String? cwd,
@@ -354,49 +354,9 @@ class CodexRuntime extends ChangeNotifier {
     CodexApprovalPolicy approval = CodexApprovalPolicy.suggest,
     List<String> extraArgs = const [],
   }) async {
-    if (shouldBlockEmbeddedAgentLaunch(
-      isAppleHost: Platform.isIOS || Platform.isMacOS,
-    )) {
-      throw UnsupportedError(
-        'App Store builds do not allow launching a local Codex app-server process.',
-      );
-    }
-    if (_process != null) {
-      throw StateError('Codex already running');
-    }
-
-    _state = CodexConnectionState.connecting;
-    _lastError = null;
-    notifyListeners();
-
-    try {
-      final args = [
-        'app-server',
-        '--listen',
-        'stdio://',
-        '-s',
-        sandbox.value,
-        '-a',
-        approval.value,
-        ...extraArgs,
-      ];
-      final launch = _resolveLaunchConfiguration(codexPath, args);
-
-      _process = await Process.start(
-        launch.executable,
-        launch.arguments,
-        workingDirectory: cwd,
-        runInShell: launch.runInShell,
-      );
-
-      _setupStdioStreams();
-      await _initialize();
-    } catch (e) {
-      _state = CodexConnectionState.error;
-      _lastError = e.toString();
-      notifyListeners();
-      rethrow;
-    }
+    throw UnsupportedError(
+      'Local Codex app-server is disabled. All Codex interactions must go through xworkmate-bridge.',
+    );
   }
 
   @visibleForTesting

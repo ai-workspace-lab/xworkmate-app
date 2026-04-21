@@ -9,7 +9,7 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 void main() {
   group('Bridge runtime cleanup', () {
     test(
-      'keeps runtime pinned to managed bridge while preserving synced metadata',
+      'uses synced bridge endpoint only when account sync has a bridge token',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
           'xworkmate-bridge-runtime-cleanup-',
@@ -38,7 +38,16 @@ void main() {
               bridgeServerUrl: 'https://xworkmate-bridge-alt.svc.plus',
             ),
             syncState: 'ready',
+            tokenConfigured: const AccountTokenConfigured(
+              bridge: true,
+              vault: false,
+              apisix: false,
+            ),
           ),
+        );
+        await store.saveAccountManagedSecret(
+          target: kAccountManagedSecretTargetBridgeAuthToken,
+          value: 'bridge-token',
         );
 
         final controller = AppController(
@@ -52,7 +61,7 @@ void main() {
 
         expect(
           controller.resolveBridgeAcpEndpointInternal()?.toString(),
-          kManagedBridgeServerUrl,
+          'https://xworkmate-bridge-alt.svc.plus',
         );
         expect(
           controller
@@ -60,12 +69,9 @@ void main() {
                 AssistantExecutionTarget.gateway,
               )
               ?.toString(),
-          kManagedBridgeServerUrl,
+          'https://xworkmate-bridge-alt.svc.plus',
         );
-        expect(
-          await store.loadAccountSyncState(),
-          isNotNull,
-        );
+        expect(await store.loadAccountSyncState(), isNotNull);
         expect(
           (await store.loadAccountSyncState())!.syncedDefaults.bridgeServerUrl,
           'https://xworkmate-bridge-alt.svc.plus',
@@ -74,7 +80,7 @@ void main() {
     );
 
     test(
-      'falls back to the managed bridge endpoint without BRIDGE_SERVER_URL',
+      'does not fallback to the managed bridge endpoint when signed out',
       () {
         final controller = AppController(
           environmentOverride: const <String, String>{
@@ -83,10 +89,7 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        expect(
-          controller.resolveBridgeAcpEndpointInternal()?.toString(),
-          kManagedBridgeServerUrl,
-        );
+        expect(controller.resolveBridgeAcpEndpointInternal(), isNull);
       },
     );
 
@@ -98,7 +101,12 @@ void main() {
         );
         addTearDown(() async {
           if (await storeRoot.exists()) {
-            await storeRoot.delete(recursive: true);
+            try {
+              await storeRoot.delete(recursive: true);
+            } on FileSystemException {
+              // Temp cleanup is best effort here. The controller may still be
+              // releasing files when teardown starts.
+            }
           }
         });
 
@@ -113,9 +121,23 @@ void main() {
           target: kAccountManagedSecretTargetBridgeAuthToken,
           value: 'bridge-token',
         );
+        await store.saveAccountSyncState(
+          AccountSyncState.defaults().copyWith(
+            syncedDefaults: AccountRemoteProfile.defaults().copyWith(
+              bridgeServerUrl: kManagedBridgeServerUrl,
+            ),
+            syncState: 'ready',
+            tokenConfigured: const AccountTokenConfigured(
+              bridge: true,
+              vault: false,
+              apisix: false,
+            ),
+          ),
+        );
 
         final controller = AppController(store: store);
         addTearDown(controller.dispose);
+        await controller.settingsControllerInternal.initialize();
 
         final bridgeHeader = await controller
             .resolveGatewayAcpAuthorizationHeaderInternal(
