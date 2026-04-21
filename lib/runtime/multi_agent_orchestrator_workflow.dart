@@ -269,7 +269,7 @@ $originalCode
     );
   }
 
-  /// 通用的 CLI 进程执行方法
+  /// 通用的 CLI 进程执行方法 (DEPRECATED: Use bridge instead)
   Future<CliResult> runCliPromptInternal({
     required MultiAgentRole role,
     required String tool,
@@ -277,167 +277,9 @@ $originalCode
     required String prompt,
     required String cwd,
   }) async {
-    late final List<String> args;
-    late final String command;
-    late final Map<String, String> envVars;
-    final useOllamaLaunch = prefersOllamaLaunchInternal(
-      tool: tool,
-      model: model,
-    );
-
-    switch (tool) {
-      case 'claude':
-        command = useOllamaLaunch ? 'ollama' : resolveCliPathInternal('claude');
-        envVars = buildCliEnvVarsInternal(tool: tool);
-        if (useOllamaLaunch) {
-          args = buildOllamaLaunchArgsInternal(
-            tool: tool,
-            model: model,
-            prompt: prompt,
-            cwd: cwd,
-          );
-        } else if (model.isNotEmpty) {
-          args = ['--model', model, '-p', prompt];
-        } else {
-          args = ['-p', prompt];
-        }
-        break;
-
-      case 'codex':
-        command = useOllamaLaunch ? 'ollama' : resolveCliPathInternal('codex');
-        envVars = buildCliEnvVarsInternal(tool: tool);
-        if (useOllamaLaunch) {
-          args = buildOllamaLaunchArgsInternal(
-            tool: tool,
-            model: model,
-            prompt: prompt,
-            cwd: cwd,
-          );
-        } else if (model.isNotEmpty) {
-          args = [
-            'exec',
-            '--skip-git-repo-check',
-            '--color',
-            'never',
-            if (cwd.isNotEmpty) ...['-C', cwd],
-            '-m',
-            model,
-            prompt,
-          ];
-        } else {
-          args = [
-            'exec',
-            '--skip-git-repo-check',
-            '--color',
-            'never',
-            if (cwd.isNotEmpty) ...['-C', cwd],
-            prompt,
-          ];
-        }
-        break;
-
-      case 'gemini':
-        command = resolveCliPathInternal('gemini');
-        envVars = buildCliEnvVarsInternal(tool: tool);
-        if (model.isNotEmpty) {
-          args = ['--model', model, '-p', prompt];
-        } else {
-          args = ['-p', prompt];
-        }
-        break;
-
-      case 'opencode':
-        command = useOllamaLaunch
-            ? 'ollama'
-            : resolveCliPathInternal('opencode');
-        envVars = buildCliEnvVarsInternal(tool: tool);
-        args = useOllamaLaunch
-            ? buildOllamaLaunchArgsInternal(
-                tool: tool,
-                model: model,
-                prompt: prompt,
-                cwd: cwd,
-              )
-            : [
-                'run',
-                '--format',
-                'default',
-                if (cwd.isNotEmpty) ...['--dir', cwd],
-                if (model.isNotEmpty) ...['-m', model],
-                prompt,
-              ];
-        break;
-
-      default:
-        throw ArgumentError('Unknown tool: $tool');
-    }
-
-    final cliAvailable = await binaryExistsInternal(command);
-    if (configInternal.usesAris && !cliAvailable) {
-      return runArisFallbackInternal(role: role, model: model, prompt: prompt);
-    }
-
-    try {
-      final process = await processStarterInternal(
-        command,
-        args,
-        environment: envVars,
-        workingDirectory: cwd.isNotEmpty ? cwd : null,
-      );
-      activeCliProcessInternal = process;
-
-      await process.stdin.close();
-
-      // 超时控制
-      final timeout = Duration(seconds: configInternal.timeoutSeconds);
-
-      final stdoutFuture = process.stdout
-          .transform(utf8.decoder)
-          .join()
-          .timeout(
-            timeout,
-            onTimeout: () {
-              process.kill();
-              return '[超时或进程已终止]';
-            },
-          );
-
-      final stderrFuture = process.stderr
-          .transform(utf8.decoder)
-          .join()
-          .timeout(timeout, onTimeout: () => '');
-
-      final results = await Future.wait([stdoutFuture, stderrFuture]);
-      final exitCode = await process.exitCode.timeout(
-        timeout,
-        onTimeout: () => -1,
-      );
-      activeCliProcessInternal = null;
-
-      final cliResult = CliResult(
-        output: results[0],
-        error: results[1],
-        exitCode: exitCode,
-      );
-      if (configInternal.usesAris && !cliResult.success) {
-        return runArisFallbackInternal(
-          role: role,
-          model: model,
-          prompt: prompt,
-        );
-      }
-      return cliResult;
-    } catch (e) {
-      activeCliProcessInternal = null;
-      if (configInternal.usesAris) {
-        return runArisFallbackInternal(
-          role: role,
-          model: model,
-          prompt: prompt,
-        );
-      }
-      return CliResult(output: '', error: e.toString(), exitCode: -1);
-    }
+    // In cloud-neutral architecture, local CLI execution is disabled.
+    // We should fallback to OpenAI compatible API or bridge execution.
+    return runArisFallbackInternal(role: role, model: model, prompt: prompt);
   }
 
   /// 构建 Architect 的 Prompt
@@ -481,49 +323,6 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
     MultiAgentRole role,
     String configuredTool,
   ) async {
-    if (!configInternal.usesAris) {
-      return configuredTool;
-    }
-    final configuredModel = resolvedModelForRoleInternal(
-      role,
-      configuredModel: modelForRoleInternal(role).trim(),
-    );
-    final candidates = switch (role) {
-      MultiAgentRole.architect => <String>[
-        configuredTool,
-        'claude',
-        'codex',
-        'opencode',
-        'gemini',
-      ],
-      MultiAgentRole.engineer => <String>[
-        configuredTool,
-        'codex',
-        'opencode',
-        'claude',
-        'gemini',
-      ],
-      MultiAgentRole.testerDoc => <String>[
-        configuredTool,
-        'opencode',
-        'codex',
-        'claude',
-        'gemini',
-      ],
-    };
-    for (final candidate in candidates) {
-      final trimmed = candidate.trim();
-      if (trimmed.isEmpty) {
-        continue;
-      }
-      if (prefersOllamaLaunchInternal(tool: trimmed, model: configuredModel)) {
-        if (await binaryExistsInternal('ollama')) {
-          return trimmed;
-        }
-      } else if (await binaryExistsInternal(resolveCliPathInternal(trimmed))) {
-        return trimmed;
-      }
-    }
     return configuredTool;
   }
 
@@ -546,16 +345,7 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
   }
 
   Future<bool> binaryExistsInternal(String command) async {
-    final resolver = binaryExistsResolverInternal;
-    if (resolver != null) {
-      return resolver(command);
-    }
-    final check = await Process.run(
-      Platform.isWindows ? 'where' : 'which',
-      <String>[command],
-      runInShell: true,
-    );
-    return check.exitCode == 0 && '${check.stdout}'.trim().isNotEmpty;
+    return false;
   }
 
   Future<CliResult> runArisFallbackInternal({
@@ -594,19 +384,10 @@ ${selectedSkills.isEmpty ? '- 无' : selectedSkills.map((item) => '- $item').joi
     required String model,
     required String prompt,
   }) async {
-    if (await binaryExistsInternal(resolveCliPathInternal('claude'))) {
-      return runCliPromptInternal(
-        role: MultiAgentRole.testerDoc,
-        tool: 'claude',
-        model: model,
-        prompt: prompt,
-        cwd: '',
-      );
-    }
-    return CliResult(
-      output: '',
-      error: 'Claude CLI is unavailable for claude-review',
-      exitCode: -1,
+    return runArisFallbackInternal(
+      role: MultiAgentRole.testerDoc,
+      model: model,
+      prompt: prompt,
     );
   }
 

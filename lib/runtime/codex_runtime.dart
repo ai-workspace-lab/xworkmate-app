@@ -302,49 +302,8 @@ class CodexRuntime extends ChangeNotifier {
   CodexAccount? get account => _account;
   Stream<CodexEvent> get events => _events.stream;
 
-  /// Find Codex binary in PATH or common locations.
-  Future<String?> findCodexBinary() async {
-    // Check environment variable first
-    final envPath = Platform.environment['CODEX_PATH'];
-    if (envPath != null && envPath.isNotEmpty) {
-      final file = File(envPath);
-      if (await file.exists()) {
-        return envPath;
-      }
-    }
-
-    // Try common locations
-    final paths = defaultCodexBinaryCandidates();
-
-    for (final path in paths) {
-      final file = File(path);
-      if (await file.exists()) {
-        return path;
-      }
-    }
-
-    // Try to find via platform-native lookup.
-    try {
-      final result = await Process.run(
-        _lookupExecutableProgram(),
-        _lookupExecutableArguments(),
-      );
-      if (result.exitCode == 0) {
-        final lines = LineSplitter.split(
-          result.stdout as String,
-        ).map((line) => line.trim()).where((line) => line.isNotEmpty);
-        for (final path in lines) {
-          if (await File(path).exists()) {
-            return path;
-          }
-        }
-      }
-    } catch (_) {
-      // Ignore
-    }
-
-    return null;
-  }
+  /// Find Codex binary (DEPRECATED: Use bridge instead).
+  Future<String?> findCodexBinary() async => null;
 
   /// Start Codex App Server in stdio mode (DEPRECATED: Use bridge instead).
   Future<void> startStdio({
