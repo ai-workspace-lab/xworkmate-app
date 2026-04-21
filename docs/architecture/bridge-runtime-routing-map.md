@@ -37,11 +37,12 @@ flowchart TD
 
 - App runtime requests use `https://xworkmate-bridge.svc.plus/acp/rpc`.
 - Provider and gateway selection are passed as request params, including `provider`, `routing`, and `requestedExecutionTarget`.
-- Bridge-owned mapping:
-  - `Hermes` -> `https://xworkmate-bridge.svc.plus/acp-server/hermes`
-  - `Codex` -> `https://xworkmate-bridge.svc.plus/acp-server/codex`
-  - `OpenCode` -> `https://xworkmate-bridge.svc.plus/acp-server/opencode`
-  - `Gemini` -> `https://xworkmate-bridge.svc.plus/acp-server/gemini`
-  - `OpenClaw` -> `https://xworkmate-bridge.svc.plus/gateway/openclaw`
+- Bridge-owned internal routing (Backend internal only):
+  - `Hermes` -> `/acp-server/hermes`
+  - `Codex` -> `/acp-server/codex`
+  - `OpenCode` -> `/acp-server/opencode`
+  - `Gemini` -> `/acp-server/gemini`
+  - `OpenClaw` -> `/gateway/openclaw`
 - The app must not route managed bridge tasks to local or LAN endpoints such as `127.0.0.1:*` or `192.168.*:*`.
-- The app must not route managed bridge tasks by directly constructing `/acp-server/*` or `/gateway/openclaw` URLs.
+- The app must not route managed bridge tasks by directly constructing `/acp-server/*` or `/gateway/*` URLs.
+- All App-side requests go through `https://xworkmate-bridge.svc.plus/acp/rpc`.
