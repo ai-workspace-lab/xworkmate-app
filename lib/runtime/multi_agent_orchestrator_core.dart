@@ -14,39 +14,21 @@ import 'multi_agent_orchestrator_support.dart';
 /// 多 Agent 协作编排器
 ///
 /// 管理 Architect（调度/文档）→ Lead Engineer（主程）→ Worker/Review（并行 worker + 复审）
-/// 的工作流，通过 Ollama 与外部 CLI 工具桥接首批云模型协作能力。
+/// 的工作流。
 ///
-/// 角色分工：
-/// - Architect（调度/文档）：负责任务分解、接受标准、工作流设计
-/// - Lead Engineer（主程）：负责关键实现、重构、集成收口
-/// - Worker/Review（并行 worker）：负责补充实现、复审、回归建议
+/// 在云中性设计下，编排逻辑应通过桥接转发到远程 ACP 端点执行。
 class MultiAgentOrchestrator extends ChangeNotifier {
   MultiAgentOrchestrator({
     required MultiAgentConfig config,
-    Future<bool> Function(String command)? binaryExistsResolver,
     HttpClient Function()? httpClientFactory,
-    CliProcessStarter? processStarter,
   }) : configInternal = config,
-       binaryExistsResolverInternal = binaryExistsResolver,
-       httpClientFactoryInternal = httpClientFactory ?? HttpClient.new,
-       processStarterInternal =
-           processStarter ??
-           ((executable, arguments, {environment, workingDirectory}) {
-             return Process.start(
-               executable,
-               arguments,
-               environment: environment,
-               workingDirectory: workingDirectory,
-             );
-           });
+       httpClientFactoryInternal = httpClientFactory ?? HttpClient.new;
 
   /// 当前配置
   MultiAgentConfig configInternal;
   MultiAgentConfig get config => configInternal;
-  final Future<bool> Function(String command)? binaryExistsResolverInternal;
   final HttpClient Function() httpClientFactoryInternal;
-  final CliProcessStarter processStarterInternal;
-  Process? activeCliProcessInternal;
+  
   HttpClient? activeHttpClientInternal;
   bool abortRequestedInternal = false;
 
@@ -80,15 +62,6 @@ class MultiAgentOrchestrator extends ChangeNotifier {
 
   Future<void> abort() async {
     abortRequestedInternal = true;
-    final process = activeCliProcessInternal;
-    activeCliProcessInternal = null;
-    if (process != null) {
-      try {
-        process.kill();
-      } catch (_) {
-        // Best effort only.
-      }
-    }
     final client = activeHttpClientInternal;
     activeHttpClientInternal = null;
     if (client != null) {
@@ -97,16 +70,6 @@ class MultiAgentOrchestrator extends ChangeNotifier {
       } catch (_) {
         // Best effort only.
       }
-    }
-  }
-
-  void assertEmbeddedProcessesAllowedInternal() {
-    if (shouldBlockEmbeddedAgentLaunch(
-      isAppleHost: Platform.isIOS || Platform.isMacOS,
-    )) {
-      throw UnsupportedError(
-        'App Store builds do not allow launching embedded multi-agent subprocesses.',
-      );
     }
   }
 
@@ -135,8 +98,6 @@ class MultiAgentOrchestrator extends ChangeNotifier {
   }
 
   /// 执行完整的协作工作流
-  ///
-  /// 流程：Architect 分析 → Engineer 实现 → Tester 审阅 → 迭代（如需要）
   Future<CollaborationResult> runCollaboration({
     required String taskPrompt,
     required String workingDirectory,
@@ -144,7 +105,6 @@ class MultiAgentOrchestrator extends ChangeNotifier {
     List<String> selectedSkills = const [],
     void Function(MultiAgentRunEvent event)? onEvent,
   }) async {
-    assertEmbeddedProcessesAllowedInternal();
     if (isRunningInternal) {
       throw StateError('Collaboration is already running');
     }

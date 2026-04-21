@@ -6,6 +6,9 @@ import 'multi_agent_mount_resolver.dart';
 import 'opencode_config_bridge.dart';
 import 'runtime_models.dart';
 
+/// 协作模式挂载管理器
+///
+/// 在云中性设计下，挂载目标的发现与状态调和应通过桥接同步到远程端点。
 class MultiAgentMountManager {
   MultiAgentMountManager({
     CodexConfigBridge? codexConfigBridge,
@@ -62,14 +65,13 @@ class MultiAgentMountManager {
   }
 
   Future<ArisMountProbe> _buildArisProbe() async {
-    // ARIS is legacy and has been removed from assets.
     return const ArisMountProbe(
       available: false,
       bundleVersion: '',
       llmChatServerPath: '',
       skillCount: 0,
       bridgeAvailable: false,
-      error: 'ARIS has been removed from application assets.',
+      error: 'Legacy local agent execution is disabled.',
     );
   }
 
@@ -79,29 +81,12 @@ class MultiAgentMountManager {
   }) async {
     final states = <ManagedMountTargetState>[];
     for (final adapter in _adapters) {
-      try {
-        states.add(
-          await adapter.reconcile(
-            config: config,
-            aiGatewayUrl: aiGatewayUrl,
-          ),
-        );
-      } catch (error) {
-        states.add(
-          ManagedMountTargetState.placeholder(
-            targetId: adapter.targetId,
-            label: adapter.label,
-            supportsSkills: adapter.supportsSkills,
-            supportsMcp: adapter.supportsMcp,
-            supportsAiGatewayInjection: adapter.supportsAiGatewayInjection,
-          ).copyWith(
-            available: await adapter.isInstalled(),
-            discoveryState: 'error',
-            syncState: 'error',
-            detail: error.toString(),
-          ),
-        );
-      }
+      states.add(
+        await adapter.reconcile(
+          config: config,
+          aiGatewayUrl: aiGatewayUrl,
+        ),
+      );
     }
     return config.copyWith(
       mountTargets: states,
@@ -124,36 +109,6 @@ abstract class CliMountAdapter {
     required MultiAgentConfig config,
     required String aiGatewayUrl,
   });
-
-  Future<String> _runCommand(List<String> command) async {
-    final result = await Process.run(
-      command.first,
-      command.sublist(1),
-      runInShell: true,
-    );
-    final stdout = '${result.stdout}'.trim();
-    final stderr = '${result.stderr}'.trim();
-    return stdout.isNotEmpty ? stdout : stderr;
-  }
-
-  Future<int> _countListedEntries(List<String> command) async {
-    final output = await _runCommand(command);
-    if (output.isEmpty ||
-        output.contains('No MCP servers configured') ||
-        output.contains('No MCP servers configured yet') ||
-        output.contains('No MCP servers configured.')) {
-      return 0;
-    }
-    return output
-        .split('\n')
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .where((item) => !item.startsWith('Usage:'))
-        .where((item) => !item.startsWith('┌'))
-        .where((item) => !item.startsWith('│'))
-        .where((item) => !item.startsWith('└'))
-        .length;
-  }
 
   int countMcpTomlSections(String content) {
     return RegExp(
@@ -191,28 +146,6 @@ class CodexMountAdapter extends CliMountAdapter {
     required MultiAgentConfig config,
     required String aiGatewayUrl,
   }) async {
-    final available = await isInstalled();
-    final configFile = File('${_bridge.codexHome}/config.toml');
-    final content = await configFile.exists()
-        ? await configFile.readAsString()
-        : '';
-    final discoveredMcpCount = countMcpTomlSections(content);
-    final managedMcpServers = config.managedMcpServers
-        .where((item) => item.enabled && item.command.trim().isNotEmpty)
-        .toList(growable: false);
-    if (available && config.autoSync && managedMcpServers.isNotEmpty) {
-      await _bridge.configureManagedMcpServers(
-        servers: managedMcpServers
-            .map(
-              (item) => CodexMcpServer(
-                name: item.id,
-                command: item.command,
-                args: item.args,
-              ),
-            )
-            .toList(growable: false),
-      );
-    }
     return ManagedMountTargetState.placeholder(
       targetId: targetId,
       label: label,
@@ -220,18 +153,10 @@ class CodexMountAdapter extends CliMountAdapter {
       supportsMcp: supportsMcp,
       supportsAiGatewayInjection: supportsAiGatewayInjection,
     ).copyWith(
-      available: available,
-      discoveryState: available ? 'ready' : 'missing',
-      syncState: !available
-          ? 'missing'
-          : config.autoSync
-          ? 'ready'
-          : 'disabled',
-      discoveredMcpCount: discoveredMcpCount,
-      managedMcpCount: managedMcpServers.length,
-      detail: aiGatewayUrl.isNotEmpty
-          ? 'LLM API uses launch-scoped defaults for collaboration runs.'
-          : 'LLM API not configured.',
+      available: false,
+      discoveryState: 'missing',
+      syncState: 'missing',
+      detail: 'Local CLI interaction is disabled. Use bridge for orchestration.',
     );
   }
 }
@@ -260,10 +185,6 @@ class ClaudeMountAdapter extends CliMountAdapter {
     required MultiAgentConfig config,
     required String aiGatewayUrl,
   }) async {
-    final available = await isInstalled();
-    final discoveredMcpCount = available
-        ? await _countListedEntries(<String>['claude', 'mcp', 'list'])
-        : 0;
     return ManagedMountTargetState.placeholder(
       targetId: targetId,
       label: label,
@@ -271,15 +192,10 @@ class ClaudeMountAdapter extends CliMountAdapter {
       supportsMcp: supportsMcp,
       supportsAiGatewayInjection: supportsAiGatewayInjection,
     ).copyWith(
-      available: available,
-      discoveryState: available ? 'ready' : 'missing',
-      syncState: available && config.autoSync ? 'launch-only' : 'disabled',
-      discoveredMcpCount: discoveredMcpCount,
-      managedMcpCount: config.managedMcpServers
-          .where((item) => item.enabled)
-          .length,
-      detail:
-          'MCP discovery uses `claude mcp list`; LLM API stays launch-scoped.',
+      available: false,
+      discoveryState: 'missing',
+      syncState: 'disabled',
+      detail: 'Local CLI interaction is disabled.',
     );
   }
 }
@@ -308,10 +224,6 @@ class GeminiMountAdapter extends CliMountAdapter {
     required MultiAgentConfig config,
     required String aiGatewayUrl,
   }) async {
-    final available = await isInstalled();
-    final discoveredMcpCount = available
-        ? await _countListedEntries(<String>['gemini', 'mcp', 'list'])
-        : 0;
     return ManagedMountTargetState.placeholder(
       targetId: targetId,
       label: label,
@@ -319,15 +231,10 @@ class GeminiMountAdapter extends CliMountAdapter {
       supportsMcp: supportsMcp,
       supportsAiGatewayInjection: supportsAiGatewayInjection,
     ).copyWith(
-      available: available,
-      discoveryState: available ? 'ready' : 'missing',
-      syncState: available && config.autoSync ? 'launch-only' : 'disabled',
-      discoveredMcpCount: discoveredMcpCount,
-      managedMcpCount: config.managedMcpServers
-          .where((item) => item.enabled)
-          .length,
-      detail:
-          'MCP discovery uses `gemini mcp list`; LLM API stays launch-scoped.',
+      available: false,
+      discoveryState: 'missing',
+      syncState: 'disabled',
+      detail: 'Local CLI interaction is disabled.',
     );
   }
 }
@@ -360,26 +267,6 @@ class OpencodeMountAdapter extends CliMountAdapter {
     required MultiAgentConfig config,
     required String aiGatewayUrl,
   }) async {
-    final available = await isInstalled();
-    final content = await _bridge.readConfig();
-    final discoveredMcpCount = countMcpTomlSections(content);
-    final managedMcpServers = config.managedMcpServers
-        .where((item) => item.enabled)
-        .toList(growable: false);
-    if (available && config.autoSync && managedMcpServers.isNotEmpty) {
-      await _bridge.configureManagedMcpServers(
-        servers: managedMcpServers
-            .map(
-              (item) => OpencodeMcpServer(
-                name: item.id,
-                command: item.command,
-                url: item.url,
-                args: item.args,
-              ),
-            )
-            .toList(growable: false),
-      );
-    }
     return ManagedMountTargetState.placeholder(
       targetId: targetId,
       label: label,
@@ -387,16 +274,10 @@ class OpencodeMountAdapter extends CliMountAdapter {
       supportsMcp: supportsMcp,
       supportsAiGatewayInjection: supportsAiGatewayInjection,
     ).copyWith(
-      available: available,
-      discoveryState: available ? 'ready' : 'missing',
-      syncState: !available
-          ? 'missing'
-          : config.autoSync
-          ? 'ready'
-          : 'disabled',
-      discoveredMcpCount: discoveredMcpCount,
-      managedMcpCount: managedMcpServers.length,
-      detail: 'Managed MCP config is preserved in ~/.opencode/config.toml.',
+      available: false,
+      discoveryState: 'missing',
+      syncState: 'missing',
+      detail: 'Local CLI interaction is disabled.',
     );
   }
 }
@@ -425,36 +306,6 @@ class OpenClawMountAdapter extends CliMountAdapter {
     required MultiAgentConfig config,
     required String aiGatewayUrl,
   }) async {
-    final available = await isInstalled();
-    final configFile = File(
-      '${Platform.environment['HOME'] ?? ''}/.openclaw/openclaw.json',
-    );
-    var discoveredSkillCount = 0;
-    var detail = 'OpenClaw acts as the host/control plane mount.';
-    if (await configFile.exists()) {
-      try {
-        final decoded = jsonDecode(await configFile.readAsString());
-        final agents =
-            (decoded is Map<String, dynamic> &&
-                decoded['agents'] is Map<String, dynamic> &&
-                (decoded['agents'] as Map<String, dynamic>)['list'] is List)
-            ? ((decoded['agents'] as Map<String, dynamic>)['list'] as List)
-                  .length
-            : 0;
-        final skillsDir = Directory(
-          '${Platform.environment['HOME'] ?? ''}/.openclaw/skills',
-        );
-        if (await skillsDir.exists()) {
-          discoveredSkillCount = await skillsDir
-              .list()
-              .where((entity) => entity is File || entity is Directory)
-              .length;
-        }
-        detail = 'agents: $agents · skills: $discoveredSkillCount';
-      } catch (_) {
-        detail = 'OpenClaw config detected but could not be fully parsed.';
-      }
-    }
     return ManagedMountTargetState.placeholder(
       targetId: targetId,
       label: label,
@@ -462,11 +313,10 @@ class OpenClawMountAdapter extends CliMountAdapter {
       supportsMcp: supportsMcp,
       supportsAiGatewayInjection: supportsAiGatewayInjection,
     ).copyWith(
-      available: available,
-      discoveryState: available ? 'ready' : 'missing',
-      syncState: available && config.autoSync ? 'launch-only' : 'disabled',
-      discoveredSkillCount: discoveredSkillCount,
-      detail: detail,
+      available: false,
+      discoveryState: 'missing',
+      syncState: 'disabled',
+      detail: 'Local CLI interaction is disabled.',
     );
   }
 }
