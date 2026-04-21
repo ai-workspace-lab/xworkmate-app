@@ -104,7 +104,7 @@ Uri? resolveBridgeProviderBaseEndpoint(
   basePath = basePath.replaceFirst(RegExp(r'/+$'), '');
 
   final providerPath = gateway
-      ? '$basePath/gateway/$normalizedProviderId'
+      ? '$basePath/acp-server/gateway/$normalizedProviderId'
       : '$basePath/acp-server/$normalizedProviderId';
 
   return bridgeBaseEndpoint.replace(

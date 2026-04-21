@@ -53,6 +53,8 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
   required bool bridgeReady,
   required String bridgeLabel,
   required AccountSyncState? accountSyncState,
+  required bool accountSignedIn,
+  required bool bridgeConfigured,
 }) {
   if (bridgeReady) {
     return AssistantThreadConnectionState(
@@ -66,36 +68,75 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
     );
   }
 
+  if (!accountSignedIn) {
+    return AssistantThreadConnectionState(
+      executionTarget: target,
+      status: RuntimeConnectionStatus.offline,
+      primaryLabel: appText('已退出登录', 'Signed out'),
+      detailLabel: appText('请先登录 svc.plus', 'Please sign in to svc.plus first'),
+      ready: false,
+      gatewayTokenMissing: false,
+      lastError: null,
+    );
+  }
+
   final syncState = accountSyncState?.syncState.trim().toLowerCase() ?? '';
   final syncMessage = accountSyncState?.syncMessage.trim() ?? '';
   final tokenMissing = syncMessage == 'Bridge authorization is unavailable';
   final endpointMissing = syncMessage == 'Bridge endpoint is unavailable';
   final blocked = syncState == 'blocked';
   final failed = blocked && !tokenMissing && !endpointMissing;
-  final status = tokenMissing || failed
-      ? RuntimeConnectionStatus.error
-      : RuntimeConnectionStatus.offline;
-  final primaryLabel = tokenMissing
-      ? appText('缺少令牌', 'Missing Token')
-      : failed
-      ? appText('连接失败', 'Connection Failed')
-      : status.label;
-  final detailLabel = tokenMissing
-      ? appText(
-          'xworkmate-bridge 授权不可用',
-          'xworkmate-bridge authorization unavailable',
-        )
-      : failed
-      ? appText('xworkmate-bridge 连接失败', 'xworkmate-bridge connection failed')
-      : appText('xworkmate-bridge 未连接', 'xworkmate-bridge is not connected');
+
+  // SyncBlocked logic
+  if (tokenMissing || failed || blocked) {
+    final status = RuntimeConnectionStatus.error;
+    final primaryLabel = tokenMissing
+        ? appText('缺少令牌', 'Missing Token')
+        : failed
+        ? appText('连接失败', 'Connection Failed')
+        : status.label;
+    final detailLabel = tokenMissing
+        ? appText(
+            'xworkmate-bridge 授权不可用',
+            'xworkmate-bridge authorization unavailable',
+          )
+        : failed
+        ? appText('xworkmate-bridge 连接失败', 'xworkmate-bridge connection failed')
+        : appText('xworkmate-bridge 未连接', 'xworkmate-bridge is not connected');
+    return AssistantThreadConnectionState(
+      executionTarget: target,
+      status: status,
+      primaryLabel: primaryLabel,
+      detailLabel: detailLabel,
+      ready: false,
+      gatewayTokenMissing: tokenMissing,
+      lastError: failed ? syncMessage : null,
+    );
+  }
+
+  // BridgeDiscovering logic (Signed in, not blocked, but not ready yet)
+  if (bridgeConfigured) {
+    return AssistantThreadConnectionState(
+      executionTarget: target,
+      status: RuntimeConnectionStatus.offline,
+      primaryLabel: appText('正在发现', 'Discovering'),
+      detailLabel:
+          appText('正在加载 Bridge 能力...', 'Loading Bridge capabilities...'),
+      ready: false,
+      gatewayTokenMissing: false,
+      lastError: null,
+    );
+  }
+
+  // Default Offline/Unconnected
   return AssistantThreadConnectionState(
     executionTarget: target,
-    status: status,
-    primaryLabel: primaryLabel,
-    detailLabel: detailLabel,
+    status: RuntimeConnectionStatus.offline,
+    primaryLabel: RuntimeConnectionStatus.offline.label,
+    detailLabel: appText('xworkmate-bridge 未连接', 'xworkmate-bridge is not connected'),
     ready: false,
-    gatewayTokenMissing: tokenMissing,
-    lastError: failed ? syncMessage : null,
+    gatewayTokenMissing: false,
+    lastError: null,
   );
 }
 
@@ -286,8 +327,9 @@ extension AppControllerDesktopThreadSessions on AppController {
     final target = assistantExecutionTargetForSession(normalizedSessionKey);
     final providers = providerCatalogForExecutionTarget(target);
     final availableTargets = bridgeAvailableExecutionTargets;
+    final bridgeConfigured = isBridgeAcpRuntimeConfiguredInternal();
     final bridgeReady =
-        isBridgeAcpRuntimeConfiguredInternal() &&
+        bridgeConfigured &&
         providers.isNotEmpty &&
         (availableTargets.isEmpty || availableTargets.contains(target));
     final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
@@ -299,6 +341,8 @@ extension AppControllerDesktopThreadSessions on AppController {
       bridgeReady: bridgeReady,
       bridgeLabel: bridgeLabel,
       accountSyncState: settingsControllerInternal.accountSyncState,
+      accountSignedIn: settingsControllerInternal.accountSignedIn,
+      bridgeConfigured: bridgeConfigured,
     );
   }
 

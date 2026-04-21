@@ -638,6 +638,13 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   Uri? resolveBridgeAcpEndpointInternal() {
     final modeConfig = settings.acpBridgeServerModeConfig;
     
+    // Prioritize BRIDGE_SERVER_URL from environment or override
+    final envEndpoint = runtimeEnvironmentValueInternal('BRIDGE_SERVER_URL');
+    if (envEndpoint != null && isSupportedExternalAcpEndpoint(envEndpoint)) {
+      final uri = Uri.tryParse(envEndpoint);
+      if (uri != null) return uri.replace(query: null, fragment: null);
+    }
+
     // Prioritize the cloud endpoint if available or if we're connected to svc.plus
     final cloudEndpoint = _activeCloudSyncedBridgeEndpointInternal();
     if (cloudEndpoint.isNotEmpty) {
@@ -699,12 +706,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       return isSupportedExternalAcpEndpoint(syncedEndpoint) ? syncedEndpoint : '';
     }
 
-    // Fallback: If we are logged in with an svc.plus account, default to the known bridge URL.
-    if (settings.accountUsername.endsWith('@svc.plus') || 
-        settings.accountBaseUrl.contains('svc.plus')) {
-      return 'https://xworkmate-bridge.svc.plus';
-    }
-
     return isSupportedExternalAcpEndpoint(syncedEndpoint) ? syncedEndpoint : '';
   }
 
@@ -732,6 +733,11 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         normalizedHost == bridgeHost &&
         (bridgePort <= 0 || endpoint.port == bridgePort);
     if (matchesBridgeEndpoint) {
+      final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
+      if (envToken != null && envToken.isNotEmpty) {
+        return envToken;
+      }
+
       final modeConfig = settings.acpBridgeServerModeConfig;
       if (modeConfig.usesSelfHostedBase) {
         final manualToken = await settingsControllerInternal
@@ -741,15 +747,12 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         }
         return null;
       }
-      final syncState = settingsControllerInternal.accountSyncState;
-      if (syncState?.syncState.trim().toLowerCase() == 'ready' &&
-          syncState?.tokenConfigured.bridge == true) {
-        final bridgeToken = (await storeInternal.loadAccountManagedSecret(
-          target: kAccountManagedSecretTargetBridgeAuthToken,
-        ))?.trim();
-        if (bridgeToken?.isNotEmpty == true) {
-          return bridgeToken;
-        }
+
+      final bridgeToken = (await storeInternal.loadAccountManagedSecret(
+        target: kAccountManagedSecretTargetBridgeAuthToken,
+      ))?.trim();
+      if (bridgeToken?.isNotEmpty == true) {
+        return bridgeToken;
       }
     }
     return null;

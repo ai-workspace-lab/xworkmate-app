@@ -16,6 +16,8 @@ void main() {
             syncMessage: 'Bridge authorization is unavailable',
             lastSyncError: 'Bridge authorization is unavailable',
           ),
+          accountSignedIn: true,
+          bridgeConfigured: true,
         );
 
         expect(state.connected, isTrue);
@@ -37,6 +39,8 @@ void main() {
           lastSyncError: 'Bridge authorization is unavailable',
           profileScope: 'bridge',
         ),
+        accountSignedIn: true,
+        bridgeConfigured: true,
       );
 
       expect(state.connected, isFalse);
@@ -52,12 +56,48 @@ void main() {
         bridgeReady: false,
         bridgeLabel: 'xworkmate-bridge.svc.plus',
         accountSyncState: null,
+        accountSignedIn: true,
+        bridgeConfigured: false,
       );
 
       expect(state.connected, isFalse);
       expect(state.status, RuntimeConnectionStatus.offline);
       expect(state.primaryLabel, '离线');
       expect(state.detailLabel, 'xworkmate-bridge 未连接');
+      expect(state.gatewayTokenMissing, isFalse);
+    });
+
+    test('surfaces signed-out status when not signed in', () {
+      final state = resolveGatewayThreadConnectionStateInternal(
+        target: AssistantExecutionTarget.gateway,
+        bridgeReady: false,
+        bridgeLabel: 'xworkmate-bridge.svc.plus',
+        accountSyncState: null,
+        accountSignedIn: false,
+        bridgeConfigured: false,
+      );
+
+      expect(state.connected, isFalse);
+      expect(state.status, RuntimeConnectionStatus.offline);
+      expect(state.primaryLabel, '已退出登录');
+      expect(state.detailLabel, '请先登录 svc.plus');
+      expect(state.gatewayTokenMissing, isFalse);
+    });
+
+    test('surfaces discovering status when configured but not ready', () {
+      final state = resolveGatewayThreadConnectionStateInternal(
+        target: AssistantExecutionTarget.gateway,
+        bridgeReady: false,
+        bridgeLabel: 'xworkmate-bridge.svc.plus',
+        accountSyncState: null,
+        accountSignedIn: true,
+        bridgeConfigured: true,
+      );
+
+      expect(state.connected, isFalse);
+      expect(state.status, RuntimeConnectionStatus.offline);
+      expect(state.primaryLabel, '正在发现');
+      expect(state.detailLabel, '正在加载 Bridge 能力...');
       expect(state.gatewayTokenMissing, isFalse);
     });
   });

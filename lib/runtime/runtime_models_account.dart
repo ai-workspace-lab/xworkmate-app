@@ -520,7 +520,7 @@ class AcpBridgeServerEffectiveConfig {
 
   factory AcpBridgeServerEffectiveConfig.defaults() {
     return const AcpBridgeServerEffectiveConfig(
-      endpoint: kManagedBridgeServerUrl,
+      endpoint: '',
       tokenRef: '',
       source: 'default',
       reason: 'No active source configured',
@@ -552,7 +552,7 @@ class AcpBridgeServerEffectiveConfig {
 
   factory AcpBridgeServerEffectiveConfig.fromJson(Map<String, dynamic> json) {
     return AcpBridgeServerEffectiveConfig(
-      endpoint: json['endpoint'] as String? ?? kManagedBridgeServerUrl,
+      endpoint: json['endpoint'] as String? ?? '',
       tokenRef: json['tokenRef'] as String? ?? '',
       source: json['source'] as String? ?? 'default',
       reason: json['reason'] as String? ?? '',
