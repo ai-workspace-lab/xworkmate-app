@@ -3,17 +3,17 @@
 Last Updated: 2026-04-19
 
 本文件记录当前 `Settings -> Integrations` 在主链中的职责边界，以及
-`acpBridgeServerModeConfig` 的有效配置仲裁规则。
+`acpBridgeServerModeConfig` 在 settings surface 中的配置仲裁规则。
 
 ## Current Rule
 
 - Settings 只管理 Bridge 连接参数、account sync 元数据和本地编辑态
-- `AcpBridgeServerModeConfig.effective` 是运行时实际生效配置
+- `AcpBridgeServerModeConfig.effective` 只用于 settings surface 的连接与展示语义
 - `selfHosted` 优先级高于 `cloudSynced`
-- `cloudSynced` 只在 manual Bridge 未配置时作为有效回退来源
+- `cloudSynced` 只在 manual Bridge 未配置时作为 settings metadata 回退来源
 - app 不从本地 endpoint preset、旧 module 配置、历史 fallback 恢复 provider catalog
 - `xworkmate-bridge` 仍然是 provider catalog、gateway capability、routing resolve 的唯一真源
-- `BRIDGE_SERVER_URL` 只属于 `AccountSyncState` 元数据
+- `BRIDGE_SERVER_URL` 只属于 `AccountSyncState` 元数据，不参与 assistant runtime endpoint 选择
 - `BRIDGE_AUTH_TOKEN` 只进入 secure storage / managed secret
 
 ## Canonical State Model
@@ -119,18 +119,18 @@ stateDiagram-v2
     DefaultEffective --> CloudEffective: cloud sync 恢复
 
     note right of BridgeEffective
-        source = bridge
-        effective.endpoint = selfHosted.serverUrl
+        source = bridge metadata
+        used by settings only
     end note
 
     note right of CloudEffective
-        source = cloud
-        effective.endpoint = accountSyncState.syncedDefaults.bridgeServerUrl
+        source = cloud metadata
+        used by settings only
     end note
 
     note right of DefaultEffective
-        source = default
-        effective.endpoint = kManagedBridgeServerUrl
+        source = managed bridge origin
+        assistant runtime fixed to kManagedBridgeServerUrl
     end note
 ```
 
