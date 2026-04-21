@@ -598,6 +598,16 @@ class AppController extends ChangeNotifier {
       for (final p in catalog) {
         if (p.providerId == normalizedId) return p;
       }
+
+      // If not in catalog but we have an ID, return a synthetic provider to allow routing
+      return SingleAgentProvider(
+        providerId: normalizedId,
+        label: providerFallbackLabelInternal(normalizedId),
+        badge: providerFallbackBadgeInternal(
+          providerId: normalizedId,
+          label: providerFallbackLabelInternal(normalizedId),
+        ),
+      );
     }
     return (defaultToCatalog && catalog.isNotEmpty)
         ? catalog.first
