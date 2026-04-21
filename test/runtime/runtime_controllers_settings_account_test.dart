@@ -289,7 +289,7 @@ void main() {
     );
 
     test(
-      'syncAccountSettings refreshes managed bridge contract from protected account profile',
+      'syncAccountSettings refreshes managed bridge metadata from protected account profile',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
           'xworkmate-account-managed-bridge-refresh-',
@@ -365,7 +365,7 @@ void main() {
     );
 
     test(
-      'synced bridge url becomes runtime endpoint only with a configured bridge token',
+      'managed bridge endpoint stays fixed regardless of synced bridge url metadata',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
           'xworkmate-account-managed-bridge-runtime-',
@@ -412,28 +412,28 @@ void main() {
 
         expect(
           controller.resolveGatewayAcpEndpointInternal()?.toString(),
-          'https://xworkmate-bridge-alt.svc.plus',
+          kManagedBridgeServerUrl,
         );
         expect(
           await controller.resolveGatewayAcpAuthorizationHeaderInternal(
             Uri.parse('https://xworkmate-bridge-alt.svc.plus/acp/rpc'),
           ),
-          'bridge-token',
+          isNull,
         );
         expect(
           await controller.resolveGatewayAcpAuthorizationHeaderInternal(
             Uri.parse('$kManagedBridgeServerUrl/acp/rpc'),
           ),
-          isNull,
+          'bridge-token',
         );
       },
     );
 
     test(
-      'syncAccountSettings blocks and clears stale token when bridge endpoint is unavailable',
+      'syncAccountSettings succeeds when bridge url metadata is missing',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
-          'xworkmate-account-managed-bridge-missing-url-',
+          'xworkmate-account-managed-bridge-missing-metadata-',
         );
         addTearDown(() async {
           if (await storeRoot.exists()) {
@@ -483,14 +483,15 @@ void main() {
           baseUrl: 'https://accounts.svc.plus',
         );
 
-        expect(result.state, 'blocked');
-        expect(result.message, 'Bridge endpoint is unavailable');
+        expect(result.state, 'ready');
+        expect(result.message, 'Bridge access synced');
         expect(
           await store.loadAccountManagedSecret(
             target: kAccountManagedSecretTargetBridgeAuthToken,
           ),
-          isNull,
+          'fresh-bridge-token',
         );
+        expect(controller.accountSyncState!.syncedDefaults.bridgeServerUrl, '');
       },
     );
 
