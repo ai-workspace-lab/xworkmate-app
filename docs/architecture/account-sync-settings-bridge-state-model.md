@@ -43,39 +43,46 @@ flowchart TD
 
 ```mermaid
 stateDiagram-v2
-    [*] --> SignedOut
+    [*] --> SignedOut: App Start / Logout
 
-    SignedOut: no account session
-    SignedOut --> SignedOut: do not send\nno fallback\nno stale token read
-    SignedOut --> Syncing: svc.plus login
+    state SignedOut {
+        [*] --> NoSession: No token / No endpoint
+        NoSession: 不能连接 / 不能发送 / 不读旧Secret
+    }
 
-    Syncing: sync bridge config after login
-    Syncing --> SyncBlocked: missing BRIDGE_AUTH_TOKEN\nor sync failed
-    Syncing --> BridgeDiscovering: bridge URL + token synced
+    SignedOut --> Syncing: Login (svc.plus)
+    Syncing --> SyncBlocked: Sync Error / Token Missing / Endpoint Missing
+    Syncing --> BridgeDiscovering: URL + Token available
+    
+    state SyncBlocked {
+        [*] --> BlockedError: Status Error
+        BlockedError: 显示具体错误 / 不可发送
+    }
 
-    SyncBlocked: signed in but bridge unavailable
-    SyncBlocked --> Syncing: user syncs again
-    SyncBlocked --> SignedOut: logout clears session/token/catalog
+    SyncBlocked --> Syncing: Retry Sync / Refresh Session
 
-    BridgeDiscovering: load acp.capabilities from /acp/rpc
-    BridgeDiscovering --> SyncBlocked: 401/403/token missing\nor endpoint missing
-    BridgeDiscovering --> BridgeReady: providerCatalog/gatewayProviders valid
+    state BridgeDiscovering {
+        [*] --> RefreshingCapabilities: Load /acp/rpc
+        RefreshingCapabilities: Catalog is empty / 不可发送
+    }
 
-    BridgeReady: assistant can send
-    BridgeReady --> ProviderDispatch: user submits message
-    BridgeReady --> SignedOut: logout clears session/token/catalog
+    BridgeDiscovering --> BridgeReady: Catalog valid (providers found)
+    BridgeDiscovering --> SyncBlocked: 401 Unauthorized / Connection Error
 
-    ProviderDispatch: resolve endpoint by selected provider
-    ProviderDispatch --> AgentEndpoint: Hermes/Codex/Gemini/OpenCode
-    ProviderDispatch --> GatewayEndpoint: OpenClaw Gateway
+    state BridgeReady {
+        [*] --> Connected: Catalog populated
+        Connected: 允许发送对话
+        Connected --> ProviderRouting: User message
+    }
 
-    AgentEndpoint: /acp-server/{provider}/acp/rpc
-    GatewayEndpoint: /gateway/openclaw/acp/rpc
+    state ProviderRouting {
+        Gateway: /gateway/openclaw/acp/rpc
+        Agent: /acp-server/{id}/acp/rpc
+    }
 
-    AgentEndpoint --> BridgeReady: result returned
-    GatewayEndpoint --> BridgeReady: result returned
-    AgentEndpoint --> SyncBlocked: auth failure
-    GatewayEndpoint --> SyncBlocked: auth failure
+    BridgeReady --> SignedOut: Logout
+    SyncBlocked --> SignedOut: Logout
+    BridgeDiscovering --> SignedOut: Logout
 ```
 
 ## Field Semantics
