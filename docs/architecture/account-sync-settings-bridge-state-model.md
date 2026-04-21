@@ -72,12 +72,6 @@ stateDiagram-v2
     state BridgeReady {
         [*] --> Connected: Catalog populated
         Connected: 允许发送对话
-        Connected --> ProviderRouting: User message
-    }
-
-    state ProviderRouting {
-        Gateway: /gateway/openclaw/acp/rpc
-        Agent: /acp-server/{id}/acp/rpc
     }
 
     BridgeReady --> SignedOut: Logout
@@ -119,7 +113,7 @@ flowchart TD
 - `BRIDGE_SERVER_URL` may be retained in `AccountSyncState.syncedDefaults.bridgeServerUrl`, but it is metadata only.
 - `BRIDGE_AUTH_TOKEN` is written to secure storage only, never to normal settings.
 - Bridge runtime requests use `Authorization: Bearer <token>` from secure storage.
-- Capabilities and routing discovery use the bridge root `/acp/rpc`; assistant execution uses provider-specific public endpoints.
+- Capabilities, routing discovery, and assistant execution all use the bridge root `/acp/rpc`.
 
 ## Persistence Rules
 
