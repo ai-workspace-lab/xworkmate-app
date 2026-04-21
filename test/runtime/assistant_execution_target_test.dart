@@ -376,7 +376,7 @@ void main() {
     );
 
     test(
-      'sendChatMessage refreshes gateway capabilities and fails locally when gateway provider catalog stays empty',
+      'sendChatMessage refreshes capabilities and fails locally when agent provider catalog stays empty',
       () async {
         final capture = await _startEmptyCapabilityServer();
         addTearDown(capture.close);
@@ -435,7 +435,7 @@ void main() {
         await controller.sessionsController.switchSession('session-1');
         await _waitForRequest(capture, minimumCount: 1);
         await controller.setAssistantExecutionTarget(
-          AssistantExecutionTarget.gateway,
+          AssistantExecutionTarget.agent,
         );
         await Future<void>.delayed(const Duration(milliseconds: 200));
 
@@ -445,14 +445,14 @@ void main() {
             isA<StateError>().having(
               (error) => error.message,
               'message',
-              contains('gateway provider'),
+              contains('agent provider'),
             ),
           ),
         );
 
         expect(fakeGoTaskService.executeCount, 0);
         expect(capture.requestCount, greaterThanOrEqualTo(3));
-        expect(controller.chatMessages.last.text, contains('gateway provider'));
+        expect(controller.chatMessages.last.text, contains('agent provider'));
       },
     );
   });
