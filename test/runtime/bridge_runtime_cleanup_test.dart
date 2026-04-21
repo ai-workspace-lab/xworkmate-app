@@ -134,7 +134,25 @@ void main() {
     test(
       'ignores legacy INTERNAL_SERVICE_TOKEN for managed bridge auth resolution',
       () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-bridge-auth-resolver-legacy-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            await storeRoot.delete(recursive: true);
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+
         final controller = AppController(
+          store: store,
           environmentOverride: const <String, String>{
             'INTERNAL_SERVICE_TOKEN': 'legacy-bridge-token',
           },
