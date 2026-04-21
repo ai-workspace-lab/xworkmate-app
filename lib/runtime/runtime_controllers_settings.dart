@@ -538,7 +538,7 @@ class SettingsController extends ChangeNotifier {
           );
         }
       } catch (_) {
-        // Best effort only. Directory watch below remains as a fallback.
+        // Best effort only. If file watching fails, directory watching may still work.
       }
     }
     if (directory != null) {

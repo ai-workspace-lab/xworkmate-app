@@ -16,6 +16,78 @@ import '../../widgets/surface_card.dart';
 import 'settings_account_panel.dart';
 import 'settings_about_panel.dart';
 
+Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({
+  required Uri bridgeEndpoint,
+  required Future<String?> Function(Uri endpoint) authorizationResolver,
+  HttpClient Function()? clientFactory,
+}) async {
+  final pingEndpoint = bridgeEndpoint.replace(
+    path: '/api/ping',
+    query: null,
+    fragment: null,
+  );
+  final authorizationHeader = await authorizationResolver(pingEndpoint);
+  if (authorizationHeader == null || authorizationHeader.trim().isEmpty) {
+    return const <String, dynamic>{
+      'status': 'unavailable',
+      'version': '',
+      'commit': '',
+      'image': '',
+      'buildDate': '',
+    };
+  }
+
+  final client = (clientFactory ?? HttpClient.new)()
+    ..connectionTimeout = const Duration(seconds: 4);
+  try {
+    final request = await client
+        .getUrl(pingEndpoint)
+        .timeout(const Duration(seconds: 4));
+    request.headers.set(
+      HttpHeaders.authorizationHeader,
+      'Bearer $authorizationHeader',
+    );
+    request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+    final response = await request.close().timeout(const Duration(seconds: 4));
+    final body = await utf8
+        .decodeStream(response)
+        .timeout(const Duration(seconds: 4));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return const <String, dynamic>{
+        'status': 'unavailable',
+        'version': '',
+        'commit': '',
+        'image': '',
+        'buildDate': '',
+      };
+    }
+    final decoded = jsonDecode(body);
+    if (decoded is Map<String, dynamic>) {
+      return decoded;
+    }
+    if (decoded is Map) {
+      return decoded.cast<String, dynamic>();
+    }
+  } catch (_) {
+    return const <String, dynamic>{
+      'status': 'unavailable',
+      'version': '',
+      'commit': '',
+      'image': '',
+      'buildDate': '',
+    };
+  } finally {
+    client.close(force: true);
+  }
+  return const <String, dynamic>{
+    'status': 'unavailable',
+    'version': '',
+    'commit': '',
+    'image': '',
+    'buildDate': '',
+  };
+}
+
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
     super.key,
@@ -54,7 +126,8 @@ class _SettingsPageState extends State<SettingsPage> {
     final settings = widget.controller.settings;
     _lastSavedAccountBaseUrl = settings.accountBaseUrl;
     _lastSavedAccountIdentifier = settings.accountUsername;
-    _lastSavedBridgeUrl = settings.acpBridgeServerModeConfig.selfHosted.serverUrl;
+    _lastSavedBridgeUrl =
+        settings.acpBridgeServerModeConfig.selfHosted.serverUrl;
     _accountBaseUrlController = TextEditingController(
       text: _lastSavedAccountBaseUrl,
     );
@@ -83,7 +156,14 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _loadBridgeToken() async {
     final token = await widget.controller.settingsController
-        .loadSecretValueByRef(widget.controller.settings.acpBridgeServerModeConfig.selfHosted.passwordRef);
+        .loadSecretValueByRef(
+          widget
+              .controller
+              .settings
+              .acpBridgeServerModeConfig
+              .selfHosted
+              .passwordRef,
+        );
     if (mounted) {
       _bridgeTokenController.text = token;
     }
@@ -109,7 +189,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _lastSavedBridgeUrl = bridgeConfig.selfHosted.serverUrl;
   }
 
-  Future<void> _saveAccountProfile(
+  Future<void> _persistAccountProfileSettings(
     SettingsSnapshot settings, {
     required bool isManualBridge,
   }) async {
@@ -121,11 +201,8 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
 
-    // Resolve the effective config based on the new sources
-    final nextEffective = widget.controller.settingsController.resolveAcpBridgeServerEffectiveConfig(
-      config: nextBridgeConfig,
-      accountSyncState: widget.controller.settingsController.accountSyncState,
-    );
+    final nextEffective = widget.controller.settingsController
+        .resolveAcpBridgeServerEffectiveConfig(config: nextBridgeConfig);
 
     final nextSettings = settings.copyWith(
       accountBaseUrl: _accountBaseUrlController.text.trim(),
@@ -146,14 +223,15 @@ class _SettingsPageState extends State<SettingsPage> {
 
     _lastSavedAccountBaseUrl = nextSettings.accountBaseUrl;
     _lastSavedAccountIdentifier = nextSettings.accountUsername;
-    _lastSavedBridgeUrl = nextSettings.acpBridgeServerModeConfig.selfHosted.serverUrl;
+    _lastSavedBridgeUrl =
+        nextSettings.acpBridgeServerModeConfig.selfHosted.serverUrl;
   }
 
   Future<void> _loginAccount(SettingsSnapshot settings) async {
     final baseUrl = _accountBaseUrlController.text.trim();
     final identifier = _accountIdentifierController.text.trim();
     try {
-      await _saveAccountProfile(settings, isManualBridge: false);
+      await _persistAccountProfileSettings(settings, isManualBridge: false);
       await widget.controller.settingsController.loginAccount(
         baseUrl: baseUrl,
         identifier: identifier,
@@ -166,7 +244,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _syncAccount(SettingsSnapshot settings) async {
-    await _saveAccountProfile(settings, isManualBridge: false);
+    await _persistAccountProfileSettings(settings, isManualBridge: false);
     await widget.controller.settingsController.syncAccountSettings(
       baseUrl: _accountBaseUrlController.text.trim(),
     );
@@ -176,7 +254,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _verifyAccountMfa(SettingsSnapshot settings) async {
     try {
-      await _saveAccountProfile(settings, isManualBridge: false);
+      await _persistAccountProfileSettings(settings, isManualBridge: false);
       await widget.controller.settingsController.verifyAccountMfa(
         baseUrl: _accountBaseUrlController.text.trim(),
         code: _accountMfaCodeController.text.trim(),
@@ -251,50 +329,11 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<Map<String, dynamic>> _loadBridgeMetadata() async {
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
-    try {
-      final request = await client
-          .getUrl(Uri.parse('$kManagedBridgeServerUrl/api/ping'))
-          .timeout(const Duration(seconds: 4));
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      final response = await request.close().timeout(const Duration(seconds: 4));
-      final body = await utf8
-          .decodeStream(response)
-          .timeout(const Duration(seconds: 4));
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        return <String, dynamic>{
-          'status': 'error',
-          'version': '',
-          'commit': '',
-          'image': '',
-          'buildDate': '',
-        };
-      }
-      final decoded = jsonDecode(body);
-      if (decoded is Map<String, dynamic>) {
-        return decoded;
-      }
-      if (decoded is Map) {
-        return decoded.cast<String, dynamic>();
-      }
-    } catch (_) {
-      return const <String, dynamic>{
-        'status': 'unavailable',
-        'version': '',
-        'commit': '',
-        'image': '',
-        'buildDate': '',
-      };
-    } finally {
-      client.close(force: true);
-    }
-    return const <String, dynamic>{
-      'status': 'unavailable',
-      'version': '',
-      'commit': '',
-      'image': '',
-      'buildDate': '',
-    };
+    return loadBridgeMetadataForSettingsAbout(
+      bridgeEndpoint: Uri.parse(kManagedBridgeServerUrl),
+      authorizationResolver:
+          widget.controller.resolveGatewayAcpAuthorizationHeaderInternal,
+    );
   }
 
   @override
@@ -357,12 +396,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 bridgeUrlController: _bridgeUrlController,
                 bridgeTokenController: _bridgeTokenController,
                 onSaveAccountProfile: ({required bool isManualBridge}) =>
-                    _saveAccountProfile(
+                    _persistAccountProfileSettings(
                       widget.controller.settings,
                       isManualBridge: isManualBridge,
                     ),
                 onLogin: () => _loginAccount(widget.controller.settings),
-                onVerifyMfa: () => _verifyAccountMfa(widget.controller.settings),
+                onVerifyMfa: () =>
+                    _verifyAccountMfa(widget.controller.settings),
                 onCancelMfa: _cancelAccountMfa,
                 onSync: () => _syncAccount(widget.controller.settings),
                 onLogout: _logoutAccount,

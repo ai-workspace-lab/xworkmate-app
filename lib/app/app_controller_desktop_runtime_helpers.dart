@@ -636,27 +636,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   Uri? resolveBridgeAcpEndpointInternal() {
-    final modeConfig = settings.acpBridgeServerModeConfig;
-
-    final cloudEndpoint = _activeCloudSyncedBridgeEndpointInternal();
-    if (cloudEndpoint.isNotEmpty) {
-      final uri = Uri.tryParse(cloudEndpoint);
-      if (uri != null) return uri.replace(query: null, fragment: null);
-    }
-
-    if (modeConfig.usesSelfHostedBase) {
-      final candidate = modeConfig.selfHosted.serverUrl.trim();
-      if (candidate.isNotEmpty) {
-        final uri = Uri.tryParse(candidate);
-        final scheme = uri?.scheme.trim().toLowerCase() ?? '';
-        if (uri != null &&
-            kSupportedExternalAcpEndpointSchemes.contains(scheme)) {
-          return uri.replace(query: null, fragment: null);
-        }
-      }
-    }
-
-    return null;
+    final uri = Uri.parse(kManagedBridgeServerUrl);
+    return uri.replace(query: null, fragment: null);
   }
 
   Uri? resolveExternalAcpEndpointForTargetInternal(AssistantExecutionTarget _) {
@@ -664,33 +645,13 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   bool isBridgeAcpRuntimeConfiguredInternal() {
-    final modeConfig = settings.acpBridgeServerModeConfig;
-    if (modeConfig.usesSelfHostedBase) {
-      return modeConfig.selfHosted.isConfigured;
-    }
-    return _activeCloudSyncedBridgeEndpointInternal().isNotEmpty;
+    return true;
   }
 
   Uri? resolveExternalAcpEndpointForRequestInternal(
     GoTaskServiceRequest request,
   ) {
     return resolveBridgeAcpEndpointInternal();
-  }
-
-  String _activeCloudSyncedBridgeEndpointInternal() {
-    final syncState = settingsControllerInternal.accountSyncState;
-    final syncedEndpoint =
-        syncState?.syncedDefaults.bridgeServerUrl.trim() ?? '';
-
-    if (syncState?.syncState.trim().toLowerCase() == 'ready' &&
-        syncState?.tokenConfigured.bridge == true &&
-        syncedEndpoint.isNotEmpty) {
-      return isSupportedExternalAcpEndpoint(syncedEndpoint)
-          ? syncedEndpoint
-          : '';
-    }
-
-    return '';
   }
 
   Uri? gatewayProfileBaseUriInternal(GatewayConnectionProfile profile) {
@@ -720,16 +681,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
       if (envToken != null && envToken.isNotEmpty) {
         return envToken;
-      }
-
-      final modeConfig = settings.acpBridgeServerModeConfig;
-      if (modeConfig.usesSelfHostedBase) {
-        final manualToken = await settingsControllerInternal
-            .loadSecretValueByRef(modeConfig.selfHosted.passwordRef);
-        if (manualToken.trim().isNotEmpty) {
-          return manualToken.trim();
-        }
-        return null;
       }
 
       final bridgeToken = (await storeInternal.loadAccountManagedSecret(

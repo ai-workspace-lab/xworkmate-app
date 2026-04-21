@@ -284,18 +284,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
       target: kAccountManagedSecretTargetBridgeAuthToken,
       value: bridgeToken,
     );
-    final syncedBridgeServerUrl = _resolveBridgeServerUrl(syncPayload);
-    if (!isSupportedExternalAcpEndpoint(syncedBridgeServerUrl)) {
-      return _persistAccountSyncContractFailureInternal(
-        controller,
-        message: 'Bridge endpoint is unavailable',
-        quiet: quiet,
-      );
-    }
-    final resolvedBridgeServerUrl = _resolveCurrentBridgeServerUrl(
-      controller,
-      bridgeServerUrlOverride: syncedBridgeServerUrl,
-    );
+    final syncedBridgeServerUrl = _extractBridgeServerUrlMetadata(syncPayload);
     await controller.storeInternal.clearAccountManagedSecret(
       target: kAccountManagedSecretTargetAIGatewayAccessToken,
     );
@@ -305,12 +294,12 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
 
     final nextState = AccountSyncState.defaults().copyWith(
       syncedDefaults: AccountRemoteProfile.defaults().copyWith(
-        bridgeServerUrl: resolvedBridgeServerUrl,
+        bridgeServerUrl: syncedBridgeServerUrl,
       ),
       syncState: 'ready',
       syncMessage: 'Bridge access synced',
       lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
-      lastSyncSource: resolvedBridgeServerUrl,
+      lastSyncSource: syncedBridgeServerUrl,
       lastSyncError: '',
       profileScope: 'bridge',
       tokenConfigured: const AccountTokenConfigured(
@@ -326,7 +315,6 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     final nextEffective = resolveAcpBridgeServerEffectiveConfigInternal(
       controller,
       config: currentModeConfig,
-      accountSyncState: nextState,
     );
 
     final identifier =
@@ -347,7 +335,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
         lastSyncAt: nextState.lastSyncAtMs,
         remoteServerSummary: currentModeConfig.cloudSynced.remoteServerSummary
             .copyWith(
-              endpoint: nextEffective.endpoint,
+              endpoint: syncedBridgeServerUrl,
               hasAdvancedOverrides: false,
             ),
       ),
@@ -578,7 +566,7 @@ Future<AccountSyncResult> _persistAccountSyncContractFailureInternal(
   );
 }
 
-String _resolveBridgeServerUrl(Map<String, dynamic> payload) {
+String _extractBridgeServerUrlMetadata(Map<String, dynamic> payload) {
   final explicit = _stringValue(payload['BRIDGE_SERVER_URL']);
   if (explicit.isNotEmpty) {
     return explicit;
@@ -593,10 +581,7 @@ String _resolveBridgeServerUrl(Map<String, dynamic> payload) {
 AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfigInternal(
   SettingsController controller, {
   required AcpBridgeServerModeConfig config,
-  AccountSyncState? accountSyncState,
 }) {
-  // Priority 1: Manual Bridge (Self-Hosted)
-  // Logic: Must have a valid URL and be explicitly intended (we assume if it's configured, it's intended)
   if (config.selfHosted.isConfigured) {
     return AcpBridgeServerEffectiveConfig(
       endpoint: config.selfHosted.serverUrl,
@@ -606,41 +591,12 @@ AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfigInternal(
     );
   }
 
-  // Priority 2: Cloud Sync (svc.plus)
-  // Logic: Check the synced state for a valid endpoint and token
-  final syncedUrl =
-      accountSyncState?.syncedDefaults.bridgeServerUrl.trim() ?? '';
-  final hasSyncedToken = accountSyncState?.tokenConfigured.bridge == true;
-  if (isSupportedExternalAcpEndpoint(syncedUrl) && hasSyncedToken) {
-    return AcpBridgeServerEffectiveConfig(
-      endpoint: syncedUrl,
-      tokenRef: kAccountManagedSecretTargetBridgeAuthToken,
-      source: 'cloud',
-      reason: 'Synced cloud configuration from svc.plus is active',
-    );
-  }
-
   return AcpBridgeServerEffectiveConfig(
     endpoint: '',
     tokenRef: '',
     source: 'default',
     reason: 'No active Bridge source is configured',
   );
-}
-
-String _resolveCurrentBridgeServerUrl(
-  SettingsController controller, {
-  String bridgeServerUrlOverride = '',
-}) {
-  final override = bridgeServerUrlOverride.trim();
-  if (override.isNotEmpty) {
-    return override;
-  }
-  return controller
-      .snapshotInternal
-      .acpBridgeServerModeConfig
-      .effective
-      .endpoint;
 }
 
 int _parseExpiresAtMs(Object? value) {
