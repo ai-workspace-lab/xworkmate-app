@@ -317,7 +317,7 @@ void main() {
     );
 
     test(
-      'desktop task execution routes Hermes through provider public endpoint',
+      'desktop task execution routes Hermes through bridge RPC with provider params',
       () async {
         final capture = await _startAcpHttpServer();
         addTearDown(capture.close);
@@ -343,12 +343,19 @@ void main() {
         );
 
         expect(capture.authorizationHeader, 'Bearer bridge-token');
-        expect(capture.requestPath, '/acp-server/hermes/acp/rpc');
+        expect(capture.requestPath, '/acp/rpc');
+        expect(capture.requestPath, isNot(contains('/acp-server')));
+        expect(capture.requestPath, isNot(contains('/gateway/openclaw')));
+        expect(capture.requestBody, contains('"provider":"hermes"'));
+        expect(
+          capture.requestBody,
+          contains('"requestedExecutionTarget":"agent"'),
+        );
       },
     );
 
     test(
-      'desktop task execution routes OpenClaw through gateway public endpoint',
+      'desktop task execution routes OpenClaw through bridge RPC with gateway params',
       () async {
         final capture = await _startAcpHttpServer();
         addTearDown(capture.close);
@@ -374,7 +381,15 @@ void main() {
         );
 
         expect(capture.authorizationHeader, 'Bearer bridge-token');
-        expect(capture.requestPath, '/gateway/openclaw/acp/rpc');
+        expect(capture.requestPath, '/acp/rpc');
+        expect(capture.requestPath, isNot(contains('/acp-server')));
+        expect(capture.requestPath, isNot(contains('/acp-server/gateway')));
+        expect(capture.requestPath, isNot(contains('/gateway/openclaw')));
+        expect(capture.requestBody, contains('"provider":"openclaw"'));
+        expect(
+          capture.requestBody,
+          contains('"requestedExecutionTarget":"gateway"'),
+        );
       },
     );
   });
@@ -454,6 +469,7 @@ Future<_CapturedAcpHttpServer> _startAcpHttpServer() async {
         request.headers.value(HttpHeaders.authorizationHeader) ?? '';
     capture.requestPath = request.uri.path;
     final body = await utf8.decoder.bind(request).join();
+    capture.requestBody = body;
     final id = _decodeRequestId(body);
     request.response.headers.contentType = ContentType.json;
     request.response.write(
@@ -483,6 +499,7 @@ class _CapturedAcpHttpServer {
   final Uri baseEndpoint;
   String authorizationHeader = '';
   String requestPath = '';
+  String requestBody = '';
 
   Future<void> close() => _server.close(force: true);
 }

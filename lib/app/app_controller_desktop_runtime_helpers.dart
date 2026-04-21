@@ -637,15 +637,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
 
   Uri? resolveBridgeAcpEndpointInternal() {
     final modeConfig = settings.acpBridgeServerModeConfig;
-    
-    // Prioritize BRIDGE_SERVER_URL from environment or override
-    final envEndpoint = runtimeEnvironmentValueInternal('BRIDGE_SERVER_URL');
-    if (envEndpoint != null && isSupportedExternalAcpEndpoint(envEndpoint)) {
-      final uri = Uri.tryParse(envEndpoint);
-      if (uri != null) return uri.replace(query: null, fragment: null);
-    }
 
-    // Prioritize the cloud endpoint if available or if we're connected to svc.plus
     final cloudEndpoint = _activeCloudSyncedBridgeEndpointInternal();
     if (cloudEndpoint.isNotEmpty) {
       final uri = Uri.tryParse(cloudEndpoint);
@@ -657,7 +649,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       if (candidate.isNotEmpty) {
         final uri = Uri.tryParse(candidate);
         final scheme = uri?.scheme.trim().toLowerCase() ?? '';
-        if (uri != null && kSupportedExternalAcpEndpointSchemes.contains(scheme)) {
+        if (uri != null &&
+            kSupportedExternalAcpEndpointSchemes.contains(scheme)) {
           return uri.replace(query: null, fragment: null);
         }
       }
@@ -681,32 +674,23 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   Uri? resolveExternalAcpEndpointForRequestInternal(
     GoTaskServiceRequest request,
   ) {
-    final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
-    final providerId = request.target.isGateway
-        ? kCanonicalGatewayProviderId
-        : request.provider.providerId.trim();
-    if (providerId.isEmpty) {
-      return null;
-    }
-    return resolveBridgeProviderBaseEndpoint(
-      bridgeEndpoint,
-      providerId: providerId,
-      gateway: request.target.isGateway,
-    );
+    return resolveBridgeAcpEndpointInternal();
   }
 
   String _activeCloudSyncedBridgeEndpointInternal() {
     final syncState = settingsControllerInternal.accountSyncState;
-    final syncedEndpoint = syncState?.syncedDefaults.bridgeServerUrl.trim() ?? '';
-    
-    // If sync is ready and configured, use it.
+    final syncedEndpoint =
+        syncState?.syncedDefaults.bridgeServerUrl.trim() ?? '';
+
     if (syncState?.syncState.trim().toLowerCase() == 'ready' &&
         syncState?.tokenConfigured.bridge == true &&
         syncedEndpoint.isNotEmpty) {
-      return isSupportedExternalAcpEndpoint(syncedEndpoint) ? syncedEndpoint : '';
+      return isSupportedExternalAcpEndpoint(syncedEndpoint)
+          ? syncedEndpoint
+          : '';
     }
 
-    return isSupportedExternalAcpEndpoint(syncedEndpoint) ? syncedEndpoint : '';
+    return '';
   }
 
   Uri? gatewayProfileBaseUriInternal(GatewayConnectionProfile profile) {

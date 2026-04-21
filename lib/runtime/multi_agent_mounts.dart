@@ -1,6 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'codex_config_bridge.dart';
 import 'multi_agent_mount_resolver.dart';
 import 'opencode_config_bridge.dart';
@@ -54,10 +51,7 @@ class MultiAgentMountManager {
     if (resolved != null) {
       return resolved;
     }
-    return _reconcileLocally(
-      config: config,
-      aiGatewayUrl: aiGatewayUrl,
-    );
+    return _reconcileLocally(config: config, aiGatewayUrl: aiGatewayUrl);
   }
 
   Future<void> dispose() async {
@@ -82,10 +76,7 @@ class MultiAgentMountManager {
     final states = <ManagedMountTargetState>[];
     for (final adapter in _adapters) {
       states.add(
-        await adapter.reconcile(
-          config: config,
-          aiGatewayUrl: aiGatewayUrl,
-        ),
+        await adapter.reconcile(config: config, aiGatewayUrl: aiGatewayUrl),
       );
     }
     return config.copyWith(
@@ -119,9 +110,7 @@ abstract class CliMountAdapter {
 }
 
 class CodexMountAdapter extends CliMountAdapter {
-  CodexMountAdapter(this._bridge);
-
-  final CodexConfigBridge _bridge;
+  CodexMountAdapter(CodexConfigBridge bridge);
 
   @override
   String get targetId => 'codex';
@@ -156,7 +145,8 @@ class CodexMountAdapter extends CliMountAdapter {
       available: false,
       discoveryState: 'missing',
       syncState: 'missing',
-      detail: 'Local CLI interaction is disabled. Use bridge for orchestration.',
+      detail:
+          'Local CLI interaction is disabled. Use bridge for orchestration.',
     );
   }
 }
@@ -240,9 +230,7 @@ class GeminiMountAdapter extends CliMountAdapter {
 }
 
 class OpencodeMountAdapter extends CliMountAdapter {
-  OpencodeMountAdapter(this._bridge);
-
-  final OpencodeConfigBridge _bridge;
+  OpencodeMountAdapter(OpencodeConfigBridge bridge);
 
   @override
   String get targetId => 'opencode';

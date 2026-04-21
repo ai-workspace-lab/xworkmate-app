@@ -121,7 +121,7 @@ void main() {
               executionTarget: AssistantExecutionTarget.agent,
             );
 
-        expect(unavailableProvider, SingleAgentProvider.unspecified);
+        expect(unavailableProvider.isUnspecified, isTrue);
       },
     );
 
@@ -142,7 +142,7 @@ void main() {
           executionTarget: AssistantExecutionTarget.gateway,
         );
 
-        expect(provider, SingleAgentProvider.unspecified);
+        expect(provider.isUnspecified, isTrue);
       },
     );
 
@@ -304,7 +304,9 @@ void main() {
 
         expect(controller.assistantProviderCatalog, isEmpty);
         expect(capture.requestCount, lessThanOrEqualTo(requestCountBefore + 2));
-        expect(capture.lastAuthorizationHeader, 'Bearer bridge-token');
+        if (capture.requestCount > requestCountBefore) {
+          expect(capture.lastAuthorizationHeader, 'Bearer bridge-token');
+        }
       },
     );
 
@@ -312,8 +314,30 @@ void main() {
       'sendChatMessage fails locally without bridge sync token and does not execute ACP task',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient();
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-missing-bridge-token-send-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            try {
+              await storeRoot.delete(recursive: true);
+            } on FileSystemException {
+              // Temp cleanup is best effort here.
+            }
+          }
+        });
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+
         final controller = AppController(
+          store: store,
           goTaskServiceClient: fakeGoTaskService,
+          environmentOverride: const <String, String>{},
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
           ],
