@@ -148,7 +148,7 @@ A refactor task is complete only when:
 - Assistant conversation runtime must treat signed-out state as disconnected: do not send requests, do not read stale managed bridge secrets, and do not fallback to local ACP endpoints or default managed bridge endpoints.
 - Missing managed `BRIDGE_AUTH_TOKEN` means disconnected. Do not fallback from bridge ACP auth to gateway profile tokens.
 - Keep the UI unchanged for bridge state-flow fixes unless explicitly requested; adjust runtime readiness, endpoint resolution, and tests instead.
-- After svc.plus login and bridge sync, route provider execution through the public bridge endpoints: Hermes/Codex/Gemini/OpenCode use `/acp-server/{provider}/acp/rpc`, and OpenClaw uses `/gateway/openclaw/acp/rpc`.
+- After svc.plus login and bridge sync, route all provider and gateway execution through the unified managed bridge endpoint `/acp/rpc`. Do not use provider-specific paths or directly construct `/acp-server/*` or `/gateway/*` URLs.
 - For a user-initiated gateway connect action, the current form values may be used directly for the immediate handshake. Do not require a secure-store readback for the active request.
 - Keep network trust boundaries explicit. Loopback/local mode may use non-TLS intentionally; remote mode must not silently downgrade transport security.
 - File and attachment access must be user-driven. Never read or send workspace files implicitly.
