@@ -273,8 +273,7 @@ extension AppControllerDesktopThreadActions on AppController {
       recomputeTasksInternal();
       throw error;
     }
-    if (currentTarget.isGateway &&
-        providerCatalogForExecutionTarget(currentTarget).isEmpty) {
+    if (providerCatalogForExecutionTarget(currentTarget).isEmpty) {
       try {
         await refreshSingleAgentCapabilitiesInternal(forceRefresh: true);
       } catch (_) {
@@ -292,10 +291,15 @@ extension AppControllerDesktopThreadActions on AppController {
           updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
         );
         final error = StateError(
-          appText(
-            'Gateway ACP 未报告可用的 gateway provider，当前无法发送。',
-            'Gateway ACP did not report a usable gateway provider, so this Gateway task cannot run yet.',
-          ),
+          currentTarget.isGateway
+              ? appText(
+                  'Gateway ACP 未报告可用的 gateway provider，当前无法发送。',
+                  'Gateway ACP did not report a usable gateway provider, so this Gateway task cannot run yet.',
+                )
+              : appText(
+                  'Gateway ACP 未报告可用的 agent provider，当前无法发送。',
+                  'Gateway ACP did not report a usable agent provider, so this Agent task cannot run yet.',
+                ),
         );
         appendAssistantThreadMessageInternal(
           normalizedSessionKey,

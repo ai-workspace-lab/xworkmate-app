@@ -118,6 +118,14 @@ class AssistantPageStateInternal extends State<AssistantPage> {
     conversationControllerInternal = ScrollController();
     composerFocusNodeInternal = FocusNode();
     sidePaneCollapsedInternal = widget.unifiedPaneStartsCollapsed;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(
+        widget.controller.refreshAcpCapabilitiesInternal(forceRefresh: true),
+      );
+    });
   }
 
   @override
