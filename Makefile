@@ -20,7 +20,7 @@ APP_DART_DEFINE_BUILD ?= --dart-define=XWORKMATE_BUILD_NUMBER=$(APP_BUILD_NUMBER
 APP_DART_DEFINE_BUILD_DATE ?= --dart-define=XWORKMATE_BUILD_DATE=$(APP_BUILD_DATE)
 APP_DART_DEFINE_BUILD_COMMIT ?= --dart-define=XWORKMATE_BUILD_COMMIT=$(APP_BUILD_COMMIT)
 
-.PHONY: help deps analyze test test-all test-flutter test-golden test-integration test-integration-macos test-patrol test-go test-ci check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs docs-public-api check-export-compliance test-real-env-login-chain inspect-xworkmate-bridge-service
+.PHONY: help deps analyze test test-all test-flutter test-golden test-integration test-integration-macos test-patrol test-go test-ci check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs docs-public-api check-export-compliance test-real-env-login-chain inspect-xworkmate-bridge-service test-api-contract test-api-scenario-contract check-api-external
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -52,6 +52,14 @@ test-real-env-login-chain: ## Run the real-env login/sync integration chain on m
 
 inspect-xworkmate-bridge-service: ## Read-only SSH inspection for xworkmate-bridge.svc.plus service
 	bash scripts/check-xworkmate-bridge-service.sh
+
+test-api-contract: ## Run the API interface contract script against external services
+	bash scripts/ci/verify_api_interface_contract.sh
+
+test-api-scenario-contract: ## Run the scenario-oriented API script against external services
+	bash scripts/ci/verify_api_scenario_contract.sh
+
+check-api-external: test-api-contract test-api-scenario-contract ## Run both external API validation scripts
 
 test-patrol: ## Run Patrol end-to-end tests
 	dart pub global activate patrol_cli
