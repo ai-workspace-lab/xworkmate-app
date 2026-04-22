@@ -267,6 +267,16 @@ void main() {
           enableSecureStorage: false,
         );
         await store.initialize();
+        await store.saveAccountSessionToken('session-token');
+        await store.saveAccountSessionSummary(
+          const AccountSessionSummary(
+            userId: 'user-1',
+            email: 'review@svc.plus',
+            name: 'Review User',
+            role: 'reviewer',
+            mfaEnabled: true,
+          ),
+        );
         await store.saveAccountSyncState(
           AccountSyncState.defaults().copyWith(
             syncedDefaults: AccountRemoteProfile.defaults().copyWith(
@@ -362,7 +372,7 @@ void main() {
             isA<StateError>().having(
               (error) => error.message,
               'message',
-              contains('xworkmate-bridge 未连接'),
+              contains('请先登录 svc.plus'),
             ),
           ),
         );
@@ -370,7 +380,7 @@ void main() {
         expect(fakeGoTaskService.executeCount, 0);
         expect(
           controller.chatMessages.last.text,
-          contains('xworkmate-bridge 未连接'),
+          contains('请先登录 svc.plus'),
         );
       },
     );
@@ -403,6 +413,16 @@ void main() {
           enableSecureStorage: false,
         );
         await store.initialize();
+        await store.saveAccountSessionToken('session-token');
+        await store.saveAccountSessionSummary(
+          const AccountSessionSummary(
+            userId: 'user-1',
+            email: 'review@svc.plus',
+            name: 'Review User',
+            role: 'reviewer',
+            mfaEnabled: true,
+          ),
+        );
         await store.saveAccountSyncState(
           AccountSyncState.defaults().copyWith(
             syncedDefaults: AccountRemoteProfile.defaults().copyWith(
@@ -424,7 +444,9 @@ void main() {
         final controller = AppController(
           store: store,
           goTaskServiceClient: fakeGoTaskService,
-          environmentOverride: <String, String>{},
+          environmentOverride: <String, String>{
+            'BRIDGE_AUTH_TOKEN': 'bridge-token',
+          },
           initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
             AssistantExecutionTarget.agent,
             AssistantExecutionTarget.gateway,
@@ -432,8 +454,30 @@ void main() {
         );
         addTearDown(controller.dispose);
 
+        controller.settingsControllerInternal.accountSessionTokenInternal =
+            'session-token';
+        controller.settingsControllerInternal.accountSessionInternal =
+            const AccountSessionSummary(
+          userId: 'user-1',
+          email: 'review@svc.plus',
+          name: 'Review User',
+          role: 'reviewer',
+          mfaEnabled: true,
+        );
+        controller.settingsControllerInternal.accountSyncStateInternal =
+            AccountSyncState.defaults().copyWith(
+          syncedDefaults: AccountRemoteProfile.defaults().copyWith(
+            bridgeServerUrl: capture.baseEndpoint.toString(),
+          ),
+          syncState: 'ready',
+          tokenConfigured: const AccountTokenConfigured(
+            bridge: true,
+            vault: false,
+            apisix: false,
+          ),
+        );
+
         await controller.sessionsController.switchSession('session-1');
-        await _waitForRequest(capture, minimumCount: 1);
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.agent,
         );
@@ -445,14 +489,14 @@ void main() {
             isA<StateError>().having(
               (error) => error.message,
               'message',
-              contains('agent provider'),
+              contains('正在加载 Bridge 能力'),
             ),
           ),
         );
 
         expect(fakeGoTaskService.executeCount, 0);
-        expect(capture.requestCount, greaterThanOrEqualTo(3));
-        expect(controller.chatMessages.last.text, contains('agent provider'));
+        expect(capture.requestCount, lessThanOrEqualTo(2));
+        expect(controller.chatMessages.last.text, contains('正在加载 Bridge 能力'));
       },
     );
   });

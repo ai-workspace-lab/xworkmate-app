@@ -7,6 +7,24 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   group('Assistant connection state', () {
+    test('does not report bridge runtime configured by default', () async {
+      final controller = await _isolatedController(
+        initialBridgeProviderCatalog: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+        ],
+        initialGatewayProviderCatalog: const <SingleAgentProvider>[
+          SingleAgentProvider.openclaw,
+        ],
+        initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+          AssistantExecutionTarget.agent,
+          AssistantExecutionTarget.gateway,
+        ],
+      );
+      addTearDown(controller.dispose);
+
+      expect(controller.isBridgeAcpRuntimeConfiguredInternal(), isFalse);
+    });
+
     test(
       'keeps signed-out sessions disconnected even when provider catalogs exist',
       () async {
