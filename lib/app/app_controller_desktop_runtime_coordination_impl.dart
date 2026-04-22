@@ -162,6 +162,15 @@ String? assistantWorkingDirectoryForSessionRuntimeInternal(
   final normalizedSessionKey = controller.normalizedAssistantSessionKeyInternal(
     sessionKey,
   );
+  final remoteCandidate =
+      controller
+          .assistantThreadRecordsInternal[normalizedSessionKey]
+          ?.lastRemoteWorkingDirectory
+          ?.trim() ??
+      '';
+  if (remoteCandidate.isNotEmpty) {
+    return remoteCandidate;
+  }
   final candidate =
       controller
           .assistantThreadRecordsInternal[normalizedSessionKey]
@@ -186,11 +195,8 @@ String? resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal(
   if (record?.workspaceKind != WorkspaceKind.localFs) {
     return null;
   }
-  final candidate = assistantWorkingDirectoryForSessionRuntimeInternal(
-    controller,
-    sessionKey,
-  );
-  if (candidate == null) {
+  final candidate = record?.workspaceBinding.workspacePath.trim() ?? '';
+  if (candidate.isEmpty) {
     return null;
   }
   final directory = Directory(candidate);

@@ -189,15 +189,12 @@ extension AppControllerDesktopThreadBinding on AppController {
     required ThreadOwnerScope ownerScope,
     WorkspaceBinding? existingBinding,
   }) {
-    final remotePath = remoteThreadWorkspacePathInternal(
-      sessionKey,
-      ownerScope,
-    );
+    final localPath = localThreadWorkspacePathInternal(sessionKey);
     return WorkspaceBinding(
       workspaceId: normalizedAssistantSessionKeyInternal(sessionKey),
-      workspaceKind: WorkspaceKind.remoteFs,
-      workspacePath: remotePath,
-      displayPath: remotePath,
+      workspaceKind: WorkspaceKind.localFs,
+      workspacePath: localPath,
+      displayPath: localPath,
       writable: existingBinding?.writable ?? true,
     );
   }
@@ -280,6 +277,11 @@ extension AppControllerDesktopThreadBinding on AppController {
       normalizedSessionKey,
       ownerScope: ownerScope,
       workspaceBinding: workspaceBinding,
+      lastRemoteWorkingDirectory: remoteThreadWorkspacePathInternal(
+        normalizedSessionKey,
+        ownerScope,
+      ),
+      lastRemoteWorkspaceRefKind: WorkspaceRefKind.remotePath,
       executionBinding: buildDesktopExecutionBindingInternal(
         executionTarget: snapshot.executionTarget,
         existingBinding: snapshot.record?.executionBinding,
