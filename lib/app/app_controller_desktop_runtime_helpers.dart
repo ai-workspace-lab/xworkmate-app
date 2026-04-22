@@ -645,7 +645,17 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   bool isBridgeAcpRuntimeConfiguredInternal() {
-    return true;
+    final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
+    if (bridgeEndpoint == null) {
+      return false;
+    }
+    final accountSyncState = settingsControllerInternal.accountSyncState;
+    if (settingsControllerInternal.accountSignedIn &&
+        accountSyncState?.tokenConfigured.bridge == true) {
+      return true;
+    }
+    final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
+    return envToken != null && envToken.isNotEmpty;
   }
 
   Uri? resolveExternalAcpEndpointForRequestInternal(
