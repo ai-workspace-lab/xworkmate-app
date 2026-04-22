@@ -16,6 +16,7 @@
 
 - [核心功能集成测试手动 Case](../cases/core-integration-manual-cases.md)
 - [核心功能集成测试自动化规划](./core-integration-auto-test-plan.md)
+- [APP 对接外部服务 API 接口测试详细清单](./app-external-service-api-test-matrix.md)
 - [Testing Guide](../README_TESTING.md)
 
 ## 2. 状态口径
