@@ -22,7 +22,7 @@ Last Updated: 2026-04-22
 用途：
 
 - 按真实使用链路跑完整场景
-- 重点验证登录 -> 同步 -> 能力 -> 路由 -> 会话生命周期
+- 重点验证登录 -> 同步 -> 能力 -> 路由 -> 会话启动 / 续跑 / 取消 / 关闭
 
 ## 2. 运行前提
 
@@ -73,14 +73,14 @@ make check-api-external
 - profile sync 元数据读取
 - bridge capabilities 拉取
 - routing resolve
-- `session.start`
-- `session.message`
+- `thread/start`
+- `turn/start`
 - `session.cancel`
 - `session.close`
 
 ## 5. 已知行为
 
-- `session.start` / `session.message` 在当前环境下可能返回下游连接失败，这不代表脚本失效
+- `thread/start` / `turn/start` 在当前环境下可能返回下游连接失败，这不代表脚本失效
 - 只要脚本正确拿到 JSON-RPC 返回并解析出结果，就认为脚本可用
 - 脚本不会把 `BRIDGE_SERVER_URL` 当成 runtime 真源；它只作为可选显式输入
 
