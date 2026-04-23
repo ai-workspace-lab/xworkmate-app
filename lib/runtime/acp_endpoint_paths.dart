@@ -44,6 +44,12 @@ class AcpEndpointPaths {
     }
 
     path = path.replaceFirst(RegExp(r'/+$'), '');
+    if (path == '/acp-server' ||
+        path.startsWith('/acp-server/') ||
+        path == '/gateway' ||
+        path.startsWith('/gateway/')) {
+      return '';
+    }
     return path == '/' ? '' : path;
   }
 }
