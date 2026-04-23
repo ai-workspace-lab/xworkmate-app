@@ -19,8 +19,19 @@ class GoRuntimeDispatchDesktopClient implements RuntimeDispatchResolver {
     Iterable<String> requiredCapabilities = const <String>[],
   }) async {
     final response = await _client.request(
-      method: 'xworkmate.dispatch.resolve',
+      method: 'xworkmate.routing.resolve',
       params: <String, dynamic>{
+        'routing': <String, dynamic>{
+          'routingMode': 'auto',
+          if (preferredProviderId.trim().isNotEmpty)
+            'preferredGatewayTarget': preferredProviderId.trim(),
+          'explicitExecutionTarget': '',
+          'explicitProviderId': preferredProviderId.trim(),
+          'explicitModel': '',
+          'explicitSkills': const <String>[],
+          'allowSkillInstall': false,
+          'availableSkills': const <Object?>[],
+        },
         'preferredProviderId': preferredProviderId.trim(),
         'requiredCapabilities': requiredCapabilities
             .map((item) => item.trim())
@@ -45,8 +56,19 @@ class GoRuntimeDispatchDesktopClient implements RuntimeDispatchResolver {
     required Map<String, dynamic> nodeInfo,
   }) async {
     final response = await _client.request(
-      method: 'xworkmate.dispatch.resolve',
+      method: 'xworkmate.routing.resolve',
       params: <String, dynamic>{
+        'routing': <String, dynamic>{
+          'routingMode': 'auto',
+          if (preferredProviderId.trim().isNotEmpty)
+            'preferredGatewayTarget': preferredProviderId.trim(),
+          'explicitExecutionTarget': '',
+          'explicitProviderId': preferredProviderId.trim(),
+          'explicitModel': '',
+          'explicitSkills': const <String>[],
+          'allowSkillInstall': false,
+          'availableSkills': const <Object?>[],
+        },
         'preferredProviderId': preferredProviderId.trim(),
         'requiredCapabilities': requiredCapabilities
             .map((item) => item.trim())
