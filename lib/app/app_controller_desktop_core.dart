@@ -646,15 +646,6 @@ class AppController extends ChangeNotifier {
     AssistantExecutionTarget target,
   ) => resolvedDefaultModel.trim();
 
-  List<AssistantThreadSkillEntry> assistantImportedSkillsForSession(
-    String sessionKey,
-  ) =>
-      assistantThreadRecordsInternal[normalizedAssistantSessionKeyInternal(
-            sessionKey,
-          )]
-          ?.importedSkills ??
-      const [];
-
   void navigateTo(WorkspaceDestination destination) =>
       AppControllerDesktopNavigation(this).navigateTo(destination);
 
@@ -692,6 +683,6 @@ class AppController extends ChangeNotifier {
         this,
       ).refreshMultiAgentMounts(sync: sync);
 
-  double get assistantSkillCount => 0; // Legacy
-  int get currentAssistantSkillCount => 0; // Legacy
+  double get assistantSkillCount => skills.length.toDouble();
+  int get currentAssistantSkillCount => skills.length;
 }

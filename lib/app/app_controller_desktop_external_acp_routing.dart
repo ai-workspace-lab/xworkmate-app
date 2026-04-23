@@ -46,28 +46,27 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
     );
     final thread = assistantThreadRecordsInternal[normalizedSessionKey];
     const preferredGatewayTarget = kCanonicalGatewayProviderId;
-    final availableSkills =
-        assistantImportedSkillsForSession(normalizedSessionKey)
-            .map((item) {
-              return ExternalCodeAgentAcpAvailableSkill(
-                id: item.key,
-                label: item.label,
-                description: item.description,
-              );
-            })
-            .toList(growable: false);
-    final selectedSkills =
-        assistantSelectedSkillsForSession(normalizedSessionKey)
-            .map((item) {
-              return item.label.trim().isNotEmpty ? item.label : item.key;
-            })
-            .where((item) => item.trim().isNotEmpty)
-            .toList(growable: false);
+    final availableSkills = skills
+        .map((item) {
+          return ExternalCodeAgentAcpAvailableSkill(
+            id: item.skillKey,
+            label: item.name,
+            description: item.description,
+          );
+        })
+        .toList(growable: false);
+    final selectedSkills = assistantSelectedSkillKeysForSession(
+      normalizedSessionKey,
+    );
 
     final currentTarget = assistantExecutionTargetForSession(
       normalizedSessionKey,
     );
     final resolvedProvider = assistantProviderForSession(normalizedSessionKey);
+    final resolvedExecutionTarget =
+        explicitExecutionTarget?.trim().isNotEmpty == true
+        ? explicitExecutionTarget!.trim()
+        : _routingExecutionTargetValueInternal(currentTarget);
     final resolvedExplicitProviderId =
         thread?.hasExplicitProviderSelection == true &&
             !currentTarget.isGateway &&
@@ -80,33 +79,10 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
     final resolvedExplicitSkills = thread?.hasExplicitSkillSelection ?? false
         ? selectedSkills
         : const <String>[];
-    final hasAnyExplicitSelection =
-        resolvedExplicitProviderId.isNotEmpty ||
-        resolvedExplicitModel.trim().isNotEmpty ||
-        resolvedExplicitSkills.isNotEmpty;
-    final resolvedExplicitExecutionTarget =
-        explicitExecutionTarget?.trim().isNotEmpty == true
-        ? explicitExecutionTarget!.trim()
-        : (hasAnyExplicitSelection || currentTarget.isGateway)
-        ? _routingExecutionTargetValueInternal(currentTarget)
-        : '';
-    final hasExplicitSelection =
-        resolvedExplicitExecutionTarget.isNotEmpty ||
-        resolvedExplicitProviderId.isNotEmpty ||
-        resolvedExplicitModel.trim().isNotEmpty ||
-        resolvedExplicitSkills.isNotEmpty;
-
-    if (!hasExplicitSelection) {
-      return ExternalCodeAgentAcpRoutingConfig.auto(
-        preferredGatewayTarget: preferredGatewayTarget,
-        availableSkills: availableSkills,
-      );
-    }
-
     return ExternalCodeAgentAcpRoutingConfig(
       mode: ExternalCodeAgentAcpRoutingMode.explicit,
       preferredGatewayTarget: preferredGatewayTarget,
-      explicitExecutionTarget: resolvedExplicitExecutionTarget,
+      explicitExecutionTarget: resolvedExecutionTarget,
       explicitProviderId: resolvedExplicitProviderId,
       explicitModel: resolvedExplicitModel,
       explicitSkills: resolvedExplicitSkills,
