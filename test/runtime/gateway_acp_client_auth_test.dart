@@ -283,6 +283,37 @@ void main() {
     );
 
     test(
+      'desktop task execution normalizes provider endpoint paths back to bridge RPC',
+      () async {
+        final capture = await _startAcpHttpServer();
+        addTearDown(capture.close);
+        final client = GatewayAcpClient(
+          endpointResolver: () => capture.baseEndpoint,
+          authorizationResolver: (_) async => 'bridge-token',
+        );
+
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: client,
+          endpointResolver: (_) => capture.baseEndpoint,
+          taskEndpointResolver: (_) =>
+              capture.baseEndpoint.replace(path: '/acp-server/codex'),
+        );
+
+        await transport.executeTask(
+          _taskRequest(
+            target: AssistantExecutionTarget.agent,
+            provider: SingleAgentProvider.codex,
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(capture.authorizationHeader, 'Bearer bridge-token');
+        expect(capture.requestPath, '/acp/rpc');
+        expect(capture.requestPath, isNot(contains('/acp-server')));
+      },
+    );
+
+    test(
       'desktop task execution routes OpenClaw through bridge RPC with gateway params',
       () async {
         final capture = await _startAcpHttpServer();

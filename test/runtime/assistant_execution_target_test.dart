@@ -378,10 +378,7 @@ void main() {
         );
 
         expect(fakeGoTaskService.executeCount, 0);
-        expect(
-          controller.chatMessages.last.text,
-          contains('请先登录 svc.plus'),
-        );
+        expect(controller.chatMessages.last.text, contains('请先登录 svc.plus'));
       },
     );
 
@@ -458,24 +455,24 @@ void main() {
             'session-token';
         controller.settingsControllerInternal.accountSessionInternal =
             const AccountSessionSummary(
-          userId: 'user-1',
-          email: 'review@svc.plus',
-          name: 'Review User',
-          role: 'reviewer',
-          mfaEnabled: true,
-        );
+              userId: 'user-1',
+              email: 'review@svc.plus',
+              name: 'Review User',
+              role: 'reviewer',
+              mfaEnabled: true,
+            );
         controller.settingsControllerInternal.accountSyncStateInternal =
             AccountSyncState.defaults().copyWith(
-          syncedDefaults: AccountRemoteProfile.defaults().copyWith(
-            bridgeServerUrl: capture.baseEndpoint.toString(),
-          ),
-          syncState: 'ready',
-          tokenConfigured: const AccountTokenConfigured(
-            bridge: true,
-            vault: false,
-            apisix: false,
-          ),
-        );
+              syncedDefaults: AccountRemoteProfile.defaults().copyWith(
+                bridgeServerUrl: capture.baseEndpoint.toString(),
+              ),
+              syncState: 'ready',
+              tokenConfigured: const AccountTokenConfigured(
+                bridge: true,
+                vault: false,
+                apisix: false,
+              ),
+            );
 
         await controller.sessionsController.switchSession('session-1');
         await controller.setAssistantExecutionTarget(
@@ -500,19 +497,6 @@ void main() {
       },
     );
   });
-}
-
-Future<void> _waitForRequest(
-  _CapabilityServerCapture capture, {
-  required int minimumCount,
-}) async {
-  for (var index = 0; index < 20; index += 1) {
-    if (capture.requestCount >= minimumCount) {
-      return;
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 100));
-  }
-  fail('Timed out waiting for $minimumCount capability requests');
 }
 
 Future<_CapabilityServerCapture> _startCapabilityServer() async {
