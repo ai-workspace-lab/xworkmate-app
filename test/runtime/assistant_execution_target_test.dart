@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_controller_desktop_external_acp_routing.dart';
+import 'package:xworkmate/features/assistant/assistant_page_composer_skill_models.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
@@ -210,6 +211,30 @@ void main() {
         expect(routing.explicitExecutionTarget, 'gateway');
         expect(routing.preferredGatewayTarget, 'openclaw');
         expect(routing.explicitProviderId, '');
+      },
+    );
+
+    test(
+      'bridge skill summaries preserve bridge key and name without remap',
+      () {
+        final option = skillOptionFromGatewayInternal(
+          const GatewaySkillSummary(
+            name: 'Browser Fetch',
+            description: 'Bridge-managed browser skill',
+            source: 'bridge',
+            skillKey: 'browser-fetch',
+            primaryEnv: null,
+            eligible: true,
+            disabled: false,
+            missingBins: <String>[],
+            missingEnv: <String>[],
+            missingConfig: <String>[],
+          ),
+        );
+
+        expect(option.key, 'browser-fetch');
+        expect(option.label, 'Browser Fetch');
+        expect(option.description, 'Bridge-managed browser skill');
       },
     );
 

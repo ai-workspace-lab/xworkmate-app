@@ -214,38 +214,18 @@ extension AppControllerDesktopThreadSessions on AppController {
     );
   }
 
-  int assistantSkillCountForSession(String sessionKey) {
-    return skills.length;
-  }
-
-  int get currentAssistantSkillCount =>
-      assistantSkillCountForSession(currentSessionKey);
-
   List<String> assistantSelectedSkillKeysForSession(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final importedKeys = assistantImportedSkillsForSession(
-      normalizedSessionKey,
-    ).map((item) => item.key).toSet();
     final selected =
         assistantThreadRecordsInternal[normalizedSessionKey]
             ?.selectedSkillKeys ??
         const <String>[];
+    final availableKeys = skills.map((item) => item.skillKey).toSet();
     return selected
-        .where((item) => importedKeys.contains(item))
+        .where(availableKeys.contains)
         .toList(growable: false);
-  }
-
-  List<AssistantThreadSkillEntry> assistantSelectedSkillsForSession(
-    String sessionKey,
-  ) {
-    final selectedKeys = assistantSelectedSkillKeysForSession(
-      sessionKey,
-    ).toSet();
-    return assistantImportedSkillsForSession(
-      sessionKey,
-    ).where((item) => selectedKeys.contains(item.key)).toList(growable: false);
   }
 
   String assistantModelForSession(String sessionKey) {
