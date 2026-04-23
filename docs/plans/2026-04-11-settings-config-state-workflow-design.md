@@ -43,8 +43,8 @@ The app only talks to:
 - call bridge runtime methods:
   - `acp.capabilities`
   - `xworkmate.routing.resolve`
-  - `session.start`
-  - `session.message`
+  - `thread/start`
+  - `turn/start`
   - `session.cancel`
   - `session.close`
   - bridge-owned gateway methods
