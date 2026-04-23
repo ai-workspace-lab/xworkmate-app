@@ -349,6 +349,35 @@ void main() {
         );
       },
     );
+
+    test(
+      'desktop task execution uses thread/start instead of legacy session.start',
+      () async {
+        final capture = await _startAcpHttpServer();
+        addTearDown(capture.close);
+        final client = GatewayAcpClient(
+          endpointResolver: () => capture.baseEndpoint,
+          authorizationResolver: (_) async => 'bridge-token',
+        );
+
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: client,
+          endpointResolver: (_) => capture.baseEndpoint,
+          taskEndpointResolver: (_) => capture.baseEndpoint,
+        );
+
+        await transport.executeTask(
+          _taskRequest(
+            target: AssistantExecutionTarget.agent,
+            provider: SingleAgentProvider.codex,
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(capture.requestBody, contains('"method":"thread/start"'));
+        expect(capture.requestBody, isNot(contains('"method":"session.start"')));
+      },
+    );
   });
 }
 

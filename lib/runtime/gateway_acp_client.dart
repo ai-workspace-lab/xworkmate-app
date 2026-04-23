@@ -266,7 +266,7 @@ class GatewayAcpClient {
       }
       final rpcRequest = _GatewayAcpRpcRequest(
         id: _nextRequestId('multi-agent'),
-        method: request.resumeSession ? 'session.message' : 'session.start',
+        method: request.resumeSession ? 'turn/start' : 'thread/start',
         params: <String, dynamic>{
           'sessionId': request.sessionId,
           'threadId': request.threadId,

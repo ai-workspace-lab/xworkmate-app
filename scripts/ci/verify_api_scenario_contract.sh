@@ -136,7 +136,7 @@ capabilities_json="$(
     -H "Authorization: Bearer ${bridge_auth_token}"
 )"
 
-start_payload='{"jsonrpc":"2.0","id":"start","method":"session.start","params":{"sessionId":"scenario-session-001","threadId":"scenario-session-001","mode":"gateway-chat","taskPrompt":"Say hello in one short sentence.","workingDirectory":"/tmp","selectedSkills":[],"attachments":[],"provider":"codex","routing":{"routingMode":"auto","preferredGatewayTarget":"codex","explicitExecutionTarget":"agent","explicitProviderId":"codex","explicitModel":"","explicitSkills":[],"allowSkillInstall":false,"availableSkills":[]},"requestedExecutionTarget":"agent","executionTarget":"agent"}}'
+start_payload='{"jsonrpc":"2.0","id":"start","method":"thread/start","params":{"sessionId":"scenario-session-001","threadId":"scenario-session-001","mode":"gateway-chat","taskPrompt":"Say hello in one short sentence.","workingDirectory":"/tmp","selectedSkills":[],"attachments":[],"provider":"codex","routing":{"routingMode":"auto","preferredGatewayTarget":"codex","explicitExecutionTarget":"agent","explicitProviderId":"codex","explicitModel":"","explicitSkills":[],"allowSkillInstall":false,"availableSkills":[]},"requestedExecutionTarget":"agent","executionTarget":"agent"}}'
 start_json="$(
   json_post \
     "${bridge_server_url}/acp/rpc" \
@@ -153,12 +153,12 @@ payload = json.loads(os.environ["RESPONSE_JSON"])
 result = payload.get("result") or payload.get("payload") or {}
 turn_id = str(result.get("turnId") or "").strip()
 if not turn_id:
-    raise SystemExit("session.start did not return turnId")
+    raise SystemExit("thread/start did not return turnId")
 print(turn_id)
 PY
 )"
 
-message_payload='{"jsonrpc":"2.0","id":"message","method":"session.message","params":{"sessionId":"scenario-session-001","threadId":"scenario-session-001","mode":"gateway-chat","taskPrompt":"Continue with a very short acknowledgement.","workingDirectory":"/tmp","selectedSkills":[],"attachments":[],"provider":"codex","routing":{"routingMode":"auto","preferredGatewayTarget":"codex","explicitExecutionTarget":"agent","explicitProviderId":"codex","explicitModel":"","explicitSkills":[],"allowSkillInstall":false,"availableSkills":[]},"requestedExecutionTarget":"agent","executionTarget":"agent"}}'
+message_payload='{"jsonrpc":"2.0","id":"message","method":"turn/start","params":{"sessionId":"scenario-session-001","threadId":"scenario-session-001","mode":"gateway-chat","taskPrompt":"Continue with a very short acknowledgement.","workingDirectory":"/tmp","selectedSkills":[],"attachments":[],"provider":"codex","routing":{"routingMode":"auto","preferredGatewayTarget":"codex","explicitExecutionTarget":"agent","explicitProviderId":"codex","explicitModel":"","explicitSkills":[],"allowSkillInstall":false,"availableSkills":[]},"requestedExecutionTarget":"agent","executionTarget":"agent"}}'
 message_json="$(
   json_post \
     "${bridge_server_url}/acp/rpc" \
@@ -207,9 +207,9 @@ import os
 payload = json.loads(os.environ["RESPONSE_JSON"])
 result = payload.get("result") or payload.get("payload") or {}
 if result.get("resolvedProviderId") != "codex":
-    raise SystemExit("session.start did not resolve codex")
+    raise SystemExit("thread/start did not resolve codex")
 if not str(result.get("error") or "").strip():
-    raise SystemExit("session.start in this environment should expose downstream error details")
+    raise SystemExit("thread/start in this environment should expose downstream error details")
 PY
 
 RESPONSE_JSON="${message_json}" python3 - <<'PY'
@@ -219,9 +219,9 @@ import os
 payload = json.loads(os.environ["RESPONSE_JSON"])
 result = payload.get("result") or payload.get("payload") or {}
 if result.get("turnId") == "":
-    raise SystemExit("session.message did not return turnId")
+    raise SystemExit("turn/start did not return turnId")
 if str(result.get("turnId") or "").strip() == "":
-    raise SystemExit("session.message did not return turnId")
+    raise SystemExit("turn/start did not return turnId")
 PY
 
 RESPONSE_JSON="${cancel_json}" python3 - <<'PY'

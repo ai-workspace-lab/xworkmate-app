@@ -36,7 +36,7 @@ flowchart TD
     subgraph CONTRACT["Bridge-facing contract"]
         B1["acp.capabilities"]
         B2["xworkmate.routing.resolve"]
-        B3["session.start / session.message / session.cancel / session.close"]
+        B3["thread/start / turn/start / session.cancel / session.close"]
         B4["xworkmate.gateway.connect / request / disconnect"]
     end
 
