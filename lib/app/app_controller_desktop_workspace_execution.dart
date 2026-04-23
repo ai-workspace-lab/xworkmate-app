@@ -372,10 +372,8 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     if (normalizedSkillKey.isEmpty) {
       return;
     }
-    final importedKeys = assistantImportedSkillsForSession(
-      normalizedSessionKey,
-    ).map((item) => item.key).toSet();
-    if (!importedKeys.contains(normalizedSkillKey)) {
+    final availableKeys = skills.map((item) => item.skillKey).toSet();
+    if (!availableKeys.contains(normalizedSkillKey)) {
       return;
     }
     final nextSelected = List<String>.from(

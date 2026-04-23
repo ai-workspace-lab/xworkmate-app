@@ -262,17 +262,20 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       addOption(option);
     }
 
-    for (final option in fallbackSkillOptionsInternal) {
-      addOption(option);
-    }
-
     return options;
   }
 
   List<String> selectedSkillKeysForInternal(AppController controller) {
-    return controller.assistantSelectedSkillKeysForSession(
-      controller.currentSessionKey,
-    );
+    final selected =
+        controller.taskThreadForSessionInternal(controller.currentSessionKey)
+            ?.selectedSkillKeys ??
+        const <String>[];
+    final availableKeys = availableSkillOptionsInternal(controller)
+        .map((option) => option.key)
+        .toSet();
+    return selected
+        .where(availableKeys.contains)
+        .toList(growable: false);
   }
 
   List<String> resolveSelectedSkillLabelsInternal(AppController controller) {
