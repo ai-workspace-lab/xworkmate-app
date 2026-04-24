@@ -62,7 +62,7 @@
 - Source: `lib/runtime/gateway_acp_client.dart`
 - Type: `class`
 - Responsibility:
-  描述一次 multi-agent thread/start / turn/start 请求。
+  描述一次 multi-agent session.start / session.message 请求。
 
 ### Constructor Parameters
 
@@ -74,7 +74,7 @@
 | `workingDirectory` | `String` | Yes | 工作目录 |
 | `attachments` | `List<CollaborationAttachment>` | Yes | 本地文件附件 |
 | `selectedSkills` | `List<String>` | Yes | 显式选中的技能键 |
-| `resumeSession` | `bool` | Yes | `false` 时发 `thread/start`，`true` 时发 `turn/start` |
+| `resumeSession` | `bool` | Yes | `false` 时发 `session.start`，`true` 时发 `session.message` |
 
 ## `GatewayAcpClient`
 

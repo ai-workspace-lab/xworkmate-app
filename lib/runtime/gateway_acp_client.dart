@@ -145,7 +145,8 @@ class GatewayAcpClient {
       singleAgent: singleAgent,
       multiAgent: multiAgent,
       availableExecutionTargets: _parseAvailableExecutionTargets(
-        result['availableExecutionTargets'] ?? caps['availableExecutionTargets'],
+        result['availableExecutionTargets'] ??
+            caps['availableExecutionTargets'],
         singleAgent: singleAgent,
         gatewayProviderCatalog: gatewayProviderCatalog,
       ),
@@ -266,7 +267,7 @@ class GatewayAcpClient {
       }
       final rpcRequest = _GatewayAcpRpcRequest(
         id: _nextRequestId('multi-agent'),
-        method: request.resumeSession ? 'turn/start' : 'thread/start',
+        method: request.resumeSession ? 'session.message' : 'session.start',
         params: <String, dynamic>{
           'sessionId': request.sessionId,
           'threadId': request.threadId,

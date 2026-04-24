@@ -105,7 +105,7 @@ class ExternalCodeAgentAcpDesktopTransport
         );
       }
       final response = await _client.request(
-        method: request.resumeSession ? 'turn/start' : 'thread/start',
+        method: request.resumeSession ? 'session.message' : 'session.start',
         params: request.toExternalAcpParams(),
         endpointOverride: endpointOverride,
         onNotification: (notification) {
