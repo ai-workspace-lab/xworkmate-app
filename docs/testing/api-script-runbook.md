@@ -73,14 +73,14 @@ make check-api-external
 - profile sync 元数据读取
 - bridge capabilities 拉取
 - routing resolve
-- `thread/start`
-- `turn/start`
+- `session.start`
+- `session.message`
 - `session.cancel`
 - `session.close`
 
 ## 5. 已知行为
 
-- `thread/start` / `turn/start` 在当前环境下可能返回下游连接失败，这不代表脚本失效
+- `session.start` / `session.message` 在当前环境下可能返回下游连接失败，这不代表脚本失效
 - 只要脚本正确拿到 JSON-RPC 返回并解析出结果，就认为脚本可用
 - 脚本不会把 `BRIDGE_SERVER_URL` 当成 runtime 真源；它只作为可选显式输入
 

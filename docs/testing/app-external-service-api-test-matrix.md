@@ -6,7 +6,7 @@ Last Updated: 2026-04-22
 
 - 账户服务 `accounts.svc.plus`
 - 桥接服务 `xworkmate-bridge.svc.plus`
-- 桥接侧 JSON-RPC 会话接口 `thread/start` / `turn/start` / `session.cancel` / `session.close`
+- 桥接侧 JSON-RPC 会话接口 `session.start` / `session.message` / `session.cancel` / `session.close`
 
 本文目标不是抽象协议说明，而是把 APP 真实会调用的接口、请求体、返回体、鉴权方式、已验证结果和当前风险点整理成可执行测试清单。
 
@@ -20,8 +20,8 @@ Last Updated: 2026-04-22
 - `acp.capabilities`
 - `xworkmate.routing.resolve`
 - 会话生命周期接口：
-  - `thread/start`
-  - `turn/start`
+  - `session.start`
+  - `session.message`
   - `session.cancel`
   - `session.close`
 
@@ -79,8 +79,8 @@ Last Updated: 2026-04-22
 | bridge | `/acp/rpc` | `POST` | `Authorization: Bearer <BRIDGE_AUTH_TOKEN>` | bridge JSON-RPC 主入口 | 所有运行时任务统一走这里 |
 | bridge | `acp.capabilities` | JSON-RPC method | 同上 | 拉取 provider catalog / target catalog | capability 只读快照 |
 | bridge | `xworkmate.routing.resolve` | JSON-RPC method | 同上 | 解析 provider / gateway / skills 路由 | 返回 resolved / unavailable 信息 |
-| bridge | `thread/start` | JSON-RPC method | 同上 | 开启新会话 | session 生命周期起点 |
-| bridge | `turn/start` | JSON-RPC method | 同上 | 继续现有会话 | 续写 / follow-up |
+| bridge | `session.start` | JSON-RPC method | 同上 | 开启新会话 | session 生命周期起点 |
+| bridge | `session.message` | JSON-RPC method | 同上 | 继续现有会话 | 续写 / follow-up |
 | bridge | `session.cancel` | JSON-RPC method | 同上 | 取消正在进行的会话 | 终止流式任务 |
 | bridge | `session.close` | JSON-RPC method | 同上 | 关闭会话 | 释放会话资源 |
 
@@ -332,7 +332,7 @@ Last Updated: 2026-04-22
 
 这些字段由 [`GoTaskServiceRequest.toExternalAcpParams()`](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/runtime/go_task_service_client.dart) 生成。
 
-### 6.2 `thread/start`
+### 6.2 `session.start`
 
 #### 目标
 
@@ -345,7 +345,7 @@ Last Updated: 2026-04-22
 {
   "jsonrpc": "2.0",
   "id": "1",
-  "method": "thread/start",
+  "method": "session.start",
   "params": {
     "sessionId": "test-session-001",
     "threadId": "test-session-001",
@@ -409,7 +409,7 @@ Last Updated: 2026-04-22
 - 不能回退到本地 hardcoded endpoint 作为 APP runtime 真源
 - 不能把 provider 路由走成 `/acp-server/*` 直连
 
-### 6.3 `turn/start`
+### 6.3 `session.message`
 
 #### 目标
 
@@ -422,7 +422,7 @@ Last Updated: 2026-04-22
 {
   "jsonrpc": "2.0",
   "id": "2",
-  "method": "turn/start",
+  "method": "session.message",
   "params": {
     "sessionId": "test-session-001",
     "threadId": "test-session-001",
@@ -450,7 +450,7 @@ Last Updated: 2026-04-22
 
 #### 返回体重点
 
-- 与 `thread/start` 相同的会话结果字段
+- 与 `session.start` 相同的会话结果字段
 
 #### 当前实测结果
 
@@ -548,7 +548,7 @@ Last Updated: 2026-04-22
 | [`lib/runtime/account_runtime_client.dart`](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/runtime/account_runtime_client.dart) | 账户登录、会话、同步接口封装 |
 | [`lib/runtime/gateway_acp_client.dart`](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/runtime/gateway_acp_client.dart) | bridge JSON-RPC 请求、capabilities、routing、session 生命周期 |
 | [`lib/runtime/go_task_service_client.dart`](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/runtime/go_task_service_client.dart) | 会话请求参数组装 |
-| [`lib/runtime/external_code_agent_acp_desktop_transport.dart`](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/runtime/external_code_agent_acp_desktop_transport.dart) | thread/start / turn/start 触发路径 |
+| [`lib/runtime/external_code_agent_acp_desktop_transport.dart`](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/runtime/external_code_agent_acp_desktop_transport.dart) | session.start / session.message 触发路径 |
 
 ## 8. 自动化测试建议
 
@@ -562,20 +562,20 @@ Last Updated: 2026-04-22
 #### 桥接协议层
 
 - `test/runtime/gateway_acp_client_session_test.dart`
-  - 覆盖 `thread/start`
-  - 覆盖 `turn/start`
+  - 覆盖 `session.start`
+  - 覆盖 `session.message`
   - 覆盖 `session.cancel`
   - 覆盖 `session.close`
   - 断言 Bearer 头、JSON-RPC method、params 结构
 
 #### 失败分支
 
-- `thread/start` 下游连接失败时，返回值中应保留：
+- `session.start` 下游连接失败时，返回值中应保留：
   - `success: false`
   - `error`
   - `turnId`
   - `resolvedProviderId`
-- `turn/start` follow-up 失败时，不应破坏会话标识
+- `session.message` follow-up 失败时，不应破坏会话标识
 
 ### 8.3 建议断言
 
@@ -587,7 +587,7 @@ Last Updated: 2026-04-22
 
 ## 9. 当前已知风险
 
-- `thread/start` / `turn/start` 当前环境下下游连接到 `127.0.0.1:9001` 失败
+- `session.start` / `session.message` 当前环境下下游连接到 `127.0.0.1:9001` 失败
 - 这说明 bridge 主入口可用，但后端 provider 适配层在当前运行环境里未就绪
 - 这是 bridge 后端运行态问题，不是 APP 侧 JSON-RPC 协议错误
 
@@ -598,8 +598,8 @@ Last Updated: 2026-04-22
 3. `GET /api/auth/xworkmate/profile/sync`
 4. `acp.capabilities`
 5. `xworkmate.routing.resolve`
-6. `thread/start`
-7. `turn/start`
+6. `session.start`
+7. `session.message`
 8. `session.cancel`
 9. `session.close`
 
@@ -610,6 +610,6 @@ Last Updated: 2026-04-22
 - 账户侧负责登录与同步元数据
 - bridge 侧负责 capability、路由解析和会话生命周期
 - 任务执行必须统一经过 `/acp/rpc`
-- `thread/start` / `turn/start` 的协议入口已验证通畅
+- `session.start` / `session.message` 的协议入口已验证通畅
 - `session.cancel` / `session.close` 的协议入口已验证可用
 - 当前剩余风险集中在桥接后端下游 provider 连接，而不是 APP 侧接口拼接

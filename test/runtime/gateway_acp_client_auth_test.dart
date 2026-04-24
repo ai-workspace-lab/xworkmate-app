@@ -347,11 +347,13 @@ void main() {
           capture.requestBody,
           contains('"requestedExecutionTarget":"gateway"'),
         );
+        expect(capture.requestBody, contains('"method":"session.start"'));
+        expect(capture.requestBody, isNot(contains('"method":"thread/start"')));
       },
     );
 
     test(
-      'desktop task execution uses thread/start instead of legacy session.start',
+      'desktop task execution uses session.start for new sessions',
       () async {
         final capture = await _startAcpHttpServer();
         addTearDown(capture.close);
@@ -374,16 +376,129 @@ void main() {
           onUpdate: (_) {},
         );
 
-        expect(capture.requestBody, contains('"method":"thread/start"'));
-        expect(capture.requestBody, isNot(contains('"method":"session.start"')));
+        expect(capture.requestBody, contains('"method":"session.start"'));
+        expect(capture.requestBody, isNot(contains('"method":"thread/start"')));
       },
     );
+
+    test('desktop follow-up execution uses session.message', () async {
+      final capture = await _startAcpHttpServer();
+      addTearDown(capture.close);
+      final client = GatewayAcpClient(
+        endpointResolver: () => capture.baseEndpoint,
+        authorizationResolver: (_) async => 'bridge-token',
+      );
+
+      final transport = ExternalCodeAgentAcpDesktopTransport(
+        client: client,
+        endpointResolver: (_) => capture.baseEndpoint,
+        taskEndpointResolver: (_) => capture.baseEndpoint,
+      );
+
+      await transport.executeTask(
+        _taskRequest(
+          target: AssistantExecutionTarget.agent,
+          provider: SingleAgentProvider.codex,
+          resumeSession: true,
+        ),
+        onUpdate: (_) {},
+      );
+
+      expect(capture.requestBody, contains('"method":"session.message"'));
+      expect(capture.requestBody, isNot(contains('"method":"turn/start"')));
+    });
+
+    test('multi-agent execution uses session lifecycle methods', () async {
+      final capture = await _startAcpHttpServer();
+      addTearDown(capture.close);
+      final client = GatewayAcpClient(
+        endpointResolver: () => capture.baseEndpoint,
+        authorizationResolver: (_) async => 'bridge-token',
+      );
+
+      final events = await client
+          .runMultiAgent(
+            const GatewayAcpMultiAgentRequest(
+              sessionId: 'session-1',
+              threadId: 'session-1',
+              prompt: 'hi',
+              workingDirectory: '/tmp',
+              attachments: <CollaborationAttachment>[],
+              selectedSkills: <String>[],
+              resumeSession: false,
+            ),
+          )
+          .toList();
+
+      expect(events, isNotEmpty);
+      expect(
+        capture.requestBodies,
+        contains(
+          predicate<String>((body) {
+            return body.contains('"method":"session.start"');
+          }),
+        ),
+      );
+      expect(
+        capture.requestBodies,
+        isNot(
+          contains(
+            predicate<String>((body) {
+              return body.contains('"method":"thread/start"');
+            }),
+          ),
+        ),
+      );
+    });
+
+    test('multi-agent follow-up uses session.message', () async {
+      final capture = await _startAcpHttpServer();
+      addTearDown(capture.close);
+      final client = GatewayAcpClient(
+        endpointResolver: () => capture.baseEndpoint,
+        authorizationResolver: (_) async => 'bridge-token',
+      );
+
+      await client
+          .runMultiAgent(
+            const GatewayAcpMultiAgentRequest(
+              sessionId: 'session-1',
+              threadId: 'session-1',
+              prompt: 'hi',
+              workingDirectory: '/tmp',
+              attachments: <CollaborationAttachment>[],
+              selectedSkills: <String>[],
+              resumeSession: true,
+            ),
+          )
+          .toList();
+
+      expect(
+        capture.requestBodies,
+        contains(
+          predicate<String>((body) {
+            return body.contains('"method":"session.message"');
+          }),
+        ),
+      );
+      expect(
+        capture.requestBodies,
+        isNot(
+          contains(
+            predicate<String>((body) {
+              return body.contains('"method":"turn/start"');
+            }),
+          ),
+        ),
+      );
+    });
   });
 }
 
 GoTaskServiceRequest _taskRequest({
   required AssistantExecutionTarget target,
   required SingleAgentProvider provider,
+  bool resumeSession = false,
 }) {
   return GoTaskServiceRequest(
     sessionId: 'session-1',
@@ -399,6 +514,7 @@ GoTaskServiceRequest _taskRequest({
     agentId: '',
     metadata: const <String, dynamic>{},
     provider: provider,
+    resumeSession: resumeSession,
   );
 }
 
@@ -414,6 +530,7 @@ Future<_CapturedAcpHttpServer> _startAcpHttpServer() async {
     capture.requestPath = request.uri.path;
     final body = await utf8.decoder.bind(request).join();
     capture.requestBody = body;
+    capture.requestBodies.add(body);
     final id = _decodeRequestId(body);
     request.response.headers.contentType = ContentType.json;
     request.response.write(
@@ -444,6 +561,7 @@ class _CapturedAcpHttpServer {
   String authorizationHeader = '';
   String requestPath = '';
   String requestBody = '';
+  final List<String> requestBodies = <String>[];
 
   Future<void> close() => _server.close(force: true);
 }
