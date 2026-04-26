@@ -255,6 +255,10 @@ class GoTaskServiceRequest {
 
   Map<String, dynamic> toExternalAcpParams() {
     final resolvedRouting = effectiveRouting;
+    final providerId = provider.isUnspecified ? '' : provider.providerId;
+    final gatewayProviderId = normalizedTarget.isGateway
+        ? (providerId.isEmpty ? kCanonicalGatewayProviderId : providerId)
+        : '';
     final params = <String, dynamic>{
       'sessionId': sessionId,
       'threadId': threadId,
@@ -289,7 +293,11 @@ class GoTaskServiceRequest {
               },
             )
             .toList(growable: false),
-      if (!provider.isUnspecified) 'provider': provider.providerId,
+      if (providerId.isNotEmpty) 'provider': providerId,
+      if (gatewayProviderId.isNotEmpty) ...<String, dynamic>{
+        'gatewayProvider': gatewayProviderId,
+        'gatewayProviderId': gatewayProviderId,
+      },
       if (remoteWorkingDirectoryHint.trim().isNotEmpty)
         'remoteWorkingDirectoryHint': remoteWorkingDirectoryHint.trim(),
       if (model.trim().isNotEmpty) 'model': model.trim(),

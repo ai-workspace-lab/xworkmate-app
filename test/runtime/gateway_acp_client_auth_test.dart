@@ -247,38 +247,48 @@ void main() {
     );
 
     test(
-      'desktop task execution routes Hermes through bridge RPC with provider params',
+      'desktop agent task execution routes bridge-owned providers through bridge RPC',
       () async {
-        final capture = await _startAcpHttpServer();
-        addTearDown(capture.close);
-        final client = GatewayAcpClient(
-          endpointResolver: () => capture.baseEndpoint,
-          authorizationResolver: (_) async => 'bridge-token',
-        );
+        for (final providerId in <String>[
+          'codex',
+          'opencode',
+          'gemini',
+          'hermes',
+        ]) {
+          final capture = await _startAcpHttpServer();
+          addTearDown(capture.close);
+          final client = GatewayAcpClient(
+            endpointResolver: () => capture.baseEndpoint,
+            authorizationResolver: (_) async => 'bridge-token',
+          );
 
-        final transport = ExternalCodeAgentAcpDesktopTransport(
-          client: client,
-          endpointResolver: (_) => capture.baseEndpoint,
-          taskEndpointResolver: (_) => capture.baseEndpoint,
-        );
+          final transport = ExternalCodeAgentAcpDesktopTransport(
+            client: client,
+            endpointResolver: (_) => capture.baseEndpoint,
+            taskEndpointResolver: (_) => capture.baseEndpoint,
+          );
 
-        await transport.executeTask(
-          _taskRequest(
-            target: AssistantExecutionTarget.agent,
-            provider: SingleAgentProvider.fromJsonValue('hermes'),
-          ),
-          onUpdate: (_) {},
-        );
+          await transport.executeTask(
+            _taskRequest(
+              target: AssistantExecutionTarget.agent,
+              provider: SingleAgentProvider.fromJsonValue(providerId),
+            ),
+            onUpdate: (_) {},
+          );
 
-        expect(capture.authorizationHeader, 'Bearer bridge-token');
-        expect(capture.requestPath, '/acp/rpc');
-        expect(capture.requestPath, isNot(contains('/acp-server')));
-        expect(capture.requestPath, isNot(contains('/gateway/openclaw')));
-        expect(capture.requestBody, contains('"provider":"hermes"'));
-        expect(
-          capture.requestBody,
-          contains('"requestedExecutionTarget":"agent"'),
-        );
+          final params = _lastRequestParams(capture);
+          final routing = params['routing'] as Map<String, dynamic>;
+          expect(capture.authorizationHeader, 'Bearer bridge-token');
+          expect(capture.requestPath, '/acp/rpc');
+          expect(capture.requestPath, isNot(contains('/acp-server')));
+          expect(capture.requestPath, isNot(contains('/gateway/openclaw')));
+          expect(params['provider'], providerId);
+          expect(params['requestedExecutionTarget'], 'agent');
+          expect(routing['explicitProviderId'], providerId);
+          expect(routing['explicitExecutionTarget'], 'agent');
+          expect(params.containsKey('gatewayProvider'), isFalse);
+          expect(params.containsKey('gatewayProviderId'), isFalse);
+        }
       },
     );
 
@@ -342,11 +352,16 @@ void main() {
         expect(capture.requestPath, isNot(contains('/acp-server')));
         expect(capture.requestPath, isNot(contains('/acp-server/gateway')));
         expect(capture.requestPath, isNot(contains('/gateway/openclaw')));
-        expect(capture.requestBody, contains('"provider":"openclaw"'));
-        expect(
-          capture.requestBody,
-          contains('"requestedExecutionTarget":"gateway"'),
-        );
+        final params = _lastRequestParams(capture);
+        final routing = params['routing'] as Map<String, dynamic>;
+        expect(params['provider'], 'openclaw');
+        expect(params['gatewayProvider'], 'openclaw');
+        expect(params['gatewayProviderId'], 'openclaw');
+        expect(params['executionTarget'], 'gateway');
+        expect(params['requestedExecutionTarget'], 'gateway');
+        expect(routing['preferredGatewayTarget'], 'openclaw');
+        expect(routing['explicitExecutionTarget'], 'gateway');
+        expect(routing['explicitProviderId'], 'openclaw');
         expect(capture.requestBody, contains('"method":"session.start"'));
         expect(capture.requestBody, isNot(contains('"method":"thread/start"')));
       },
@@ -551,6 +566,11 @@ String _decodeRequestId(String body) {
     return decoded['id'].toString();
   }
   return 'request-id';
+}
+
+Map<String, dynamic> _lastRequestParams(_CapturedAcpHttpServer capture) {
+  final decoded = jsonDecode(capture.requestBody) as Map<String, dynamic>;
+  return (decoded['params'] as Map).cast<String, dynamic>();
 }
 
 class _CapturedAcpHttpServer {
