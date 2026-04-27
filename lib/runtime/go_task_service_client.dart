@@ -714,15 +714,7 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
     }
     return errorText;
   }();
-  final responseText =
-      (result['output']?.toString().trim().isNotEmpty == true
-              ? result['output'].toString().trim()
-              : result['summary']?.toString().trim().isNotEmpty == true
-              ? result['summary'].toString().trim()
-              : result['resultSummary']?.toString().trim().isNotEmpty == true
-              ? result['resultSummary'].toString().trim()
-              : result['message']?.toString().trim() ?? '')
-          .trim();
+  final responseText = _extractGoTaskDisplayText(result);
   final primaryText =
       (completedMessage?.trim().isNotEmpty == true
               ? completedMessage!.trim()
@@ -746,6 +738,100 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
         '',
     route: route,
   );
+}
+
+String _extractGoTaskDisplayText(Object? value, [Set<Object>? visited]) {
+  final seen = visited ?? <Object>{};
+  if (value == null) {
+    return '';
+  }
+  if (value is String) {
+    return value.trim();
+  }
+  if (value is Map) {
+    if (!seen.add(value)) {
+      return '';
+    }
+    final map = value.cast<String, dynamic>();
+    for (final key in const <String>[
+      'output',
+      'summary',
+      'resultSummary',
+      'message',
+      'content',
+      'text',
+      'output_text',
+    ]) {
+      final extracted = _extractGoTaskTextCandidate(map[key], seen);
+      if (extracted.isNotEmpty) {
+        return extracted;
+      }
+    }
+    final choices = _castList(map['choices']);
+    if (choices.isNotEmpty) {
+      for (final choice in choices) {
+        final extracted = _extractGoTaskDisplayText(
+          _castMap(choice)['message'],
+          seen,
+        );
+        if (extracted.isNotEmpty) {
+          return extracted;
+        }
+      }
+    }
+    for (final key in const <String>[
+      'result',
+      'payload',
+      'data',
+      'response',
+      'body',
+    ]) {
+      final extracted = _extractGoTaskDisplayText(map[key], seen);
+      if (extracted.isNotEmpty) {
+        return extracted;
+      }
+    }
+    return '';
+  }
+  if (value is List) {
+    if (!seen.add(value)) {
+      return '';
+    }
+    final parts = <String>[];
+    for (final item in value) {
+      final extracted = _extractGoTaskDisplayText(item, seen);
+      if (extracted.isNotEmpty) {
+        parts.add(extracted);
+      }
+    }
+    return parts.join('\n').trim();
+  }
+  return '';
+}
+
+String _extractGoTaskTextCandidate(Object? value, Set<Object> visited) {
+  if (value == null) {
+    return '';
+  }
+  if (value is String) {
+    return value.trim();
+  }
+  if (value is List) {
+    return _extractGoTaskDisplayText(value, visited);
+  }
+  if (value is Map) {
+    final map = value.cast<String, dynamic>();
+    final type = map['type']?.toString().trim();
+    if (type == 'output_text') {
+      final text =
+          map['text']?.toString().trim() ?? map['value']?.toString().trim();
+      if (text != null && text.isNotEmpty) {
+        return text;
+      }
+    }
+    return _extractGoTaskDisplayText(map, visited);
+  }
+  return '';
 }
 
 Map<String, dynamic> mergeGoTaskServiceResponseResult(
@@ -817,4 +903,11 @@ List<Map<String, dynamic>> _castMapList(Object? raw) {
     return const <Map<String, dynamic>>[];
   }
   return raw.map(_castMap).toList(growable: false);
+}
+
+List<dynamic> _castList(Object? raw) {
+  if (raw is List) {
+    return raw;
+  }
+  return const <dynamic>[];
 }

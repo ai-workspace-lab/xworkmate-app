@@ -10,6 +10,64 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
+  group('GoTaskService ACP response parsing', () {
+    test('uses direct bridge output text', () {
+      final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'id': 'request-id',
+        'result': <String, dynamic>{
+          'success': true,
+          'output': 'direct response',
+        },
+      }, route: GoTaskServiceRoute.externalAcpSingle);
+
+      expect(result.success, isTrue);
+      expect(result.message, 'direct response');
+    });
+
+    test('uses nested provider result output text', () {
+      final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'id': 'request-id',
+        'result': <String, dynamic>{
+          'success': true,
+          'result': <String, dynamic>{
+            'success': true,
+            'output': 'nested provider response',
+          },
+        },
+      }, route: GoTaskServiceRoute.externalAcpSingle);
+
+      expect(result.success, isTrue);
+      expect(result.message, 'nested provider response');
+    });
+
+    test('uses output content list text', () {
+      final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'id': 'request-id',
+        'result': <String, dynamic>{
+          'success': true,
+          'payload': <String, dynamic>{
+            'output': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'content': <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'type': 'output_text',
+                    'text': 'content list response',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      }, route: GoTaskServiceRoute.externalAcpSingle);
+
+      expect(result.success, isTrue);
+      expect(result.message, 'content list response');
+    });
+  });
+
   group('GatewayAcpClient authorization', () {
     test('normalizes raw resolver token into bearer header for HTTP', () async {
       final capture = await _startAcpHttpServer();
