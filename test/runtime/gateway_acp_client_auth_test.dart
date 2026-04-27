@@ -66,6 +66,34 @@ void main() {
       expect(result.success, isTrue);
       expect(result.message, 'content list response');
     });
+
+    test('uses bridge failure text instead of empty output fallback', () {
+      final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'id': 'request-id',
+        'result': <String, dynamic>{
+          'success': false,
+          'error': 'codex returned no displayable output',
+        },
+      }, route: GoTaskServiceRoute.externalAcpSingle);
+
+      expect(result.success, isFalse);
+      expect(result.message, 'codex returned no displayable output');
+    });
+
+    test('uses unavailable message when bridge reports provider failure', () {
+      final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'id': 'request-id',
+        'result': <String, dynamic>{
+          'success': false,
+          'unavailableMessage': 'codex execution environment is unavailable',
+        },
+      }, route: GoTaskServiceRoute.externalAcpSingle);
+
+      expect(result.success, isFalse);
+      expect(result.message, 'codex execution environment is unavailable');
+    });
   });
 
   group('GatewayAcpClient authorization', () {
