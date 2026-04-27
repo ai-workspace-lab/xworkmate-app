@@ -703,7 +703,7 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
     if (success) {
       return '';
     }
-    final errorText = result['error']?.toString().trim() ?? '';
+    final errorText = _firstGoTaskFailureText(result);
     final needsSkillInstall = _boolValue(result['needsSkillInstall']) ?? false;
     if (needsSkillInstall && skillCandidates.isNotEmpty) {
       final candidateText = skillCandidates.join(', ');
@@ -738,6 +738,22 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
         '',
     route: route,
   );
+}
+
+String _firstGoTaskFailureText(Map<String, dynamic> result) {
+  for (final key in const <String>[
+    'error',
+    'errorMessage',
+    'message',
+    'unavailableMessage',
+    'unavailableCode',
+  ]) {
+    final text = _extractGoTaskDisplayText(result[key]);
+    if (text.isNotEmpty) {
+      return text;
+    }
+  }
+  return '';
 }
 
 String _extractGoTaskDisplayText(Object? value, [Set<Object>? visited]) {
