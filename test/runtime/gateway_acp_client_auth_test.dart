@@ -94,6 +94,54 @@ void main() {
       expect(result.success, isFalse);
       expect(result.message, 'codex execution environment is unavailable');
     });
+
+    test('keeps bridge message and inline artifacts together', () {
+      final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'id': 'request-id',
+        'result': <String, dynamic>{
+          'success': true,
+          'message': 'hello',
+          'artifacts': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'relativePath': 'notes/hello.txt',
+              'content': 'artifact body',
+              'contentType': 'text/plain',
+            },
+          ],
+        },
+      }, route: GoTaskServiceRoute.externalAcpSingle);
+
+      expect(result.success, isTrue);
+      expect(result.message, 'hello');
+      expect(result.artifacts, hasLength(1));
+      expect(result.artifacts.single.relativePath, 'notes/hello.txt');
+      expect(result.artifacts.single.content, 'artifact body');
+    });
+
+    test('uses nested bridge inline artifacts when provider wraps payload', () {
+      final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'id': 'request-id',
+        'result': <String, dynamic>{
+          'success': true,
+          'payload': <String, dynamic>{
+            'message': 'hello',
+            'artifacts': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'relativePath': 'hello.txt',
+                'content': 'nested artifact body',
+              },
+            ],
+          },
+        },
+      }, route: GoTaskServiceRoute.externalAcpSingle);
+
+      expect(result.message, 'hello');
+      expect(result.artifacts, hasLength(1));
+      expect(result.artifacts.single.relativePath, 'hello.txt');
+      expect(result.artifacts.single.content, 'nested artifact body');
+    });
   });
 
   group('GatewayAcpClient authorization', () {
