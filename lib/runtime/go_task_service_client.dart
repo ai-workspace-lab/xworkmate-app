@@ -503,7 +503,7 @@ class GoTaskServiceResult {
       _castMapList(raw['memorySources']);
 
   List<GoTaskServiceArtifact> get artifacts {
-    final rawArtifacts = raw['artifacts'];
+    final rawArtifacts = _firstGoTaskArtifactList(raw);
     if (rawArtifacts is! List) {
       return const <GoTaskServiceArtifact>[];
     }
@@ -543,6 +543,20 @@ class GoTaskServiceResult {
     }
     return WorkspaceRefKindCopy.fromJsonValue(rawValue);
   }
+}
+
+Object? _firstGoTaskArtifactList(Map<String, dynamic> result) {
+  for (final candidate in <Object?>[
+    result['artifacts'],
+    _castMap(result['payload'])['artifacts'],
+    _castMap(result['result'])['artifacts'],
+    _castMap(result['data'])['artifacts'],
+  ]) {
+    if (candidate is List) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
 String? goTaskServiceGatewayEntryState({
