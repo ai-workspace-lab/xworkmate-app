@@ -49,15 +49,24 @@ void main() {
           home: AppShell(controller: controller),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
 
-      expect(find.byKey(const Key('assistant-conversation-shell')), findsOneWidget);
-      expect(find.byKey(const Key('settings-account-panel-card')), findsNothing);
+      expect(
+        find.byKey(const Key('assistant-conversation-shell')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('settings-account-panel-card')),
+        findsNothing,
+      );
 
       controller.openSettings();
-      await tester.pumpAndSettle();
+      await tester.pump();
 
-      expect(find.byKey(const Key('settings-account-panel-card')), findsOneWidget);
+      expect(
+        find.byKey(const Key('settings-account-panel-card')),
+        findsOneWidget,
+      );
     });
   });
 }
