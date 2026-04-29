@@ -726,7 +726,7 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
       }
       return 'Skill install required: $candidateText';
     }
-    return errorText;
+    return _diagnosticGoTaskFailureText(result, errorText);
   }();
   final responseText = _extractGoTaskDisplayText(result);
   final primaryText =
@@ -768,6 +768,29 @@ String _firstGoTaskFailureText(Map<String, dynamic> result) {
     }
   }
   return '';
+}
+
+String _diagnosticGoTaskFailureText(
+  Map<String, dynamic> result,
+  String errorText,
+) {
+  final text = errorText.trim();
+  if (text.isEmpty) {
+    return '';
+  }
+  final diagnostics = <String>[];
+  final code = result['unavailableCode']?.toString().trim() ?? '';
+  if (code.isNotEmpty && !text.contains(code)) {
+    diagnostics.add('code: $code');
+  }
+  final upstreamMethod = result['upstreamMethod']?.toString().trim() ?? '';
+  if (upstreamMethod.isNotEmpty) {
+    diagnostics.add('upstream: $upstreamMethod');
+  }
+  if (diagnostics.isEmpty) {
+    return text;
+  }
+  return '$text (${diagnostics.join(', ')})';
 }
 
 String _extractGoTaskDisplayText(Object? value, [Set<Object>? visited]) {

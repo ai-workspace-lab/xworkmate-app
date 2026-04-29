@@ -95,6 +95,26 @@ void main() {
       expect(result.message, 'codex execution environment is unavailable');
     });
 
+    test('keeps provider failure diagnostics for empty upstream output', () {
+      final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'id': 'request-id',
+        'result': <String, dynamic>{
+          'success': false,
+          'provider': 'hermes',
+          'error': 'hermes upstream returned empty response',
+          'unavailableCode': 'PROVIDER_EMPTY_RESPONSE',
+          'upstreamMethod': 'session/prompt',
+        },
+      }, route: GoTaskServiceRoute.externalAcpSingle);
+
+      expect(result.success, isFalse);
+      expect(
+        result.message,
+        'hermes upstream returned empty response (code: PROVIDER_EMPTY_RESPONSE, upstream: session/prompt)',
+      );
+    });
+
     test('keeps bridge message and inline artifacts together', () {
       final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
         'jsonrpc': '2.0',
