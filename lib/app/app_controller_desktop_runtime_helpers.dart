@@ -419,6 +419,13 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   String? assistantWorkingDirectoryForSessionInternal(String sessionKey) =>
       assistantWorkingDirectoryForSessionRuntimeInternal(this, sessionKey);
 
+  String? assistantRemoteWorkingDirectoryHintForSessionInternal(
+    String sessionKey,
+  ) => assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal(
+    this,
+    sessionKey,
+  );
+
   String? resolveLocalAssistantWorkingDirectoryForSessionInternal(
     String sessionKey, {
     bool requireLocalExistence = true,

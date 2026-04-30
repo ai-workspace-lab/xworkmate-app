@@ -159,24 +159,25 @@ String? assistantWorkingDirectoryForSessionRuntimeInternal(
   AppController controller,
   String sessionKey,
 ) {
+  return resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal(
+    controller,
+    sessionKey,
+    requireLocalExistence: false,
+  );
+}
+
+String? assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal(
+  AppController controller,
+  String sessionKey,
+) {
   final normalizedSessionKey = controller.normalizedAssistantSessionKeyInternal(
     sessionKey,
   );
-  final remoteCandidate =
+  final candidate =
       controller
           .assistantThreadRecordsInternal[normalizedSessionKey]
           ?.lastRemoteWorkingDirectory
           ?.trim() ??
-      '';
-  if (remoteCandidate.isNotEmpty) {
-    return remoteCandidate;
-  }
-  final candidate =
-      controller
-          .assistantThreadRecordsInternal[normalizedSessionKey]
-          ?.workspaceBinding
-          .workspacePath
-          .trim() ??
       '';
   if (candidate.isEmpty) {
     return null;

@@ -42,7 +42,7 @@ void main() {
           controller,
           'session-1',
         ),
-        remoteWorkspace.path,
+        localWorkspace.path,
       );
       expect(
         resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal(
@@ -50,6 +50,13 @@ void main() {
           'session-1',
         ),
         localWorkspace.path,
+      );
+      expect(
+        assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal(
+          controller,
+          'session-1',
+        ),
+        remoteWorkspace.path,
       );
     },
   );
