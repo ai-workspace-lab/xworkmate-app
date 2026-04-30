@@ -50,6 +50,39 @@ void main() {
       expect(metadata['buildDate'], '2026-04-21');
     });
 
+    test('preserves prebuilt bearer authorization', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      var authorizationHeader = '';
+      server.listen((request) async {
+        authorizationHeader =
+            request.headers.value(HttpHeaders.authorizationHeader) ?? '';
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.json
+          ..write(
+            jsonEncode(<String, dynamic>{
+              'status': 'ok',
+              'version': '991ecb0',
+            }),
+          );
+        await request.response.close();
+      });
+
+      final metadata = await loadBridgeMetadataForSettingsAbout(
+        bridgeEndpoint: Uri.parse(
+          'http://${server.address.address}:${server.port}',
+        ),
+        authorizationResolver: (_) async => 'Bearer bridge-token',
+      );
+
+      expect(authorizationHeader, 'Bearer bridge-token');
+      expect(metadata['status'], 'ok');
+    });
+
     test('returns unavailable when bridge authorization is missing', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {

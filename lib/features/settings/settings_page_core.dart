@@ -27,7 +27,10 @@ Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({
     fragment: null,
   );
   final authorizationHeader = await authorizationResolver(pingEndpoint);
-  if (authorizationHeader == null || authorizationHeader.trim().isEmpty) {
+  final normalizedAuthorizationHeader = _normalizeAuthorizationHeader(
+    authorizationHeader ?? '',
+  );
+  if (normalizedAuthorizationHeader.isEmpty) {
     return const <String, dynamic>{
       'status': 'unavailable',
       'version': '',
@@ -45,7 +48,7 @@ Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({
         .timeout(const Duration(seconds: 4));
     request.headers.set(
       HttpHeaders.authorizationHeader,
-      'Bearer $authorizationHeader',
+      normalizedAuthorizationHeader,
     );
     request.headers.set(HttpHeaders.acceptHeader, 'application/json');
     final response = await request.close().timeout(const Duration(seconds: 4));
@@ -86,6 +89,21 @@ Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({
     'image': '',
     'buildDate': '',
   };
+}
+
+String _normalizeAuthorizationHeader(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) {
+    return '';
+  }
+  final separatorIndex = trimmed.indexOf(RegExp(r'\s'));
+  if (separatorIndex > 0 && separatorIndex < trimmed.length - 1) {
+    final scheme = trimmed.substring(0, separatorIndex);
+    if (RegExp(r"^[A-Za-z][A-Za-z0-9!#$%&'*+.^_`|~-]*$").hasMatch(scheme)) {
+      return trimmed;
+    }
+  }
+  return 'Bearer $trimmed';
 }
 
 class SettingsPage extends StatefulWidget {
