@@ -235,9 +235,7 @@ extension AppControllerDesktopThreadActions on AppController {
     final currentTarget = assistantExecutionTargetForSession(currentSessionKey);
     final connectionState = currentAssistantConnectionState;
     if (!connectionState.connected) {
-      final error = StateError(
-        connectionState.detailLabel,
-      );
+      final error = StateError(connectionState.detailLabel);
       appendAssistantThreadMessageInternal(
         currentSessionKey,
         assistantErrorMessageInternal(error.message),
@@ -253,6 +251,11 @@ extension AppControllerDesktopThreadActions on AppController {
     );
     final workingDirectory =
         assistantWorkingDirectoryForSessionInternal(
+          currentSessionKey,
+        )?.trim() ??
+        '';
+    final remoteWorkingDirectoryHint =
+        assistantRemoteWorkingDirectoryHintForSessionInternal(
           currentSessionKey,
         )?.trim() ??
         '';
@@ -347,6 +350,7 @@ extension AppControllerDesktopThreadActions on AppController {
               provider: assistantProviderForSession(sessionKey),
               prompt: message,
               workingDirectory: workingDirectory,
+              remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
               model: assistantModelForSession(sessionKey),
               thinking: thinking,
               selectedSkills: selectedSkillLabels,
@@ -372,6 +376,11 @@ extension AppControllerDesktopThreadActions on AppController {
               result: result,
             ),
             latestResolvedRuntimeModel: result.resolvedModel.trim(),
+            lastRemoteWorkingDirectory:
+                result.remoteWorkingDirectory.trim().isNotEmpty
+                ? result.remoteWorkingDirectory.trim()
+                : null,
+            lastRemoteWorkspaceRefKind: result.remoteWorkspaceRefKind,
             lifecycleStatus: 'ready',
             lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
             lastResultCode: result.success ? 'success' : 'error',

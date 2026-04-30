@@ -114,6 +114,8 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
     );
     final workingDirectory = controller
         .assistantWorkingDirectoryForSessionInternal(sessionKey);
+    final remoteWorkingDirectoryHint = controller
+        .assistantRemoteWorkingDirectoryHintForSessionInternal(sessionKey);
     if (workingDirectory == null || workingDirectory.trim().isEmpty) {
       final error = StateError(
         appText(
@@ -163,6 +165,7 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
           target: controller.assistantExecutionTargetForSession(sessionKey),
           prompt: composedPrompt,
           workingDirectory: workingDirectory,
+          remoteWorkingDirectoryHint: remoteWorkingDirectoryHint?.trim() ?? '',
           model: controller.assistantModelForSession(sessionKey),
           thinking: 'medium',
           selectedSkills: selectedSkillLabels,
@@ -200,6 +203,15 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
       await controller.persistGoTaskArtifactsForSessionInternal(
         sessionKey,
         result,
+      );
+      controller.upsertTaskThreadInternal(
+        sessionKey,
+        lastRemoteWorkingDirectory:
+            result.remoteWorkingDirectory.trim().isNotEmpty
+            ? result.remoteWorkingDirectory.trim()
+            : null,
+        lastRemoteWorkspaceRefKind: result.remoteWorkspaceRefKind,
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       );
       controller.appendLocalSessionMessageInternal(
         sessionKey,
