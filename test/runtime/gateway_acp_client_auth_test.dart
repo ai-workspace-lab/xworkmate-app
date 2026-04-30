@@ -577,6 +577,41 @@ void main() {
       expect(capture.requestBody, isNot(contains('"method":"turn/start"')));
     });
 
+    test(
+      'desktop execution keeps local cwd and sends remote workspace as hint',
+      () async {
+        final capture = await _startAcpHttpServer();
+        addTearDown(capture.close);
+        final client = GatewayAcpClient(
+          endpointResolver: () => capture.baseEndpoint,
+          authorizationResolver: (_) async => 'bridge-token',
+        );
+
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: client,
+          endpointResolver: (_) => capture.baseEndpoint,
+          taskEndpointResolver: (_) => capture.baseEndpoint,
+        );
+
+        await transport.executeTask(
+          _taskRequest(
+            target: AssistantExecutionTarget.agent,
+            provider: SingleAgentProvider.codex,
+            remoteWorkingDirectoryHint: '/owners/local/user/demo/threads/main',
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(capture.requestBody, contains('"workingDirectory":"/tmp"'));
+        expect(
+          capture.requestBody,
+          contains(
+            '"remoteWorkingDirectoryHint":"/owners/local/user/demo/threads/main"',
+          ),
+        );
+      },
+    );
+
     test('multi-agent execution uses session lifecycle methods', () async {
       final capture = await _startAcpHttpServer();
       addTearDown(capture.close);
@@ -668,6 +703,7 @@ GoTaskServiceRequest _taskRequest({
   required AssistantExecutionTarget target,
   required SingleAgentProvider provider,
   bool resumeSession = false,
+  String remoteWorkingDirectoryHint = '',
 }) {
   return GoTaskServiceRequest(
     sessionId: 'session-1',
@@ -683,6 +719,7 @@ GoTaskServiceRequest _taskRequest({
     agentId: '',
     metadata: const <String, dynamic>{},
     provider: provider,
+    remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
     resumeSession: resumeSession,
   );
 }
