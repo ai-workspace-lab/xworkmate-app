@@ -221,6 +221,58 @@ void main() {
       expect(capture.authorizationHeader, 'Bearer ready-token');
     });
 
+    test('surfaces structured bridge HTTP 502 diagnostics', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        await utf8.decoder.bind(request).join();
+        request.response
+          ..statusCode = HttpStatus.badGateway
+          ..headers.contentType = ContentType.json
+          ..write(
+            jsonEncode(<String, dynamic>{
+              'error': <String, dynamic>{
+                'message': 'openclaw upstream request failed',
+                'data': <String, dynamic>{
+                  'unavailableCode': 'UPSTREAM_BAD_GATEWAY',
+                  'upstreamMethod': 'session.start',
+                },
+              },
+            }),
+          );
+        await request.response.close();
+      });
+      final client = GatewayAcpClient(
+        endpointResolver: () => Uri.parse('http://127.0.0.1:${server.port}'),
+      );
+
+      await expectLater(
+        client.request(
+          method: 'session.start',
+          params: const <String, dynamic>{},
+        ),
+        throwsA(
+          isA<GatewayAcpException>()
+              .having((error) => error.code, 'code', 'ACP_HTTP_502')
+              .having(
+                (error) => error.message,
+                'message',
+                contains('openclaw upstream request failed'),
+              )
+              .having(
+                (error) => error.message,
+                'diagnostic code',
+                contains('UPSTREAM_BAD_GATEWAY'),
+              )
+              .having(
+                (error) => error.message,
+                'upstream',
+                contains('session.start'),
+              ),
+        ),
+      );
+    });
+
     test('desktop bridge auth resolver skips unrelated endpoints', () async {
       final storeRoot = await Directory.systemTemp.createTemp(
         'xworkmate-acp-auth-unrelated-',
@@ -244,7 +296,9 @@ void main() {
       );
 
       final controller = AppController(
-          environmentOverride: const <String, String>{},store: store);
+        environmentOverride: const <String, String>{},
+        store: store,
+      );
       addTearDown(controller.dispose);
 
       final header = await controller
@@ -292,7 +346,9 @@ void main() {
         await store.saveSecretValueByRef('gateway_token_0', 'gateway-token');
 
         final controller = AppController(
-          environmentOverride: const <String, String>{},store: store);
+          environmentOverride: const <String, String>{},
+          store: store,
+        );
         addTearDown(controller.dispose);
         await controller.settingsControllerInternal.resetSnapshot(
           await store.loadSettingsSnapshot(),
@@ -390,7 +446,9 @@ void main() {
         await store.saveSecretValueByRef('gateway_token_0', 'gateway-token');
 
         final controller = AppController(
-          environmentOverride: const <String, String>{},store: store);
+          environmentOverride: const <String, String>{},
+          store: store,
+        );
         addTearDown(controller.dispose);
         await controller.settingsControllerInternal.initialize();
 
@@ -550,6 +608,56 @@ void main() {
 
         expect(capture.requestBody, contains('"method":"session.start"'));
         expect(capture.requestBody, isNot(contains('"method":"thread/start"')));
+      },
+    );
+
+    test(
+      'desktop transport preserves gateway ACP HTTP failure detail',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.listen((request) async {
+          await utf8.decoder.bind(request).join();
+          request.response
+            ..statusCode = HttpStatus.badGateway
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode(<String, dynamic>{
+                'error': <String, dynamic>{
+                  'message': 'openclaw upstream request failed',
+                  'data': <String, dynamic>{
+                    'unavailableCode': 'UPSTREAM_BAD_GATEWAY',
+                  },
+                },
+              }),
+            );
+          await request.response.close();
+        });
+        final endpoint = Uri.parse('http://127.0.0.1:${server.port}');
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: GatewayAcpClient(endpointResolver: () => endpoint),
+          endpointResolver: (_) => endpoint,
+          taskEndpointResolver: (_) => endpoint,
+        );
+
+        await expectLater(
+          transport.executeTask(
+            _taskRequest(
+              target: AssistantExecutionTarget.gateway,
+              provider: SingleAgentProvider.openclaw,
+            ),
+            onUpdate: (_) {},
+          ),
+          throwsA(
+            isA<GatewayAcpException>()
+                .having((error) => error.code, 'code', 'ACP_HTTP_502')
+                .having(
+                  (error) => error.message,
+                  'message',
+                  contains('openclaw upstream request failed'),
+                ),
+          ),
+        );
       },
     );
 

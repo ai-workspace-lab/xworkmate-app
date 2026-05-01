@@ -132,6 +132,8 @@ class ExternalCodeAgentAcpDesktopTransport
         streamedText: streamedText,
         completedMessage: completedMessage,
       );
+    } on GatewayAcpException {
+      rethrow;
     } catch (error) {
       throw GatewayAcpException(
         error.toString(),

@@ -706,12 +706,10 @@ class GatewayAcpClient {
     }
     try {
       final decoded = _decodeMap(trimmed);
-      final error = asMap(decoded['error']);
-      return (stringValue(error['message']) ??
-              stringValue(decoded['message']) ??
-              stringValue(decoded['detail']) ??
-              '')
-          .trim();
+      final detail = _extractStructuredErrorDetail(decoded);
+      if (detail.isNotEmpty) {
+        return detail;
+      }
     } on FormatException {
       // Fall through to textual snippet extraction below.
     }
@@ -723,6 +721,98 @@ class GatewayAcpClient {
     return singleLine.length <= 160
         ? singleLine
         : '${singleLine.substring(0, 157)}...';
+  }
+
+  String _extractStructuredErrorDetail(Map<String, dynamic> decoded) {
+    final candidates = <String>[];
+    void addCandidate(Object? value) {
+      final text = _extractStructuredErrorText(value).trim();
+      if (text.isNotEmpty && !candidates.contains(text)) {
+        candidates.add(text);
+      }
+    }
+
+    final error = decoded['error'];
+    addCandidate(error);
+    if (error is Map) {
+      final errorMap = error.cast<String, dynamic>();
+      addCandidate(errorMap['data']);
+      addCandidate(errorMap['details']);
+    }
+    for (final key in const <String>[
+      'message',
+      'detail',
+      'errorMessage',
+      'unavailableMessage',
+      'reason',
+      'description',
+      'body',
+    ]) {
+      addCandidate(decoded[key]);
+    }
+    final code = stringValue(decoded['code']) ?? '';
+    if (candidates.isEmpty && code.isNotEmpty) {
+      candidates.add(code);
+    }
+    return candidates.join(' · ');
+  }
+
+  String _extractStructuredErrorText(Object? value, [Set<Object>? visited]) {
+    if (value == null) {
+      return '';
+    }
+    if (value is String) {
+      return value.trim();
+    }
+    if (value is num || value is bool) {
+      return value.toString();
+    }
+    final seen = visited ?? <Object>{};
+    if (!seen.add(value)) {
+      return '';
+    }
+    if (value is Map) {
+      final map = value.cast<String, dynamic>();
+      final parts = <String>[];
+      for (final key in const <String>[
+        'message',
+        'detail',
+        'error',
+        'errorMessage',
+        'unavailableMessage',
+        'upstreamError',
+        'reason',
+        'description',
+      ]) {
+        final text = _extractStructuredErrorText(map[key], seen);
+        if (text.isNotEmpty && !parts.contains(text)) {
+          parts.add(text);
+        }
+      }
+      final code =
+          stringValue(map['code']) ?? stringValue(map['unavailableCode']) ?? '';
+      final upstream =
+          stringValue(map['upstreamMethod']) ??
+          stringValue(map['upstream']) ??
+          '';
+      if (code.isNotEmpty && parts.every((part) => !part.contains(code))) {
+        parts.add('code: $code');
+      }
+      if (upstream.isNotEmpty) {
+        parts.add('upstream: $upstream');
+      }
+      if (parts.length <= 1) {
+        return parts.join();
+      }
+      return '${parts.first} (${parts.skip(1).join(', ')})';
+    }
+    if (value is Iterable) {
+      return value
+          .map((item) => _extractStructuredErrorText(item, seen))
+          .where((item) => item.isNotEmpty)
+          .join(' · ');
+    }
+    return value.toString().trim();
   }
 
   Future<String> _resolveAuthorizationHeader(
