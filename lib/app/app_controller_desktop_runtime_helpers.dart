@@ -638,6 +638,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (override.isNotEmpty) {
       return override;
     }
+    if (environmentOverrideInternal != null) {
+      return null;
+    }
     final value = Platform.environment[key]?.trim() ?? '';
     return value.isEmpty ? null : value;
   }

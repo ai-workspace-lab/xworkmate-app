@@ -57,6 +57,7 @@ void main() {
       'switching a session to gateway uses the bridge-provided gateway catalog',
       () async {
         final controller = AppController(
+          environmentOverride: const <String, String>{},
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
             SingleAgentProvider.opencode,
@@ -112,7 +113,7 @@ void main() {
     test(
       'returns unspecified when a saved provider is no longer in the current catalog',
       () {
-        final controller = AppController();
+        final controller = AppController(environmentOverride: const <String, String>{});
         addTearDown(controller.dispose);
 
         final unavailableProvider = controller
@@ -129,6 +130,7 @@ void main() {
       'does not recover a stale gateway provider from an empty gateway catalog',
       () {
         final controller = AppController(
+          environmentOverride: const <String, String>{},
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
             SingleAgentProvider.opencode,
@@ -150,6 +152,7 @@ void main() {
       'switching a session to gateway with an empty gateway catalog keeps provider selection inherited',
       () async {
         final controller = AppController(
+          environmentOverride: const <String, String>{},
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
             SingleAgentProvider.opencode,
@@ -181,9 +184,10 @@ void main() {
     );
 
     test(
-      'gateway target without a live gateway provider falls back to auto routing',
+      'gateway target without a live gateway provider uses explicit gateway routing',
       () async {
         final controller = AppController(
+          environmentOverride: const <String, String>{},
           initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
             AssistantExecutionTarget.agent,
             AssistantExecutionTarget.gateway,
@@ -200,9 +204,9 @@ void main() {
           'session-1',
         );
 
-        expect(routing.isAuto, isTrue);
-        expect(routing.explicitExecutionTarget, isEmpty);
-        expect(routing.explicitProviderId, isEmpty);
+        expect(routing.mode, ExternalCodeAgentAcpRoutingMode.explicit);
+        expect(routing.explicitExecutionTarget, 'gateway');
+        expect(routing.explicitProviderId, 'openclaw');
       },
     );
 
@@ -210,6 +214,7 @@ void main() {
       'locks the gateway provider catalog to the canonical openclaw contract',
       () {
         final controller = AppController(
+          environmentOverride: const <String, String>{},
           initialGatewayProviderCatalog: <SingleAgentProvider>[
             SingleAgentProvider.fromJsonValue(
               'hermes',

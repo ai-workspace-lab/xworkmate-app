@@ -14,7 +14,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final controller = AppController();
+      final controller = AppController(environmentOverride: const <String, String>{});
       addTearDown(controller.dispose);
 
       await tester.pumpWidget(
@@ -40,7 +40,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final controller = AppController();
+      final controller = AppController(environmentOverride: const <String, String>{});
       addTearDown(controller.dispose);
 
       await tester.pumpWidget(
