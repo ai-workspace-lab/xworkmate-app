@@ -69,7 +69,7 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
     );
     final resolvedProvider = assistantProviderForSession(normalizedSessionKey);
     final resolvedExplicitProviderId =
-        thread?.hasExplicitProviderSelection == true &&
+        (thread?.hasExplicitProviderSelection == true || currentTarget.isGateway) &&
             !resolvedProvider.isUnspecified
         ? resolvedProvider.providerId
         : '';
@@ -86,7 +86,7 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
     final resolvedExplicitExecutionTarget =
         explicitExecutionTarget?.trim().isNotEmpty == true
         ? explicitExecutionTarget!.trim()
-        : hasAnyExplicitSelection
+        : (hasAnyExplicitSelection || currentTarget.isGateway)
         ? _routingExecutionTargetValueInternal(currentTarget)
         : '';
     final hasExplicitSelection =

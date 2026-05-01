@@ -406,7 +406,8 @@ void main() {
           value: 'bridge-token',
         );
 
-        final controller = AppController(store: store);
+        final controller = AppController(
+          environmentOverride: const <String, String>{},store: store);
         addTearDown(controller.dispose);
         await controller.settingsControllerInternal.initialize();
 
