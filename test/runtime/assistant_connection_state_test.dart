@@ -242,6 +242,7 @@ Future<AppController> _isolatedController({
   );
   await store.initialize();
   return AppController(
+          environmentOverride: const <String, String>{},
     store: store,
     initialBridgeProviderCatalog: initialBridgeProviderCatalog,
     initialGatewayProviderCatalog: initialGatewayProviderCatalog,
