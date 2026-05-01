@@ -138,7 +138,8 @@ void main() {
           ),
         );
 
-        final controller = AppController(store: store);
+        final controller = AppController(
+          environmentOverride: const <String, String>{},store: store);
         addTearDown(controller.dispose);
         await controller.settingsControllerInternal.initialize();
 
@@ -158,7 +159,7 @@ void main() {
     test(
       'runtime coordinator only exposes remote and offline gateway modes',
       () {
-        final controller = AppController();
+        final controller = AppController(environmentOverride: const <String, String>{});
         addTearDown(controller.dispose);
 
         expect(

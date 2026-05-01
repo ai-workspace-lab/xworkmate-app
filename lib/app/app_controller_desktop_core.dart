@@ -594,6 +594,7 @@ class AppController extends ChangeNotifier {
   }) {
     final normalizedId = normalizeSingleAgentProviderId(providerId ?? '');
     final catalog = providerCatalogForExecutionTarget(executionTarget);
+
     if (normalizedId.isNotEmpty) {
       for (final p in catalog) {
         if (p.providerId == normalizedId) return p;
@@ -613,6 +614,7 @@ class AppController extends ChangeNotifier {
     return resolveProviderForExecutionTarget(
       thread?.executionBinding.providerId,
       executionTarget: target,
+      defaultToCatalog: target.isGateway,
     );
   }
 

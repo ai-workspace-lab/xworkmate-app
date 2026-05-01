@@ -13,7 +13,7 @@ void main() {
     testWidgets(
       'does not fabricate providers when live capabilities are unavailable',
       (tester) async {
-        final controller = AppController();
+        final controller = AppController(environmentOverride: const <String, String>{});
         addTearDown(controller.dispose);
 
         await controller.sessionsController.switchSession('session-1');
@@ -55,6 +55,7 @@ void main() {
 
     testWidgets('shows mode-specific provider catalogs', (tester) async {
       final controller = AppController(
+          environmentOverride: const <String, String>{},
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
           SingleAgentProvider.opencode,
@@ -203,6 +204,7 @@ void main() {
       tester,
     ) async {
       final controller = AppController(
+          environmentOverride: const <String, String>{},
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
           SingleAgentProvider.opencode,
@@ -251,6 +253,7 @@ void main() {
       tester,
     ) async {
       final controller = AppController(
+          environmentOverride: const <String, String>{},
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
           SingleAgentProvider.opencode,
@@ -312,7 +315,7 @@ void main() {
     });
 
     testWidgets('uses submit button instead of connect action', (tester) async {
-      final controller = AppController();
+      final controller = AppController(environmentOverride: const <String, String>{});
       addTearDown(controller.dispose);
 
       await controller.sessionsController.switchSession('session-1');

@@ -243,7 +243,8 @@ void main() {
         value: 'bridge-token',
       );
 
-      final controller = AppController(store: store);
+      final controller = AppController(
+          environmentOverride: const <String, String>{},store: store);
       addTearDown(controller.dispose);
 
       final header = await controller
@@ -290,7 +291,8 @@ void main() {
         );
         await store.saveSecretValueByRef('gateway_token_0', 'gateway-token');
 
-        final controller = AppController(store: store);
+        final controller = AppController(
+          environmentOverride: const <String, String>{},store: store);
         addTearDown(controller.dispose);
         await controller.settingsControllerInternal.resetSnapshot(
           await store.loadSettingsSnapshot(),
@@ -387,7 +389,8 @@ void main() {
         );
         await store.saveSecretValueByRef('gateway_token_0', 'gateway-token');
 
-        final controller = AppController(store: store);
+        final controller = AppController(
+          environmentOverride: const <String, String>{},store: store);
         addTearDown(controller.dispose);
         await controller.settingsControllerInternal.initialize();
 

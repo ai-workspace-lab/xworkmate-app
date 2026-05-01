@@ -5,7 +5,7 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 void main() {
   group('Assistant model display', () {
     test('hides stale model display when no runtime model matches', () async {
-      final controller = AppController();
+      final controller = AppController(environmentOverride: const <String, String>{});
       addTearDown(controller.dispose);
 
       await controller.sessionsController.switchSession('session-1');
@@ -23,7 +23,7 @@ void main() {
     test(
       'shows matched runtime model when gateway catalog is available',
       () async {
-        final controller = AppController();
+        final controller = AppController(environmentOverride: const <String, String>{});
         addTearDown(controller.dispose);
 
         await controller.sessionsController.switchSession('session-1');
