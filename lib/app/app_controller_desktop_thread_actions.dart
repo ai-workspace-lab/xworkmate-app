@@ -236,7 +236,9 @@ extension AppControllerDesktopThreadActions on AppController {
     var connectionState = currentAssistantConnectionState;
     if (!connectionState.connected &&
         isBridgeAcpRuntimeConfiguredInternal() &&
-        !bridgeCapabilitiesRefreshAttemptedInternal) {
+        bridgeCapabilityRefreshNeededForAssistantTargetInternal(
+          currentTarget,
+        )) {
       try {
         await refreshAcpCapabilitiesInternal(forceRefresh: true);
         connectionState = currentAssistantConnectionState;

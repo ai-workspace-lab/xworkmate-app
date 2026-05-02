@@ -28,6 +28,33 @@ void main() {
       },
     );
 
+    test('requires the target capability contract before reporting ready', () {
+      expect(
+        bridgeCapabilityReadyForExecutionTargetInternal(
+          target: AssistantExecutionTarget.gateway,
+          bridgeConfigured: true,
+          providers: const <SingleAgentProvider>[SingleAgentProvider.openclaw],
+          availableTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.agent,
+          ],
+        ),
+        isFalse,
+      );
+
+      expect(
+        bridgeCapabilityReadyForExecutionTargetInternal(
+          target: AssistantExecutionTarget.gateway,
+          bridgeConfigured: true,
+          providers: const <SingleAgentProvider>[SingleAgentProvider.openclaw],
+          availableTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.agent,
+            AssistantExecutionTarget.gateway,
+          ],
+        ),
+        isTrue,
+      );
+    });
+
     test('maps blocked bridge authorization into the token-missing state', () {
       final state = resolveGatewayThreadConnectionStateInternal(
         target: AssistantExecutionTarget.gateway,
