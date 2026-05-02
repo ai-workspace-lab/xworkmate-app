@@ -64,10 +64,7 @@ void main() {
           ..statusCode = HttpStatus.ok
           ..headers.contentType = ContentType.json
           ..write(
-            jsonEncode(<String, dynamic>{
-              'status': 'ok',
-              'version': '991ecb0',
-            }),
+            jsonEncode(<String, dynamic>{'status': 'ok', 'version': '991ecb0'}),
           );
         await request.response.close();
       });
@@ -135,5 +132,36 @@ void main() {
       expect(metadata['image'], '');
       expect(metadata['buildDate'], '');
     });
+
+    test(
+      'returns unavailable when authorized bridge ping returns 502',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          request.response
+            ..statusCode = HttpStatus.badGateway
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode(<String, dynamic>{'message': 'upstream down'}));
+          await request.response.close();
+        });
+
+        final metadata = await loadBridgeMetadataForSettingsAbout(
+          bridgeEndpoint: Uri.parse(
+            'http://${server.address.address}:${server.port}',
+          ),
+          authorizationResolver: (_) async => 'bridge-token',
+        );
+
+        expect(metadata['status'], 'unavailable');
+        expect(metadata['version'], '');
+        expect(metadata['commit'], '');
+        expect(metadata['image'], '');
+        expect(metadata['buildDate'], '');
+      },
+    );
   });
 }
