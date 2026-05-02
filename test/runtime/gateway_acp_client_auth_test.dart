@@ -569,14 +569,13 @@ void main() {
         expect(capture.requestPath, isNot(contains('/gateway/openclaw')));
         final params = _lastRequestParams(capture);
         final routing = params['routing'] as Map<String, dynamic>;
-        expect(params['provider'], 'openclaw');
-        expect(params['gatewayProvider'], 'openclaw');
-        expect(params['gatewayProviderId'], 'openclaw');
+        expect(params.containsKey('gatewayProvider'), isFalse);
+        expect(params.containsKey('gatewayProviderId'), isFalse);
         expect(params['executionTarget'], 'gateway');
         expect(params['requestedExecutionTarget'], 'gateway');
-        expect(routing['preferredGatewayTarget'], 'openclaw');
+        expect(routing['preferredGatewayProviderId'], 'openclaw');
         expect(routing['explicitExecutionTarget'], 'gateway');
-        expect(routing['explicitProviderId'], 'openclaw');
+        expect(routing.containsKey('explicitProviderId'), isFalse);
         expect(capture.requestBody, contains('"method":"session.start"'));
         expect(capture.requestBody, isNot(contains('"method":"thread/start"')));
       },

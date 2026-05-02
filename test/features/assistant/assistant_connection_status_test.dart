@@ -100,5 +100,25 @@ void main() {
       expect(state.detailLabel, '正在加载 Bridge 能力...');
       expect(state.gatewayTokenMissing, isFalse);
     });
+
+    test('surfaces failed discovery after capability refresh is attempted', () {
+      final state = resolveGatewayThreadConnectionStateInternal(
+        target: AssistantExecutionTarget.gateway,
+        bridgeReady: false,
+        bridgeLabel: 'xworkmate-bridge.svc.plus',
+        accountSyncState: null,
+        accountSignedIn: true,
+        bridgeConfigured: true,
+        bridgeDiscoveryAttempted: true,
+        bridgeDiscoveryError: 'ACP_HTTP_502: upstream failed',
+        providerCatalogEmpty: true,
+      );
+
+      expect(state.connected, isFalse);
+      expect(state.status, RuntimeConnectionStatus.error);
+      expect(state.primaryLabel, '连接失败');
+      expect(state.detailLabel, 'ACP_HTTP_502: upstream failed');
+      expect(state.lastError, 'ACP_HTTP_502: upstream failed');
+    });
   });
 }

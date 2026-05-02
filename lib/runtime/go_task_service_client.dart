@@ -144,7 +144,7 @@ class ExternalCodeAgentAcpRoutingConfig {
     return <String, dynamic>{
       'routingMode': mode.name,
       if (preferredGatewayTarget.trim().isNotEmpty)
-        'preferredGatewayTarget': preferredGatewayTarget.trim(),
+        'preferredGatewayProviderId': preferredGatewayTarget.trim(),
       if (explicitExecutionTarget.trim().isNotEmpty)
         'explicitExecutionTarget': explicitExecutionTarget.trim(),
       if (explicitProviderId.trim().isNotEmpty)
@@ -256,9 +256,7 @@ class GoTaskServiceRequest {
   Map<String, dynamic> toExternalAcpParams() {
     final resolvedRouting = effectiveRouting;
     final providerId = provider.isUnspecified ? '' : provider.providerId;
-    final gatewayProviderId = normalizedTarget.isGateway
-        ? (providerId.isEmpty ? kCanonicalGatewayProviderId : providerId)
-        : '';
+    final agentProviderId = normalizedTarget.isGateway ? '' : providerId;
     final params = <String, dynamic>{
       'sessionId': sessionId,
       'threadId': threadId,
@@ -293,11 +291,7 @@ class GoTaskServiceRequest {
               },
             )
             .toList(growable: false),
-      if (providerId.isNotEmpty) 'provider': providerId,
-      if (gatewayProviderId.isNotEmpty) ...<String, dynamic>{
-        'gatewayProvider': gatewayProviderId,
-        'gatewayProviderId': gatewayProviderId,
-      },
+      if (agentProviderId.isNotEmpty) 'provider': agentProviderId,
       if (remoteWorkingDirectoryHint.trim().isNotEmpty)
         'remoteWorkingDirectoryHint': remoteWorkingDirectoryHint.trim(),
       if (model.trim().isNotEmpty) 'model': model.trim(),
@@ -324,7 +318,7 @@ class GoTaskServiceRequest {
       AssistantExecutionTarget.agent => 'agent',
       AssistantExecutionTarget.gateway => 'gateway',
     };
-    final explicitProviderId = provider.isUnspecified
+    final explicitProviderId = provider.isUnspecified || gatewayTarget.isGateway
         ? ''
         : provider.providerId;
     final explicitModelValue = model.trim();

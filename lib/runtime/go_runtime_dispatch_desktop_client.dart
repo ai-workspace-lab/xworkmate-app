@@ -24,7 +24,7 @@ class GoRuntimeDispatchDesktopClient implements RuntimeDispatchResolver {
         'routing': <String, dynamic>{
           'routingMode': 'auto',
           if (preferredProviderId.trim().isNotEmpty)
-            'preferredGatewayTarget': preferredProviderId.trim(),
+            'preferredGatewayProviderId': preferredProviderId.trim(),
           'explicitExecutionTarget': '',
           'explicitProviderId': preferredProviderId.trim(),
           'explicitModel': '',
@@ -61,7 +61,7 @@ class GoRuntimeDispatchDesktopClient implements RuntimeDispatchResolver {
         'routing': <String, dynamic>{
           'routingMode': 'auto',
           if (preferredProviderId.trim().isNotEmpty)
-            'preferredGatewayTarget': preferredProviderId.trim(),
+            'preferredGatewayProviderId': preferredProviderId.trim(),
           'explicitExecutionTarget': '',
           'explicitProviderId': preferredProviderId.trim(),
           'explicitModel': '',

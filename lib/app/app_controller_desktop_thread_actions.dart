@@ -234,7 +234,9 @@ extension AppControllerDesktopThreadActions on AppController {
     final currentSessionKey = sessionsControllerInternal.currentSessionKey;
     final currentTarget = assistantExecutionTargetForSession(currentSessionKey);
     var connectionState = currentAssistantConnectionState;
-    if (!connectionState.connected && isBridgeAcpRuntimeConfiguredInternal()) {
+    if (!connectionState.connected &&
+        isBridgeAcpRuntimeConfiguredInternal() &&
+        !bridgeCapabilitiesRefreshAttemptedInternal) {
       try {
         await refreshAcpCapabilitiesInternal(forceRefresh: true);
         connectionState = currentAssistantConnectionState;
