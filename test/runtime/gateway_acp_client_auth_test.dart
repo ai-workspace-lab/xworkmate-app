@@ -273,6 +273,43 @@ void main() {
       );
     });
 
+    test('surfaces plain-text bridge HTTP 502 diagnostics', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        await utf8.decoder.bind(request).join();
+        request.response
+          ..statusCode = HttpStatus.badGateway
+          ..headers.contentType = ContentType.text
+          ..write('openclaw upstream returned empty response');
+        await request.response.close();
+      });
+      final client = GatewayAcpClient(
+        endpointResolver: () => Uri.parse('http://127.0.0.1:${server.port}'),
+      );
+
+      await expectLater(
+        client.request(
+          method: 'session.start',
+          params: const <String, dynamic>{},
+        ),
+        throwsA(
+          isA<GatewayAcpException>()
+              .having((error) => error.code, 'code', 'ACP_HTTP_502')
+              .having(
+                (error) => error.message,
+                'message',
+                contains('openclaw upstream returned empty response'),
+              )
+              .having(
+                (error) => error.message,
+                'content type',
+                contains('unexpected content type: text/plain'),
+              ),
+        ),
+      );
+    });
+
     test('desktop bridge auth resolver skips unrelated endpoints', () async {
       final storeRoot = await Directory.systemTemp.createTemp(
         'xworkmate-acp-auth-unrelated-',
@@ -508,7 +545,7 @@ void main() {
     );
 
     test(
-      'desktop task execution normalizes provider endpoint paths back to bridge RPC',
+      'desktop task execution rejects provider endpoint paths as bridge RPC bases',
       () async {
         final capture = await _startAcpHttpServer();
         addTearDown(capture.close);
@@ -524,17 +561,24 @@ void main() {
               capture.baseEndpoint.replace(path: '/acp-server/codex'),
         );
 
-        await transport.executeTask(
-          _taskRequest(
-            target: AssistantExecutionTarget.agent,
-            provider: SingleAgentProvider.codex,
+        await expectLater(
+          transport.executeTask(
+            _taskRequest(
+              target: AssistantExecutionTarget.agent,
+              provider: SingleAgentProvider.codex,
+            ),
+            onUpdate: (_) {},
           ),
-          onUpdate: (_) {},
+          throwsA(
+            isA<GatewayAcpException>().having(
+              (error) => error.code,
+              'code',
+              'ACP_HTTP_ENDPOINT_MISSING',
+            ),
+          ),
         );
 
-        expect(capture.authorizationHeader, 'Bearer bridge-token');
-        expect(capture.requestPath, '/acp/rpc');
-        expect(capture.requestPath, isNot(contains('/acp-server')));
+        expect(capture.requestBodies, isEmpty);
       },
     );
 

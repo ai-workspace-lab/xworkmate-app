@@ -2,7 +2,7 @@
 
 ## 1. 架构概览 (Unified Routing Architecture)
 
-当前系统采用 `xworkmate-bridge.svc.plus` 作为统一入口。App 侧只通过 managed bridge ACP 主入口发送任务，provider / gateway 的 public mapping 由 bridge 后端拥有。
+当前系统采用 `xworkmate-bridge.svc.plus` 作为统一入口。App 侧只通过 managed bridge ACP 主入口发送任务，provider / gateway 的执行地址由 bridge 后端内部拥有，不暴露为 App-facing public mapping。
 
 ```mermaid
 graph TD
@@ -16,10 +16,10 @@ graph TD
 
     subgraph "Bridge-owned Routing"
         ManagedBridge["Managed Bridge ACP<br/>/acp/rpc"]
-        CodexProvider["Codex map<br/>/acp-server/codex"]
-        OpenCodeProvider["OpenCode map<br/>/acp-server/opencode"]
-        GeminiAdapter["Gemini map<br/>/acp-server/gemini"]
-        OpenClawGateway["OpenClaw map<br/>/gateway/openclaw"]
+        CodexProvider["Codex internal runtime"]
+        OpenCodeProvider["OpenCode internal runtime"]
+        GeminiAdapter["Gemini internal runtime"]
+        OpenClawGateway["OpenClaw internal runtime"]
     end
 
     %% Routing Rules
@@ -40,10 +40,8 @@ graph TD
 | Bridge-owned mapping | App 侧行为 | 备注 |
 | :--- | :--- | :--- |
 | `/acp/rpc` | 直接调用 | Managed Bridge ACP 主入口，提供能力发现与任务发送 |
-| `/acp-server/codex` | 不直连 | Bridge 后端映射至 Codex Provider |
-| `/acp-server/opencode` | 不直连 | Bridge 后端映射至 OpenCode Provider |
-| `/acp-server/gemini` | 不直连 | Bridge 后端映射至 Gemini Adapter |
-| `/gateway/openclaw` | 不直连 | Bridge 后端映射至 OpenClaw Gateway |
+| provider runtime | 不直连 | Bridge 后端内部解析 provider |
+| gateway runtime | 不直连 | Bridge 后端内部解析 gateway provider |
 
 ## 3. 运维配置优化
 
