@@ -122,6 +122,22 @@ void main() {
       },
     );
 
+    test(
+      'labels gateway offline errors as OpenClaw runtime failures',
+      () async {
+        final controller = await _isolatedController();
+        addTearDown(controller.dispose);
+
+        final label = controller.gatewayExecutionErrorLabelInternal(
+          'gateway not connected',
+          target: AssistantExecutionTarget.gateway,
+        );
+
+        expect(label, contains('OpenClaw Gateway 当前未连接'));
+        expect(label, isNot(contains('xworkmate-bridge 未连接')));
+      },
+    );
+
     test('keeps signed-out generic runtime failures disconnected', () async {
       final controller = await _isolatedController();
       addTearDown(controller.dispose);
