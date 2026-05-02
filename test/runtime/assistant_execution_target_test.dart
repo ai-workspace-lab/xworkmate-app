@@ -113,7 +113,9 @@ void main() {
     test(
       'returns unspecified when a saved provider is no longer in the current catalog',
       () {
-        final controller = AppController(environmentOverride: const <String, String>{});
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+        );
         addTearDown(controller.dispose);
 
         final unavailableProvider = controller
@@ -206,7 +208,8 @@ void main() {
 
         expect(routing.mode, ExternalCodeAgentAcpRoutingMode.explicit);
         expect(routing.explicitExecutionTarget, 'gateway');
-        expect(routing.explicitProviderId, 'openclaw');
+        expect(routing.preferredGatewayTarget, 'openclaw');
+        expect(routing.explicitProviderId, '');
       },
     );
 
@@ -315,6 +318,8 @@ void main() {
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.agent,
         );
+        controller.bridgeCapabilitiesRefreshAttemptedInternal = true;
+        controller.bridgeCapabilitiesRefreshErrorInternal = '';
         await Future<void>.delayed(const Duration(milliseconds: 200));
 
         expect(controller.assistantProviderCatalog, isEmpty);
@@ -484,6 +489,8 @@ void main() {
           AssistantExecutionTarget.agent,
         );
         await Future<void>.delayed(const Duration(milliseconds: 200));
+        controller.bridgeCapabilitiesRefreshAttemptedInternal = true;
+        controller.bridgeCapabilitiesRefreshErrorInternal = '';
 
         await expectLater(
           controller.sendChatMessage('hi'),
@@ -491,14 +498,17 @@ void main() {
             isA<StateError>().having(
               (error) => error.message,
               'message',
-              contains('正在加载 Bridge 能力'),
+              contains('Gateway ACP 未报告可用的 provider'),
             ),
           ),
         );
 
         expect(fakeGoTaskService.executeCount, 0);
         expect(capture.requestCount, lessThanOrEqualTo(2));
-        expect(controller.chatMessages.last.text, contains('正在加载 Bridge 能力'));
+        expect(
+          controller.chatMessages.last.text,
+          contains('Gateway ACP 未报告可用的 provider'),
+        );
       },
     );
   });

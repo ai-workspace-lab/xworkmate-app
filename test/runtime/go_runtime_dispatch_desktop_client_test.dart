@@ -30,7 +30,7 @@ void main() {
 
     expect(capture.method, 'xworkmate.routing.resolve');
     expect(capture.body, contains('"routingMode":"auto"'));
-    expect(capture.body, contains('"preferredGatewayTarget":"codex"'));
+    expect(capture.body, contains('"preferredGatewayProviderId":"codex"'));
   });
 }
 

@@ -240,6 +240,9 @@ class AppController extends ChangeNotifier {
     bridgeAvailableExecutionTargetsInternal = compactAssistantExecutionTargets(
       initialAvailableExecutionTargets ?? const <AssistantExecutionTarget>[],
     );
+    bridgeCapabilitiesRefreshAttemptedInternal =
+        bridgeAgentProviderCatalogInternal.isNotEmpty ||
+        bridgeGatewayProviderCatalogInternal.isNotEmpty;
 
     attachChildListenersInternal();
     unawaited(initializeInternal());
@@ -308,6 +311,8 @@ class AppController extends ChangeNotifier {
       const <SingleAgentProvider>[];
   List<AssistantExecutionTarget> bridgeAvailableExecutionTargetsInternal =
       const <AssistantExecutionTarget>[];
+  bool bridgeCapabilitiesRefreshAttemptedInternal = false;
+  String bridgeCapabilitiesRefreshErrorInternal = '';
   final Map<String, List<GatewayChatMessage>> assistantThreadMessagesInternal =
       <String, List<GatewayChatMessage>>{};
   late final DesktopTaskThreadRepository taskThreadRepositoryInternal =
