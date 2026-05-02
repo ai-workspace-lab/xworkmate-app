@@ -55,6 +55,9 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
   required AccountSyncState? accountSyncState,
   required bool accountSignedIn,
   required bool bridgeConfigured,
+  bool bridgeDiscoveryAttempted = false,
+  String bridgeDiscoveryError = '',
+  bool providerCatalogEmpty = false,
 }) {
   if (bridgeReady) {
     return AssistantThreadConnectionState(
@@ -114,14 +117,41 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
     );
   }
 
+  final discoveryError = bridgeDiscoveryError.trim();
+  if (bridgeConfigured && bridgeDiscoveryAttempted) {
+    final status = RuntimeConnectionStatus.error;
+    final detailLabel = discoveryError.isNotEmpty
+        ? discoveryError
+        : providerCatalogEmpty
+        ? appText(
+            'Gateway ACP 未报告可用的 provider',
+            'Gateway ACP did not report a usable provider',
+          )
+        : appText(
+            'xworkmate-bridge 连接失败',
+            'xworkmate-bridge connection failed',
+          );
+    return AssistantThreadConnectionState(
+      executionTarget: target,
+      status: status,
+      primaryLabel: appText('连接失败', 'Connection Failed'),
+      detailLabel: detailLabel,
+      ready: false,
+      gatewayTokenMissing: false,
+      lastError: detailLabel,
+    );
+  }
+
   // BridgeDiscovering logic (Signed in, not blocked, but not ready yet)
   if (bridgeConfigured) {
     return AssistantThreadConnectionState(
       executionTarget: target,
       status: RuntimeConnectionStatus.offline,
       primaryLabel: appText('正在发现', 'Discovering'),
-      detailLabel:
-          appText('正在加载 Bridge 能力...', 'Loading Bridge capabilities...'),
+      detailLabel: appText(
+        '正在加载 Bridge 能力...',
+        'Loading Bridge capabilities...',
+      ),
       ready: false,
       gatewayTokenMissing: false,
       lastError: null,
@@ -133,7 +163,10 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
     executionTarget: target,
     status: RuntimeConnectionStatus.offline,
     primaryLabel: RuntimeConnectionStatus.offline.label,
-    detailLabel: appText('xworkmate-bridge 未连接', 'xworkmate-bridge is not connected'),
+    detailLabel: appText(
+      'xworkmate-bridge 未连接',
+      'xworkmate-bridge is not connected',
+    ),
     ready: false,
     gatewayTokenMissing: false,
     lastError: null,
@@ -343,6 +376,9 @@ extension AppControllerDesktopThreadSessions on AppController {
       accountSyncState: settingsControllerInternal.accountSyncState,
       accountSignedIn: settingsControllerInternal.accountSignedIn,
       bridgeConfigured: bridgeConfigured,
+      bridgeDiscoveryAttempted: bridgeCapabilitiesRefreshAttemptedInternal,
+      bridgeDiscoveryError: bridgeCapabilitiesRefreshErrorInternal,
+      providerCatalogEmpty: providers.isEmpty,
     );
   }
 
