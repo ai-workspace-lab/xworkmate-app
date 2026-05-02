@@ -230,6 +230,12 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (lowered.contains('gateway not connected') ||
         lowered.contains('code: offline') ||
         lowered.contains('offlin') && lowered.contains('gateway')) {
+      if (target.isGateway) {
+        return appText(
+          'OpenClaw Gateway 当前未连接。请确认 xworkmate-bridge 节点本机 127.0.0.1:18789 可用后重试。',
+          'OpenClaw Gateway is not connected. Confirm the xworkmate-bridge host can reach 127.0.0.1:18789, then try again.',
+        );
+      }
       final profile = gatewayProfileForAssistantExecutionTargetInternal(target);
       final address = gatewayAddressLabelInternal(profile);
       return address == appText('未连接目标', 'No target')
