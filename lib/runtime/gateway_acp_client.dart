@@ -680,12 +680,15 @@ class GatewayAcpClient {
   }) {
     final base = 'ACP HTTP request failed ($statusCode)';
     final normalizedType = contentType.trim();
+    final detail = _extractErrorDetail(body);
     if (normalizedType.isNotEmpty &&
         !_contentTypeLooksJsonOrSse(normalizedType)) {
+      if (detail.isNotEmpty) {
+        return '$base · $detail · unexpected content type: $normalizedType';
+      }
       return '$base · unexpected content type: $normalizedType';
     }
 
-    final detail = _extractErrorDetail(body);
     if (detail.isNotEmpty) {
       return '$base · $detail';
     }

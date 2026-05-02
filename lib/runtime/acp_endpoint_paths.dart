@@ -23,6 +23,27 @@ class AcpEndpointPaths {
     );
   }
 
+  static bool isProviderMappingPath(String rawPath) {
+    var path = rawPath.trim();
+    if (path.isEmpty || path == '/') {
+      return false;
+    }
+    if (!path.startsWith('/')) {
+      path = '/$path';
+    }
+    path = path.replaceFirst(RegExp(r'/+$'), '');
+    if (path.endsWith('/acp/rpc')) {
+      path = path.substring(0, path.length - '/acp/rpc'.length);
+    } else if (path.endsWith('/acp')) {
+      path = path.substring(0, path.length - '/acp'.length);
+    }
+    path = path.replaceFirst(RegExp(r'/+$'), '');
+    return path == '/acp-server' ||
+        path.startsWith('/acp-server/') ||
+        path == '/gateway' ||
+        path.startsWith('/gateway/');
+  }
+
   static String _normalizeBasePath(String rawPath) {
     var path = rawPath.trim();
     if (path.isEmpty || path == '/') {
@@ -44,18 +65,15 @@ class AcpEndpointPaths {
     }
 
     path = path.replaceFirst(RegExp(r'/+$'), '');
-    if (path == '/acp-server' ||
-        path.startsWith('/acp-server/') ||
-        path == '/gateway' ||
-        path.startsWith('/gateway/')) {
-      return '';
-    }
     return path == '/' ? '' : path;
   }
 }
 
 Uri? resolveAcpWebSocketEndpoint(Uri? endpoint) {
   if (endpoint == null || endpoint.host.trim().isEmpty) {
+    return null;
+  }
+  if (AcpEndpointPaths.isProviderMappingPath(endpoint.path)) {
     return null;
   }
   final scheme = endpoint.scheme.trim().toLowerCase();
@@ -74,6 +92,9 @@ Uri? resolveAcpWebSocketEndpoint(Uri? endpoint) {
 
 Uri? resolveAcpHttpRpcEndpoint(Uri? endpoint) {
   if (endpoint == null || endpoint.host.trim().isEmpty) {
+    return null;
+  }
+  if (AcpEndpointPaths.isProviderMappingPath(endpoint.path)) {
     return null;
   }
   final scheme = endpoint.scheme.trim().toLowerCase();
