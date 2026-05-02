@@ -173,6 +173,18 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
   );
 }
 
+bool bridgeCapabilityReadyForExecutionTargetInternal({
+  required AssistantExecutionTarget target,
+  required bool bridgeConfigured,
+  required List<SingleAgentProvider> providers,
+  required List<AssistantExecutionTarget> availableTargets,
+}) {
+  if (!bridgeConfigured || providers.isEmpty) {
+    return false;
+  }
+  return availableTargets.isEmpty || availableTargets.contains(target);
+}
+
 extension AppControllerDesktopThreadSessions on AppController {
   AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordsInternal(
     TaskThread? primaryRecord, {
@@ -361,10 +373,12 @@ extension AppControllerDesktopThreadSessions on AppController {
     final providers = providerCatalogForExecutionTarget(target);
     final availableTargets = bridgeAvailableExecutionTargets;
     final bridgeConfigured = isBridgeAcpRuntimeConfiguredInternal();
-    final bridgeReady =
-        bridgeConfigured &&
-        providers.isNotEmpty &&
-        (availableTargets.isEmpty || availableTargets.contains(target));
+    final bridgeReady = bridgeCapabilityReadyForExecutionTargetInternal(
+      target: target,
+      bridgeConfigured: bridgeConfigured,
+      providers: providers,
+      availableTargets: availableTargets,
+    );
     final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
     final bridgeLabel = bridgeEndpoint?.host.trim().isNotEmpty == true
         ? bridgeEndpoint!.host.trim()
@@ -380,6 +394,26 @@ extension AppControllerDesktopThreadSessions on AppController {
       bridgeDiscoveryError: bridgeCapabilitiesRefreshErrorInternal,
       providerCatalogEmpty: providers.isEmpty,
     );
+  }
+
+  bool bridgeCapabilityReadyForAssistantTargetInternal(
+    AssistantExecutionTarget target,
+  ) {
+    return bridgeCapabilityReadyForExecutionTargetInternal(
+      target: target,
+      bridgeConfigured: isBridgeAcpRuntimeConfiguredInternal(),
+      providers: providerCatalogForExecutionTarget(target),
+      availableTargets: bridgeAvailableExecutionTargets,
+    );
+  }
+
+  bool bridgeCapabilityRefreshNeededForAssistantTargetInternal(
+    AssistantExecutionTarget target,
+  ) {
+    if (!isBridgeAcpRuntimeConfiguredInternal()) {
+      return false;
+    }
+    return !bridgeCapabilityReadyForAssistantTargetInternal(target);
   }
 
   String get assistantConnectionStatusLabel =>

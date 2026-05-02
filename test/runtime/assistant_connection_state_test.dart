@@ -54,6 +54,74 @@ void main() {
       },
     );
 
+    test(
+      'uses the same gateway capability readiness for status and send guard',
+      () async {
+        final controller = await _isolatedController(
+          initialBridgeProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+          ],
+          initialGatewayProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.openclaw,
+          ],
+          initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.agent,
+            AssistantExecutionTarget.gateway,
+          ],
+          environmentOverride: const <String, String>{
+            'BRIDGE_AUTH_TOKEN': 'bridge-token',
+          },
+        );
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('session-1');
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+
+        final state = controller.currentAssistantConnectionState;
+        expect(state.connected, isTrue);
+        expect(
+          controller.bridgeCapabilityRefreshNeededForAssistantTargetInternal(
+            AssistantExecutionTarget.gateway,
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'refreshes gateway capabilities when previous discovery missed openclaw',
+      () async {
+        final controller = await _isolatedController(
+          initialBridgeProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+          ],
+          initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.agent,
+            AssistantExecutionTarget.gateway,
+          ],
+          environmentOverride: const <String, String>{
+            'BRIDGE_AUTH_TOKEN': 'bridge-token',
+          },
+        );
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('session-1');
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+
+        expect(controller.currentAssistantConnectionState.connected, isFalse);
+        expect(
+          controller.bridgeCapabilityRefreshNeededForAssistantTargetInternal(
+            AssistantExecutionTarget.gateway,
+          ),
+          isTrue,
+        );
+      },
+    );
+
     test('keeps signed-out generic runtime failures disconnected', () async {
       final controller = await _isolatedController();
       addTearDown(controller.dispose);
@@ -221,6 +289,7 @@ Future<AppController> _isolatedController({
   List<SingleAgentProvider>? initialBridgeProviderCatalog,
   List<SingleAgentProvider>? initialGatewayProviderCatalog,
   List<AssistantExecutionTarget>? initialAvailableExecutionTargets,
+  Map<String, String> environmentOverride = const <String, String>{},
 }) async {
   final storeRoot = await Directory.systemTemp.createTemp(
     'xworkmate-assistant-connection-state-',
@@ -242,7 +311,7 @@ Future<AppController> _isolatedController({
   );
   await store.initialize();
   return AppController(
-          environmentOverride: const <String, String>{},
+    environmentOverride: environmentOverride,
     store: store,
     initialBridgeProviderCatalog: initialBridgeProviderCatalog,
     initialGatewayProviderCatalog: initialGatewayProviderCatalog,
