@@ -546,7 +546,7 @@ class GatewayAcpClient {
     Uri? endpointOverride,
     String authorizationOverride = '',
   }) async {
-    final endpoint = _resolveHttpRpcEndpoint(endpointOverride);
+    final endpoint = _resolveHttpRpcEndpoint(endpointOverride, request.method);
     if (endpoint == null) {
       throw const GatewayAcpException(
         'Missing ACP HTTP endpoint',
@@ -1046,8 +1046,17 @@ class GatewayAcpClient {
     return const <String, dynamic>{};
   }
 
-  Uri? _resolveHttpRpcEndpoint([Uri? endpointOverride]) {
-    return resolveAcpHttpRpcEndpoint(endpointOverride ?? endpointResolver());
+  Uri? _resolveHttpRpcEndpoint([Uri? endpointOverride, String method = '']) {
+    final endpoint = endpointOverride ?? endpointResolver();
+    if (_isOpenClawTaskSubmitEndpoint(endpoint) &&
+        _isOpenClawTaskSubmitMethod(method)) {
+      return endpoint?.replace(
+        path: '/gateway/openclaw',
+        query: null,
+        fragment: null,
+      );
+    }
+    return resolveAcpHttpRpcEndpoint(endpoint);
   }
 
   String _nextRequestId(String method) {
@@ -1103,6 +1112,20 @@ class GatewayAcpClient {
     }
     throw const FormatException('Unterminated JSON document');
   }
+}
+
+bool _isOpenClawTaskSubmitEndpoint(Uri? endpoint) {
+  var path = endpoint?.path.trim() ?? '';
+  if (!path.startsWith('/')) {
+    path = '/$path';
+  }
+  path = path.replaceFirst(RegExp(r'/+$'), '');
+  return path == '/gateway/openclaw';
+}
+
+bool _isOpenClawTaskSubmitMethod(String method) {
+  final normalized = method.trim();
+  return normalized == 'session.start' || normalized == 'session.message';
 }
 
 class _GatewayAcpRpcRequest {

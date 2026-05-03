@@ -11,15 +11,12 @@ void main() {
       expect(endpoint.toString(), 'https://xworkmate-bridge.svc.plus/acp/rpc');
     });
 
-    test('keeps OpenClaw gateway submit path as HTTP endpoint', () {
+    test('rejects OpenClaw gateway submit path as a global ACP base', () {
       final endpoint = resolveAcpHttpRpcEndpoint(
         Uri.parse('https://xworkmate-bridge.svc.plus/gateway/openclaw'),
       );
 
-      expect(
-        endpoint.toString(),
-        'https://xworkmate-bridge.svc.plus/gateway/openclaw',
-      );
+      expect(endpoint, isNull);
     });
 
     test('rejects provider mapping paths as app RPC bases', () {

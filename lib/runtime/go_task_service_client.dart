@@ -425,7 +425,11 @@ class GoTaskServiceArtifact {
       contentType: json['contentType']?.toString().trim() ?? '',
       encoding: json['encoding']?.toString().trim() ?? '',
       content: json['content']?.toString() ?? '',
-      downloadUrl: json['downloadUrl']?.toString().trim() ?? '',
+      downloadUrl:
+          json['downloadUrl']?.toString().trim() ??
+          json['downloadURL']?.toString().trim() ??
+          json['download_url']?.toString().trim() ??
+          '',
       sizeBytes: parseSize(json['sizeBytes'] ?? json['size']),
       sha256: json['sha256']?.toString().trim() ?? '',
     );
