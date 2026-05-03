@@ -94,6 +94,17 @@ Uri? resolveAcpHttpRpcEndpoint(Uri? endpoint) {
   if (endpoint == null || endpoint.host.trim().isEmpty) {
     return null;
   }
+  if (_isGatewayOpenClawPath(endpoint.path)) {
+    final scheme = endpoint.scheme.trim().toLowerCase();
+    if (scheme != 'http' && scheme != 'https') {
+      return null;
+    }
+    return endpoint.replace(
+      path: '/gateway/openclaw',
+      query: null,
+      fragment: null,
+    );
+  }
   if (AcpEndpointPaths.isProviderMappingPath(endpoint.path)) {
     return null;
   }
@@ -103,4 +114,13 @@ Uri? resolveAcpHttpRpcEndpoint(Uri? endpoint) {
   }
   final paths = AcpEndpointPaths.fromBaseEndpoint(endpoint);
   return endpoint.replace(path: paths.httpRpcPath, query: null, fragment: null);
+}
+
+bool _isGatewayOpenClawPath(String rawPath) {
+  var path = rawPath.trim();
+  if (!path.startsWith('/')) {
+    path = '/$path';
+  }
+  path = path.replaceFirst(RegExp(r'/+$'), '');
+  return path == '/gateway/openclaw';
 }

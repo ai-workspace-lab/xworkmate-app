@@ -10,7 +10,9 @@ void main() {
   test(
     'keeps local workspace binding separate from remote execution workspace',
     () {
-      final controller = AppController(environmentOverride: const <String, String>{});
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
       addTearDown(controller.dispose);
 
       final localWorkspace = Directory.systemTemp.createTempSync(
@@ -62,7 +64,9 @@ void main() {
   );
 
   test('writes inline ACP artifacts into the local thread workspace', () async {
-    final controller = AppController(environmentOverride: const <String, String>{});
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
     addTearDown(controller.dispose);
 
     final localWorkspace = await Directory.systemTemp.createTemp(

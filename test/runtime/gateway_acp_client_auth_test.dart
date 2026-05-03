@@ -583,7 +583,7 @@ void main() {
     );
 
     test(
-      'desktop task execution routes OpenClaw through bridge RPC with gateway params',
+      'desktop task execution routes OpenClaw through dedicated bridge gateway path',
       () async {
         final capture = await _startAcpHttpServer();
         addTearDown(capture.close);
@@ -595,7 +595,8 @@ void main() {
         final transport = ExternalCodeAgentAcpDesktopTransport(
           client: client,
           endpointResolver: (_) => capture.baseEndpoint,
-          taskEndpointResolver: (_) => capture.baseEndpoint,
+          taskEndpointResolver: (_) =>
+              capture.baseEndpoint.replace(path: '/gateway/openclaw'),
         );
 
         await transport.executeTask(
@@ -607,10 +608,9 @@ void main() {
         );
 
         expect(capture.authorizationHeader, 'Bearer bridge-token');
-        expect(capture.requestPath, '/acp/rpc');
+        expect(capture.requestPath, '/gateway/openclaw');
         expect(capture.requestPath, isNot(contains('/acp-server')));
         expect(capture.requestPath, isNot(contains('/acp-server/gateway')));
-        expect(capture.requestPath, isNot(contains('/gateway/openclaw')));
         final params = _lastRequestParams(capture);
         final routing = params['routing'] as Map<String, dynamic>;
         expect(params.containsKey('gatewayProvider'), isFalse);

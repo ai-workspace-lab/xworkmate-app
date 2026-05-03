@@ -609,21 +609,19 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
 
     var wroteArtifact = false;
     for (final artifact in artifacts) {
-      if (!artifact.hasInlineContent) {
-        continue;
-      }
       final relativePath = _sanitizeArtifactRelativePathInternal(
         artifact.relativePath,
       );
       if (relativePath.isEmpty) {
         continue;
       }
+      final bytes = await artifactBytesInternal(artifact);
+      if (bytes == null) {
+        continue;
+      }
       final target = await _nextArtifactTargetFileInternal(root, relativePath);
       await target.parent.create(recursive: true);
-      await target.writeAsBytes(
-        _decodeArtifactContentInternal(artifact),
-        flush: true,
-      );
+      await target.writeAsBytes(bytes, flush: true);
       wroteArtifact = true;
     }
 
@@ -633,6 +631,51 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       lastArtifactSyncStatus: wroteArtifact ? 'synced' : 'no-inline-content',
       updatedAtMs: syncedAtMs,
     );
+  }
+
+  Future<List<int>?> artifactBytesInternal(
+    GoTaskServiceArtifact artifact,
+  ) async {
+    if (artifact.hasInlineContent) {
+      return _decodeArtifactContentInternal(artifact);
+    }
+    final rawDownloadUrl = artifact.downloadUrl.trim();
+    if (rawDownloadUrl.isEmpty) {
+      return null;
+    }
+    final uri = Uri.tryParse(rawDownloadUrl);
+    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+      return null;
+    }
+    final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
+    final sameBridgeHost =
+        bridgeEndpoint != null &&
+        uri.host.trim().toLowerCase() ==
+            bridgeEndpoint.host.trim().toLowerCase();
+    if (!sameBridgeHost) {
+      return null;
+    }
+    final authorization = await resolveGatewayAcpAuthorizationHeaderInternal(
+      uri,
+    );
+    if (authorization == null || authorization.trim().isEmpty) {
+      return null;
+    }
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(uri);
+      request.headers.set(HttpHeaders.authorizationHeader, authorization);
+      final response = await request.close();
+      if (response.statusCode != HttpStatus.ok) {
+        return null;
+      }
+      return response.fold<List<int>>(
+        <int>[],
+        (buffer, chunk) => buffer..addAll(chunk),
+      );
+    } finally {
+      client.close(force: true);
+    }
   }
 
   Uri? resolveGatewayAcpEndpointInternal() {
@@ -677,7 +720,14 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   Uri? resolveExternalAcpEndpointForRequestInternal(
     GoTaskServiceRequest request,
   ) {
-    return resolveBridgeAcpEndpointInternal();
+    final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
+    if (bridgeEndpoint == null) {
+      return null;
+    }
+    if (request.target.isGateway) {
+      return bridgeEndpoint.replace(path: '/gateway/openclaw');
+    }
+    return bridgeEndpoint;
   }
 
   Uri? gatewayProfileBaseUriInternal(GatewayConnectionProfile profile) {
