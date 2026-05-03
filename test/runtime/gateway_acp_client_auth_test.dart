@@ -626,6 +626,91 @@ void main() {
     );
 
     test(
+      'desktop OpenClaw follow-up routes through dedicated bridge gateway path',
+      () async {
+        final capture = await _startAcpHttpServer();
+        addTearDown(capture.close);
+        final client = GatewayAcpClient(
+          endpointResolver: () => capture.baseEndpoint,
+          authorizationResolver: (_) async => 'bridge-token',
+        );
+
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: client,
+          endpointResolver: (_) => capture.baseEndpoint,
+          taskEndpointResolver: (_) =>
+              capture.baseEndpoint.replace(path: '/gateway/openclaw'),
+        );
+
+        await transport.executeTask(
+          _taskRequest(
+            target: AssistantExecutionTarget.gateway,
+            provider: SingleAgentProvider.openclaw,
+            resumeSession: true,
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(capture.requestPath, '/gateway/openclaw');
+        expect(capture.requestBody, contains('"method":"session.message"'));
+      },
+    );
+
+    test(
+      'desktop controller only uses gateway path for OpenClaw task submit',
+      () {
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+        );
+        addTearDown(controller.dispose);
+
+        final openClawStart = controller
+            .resolveExternalAcpEndpointForRequestInternal(
+              _taskRequest(
+                target: AssistantExecutionTarget.gateway,
+                provider: SingleAgentProvider.openclaw,
+              ),
+            );
+        final openClawFollowUp = controller
+            .resolveExternalAcpEndpointForRequestInternal(
+              _taskRequest(
+                target: AssistantExecutionTarget.gateway,
+                provider: SingleAgentProvider.openclaw,
+                resumeSession: true,
+              ),
+            );
+        final unspecifiedGateway = controller
+            .resolveExternalAcpEndpointForRequestInternal(
+              _taskRequest(
+                target: AssistantExecutionTarget.gateway,
+                provider: SingleAgentProvider.unspecified,
+              ),
+            );
+        final multiAgentGateway = controller
+            .resolveExternalAcpEndpointForRequestInternal(
+              _taskRequest(
+                target: AssistantExecutionTarget.gateway,
+                provider: SingleAgentProvider.openclaw,
+                multiAgent: true,
+              ),
+            );
+        final agentTask = controller
+            .resolveExternalAcpEndpointForRequestInternal(
+              _taskRequest(
+                target: AssistantExecutionTarget.agent,
+                provider: SingleAgentProvider.codex,
+              ),
+            );
+
+        expect(openClawStart?.path, '/gateway/openclaw');
+        expect(openClawFollowUp?.path, '/gateway/openclaw');
+        expect(unspecifiedGateway?.path, '');
+        expect(multiAgentGateway?.path, '');
+        expect(agentTask?.path, '');
+      },
+    );
+
+    test(
       'desktop task execution uses session.start for new sessions',
       () async {
         final capture = await _startAcpHttpServer();
@@ -857,6 +942,7 @@ GoTaskServiceRequest _taskRequest({
   required AssistantExecutionTarget target,
   required SingleAgentProvider provider,
   bool resumeSession = false,
+  bool multiAgent = false,
   String remoteWorkingDirectoryHint = '',
 }) {
   return GoTaskServiceRequest(
@@ -875,6 +961,7 @@ GoTaskServiceRequest _taskRequest({
     provider: provider,
     remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
     resumeSession: resumeSession,
+    multiAgent: multiAgent,
   );
 }
 

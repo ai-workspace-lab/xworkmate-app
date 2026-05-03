@@ -655,9 +655,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (!sameBridgeHost) {
       return null;
     }
-    final authorization = await resolveGatewayAcpAuthorizationHeaderInternal(
-      uri,
-    );
+    final authorization =
+        await resolveBridgeArtifactAuthorizationHeaderInternal(uri);
     if (authorization == null || authorization.trim().isEmpty) {
       return null;
     }
@@ -724,7 +723,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (bridgeEndpoint == null) {
       return null;
     }
-    if (request.target.isGateway) {
+    if (_usesOpenClawTaskSubmitEndpointInternal(request)) {
       return bridgeEndpoint.replace(path: '/gateway/openclaw');
     }
     return bridgeEndpoint;
@@ -769,6 +768,30 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     return null;
   }
 
+  Future<String?> resolveBridgeArtifactAuthorizationHeaderInternal(
+    Uri endpoint,
+  ) async {
+    final normalizedHost = endpoint.host.trim().toLowerCase();
+    final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
+    final bridgeHost = bridgeEndpoint?.host.trim().toLowerCase() ?? '';
+    if (bridgeHost.isEmpty || normalizedHost != bridgeHost) {
+      return null;
+    }
+
+    final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
+    if (envToken != null && envToken.isNotEmpty) {
+      return _normalizeAuthorizationHeaderInternal(envToken);
+    }
+
+    final bridgeToken = (await storeInternal.loadAccountManagedSecret(
+      target: kAccountManagedSecretTargetBridgeAuthToken,
+    ))?.trim();
+    if (bridgeToken?.isNotEmpty == true) {
+      return _normalizeAuthorizationHeaderInternal(bridgeToken!);
+    }
+    return null;
+  }
+
   int? gatewayProfileIndexMatchingEndpointInternal(Uri endpoint) {
     final normalizedHost = endpoint.host.trim().toLowerCase();
     final normalizedScheme = endpoint.scheme.trim().toLowerCase();
@@ -801,6 +824,34 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   int gatewayProfileIndexForExecutionTargetInternal(
     AssistantExecutionTarget target,
   ) => kGatewayRemoteProfileIndex;
+}
+
+bool _usesOpenClawTaskSubmitEndpointInternal(GoTaskServiceRequest request) {
+  if (request.isMultiAgentRequest || !request.target.isGateway) {
+    return false;
+  }
+  return normalizeSingleAgentProviderId(request.provider.providerId) ==
+      kCanonicalGatewayProviderId;
+}
+
+String _normalizeAuthorizationHeaderInternal(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) {
+    return '';
+  }
+  if (_looksLikeAuthorizationHeaderInternal(trimmed)) {
+    return trimmed;
+  }
+  return 'Bearer $trimmed';
+}
+
+bool _looksLikeAuthorizationHeaderInternal(String raw) {
+  final separatorIndex = raw.indexOf(RegExp(r'\s'));
+  if (separatorIndex <= 0 || separatorIndex >= raw.length - 1) {
+    return false;
+  }
+  final scheme = raw.substring(0, separatorIndex);
+  return RegExp(r"^[A-Za-z][A-Za-z0-9!#$%&'*+.^_`|~-]*$").hasMatch(scheme);
 }
 
 String _sanitizeArtifactRelativePathInternal(String raw) {
