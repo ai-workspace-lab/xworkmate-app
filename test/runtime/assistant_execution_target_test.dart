@@ -393,7 +393,7 @@ void main() {
     );
 
     test(
-      'sendChatMessage refreshes capabilities and fails locally when agent provider catalog stays empty',
+      'sendChatMessage surfaces managed bridge auth failure before agent provider dispatch',
       () async {
         final capture = await _startEmptyCapabilityServer();
         addTearDown(capture.close);
@@ -498,16 +498,22 @@ void main() {
             isA<StateError>().having(
               (error) => error.message,
               'message',
-              contains('Gateway ACP 未报告可用的 provider'),
+              anyOf(
+                contains('ACP_HTTP_401'),
+                contains('请先登录 svc.plus'),
+              ),
             ),
           ),
         );
 
         expect(fakeGoTaskService.executeCount, 0);
-        expect(capture.requestCount, lessThanOrEqualTo(2));
+        expect(capture.requestCount, 0);
         expect(
           controller.chatMessages.last.text,
-          contains('Gateway ACP 未报告可用的 provider'),
+          anyOf(
+            contains('ACP_HTTP_401'),
+            contains('请先登录 svc.plus'),
+          ),
         );
       },
     );
