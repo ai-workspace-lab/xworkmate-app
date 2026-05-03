@@ -11,16 +11,23 @@ void main() {
       expect(endpoint.toString(), 'https://xworkmate-bridge.svc.plus/acp/rpc');
     });
 
+    test('keeps OpenClaw gateway submit path as HTTP endpoint', () {
+      final endpoint = resolveAcpHttpRpcEndpoint(
+        Uri.parse('https://xworkmate-bridge.svc.plus/gateway/openclaw'),
+      );
+
+      expect(
+        endpoint.toString(),
+        'https://xworkmate-bridge.svc.plus/gateway/openclaw',
+      );
+    });
+
     test('rejects provider mapping paths as app RPC bases', () {
       final codexEndpoint = resolveAcpHttpRpcEndpoint(
         Uri.parse('https://xworkmate-bridge.svc.plus/acp-server/codex'),
       );
-      final gatewayEndpoint = resolveAcpHttpRpcEndpoint(
-        Uri.parse('https://xworkmate-bridge.svc.plus/gateway/openclaw'),
-      );
 
       expect(codexEndpoint, isNull);
-      expect(gatewayEndpoint, isNull);
     });
 
     test('rejects provider mapping paths even when ACP suffix is present', () {
