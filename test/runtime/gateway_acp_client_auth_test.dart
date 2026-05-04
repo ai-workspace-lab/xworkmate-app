@@ -711,6 +711,31 @@ void main() {
     );
 
     test(
+      'desktop controller resolves OpenClaw gateway submit on managed bridge origin',
+      () {
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+        );
+        addTearDown(controller.dispose);
+
+        final endpoint = controller
+            .resolveExternalAcpEndpointForRequestInternal(
+              _taskRequest(
+                target: AssistantExecutionTarget.gateway,
+                provider: SingleAgentProvider.openclaw,
+              ),
+            );
+
+        expect(
+          endpoint.toString(),
+          'https://xworkmate-bridge.svc.plus/gateway/openclaw',
+        );
+        expect(endpoint, isNotNull);
+        expect(endpoint!.path, isNot('/acp/rpc'));
+      },
+    );
+
+    test(
       'desktop task execution uses session.start for new sessions',
       () async {
         final capture = await _startAcpHttpServer();
