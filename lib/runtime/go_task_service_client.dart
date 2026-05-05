@@ -723,8 +723,8 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
       .map((item) => item['id']?.toString().trim() ?? '')
       .where((item) => item.isNotEmpty)
       .toList(growable: false);
+  final success = _boolValue(result['success']) ?? true;
   final fallbackFailureText = () {
-    final success = _boolValue(result['success']) ?? true;
     if (success) {
       return '';
     }
@@ -751,12 +751,20 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
               ? streamedText.trim()
               : '')
           .trim();
+  final directErrorMessage = result['error']?.toString().trim() ?? '';
+  final effectiveErrorMessage = success
+      ? directErrorMessage
+      : fallbackFailureText.isNotEmpty
+      ? fallbackFailureText
+      : primaryText.isNotEmpty
+      ? primaryText
+      : directErrorMessage;
   return GoTaskServiceResult(
-    success: _boolValue(result['success']) ?? true,
+    success: success,
     message: primaryText,
     turnId: result['turnId']?.toString().trim() ?? '',
     raw: result,
-    errorMessage: result['error']?.toString() ?? '',
+    errorMessage: effectiveErrorMessage,
     resolvedModel:
         result['model']?.toString().trim() ??
         result['resolvedModel']?.toString().trim() ??
