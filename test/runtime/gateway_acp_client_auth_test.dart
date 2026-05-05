@@ -79,6 +79,22 @@ void main() {
 
       expect(result.success, isFalse);
       expect(result.message, 'codex returned no displayable output');
+      expect(result.errorMessage, 'codex returned no displayable output');
+    });
+
+    test('uses bridge failure message when error field is absent', () {
+      final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'id': 'request-id',
+        'result': <String, dynamic>{
+          'success': false,
+          'message': 'OpenClaw gateway returned artifact_missing',
+        },
+      }, route: GoTaskServiceRoute.externalAcpSingle);
+
+      expect(result.success, isFalse);
+      expect(result.message, 'OpenClaw gateway returned artifact_missing');
+      expect(result.errorMessage, 'OpenClaw gateway returned artifact_missing');
     });
 
     test('uses unavailable message when bridge reports provider failure', () {
@@ -93,6 +109,7 @@ void main() {
 
       expect(result.success, isFalse);
       expect(result.message, 'codex execution environment is unavailable');
+      expect(result.errorMessage, 'codex execution environment is unavailable');
     });
 
     test('keeps provider failure diagnostics for empty upstream output', () {
@@ -111,6 +128,10 @@ void main() {
       expect(result.success, isFalse);
       expect(
         result.message,
+        'hermes upstream returned empty response (code: PROVIDER_EMPTY_RESPONSE, upstream: session/prompt)',
+      );
+      expect(
+        result.errorMessage,
         'hermes upstream returned empty response (code: PROVIDER_EMPTY_RESPONSE, upstream: session/prompt)',
       );
     });
