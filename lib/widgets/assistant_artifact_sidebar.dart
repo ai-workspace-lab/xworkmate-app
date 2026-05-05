@@ -29,6 +29,7 @@ class AssistantArtifactSidebar extends StatefulWidget {
     required this.threadTitle,
     required this.workspacePath,
     required this.workspaceKind,
+    required this.artifactSyncAtMs,
     required this.onCollapse,
     required this.loadSnapshot,
     required this.loadPreview,
@@ -39,6 +40,7 @@ class AssistantArtifactSidebar extends StatefulWidget {
   final String threadTitle;
   final String workspacePath;
   final WorkspaceRefKind workspaceKind;
+  final double? artifactSyncAtMs;
   final VoidCallback onCollapse;
   final AssistantArtifactSnapshotLoader loadSnapshot;
   final AssistantArtifactPreviewLoader loadPreview;
@@ -69,7 +71,8 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.sessionKey != widget.sessionKey ||
         oldWidget.workspacePath != widget.workspacePath ||
-        oldWidget.workspaceKind != widget.workspaceKind) {
+        oldWidget.workspaceKind != widget.workspaceKind ||
+        oldWidget.artifactSyncAtMs != widget.artifactSyncAtMs) {
       _activeTab = AssistantArtifactSidebarTab.files;
       _selectedEntry = null;
       _preview = const AssistantArtifactPreview.empty();
@@ -537,10 +540,7 @@ class AssistantArtifactSidebarRevealButton extends StatelessWidget {
           side: BorderSide.none,
           shape: const CircleBorder(),
         ),
-        icon: const Icon(
-          Icons.keyboard_double_arrow_left_rounded,
-          size: 20,
-        ),
+        icon: const Icon(Icons.keyboard_double_arrow_left_rounded, size: 20),
       ),
     );
   }
