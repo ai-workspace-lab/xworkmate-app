@@ -229,6 +229,119 @@ void main() {
     },
   );
 
+  test(
+    'syncs bridge OpenClaw download URL artifacts into the draft task workspace',
+    () async {
+      String observedAuthorization = '';
+      String observedRelativePath = '';
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        observedAuthorization =
+            request.headers.value(HttpHeaders.authorizationHeader) ?? '';
+        observedRelativePath =
+            request.uri.queryParameters['relativePath']?.trim() ?? '';
+        expect(request.uri.path, '/artifacts/openclaw/download');
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.binary
+          ..add(<int>[0x41, 0x52, 0x54, 0x49, 0x46, 0x41, 0x43, 0x54]);
+        await request.response.close();
+      });
+
+      final controller = AppController(
+        environmentOverride: const <String, String>{
+          'BRIDGE_AUTH_TOKEN': 'bridge-token',
+        },
+      );
+      addTearDown(controller.dispose);
+
+      final baseWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-app-task-workspace-',
+      );
+      addTearDown(() async {
+        if (await baseWorkspace.exists()) {
+          await baseWorkspace.delete(recursive: true);
+        }
+      });
+
+      const sessionKey = 'draft-1777962850788';
+      final taskWorkspace = Directory(
+        '${baseWorkspace.path}/.xworkmate/threads/$sessionKey',
+      );
+      controller.upsertTaskThreadInternal(
+        sessionKey,
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: sessionKey,
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: taskWorkspace.path,
+          displayPath: taskWorkspace.path,
+          writable: true,
+        ),
+      );
+
+      final result = GoTaskServiceResult(
+        success: true,
+        message: 'hello',
+        turnId: 'turn-1',
+        raw: <String, dynamic>{
+          'artifacts': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'relativePath': 'exports/openclaw.bin',
+              'downloadUrl':
+                  'http://xworkmate-bridge.svc.plus:${server.port}/artifacts/openclaw/download'
+                  '?sessionKey=$sessionKey&runId=run-1&relativePath=exports%2Fopenclaw.bin'
+                  '&expires=9999999999&sig=test-signature',
+              'contentType': 'application/octet-stream',
+              'sizeBytes': 8,
+              'sha256':
+                  '59f56f3c87334ee2eb47024a0748f725c1ad2be2954a85bc680db4b012d0b02e',
+            },
+          ],
+        },
+        errorMessage: '',
+        resolvedModel: '',
+        route: GoTaskServiceRoute.externalAcpSingle,
+      );
+
+      final proxyClient = HttpClient()
+        ..findProxy = (_) => 'PROXY 127.0.0.1:${server.port}';
+      await HttpOverrides.runZoned(() async {
+        await controller.persistGoTaskArtifactsForSessionInternal(
+          sessionKey,
+          result,
+        );
+      }, createHttpClient: (_) => proxyClient);
+
+      final artifact = File('${taskWorkspace.path}/exports/openclaw.bin');
+      expect(await artifact.readAsBytes(), <int>[
+        0x41,
+        0x52,
+        0x54,
+        0x49,
+        0x46,
+        0x41,
+        0x43,
+        0x54,
+      ]);
+      expect(observedAuthorization, 'Bearer bridge-token');
+      expect(observedRelativePath, 'exports/openclaw.bin');
+
+      final thread = controller.requireTaskThreadForSessionInternal(sessionKey);
+      expect(thread.workspaceBinding.workspacePath, taskWorkspace.path);
+      expect(thread.lastArtifactSyncStatus, 'synced');
+      expect(thread.lastArtifactSyncAtMs, greaterThan(0));
+
+      final snapshot = await controller.loadAssistantArtifactSnapshot(
+        sessionKey: sessionKey,
+      );
+      expect(
+        snapshot.fileEntries.map((entry) => entry.relativePath),
+        contains('exports/openclaw.bin'),
+      );
+    },
+  );
+
   test('skips download URL artifacts outside the bridge host', () async {
     final controller = AppController(
       environmentOverride: const <String, String>{
