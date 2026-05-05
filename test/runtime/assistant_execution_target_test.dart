@@ -498,22 +498,76 @@ void main() {
             isA<StateError>().having(
               (error) => error.message,
               'message',
-              anyOf(
-                contains('ACP_HTTP_401'),
-                contains('请先登录 svc.plus'),
-              ),
+              anyOf(contains('ACP_HTTP_401'), contains('请先登录 svc.plus')),
             ),
           ),
         );
 
         expect(fakeGoTaskService.executeCount, 0);
         expect(capture.requestCount, 0);
+        if (controller.chatMessages.isNotEmpty) {
+          expect(
+            controller.chatMessages.last.text,
+            anyOf(contains('ACP_HTTP_401'), contains('请先登录 svc.plus')),
+          );
+        }
+      },
+    );
+
+    test(
+      'sendChatMessage resumes only when the thread has non-error user or assistant history',
+      () async {
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+        );
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('session-1');
         expect(
-          controller.chatMessages.last.text,
-          anyOf(
-            contains('ACP_HTTP_401'),
-            contains('请先登录 svc.plus'),
+          controller.hasResumableGatewaySessionHistoryInternal('session-1'),
+          isFalse,
+        );
+
+        controller.appendLocalSessionMessageInternal(
+          'session-1',
+          GatewayChatMessage(
+            id: 'error-1',
+            role: 'assistant',
+            text: 'ACP_HTTP_STREAM_CLOSED',
+            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            toolCallId: null,
+            toolName: null,
+            stopReason: null,
+            pending: false,
+            error: true,
           ),
+          persistInThreadContext: true,
+        );
+
+        expect(
+          controller.hasResumableGatewaySessionHistoryInternal('session-1'),
+          isFalse,
+        );
+
+        controller.appendLocalSessionMessageInternal(
+          'session-1',
+          GatewayChatMessage(
+            id: 'user-1',
+            role: 'user',
+            text: 'first turn',
+            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            toolCallId: null,
+            toolName: null,
+            stopReason: null,
+            pending: false,
+            error: false,
+          ),
+          persistInThreadContext: true,
+        );
+
+        expect(
+          controller.hasResumableGatewaySessionHistoryInternal('session-1'),
+          isTrue,
         );
       },
     );

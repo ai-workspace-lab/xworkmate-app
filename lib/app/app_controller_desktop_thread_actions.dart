@@ -330,6 +330,9 @@ extension AppControllerDesktopThreadActions on AppController {
         final sessionKey = normalizedAssistantSessionKeyInternal(
           currentSessionKey,
         );
+        final resumeSession = hasResumableGatewaySessionHistoryInternal(
+          sessionKey,
+        );
         final userText = message.trim().isEmpty
             ? 'See attached.'
             : message.trim();
@@ -372,6 +375,7 @@ extension AppControllerDesktopThreadActions on AppController {
               metadata: dispatch.metadata,
               routing: buildExternalAcpRoutingForSessionInternal(sessionKey),
               routingHint: 'gateway',
+              resumeSession: resumeSession,
             ),
             onUpdate: (update) {
               if (update.isDelta) {
@@ -471,6 +475,24 @@ extension AppControllerDesktopThreadActions on AppController {
       },
     );
     recomputeTasksInternal();
+  }
+
+  bool hasResumableGatewaySessionHistoryInternal(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final messages = <GatewayChatMessage>[
+      ...?assistantThreadRecordsInternal[normalizedSessionKey]?.messages,
+      ...?assistantThreadMessagesInternal[normalizedSessionKey],
+      ...?localSessionMessagesInternal[normalizedSessionKey],
+    ];
+    return messages.any((message) {
+      final role = message.role.trim().toLowerCase();
+      if (message.error || role.isEmpty) {
+        return false;
+      }
+      return role == 'user' || role == 'assistant';
+    });
   }
 
   Future<void> abortRun() async {
