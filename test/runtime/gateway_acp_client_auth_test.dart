@@ -162,6 +162,49 @@ void main() {
       expect(result.artifacts.single.relativePath, 'hello.txt');
       expect(result.artifacts.single.content, 'nested artifact body');
     });
+
+    test('uses bridge files and attachments aliases as artifacts', () {
+      final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'id': 'request-id',
+        'result': <String, dynamic>{
+          'success': true,
+          'message': 'created files',
+          'payload': <String, dynamic>{
+            'files': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'path': 'reports/summary.pdf',
+                'downloadUrl':
+                    'https://xworkmate-bridge.svc.plus/artifacts/summary.pdf',
+                'contentType': 'application/pdf',
+              },
+            ],
+          },
+          'data': <String, dynamic>{
+            'attachments': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'name': 'deck.pptx',
+                'content': 'pptx-body',
+                'contentType':
+                    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+              },
+            ],
+          },
+        },
+      }, route: GoTaskServiceRoute.externalAcpSingle);
+
+      expect(result.message, 'created files');
+      expect(
+        result.artifacts.map((item) => item.relativePath),
+        containsAll(<String>['reports/summary.pdf', 'deck.pptx']),
+      );
+      expect(
+        result.artifacts
+            .singleWhere((item) => item.relativePath == 'reports/summary.pdf')
+            .downloadUrl,
+        'https://xworkmate-bridge.svc.plus/artifacts/summary.pdf',
+      );
+    });
   });
 
   group('GatewayAcpClient authorization', () {

@@ -420,7 +420,11 @@ class GoTaskServiceArtifact {
     }
 
     return GoTaskServiceArtifact(
-      relativePath: json['relativePath']?.toString().trim() ?? '',
+      relativePath:
+          json['relativePath']?.toString().trim() ??
+          json['path']?.toString().trim() ??
+          json['name']?.toString().trim() ??
+          '',
       label: json['label']?.toString().trim() ?? '',
       contentType: json['contentType']?.toString().trim() ?? '',
       encoding: json['encoding']?.toString().trim() ?? '',
@@ -544,17 +548,26 @@ class GoTaskServiceResult {
 }
 
 Object? _firstGoTaskArtifactList(Map<String, dynamic> result) {
+  final artifacts = <Object?>[];
   for (final candidate in <Object?>[
     result['artifacts'],
+    result['files'],
+    result['attachments'],
     _castMap(result['payload'])['artifacts'],
+    _castMap(result['payload'])['files'],
+    _castMap(result['payload'])['attachments'],
     _castMap(result['result'])['artifacts'],
+    _castMap(result['result'])['files'],
+    _castMap(result['result'])['attachments'],
     _castMap(result['data'])['artifacts'],
+    _castMap(result['data'])['files'],
+    _castMap(result['data'])['attachments'],
   ]) {
     if (candidate is List) {
-      return candidate;
+      artifacts.addAll(candidate);
     }
   }
-  return null;
+  return artifacts.isEmpty ? null : artifacts;
 }
 
 String? goTaskServiceGatewayEntryState({
