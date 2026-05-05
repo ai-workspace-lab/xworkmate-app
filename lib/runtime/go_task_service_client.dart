@@ -479,9 +479,6 @@ class GoTaskServiceResult {
   String get resolvedProviderId =>
       raw['resolvedProviderId']?.toString().trim() ?? '';
 
-  String get resolvedGatewayProviderId =>
-      raw['resolvedGatewayProviderId']?.toString().trim() ?? '';
-
   List<String> get resolvedSkills {
     final rawList = raw['resolvedSkills'];
     if (rawList is! List) {
