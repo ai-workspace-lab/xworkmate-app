@@ -594,13 +594,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       );
       return;
     }
-    var artifacts = result.artifacts;
-    if (artifacts.isEmpty) {
-      artifacts = await exportOpenClawArtifactsForSessionInternal(
-        normalizedSessionKey,
-        result,
-      );
-    }
+    final artifacts = result.artifacts;
     if (artifacts.isEmpty) {
       upsertTaskThreadInternal(
         normalizedSessionKey,
@@ -637,98 +631,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       lastArtifactSyncStatus: wroteArtifact ? 'synced' : 'no-inline-content',
       updatedAtMs: syncedAtMs,
     );
-  }
-
-  Future<List<GoTaskServiceArtifact>> exportOpenClawArtifactsForSessionInternal(
-    String sessionKey,
-    GoTaskServiceResult result,
-  ) async {
-    if (!goTaskResultLooksLikeOpenClawGatewayInternal(result)) {
-      return const <GoTaskServiceArtifact>[];
-    }
-    final runId = goTaskResultRunIdInternal(result);
-    if (runId.isEmpty) {
-      return const <GoTaskServiceArtifact>[];
-    }
-    final endpoint = resolveBridgeAcpEndpointInternal()?.replace(
-      path: '/gateway/openclaw',
-      query: null,
-      fragment: null,
-    );
-    if (endpoint == null) {
-      return const <GoTaskServiceArtifact>[];
-    }
-    try {
-      final response = await gatewayAcpClientInternal.request(
-        method: 'xworkmate.artifacts.export',
-        params: <String, dynamic>{
-          'sessionKey': normalizedAssistantSessionKeyInternal(sessionKey),
-          'runId': runId,
-          'maxFiles': 64,
-          'maxInlineBytes': 10 * 1024 * 1024,
-        },
-        endpointOverride: endpoint,
-      );
-      final exported = GoTaskServiceResult(
-        success: true,
-        message: '',
-        turnId: result.turnId,
-        raw: mapValueInternal(response['result']),
-        errorMessage: '',
-        resolvedModel: result.resolvedModel,
-        route: result.route,
-      );
-      return exported.artifacts;
-    } on GatewayAcpException {
-      return const <GoTaskServiceArtifact>[];
-    } on IOException {
-      return const <GoTaskServiceArtifact>[];
-    } on FormatException {
-      return const <GoTaskServiceArtifact>[];
-    } on StateError {
-      return const <GoTaskServiceArtifact>[];
-    }
-  }
-
-  bool goTaskResultLooksLikeOpenClawGatewayInternal(
-    GoTaskServiceResult result,
-  ) {
-    final values = <String>[
-      result.resolvedExecutionTarget,
-      result.resolvedEndpointTarget,
-      result.resolvedGatewayProviderId,
-      result.resolvedProviderId,
-      result.raw['mode']?.toString() ?? '',
-      result.raw['provider']?.toString() ?? '',
-      result.raw['gatewayProvider']?.toString() ?? '',
-      result.raw['gatewayProviderId']?.toString() ?? '',
-    ].map((item) => item.trim().toLowerCase()).toSet();
-    return values.contains('gateway') || values.contains('openclaw');
-  }
-
-  String goTaskResultRunIdInternal(GoTaskServiceResult result) {
-    for (final value in <Object?>[
-      result.raw['runId'],
-      result.raw['runID'],
-      result.raw['turnId'],
-      result.turnId,
-    ]) {
-      final text = value?.toString().trim() ?? '';
-      if (text.isNotEmpty) {
-        return text;
-      }
-    }
-    return '';
-  }
-
-  Map<String, dynamic> mapValueInternal(Object? value) {
-    if (value is Map<String, dynamic>) {
-      return value;
-    }
-    if (value is Map) {
-      return value.cast<String, dynamic>();
-    }
-    return const <String, dynamic>{};
   }
 
   Future<List<int>?> artifactBytesInternal(
