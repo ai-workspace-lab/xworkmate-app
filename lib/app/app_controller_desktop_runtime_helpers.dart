@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter/material.dart';
 import 'app_metadata.dart';
 import 'app_capabilities.dart';
@@ -608,27 +609,48 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     await root.create(recursive: true);
 
     var wroteArtifact = false;
+    var failedArtifact = false;
+    var skippedArtifact = false;
     for (final artifact in artifacts) {
       final relativePath = _sanitizeArtifactRelativePathInternal(
         artifact.relativePath,
       );
       if (relativePath.isEmpty) {
+        skippedArtifact = true;
         continue;
       }
-      final bytes = await artifactBytesInternal(artifact);
+      final bytesResult = await _artifactBytesResultInternal(artifact);
+      if (bytesResult.failed) {
+        failedArtifact = true;
+      }
+      final bytes = bytesResult.bytes;
       if (bytes == null) {
+        skippedArtifact = true;
         continue;
       }
       final target = await _nextArtifactTargetFileInternal(root, relativePath);
       await target.parent.create(recursive: true);
-      await target.writeAsBytes(bytes, flush: true);
+      final verified = await _writeVerifiedArtifactBytesInternal(
+        target,
+        bytes,
+        artifact,
+      );
+      if (!verified) {
+        failedArtifact = true;
+        continue;
+      }
       wroteArtifact = true;
     }
 
+    final syncStatus = wroteArtifact
+        ? (failedArtifact || skippedArtifact ? 'partial' : 'synced')
+        : failedArtifact
+        ? 'download-failed'
+        : 'no-artifacts';
     upsertTaskThreadInternal(
       normalizedSessionKey,
       lastArtifactSyncAtMs: syncedAtMs,
-      lastArtifactSyncStatus: wroteArtifact ? 'synced' : 'no-inline-content',
+      lastArtifactSyncStatus: syncStatus,
       updatedAtMs: syncedAtMs,
     );
   }
@@ -636,16 +658,24 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   Future<List<int>?> artifactBytesInternal(
     GoTaskServiceArtifact artifact,
   ) async {
+    return (await _artifactBytesResultInternal(artifact)).bytes;
+  }
+
+  Future<_ArtifactBytesResult> _artifactBytesResultInternal(
+    GoTaskServiceArtifact artifact,
+  ) async {
     if (artifact.hasInlineContent) {
-      return _decodeArtifactContentInternal(artifact);
+      return _ArtifactBytesResult.bytes(
+        _decodeArtifactContentInternal(artifact),
+      );
     }
     final rawDownloadUrl = artifact.downloadUrl.trim();
     if (rawDownloadUrl.isEmpty) {
-      return null;
+      return const _ArtifactBytesResult.skipped();
     }
     final uri = Uri.tryParse(rawDownloadUrl);
     if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
-      return null;
+      return const _ArtifactBytesResult.skipped();
     }
     final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
     final sameBridgeHost =
@@ -653,27 +683,141 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         uri.host.trim().toLowerCase() ==
             bridgeEndpoint.host.trim().toLowerCase();
     if (!sameBridgeHost) {
-      return null;
+      return const _ArtifactBytesResult.skipped();
     }
     final authorization =
         await resolveBridgeArtifactAuthorizationHeaderInternal(uri);
     if (authorization == null || authorization.trim().isEmpty) {
-      return null;
+      return const _ArtifactBytesResult.skipped();
     }
-    final client = HttpClient();
+    final bytes = await _downloadBridgeArtifactBytesInternal(
+      uri,
+      authorization,
+    );
+    if (bytes == null) {
+      return const _ArtifactBytesResult.failed();
+    }
+    return _ArtifactBytesResult.bytes(bytes);
+  }
+
+  Future<List<int>?> _downloadBridgeArtifactBytesInternal(
+    Uri uri,
+    String authorization,
+  ) async {
+    var bytes = <int>[];
+    for (var attempt = 1; attempt <= 3; attempt++) {
+      final result = await _downloadBridgeArtifactBytesOnceInternal(
+        uri,
+        authorization,
+        rangeStart: bytes.length,
+      );
+      if (result.reset) {
+        bytes = <int>[];
+      }
+      if (result.bytes.isNotEmpty) {
+        bytes.addAll(result.bytes);
+      }
+      if (result.completed) {
+        return bytes;
+      }
+      if (attempt < 3) {
+        await Future<void>.delayed(Duration(milliseconds: attempt * 250));
+      }
+    }
+    return null;
+  }
+
+  Future<_ArtifactDownloadAttemptResult>
+  _downloadBridgeArtifactBytesOnceInternal(
+    Uri uri,
+    String authorization, {
+    required int rangeStart,
+  }) async {
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 12);
+    var reset = false;
+    final bytes = <int>[];
     try {
       final request = await client.getUrl(uri);
       request.headers.set(HttpHeaders.authorizationHeader, authorization);
-      final response = await request.close();
-      if (response.statusCode != HttpStatus.ok) {
-        return null;
+      if (rangeStart > 0) {
+        request.headers.set(HttpHeaders.rangeHeader, 'bytes=$rangeStart-');
       }
-      return response.fold<List<int>>(
-        <int>[],
-        (buffer, chunk) => buffer..addAll(chunk),
+      final response = await request.close();
+      if (response.statusCode == HttpStatus.ok) {
+        reset = rangeStart > 0;
+      } else if (response.statusCode == HttpStatus.partialContent) {
+        reset = false;
+      } else {
+        return const _ArtifactDownloadAttemptResult.retry();
+      }
+      await for (final chunk in response) {
+        bytes.addAll(chunk);
+      }
+      return _ArtifactDownloadAttemptResult(
+        bytes: bytes,
+        completed: true,
+        reset: reset,
+      );
+    } on HttpException {
+      return _ArtifactDownloadAttemptResult(
+        bytes: bytes,
+        completed: false,
+        reset: reset,
+      );
+    } on SocketException {
+      return _ArtifactDownloadAttemptResult(
+        bytes: bytes,
+        completed: false,
+        reset: reset,
+      );
+    } on TimeoutException {
+      return _ArtifactDownloadAttemptResult(
+        bytes: bytes,
+        completed: false,
+        reset: reset,
+      );
+    } on StateError {
+      return _ArtifactDownloadAttemptResult(
+        bytes: bytes,
+        completed: false,
+        reset: reset,
       );
     } finally {
       client.close(force: true);
+    }
+  }
+
+  Future<bool> _writeVerifiedArtifactBytesInternal(
+    File target,
+    List<int> bytes,
+    GoTaskServiceArtifact artifact,
+  ) async {
+    final expectedSize = artifact.sizeBytes;
+    if (expectedSize != null && expectedSize != bytes.length) {
+      return false;
+    }
+    final expectedSha256 = artifact.sha256.trim().toLowerCase();
+    if (expectedSha256.isNotEmpty &&
+        expectedSha256.length == 64 &&
+        crypto.sha256.convert(bytes).toString() != expectedSha256) {
+      return false;
+    }
+    final temp = File(
+      '${target.path}.xworkmate-sync-${DateTime.now().microsecondsSinceEpoch}.tmp',
+    );
+    try {
+      await temp.writeAsBytes(bytes, flush: true);
+      if (await target.exists()) {
+        await target.delete();
+      }
+      await temp.rename(target.path);
+      return true;
+    } catch (_) {
+      if (await temp.exists()) {
+        await temp.delete();
+      }
+      return false;
     }
   }
 
@@ -865,6 +1009,35 @@ String _sanitizeArtifactRelativePathInternal(String raw) {
         (segment) => segment.isNotEmpty && segment != '.' && segment != '..',
       )
       .join('/');
+}
+
+class _ArtifactBytesResult {
+  const _ArtifactBytesResult._({this.bytes, required this.failed});
+
+  const _ArtifactBytesResult.skipped() : this._(failed: false);
+
+  const _ArtifactBytesResult.failed() : this._(failed: true);
+
+  const _ArtifactBytesResult.bytes(List<int> bytes)
+    : this._(bytes: bytes, failed: false);
+
+  final List<int>? bytes;
+  final bool failed;
+}
+
+class _ArtifactDownloadAttemptResult {
+  const _ArtifactDownloadAttemptResult({
+    required this.bytes,
+    required this.completed,
+    required this.reset,
+  });
+
+  const _ArtifactDownloadAttemptResult.retry()
+    : this(bytes: const <int>[], completed: false, reset: false);
+
+  final List<int> bytes;
+  final bool completed;
+  final bool reset;
 }
 
 List<int> _decodeArtifactContentInternal(GoTaskServiceArtifact artifact) {
