@@ -724,6 +724,38 @@ void main() {
     );
 
     test(
+      'OpenClaw task submit uses extended HTTP response timeout',
+      () {
+        final openClawEndpoint = Uri.parse(
+          'https://xworkmate-bridge.svc.plus/gateway/openclaw',
+        );
+        final acpEndpoint = Uri.parse(
+          'https://xworkmate-bridge.svc.plus/acp/rpc',
+        );
+
+        expect(
+          gatewayAcpHttpResponseTimeoutFor(openClawEndpoint, 'session.start'),
+          const Duration(minutes: 10),
+        );
+        expect(
+          gatewayAcpHttpResponseTimeoutFor(openClawEndpoint, 'session.message'),
+          const Duration(minutes: 10),
+        );
+        expect(
+          gatewayAcpHttpResponseTimeoutFor(acpEndpoint, 'session.start'),
+          const Duration(seconds: 120),
+        );
+        expect(
+          gatewayAcpHttpResponseTimeoutFor(
+            openClawEndpoint,
+            'acp.capabilities',
+          ),
+          const Duration(seconds: 120),
+        );
+      },
+    );
+
+    test(
       'desktop controller only uses gateway path for OpenClaw task submit',
       () {
         final controller = AppController(

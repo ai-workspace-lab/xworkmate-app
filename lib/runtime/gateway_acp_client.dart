@@ -586,7 +586,7 @@ class GatewayAcpClient {
         ),
       );
       final response = await httpRequest.close().timeout(
-        const Duration(seconds: 120),
+        gatewayAcpHttpResponseTimeoutFor(endpoint, request.method),
       );
       statusCode = response.statusCode;
       contentType =
@@ -1134,6 +1134,14 @@ String _httpAcceptHeaderFor(Uri endpoint, String method) {
     return 'application/json';
   }
   return 'text/event-stream, application/json';
+}
+
+Duration gatewayAcpHttpResponseTimeoutFor(Uri endpoint, String method) {
+  if (_isOpenClawTaskSubmitEndpoint(endpoint) &&
+      _isOpenClawTaskSubmitMethod(method)) {
+    return const Duration(minutes: 10);
+  }
+  return const Duration(seconds: 120);
 }
 
 class _GatewayAcpRpcRequest {
