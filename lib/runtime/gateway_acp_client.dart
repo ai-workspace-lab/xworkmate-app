@@ -566,7 +566,7 @@ class GatewayAcpClient {
       );
       httpRequest.headers.set(
         HttpHeaders.acceptHeader,
-        'text/event-stream, application/json',
+        _httpAcceptHeaderFor(endpoint, request.method),
       );
       final authorization = await _resolveAuthorizationHeader(
         endpoint,
@@ -1126,6 +1126,14 @@ bool _isOpenClawTaskSubmitEndpoint(Uri? endpoint) {
 bool _isOpenClawTaskSubmitMethod(String method) {
   final normalized = method.trim();
   return normalized == 'session.start' || normalized == 'session.message';
+}
+
+String _httpAcceptHeaderFor(Uri endpoint, String method) {
+  if (_isOpenClawTaskSubmitEndpoint(endpoint) &&
+      _isOpenClawTaskSubmitMethod(method)) {
+    return 'application/json';
+  }
+  return 'text/event-stream, application/json';
 }
 
 class _GatewayAcpRpcRequest {

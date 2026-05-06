@@ -244,6 +244,7 @@ void main() {
       );
 
       expect(capture.authorizationHeader, 'Bearer bridge-token');
+      expect(capture.acceptHeader, 'text/event-stream, application/json');
       expect(capture.requestPath, '/acp/rpc');
       expect((response['result'] as Map)['ok'], true);
     });
@@ -672,6 +673,7 @@ void main() {
         );
 
         expect(capture.authorizationHeader, 'Bearer bridge-token');
+        expect(capture.acceptHeader, 'application/json');
         expect(capture.requestPath, '/gateway/openclaw');
         expect(capture.requestPath, isNot(contains('/acp-server')));
         expect(capture.requestPath, isNot(contains('/acp-server/gateway')));
@@ -715,6 +717,7 @@ void main() {
           onUpdate: (_) {},
         );
 
+        expect(capture.acceptHeader, 'application/json');
         expect(capture.requestPath, '/gateway/openclaw');
         expect(capture.requestBody, contains('"method":"session.message"'));
       },
@@ -1063,6 +1066,8 @@ Future<_CapturedAcpHttpServer> _startAcpHttpServer() async {
   server.listen((request) async {
     capture.authorizationHeader =
         request.headers.value(HttpHeaders.authorizationHeader) ?? '';
+    capture.acceptHeader =
+        request.headers.value(HttpHeaders.acceptHeader) ?? '';
     capture.requestPath = request.uri.path;
     final body = await utf8.decoder.bind(request).join();
     capture.requestBody = body;
@@ -1100,6 +1105,7 @@ class _CapturedAcpHttpServer {
   final HttpServer _server;
   final Uri baseEndpoint;
   String authorizationHeader = '';
+  String acceptHeader = '';
   String requestPath = '';
   String requestBody = '';
   final List<String> requestBodies = <String>[];
