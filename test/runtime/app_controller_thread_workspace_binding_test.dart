@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_controller_desktop_runtime_coordination_impl.dart';
@@ -201,14 +202,13 @@ void main() {
         route: GoTaskServiceRoute.externalAcpSingle,
       );
 
-      final proxyClient = HttpClient()
-        ..findProxy = (_) => 'PROXY 127.0.0.1:${server.port}';
+      final clientFactory = _proxiedClientFactory(server.port);
       await HttpOverrides.runZoned(() async {
         await controller.persistGoTaskArtifactsForSessionInternal(
           'session-1',
           result,
         );
-      }, createHttpClient: (_) => proxyClient);
+      }, createHttpClient: clientFactory);
 
       final artifact = File('${localWorkspace.path}/reports/download.txt');
       expect(await artifact.readAsString(), 'downloaded artifact body');
@@ -295,7 +295,7 @@ void main() {
               'contentType': 'application/octet-stream',
               'sizeBytes': 8,
               'sha256':
-                  '59f56f3c87334ee2eb47024a0748f725c1ad2be2954a85bc680db4b012d0b02e',
+                  '7fbd7ef36fdd97293aa5b3bcd597146101d3ea9a12b271ed0c88bdca25b63d12',
             },
           ],
         },
@@ -304,14 +304,13 @@ void main() {
         route: GoTaskServiceRoute.externalAcpSingle,
       );
 
-      final proxyClient = HttpClient()
-        ..findProxy = (_) => 'PROXY 127.0.0.1:${server.port}';
+      final clientFactory = _proxiedClientFactory(server.port);
       await HttpOverrides.runZoned(() async {
         await controller.persistGoTaskArtifactsForSessionInternal(
           sessionKey,
           result,
         );
-      }, createHttpClient: (_) => proxyClient);
+      }, createHttpClient: clientFactory);
 
       final artifact = File('${taskWorkspace.path}/exports/openclaw.bin');
       expect(await artifact.readAsBytes(), <int>[
@@ -341,6 +340,323 @@ void main() {
       );
     },
   );
+
+  test(
+    'resumes bridge artifact downloads after a weak network disconnect',
+    () async {
+      final body = <int>[0x41, 0x52, 0x54, 0x49, 0x46, 0x41, 0x43, 0x54];
+      final observedRanges = <String>[];
+      var requestCount = 0;
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close());
+      server.listen((socket) async {
+        requestCount += 1;
+        final requestBytes = <int>[];
+        await for (final chunk in socket) {
+          requestBytes.addAll(chunk);
+          if (String.fromCharCodes(requestBytes).contains('\r\n\r\n')) {
+            break;
+          }
+        }
+        final rawRequest = String.fromCharCodes(requestBytes);
+        final rangeLine = rawRequest
+            .split('\r\n')
+            .firstWhere(
+              (line) => line.toLowerCase().startsWith('range:'),
+              orElse: () => '',
+            );
+        observedRanges.add(
+          rangeLine.replaceFirst(RegExp('^[Rr]ange:\\s*'), ''),
+        );
+        if (requestCount == 1) {
+          socket.add(
+            'HTTP/1.1 200 OK\r\n'
+                    'Content-Type: application/octet-stream\r\n'
+                    'Content-Length: 8\r\n'
+                    '\r\n'
+                .codeUnits,
+          );
+          socket.add(body.take(4).toList());
+          await socket.flush();
+          socket.destroy();
+          return;
+        }
+        expect(rangeLine.toLowerCase(), 'range: bytes=4-');
+        socket.add(
+          'HTTP/1.1 206 Partial Content\r\n'
+                  'Content-Type: application/octet-stream\r\n'
+                  'Content-Range: bytes 4-7/8\r\n'
+                  'Content-Length: 4\r\n'
+                  '\r\n'
+              .codeUnits,
+        );
+        socket.add(body.skip(4).toList());
+        await socket.flush();
+        await socket.close();
+      });
+
+      final controller = AppController(
+        environmentOverride: const <String, String>{
+          'BRIDGE_AUTH_TOKEN': 'bridge-token',
+        },
+      );
+      addTearDown(controller.dispose);
+
+      final localWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-resume-artifact-workspace-',
+      );
+      addTearDown(() async {
+        if (await localWorkspace.exists()) {
+          await localWorkspace.delete(recursive: true);
+        }
+      });
+      controller.upsertTaskThreadInternal(
+        'session-1',
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: 'session-1',
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: localWorkspace.path,
+          displayPath: localWorkspace.path,
+          writable: true,
+        ),
+      );
+
+      final result = GoTaskServiceResult(
+        success: true,
+        message: 'hello',
+        turnId: 'turn-1',
+        raw: <String, dynamic>{
+          'artifacts': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'relativePath': 'reports/resume.bin',
+              'downloadUrl':
+                  'http://xworkmate-bridge.svc.plus:${server.port}/artifacts/openclaw/download'
+                  '?sessionKey=session-1&runId=run-1&relativePath=reports%2Fresume.bin'
+                  '&expires=9999999999&sig=test-signature',
+              'contentType': 'application/octet-stream',
+              'sizeBytes': body.length,
+              'sha256': crypto.sha256.convert(body).toString(),
+            },
+          ],
+        },
+        errorMessage: '',
+        resolvedModel: '',
+        route: GoTaskServiceRoute.externalAcpSingle,
+      );
+
+      final clientFactory = _proxiedClientFactory(server.port);
+      await HttpOverrides.runZoned(() async {
+        await controller.persistGoTaskArtifactsForSessionInternal(
+          'session-1',
+          result,
+        );
+      }, createHttpClient: clientFactory);
+
+      expect(requestCount, 2);
+      expect(observedRanges, <String>['', 'bytes=4-']);
+      expect(
+        await File('${localWorkspace.path}/reports/resume.bin').readAsBytes(),
+        body,
+      );
+      expect(
+        controller
+            .requireTaskThreadForSessionInternal('session-1')
+            .lastArtifactSyncStatus,
+        'synced',
+      );
+    },
+  );
+
+  test('keeps syncing later artifacts when one download fails', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((request) async {
+      if (request.uri.path.endsWith('/failed.txt')) {
+        request.response.statusCode = HttpStatus.badGateway;
+        await request.response.close();
+        return;
+      }
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.text
+        ..write('download ok');
+      await request.response.close();
+    });
+
+    final controller = AppController(
+      environmentOverride: const <String, String>{
+        'BRIDGE_AUTH_TOKEN': 'bridge-token',
+      },
+    );
+    addTearDown(controller.dispose);
+
+    final localWorkspace = await Directory.systemTemp.createTemp(
+      'xworkmate-partial-artifact-workspace-',
+    );
+    addTearDown(() async {
+      if (await localWorkspace.exists()) {
+        await localWorkspace.delete(recursive: true);
+      }
+    });
+    controller.upsertTaskThreadInternal(
+      'session-1',
+      workspaceBinding: WorkspaceBinding(
+        workspaceId: 'session-1',
+        workspaceKind: WorkspaceKind.localFs,
+        workspacePath: localWorkspace.path,
+        displayPath: localWorkspace.path,
+        writable: true,
+      ),
+    );
+
+    final result = GoTaskServiceResult(
+      success: true,
+      message: 'hello',
+      turnId: 'turn-1',
+      raw: <String, dynamic>{
+        'artifacts': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'relativePath': 'reports/inline.txt',
+            'content': 'inline ok',
+            'contentType': 'text/plain',
+          },
+          <String, dynamic>{
+            'relativePath': 'reports/failed.txt',
+            'downloadUrl':
+                'http://xworkmate-bridge.svc.plus:${server.port}/failed.txt',
+            'contentType': 'text/plain',
+          },
+          <String, dynamic>{
+            'relativePath': 'reports/download.txt',
+            'downloadUrl':
+                'http://xworkmate-bridge.svc.plus:${server.port}/download.txt',
+            'contentType': 'text/plain',
+          },
+        ],
+      },
+      errorMessage: '',
+      resolvedModel: '',
+      route: GoTaskServiceRoute.externalAcpSingle,
+    );
+
+    final clientFactory = _proxiedClientFactory(server.port);
+    await HttpOverrides.runZoned(() async {
+      await controller.persistGoTaskArtifactsForSessionInternal(
+        'session-1',
+        result,
+      );
+    }, createHttpClient: clientFactory);
+
+    expect(
+      await File('${localWorkspace.path}/reports/inline.txt').readAsString(),
+      'inline ok',
+    );
+    expect(
+      await File('${localWorkspace.path}/reports/download.txt').readAsString(),
+      'download ok',
+    );
+    expect(
+      await File('${localWorkspace.path}/reports/failed.txt').exists(),
+      isFalse,
+    );
+    final snapshot = await controller.loadAssistantArtifactSnapshot(
+      sessionKey: 'session-1',
+    );
+    expect(
+      snapshot.fileEntries.map((entry) => entry.relativePath),
+      containsAll(<String>['reports/inline.txt', 'reports/download.txt']),
+    );
+    expect(
+      controller
+          .requireTaskThreadForSessionInternal('session-1')
+          .lastArtifactSyncStatus,
+      'partial',
+    );
+  });
+
+  test('drops artifacts when size or sha256 validation fails', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((request) async {
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.text
+        ..write('bad body');
+      await request.response.close();
+    });
+
+    final controller = AppController(
+      environmentOverride: const <String, String>{
+        'BRIDGE_AUTH_TOKEN': 'bridge-token',
+      },
+    );
+    addTearDown(controller.dispose);
+
+    final localWorkspace = await Directory.systemTemp.createTemp(
+      'xworkmate-invalid-artifact-workspace-',
+    );
+    addTearDown(() async {
+      if (await localWorkspace.exists()) {
+        await localWorkspace.delete(recursive: true);
+      }
+    });
+    controller.upsertTaskThreadInternal(
+      'session-1',
+      workspaceBinding: WorkspaceBinding(
+        workspaceId: 'session-1',
+        workspaceKind: WorkspaceKind.localFs,
+        workspacePath: localWorkspace.path,
+        displayPath: localWorkspace.path,
+        writable: true,
+      ),
+    );
+
+    final result = GoTaskServiceResult(
+      success: true,
+      message: 'hello',
+      turnId: 'turn-1',
+      raw: <String, dynamic>{
+        'artifacts': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'relativePath': 'reports/invalid.txt',
+            'downloadUrl':
+                'http://xworkmate-bridge.svc.plus:${server.port}/invalid.txt',
+            'contentType': 'text/plain',
+            'sizeBytes': 8,
+            'sha256':
+                '0000000000000000000000000000000000000000000000000000000000000000',
+          },
+        ],
+      },
+      errorMessage: '',
+      resolvedModel: '',
+      route: GoTaskServiceRoute.externalAcpSingle,
+    );
+
+    final clientFactory = _proxiedClientFactory(server.port);
+    await HttpOverrides.runZoned(() async {
+      await controller.persistGoTaskArtifactsForSessionInternal(
+        'session-1',
+        result,
+      );
+    }, createHttpClient: clientFactory);
+
+    expect(
+      await File('${localWorkspace.path}/reports/invalid.txt').exists(),
+      isFalse,
+    );
+    final leftovers = await localWorkspace
+        .list(recursive: true)
+        .where((entity) => entity.path.contains('.xworkmate-sync-'))
+        .toList();
+    expect(leftovers, isEmpty);
+    expect(
+      controller
+          .requireTaskThreadForSessionInternal('session-1')
+          .lastArtifactSyncStatus,
+      'download-failed',
+    );
+  });
 
   test('skips download URL artifacts outside the bridge host', () async {
     final controller = AppController(
@@ -401,7 +717,16 @@ void main() {
       controller
           .requireTaskThreadForSessionInternal('session-1')
           .lastArtifactSyncStatus,
-      'no-inline-content',
+      'no-artifacts',
     );
   });
+}
+
+HttpClient Function(SecurityContext?) _proxiedClientFactory(int port) {
+  final clients = List<HttpClient>.generate(
+    16,
+    (_) => HttpClient()..findProxy = (_) => 'PROXY 127.0.0.1:$port',
+  );
+  var index = 0;
+  return (_) => clients[index++];
 }
