@@ -336,6 +336,37 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                       ]);
                     }
                   },
+                  onOpenEntryLocation: (entry) async {
+                    final workspacePath = controller
+                        .assistantWorkspacePathForSession(
+                          controller.currentSessionKey,
+                        )
+                        .trim();
+                    if (workspacePath.isEmpty) {
+                      return;
+                    }
+                    final targetPath =
+                        entry.relativePath.startsWith('/') ||
+                            entry.relativePath.startsWith('\\') ||
+                            entry.relativePath.contains(':\\')
+                        ? entry.relativePath
+                        : '${workspacePath.replaceAll(RegExp(r'[\\/]+$'), '')}${Platform.pathSeparator}${entry.relativePath}';
+                    if (Platform.isMacOS) {
+                      await Process.run('open', <String>['-R', targetPath]);
+                      return;
+                    }
+                    if (Platform.isLinux) {
+                      await Process.run('xdg-open', <String>[
+                        File(targetPath).parent.path,
+                      ]);
+                      return;
+                    }
+                    if (Platform.isWindows) {
+                      await Process.run('explorer.exe', <String>[
+                        '/select,$targetPath',
+                      ]);
+                    }
+                  },
                   loadSnapshot: () =>
                       controller.loadAssistantArtifactSnapshot(),
                   loadPreview: (entry) =>

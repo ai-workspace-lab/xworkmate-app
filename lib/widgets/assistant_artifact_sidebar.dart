@@ -19,6 +19,8 @@ typedef AssistantArtifactSnapshotLoader =
 typedef AssistantArtifactPreviewLoader =
     Future<AssistantArtifactPreview> Function(AssistantArtifactEntry entry);
 typedef AssistantArtifactOpenWorkspace = Future<void> Function();
+typedef AssistantArtifactOpenEntryLocation =
+    Future<void> Function(AssistantArtifactEntry entry);
 
 enum AssistantArtifactSidebarTab { files, preview }
 
@@ -34,6 +36,7 @@ class AssistantArtifactSidebar extends StatefulWidget {
     required this.loadSnapshot,
     required this.loadPreview,
     this.onOpenWorkspace,
+    this.onOpenEntryLocation,
   });
 
   final String sessionKey;
@@ -45,6 +48,7 @@ class AssistantArtifactSidebar extends StatefulWidget {
   final AssistantArtifactSnapshotLoader loadSnapshot;
   final AssistantArtifactPreviewLoader loadPreview;
   final AssistantArtifactOpenWorkspace? onOpenWorkspace;
+  final AssistantArtifactOpenEntryLocation? onOpenEntryLocation;
 
   @override
   State<AssistantArtifactSidebar> createState() =>
@@ -85,6 +89,7 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
     final palette = context.palette;
     final theme = Theme.of(context);
     final snapshot = _snapshot;
+    final entries = _artifactEntries(snapshot);
     final entriesForPreview = _previewCandidates(snapshot);
     final selectedEntry = _selectedEntry;
     final workspacePath = widget.workspacePath.trim();
@@ -268,7 +273,7 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
                   _activeTab = nextTab;
                 });
                 if (nextTab == AssistantArtifactSidebarTab.preview &&
-                    selectedEntry == null &&
+                    (selectedEntry == null || !selectedEntry.previewable) &&
                     entriesForPreview.isNotEmpty) {
                   unawaited(_selectEntry(entriesForPreview.first));
                 }
@@ -284,6 +289,7 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
               child: _buildTabBody(
                 context,
                 snapshot: snapshot,
+                entries: entries,
                 previewCandidates: entriesForPreview,
               ),
             ),
@@ -320,6 +326,7 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
   Widget _buildTabBody(
     BuildContext context, {
     required AssistantArtifactSnapshot? snapshot,
+    required List<AssistantArtifactEntry> entries,
     required List<AssistantArtifactEntry> previewCandidates,
   }) {
     if (_loadError != null) {
@@ -347,9 +354,10 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
     return switch (_activeTab) {
       AssistantArtifactSidebarTab.files => _ArtifactEntryList(
         key: const Key('assistant-artifact-tab-files'),
-        entries: previewCandidates,
+        entries: entries,
         emptyMessage: _filesEmptyMessage(snapshot),
         onSelectEntry: _selectEntry,
+        onOpenEntryLocation: widget.onOpenEntryLocation,
         selectedEntry: _selectedEntry,
       ),
       AssistantArtifactSidebarTab.preview => _ArtifactPreviewPanel(
@@ -364,6 +372,14 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
   }
 
   List<AssistantArtifactEntry> _previewCandidates(
+    AssistantArtifactSnapshot? snapshot,
+  ) {
+    return _artifactEntries(
+      snapshot,
+    ).where((item) => item.previewable).toList(growable: false);
+  }
+
+  List<AssistantArtifactEntry> _artifactEntries(
     AssistantArtifactSnapshot? snapshot,
   ) {
     if (snapshot == null) {
@@ -445,6 +461,12 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
   }
 
   Future<void> _selectEntry(AssistantArtifactEntry entry) async {
+    if (!entry.previewable) {
+      setState(() {
+        _selectedEntry = entry;
+      });
+      return;
+    }
     setState(() {
       _selectedEntry = entry;
       _activeTab = AssistantArtifactSidebarTab.preview;
@@ -552,12 +574,14 @@ class _ArtifactEntryList extends StatelessWidget {
     required this.entries,
     required this.emptyMessage,
     required this.onSelectEntry,
+    required this.onOpenEntryLocation,
     required this.selectedEntry,
   });
 
   final List<AssistantArtifactEntry> entries;
   final String emptyMessage;
   final ValueChanged<AssistantArtifactEntry> onSelectEntry;
+  final AssistantArtifactOpenEntryLocation? onOpenEntryLocation;
   final AssistantArtifactEntry? selectedEntry;
 
   @override
@@ -592,7 +616,7 @@ class _ArtifactEntryList extends StatelessWidget {
             key: ValueKey<String>(
               'assistant-artifact-entry-${entry.relativePath}',
             ),
-            onTap: () => onSelectEntry(entry),
+            onTap: entry.previewable ? () => onSelectEntry(entry) : null,
             borderRadius: BorderRadius.circular(AppRadius.button),
             child: Container(
               padding: const EdgeInsets.all(AppSpacing.sm),
@@ -645,12 +669,52 @@ class _ArtifactEntryList extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (entry.previewable)
-                    Icon(
-                      Icons.visibility_outlined,
-                      size: 16,
-                      color: palette.textMuted,
-                    ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Tooltip(
+                        message: entry.previewable
+                            ? appText('预览文件', 'Preview file')
+                            : appText(
+                                '此类型不可预览',
+                                'Preview is unavailable for this type',
+                              ),
+                        child: IconButton(
+                          key: ValueKey<String>(
+                            'assistant-artifact-preview-${entry.relativePath}',
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 28,
+                            height: 28,
+                          ),
+                          onPressed: entry.previewable
+                              ? () => onSelectEntry(entry)
+                              : null,
+                          icon: const Icon(Icons.visibility_outlined, size: 16),
+                        ),
+                      ),
+                      Tooltip(
+                        message: appText('打开文件所在位置', 'Open file location'),
+                        child: IconButton(
+                          key: ValueKey<String>(
+                            'assistant-artifact-open-location-${entry.relativePath}',
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 28,
+                            height: 28,
+                          ),
+                          onPressed: onOpenEntryLocation == null
+                              ? null
+                              : () => onOpenEntryLocation!(entry),
+                          icon: const Icon(Icons.folder_open_rounded, size: 16),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
