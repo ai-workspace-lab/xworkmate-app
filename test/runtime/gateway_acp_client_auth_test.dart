@@ -687,160 +687,193 @@ void main() {
       },
     );
 
-    test('desktop task execution routes OpenClaw through bridge RPC', () async {
-      final capture = await _startAcpHttpServer();
-      addTearDown(capture.close);
-      final client = GatewayAcpClient(
-        endpointResolver: () => capture.baseEndpoint,
-        authorizationResolver: (_) async => 'bridge-token',
-      );
-
-      final transport = ExternalCodeAgentAcpDesktopTransport(
-        client: client,
-        endpointResolver: (_) => capture.baseEndpoint,
-        taskEndpointResolver: (_) => capture.baseEndpoint,
-      );
-
-      await transport.executeTask(
-        _taskRequest(
-          target: AssistantExecutionTarget.gateway,
-          provider: SingleAgentProvider.openclaw,
-        ),
-        onUpdate: (_) {},
-      );
-
-      expect(capture.authorizationHeader, 'Bearer bridge-token');
-      expect(capture.acceptHeader, 'text/event-stream, application/json');
-      expect(capture.requestPath, '/acp/rpc');
-      expect(capture.requestPath, isNot(contains('/acp-server')));
-      expect(capture.requestPath, isNot(contains('/acp-server/gateway')));
-      expect(capture.requestPath, isNot(contains('/gateway/openclaw')));
-      final params = _lastRequestParams(capture);
-      final routing = params['routing'] as Map<String, dynamic>;
-      expect(params.containsKey('gatewayProvider'), isFalse);
-      expect(params.containsKey('gatewayProviderId'), isFalse);
-      expect(params['executionTarget'], 'gateway');
-      expect(params['requestedExecutionTarget'], 'gateway');
-      expect(routing['preferredGatewayProviderId'], 'openclaw');
-      expect(routing['explicitExecutionTarget'], 'gateway');
-      expect(routing.containsKey('explicitProviderId'), isFalse);
-      expect(capture.requestBody, contains('"method":"session.start"'));
-      expect(capture.requestBody, isNot(contains('"method":"thread/start"')));
-    });
-
-    test('desktop OpenClaw follow-up routes through bridge RPC', () async {
-      final capture = await _startAcpHttpServer();
-      addTearDown(capture.close);
-      final client = GatewayAcpClient(
-        endpointResolver: () => capture.baseEndpoint,
-        authorizationResolver: (_) async => 'bridge-token',
-      );
-
-      final transport = ExternalCodeAgentAcpDesktopTransport(
-        client: client,
-        endpointResolver: (_) => capture.baseEndpoint,
-        taskEndpointResolver: (_) => capture.baseEndpoint,
-      );
-
-      await transport.executeTask(
-        _taskRequest(
-          target: AssistantExecutionTarget.gateway,
-          provider: SingleAgentProvider.openclaw,
-          resumeSession: true,
-        ),
-        onUpdate: (_) {},
-      );
-
-      expect(capture.acceptHeader, 'text/event-stream, application/json');
-      expect(capture.requestPath, '/acp/rpc');
-      expect(capture.requestPath, isNot(contains('/gateway/openclaw')));
-      expect(capture.requestBody, contains('"method":"session.message"'));
-    });
-
     test(
-      'bridge RPC session methods use the standard HTTP response timeout',
-      () {
-        final openClawEndpoint = Uri.parse(
-          'https://xworkmate-bridge.svc.plus/gateway/openclaw',
-        );
-        final acpEndpoint = Uri.parse(
-          'https://xworkmate-bridge.svc.plus/acp/rpc',
+      'desktop task execution rejects OpenClaw gateway path for non-task methods',
+      () async {
+        final capture = await _startAcpHttpServer();
+        addTearDown(capture.close);
+        final client = GatewayAcpClient(
+          endpointResolver: () =>
+              capture.baseEndpoint.replace(path: '/gateway/openclaw'),
+          authorizationResolver: (_) async => 'bridge-token',
         );
 
-        expect(
-          gatewayAcpHttpResponseTimeoutFor(openClawEndpoint, 'session.start'),
-          const Duration(seconds: 120),
-        );
-        expect(
-          gatewayAcpHttpResponseTimeoutFor(openClawEndpoint, 'session.message'),
-          const Duration(seconds: 120),
-        );
-        expect(
-          gatewayAcpHttpResponseTimeoutFor(acpEndpoint, 'session.start'),
-          const Duration(seconds: 120),
-        );
-        expect(
-          gatewayAcpHttpResponseTimeoutFor(
-            openClawEndpoint,
-            'acp.capabilities',
+        await expectLater(
+          client.request(
+            method: 'acp.capabilities',
+            params: const <String, dynamic>{},
           ),
-          const Duration(seconds: 120),
+          throwsA(
+            isA<GatewayAcpException>().having(
+              (error) => error.code,
+              'code',
+              'ACP_HTTP_ENDPOINT_MISSING',
+            ),
+          ),
         );
+
+        expect(capture.requestBodies, isEmpty);
       },
     );
 
-    test('desktop controller resolves task requests to the bridge origin', () {
-      final controller = AppController(
-        environmentOverride: const <String, String>{},
-      );
-      addTearDown(controller.dispose);
+    test(
+      'desktop task execution routes OpenClaw through dedicated bridge gateway path',
+      () async {
+        final capture = await _startAcpHttpServer();
+        addTearDown(capture.close);
+        final client = GatewayAcpClient(
+          endpointResolver: () => capture.baseEndpoint,
+          authorizationResolver: (_) async => 'bridge-token',
+        );
 
-      final openClawStart = controller
-          .resolveExternalAcpEndpointForRequestInternal(
-            _taskRequest(
-              target: AssistantExecutionTarget.gateway,
-              provider: SingleAgentProvider.openclaw,
-            ),
-          );
-      final openClawFollowUp = controller
-          .resolveExternalAcpEndpointForRequestInternal(
-            _taskRequest(
-              target: AssistantExecutionTarget.gateway,
-              provider: SingleAgentProvider.openclaw,
-              resumeSession: true,
-            ),
-          );
-      final unspecifiedGateway = controller
-          .resolveExternalAcpEndpointForRequestInternal(
-            _taskRequest(
-              target: AssistantExecutionTarget.gateway,
-              provider: SingleAgentProvider.unspecified,
-            ),
-          );
-      final multiAgentGateway = controller
-          .resolveExternalAcpEndpointForRequestInternal(
-            _taskRequest(
-              target: AssistantExecutionTarget.gateway,
-              provider: SingleAgentProvider.openclaw,
-              multiAgent: true,
-            ),
-          );
-      final agentTask = controller.resolveExternalAcpEndpointForRequestInternal(
-        _taskRequest(
-          target: AssistantExecutionTarget.agent,
-          provider: SingleAgentProvider.codex,
-        ),
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: client,
+          endpointResolver: (_) => capture.baseEndpoint,
+          taskEndpointResolver: (_) =>
+              capture.baseEndpoint.replace(path: '/gateway/openclaw'),
+        );
+
+        await transport.executeTask(
+          _taskRequest(
+            target: AssistantExecutionTarget.gateway,
+            provider: SingleAgentProvider.openclaw,
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(capture.authorizationHeader, 'Bearer bridge-token');
+        expect(capture.acceptHeader, 'application/json');
+        expect(capture.requestPath, '/gateway/openclaw');
+        expect(capture.requestPath, isNot(contains('/acp-server')));
+        expect(capture.requestPath, isNot(contains('/acp-server/gateway')));
+        final params = _lastRequestParams(capture);
+        final routing = params['routing'] as Map<String, dynamic>;
+        expect(params.containsKey('gatewayProvider'), isFalse);
+        expect(params.containsKey('gatewayProviderId'), isFalse);
+        expect(params['executionTarget'], 'gateway');
+        expect(params['requestedExecutionTarget'], 'gateway');
+        expect(routing['preferredGatewayProviderId'], 'openclaw');
+        expect(routing['explicitExecutionTarget'], 'gateway');
+        expect(routing.containsKey('explicitProviderId'), isFalse);
+        expect(capture.requestBody, contains('"method":"session.start"'));
+        expect(capture.requestBody, isNot(contains('"method":"thread/start"')));
+      },
+    );
+
+    test(
+      'desktop OpenClaw follow-up routes through dedicated bridge gateway path',
+      () async {
+        final capture = await _startAcpHttpServer();
+        addTearDown(capture.close);
+        final client = GatewayAcpClient(
+          endpointResolver: () => capture.baseEndpoint,
+          authorizationResolver: (_) async => 'bridge-token',
+        );
+
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: client,
+          endpointResolver: (_) => capture.baseEndpoint,
+          taskEndpointResolver: (_) =>
+              capture.baseEndpoint.replace(path: '/gateway/openclaw'),
+        );
+
+        await transport.executeTask(
+          _taskRequest(
+            target: AssistantExecutionTarget.gateway,
+            provider: SingleAgentProvider.openclaw,
+            resumeSession: true,
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(capture.acceptHeader, 'application/json');
+        expect(capture.requestPath, '/gateway/openclaw');
+        expect(capture.requestBody, contains('"method":"session.message"'));
+      },
+    );
+
+    test('OpenClaw task submit uses extended HTTP response timeout', () {
+      final openClawEndpoint = Uri.parse(
+        'https://xworkmate-bridge.svc.plus/gateway/openclaw',
+      );
+      final acpEndpoint = Uri.parse(
+        'https://xworkmate-bridge.svc.plus/acp/rpc',
       );
 
-      expect(openClawStart?.path, '');
-      expect(openClawFollowUp?.path, '');
-      expect(unspecifiedGateway?.path, '');
-      expect(multiAgentGateway?.path, '');
-      expect(agentTask?.path, '');
+      expect(
+        gatewayAcpHttpResponseTimeoutFor(openClawEndpoint, 'session.start'),
+        const Duration(minutes: 10),
+      );
+      expect(
+        gatewayAcpHttpResponseTimeoutFor(openClawEndpoint, 'session.message'),
+        const Duration(minutes: 10),
+      );
+      expect(
+        gatewayAcpHttpResponseTimeoutFor(acpEndpoint, 'session.start'),
+        const Duration(seconds: 120),
+      );
+      expect(
+        gatewayAcpHttpResponseTimeoutFor(openClawEndpoint, 'acp.capabilities'),
+        const Duration(seconds: 120),
+      );
     });
 
     test(
-      'desktop controller does not expose OpenClaw gateway path as task endpoint',
+      'desktop controller only uses gateway path for OpenClaw task submit',
+      () {
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+        );
+        addTearDown(controller.dispose);
+
+        final openClawStart = controller
+            .resolveExternalAcpEndpointForRequestInternal(
+              _taskRequest(
+                target: AssistantExecutionTarget.gateway,
+                provider: SingleAgentProvider.openclaw,
+              ),
+            );
+        final openClawFollowUp = controller
+            .resolveExternalAcpEndpointForRequestInternal(
+              _taskRequest(
+                target: AssistantExecutionTarget.gateway,
+                provider: SingleAgentProvider.openclaw,
+                resumeSession: true,
+              ),
+            );
+        final unspecifiedGateway = controller
+            .resolveExternalAcpEndpointForRequestInternal(
+              _taskRequest(
+                target: AssistantExecutionTarget.gateway,
+                provider: SingleAgentProvider.unspecified,
+              ),
+            );
+        final multiAgentGateway = controller
+            .resolveExternalAcpEndpointForRequestInternal(
+              _taskRequest(
+                target: AssistantExecutionTarget.gateway,
+                provider: SingleAgentProvider.openclaw,
+                multiAgent: true,
+              ),
+            );
+        final agentTask = controller
+            .resolveExternalAcpEndpointForRequestInternal(
+              _taskRequest(
+                target: AssistantExecutionTarget.agent,
+                provider: SingleAgentProvider.codex,
+              ),
+            );
+
+        expect(openClawStart?.path, '/gateway/openclaw');
+        expect(openClawFollowUp?.path, '/gateway/openclaw');
+        expect(unspecifiedGateway?.path, '');
+        expect(multiAgentGateway?.path, '');
+        expect(agentTask?.path, '');
+      },
+    );
+
+    test(
+      'desktop controller resolves OpenClaw gateway submit on managed bridge origin',
       () {
         final controller = AppController(
           environmentOverride: const <String, String>{},
@@ -855,9 +888,12 @@ void main() {
               ),
             );
 
-        expect(endpoint.toString(), 'https://xworkmate-bridge.svc.plus');
+        expect(
+          endpoint.toString(),
+          'https://xworkmate-bridge.svc.plus/gateway/openclaw',
+        );
         expect(endpoint, isNotNull);
-        expect(endpoint!.path, isNot('/gateway/openclaw'));
+        expect(endpoint!.path, isNot('/acp/rpc'));
       },
     );
 
