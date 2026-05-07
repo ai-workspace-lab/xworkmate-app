@@ -489,7 +489,22 @@ extension AppControllerDesktopThreadSessions on AppController {
         ),
       );
     }
-    return items;
+    return dedupeGatewayChatMessagesByIdThreadSessionInternal(items);
+  }
+
+  List<GatewayChatMessage> dedupeGatewayChatMessagesByIdThreadSessionInternal(
+    List<GatewayChatMessage> messages,
+  ) {
+    final seenIds = <String>{};
+    final deduped = <GatewayChatMessage>[];
+    for (final message in messages) {
+      final id = message.id.trim();
+      if (id.isNotEmpty && !seenIds.add(id)) {
+        continue;
+      }
+      deduped.add(message);
+    }
+    return deduped;
   }
 
   String normalizedAssistantSessionKeyInternal(String sessionKey) {

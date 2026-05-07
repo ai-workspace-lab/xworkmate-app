@@ -596,6 +596,73 @@ void main() {
         );
       },
     );
+
+    test(
+      'chatMessages does not duplicate persisted local turn messages',
+      () async {
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+        );
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('session-1');
+
+        final userMessage = GatewayChatMessage(
+          id: 'local-user-1',
+          role: 'user',
+          text: 'hi',
+          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          toolCallId: null,
+          toolName: null,
+          stopReason: null,
+          pending: false,
+          error: false,
+        );
+        final assistantMessage = GatewayChatMessage(
+          id: 'local-assistant-1',
+          role: 'assistant',
+          text: 'Bridge response',
+          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          toolCallId: null,
+          toolName: null,
+          stopReason: null,
+          pending: false,
+          error: false,
+        );
+
+        controller.appendLocalSessionMessageInternal(
+          'session-1',
+          userMessage,
+          persistInThreadContext: true,
+        );
+        controller.appendLocalSessionMessageInternal(
+          'session-1',
+          assistantMessage,
+          persistInThreadContext: true,
+        );
+        controller.assistantThreadMessagesInternal['session-1'] =
+            List<GatewayChatMessage>.from(
+              controller
+                  .requireTaskThreadForSessionInternal('session-1')
+                  .messages,
+            );
+
+        final visibleMessages = controller.chatMessages;
+
+        expect(
+          visibleMessages.where((message) => message.id == userMessage.id),
+          hasLength(1),
+        );
+        expect(
+          visibleMessages.where((message) => message.id == assistantMessage.id),
+          hasLength(1),
+        );
+        expect(
+          visibleMessages.map((message) => message.text),
+          containsAllInOrder(<String>[userMessage.text, assistantMessage.text]),
+        );
+      },
+    );
   });
 }
 
