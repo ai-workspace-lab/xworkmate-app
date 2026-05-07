@@ -719,7 +719,27 @@ void main() {
     test(
       'desktop task execution routes OpenClaw through dedicated bridge gateway path',
       () async {
-        final capture = await _startAcpHttpServer();
+        final capture = await _startAcpHttpServer(
+          result: <String, dynamic>{
+            'success': true,
+            'status': 'completed',
+            'output': 'created files',
+            'remoteWorkingDirectory': '/owners/local/user/demo/threads/main',
+            'remoteWorkspaceRefKind': 'remotePath',
+            'artifacts': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'relativePath': 'exports/k8s-networking.pdf',
+                'downloadUrl':
+                    'https://xworkmate-bridge.svc.plus/artifacts/openclaw/download'
+                    '?sessionKey=session-1&runId=run-1&relativePath=exports%2Fk8s-networking.pdf',
+                'contentType': 'application/pdf',
+                'sizeBytes': 123,
+                'sha256':
+                    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              },
+            ],
+          },
+        );
         addTearDown(capture.close);
         final client = GatewayAcpClient(
           endpointResolver: () => capture.baseEndpoint,
@@ -733,7 +753,7 @@ void main() {
               capture.baseEndpoint.replace(path: '/gateway/openclaw'),
         );
 
-        await transport.executeTask(
+        final result = await transport.executeTask(
           _taskRequest(
             target: AssistantExecutionTarget.gateway,
             provider: SingleAgentProvider.openclaw,
@@ -757,6 +777,24 @@ void main() {
         expect(routing.containsKey('explicitProviderId'), isFalse);
         expect(capture.requestBody, contains('"method":"session.start"'));
         expect(capture.requestBody, isNot(contains('"method":"thread/start"')));
+        expect(result.success, isTrue);
+        expect(result.message, 'created files');
+        expect(
+          result.remoteWorkingDirectory,
+          '/owners/local/user/demo/threads/main',
+        );
+        expect(result.remoteWorkspaceRefKind, WorkspaceRefKind.remotePath);
+        expect(result.artifacts, hasLength(1));
+        expect(
+          result.artifacts.single.relativePath,
+          'exports/k8s-networking.pdf',
+        );
+        expect(
+          result.artifacts.single.downloadUrl,
+          contains('/artifacts/openclaw/download'),
+        );
+        expect(result.artifacts.single.content, isEmpty);
+        expect(result.artifacts.single.encoding, isEmpty);
       },
     );
 
@@ -1152,7 +1190,9 @@ GoTaskServiceRequest _taskRequest({
   );
 }
 
-Future<_CapturedAcpHttpServer> _startAcpHttpServer() async {
+Future<_CapturedAcpHttpServer> _startAcpHttpServer({
+  Map<String, dynamic> result = const <String, dynamic>{'ok': true},
+}) async {
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   final capture = _CapturedAcpHttpServer._(
     server,
@@ -1173,7 +1213,7 @@ Future<_CapturedAcpHttpServer> _startAcpHttpServer() async {
       jsonEncode(<String, dynamic>{
         'jsonrpc': '2.0',
         'id': id,
-        'result': <String, dynamic>{'ok': true},
+        'result': result,
       }),
     );
     await request.response.close();
