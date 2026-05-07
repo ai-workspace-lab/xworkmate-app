@@ -866,7 +866,7 @@ void main() {
 
         expect(openClawStart?.path, '/gateway/openclaw');
         expect(openClawFollowUp?.path, '/gateway/openclaw');
-        expect(unspecifiedGateway?.path, '');
+        expect(unspecifiedGateway?.path, '/gateway/openclaw');
         expect(multiAgentGateway?.path, '');
         expect(agentTask?.path, '');
       },

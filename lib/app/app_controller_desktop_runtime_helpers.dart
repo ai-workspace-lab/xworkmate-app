@@ -974,7 +974,13 @@ bool _usesOpenClawTaskSubmitEndpointInternal(GoTaskServiceRequest request) {
   if (request.isMultiAgentRequest || !request.target.isGateway) {
     return false;
   }
-  return normalizeSingleAgentProviderId(request.provider.providerId) ==
+  final providerId = normalizeSingleAgentProviderId(request.provider.providerId);
+  if (providerId == kCanonicalGatewayProviderId) {
+    return true;
+  }
+  return normalizeSingleAgentProviderId(
+        request.effectiveRouting.preferredGatewayTarget,
+      ) ==
       kCanonicalGatewayProviderId;
 }
 
