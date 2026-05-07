@@ -228,6 +228,24 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }) {
     final raw = error.toString().trim();
     final lowered = raw.toLowerCase();
+    final detailCode = error is GatewayAcpException
+        ? error.detailCode?.trim().toUpperCase()
+        : null;
+    final primaryCode = error is GatewayAcpException
+        ? error.code?.trim().toUpperCase()
+        : null;
+    final openClawSocketClosed =
+        target.isGateway &&
+        (detailCode == 'OPENCLAW_GATEWAY_SOCKET_CLOSED' ||
+            primaryCode == 'OPENCLAW_GATEWAY_SOCKET_CLOSED' ||
+            raw.contains('OPENCLAW_GATEWAY_SOCKET_CLOSED') ||
+            lowered.contains('openclaw') && lowered.contains('socket closed'));
+    if (openClawSocketClosed) {
+      return appText(
+        'OpenClaw Gateway 连接在任务执行中断开，请稍后重试；若持续出现，请检查 xworkmate-bridge 主机到 127.0.0.1:18789 的 OpenClaw runtime 连接。',
+        'The OpenClaw Gateway connection closed during task execution. Try again later; if it keeps happening, check the OpenClaw runtime connection from the xworkmate-bridge host to 127.0.0.1:18789.',
+      );
+    }
     if (lowered.contains('gateway not connected') ||
         lowered.contains('code: offline') ||
         lowered.contains('offlin') && lowered.contains('gateway')) {
@@ -974,7 +992,9 @@ bool _usesOpenClawTaskSubmitEndpointInternal(GoTaskServiceRequest request) {
   if (request.isMultiAgentRequest || !request.target.isGateway) {
     return false;
   }
-  final providerId = normalizeSingleAgentProviderId(request.provider.providerId);
+  final providerId = normalizeSingleAgentProviderId(
+    request.provider.providerId,
+  );
   if (providerId == kCanonicalGatewayProviderId) {
     return true;
   }
