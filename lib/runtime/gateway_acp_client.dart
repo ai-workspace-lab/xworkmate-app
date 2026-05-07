@@ -6,10 +6,16 @@ import 'acp_endpoint_paths.dart';
 import 'runtime_models.dart';
 
 class GatewayAcpException implements Exception {
-  const GatewayAcpException(this.message, {this.code, this.details});
+  const GatewayAcpException(
+    this.message, {
+    this.code,
+    this.detailCode,
+    this.details,
+  });
 
   final String message;
   final String? code;
+  final String? detailCode;
   final Object? details;
 
   @override
@@ -1022,11 +1028,20 @@ class GatewayAcpClient {
     if (error.isEmpty) {
       return;
     }
+    final details = error['data'] ?? error['details'];
     throw GatewayAcpException(
       stringValue(error['message']) ?? 'ACP JSON-RPC request failed',
       code: stringValue(error['code']),
-      details: error['data'],
+      detailCode: _jsonRpcErrorDetailCode(details),
+      details: details,
     );
+  }
+
+  String? _jsonRpcErrorDetailCode(Object? details) {
+    final data = asMap(details);
+    return stringValue(data['code']) ??
+        stringValue(data['detailCode']) ??
+        stringValue(data['errorCode']);
   }
 
   Map<String, dynamic> _decodeMap(dynamic raw) {
