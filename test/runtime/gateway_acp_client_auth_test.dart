@@ -1014,6 +1014,56 @@ void main() {
       },
     );
 
+    test('preserves OpenClaw gateway socket close detail code', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        await utf8.decoder.bind(request).join();
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.json
+          ..write(
+            jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'id': 'request-id',
+              'error': <String, dynamic>{
+                'code': -32002,
+                'message':
+                    'OPENCLAW_GATEWAY_SOCKET_CLOSED: OpenClaw gateway connection closed during task execution',
+                'data': <String, dynamic>{
+                  'code': 'OPENCLAW_GATEWAY_SOCKET_CLOSED',
+                  'originalCode': 'SOCKET_CLOSED',
+                },
+              },
+            }),
+          );
+        await request.response.close();
+      });
+      final endpoint = Uri.parse('http://127.0.0.1:${server.port}');
+      final client = GatewayAcpClient(endpointResolver: () => endpoint);
+
+      await expectLater(
+        client.request(
+          method: 'session.start',
+          params: const <String, dynamic>{},
+        ),
+        throwsA(
+          isA<GatewayAcpException>()
+              .having((error) => error.code, 'code', '-32002')
+              .having(
+                (error) => error.detailCode,
+                'detailCode',
+                'OPENCLAW_GATEWAY_SOCKET_CLOSED',
+              )
+              .having(
+                (error) => error.details,
+                'details',
+                containsPair('originalCode', 'SOCKET_CLOSED'),
+              ),
+        ),
+      );
+    });
+
     test('desktop follow-up execution uses session.message', () async {
       final capture = await _startAcpHttpServer();
       addTearDown(capture.close);

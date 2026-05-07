@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/runtime/gateway_acp_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
@@ -135,6 +136,27 @@ void main() {
 
         expect(label, contains('OpenClaw Gateway 当前未连接'));
         expect(label, isNot(contains('xworkmate-bridge 未连接')));
+      },
+    );
+
+    test(
+      'labels OpenClaw socket close without exposing raw JSON-RPC error',
+      () async {
+        final controller = await _isolatedController();
+        addTearDown(controller.dispose);
+
+        final label = controller.gatewayExecutionErrorLabelInternal(
+          const GatewayAcpException(
+            'OPENCLAW_GATEWAY_SOCKET_CLOSED: OpenClaw gateway connection closed during task execution',
+            code: '-32002',
+            detailCode: 'OPENCLAW_GATEWAY_SOCKET_CLOSED',
+          ),
+          target: AssistantExecutionTarget.gateway,
+        );
+
+        expect(label, contains('OpenClaw Gateway 连接在任务执行中断开'));
+        expect(label, isNot(contains('-32002')));
+        expect(label, isNot(contains('socket closed')));
       },
     );
 
