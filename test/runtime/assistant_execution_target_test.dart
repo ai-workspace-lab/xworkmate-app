@@ -558,7 +558,7 @@ void main() {
           GatewayChatMessage(
             id: 'error-1',
             role: 'assistant',
-            text: 'ACP_HTTP_STREAM_CLOSED',
+            text: 'ACP_HTTP_CONNECTION_CLOSED',
             timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
             toolCallId: null,
             toolName: null,
