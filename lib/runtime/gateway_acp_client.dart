@@ -633,7 +633,11 @@ class GatewayAcpClient {
         ),
       );
       final response = await httpRequest.close().timeout(
-        gatewayAcpHttpResponseTimeoutFor(endpoint, request.method),
+        gatewayAcpHttpResponseTimeoutFor(
+          endpoint,
+          request.method,
+          request.params,
+        ),
       );
       statusCode = response.statusCode;
       contentType =
@@ -1170,14 +1174,6 @@ class GatewayAcpClient {
 
   Uri? _resolveHttpRpcEndpoint([Uri? endpointOverride, String method = '']) {
     final endpoint = endpointOverride ?? endpointResolver();
-    if (_isOpenClawTaskSubmitEndpoint(endpoint) &&
-        _isOpenClawTaskSubmitMethod(method)) {
-      return endpoint?.replace(
-        path: '/gateway/openclaw',
-        query: null,
-        fragment: null,
-      );
-    }
     return resolveAcpHttpRpcEndpoint(endpoint);
   }
 
@@ -1236,26 +1232,116 @@ class GatewayAcpClient {
   }
 }
 
-bool _isOpenClawTaskSubmitEndpoint(Uri? endpoint) {
-  var path = endpoint?.path.trim() ?? '';
-  if (!path.startsWith('/')) {
-    path = '/$path';
-  }
-  path = path.replaceFirst(RegExp(r'/+$'), '');
-  return path == '/gateway/openclaw';
-}
-
 bool _isOpenClawTaskSubmitMethod(String method) {
   final normalized = method.trim();
   return normalized == 'session.start' || normalized == 'session.message';
 }
 
-Duration gatewayAcpHttpResponseTimeoutFor(Uri endpoint, String method) {
-  if (_isOpenClawTaskSubmitEndpoint(endpoint) &&
-      _isOpenClawTaskSubmitMethod(method)) {
-    return const Duration(minutes: 10);
+Duration gatewayAcpHttpResponseTimeoutFor(
+  Uri endpoint,
+  String method, [
+  Map<String, dynamic> params = const <String, dynamic>{},
+]) {
+  if (!_isOpenClawTaskSubmitMethod(method)) {
+    return const Duration(seconds: 120);
   }
-  return const Duration(seconds: 120);
+  return Duration(minutes: gatewayAcpTaskRuntimeBudgetMinutesForParams(params));
+}
+
+int gatewayAcpTaskRuntimeBudgetMinutesForParams(Map<String, dynamic> params) {
+  if (_looksLikeLongArtifactTask(params)) {
+    return 30;
+  }
+  if (_looksLikeGatewayTask(params)) {
+    return 10;
+  }
+  return 2;
+}
+
+bool _looksLikeGatewayTask(Map<String, dynamic> params) {
+  final target = _paramText(params, const <String>[
+    'requestedExecutionTarget',
+    'executionTarget',
+  ]).toLowerCase();
+  if (target == AssistantExecutionTarget.gateway.promptValue) {
+    return true;
+  }
+  final providerText = _paramText(params, const <String>[
+    'provider',
+    'gatewayProvider',
+    'preferredGatewayProviderId',
+  ]).toLowerCase();
+  if (providerText.contains('openclaw')) {
+    return true;
+  }
+  final routing = params['routing'];
+  if (routing is Map) {
+    final preferred = routing['preferredGatewayProviderId']
+        ?.toString()
+        .trim()
+        .toLowerCase();
+    return preferred == kCanonicalGatewayProviderId ||
+        preferred?.contains('openclaw') == true;
+  }
+  return false;
+}
+
+bool _looksLikeLongArtifactTask(Map<String, dynamic> params) {
+  final prompt = _paramText(params, const <String>[
+    'taskPrompt',
+    'prompt',
+    'message',
+  ]);
+  final lower = prompt.toLowerCase();
+  final attachments =
+      _paramListLength(params['attachments']) +
+      _paramListLength(params['inlineAttachments']);
+  if (attachments >= 2 || prompt.length >= 1200) {
+    return true;
+  }
+  const markers = <String>[
+    '生成文件',
+    '同步生成文件',
+    '产物',
+    '附件',
+    '图片提示词',
+    '完整调研ppt',
+    'markdown格式',
+    '输出markdown',
+    '输出 完整',
+    'ppt',
+    'pptx',
+    'powerpoint',
+    'markdown',
+    '.md',
+    'javascript',
+    '.js',
+    'image prompt',
+    'artifacts',
+    'downloadurl',
+  ];
+  return markers.any(lower.contains);
+}
+
+String _paramText(Map<String, dynamic> params, List<String> keys) {
+  for (final key in keys) {
+    final value = params[key];
+    if (value == null) {
+      continue;
+    }
+    final text = value.toString().trim();
+    if (text.isNotEmpty) {
+      return text;
+    }
+  }
+  return '';
+}
+
+int _paramListLength(Object? value) {
+  if (value is List) {
+    return value.length;
+  }
+  return 0;
 }
 
 class _GatewayAcpRpcRequest {

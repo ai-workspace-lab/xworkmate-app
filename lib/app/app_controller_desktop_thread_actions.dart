@@ -402,6 +402,10 @@ extension AppControllerDesktopThreadActions on AppController {
               }
             },
           );
+          if (!aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
+            clearAiGatewayStreamingTextInternal(sessionKey);
+            return;
+          }
           clearAiGatewayStreamingTextInternal(sessionKey);
           upsertTaskThreadInternal(
             sessionKey,
@@ -420,7 +424,6 @@ extension AppControllerDesktopThreadActions on AppController {
             lastResultCode: result.success ? 'success' : 'error',
             updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
           );
-          await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
           if (!result.success) {
             appendLocalSessionMessageInternal(
               sessionKey,
@@ -468,7 +471,18 @@ extension AppControllerDesktopThreadActions on AppController {
             ),
             persistInThreadContext: true,
           );
+          recomputeTasksInternal();
+          notifyIfActiveInternal();
+          await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
         } catch (error) {
+          if (!aiGatewayPendingSessionKeysInternal.contains(sessionKey) &&
+              taskThreadForSessionInternal(
+                    sessionKey,
+                  )?.lifecycleState.lastResultCode ==
+                  'aborted') {
+            clearAiGatewayStreamingTextInternal(sessionKey);
+            return;
+          }
           clearAiGatewayStreamingTextInternal(sessionKey);
           final recoverableTransportCode =
               recoverableAcpHttpTransportCodeInternal(error);
