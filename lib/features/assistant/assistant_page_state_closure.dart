@@ -17,6 +17,7 @@ import '../../app/ui_feature_manifest.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/multi_agent_orchestrator.dart';
+import '../../runtime/gateway_acp_client.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
@@ -122,6 +123,12 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
           lifecycleStatus: thread?.lifecycleState.status ?? '',
           lastResultCode: thread?.lifecycleState.lastResultCode ?? '',
           artifactSyncStatus: thread?.lastArtifactSyncStatus ?? '',
+          runtimeBudgetMinutes:
+              gatewayAcpTaskRuntimeBudgetMinutesForParams(<String, dynamic>{
+                'taskPrompt': currentTask.preview,
+                'requestedExecutionTarget':
+                    currentTask.executionTarget.promptValue,
+              }),
         );
 
         return SurfaceCard(
@@ -161,7 +168,21 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                   ),
                 ),
               ),
-              AssistantTaskProgressBar(state: progressState),
+              AssistantTaskProgressBar(
+                state: progressState,
+                onStop: progressState.running
+                    ? () {
+                        unawaited(controller.abortRun());
+                      }
+                    : null,
+                onContinue: progressState.interrupted
+                    ? () {
+                        unawaited(
+                          controller.sendChatMessage(appText('继续', 'Continue')),
+                        );
+                      }
+                    : null,
+              ),
               ColoredBox(
                 color: palette.canvas,
                 child: SizedBox(
